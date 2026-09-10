@@ -923,6 +923,8 @@ ListRendererFocus { background-color: var(--accent-container-color, #eaddff); pa
 
 /* Side menu chrome. */
 MenuButtonRight { cn1-derive: FlatButton; }
+MenuButtonRight.pressed { background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; }
+MenuButtonRight.disabled { background-color: transparent; color: #a5a0ab; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.65mm 5mm 1.65mm 5mm; }
 StatusBarSideMenu { background-color: transparent; padding: 0; margin: 0; }
 
 /* Commands, as drawn by the menu rather than the Toolbar. */
@@ -931,10 +933,20 @@ DialogCommandText { cn1-derive: Label; color: var(--accent-color, #6750a4); text
 
 /* Media transport controls. */
 MediaPlayerPlay { cn1-derive: FlatButton; }
+MediaPlayerPlay.pressed { background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; }
+MediaPlayerPlay.disabled { background-color: transparent; color: #a5a0ab; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.65mm 5mm 1.65mm 5mm; }
 MediaPlayerPause { cn1-derive: FlatButton; }
+MediaPlayerPause.pressed { background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; }
+MediaPlayerPause.disabled { background-color: transparent; color: #a5a0ab; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.65mm 5mm 1.65mm 5mm; }
 MediaPlayerFwd { cn1-derive: FlatButton; }
+MediaPlayerFwd.pressed { background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; }
+MediaPlayerFwd.disabled { background-color: transparent; color: #a5a0ab; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.65mm 5mm 1.65mm 5mm; }
 MediaPlayerBack { cn1-derive: FlatButton; }
+MediaPlayerBack.pressed { background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; }
+MediaPlayerBack.disabled { background-color: transparent; color: #a5a0ab; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.65mm 5mm 1.65mm 5mm; }
 MediaPlayerMax { cn1-derive: FlatButton; }
+MediaPlayerMax.pressed { background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; }
+MediaPlayerMax.disabled { background-color: transparent; color: #a5a0ab; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.65mm 5mm 1.65mm 5mm; }
 
 /* Map zoom controls and the rich text editor surface. */
 RichTextComponent { background-color: transparent; padding: 1mm; margin: 0; }
@@ -992,6 +1004,26 @@ GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm
     ToggleButtonOnly.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
     ToggleButtonOnly.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
     ToggleButtonOnly.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
+
+    /* The directional panes need their own dark entries: dark resolution
+       only uses a $Dark<UIID> that exists, so without these they would keep
+       the light fill under dark-mode text. */
+    PopupContentPaneUpwards { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneDownwards { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneLeft { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneRight { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    MenuButtonRight.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MenuButtonRight.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
+    MediaPlayerPlay.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerPlay.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
+    MediaPlayerPause.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerPause.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
+    MediaPlayerFwd.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerFwd.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
+    MediaPlayerBack.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerBack.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
+    MediaPlayerMax.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerMax.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
 
     /* Dark palette for the UIIDs filled in above. Only the colours change;
        geometry is inherited from the light rules, which the compiler does

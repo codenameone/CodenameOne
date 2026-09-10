@@ -1214,16 +1214,28 @@ ListRendererFocus { background-color: rgba(0,122,255,0.14); padding: 1.8mm 2mm 1
 
 
 MenuButtonRight { cn1-derive: FlatButton; }
+MenuButtonRight.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
+MenuButtonRight.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 StatusBarSideMenu { background-color: transparent; padding: 0; margin: 0; }
 
 CommandFocus { cn1-derive: Label; background-color: rgba(0,122,255,0.14); }
 DialogCommandText { cn1-derive: Label; color: var(--accent-color, #007aff); text-align: center; }
 
 MediaPlayerPlay { cn1-derive: FlatButton; }
+MediaPlayerPlay.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
+MediaPlayerPlay.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 MediaPlayerPause { cn1-derive: FlatButton; }
+MediaPlayerPause.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
+MediaPlayerPause.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 MediaPlayerFwd { cn1-derive: FlatButton; }
+MediaPlayerFwd.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
+MediaPlayerFwd.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 MediaPlayerBack { cn1-derive: FlatButton; }
+MediaPlayerBack.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
+MediaPlayerBack.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 MediaPlayerMax { cn1-derive: FlatButton; }
+MediaPlayerMax.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
+MediaPlayerMax.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 
 RichTextComponent { background-color: transparent; padding: 1mm; margin: 0; }
 
@@ -1270,6 +1282,26 @@ GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm
     ToggleButtonOnly.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
     ToggleButtonOnly.pressed { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
     ToggleButtonOnly.disabled { color: #636366; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; }
+
+    /* The directional panes need their own dark entries: dark resolution
+       only uses a $Dark<UIID> that exists, so without these they would keep
+       the light fill under dark-mode text. */
+    PopupContentPaneUpwards { background-color: rgba(28,28,30,0.94); padding: 0; margin: 0; border: 0.1mm solid #38383a; }
+    PopupContentPaneDownwards { background-color: rgba(28,28,30,0.94); padding: 0; margin: 0; border: 0.1mm solid #38383a; }
+    PopupContentPaneLeft { background-color: rgba(28,28,30,0.94); padding: 0; margin: 0; border: 0.1mm solid #38383a; }
+    PopupContentPaneRight { background-color: rgba(28,28,30,0.94); padding: 0; margin: 0; border: 0.1mm solid #38383a; }
+    MenuButtonRight.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
+    MenuButtonRight.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
+    MediaPlayerPlay.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
+    MediaPlayerPlay.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
+    MediaPlayerPause.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
+    MediaPlayerPause.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
+    MediaPlayerFwd.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
+    MediaPlayerFwd.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
+    MediaPlayerBack.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
+    MediaPlayerBack.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
+    MediaPlayerMax.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
+    MediaPlayerMax.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
 
     /* Dark palette for the UIIDs filled in above. */
     FloatingHint { color: #8e8e93; background-color: transparent; }
