@@ -804,7 +804,29 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
         File nativeMethods = new File(srcRoot, "nativeMethods.m");
         copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
-        File javaIoFileM = new File(srcRoot, "java_io_File.m");
+        // java_io_File_RUNTIME.m, not java_io_File.m.
+        //
+        // Parser.writeOutput below emits one file per surviving class, and on an
+        // Apple target that file is <class>.m -- so a retained java.io.File is
+        // written to exactly the name this copy just used, and the generated class
+        // OVERWRITES the runtime native. The result links only if nothing calls a
+        // java.io.File native: the generated class still declares exists() calling
+        // existsImpl, but existsImpl's only definition has been clobbered.
+        //
+        // OBSERVED as `Undefined symbols: _java_io_File_existsImpl...  referenced
+        // from _java_io_File_exists___R_boolean in java_io_File.o` on build-ios and
+        // build-ios-tv, while build-macos passed -- MacOSNativeBuilder sets
+        // -DconcatenateFiles=true, which routes class output into one buffer and so
+        // never writes the colliding name. IPhoneBuilder sets it only under
+        // ios.superfastBuild, so the collision is live by default there.
+        //
+        // The clean target already avoids this by writing the same resource as
+        // java_io_File_runtime.c; this is the same fix for the Apple path. The
+        // Xcode project collects sources by extension (see the .m/.c glob in the
+        // project writer), so the renamed file is compiled without further change,
+        // and NativeSignatureVerifier reads the RESOURCE "/java_io_File.m" off the
+        // classpath rather than this output path, so it is unaffected.
+        File javaIoFileM = new File(srcRoot, "java_io_File_runtime.m");
         copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileM));
 
         if (Util.getProperty("USE_RPMALLOC", "false").equals("true")) {
