@@ -26,12 +26,14 @@ package com.codename1.flutter.animation;
 import dart.core.Duration;
 
 /**
- * Cross-fades between successive {@code child} widgets using a supplied
- * transition — the {@code animations} package's {@code PageTransitionSwitcher}.
- * The {@code transitionBuilder} is a three-argument closure
- * {@code (child, primaryAnimation, secondaryAnimation)}. This pass hosts the
- * current child directly; running the outgoing/incoming transition is deferred
- * (see {@link AnimatedChildWidget}).
+ * Runs a supplied transition when its {@code child} is replaced -- the {@code animations}
+ * package's {@code PageTransitionSwitcher}. The {@code transitionBuilder} is a
+ * three-argument closure {@code (child, primaryAnimation, secondaryAnimation)}.
+ *
+ * <p>It used to host the current child directly and run nothing, which made every switch
+ * a cut. That is not a small omission where the gallery uses it: Reply's search is not a
+ * pushed route at all, it is this widget swapping the search page in for the mail
+ * navigator, so the whole animation of opening search lived here and there was none.</p>
  */
 public class PageTransitionSwitcher extends AnimatedChildWidget {
 
@@ -54,5 +56,25 @@ public class PageTransitionSwitcher extends AnimatedChildWidget {
 
     public Object getTransitionBuilder() {
         return transitionBuilder;
+    }
+
+    @Override
+    public com.codename1.flutter.Element createElement() {
+        return new PageTransitionSwitcherElement(this);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public com.codename1.flutter.Widget build(com.codename1.flutter.BuildContext context) {
+        com.codename1.flutter.Widget child = getChild();
+        if (child == null || !(transitionBuilder instanceof dart.runtime.Funcs.Func3)
+                || !(context instanceof PageTransitionSwitcherElement)) {
+            return child;
+        }
+        PageTransitionSwitcherElement e = (PageTransitionSwitcherElement) context;
+        e.noteChild(child, duration);
+        return ((dart.runtime.Funcs.Func3<com.codename1.flutter.Widget, Animation<Double>,
+                Animation<Double>, com.codename1.flutter.Widget>) transitionBuilder)
+                .call(child, e.primary(), e.secondary());
     }
 }
