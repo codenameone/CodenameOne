@@ -1034,14 +1034,40 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// #### Parameters
     ///
     /// - `toggle`: the toggle to set
+    /// The UIID this control carried before setToggle(true) replaced it, so
+    /// setToggle(false) can put it back. Null whenever toggle mode was not
+    /// entered from a CheckBox or RadioButton UIID.
+    private String preToggleUIID;
+
     public void setToggle(boolean toggle) {
         if (this.toggle == toggle) {
             return;
         }
         this.toggle = toggle;
         accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE | AccessibilityManager.CHANGE_STATE);
-        if (toggle && "CheckBox".equals(getUIID()) || "RadioButton".equals(getUIID())) {
-            setUIID("ToggleButton");
+        // The UIID follows the mode in both directions. Two things were wrong here
+        // for as long as no theme defined ToggleButton, which is what kept them
+        // invisible:
+        //
+        //   - && binds tighter than ||, so the old condition read
+        //     (toggle && isCheckBox) || isRadioButton. setToggle(false) on a
+        //     RadioButton therefore set its UIID to ToggleButton, the opposite of
+        //     what was asked for.
+        //   - nothing restored the UIID afterwards, so a control taken back out of
+        //     toggle mode kept the toggle's appearance while painting its state
+        //     glyph again.
+        //
+        // setUIID clears preferredSize, so the size computed without the glyph is
+        // recalculated on the next layout pass.
+        String uiid = getUIID();
+        if (toggle) {
+            if ("CheckBox".equals(uiid) || "RadioButton".equals(uiid)) {
+                preToggleUIID = uiid;
+                setUIID("ToggleButton");
+            }
+        } else if (preToggleUIID != null && "ToggleButton".equals(uiid)) {
+            setUIID(preToggleUIID);
+            preToggleUIID = null;
         }
     }
 

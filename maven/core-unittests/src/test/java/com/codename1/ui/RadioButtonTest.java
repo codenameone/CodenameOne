@@ -14,6 +14,41 @@ import static org.junit.jupiter.api.Assertions.*;
 class RadioButtonTest extends UITestBase {
 
     @Test
+    void testDisablingToggleRestoresTheOriginalUiid() {
+        RadioButton radio = new RadioButton("Choice");
+        assertEquals("RadioButton", radio.getUIID());
+
+        radio.setToggle(true);
+        assertEquals("ToggleButton", radio.getUIID());
+
+        radio.setToggle(false);
+        assertFalse(radio.isToggle());
+        assertEquals("RadioButton", radio.getUIID(),
+                "leaving toggle mode has to put the UIID back, or the control keeps "
+                        + "painting as a toggle while drawing its radio glyph again");
+    }
+
+    @Test
+    void testDisablingToggleOnARadioUiidDoesNotMakeItAToggleUiid() {
+        // Regression: the condition read (toggle && isCheckBox) || isRadioButton,
+        // because && binds tighter than ||, so leaving toggle mode assigned
+        // ToggleButton whenever the UIID was RadioButton at that moment.
+        //
+        // Reaching it needs toggle mode on with a RadioButton UIID, which is what
+        // an application does when it sets its own UIID on a toggle: the early
+        // return in setToggle means a control that was never a toggle cannot get
+        // there, which is why asserting on a fresh RadioButton proves nothing.
+        RadioButton radio = new RadioButton("Choice");
+        radio.setToggle(true);
+        radio.setUIID("RadioButton");
+
+        radio.setToggle(false);
+
+        assertFalse(radio.isToggle());
+        assertEquals("RadioButton", radio.getUIID());
+    }
+
+    @Test
     void testCreateToggleAddsToGroupAndSetsToggleUiid() {
         ButtonGroup group = new ButtonGroup();
         RadioButton radio = RadioButton.createToggle("Choice", group);
