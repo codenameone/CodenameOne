@@ -271,7 +271,17 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -e
-          bash scripts/ci/apt-get-install.sh gdb >/dev/null 2>&1 || true
+          # Not silenced, and the outcome is stated. The hang dump attaches gdb from
+          # inside the test JVM, so an install that quietly failed here produced a
+          # hang-stacks.txt with nothing but sample headers -- which is how four
+          # occurrences of the suite stall ended up with no evidence at all. Still
+          # best-effort: a runner without gdb must not fail the suite, it must say so.
+          bash scripts/ci/apt-get-install.sh gdb || echo "WARNING: gdb install failed"
+          if command -v gdb >/dev/null 2>&1; then
+            echo "gdb available: $(gdb --version | head -1)"
+          else
+            echo "WARNING: gdb is NOT on PATH -- a hang in this job will capture no thread stacks."
+          fi
           Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb-run.log 2>&1 &
           export DISPLAY=:99
           sleep 2
