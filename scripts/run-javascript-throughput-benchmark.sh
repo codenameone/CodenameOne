@@ -171,6 +171,10 @@ if (typeof global.__parparInstallNativeBindings === 'function') {
 // run nothing else. See the comment on JsThroughputBench.only.
 const only = process.argv[3] || '';
 if (only) {
+  // Run the class initializer FIRST. Writing the filter before <clinit> means
+  // <clinit> gets the last word, which is how every "isolated" process ended
+  // up running the whole suite.
+  jvm.ensureClassInitialized(process.argv[4]);
   const cls = jvm.classes[process.argv[4]];
   if (!cls || !cls.staticFields) { throw new Error('cannot reach bench class to set filter'); }
   cls.staticFields['only'] = jvm.createStringLiteral(only);

@@ -64,7 +64,15 @@ public class JsThroughputBench {
 
     /**
      * Set by the harness before {@code main} runs (a plain static write into
-     * the class's field table). Empty means "run everything".
+     * the class's field table). Null or empty means "run everything".
+     *
+     * Deliberately has NO initializer. {@code = ""} compiles to a store in
+     * {@code <clinit>}, and the generated {@code main} wrapper initializes the
+     * class before its body runs -- so the harness's value was overwritten
+     * with the empty string and every "isolated" process silently ran the
+     * whole suite. That is not a small bias: it made twelve processes emit
+     * 144 rows instead of 12, and every number reported as isolated was a
+     * shared-process number.
      *
      * Per-workload isolation is not a convenience, it is a correctness
      * requirement for this suite. Measured in one process, a workload inherits
@@ -74,7 +82,7 @@ public class JsThroughputBench {
      * regression in code that is byte-for-byte identical. That happened, and
      * it cost an hour to disprove.
      */
-    public static String only = "";
+    public static String only;
 
     public static void main(String[] args) {
         run("monoVirtual", 1);
