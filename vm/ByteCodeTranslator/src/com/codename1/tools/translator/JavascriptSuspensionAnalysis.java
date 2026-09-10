@@ -120,6 +120,16 @@ final class JavascriptSuspensionAnalysis {
      * implementation of the rule and both sides call it.
      */
     static final class DispatchModel {
+        // The analysis instance, so a direct (static / special) call site is
+        // answered by the SAME resolver that built the propagation edges.
+        //
+        // The emitter used to resolve those itself. Two resolvers meant two
+        // answers, and the one that mattered was a ``super`` call landing on
+        // an interface default: the emitter resolved it and called it
+        // suspending, the analysis did not and left the caller synchronous, so
+        // a ``yield*`` was emitted inside a plain ``function`` -- which is not
+        // a subtle bug but ``ReferenceError: yield is not defined``.
+        private final JavascriptSuspensionAnalysis analysis;
         private final JavascriptReachability.Model rta;
         // Declared on a JSO bridge class. Suspending only when the call
         // site's receiver cone can actually reach one of those classes.
@@ -131,14 +141,24 @@ final class JavascriptSuspensionAnalysis {
         // Signature-wide fallback, i.e. the historical answer.
         private final java.util.Set<String> suspendingSigs;
 
-        DispatchModel(JavascriptReachability.Model rta, java.util.Set<String> jsoSigs,
-                java.util.Set<String> bridgeSigs, java.util.Set<String> jsoClasses,
-                java.util.Set<String> suspendingSigs) {
+        DispatchModel(JavascriptSuspensionAnalysis analysis, JavascriptReachability.Model rta,
+                java.util.Set<String> jsoSigs, java.util.Set<String> bridgeSigs,
+                java.util.Set<String> jsoClasses, java.util.Set<String> suspendingSigs) {
+            this.analysis = analysis;
             this.rta = rta;
             this.jsoSigs = jsoSigs;
             this.bridgeSigs = bridgeSigs;
             this.jsoClasses = jsoClasses;
             this.suspendingSigs = suspendingSigs;
+        }
+
+        /**
+         * The answer for an {@code INVOKESTATIC} / {@code INVOKESPECIAL}.
+         * An unresolvable target stays suspending, as it always did.
+         */
+        boolean isDirectSuspending(String owner, String name, String desc) {
+            BytecodeMethod target = analysis.resolveTarget(owner, name, desc);
+            return target == null || target.isJavascriptSuspending();
         }
 
         boolean isDispatchSuspending(String owner, String name, String desc) {
@@ -182,6 +202,10 @@ final class JavascriptSuspensionAnalysis {
     // dispatch on it. Captured in propagate(); for a suspending signature this
     // is literally the number of ``yield*`` sites it is responsible for.
     private Map<String, Integer> dispatchSiteCount = java.util.Collections.<String, Integer>emptyMap();
+    // Every INVOKEVIRTUAL / INVOKEINTERFACE instruction, by signature,
+    // regardless of whether the site resolved against its receiver or fell
+    // back to the signature-wide answer.
+    private final Map<String, Integer> dispatchSites = new HashMap<String, Integer>();
 
     static int run(List<ByteCodeClass> classes, File outputDirectory) {
         // Same reason as JavascriptReachability.run: never let a previous
@@ -488,11 +512,33 @@ final class JavascriptSuspensionAnalysis {
                     if (op == Opcodes.INVOKESTATIC || op == Opcodes.INVOKESPECIAL) {
                         BytecodeMethod target = resolveTarget(inv.getOwner(), inv.getName(), inv.getDesc());
                         if (target == null) {
+                            // Unresolvable, and the EMITTER treats that as
+                            // suspending (isDirectSuspending returns true for a
+                            // null target). Skipping the caller here made the
+                            // two sides mean opposite things by the same
+                            // "unknown": a ``yield*`` at the call site inside a
+                            // method emitted as a plain ``function``, which is
+                            // ``ReferenceError: yield is not defined`` rather
+                            // than anything subtle. If the site is suspending,
+                            // so is the method containing it.
+                            markSuspending(caller, "unresolved-direct:"
+                                    + JavascriptNameUtil.sanitizeClassName(inv.getOwner())
+                                    + "." + inv.getName() + inv.getDesc());
                             continue;
                         }
                         addCaller(callersOf, target, caller);
                     } else if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
                         String sig = inv.getName() + inv.getDesc();
+                        // Count the site BEFORE the receiver-resolved branch
+                        // returns. Counting from sigCallersOf alone measured
+                        // only the fallback path, so under the default RTA
+                        // path the report showed dispatch sites collapsing to
+                        // near zero -- an artefact of where the edge was
+                        // recorded, not a reduction in emitted call sites.
+                        if (reportPath != null) {
+                            Integer prev = dispatchSites.get(sig);
+                            dispatchSites.put(sig, Integer.valueOf(prev == null ? 1 : prev.intValue() + 1));
+                        }
                         // Resolve the call site against its RECEIVER TYPE
                         // rather than its bare signature. A cone that
                         // resolves gives us exact per-impl edges, so a
@@ -563,20 +609,12 @@ final class JavascriptSuspensionAnalysis {
                 }
             }
         }
-        if (reportPath != null) {
-            // One entry per dispatch INSTRUCTION, so for a suspending sig this
-            // counts the ``yield*`` sites it costs.
-            Map<String, Integer> counts = new HashMap<String, Integer>();
-            for (Map.Entry<String, List<BytecodeMethod>> e : sigCallersOf.entrySet()) {
-                counts.put(e.getKey(), Integer.valueOf(e.getValue().size()));
-            }
-            dispatchSiteCount = counts;
-        }
+        dispatchSiteCount = dispatchSites;
         // Publish the final suspending-sig set so the emitter can
         // consult it when deciding whether an INVOKEVIRTUAL /
         // INVOKEINTERFACE call site needs ``yield*`` wrapping.
         exportedSuspendingSigs = suspendingSigs;
-        exportedDispatchModel = new DispatchModel(rta,
+        exportedDispatchModel = new DispatchModel(this, rta,
                 new java.util.HashSet<String>(jsoDeclaredSigs),
                 new java.util.HashSet<String>(bridgeDispatchSigs),
                 new java.util.HashSet<String>(jsoBridgeClasses),
@@ -652,7 +690,25 @@ final class JavascriptSuspensionAnalysis {
      * to the translator's canonical ``__INIT__`` / ``__CLINIT__``
      * form before comparison.
      */
+    // owner#name+desc -> resolved direct-invoke target, null included.
+    //
+    // This is called once per direct invoke while building the propagation
+    // edges and again per direct invoke while emitting, and since it gained an
+    // interface walk on the miss path an unmemoised version made
+    // JavascriptTargetIntegrationTest go from 48s to 378s.
+    private final Map<String, BytecodeMethod> resolvedTargets = new HashMap<String, BytecodeMethod>();
+
     private BytecodeMethod resolveTarget(String owner, String name, String desc) {
+        String key = owner + "#" + name + desc;
+        if (resolvedTargets.containsKey(key)) {
+            return resolvedTargets.get(key);
+        }
+        BytecodeMethod resolved = resolveTargetUncached(owner, name, desc);
+        resolvedTargets.put(key, resolved);
+        return resolved;
+    }
+
+    private BytecodeMethod resolveTargetUncached(String owner, String name, String desc) {
         String clsName = JavascriptNameUtil.sanitizeClassName(owner);
         String normalizedName;
         if ("<init>".equals(name)) {
@@ -852,6 +908,9 @@ final class JavascriptSuspensionAnalysis {
             }
             out.println("#");
             out.println("# Section 2: suspending signatures ranked by dispatch call sites.");
+            out.println("# dispatchSites counts every INVOKEVIRTUAL / INVOKEINTERFACE on the");
+            out.println("# signature, receiver-resolved and fallback alike -- NOT the number");
+            out.println("# that end up emitting yield*, which depends on each site's receiver.");
             out.println("# SIG <dispatchSites> <firstCauseMethods> <name+descriptor>");
             for (String sig : sigs) {
                 Integer siteCount = sites.get(sig);

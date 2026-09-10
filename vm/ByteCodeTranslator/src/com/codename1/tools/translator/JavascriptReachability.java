@@ -291,7 +291,7 @@ final class JavascriptReachability {
             if (!seen.add(type)) {
                 return true;
             }
-            if (instantiated.contains(type)) {
+            if (instantiated.contains(type) && isConcreteReceiver(type)) {
                 BytecodeMethod impl = walkUp(type, name, desc);
                 if (impl == null) {
                     // An instantiated receiver whose body we cannot name is
@@ -314,6 +314,25 @@ final class JavascriptReachability {
                 }
             }
             return true;
+        }
+
+        /**
+         * Whether {@code type} can actually BE a receiver at runtime.
+         *
+         * The exported set is not a set of concrete instantiations:
+         * {@link JavascriptReachability#markClassInstantiated} adds a name
+         * before it looks at what kind of type it is, and then walks the
+         * supertype chain, so constructing one concrete class routinely puts
+         * its abstract bases and its interfaces in there too. Treating those
+         * as receivers made {@link #walkUp} return null for a type that can
+         * never be a receiver, which abandoned the whole query and dropped the
+         * call site back to the signature-wide answer -- defeating the
+         * optimization for the ordinary "abstract base declares it abstractly"
+         * shape.
+         */
+        private boolean isConcreteReceiver(String type) {
+            ByteCodeClass cls = byName.get(type);
+            return cls != null && !cls.isIsInterface() && !cls.isIsAbstract();
         }
 
         private BytecodeMethod walkUp(String startClass, String name, String desc) {
@@ -348,6 +367,61 @@ final class JavascriptReachability {
                 }
                 String base = cls.getBaseClass();
                 current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+            }
+            // Nothing on the extends chain: a Java 8 interface DEFAULT method
+            // may still supply the body, exactly as
+            // JavascriptReachability.enqueueInterfaceDefault resolves it for
+            // liveness and as the runtime's resolveVirtual resolves it for
+            // dispatch. Without this a concrete receiver that inherits a
+            // default without overriding it resolved to nothing, and the call
+            // site fell back to the signature-wide answer.
+            return walkInterfaces(startClass, normalized, desc, new HashSet<String>());
+        }
+
+        private BytecodeMethod walkInterfaces(String clsName, String name, String desc, Set<String> visited) {
+            if (clsName == null || !visited.add(clsName)) {
+                return null;
+            }
+            ByteCodeClass cls = byName.get(clsName);
+            if (cls == null) {
+                return null;
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    BytecodeMethod found = interfaceMethod(
+                            JavascriptNameUtil.sanitizeClassName(iface), name, desc, visited);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            String base = cls.getBaseClass();
+            return base == null ? null
+                    : walkInterfaces(JavascriptNameUtil.sanitizeClassName(base), name, desc, visited);
+        }
+
+        private BytecodeMethod interfaceMethod(String ifaceName, String name, String desc, Set<String> visited) {
+            if (ifaceName == null || !visited.add(ifaceName)) {
+                return null;
+            }
+            ByteCodeClass iface = byName.get(ifaceName);
+            if (iface == null) {
+                return null;
+            }
+            for (BytecodeMethod m : iface.getMethods()) {
+                if (!m.isEliminated() && !m.isAbstract()
+                        && name.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                    return m;
+                }
+            }
+            if (iface.getBaseInterfaces() != null) {
+                for (String up : iface.getBaseInterfaces()) {
+                    BytecodeMethod found = interfaceMethod(
+                            JavascriptNameUtil.sanitizeClassName(up), name, desc, visited);
+                    if (found != null) {
+                        return found;
+                    }
+                }
             }
             return null;
         }

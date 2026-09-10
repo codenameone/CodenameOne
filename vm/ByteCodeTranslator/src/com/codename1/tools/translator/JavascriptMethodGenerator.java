@@ -734,6 +734,16 @@ final class JavascriptMethodGenerator {
             String sig = invoke.getName() + invoke.getDesc();
             return suspendingSigs.contains(sig);
         }
+        // Direct calls go through the analysis's resolver too. Resolving them
+        // here independently is what let a ``super`` call to an interface
+        // default be "suspending" at the call site and synchronous in the
+        // method containing it -- a ``yield*`` inside a plain ``function``,
+        // i.e. ``ReferenceError: yield is not defined``.
+        JavascriptSuspensionAnalysis.DispatchModel direct =
+                JavascriptSuspensionAnalysis.exportedDispatchModel;
+        if (direct != null) {
+            return direct.isDirectSuspending(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        }
         BytecodeMethod target = resolveDirectInvokeTarget(invoke);
         return target == null || target.isJavascriptSuspending();
     }

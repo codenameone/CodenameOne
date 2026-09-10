@@ -96,6 +96,11 @@ def main():
     else:
         print("%-*s %12s %12s %9s" % (width, "workload", "base ms", "new ms", "change"))
         mismatched = []
+        # A workload the baseline had and this run does not is not a workload
+        # to skip: either a selected process died before emitting its BENCH
+        # line or the suite shrank, and both mean this run did less work than
+        # the thing it is being compared against.
+        vanished = sorted(set(baseline.get("workloads", {})) - set(workloads))
         for name in sorted(workloads):
             new = workloads[name]
             old = baseline.get("workloads", {}).get(name)
@@ -120,22 +125,33 @@ def main():
             if old:
                 print("%-*s %12d %12d %8.1f%%" % (
                     width, label, old, new, (new - old) / float(old) * 100.0))
+        if vanished:
+            print("\nREFUSING the comparison: %s present in the baseline and absent here."
+                  "\nAn incomplete suite cannot be read as a speedup."
+                  % ", ".join(vanished), file=sys.stderr)
+            return 1
         if mismatched:
             print("\nREFUSING the comparison: checksum changed for %s."
                   "\nA workload that computes something different cannot be compared on time."
                   % ", ".join(mismatched), file=sys.stderr)
             return 1
 
-    if drove:
-        print("\nWARNING: the sync virtual dispatcher met a generator %d time(s)."
-              "\nThe analysis classified a signature synchronous that is not; the runtime"
-              "\nabsorbed it by stepping the generator once. Fix the classification --"
-              "\ndo not read the timings as a clean result." % drove, file=sys.stderr)
-
     if os.environ.get("JSON_OUT"):
         with open(os.environ["JSON_OUT"], "w", encoding="utf-8") as handle:
             json.dump(result, handle, indent=2, sort_keys=True)
             handle.write("\n")
+
+    if drove:
+        # A diagnostic that only warns is not a gate. The runner documents
+        # exit 1 as "benchmark failure", and a run in which the sync
+        # dispatcher met a generator IS one: the classification is wrong and
+        # the runtime absorbed it, which shows up as a speedup rather than as
+        # the bug it is. Written to JSON first, so the evidence survives.
+        print("\nFAILING: the sync virtual dispatcher met a generator %d time(s)."
+              "\nThe analysis classified a signature synchronous that is not; the runtime"
+              "\nabsorbed it by stepping the generator once. Fix the classification --"
+              "\nthese timings are not a clean result." % drove, file=sys.stderr)
+        return 1
     return 0
 
 

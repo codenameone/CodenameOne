@@ -88,6 +88,7 @@ bench_log "translating to JavaScript"
 # than a broken lookup. It is also irrelevant to what is being measured here:
 # this benchmark prices call dispatch, not identifier length.
 "$JAVA_BIN" -cp "$COMPILER_JAR" \
+  ${CN1_TRANSLATOR_OPTS:-} \
   -Dparparvm.js.minify.idents.off=1 \
   -Dparparvm.js.alias.off=1 \
   -Dcodename1.javascriptport.webapp="$REPO_ROOT/Ports/JavaScriptPort/src/main/webapp" \
@@ -198,7 +199,10 @@ RAW="$WORK_DIR/raw.txt"
 
 # One process per workload. Sharing a process makes every measurement depend
 # on what ran before it, which reports phantom regressions in unchanged code.
-WORKLOADS="$(grep -oE 'run\("[A-Za-z]+"' "$BENCH_SRC" | sed 's/run("//;s/"//' | sort -u)"
+# ``|| true`` is load bearing: with set -e and pipefail, grep's exit 1 on no
+# match kills the script right here, so the probe fallback below was
+# unreachable and a probe source produced no output at all.
+WORKLOADS="$(grep -oE 'run\("[A-Za-z]+"' "$BENCH_SRC" | sed 's/run("//;s/"//' | sort -u || true)"
 # A source with no run("...") calls is a PROBE, not the benchmark -- run it once
 # unfiltered rather than refusing. Reproducing a translator bug in six seconds
 # instead of a forty-seven-minute CI cycle is most of what this harness is for.
