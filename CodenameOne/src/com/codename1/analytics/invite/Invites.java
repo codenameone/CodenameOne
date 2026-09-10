@@ -1481,7 +1481,25 @@ public final class Invites {
     private static Map<String, String> readPending() {
         Map<String, String> held = pendingFallback;
         if (held != null) {
-            writePending(held);
+            if (writePending(held)) {
+                // The cached state is invalidated, not left as it was.
+                //
+                // markTerminal() deliberately does NOT set the state when its
+                // write fails, so the record held here can be terminal while
+                // memory still says pending. Persisting it without saying so
+                // left the two disagreeing: a later flush read the cached
+                // pending state, treated the lookup as live, rewrote the
+                // terminal marker back to STATE_PENDING and issued another
+                // lookup -- with the device profile markTerminal had stripped,
+                // so it could not have matched anyway.
+                //
+                // Invalidating rather than assigning, because what the record
+                // means depends on the re-attribution setting and on whether an
+                // attribution exists, and loadState() is the one place that
+                // knows. The cost is one extra read of a record just written,
+                // and only after a storage failure.
+                stateLoaded = false;
+            }
             return held;
         }
         return InviteStore.read(InviteStore.PENDING);

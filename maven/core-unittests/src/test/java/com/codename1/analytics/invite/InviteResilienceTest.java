@@ -1559,6 +1559,37 @@ class InviteResilienceTest extends UITestBase {
 
     @Test
     @EdtTest
+    void aterminalMarkerPersistedLateIsNotReopenedAsPending() {
+        // markTerminal() deliberately does not set the state when its write
+        // fails, so the record held for retry can be terminal while memory
+        // still says pending. Persisting it without reconciling left the two
+        // disagreeing: a later flush read the cached pending state, treated the
+        // lookup as live, rewrote the terminal marker back to STATE_PENDING and
+        // issued another lookup -- with the device profile markTerminal had
+        // stripped, so it could not have matched anyway.
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+
+        // The terminal write fails, so the answer is held rather than recorded.
+        Invites.setAttributionWindow(0);
+        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+
+        // Storage recovers: the next read persists the held terminal record.
+        Map<String, String> persisted = Invites.pendingRecordForTest();
+        assertNotNull(persisted);
+        assertEquals(Invites.STATE_NONE_FOUND,
+                InviteStore.getInt(InviteStore.read(InviteStore.PENDING), "state", -1),
+                "the held terminal record was never persisted");
+
+        // And the state agrees with the record that is now on the disk.
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "the cached state still says pending, so a flush will reopen a settled lookup");
+    }
+
+    @Test
+    @EdtTest
     void aFirstTimeDenialStartsItsOwnClock() {
         // Someone who had already refused reaches this on a first launch, when
         // nothing has written a pending record yet. Copying the absent clock
