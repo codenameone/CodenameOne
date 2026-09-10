@@ -179,20 +179,33 @@ final class InviteStore {
             failNextWrite = false;
             return false;
         }
+        // The cap is applied OUTSIDE the try, deliberately.
+        //
+        // copy.remove(0) on a List<String> compiles to a CHECKCAST, and
+        // ParparVM does not throw for a failed cast -- so a checked cast inside
+        // a catch(Throwable) is a handler that cannot run on iOS, which
+        // check-cast-semantics.sh refuses outright. Nothing here can fail
+        // anyway: it is a copy, a size comparison and a removal.
+        List<String> copy = new ArrayList<String>(entries);
+        int dropped = 0;
+        while (copy.size() > MAX_OUTBOX) {
+            // Reported to Invites before it goes, so isRegistered() can keep
+            // saying no about it. That method reads absence from BOTH the
+            // outbox and the unacknowledged set as acknowledgement, and an
+            // evicted entry is in neither -- so the one registration the server
+            // is guaranteed never to have received was reported as registered,
+            // and only the log below said otherwise.
+            Invites.registrationEvicted(copy.remove(0));
+            dropped++;
+        }
+        if (dropped > 0) {
+            Log.p("invite: dropped " + dropped + " unacknowledged registration(s); "
+                    + "those invite links can no longer be attributed", Log.ERROR);
+        }
         try {
             Storage s = Storage.getInstance();
             if (s == null) {
                 return false;
-            }
-            List<String> copy = new ArrayList<String>(entries);
-            int dropped = 0;
-            while (copy.size() > MAX_OUTBOX) {
-                copy.remove(0);
-                dropped++;
-            }
-            if (dropped > 0) {
-                Log.p("invite: dropped " + dropped + " unacknowledged registration(s); "
-                        + "those invite links can no longer be attributed", Log.ERROR);
             }
             if (copy.isEmpty()) {
                 if (s.exists(OUTBOX)) {

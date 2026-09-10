@@ -538,6 +538,33 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void anEvictedRegistrationIsNotReportedAsRegistered() {
+        // The outbox is capped, and the cap drops the OLDEST entry. isRegistered()
+        // reads absence from both the outbox and the unacknowledged set as
+        // acknowledgement, and an evicted entry is in neither -- so the one
+        // registration the server is guaranteed never to have received was the
+        // one reported as registered, and only a log line said otherwise.
+        //
+        // Driven through the store rather than by minting 513 invites: the cap
+        // is InviteStore's and this is what it does when it is reached.
+        Analytics.setConsent(null);
+        implementation.setAutoProcessConnections(false);
+        Invite first = Invites.create(InviteRequest.create().campaign("evicted").build());
+        assertNotNull(first);
+        assertFalse(Invites.isRegistered(first),
+                "the fixture is already acknowledged, so the assertion below proves nothing");
+
+        List<String> stuffed = new ArrayList<String>(InviteStore.readOutbox());
+        while (stuffed.size() <= InviteStore.MAX_OUTBOX) {
+            stuffed.add("{\"code\":\"FILLER" + stuffed.size() + "\"}");
+        }
+        assertTrue(InviteStore.writeOutbox(stuffed), "the stuffed outbox could not be written");
+
+        assertFalse(Invites.isRegistered(first),
+                "an evicted registration reported itself as acknowledged");
+    }
+
+    @FormTest
     void aFailedPendingWriteDoesNotLoseTheDirectCode() {
         // handleUrl() commits STATE_PENDING and issues the claim before it
         // knows the record reached the disk. When the write failed and the
@@ -1481,6 +1508,53 @@ class InviteResilienceTest extends UITestBase {
                 "an answer the device cannot remember was reported to the listener");
         assertTrue(Invites.getState() != Invites.STATE_NONE_FOUND,
                 "the state was committed without its marker");
+    }
+
+    @Test
+    @EdtTest
+    void afailedDeliveryWriteIsStillOwedToTheListener() {
+        // The other half of the record-held-in-memory change. When the
+        // delivered=true write fails, the callback is withheld -- but the map
+        // carrying that flag is the one the failure holds for retry, so the
+        // next read persisted the very flag the failure was supposed to
+        // prevent. The answer then read as already delivered and the listener
+        // never heard it, on this launch or any other.
+        Invites.setAttributionWindow(0);
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "the fixture did not reach a terminal answer");
+
+        final int[] told = new int[1];
+        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        assertEquals(0, told[0],
+                "a delivery the device could not record was reported anyway");
+
+        // The record must not claim it was delivered, or nothing will ever
+        // report it.
+        Map<String, String> marker = Invites.pendingRecordForTest();
+        assertNotNull(marker);
+        assertFalse(InviteStore.getBoolean(marker, "delivered", false),
+                "a delivery that never happened was recorded as done");
+
+        // And a listener registered afterwards is told, which is the contract:
+        // exactly one callback per install, and the answer is remembered.
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+        assertEquals(1, told[0], "the answer was owed to the listener and never arrived");
     }
 
     @Test

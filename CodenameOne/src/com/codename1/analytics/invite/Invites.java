@@ -1361,12 +1361,18 @@ public final class Invites {
             InviteStore.put(done, key, InviteStore.get(before, key, null));
         }
         if (!writePending(done)) {
-            // Nothing is committed. Reporting a terminal outcome the device
-            // cannot remember meant the same lookup and the same callback
-            // repeated after every restart -- or, worse, the delivery flag
-            // landed on the OLD pending record and left the state at PENDING,
-            // so a supposedly settled lookup ran again and could never deliver
-            // its answer.
+            // Not reported now. Reporting a terminal outcome the device cannot
+            // remember meant the same lookup and the same callback repeated
+            // after every restart -- or, worse, the delivery flag landed on the
+            // OLD pending record and left the state at PENDING, so a supposedly
+            // settled lookup ran again and could never deliver its answer.
+            //
+            // The record is held by writePending() and persisted by the next
+            // read, so the answer is not lost, only deferred: this run says
+            // nothing and the marker is read back as an undelivered terminal
+            // answer afterwards, which is what the contract promises. The state
+            // is deliberately not set in memory either, so nothing here acts on
+            // a record that may still be only in memory.
             Log.p("invite: a terminal answer could not be persisted; it will be reached "
                     + "again rather than reported now", Log.WARNING);
             return false;
@@ -1403,8 +1409,24 @@ public final class Invites {
             // and the run's own guard prevents a repeat within it.
             return true;
         }
+        if (InviteStore.getBoolean(marker, "delivered", false)) {
+            return true;
+        }
         marker.put("delivered", "true");
-        return writePending(marker);
+        if (writePending(marker)) {
+            return true;
+        }
+        // Backed out of the map, not only reported.
+        //
+        // The caller withholds the callback when this returns false, so the
+        // record must not go on claiming the answer was delivered -- and the
+        // fallback holds THIS map. Left as it is, the next readPending() would
+        // persist the very flag the failed write was supposed to prevent,
+        // undeliveredFromMarker() would then read the answer as already given,
+        // and the listener would never hear it on any launch. Removing is the
+        // whole restore because the early return above means it was absent.
+        marker.remove("delivered");
+        return false;
     }
 
     /// Writes the pending record, keeping an in-memory copy while that fails.
@@ -2165,11 +2187,13 @@ public final class Invites {
                 int spent = InviteStore.getInt(retry, "attempts", 0);
                 retry.put("attempts", String.valueOf(spent > 0 ? spent - 1 : 0));
                 if (!writePending(retry)) {
-                    // The refund failed for the same reason the attribution did
-                    // -- the store is unwritable -- so the durable count is
-                    // still at the cap and the next flush would settle the
-                    // install rather than retry. Nothing here can fix that, so
-                    // it is said out loud instead of being assumed away.
+                    // The refund failed for the same reason the attribution
+                    // did -- the store is unwritable -- so the count ON DISK is
+                    // still at the cap. writePending() holds the refunded copy
+                    // and the next read persists it, so a retry within this
+                    // launch sees the right number; a restart before that does
+                    // not, and settles the install rather than asking again.
+                    // Said out loud rather than assumed away.
                     Log.p("invite: the attempt could not be refunded, so a later retry may "
                             + "settle this install instead of asking again", Log.WARNING);
                 }
@@ -2353,6 +2377,36 @@ public final class Invites {
     // for them and has to be told. In memory only, which is the honest limit:
     // the durable store is the thing that just failed.
     private static final List<String> unacknowledged = new ArrayList<String>();
+
+    /// Records that a queued registration was evicted to keep the outbox
+    /// under its cap.
+    ///
+    /// The entry is gone for good -- its campaign, channel, payload and
+    /// preview cannot be reconstructed from a click -- so the least this can
+    /// do is stop [#isRegistered] answering yes about it. In memory only, like
+    /// every other entry in that set: after a restart the outbox is the only
+    /// record, and the evicted entry is not in it. The ERROR logged by the
+    /// caller is the durable half.
+    ///
+    /// - `entry`: the registration JSON that was dropped
+    static void registrationEvicted(String entry) {
+        if (entry == null) {
+            return;
+        }
+        try {
+            Map<String, Object> parsed =
+                    new JSONParser().parseJSON(new java.io.StringReader(entry));
+            Object code = parsed == null ? null : parsed.get("code");
+            if (code != null) {
+                unacknowledged.add(code.toString());
+            }
+        } catch (Throwable t) {
+            // A malformed entry is already lost; failing here would take the
+            // whole write with it, and the write is what keeps the REST of the
+            // queue.
+            Log.e(t);
+        }
+    }
 
     private static boolean queueRegistration(Invite invite, InviteRequest request) {
         Map<String, Object> body = identity();
