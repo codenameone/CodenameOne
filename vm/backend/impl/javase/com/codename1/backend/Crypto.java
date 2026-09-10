@@ -190,6 +190,14 @@ public final class Crypto {
      */
     static byte[] pbkdf2(byte[] password, byte[] salt, int iterations, int length)
             throws IOException {
+        // The native arm refuses these outright (cn1_backend_crypto.c), and this one
+        // did not: a non-positive iteration count ran the loop zero extra times and
+        // returned the ONE-ROUND result, so a misconfigured SCRAM or key derivation
+        // produced a weak key that looked like it worked -- locally only, and with a
+        // different key from the one the packaged server would derive.
+        if(iterations <= 0 || length <= 0) {
+            throw new IOException("iterations and length must both be positive");
+        }
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             // SecretKeySpec rejects a zero-length key. HMAC pads the key to the block

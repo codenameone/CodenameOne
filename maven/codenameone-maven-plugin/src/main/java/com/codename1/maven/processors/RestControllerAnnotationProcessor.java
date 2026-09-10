@@ -1372,12 +1372,40 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (cls == null) {
             return false;             // cannot be inspected, so cannot be trusted
         }
+        // The WHOLE hierarchy, not the directly declared interfaces. Json.writeValue
+        // asks `instanceof Writable`, which honours a superclass's implementation
+        // and a subinterface of Writable alike -- so checking only what this class
+        // declares refused DTO hierarchies the runtime encodes perfectly well, and
+        // refused them at BUILD time, which is the worst place to be wrong about
+        // what the runtime will do.
+        return implementsWritable(ctx, cls, new LinkedHashSet<String>());
+    }
+
+    /** Depth-first over superclasses and interfaces, each visited once. */
+    private static boolean implementsWritable(ProcessorContext ctx, AnnotatedClass cls,
+            Set<String> seen) {
+        if (cls == null) {
+            return false;
+        }
         for (String itf : cls.getInterfaceInternalNames()) {
             if ("com/codename1/backend/Json$Writable".equals(itf)) {
                 return true;
             }
+            if (seen.add(itf) && implementsWritable(ctx, resolve(ctx, itf), seen)) {
+                return true;
+            }
         }
-        return false;
+        String parent = cls.getSuperInternalName();
+        if (parent == null || "java/lang/Object".equals(parent) || !seen.add(parent)) {
+            return false;
+        }
+        return implementsWritable(ctx, resolve(ctx, parent), seen);
+    }
+
+    /** The index first, then the compile classpath -- the same order as the caller. */
+    private static AnnotatedClass resolve(ProcessorContext ctx, String internalName) {
+        AnnotatedClass found = ctx.lookup(internalName);
+        return found != null ? found : fromCompileClasspath(ctx, internalName);
     }
 
     /**

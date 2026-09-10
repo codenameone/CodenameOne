@@ -931,6 +931,63 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void anInheritedWritableIsRecognised() throws Exception {
+        // Json.writeValue asks `instanceof Writable`, which is satisfied by a
+        // SUPERCLASS's implementation. The check read only the directly declared
+        // interfaces, so a perfectly ordinary DTO hierarchy failed to compile --
+        // and failed at build time, which is the worst place to be wrong about
+        // what the runtime will do.
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Base",
+                "package com.example;\n"
+                + "import com.codename1.backend.Json;\n"
+                + "public abstract class Base implements Json.Writable {\n"
+                + "    public void writeTo(com.codename1.backend.ByteSink out) { }\n"
+                + "}\n");
+        sources.put("com.example.Note",
+                "package com.example;\n"
+                + "public class Note extends Base {\n"
+                + "}\n");
+        sources.put("com.example.Notes",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public Note one() { return new Note(); }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        ProcessorContext ctx = run(classes);
+        assertFalse("a DTO inheriting Writable is encodable: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
+    public void aTypeThatIsNotWritableAtAllIsStillRefused() throws Exception {
+        // The traversal must not turn the check off: a class with no Writable
+        // anywhere in its hierarchy is still the malformed contract this refuses.
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Plain",
+                "package com.example;\n"
+                + "public class Plain {\n"
+                + "    public String name;\n"
+                + "}\n");
+        sources.put("com.example.Notes",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public Plain one() { return new Plain(); }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        ProcessorContext ctx = run(classes);
+        assertTrue("a type Json cannot write must still be refused", ctx.hasErrors());
+    }
+
+    @Test
     public void twoControllersOfTheSameShapeAreRefused() throws Exception {
         // The bootstrap chains the routers and returns the first non-null answer,
         // so a collision ACROSS controllers hides the later one exactly as a

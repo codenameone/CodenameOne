@@ -130,6 +130,15 @@ public final class Tcp {
     public int read(byte[] buffer, int offset, int length) throws IOException {
         checkOpen();
         checkRange(buffer, offset, length);
+        // Answered here, never dispatched. InputStream returns 0 for a zero-length
+        // read and the Java SE arm inherits that, while recv(_, 0) returns 0 and
+        // the native maps a zero-byte read to END OF STREAM -- so a caller that
+        // computed an empty slice was told the peer had gone away, but only once
+        // packaged. SSL_read(_, 0) is worse: OpenSSL leaves it undefined and it
+        // can report an error.
+        if(length == 0) {
+            return 0;
+        }
         int n = tls == 0 ? readImpl(handle, buffer, offset, length)
                          : tlsReadImpl(tls, buffer, offset, length);
         if(n < -1) {
@@ -141,6 +150,13 @@ public final class Tcp {
     public void write(byte[] buffer, int offset, int length) throws IOException {
         checkOpen();
         checkRange(buffer, offset, length);
+        // Symmetry with read, and for the same reason on the TLS side:
+        // SSL_write(_, 0) is undefined too. This one happens to be harmless today
+        // -- the check below is n != length, and 0 != 0 is false -- which is a
+        // reason to make it explicit rather than to leave it resting on that.
+        if(length == 0) {
+            return;
+        }
         int n = tls == 0 ? writeImpl(handle, buffer, offset, length)
                          : tlsWriteImpl(tls, buffer, offset, length);
         if(n != length) {

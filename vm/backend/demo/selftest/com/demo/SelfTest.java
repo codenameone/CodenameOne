@@ -589,6 +589,47 @@ public class SelfTest {
             tcpOutcome = "other: " + other;
         }
         check("a negative TCP connect timeout is refused", "refused", tcpOutcome);
+
+        // A zero-length read is 0 on BOTH arms. InputStream says so and the Java SE
+        // arm inherits it; the packaged one used to dispatch to recv(_, 0), whose
+        // zero-byte result the native maps to END OF STREAM. Same call, "nothing
+        // read" here and "the peer hung up" once packaged.
+        HttpServer probe = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return HttpServer.Response.text(200, "ok");
+            }
+        });
+        String emptyRead;
+        try {
+            Tcp conn = Tcp.connect("127.0.0.1", probe.getPort(), 2000);
+            try {
+                emptyRead = String.valueOf(conn.read(new byte[8], 0, 0));
+            } finally {
+                conn.close();
+            }
+        } catch (Exception err) {
+            emptyRead = "threw: " + err;
+        } finally {
+            // TIMED, like fairness() above. The no-argument stop() drains without a
+            // bound, and this probe deliberately leaves a connection that has just
+            // been closed under it -- the run sat past ten minutes before I noticed
+            // which of the two I had called.
+            probe.stop(1000);
+        }
+        check("a zero-length read answers zero", "0", emptyRead);
+
+        // And a non-positive iteration count is refused rather than quietly
+        // deriving the one-round key. The native has always refused it.
+        String weakKey;
+        try {
+            Crypto.pbkdf2Sha256("pw".getBytes("UTF-8"), "salt".getBytes("UTF-8"), 0, 32);
+            weakKey = "accepted";
+        } catch (Exception refused) {
+            // IOException here, IllegalArgumentException on the other arm -- the
+            // check is that it is REFUSED, not which exception says so.
+            weakKey = "refused";
+        }
+        check("a zero iteration count is refused", "refused", weakKey);
     }
 
     private static void json() throws Exception {
