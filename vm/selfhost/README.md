@@ -307,6 +307,43 @@ It is all malloc'd heap; there is no large non-heap component. (An earlier note
 here claimed ~600MB was "not the Java heap" -- that compared an exit-time census
 against the whole-run peak and was wrong.)
 
+### The second grace cycle is a 2014 workaround, and it is worth ~2%
+
+A dead object needs three cycles because the sweep keeps it twice: once as `fresh`
+(never marked) and once as `aging` (`mark == V-1`, not traced this cycle). The first
+is load-bearing. The second traces to November 2014, commit `31528ecfa6`:
+
+```
+-  if(o->__codenameOneGcMark != currentGcMarkValue) {      // free what was not marked
++  if(o->__codenameOneGcMark < currentGcMarkValue - 1) {   // keep one extra generation
+```
+
+whose message reads "Delayed GCing of elements to prevent them from being collected
+due to a race condition with the GC thread". **That collector had no SATB barrier**
+-- zero matches for satb or snapshot in the file at that commit -- so a mutator
+could hide a reference from the mark, and keeping an extra generation made the
+resulting lost-object race improbable rather than impossible. The cases that would
+need it today have their own guards: a page missing from the index for one cycle is
+covered by grace (its objects are `mark == -1`), and the repeated miss that aging
+cannot save either is what `cn1GcPageIndexStale` skips the entire reclaim for.
+
+`-DCN1_GC_NO_AGING` compiles the second cycle out. Evidence gathered so far:
+
+| | result |
+|---|---|
+| `run-gc-verify.sh` | GREEN, and its three self-tests still detect their injected faults -- including the injected **early-free** fault, which is the exact failure this change could cause |
+| `run-gauntlet.sh` | GREEN -- 12 torture suites byte-identical to the host JVM, plus GC stress in cooperative and forced-signal modes |
+| self-hosting gates A and D | byte-identical, 793 files |
+| peak footprint | 1334 -> 1322 MB and 1349 -> 1302 MB, about **2-3%** |
+
+**It is not the default, and the small win is why.** In this workload `aging` is only
+14-16% of the occupied heap while `fresh` is 26-36%, so removing the second cycle
+moves those objects one cycle earlier in a run that only has three or four. A long
+running application, where the heap reaches a steady state instead of growing the
+whole time, would see closer to the full 15%. And `vm/CLAUDE.md` is explicit that a
+green verifier is necessary rather than sufficient here: it could not open the
+residual SATB window even with the barrier deliberately compiled out.
+
 ### String: the NSString field is free
 
 `java.lang.String` carries a `long nsString` for the Apple targets' direct NSString

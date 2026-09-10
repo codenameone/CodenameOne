@@ -646,6 +646,37 @@ static __thread int cn1GcInGracePass = 0;
 // rebuilds and includes them. It is the REPEAT that is fatal: on the second miss those
 // objects are no longer fresh, still do not resolve, and age into the sweep's
 // m < V - 1 reclamation while a live field still points at them.
+// AGING: the sweep keeps an object for one cycle AFTER the mark stopped reaching it.
+//
+// CN1_GC_NO_AGING compiles that second cycle out, so a dead object is reclaimed by
+// the first sweep that does not mark it -- the fresh-object grace rule is untouched
+// either way.
+//
+// It is a diagnostic switch, not a supported setting, because what it is really
+// asking is whether a 2014 workaround is still load-bearing. The rule arrived in
+// 31528ecfa6, "Delayed GCing of elements to prevent them from being collected due to
+// a race condition with the GC thread", which turned `mark != currentGcMarkValue`
+// into `mark < currentGcMarkValue - 1`. That collector had no SATB barrier at all --
+// a mutator could hide a reference from the mark, and keeping an extra generation
+// made the resulting lost-object race improbable rather than impossible. The cases
+// that would need it today have their own guards: a page missing from the index for
+// one cycle is covered by grace (its objects are mark == -1), and the repeat miss
+// that aging cannot save either is what cn1GcPageIndexStale skips the whole reclaim
+// for.
+//
+// It costs a third of the retention latency. A dead object needs three cycles to
+// have its slot returned -- grace, aging, reclaim -- and a program that completes
+// three or four cycles therefore frees almost nothing it allocates.
+//
+// Before this becomes a default it needs more than a green verifier: vm/CLAUDE.md
+// records that the verifier could not open the residual SATB window even with the
+// barrier deliberately compiled out, so a pass is necessary and not sufficient.
+#ifdef CN1_GC_NO_AGING
+#define CN1_GC_SLOT_IS_DEAD(mark, epoch) ((mark) < (epoch))
+#else
+#define CN1_GC_SLOT_IS_DEAD(mark, epoch) ((mark) < (epoch) - 1)
+#endif
+
 static JAVA_BOOLEAN cn1GcPageIndexStale = JAVA_FALSE;
 // Page-heap bytes allocated across the whole run, charged cycle by cycle. Divided by
 // the cycle count it says how far the mutator ran ahead of the collector, which is what
@@ -4768,7 +4799,7 @@ void codenameOneGCSweep() {
         JAVA_OBJECT o = allObjectsInHeap[iter];
         if(o != JAVA_NULL) {
             if(o->__codenameOneGcMark != -1) {
-                if(o->__codenameOneGcMark < currentGcMarkValue - 1) {
+                if(CN1_GC_SLOT_IS_DEAD(o->__codenameOneGcMark, currentGcMarkValue)) {
                     if (o->__codenameOneGcMark <= 0) {
 #if defined(__APPLE__) && defined(__OBJC__)
 #if TARGET_OS_SIMULATOR
@@ -8323,7 +8354,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 if(o->__codenameOneParentClsReference != 0 &&
                    o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
-            } else if(m < V - 1) {
+            } else if(CN1_GC_SLOT_IS_DEAD(m, V)) {
                 cn1BibopReclaimSlot(threadStateData, o);
 #ifdef CN1_GC_VERIFY
                 { extern long cn1GcVerifyFreedSlots; cn1GcVerifyFreedSlots++; }
