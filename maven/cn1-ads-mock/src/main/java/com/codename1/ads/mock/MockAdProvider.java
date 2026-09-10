@@ -44,7 +44,6 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
-import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
@@ -121,8 +120,7 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
         private final AdFormat format;
         private AdSessionCallback cb;
         private boolean loaded;
-        private Form adForm;
-        private Form previousForm;
+        private Dialog adForm;
 
         MockFullScreen(AdFormat format) {
             this.format = format;
@@ -159,12 +157,12 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
                 return;
             }
             loaded = false;
-            previousForm = CN.getCurrentForm();
-            if (previousForm == null) {
-                // App-open ads may be presented before the first application form.
-                previousForm = new Form();
-            }
-            adForm = new Form("Mock advertisement", new BorderLayout());
+            // Dialog disposal restores its caller directly, without re-showing a
+            // modal caller or changing how that caller behaves on later shows.
+            // It also supplies a fallback form when presented during app startup.
+            adForm = new Dialog("Mock advertisement", new BorderLayout());
+            adForm.setNativeWindowMode(false);
+            adForm.setAutoDispose(false);
             adForm.add(BorderLayout.CENTER, new Label("Advertisement"));
             Button close = new Button("Close ad");
             close.addActionListener(evt -> closeAd(true));
@@ -175,7 +173,7 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
                     closeAd(true);
                 }
             });
-            adForm.show();
+            adForm.showAtPosition(0, 0, 0, 0, false);
             cb.onShown();
             // A listener may dispose the ad synchronously from onShown().
             if (adForm != null) {
@@ -187,19 +185,13 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
             if (adForm == null) {
                 return;
             }
-            Form closing = adForm;
-            Form previous = previousForm;
+            Dialog closing = adForm;
             adForm = null;
-            previousForm = null;
-            if (previous != null && CN.getCurrentForm() == closing) {
-                if (previous instanceof Dialog) {
-                    // showBack() would enter another modal wait and prevent the
-                    // reward/dismissal callbacks from disposing the caller dialog.
-                    ((Dialog) previous).showModeless();
-                } else {
-                    previous.showBack();
-                }
+            if (CN.getCurrentForm() != closing) {
+                // Application code may already have navigated away from the ad.
+                closing.setPreviousForm(null);
             }
+            closing.dispose();
             if (notify) {
                 if (format == AdFormat.REWARDED || format == AdFormat.REWARDED_INTERSTITIAL) {
                     cb.onUserEarnedReward(new RewardItem("coins", 10));

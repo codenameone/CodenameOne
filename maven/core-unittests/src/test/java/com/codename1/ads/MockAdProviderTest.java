@@ -157,6 +157,16 @@ class MockAdProviderTest extends UITestBase {
             assertNull(failure.get(), "Dismissal callback must see the restored dialog");
             assertEquals(Arrays.asList("reward", "dismissed"), events);
             assertSame(destination, CN.getCurrentForm());
+            // Reusing the same caller must still enter its original modal wait.
+            // Queue disposal from onShow so only the modal event loop can run it
+            // before show() returns.
+            boolean[] disposedDuringShow = {false};
+            dialog.addShowListener(evt -> CN.callSerially(() -> {
+                disposedDuringShow[0] = true;
+                dialog.dispose();
+            }));
+            dialog.show();
+            assertTrue(disposedDuringShow[0], "A reused modal caller must still block until disposed");
         } finally {
             watchdog.cancel();
             ad.dispose();
@@ -192,6 +202,43 @@ class MockAdProviderTest extends UITestBase {
                     : Arrays.asList("shown", "impression", "dismissed"), events);
             ad.dispose();
         }
+    }
+
+    @FormTest
+    void modelessCallerStaysModelessAfterAdDisposal() {
+        MockAdProvider.install();
+        Dialog caller = new Dialog("Modeless caller");
+        caller.showModeless();
+        InterstitialAd ad = new InterstitialAd("mock");
+        try {
+            ad.load();
+            ad.show();
+            ad.dispose();
+            assertSame(caller, CN.getCurrentForm());
+            caller.dispose();
+            boolean[] disposedDuringShow = {false};
+            caller.addShowListener(evt -> CN.callSerially(() -> {
+                disposedDuringShow[0] = true;
+                caller.dispose();
+            }));
+            caller.show();
+            assertFalse(disposedDuringShow[0], "A reused modeless caller must not wait for disposal");
+        } finally {
+            ad.dispose();
+            caller.dispose();
+        }
+    }
+
+    @FormTest
+    void disposalDoesNotUndoApplicationNavigation() {
+        MockAdProvider.install();
+        InterstitialAd ad = new InterstitialAd("mock");
+        ad.load();
+        ad.show();
+        Form destination = new Form("Application destination");
+        destination.show();
+        ad.dispose();
+        assertSame(destination, CN.getCurrentForm());
     }
 
 }
