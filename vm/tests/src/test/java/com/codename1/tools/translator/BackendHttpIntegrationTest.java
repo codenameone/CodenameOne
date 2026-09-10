@@ -879,6 +879,58 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a chunk size is 1*HEXDIG and nothing else")
+    void chunkSizesAreStrictHex() throws Exception {
+        // Integer.parseInt(_, 16) accepted a SIGN and any Unicode digit, so "+1"
+        // framed a one-byte chunk and "-0" framed the TERMINATING one -- while a
+        // conforming proxy in front rejects both. A server that frames a message
+        // differently from the intermediary ahead of it is the whole of request
+        // smuggling, which is why this parser already refuses bare LF and
+        // obsolete folding.
+        //
+        // U+0661 is ARABIC-INDIC DIGIT ONE. Character.digit answers 1 for it, so
+        // parseInt did too; it is spelled as UTF-8 bytes here because a Java
+        // source file in this tree must be ASCII.
+        byte[] arabicOne = new byte[] { (byte) 0xD9, (byte) 0xA1 };
+        String[] bad = {
+            "+1",
+            "-0",
+            " 1",
+            "1 ",
+            "",
+        };
+        for (int i = 0; i < bad.length; i++) {
+            byte[] response = rawBytes(chunkedWithSize(bad[i].getBytes(StandardCharsets.UTF_8)));
+            assertEquals(400, status(response),
+                    "chunk size \"" + bad[i] + "\" must be refused:\n"
+                            + new String(response, StandardCharsets.UTF_8));
+        }
+        byte[] unicodeDigit = rawBytes(chunkedWithSize(arabicOne));
+        assertEquals(400, status(unicodeDigit),
+                "a non-ASCII digit is not a hex digit:\n"
+                        + new String(unicodeDigit, StandardCharsets.UTF_8));
+
+        // And an ordinary hex size still frames a body, in both cases.
+        assertEquals(200, status(rawBytes(chunkedWithSize("5".getBytes(StandardCharsets.UTF_8)))),
+                "a plain size must still work");
+        assertEquals(200, status(rawBytes(chunkedWithSize("5;ext=1".getBytes(StandardCharsets.UTF_8)))),
+                "a chunk extension is legal and must still work");
+    }
+
+    /** A one-chunk request whose size line is exactly these bytes. */
+    private byte[] chunkedWithSize(byte[] size) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n")
+                .getBytes(StandardCharsets.UTF_8));
+        out.write(size);
+        out.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        out.write("[\"a\"]".getBytes(StandardCharsets.UTF_8));
+        out.write("\r\n0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        return out.toByteArray();
+    }
+
+    @Test
     @DisplayName("a chunked body that is not UTF-8 is refused too")
     void malformedUtf8ChunkedBodiesAreRefused() throws Exception {
         // The chunked path decodes separately, so it needs its own proof: fixing

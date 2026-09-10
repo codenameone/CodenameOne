@@ -201,11 +201,23 @@ public class GreeterService implements GreeterApiServer {
         // different row or none at all.
         pet.id = ((Long) withConnection(new Db.Work() {
             public Object run(Db db) throws Exception {
-                db.execute("INSERT INTO pet (name, species, weight, good) VALUES (?, ?, ?, ?)",
-                        new Object[]{inserting.name, inserting.species,
-                                new Double(inserting.weight),
-                                Boolean.valueOf(inserting.good)});
-                return new Long(db.lastInsertId());
+                // In a TRANSACTION, which is what makes the pair atomic. One
+                // connection is not enough on its own: Db synchronizes each call,
+                // so a second request can insert between this insert and the
+                // lastInsertId below and hand this response the other pet's id.
+                // transaction() holds the connection's monitor across the whole
+                // callback, so the two run together or not at all -- which is the
+                // only reason a shared in-memory connection is safe here.
+                return db.transaction(new Db.Work() {
+                    public Object run(Db inner) throws Exception {
+                        inner.execute("INSERT INTO pet (name, species, weight, good) "
+                                + "VALUES (?, ?, ?, ?)",
+                                new Object[]{inserting.name, inserting.species,
+                                        new Double(inserting.weight),
+                                        Boolean.valueOf(inserting.good)});
+                        return new Long(inner.lastInsertId());
+                    }
+                });
             }
         })).longValue();
         return pet;

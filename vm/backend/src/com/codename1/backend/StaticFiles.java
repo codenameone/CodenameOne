@@ -527,20 +527,6 @@ public final class StaticFiles implements HttpServer.Handler {
     }
 
     /** Null for a malformed escape rather than a partially decoded path. */
-    /** A hex digit's value, or -1. Deliberately not Integer.parseInt: that takes a sign. */
-    private static int hexDigit(char c) {
-        if(c >= '0' && c <= '9') {
-            return c - '0';
-        }
-        if(c >= 'a' && c <= 'f') {
-            return c - 'a' + 10;
-        }
-        if(c >= 'A' && c <= 'F') {
-            return c - 'A' + 10;
-        }
-        return -1;
-    }
-
     static String decode(String value) {
         if(value.indexOf('%') < 0) {
             return value;
@@ -571,8 +557,8 @@ public final class StaticFiles implements HttpServer.Handler {
             // Two HEX DIGITS, tested as digits. Integer.parseInt(_, 16) accepts a
             // sign, so "%+1" decoded to the byte 1 and "%-1" to -1 -- two more
             // spellings of an octet the client never wrote.
-            int hi = hexDigit(value.charAt(iter + 1));
-            int lo = hexDigit(value.charAt(iter + 2));
+            int hi = Hex.digit(value.charAt(iter + 1));
+            int lo = Hex.digit(value.charAt(iter + 2));
             if(hi < 0 || lo < 0) {
                 return null;
             }

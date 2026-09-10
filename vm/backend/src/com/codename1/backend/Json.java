@@ -228,11 +228,16 @@ public final class Json {
                     if(pos + 4 > src.length()) {
                         throw new IOException("Truncated \\u escape");
                     }
-                    try {
-                        out.append((char)Integer.parseInt(src.substring(pos, pos + 4), 16));
-                    } catch (NumberFormatException err) {
+                    // Four ASCII hex digits, exactly. parseInt took a sign and any
+                    // Unicode digit, so "\\u+041" decoded to U+0041 and so did an
+                    // Arabic-Indic spelling -- three ways to write one character,
+                    // where a filter that checked for one of them is defeated by
+                    // the others.
+                    int escaped = Hex.parse(src, pos, pos + 4);
+                    if(escaped < 0) {
                         throw new IOException("Malformed \\u escape at offset " + pos);
                     }
+                    out.append((char)escaped);
                     pos += 4;
                     break;
                 default:

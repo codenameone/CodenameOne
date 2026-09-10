@@ -4425,14 +4425,16 @@ public final class HttpServer {
             if(semi >= 0) {
                 sizeLine = sizeLine.substring(0, semi);
             }
-            int size;
-            try {
-                size = Integer.parseInt(sizeLine.trim(), 16);
-            } catch (NumberFormatException err) {
-                throw new ProtocolException(400, "malformed chunk size");
-            }
+            // 1*HEXDIG, on the raw text. Integer.parseInt(_, 16) took a sign and
+            // any Unicode digit, so "+1" and U+0661 both framed a one-byte chunk
+            // and "-0" framed the TERMINATING one -- while the intermediary in
+            // front rejects all three. A server that frames a message differently
+            // from the proxy ahead of it is the whole of request smuggling, and
+            // this parser refuses bare LF and obsolete folding for exactly that
+            // reason. No trim either: HTTP does not allow space around the size.
+            int size = Hex.parse(sizeLine, 0, sizeLine.length());
             if(size < 0) {
-                throw new ProtocolException(400, "negative chunk size");
+                throw new ProtocolException(400, "malformed chunk size");
             }
             conn.pos = lineEnd + 2;
             if(size == 0) {

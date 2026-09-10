@@ -323,7 +323,12 @@ public final class Database {
                     try {
                         out.port = Integer.parseInt(rest.substring(colon + 1).trim());
                     } catch (NumberFormatException err) {
-                        throw new IOException("Not a port number in " + url);
+                        // The URL carries the PASSWORD, and this string goes to a
+                        // log. describe() exists because of that and omits it; an
+                        // error path that pastes the whole URL undoes the care
+                        // taken everywhere else.
+                        throw new IOException("Not a port number in the database URL for "
+                                + strip(rest.substring(0, colon)));
                     }
                 } else {
                     out.host = strip(rest);
