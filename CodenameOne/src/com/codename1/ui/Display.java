@@ -1521,17 +1521,10 @@ public final class Display extends CN1Constants {
                 processSerialCalls();
             }
         } catch (Throwable err) {
-            Log.e(err);
-            if (crashReporter != null) {
-                crashReporter.exception(err);
-            }
-            if (!impl.handleEDTException(err)) {
-                if (errorHandler != null) {
-                    errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
-                } else {
-                    Dialog.show("Error", "An internal application error occurred: " + err, "OK", null);
-                }
-            }
+            // Same hazard as the dispatch loop's own handler below, on the phase that
+            // runs before the first Form is shown: anything this reports with can throw,
+            // and one that does would end the thread here instead.
+            reportEdtException(err);
         }
 
         while (keepDispatching(departing)) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
@@ -1595,24 +1588,7 @@ public final class Display extends CN1Constants {
                     releaseTeardownClaim();
                     return;
                 }
-                Log.e(err);
-                if (crashReporter != null) {
-                    // Hand the actual throwable to the registered reporter
-                    // BEFORE impl.handleEDTException gets a chance to short
-                    // circuit (legacy AndroidImplementation returns true
-                    // after showing its own AlertDialog, which used to
-                    // silently lose the exception for anyone hooking via
-                    // setCrashReporter -- including CrashProtection).
-                    crashReporter.exception(err);
-                }
-                CodenameOneThread.handleException(err);
-                if (!impl.handleEDTException(err)) {
-                    if (errorHandler != null) {
-                        errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
-                    } else {
-                        Dialog.show("Error", "An internal application error occurred: " + err, "OK", null);
-                    }
-                }
+                reportEdtException(err);
             }
         }
         // The claim keepDispatching() took is held for the whole teardown and released in the
@@ -1621,6 +1597,65 @@ public final class Display extends CN1Constants {
             runTeardown(departing[0]);
         } finally {
             releaseTeardownClaim();
+        }
+    }
+
+    /// Reports an exception that escaped the event dispatch loop, and CANNOT let a
+    /// second one escape.
+    ///
+    /// Every call this makes can throw, and four of them run code this class does not
+    /// own: a registered `CrashReporter`, the implementation's `handleEDTException`, the
+    /// application's error handler, and `Dialog.show` -- which paints, so it can fail for
+    /// any reason painting fails. Before this was wrapped, an exception from any of them
+    /// propagated out of the catch block, out of the dispatch loop and off the end of the
+    /// thread, and the dispatch thread simply ended. The process stays alive, because
+    /// every other thread does; the application never paints or handles input again and
+    /// hangs for good.
+    ///
+    /// That is not theoretical. It is how the Linux port's screenshot suite stalls: one
+    /// exception on the dispatch thread, the error handler throws while reporting it, and
+    /// the run sits there until a 40-minute cap kills it, with 13 of 100 screenshots
+    /// never taken.
+    ///
+    /// A failure to REPORT is never worth more than the dispatch thread. Both throwables
+    /// are logged -- the original first, so it is not buried by the failure to report it
+    /// -- and dispatching continues.
+    ///
+    /// #### Parameters
+    ///
+    /// - `err`: the throwable that escaped the dispatch loop
+    private void reportEdtException(Throwable err) {
+        try {
+            Log.e(err);
+        } catch (Throwable ignore) {
+            // Logging is the one thing that cannot report its own failure.
+        }
+        try {
+            if (crashReporter != null) {
+                // Hand the actual throwable to the registered reporter
+                // BEFORE impl.handleEDTException gets a chance to short
+                // circuit (legacy AndroidImplementation returns true
+                // after showing its own AlertDialog, which used to
+                // silently lose the exception for anyone hooking via
+                // setCrashReporter -- including CrashProtection).
+                crashReporter.exception(err);
+            }
+            CodenameOneThread.handleException(err);
+            if (!impl.handleEDTException(err)) {
+                if (errorHandler != null) {
+                    errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
+                } else {
+                    Dialog.show("Error", "An internal application error occurred: " + err, "OK", null);
+                }
+            }
+        } catch (Throwable reportingFailure) {
+            try {
+                Log.p("Reporting an exception on the event dispatch thread threw; "
+                        + "the dispatch thread continues. Original exception logged above.");
+                Log.e(reportingFailure);
+            } catch (Throwable ignore) {
+                // As above: nothing left to report with.
+            }
         }
     }
 
