@@ -210,6 +210,74 @@ public class DbCheck {
         }
 
         db.execute("DROP TABLE cn1_check", null);
+        concurrentTransactionsOwnTheSession(db, postgres);
+    }
+
+    /**
+     * Four handlers, one shared Database, transactions that must not interleave.
+     *
+     * This is the engine-agnostic half of a hazard SQLite only half has. Postgres
+     * and MySql each own a Wire, and a Wire owns ONE buffer with a position and a
+     * limit plus one output stream every message is built in; MySql also carries
+     * the packet sequence number. Two calls at once therefore write into the same
+     * message buffer and move each other's parse position -- protocol corruption,
+     * not merely one request's rows committed by another's COMMIT. Which of the
+     * two failures shows up first is timing, so this asserts on both: no thread
+     * may fail, and the row count must be exact.
+     */
+    private static void concurrentTransactionsOwnTheSession(final Database db,
+            boolean postgres) throws Exception {
+        // The engine's own placeholder spelling, like every other statement here:
+        // PostgreSQL wants $1 and answers "syntax error at or near )" for a ?.
+        final String slot = placeholders(postgres, 1);
+        // Dropped first, because the table outlives a run that dies. The finally
+        // below cannot fire if the process is killed, and the next run then meets
+        // "relation already exists" -- against a SHARED server, which is what CI
+        // uses, that turns one interrupted run into a failure for every run after
+        // it. Cost me exactly that here.
+        db.execute("DROP TABLE IF EXISTS cn1_lock", null);
+        db.execute("CREATE TABLE cn1_lock (tag TEXT)", null);
+        try {
+            final List failures = new ArrayList();
+            Thread[] threads = new Thread[4];
+            for(int t = 0 ; t < threads.length ; t++) {
+                final String tag = "t" + t;
+                threads[t] = new Thread(new Runnable() {
+                    public void run() {
+                        for(int round = 0 ; round < 10 ; round++) {
+                            try {
+                                db.transaction(new Database.Work() {
+                                    public Object run(Database inner) throws Exception {
+                                        inner.execute("INSERT INTO cn1_lock (tag) VALUES (" + slot + ")",
+                                                new Object[]{tag});
+                                        inner.execute("INSERT INTO cn1_lock (tag) VALUES (" + slot + ")",
+                                                new Object[]{tag});
+                                        return null;
+                                    }
+                                });
+                            } catch (Exception err) {
+                                synchronized(failures) {
+                                    failures.add(String.valueOf(err));
+                                }
+                                return;
+                            }
+                        }
+                    }
+                });
+                threads[t].start();
+            }
+            for(int t = 0 ; t < threads.length ; t++) {
+                threads[t].join(60000);
+            }
+            check("concurrent transactions on one session all succeed", "0",
+                    String.valueOf(failures.size())
+                            + (failures.isEmpty() ? "" : " -> " + failures.get(0)));
+            List counted = db.query("SELECT COUNT(*) AS n FROM cn1_lock", null);
+            check("every transaction wrote both of its rows", "80",
+                    String.valueOf(((Map)counted.get(0)).get("n")));
+        } finally {
+            db.execute("DROP TABLE cn1_lock", null);
+        }
     }
 
     /**

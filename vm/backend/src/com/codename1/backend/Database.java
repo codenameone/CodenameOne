@@ -113,8 +113,23 @@ public final class Database {
         return new Database(db, null, null, "sqlite");
     }
 
-    /** Runs a statement that returns no rows. Returns the number of rows changed. */
-    public int execute(String sql, Object[] params) throws IOException {
+    /**
+     * Synchronized, like the two below, because a shared session is not safe to
+     * interleave -- and for the network engines it is worse than interleaved
+     * transactions.
+     *
+     * Postgres and MySql each own a Wire, and a Wire owns ONE 16KB buffer with a
+     * position and a limit, plus one output stream it builds every message in.
+     * MySql also carries the packet sequence number. Two handlers calling at once
+     * therefore write into the same message buffer, move each other's parse
+     * position and desynchronize the sequence: that is protocol corruption, not
+     * merely one request's work committed by another's COMMIT.
+     *
+     * The SQLite path delegates to Db, which is synchronized on its own monitor.
+     * Holding this one first is safe -- the order is always Database then Db,
+     * never the reverse -- and Db's monitor is reentrant for the callbacks.
+     */
+    public synchronized int execute(String sql, Object[] params) throws IOException {
         if(sqlite != null) {
             return sqlite.execute(sql, params);
         }
@@ -125,7 +140,7 @@ public final class Database {
     }
 
     /** Runs a query and returns every row as a column-name to value map. */
-    public List query(String sql, Object[] params) throws IOException {
+    public synchronized List query(String sql, Object[] params) throws IOException {
         if(sqlite != null) {
             return sqlite.query(sql, params);
         }
@@ -143,7 +158,7 @@ public final class Database {
      * discovering the conflict at the first write; the other two get a plain
      * BEGIN, which is what they support.
      */
-    public Object transaction(Work body) throws Exception {
+    public synchronized Object transaction(Work body) throws Exception {
         if(sqlite != null) {
             final Work outer = body;
             final Database self = this;

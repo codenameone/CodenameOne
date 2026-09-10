@@ -602,7 +602,14 @@ public class SelfTest {
         });
         String emptyRead;
         try {
-            Tcp conn = Tcp.connect("127.0.0.1", probe.getPort(), 2000);
+            // A GENEROUS connect timeout. This check is about what a zero-length
+            // read answers, not about how fast a just-started server accepts --
+            // and this self-test runs beside the HTTP suite, which has four
+            // servers and several megabytes of traffic in flight. Two seconds
+            // failed once here and could not be reproduced; the outcome string
+            // below distinguishes "threw" from a wrong number, so if it ever does
+            // fail again it will say which.
+            Tcp conn = Tcp.connect("127.0.0.1", probe.getPort(), 15000);
             try {
                 emptyRead = String.valueOf(conn.read(new byte[8], 0, 0));
             } finally {
