@@ -1797,6 +1797,7 @@ static CN1BibopPage* _Atomic bibopAllPages;
 // CN1_GC_VERIFY block just above, which is off in an ordinary census build.
 void cn1HeapAccounting(const char* label);
 void cn1AllocCensus(const char* label);
+void cn1LiveCensus(const char* label);
 #endif
 
 #ifdef CN1_GRACE_AUDIT
@@ -4879,6 +4880,7 @@ void codenameOneGCSweep() {
     // from anywhere, so nothing could answer "what is the footprint made of".
     if(getenv("CN1_HEAP_REPORT")) {
         cn1HeapAccounting("post-sweep");
+        cn1LiveCensus("post-sweep");
     }
 #endif
 }
@@ -5603,6 +5605,7 @@ static void cn1BibopDoInit() {
 // the process actually died holding.
 static void cn1BibopExitReport(void) {
     cn1HeapAccounting("exit");
+    cn1LiveCensus("exit");
     cn1AllocCensus("exit");
 }
 #endif
@@ -7384,6 +7387,143 @@ void cn1HeapAccounting(const char* label) {
             legacyLive, legacyBytes / 1048576.0,
             (liveBytes + legacyBytes) / 1048576.0,
             (capBytes + legacyBytes) / 1048576.0);
+    fflush(stderr);
+}
+
+/**
+ * Prints the LIVE heap by class, biggest first.
+ *
+ * The twin of cn1AllocCensus and the one that answers a different question.
+ * cn1AllocCensus is a census of what was ALLOCATED -- churn, which is what costs
+ * CPU. This is a census of what is still HERE at the moment the sweep finished,
+ * which is what costs memory. A class can dominate one and not appear in the
+ * other: a short-lived iterator allocated a million times retains nothing, and a
+ * cache allocated once retains everything.
+ *
+ * Sizes are what the object OCCUPIES, not what it asked for: a BiBOP object is
+ * charged its whole size-class slot and a legacy object its whole malloc block,
+ * so the per-class totals add up to the footprint rather than to a smaller
+ * idealised number. Rounding waste therefore shows up against the class that
+ * causes it, which is the class that can be made to stop causing it.
+ *
+ * Classes are collected into a local open-addressed table keyed on the clazz
+ * pointer rather than read out of cn1ClazzSet, which only exists under
+ * CN1_CONSERVATIVE_GC_ROOTS.
+ *
+ * Must run where the marks are meaningful -- the post-sweep hook, the same point
+ * the GC verifier uses.
+ */
+#define CN1_LIVE_CENSUS_SLOTS 8192
+struct CN1LiveRow { struct clazz* c; long count; long long bytes; long reachable; };
+static struct CN1LiveRow cn1LiveRows[CN1_LIVE_CENSUS_SLOTS];
+
+static void cn1LiveTally(struct clazz* c, long long bytes, int reachable) {
+    if(c == 0) {
+        return;
+    }
+    size_t h = (((uintptr_t)c) >> 4) & (CN1_LIVE_CENSUS_SLOTS - 1);
+    for(int probe = 0 ; probe < CN1_LIVE_CENSUS_SLOTS ; probe++) {
+        size_t i = (h + (size_t)probe) & (CN1_LIVE_CENSUS_SLOTS - 1);
+        if(cn1LiveRows[i].c == 0) {
+            cn1LiveRows[i].c = c;
+        }
+        if(cn1LiveRows[i].c == c) {
+            cn1LiveRows[i].count++;
+            cn1LiveRows[i].bytes += bytes;
+            cn1LiveRows[i].reachable += reachable;
+            return;
+        }
+    }
+    // Table full: 8192 slots against the ~170 classes a large program allocates,
+    // so this is unreachable short of a pathological program. Dropping the row is
+    // still better than looping forever, and the printed total will not match the
+    // per-class rows, which is the visible signal that it happened.
+}
+
+void cn1LiveCensus(const char* label) {
+    memset(cn1LiveRows, 0, sizeof(cn1LiveRows));
+    long long bibopBytes = 0, legacyBytes = 0;
+    long bibopObjs = 0, legacyObjs = 0, bibopReach = 0, legacyReach = 0;
+
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        int n = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+        for(int i = 0 ; i < n ; i++) {
+            JAVA_OBJECT o = cn1BibopSlot(p, i);
+            int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+            // Occupied, not "provably reachable": a slot awaiting collection is
+            // still holding memory, and this census is about what memory is being
+            // held. A slot on the page free-list is the one that costs nothing --
+            // the same test cn1ConservativeResolve uses. (CN1_GC_POISON_MARK is
+            // deliberately not consulted: it is defined further down, inside the
+            // verifier's section, and exists only in a CN1_GC_VERIFY build.)
+            if(m == CN1_BIBOP_FREE_MARK) {
+                continue;
+            }
+            cn1LiveTally(o->__codenameOneParentClsReference, (long long)p->slotSize,
+                         m == currentGcMarkValue ? 1 : 0);
+            bibopBytes += (long long)p->slotSize;
+            bibopObjs++;
+            if(m == currentGcMarkValue) {
+                bibopReach++;
+            }
+        }
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+    }
+
+    int nHeap = currentSizeOfAllObjectsInHeap;
+    for(int i = 0 ; i < nHeap ; i++) {
+        JAVA_OBJECT o = allObjectsInHeap[i];
+        if(o == JAVA_NULL) {
+            continue;
+        }
+        // An adopted object lives in a BiBOP slot and was already charged by the
+        // page walk; malloc_size on it would read a block header that is not there.
+        if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+            continue;
+        }
+        long long sz = 0;
+#if defined(__APPLE__)
+        sz = (long long)malloc_size((void*)o);
+#endif
+        cn1LiveTally(o->__codenameOneParentClsReference, sz,
+                     o->__codenameOneGcMark == currentGcMarkValue ? 1 : 0);
+        legacyBytes += sz;
+        legacyObjs++;
+        if(o->__codenameOneGcMark == currentGcMarkValue) {
+            legacyReach++;
+        }
+    }
+
+    // OCCUPIED is what costs memory; REACHABLE is what the last mark actually
+    // proved live. The gap between them is garbage the collector has not got to,
+    // and telling them apart is the whole point -- "a million live iterators" and
+    // "a million dead iterators still holding slots" call for opposite fixes.
+    fprintf(stderr, "[LIVE:%s] occupied %ld objects %.2fMB | reachable %ld (%.0f%%) "
+            "| bibop %ld/%.2fMB legacy %ld/%.2fMB\n",
+            label, bibopObjs + legacyObjs, (bibopBytes + legacyBytes) / 1048576.0,
+            bibopReach + legacyReach,
+            100.0 * (bibopReach + legacyReach) / ((bibopObjs + legacyObjs) > 0 ? (bibopObjs + legacyObjs) : 1),
+            bibopObjs, bibopBytes / 1048576.0, legacyObjs, legacyBytes / 1048576.0);
+    for(int shown = 0 ; shown < 30 ; shown++) {
+        int best = -1;
+        for(int i = 0 ; i < CN1_LIVE_CENSUS_SLOTS ; i++) {
+            if(cn1LiveRows[i].c != 0 && cn1LiveRows[i].bytes > 0
+                    && (best < 0 || cn1LiveRows[i].bytes > cn1LiveRows[best].bytes)) {
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        fprintf(stderr, "[LIVE:%s]   %8.2fMB %9ld objs %4lld B/obj  reach %9ld (%3.0f%%)  %s\n",
+                label, cn1LiveRows[best].bytes / 1048576.0, cn1LiveRows[best].count,
+                cn1LiveRows[best].bytes / (cn1LiveRows[best].count > 0 ? cn1LiveRows[best].count : 1),
+                cn1LiveRows[best].reachable,
+                100.0 * cn1LiveRows[best].reachable / (cn1LiveRows[best].count > 0 ? cn1LiveRows[best].count : 1),
+                cn1LiveRows[best].c->clsName ? cn1LiveRows[best].c->clsName : "?");
+        cn1LiveRows[best].bytes = 0;
+    }
     fflush(stderr);
 }
 

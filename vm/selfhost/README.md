@@ -211,6 +211,77 @@ Growth there is also post-insert by design, so the shared-empty-table trick that
 works for ArrayList would have the put path writing into the shared table. Not
 worth it for an unmeasured win in the hottest class in the runtime.
 
+### Heap telemetry
+
+A census build answers "what is actually in the heap":
+
+```bash
+CN1_SELFHOST_CFLAGS="-DCN1_ALLOC_CENSUS" ./build-selfhost.sh -O3
+CN1_HEAP_REPORT=1 ./target/parpar-O3 clean ... 2> report.txt
+```
+
+Three reports, after every sweep and once at exit:
+
+- `[JHEAP]` -- BiBOP pages reserved / live / slack, plus the legacy heap. Answers
+  "is this fragmentation?" (here: no, slack is ~2 MB of 715 MB).
+- `[LIVE]` -- **the live heap by class**, occupied bytes, objects, bytes each, and
+  how many the last mark proved reachable. This is the one that was missing.
+- `[ALLOC]` -- allocation volume by class. Churn, which costs CPU, as opposed to
+  retention, which costs memory. A class can dominate one and not the other.
+
+`[LIVE]` charges each object what it OCCUPIES -- a whole BiBOP size-class slot, a
+whole malloc block -- so the per-class rows add up to the footprint and rounding
+waste is charged to the class that causes it.
+
+**Read the post-sweep report, not the exit one, for reachability.** `reachable`
+means "carries the current mark", so at exit -- long after the last cycle -- almost
+everything looks unreachable whether it is or not. At exit that column says 6%; at
+the last sweep, with fresh marks, it says 75%.
+
+### What the census says about this workload
+
+At the last completed sweep: 295 MB occupied, **75% of it reachable**. So the heap
+is genuinely full of live data, not garbage the collector failed to reclaim. The
+trajectory across cycles is 41 MB, 107 MB, 295 MB -- and then the run ends at
+769 MB, because only three or four cycles complete in a 1.4 s program while the
+mark thread sits at 97% CPU in `gcMarkObject`.
+
+Collecting harder does not fix it, which is the useful negative result:
+
+| mark threads | wall | cycles | peak |
+|---|---:|---:|---:|
+| 1 | 1.40 s | 4 | 1256 MB |
+| 4 | 1.25 s | 9 | 1243 MB |
+| 8 | 1.47 s | 8 | 1223 MB |
+
+`-DCN1_GC_MARK_THREADS=4` more than doubles the cycles and is slightly faster, but
+peak barely moves. Combined with 75% reachability, that says the live set really is
+this large rather than the collector being behind.
+
+Where the process memory sits, from `vmmap --summary` around peak:
+
+```
+MALLOC_LARGE          551.5M virtual / 435.8M dirty    BiBOP arenas
+MALLOC_LARGE (empty)   53.7M /  50.2M dirty            freed, not returned
+MALLOC_SMALL          232.0M / 111.7M dirty            legacy heap
+Stack                  12.2M /   0.2M
+```
+
+It is all malloc'd heap; there is no large non-heap component. (An earlier note in
+this file claimed ~600 MB was "not the Java heap" -- that compared an exit-time
+census against the whole-run peak and was wrong.)
+
+Two leads the census opens and does not settle:
+
+- Per-object width against the JDK: `String` 73 B, `ArrayList` 48 B, `Object[]`
+  100 B average. The JDK's String is ~32 B and its ArrayList ~40 B.
+- 295,907 `SimpleListIterator` objects were 72% *reachable* at a fresh sweep, and
+  a stack-local iterator should be dead the moment its loop ends. ParparVM scans
+  stacks conservatively (`CN1_CONSERVATIVE_GC_ROOTS` is defined unconditionally),
+  so a stale stack word that looks like a pointer keeps its object alive -- which
+  a deeply recursive, allocation-heavy program produces a lot of. Plausible, not
+  proven, and worth measuring before acting on.
+
 ### String: the NSString field is free
 
 `java.lang.String` carries a `long nsString` for the Apple targets' direct NSString
