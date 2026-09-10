@@ -1346,6 +1346,32 @@ class InviteResilienceTest extends UITestBase {
 
     @Test
     @EdtTest
+    void afingerprintAnswerThatArrivesAfterTheWindowIsRefused() {
+        // A request issued just before expiresAt can sit in the queue or on the
+        // wire past it, and only the CURRENT window was checked -- so a late
+        // statistical answer resolved and reported invite_install outside the
+        // window the application configured. The request carries no expiry to
+        // the server either, so the record on this device is the only place
+        // that deadline exists.
+        Invites.checkForInvite();
+        int inFlight = Invites.currentLookupEpochForTest();
+
+        // The window closes while the answer is on the wire.
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(pending);
+        pending.put("expiresAt", String.valueOf(System.currentTimeMillis() - 1000L));
+        assertTrue(InviteStore.write(InviteStore.PENDING, pending));
+        Invites.forgetLoadedState();
+
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LATE2", "c1", "sms"),
+                Invites.MATCH_FINGERPRINT, true, inFlight);
+
+        assertNull(Invites.getAttribution(),
+                "a statistical answer landed after the attribution window closed");
+    }
+
+    @Test
+    @EdtTest
     void turningOnReattributionLetsTheStateBeReadAgain() {
         // loadState() reads the pending record only when re-attribution is on,
         // so a process that cached STATE_RESOLVED before the setter ran would

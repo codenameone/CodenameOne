@@ -966,10 +966,28 @@ public final class Invites {
     /// that left the referral dimensions behind would re-link the fresh
     /// identity to the same inviter.
     public static void reset() {
+        resetVerified();
+    }
+
+    /// The same work, reporting whether the durable records really went.
+    ///
+    /// Package private and separate so `reset()` keeps the signature an
+    /// application already calls. The answer matters to exactly one caller:
+    /// an erasure must not be reported complete while the attribution record
+    /// is still readable, or it comes back on the next launch under the new
+    /// identity.
+    ///
+    /// #### Returns
+    ///
+    /// true when nothing readable is left behind
+    static boolean resetVerified() {
         lookupEpoch++;
-        InviteStore.delete(InviteStore.PENDING);
+        boolean cleared = InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
-        InviteStore.delete(InviteStore.ATTRIBUTION);
+        // ATTRIBUTION is the one that matters: it names the inviter. The other
+        // two are a lookup in progress and a queue of registrations, neither of
+        // which identifies anybody after this.
+        cleared &= InviteStore.delete(InviteStore.ATTRIBUTION);
         InviteStore.delete(InviteStore.OUTBOX);
         Preferences.delete(PREF_CONSUMED_ARG);
         clearDimensions();
@@ -984,6 +1002,7 @@ public final class Invites {
         lookupIssuedAt = 0;
         undelivered = null;
         unacknowledged.clear();
+        return cleared;
     }
 
     // Package private test seam: the epoch an outstanding lookup was issued
@@ -1003,7 +1022,23 @@ public final class Invites {
     // Package private: the analytics provider hook calls this when the client
     // id changes underneath us, which is what an erasure request looks like.
     static boolean eraseInternal() {
-        reset();
+        // The DELETES have to have happened, not just been attempted.
+        //
+        // Storage.deleteStorageFile reports nothing useful: Android's
+        // Context.deleteFile() and JavaSE's File.delete() both return a boolean
+        // and neither throws, so a delete that failed looked exactly like one
+        // that worked. reset() cleared the caches regardless, the tombstone was
+        // written, and the provider recorded the new client id as fully
+        // erased -- while the old attribution record was still on the disk. It
+        // came back on the next launch, so getAttribution() and conversion()
+        // reported the old referral identity under the new id, and a later
+        // consent change restored its dimensions.
+        boolean cleared = resetVerified();
+        if (!cleared) {
+            Log.p("invite: the attribution record could not be deleted, so the erasure is "
+                    + "not complete and will be attempted again", Log.WARNING);
+            return false;
+        }
         // A tombstone, so the erasure is not undone by the next ordinary
         // launch.
         //
@@ -2197,8 +2232,29 @@ public final class Invites {
         // deferred -- the code came back through the store, which is the whole
         // reason the Android path is the deterministic one -- so the kill
         // switch dropped the best answer the device will ever have.
-        if (MATCH_FINGERPRINT.equals(matchType) && attributionWindow == 0) {
-            return;
+        if (MATCH_FINGERPRINT.equals(matchType)) {
+            if (attributionWindow == 0) {
+                return;
+            }
+            // And the window has to still be open when the ANSWER arrives.
+            //
+            // A request issued just before expiresAt can sit in the queue or on
+            // the wire past it, and only the current window was checked -- so a
+            // late statistical answer resolved and reported invite_install
+            // outside the window the application configured. The request does
+            // not carry the expiry to the server either, so the server cannot
+            // refuse it on our behalf; the record on this device is the only
+            // place the deadline exists.
+            //
+            // Read from the pending record rather than recomputed, because it
+            // is the deadline this lookup was started under -- and a marker
+            // with no expiry at all is left alone, since that is a record from
+            // before the window was written rather than one that has run out.
+            Map<String, String> deadline = readPending();
+            long expiresAt = InviteStore.getLong(deadline, "expiresAt", 0);
+            if (expiresAt > 0 && System.currentTimeMillis() > expiresAt) {
+                return;
+            }
         }
         try {
             if (payload == null || payload.length() == 0) {

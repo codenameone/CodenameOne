@@ -110,6 +110,14 @@ final class InviteStore {
         failNextNamed = name;
     }
 
+    // The same seam for a delete. Storage.deleteStorageFile cannot be made to
+    // fail from a test either, and the erasure path turns on exactly that.
+    private static String failNextDeleteNamed;
+
+    static void failNextDeleteForTest(String name) {
+        failNextDeleteNamed = name;
+    }
+
     static boolean write(String record, Map<String, String> values) {
         if (record != null && record.equals(failNextNamed)) {
             failNextNamed = null;
@@ -127,14 +135,50 @@ final class InviteStore {
         }
     }
 
-    static void delete(String record) {
+    /// Deletes a record and says whether it is really gone.
+    ///
+    /// `deleteStorageFile` reports nothing useful on either port that matters
+    /// -- Android's `Context.deleteFile()` and JavaSE's `File.delete()` both
+    /// return a boolean and neither throws -- so a failed delete looked
+    /// identical to a successful one. That is load bearing for erasure: the
+    /// caller went on to report the identity erased while the record was still
+    /// on the disk, ready to come back on the next launch.
+    ///
+    /// Existence is re-checked afterwards rather than trusted, and a record
+    /// that survives is OVERWRITTEN with an empty one. An empty record carries
+    /// no code, no inviter and no campaign, so a delete that cannot happen at
+    /// least leaves nothing behind to restore.
+    ///
+    /// - `record`: the record name
+    ///
+    /// #### Returns
+    ///
+    /// true when nothing readable is left
+    static boolean delete(String record) {
+        if (record != null && record.equals(failNextDeleteNamed)) {
+            failNextDeleteNamed = null;
+            return false;
+        }
         try {
             Storage s = Storage.getInstance();
-            if (s != null && s.exists(record)) {
-                s.deleteStorageFile(record);
+            if (s == null) {
+                return false;
             }
+            if (!s.exists(record)) {
+                return true;
+            }
+            s.deleteStorageFile(record);
+            if (!s.exists(record)) {
+                return true;
+            }
+            if (!s.writeObject(record, new LinkedHashMap<String, String>())) {
+                return false;
+            }
+            Map<String, String> left = read(record);
+            return left == null || left.isEmpty();
         } catch (Throwable t) {
             Log.e(t);
+            return false;
         }
     }
 

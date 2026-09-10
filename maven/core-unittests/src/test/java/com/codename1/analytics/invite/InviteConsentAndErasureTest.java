@@ -157,6 +157,28 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
+    void anerasureIsNotReportedDoneWhileTheAttributionSurvives() {
+        // Storage.deleteStorageFile reports nothing useful: Android's
+        // Context.deleteFile() and JavaSE's File.delete() both return a boolean
+        // and neither throws, so a delete that failed looked exactly like one
+        // that worked. The caches were cleared regardless, the tombstone was
+        // written, and the provider recorded the new client id as fully
+        // erased -- while the attribution record was still on the disk, ready
+        // to come back on the next launch and report the old referral identity
+        // under the new id.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution());
+
+        InviteStore.failNextDeleteForTest(InviteStore.ATTRIBUTION);
+        assertFalse(Invites.eraseInternal(),
+                "an erasure reported success while the attribution record survived");
+    }
+
+    @FormTest
     void registeringTheProviderIsNotMistakenForAnErasure() {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
