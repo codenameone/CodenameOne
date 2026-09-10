@@ -421,10 +421,24 @@ ToggleButton {
 /* sel# is not the checked look. Button.isPressedStyle() sends a checked toggle
    to press# when it has no focus and to sel# when it does, and an unchecked
    toggle with focus lands on sel# as well -- so that one slot means "focused",
-   for either value. Painting the checked fill there made a focused unchecked
-   radio indistinguishable from the checked one beside it. sel# is the base
-   appearance with an accent ring instead: focus stays visible and never claims
-   a value the control does not have. */
+   for either value, and cannot also say which value.
+
+   Neither assignment is lossless, and the choice here is deliberate:
+
+     sel# = the checked fill  -> a focused UNCHECKED control looks checked.
+                                 Arrowing through a radio group makes every
+                                 control you land on claim to be selected.
+     sel# = base + focus ring -> a focused CHECKED control looks unchecked,
+                                 for as long as it holds focus.
+
+   The second is kept because it never asserts a value the control does not
+   have; the first invents one. It is a framework limit rather than a theme
+   bug -- one style slot for two dimensions -- and no CSS here can express
+   both. Fixing it properly means resolving focus separately from state in
+   Component.getStyle(), so a checked control keeps press# while focus is
+   drawn some other way. Until then, do not "fix" this rule by moving the
+   checked fill back into sel#: that trade has been made once already and it
+   is the worse half. */
 ToggleButton.selected { color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; border: 0.3mm solid var(--accent-color, #007aff); }
 ToggleButton.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
 ToggleButton.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
