@@ -97,6 +97,21 @@ public class BottomAppBar extends StatelessWidget {
         Container c = new Container();
         Color fill = color != null ? color : themedColor(context);
         NotchedShape notch = shape instanceof NotchedShape ? (NotchedShape) shape : null;
+        c.height(HEIGHT_LP);
+        c.alignment(com.codename1.flutter.Alignment.topCenter);
+        c.child(child);
+        // The bar CARRIES the display's bottom inset; it is not something the scaffold
+        // paints behind it. Flutter's BottomAppBar wraps its child in a SafeArea, so the
+        // bar measures its Material height plus the inset and everything applied to the
+        // bar applies to both.
+        //
+        // That distinction is invisible at rest and decides what happens when the bar
+        // animates. Reply folds its bar away as you read down the list, and a scaffold
+        // that adds the inset separately keeps painting a band of bar colour across the
+        // bottom of the screen after the bar itself has collapsed to nothing -- the bar
+        // does not go away, it shrinks to a stripe. Owning the inset means the fold takes
+        // it along and the bar vanishes, which is what the reference does.
+        Widget body = withBottomInset(context, c);
         if (fill != null && notch != null) {
             // Painted through the shape rather than coloured: a Container fills its box,
             // and the whole point of a notched shape is that the box is not what should
@@ -105,27 +120,38 @@ public class BottomAppBar extends StatelessWidget {
             surface.shape(notch);
             surface.color(fill);
             surface.notchMargin(notchMargin != null ? notchMargin.doubleValue() : 4.0);
-            c.height(HEIGHT_LP);
-            c.alignment(com.codename1.flutter.Alignment.topCenter);
-            c.child(child);
-            surface.child(c);
+            surface.child(body);
             return surface;
         }
-        if (fill != null) {
-            c.color(fill);
+        if (fill == null) {
+            return body;
         }
-        // Exactly the Material height, with no safe-area padding of its own: the
-        // reference draws this bar at 80 logical pixels even on a screen that
-        // HAS a bottom inset, so the inset is not the bar's to carry. Where the
-        // reply study looks 114 tall it is 80 of bar over 34 of the scaffold's
-        // own dark background.
-        c.height(HEIGHT_LP);
-        // Held at the TOP, because the scaffold may lay this bar out taller than
-        // its own height to cover the display's bottom padding, and the content
-        // belongs in the Material 80 at the top of that, not centred in the rest.
-        c.alignment(com.codename1.flutter.Alignment.topCenter);
-        c.child(child);
-        return c;
+        Container filled = new Container();
+        filled.color(fill);
+        filled.child(body);
+        return filled;
+    }
+
+    /// The bar's content plus the display's bottom inset below it, as Flutter's
+    /// {@code SafeArea} inside BottomAppBar does.
+    private static Widget withBottomInset(BuildContext context, Widget content) {
+        double bottom = 0;
+        try {
+            com.codename1.flutter.EdgeInsets p =
+                    com.codename1.flutter.MediaQuery.paddingOf(context);
+            if (p != null) {
+                bottom = p.bottom();
+            }
+        } catch (Throwable t) {
+            // no MediaQuery in reach: the bar is simply its Material height
+        }
+        if (bottom <= 0) {
+            return content;
+        }
+        com.codename1.flutter.widgets.Padding pad = new com.codename1.flutter.widgets.Padding();
+        pad.padding(com.codename1.flutter.EdgeInsets.only(0, 0, 0, bottom));
+        pad.child(content);
+        return pad;
     }
 
     /** {@code BottomAppBarTheme.color}, then the surface the bar sits on. */

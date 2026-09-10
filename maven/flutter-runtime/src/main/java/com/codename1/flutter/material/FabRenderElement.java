@@ -140,6 +140,27 @@ public class FabRenderElement extends RenderElement {
         setGlyph(c);
     }
 
+    /**
+     * Removes the drop shadow a Codename One round border draws for itself.
+     *
+     * <p>The button's elevation belongs to the Material surface under it, which is what
+     * Flutter shades and what a notched bar already accounts for. A border that also
+     * draws one produces a second, harder ring that does not match anything -- most
+     * obviously on the reply study's FAB, where it sits in the bar's notch and the ring
+     * reads as a smudge around the cut-out rather than as lift.</p>
+     *
+     * <p>Both round borders are handled, and only the shadow is touched: the theme still
+     * owns the shape and the stroke.</p>
+     */
+    private static void stripBorderShadow(com.codename1.ui.plaf.Style all) {
+        com.codename1.ui.plaf.Border b = all.getBorder();
+        if (b instanceof com.codename1.ui.plaf.RoundBorder) {
+            all.setBorder(((com.codename1.ui.plaf.RoundBorder) b).shadowOpacity(0));
+        } else if (b instanceof com.codename1.ui.plaf.RoundRectBorder) {
+            all.setBorder(((com.codename1.ui.plaf.RoundRectBorder) b).shadowOpacity(0));
+        }
+    }
+
     /// The material glyph, in whatever foreground the style now carries.
     private void setGlyph(Component c) {
         if (c instanceof com.codename1.ui.Button) {
@@ -194,6 +215,7 @@ public class FabRenderElement extends RenderElement {
                     .strokeOpacity(0)
                     .shadowOpacity(0));
         }
+        stripBorderShadow(all);
         com.codename1.flutter.Color bg = fab().getBackgroundColor();
         com.codename1.flutter.Color fgDefault = null;
         if (bg == null) {

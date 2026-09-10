@@ -432,6 +432,13 @@ public class ScaffoldRenderElement extends RenderElement {
             navHeight = ns.height();
             width = Math.max(width, ns.width());
         }
+        // The bar carries the display's inset itself (BottomAppBar.withBottomInset), so
+        // adding it here as well both double-counts it and outlives the bar: a bar that
+        // animates away left the band behind as a stripe of its own colour. The band is
+        // only ours to add when there is no bar to carry it.
+        if (navHeight > 0) {
+            bottomBand = 0;
+        }
 
         // Persistent footer buttons sit above the bottom strip.
         double footerHeight = 0;
@@ -487,9 +494,8 @@ public class ScaffoldRenderElement extends RenderElement {
             // is what the reference draws -- the reply study's bar reads as one
             // 114 logical pixel block of colour whose Inbox row sits in the top
             // 56 of it, not as an 80 tall bar floating above a gap.
-            double barTotal = navHeight + bottomBand;
-            navRender.layout(BoxConstraints.tight(self.width(), barTotal));
-            setChildOffset(navRender, 0, Math.max(0, self.height() - barTotal));
+            navRender.layout(BoxConstraints.tight(self.width(), navHeight));
+            setChildOffset(navRender, 0, Math.max(0, self.height() - navHeight));
         }
         if (footerRender != null) {
             footerRender.layout(BoxConstraints.tight(self.width(), footerHeight));
