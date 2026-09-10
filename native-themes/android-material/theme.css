@@ -353,15 +353,15 @@ ToggleButton.disabled { color: #a5a0ab; background-color: transparent; cn1-backg
    and every state is spelled out because cn1-derive is only read at base
    level. */
 ToggleButtonFirst { cn1-derive: ToggleButton; }
-ToggleButtonFirst.selected { cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
+ToggleButtonFirst.selected { color: #1d1b20; background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
 ToggleButtonFirst.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonFirst.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonLast { cn1-derive: ToggleButton; }
-ToggleButtonLast.selected { cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
+ToggleButtonLast.selected { color: #1d1b20; background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
 ToggleButtonLast.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonLast.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonOnly { cn1-derive: ToggleButton; }
-ToggleButtonOnly.selected { cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
+ToggleButtonOnly.selected { color: #1d1b20; background-color: transparent; cn1-background-type: cn1-pill-border; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
 ToggleButtonOnly.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonOnly.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 
@@ -838,10 +838,10 @@ PhoneVerificationLink {
    were undefined, so the control the guide recommends over a raw TextField
    rendered with default styling. */
 FloatingHint { cn1-derive: SecondaryLabel; color: #49454f; font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
-FloatingHint.disabled { color: #a9a8aa; background-color: transparent; }
+FloatingHint.disabled { padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 1.9mm; color: #a9a8aa; background-color: transparent; }
 /* M3 error role; the line sits under the field and carries the message. */
 ErrorLabel { cn1-derive: SecondaryLabel; color: #b3261e; font-size: 1.9mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
-ErrorLabel.disabled { color: #a9a8aa; background-color: transparent; }
+ErrorLabel.disabled { padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 1.9mm; color: #a9a8aa; background-color: transparent; }
 
 /* Table's documented cell/header UIIDs. The framework does not set these
    itself -- the chapter tells you to -- so defining them makes the documented
@@ -1027,11 +1027,11 @@ TableHeader.disabled { margin: 0; font-size: 2.5mm; color: #49454f; font-family:
     ErrorLabel { cn1-derive: SecondaryLabel; color: #f2b8b5; font-size: 1.9mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
     ErrorLabel.selected { font-family: "native:MainRegular"; color: #f2b8b5; font-size: 1.9mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
     ErrorLabel.pressed { font-family: "native:MainRegular"; color: #f2b8b5; font-size: 1.9mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
-    ErrorLabel.disabled { color: #5c5967; background-color: transparent; }
+    ErrorLabel.disabled { font-size: 1.9mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; color: #5c5967; background-color: transparent; }
     FloatingHint { cn1-derive: SecondaryLabel; color: #cac4d0; font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
     FloatingHint.selected { font-family: "native:MainRegular"; color: #cac4d0; font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
     FloatingHint.pressed { font-family: "native:MainRegular"; color: #cac4d0; font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
-    FloatingHint.disabled { color: #5c5967; background-color: transparent; }
+    FloatingHint.disabled { font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; color: #5c5967; background-color: transparent; }
     TableCell { cn1-derive: Label; color: #e6e0e9; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
     TableCell.selected { margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #e6e0e9; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
     TableCell.pressed { margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #e6e0e9; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
