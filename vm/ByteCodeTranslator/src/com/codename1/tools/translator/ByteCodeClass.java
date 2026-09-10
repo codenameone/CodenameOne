@@ -679,6 +679,18 @@ public class ByteCodeClass {
         
         b.append(".h\"\n");
         
+        // Forward-declare the COMPLETION flag so the inline class-init guards below
+        // can test it. Tentative definition; the initializer block later in this
+        // same file defines it with = 0.
+        //
+        // The guards must NOT test class__X.initialized: that flag is set BEFORE
+        // __CLINIT__ runs, because it doubles as the recursion guard for a <clinit>
+        // that touches its own statics. A guard on it can therefore skip the
+        // initializer while <clinit> is still executing and hand back a default for
+        // a static field that has not been assigned yet. __X_LOADED__ is stored
+        // after <clinit> returns and is the only flag that means "finished".
+        b.append("static int __").append(clsName).append("_LOADED__;\n");
+
         for(String s : dependsClassesInterfaces) {
             if (exportsClassesInterfaces.contains(s)) {
                 continue;
@@ -973,8 +985,8 @@ public class ByteCodeClass {
                     // per static-field access. MEASURED: __STATIC_INITIALIZER_* was
                     // 7.2% of mutator self-time, java.util.Iterator's alone 6.26%.
                     // Safe as an ACQUIRE load now that the flag is release-stored.
-                    b.append("() {\n    if(__builtin_expect(!__atomic_load_n(&class__").append(bf.getClsName())
-                            .append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
+                    b.append("() {\n    if(__builtin_expect(!__atomic_load_n(&__").append(bf.getClsName())
+                            .append("_LOADED__, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
                     if (bf.isVolatile()) {
                         b.append("(getThreadLocalData());\n     return atomic_load_explicit(&STATIC_FIELD_");
@@ -1000,8 +1012,8 @@ public class ByteCodeClass {
                         b.append("CODENAME_ONE_THREAD_STATE, ");
                     }
                     b.append(bf.getCDefinition());
-                    b.append(" __cn1StaticVal) {\n    if(__builtin_expect(!__atomic_load_n(&class__").append(bf.getClsName())
-                            .append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
+                    b.append(" __cn1StaticVal) {\n    if(__builtin_expect(!__atomic_load_n(&__").append(bf.getClsName())
+                            .append("_LOADED__, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
                     if (bf.isObjectType()) {
                         b.append("(threadStateData);\n    ");
@@ -1253,8 +1265,8 @@ public class ByteCodeClass {
         if(!isInterface && !isAbstract) {
             b.append("JAVA_OBJECT __NEW_");
             b.append(clsName);
-            b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__builtin_expect(!__atomic_load_n(&class__").append(clsName)
-                    .append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
+            b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__builtin_expect(!__atomic_load_n(&__").append(clsName)
+                    .append("_LOADED__, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
             b.append(clsName);
             b.append("(threadStateData);\n    JAVA_OBJECT o = codenameOneGcMalloc(threadStateData, sizeof(struct obj__");
             b.append(clsName);
@@ -1265,8 +1277,8 @@ public class ByteCodeClass {
             if(hasDefaultConstructor()) {
                 b.append("JAVA_OBJECT __NEW_INSTANCE_");
                 b.append(clsName);
-                b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__builtin_expect(!__atomic_load_n(&class__").append(clsName)
-                        .append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
+                b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__builtin_expect(!__atomic_load_n(&__").append(clsName)
+                        .append("_LOADED__, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
                 b.append(clsName);
                 b.append("(threadStateData);\n    JAVA_OBJECT o = codenameOneGcMalloc(threadStateData, sizeof(struct obj__");
                 b.append(clsName);

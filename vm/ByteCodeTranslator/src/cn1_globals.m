@@ -6333,6 +6333,34 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES
 #define CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES (1024L*1024*1024)
 #endif
+// cn1_available_memory answers a flat 100MB on every platform where it cannot
+// measure: Linux, Windows, and the non-Apple fallback. That number is not a
+// reading, and a bound DERIVED from it is not a bound -- it is a constant that
+// happens to look like one.
+//
+// This matters asymmetrically. cn1PacingGrowthFloorBytes above only ever RAISES
+// its floor from fm, so on a placeholder host the absolute floor wins and
+// behaviour is bit-for-bit unchanged. The run-ahead bound below only ever LOWERS
+// the cap, so scaling it by a placeholder TIGHTENS pacing on exactly the hosts we
+// know nothing about. It did: BibopPageFloorIntegrationTest went red on arm64
+// Linux, where fm/8 is 12.5MB, while the same code passed on macOS where fm is
+// real.
+//
+// So the bound applies only where fm is a genuine reading. Returns 0 to mean
+// "not measurable here, leave the cap alone".
+#ifndef CN1_PACING_PLACEHOLDER_FREE_MEM
+#define CN1_PACING_PLACEHOLDER_FREE_MEM (1024L*1024*100)
+#endif
+static long cn1PacingRunAheadBound(long fm) {
+    if(fm <= CN1_PACING_PLACEHOLDER_FREE_MEM) {
+        return 0;
+    }
+    long bound = CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES;
+    if(bound > fm / 8) {
+        bound = fm / 8;
+    }
+    return bound;
+}
 // How stale a below-floor footprint reading may be before the bound re-probes it. The
 // probe is task_info on Apple and one /proc read on Linux -- a microsecond or two -- and
 // it is taken at most once per interval across the whole process, and only when the bound
@@ -6634,11 +6662,8 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
         // under the saturation point -- a phone, a container, the flat 100MB
         // placeholder off Apple -- the floor follows fm/8 and nothing loosens.
         {
-            long runAhead = CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES;
-            if(fm > 0 && runAhead > fm / 8) {
-                runAhead = fm / 8;
-            }
-            if(capCeiling < runAhead) {
+            long runAhead = cn1PacingRunAheadBound(fm);
+            if(runAhead > 0 && capCeiling < runAhead) {
                 capCeiling = runAhead;
             }
         }
@@ -6665,15 +6690,14 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     // Apple -- this follows fm/8 and nothing is loosened. `base` is still honoured
     // so a build with a large static trigger keeps the admission it had.
     {
-        long runAhead = CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES;
-        if(fm > 0 && runAhead > fm / 8) {
-            runAhead = fm / 8;
-        }
-        if(cap > runAhead) {
-            cap = runAhead;
-        }
-        if(cap < base) {
-            cap = base;
+        long runAhead = cn1PacingRunAheadBound(fm);
+        if(runAhead > 0) {
+            if(cap > runAhead) {
+                cap = runAhead;
+            }
+            if(cap < base) {
+                cap = base;
+            }
         }
     }
     if(cn1PacingTraceOn()) {

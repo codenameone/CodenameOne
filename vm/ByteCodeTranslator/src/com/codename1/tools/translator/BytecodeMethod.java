@@ -2189,8 +2189,12 @@ public class BytecodeMethod implements SignatureSet {
         }
 
         if(includeStaticInitializer) {
-            b.append("if(__builtin_expect(!__atomic_load_n(&class__").append(cls)
-             .append(".initialized, __ATOMIC_ACQUIRE), 0)) ");
+            // Completion flag, not class__X.initialized: that one is set BEFORE
+            // __CLINIT__ runs (it is also the recursion guard), so a guard on it can
+            // skip the initializer mid-<clinit>. See the forward declaration in
+            // ByteCodeClass.generateCCode.
+            b.append("if(__builtin_expect(!__atomic_load_n(&__").append(cls)
+             .append("_LOADED__, __ATOMIC_ACQUIRE), 0)) ");
             b.append("__STATIC_INITIALIZER_");
             b.append(cls);
             b.append("(threadStateData);\n    ");
@@ -4355,6 +4359,28 @@ public class BytecodeMethod implements SignatureSet {
                     break;
                 }
                 int op = c.getOpcode();
+                // Any opcode that can MOVE OR DISCARD the builder reference ends the
+                // chain, not just the ones that store it somewhere.
+                //
+                // The matcher recognises appends by owner, not by tracking which
+                // object is on the stack, so without this it accepts
+                //     new StringBuilder(); POP; return existing.append(a).append(b).toString();
+                // -- valid bytecode -- and mistakes the appends on `existing` for
+                // appends on the builder it just allocated. Deleting the allocation
+                // and the appends would then leave the POP behind: an operand-stack
+                // underflow, and a concat of the wrong operands.
+                //
+                // The whole DUP/POP/SWAP family is refused rather than reasoned
+                // about. This costs coverage on chains whose argument expressions
+                // happen to contain one, which is the right trade: a missed fusion
+                // is slower, a wrong one is memory corruption. The pattern's own DUP
+                // sits before the scan window and is unaffected.
+                if (op == Opcodes.POP || op == Opcodes.POP2 || op == Opcodes.SWAP
+                        || op == Opcodes.DUP || op == Opcodes.DUP_X1 || op == Opcodes.DUP_X2
+                        || op == Opcodes.DUP2 || op == Opcodes.DUP2_X1 || op == Opcodes.DUP2_X2) {
+                    ok = false;
+                    break;
+                }
                 if (op == Opcodes.ASTORE || op == Opcodes.PUTFIELD || op == Opcodes.PUTSTATIC
                         || op == Opcodes.AASTORE || op == Opcodes.ARETURN) {
                     ok = false;
