@@ -7145,6 +7145,15 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // would resolve to a now-missing m: entry ("Missing virtual
             // method ...").
             String monoImpl = monomorphicDispatch == null ? null : monomorphicDispatch.get(dispatchId);
+            // A devirtualized site follows its TARGET, exactly as the
+            // straight-line and compact paths do. This one was left reading
+            // the call site's signature-wide verdict, so a complex method --
+            // one emitted through the interpreter rather than structured --
+            // could still ``yield*`` a plain function or drive a generator
+            // synchronously at precisely the sites this map exists for.
+            if (monoImpl != null) {
+                susp = isDevirtualizedInvokeSuspending(dispatchId, susp);
+            }
             String iv = monoImpl != null ? (susp ? "_dv" : "_dw") : (susp ? "_v" : "_w");
             String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
             String yk = susp ? "yield* " : "";

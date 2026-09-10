@@ -220,6 +220,16 @@ for workload in $WORKLOADS; do
     sed -n '1,40p' "$WORK_DIR/stderr.txt" >&2
     exit 1
   fi
+  # Exiting 0 is not the same as producing a measurement. A process that
+  # reaches BENCHSUITE without emitting its BENCH row leaves that workload out
+  # of the JSON, and the baseline-vs-new check cannot catch a workload that was
+  # missing from the BASELINE in the first place -- every later comparison is
+  # then blind to it. Assert the row here, where the omission is still visible.
+  if [ "$filter" != "" ] && ! grep -q "^BENCH id=$workload " "$RAW"; then
+    bench_log "workload $workload exited cleanly but emitted no BENCH row"
+    sed -n '1,20p' "$WORK_DIR/stderr.txt" >&2
+    exit 1
+  fi
 done
 cat "$RAW" >&2
 
