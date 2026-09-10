@@ -326,39 +326,9 @@ ToggleButton {
     font-size: 2.5mm;
     text-align: center;
 }
-ToggleButton.selected {
-    color: var(--accent-on-container-color, #21005d);
-    background-color: var(--accent-container-color, #eaddff);
-    cn1-background-type: cn1-pill-border;
-    border: 0.25mm solid #79747e;
-    padding: 1.55mm 4mm 1.55mm 4mm;
-    margin: 0.5mm;
-    font-family: "native:MainRegular";
-    font-size: 2.5mm;
-    text-align: center;
-}
-ToggleButton.pressed {
-    color: var(--accent-on-container-color, #21005d);
-    background-color: var(--accent-container-color, #eaddff);
-    cn1-background-type: cn1-pill-border;
-    border: 0.25mm solid #79747e;
-    padding: 1.55mm 4mm 1.55mm 4mm;
-    margin: 0.5mm;
-    font-family: "native:MainRegular";
-    font-size: 2.5mm;
-    text-align: center;
-}
-ToggleButton.disabled {
-    color: #a5a0ab;
-    background-color: transparent;
-    cn1-background-type: cn1-pill-border;
-    border: 0.25mm solid #cac4d0;
-    padding: 1.55mm 4mm 1.55mm 4mm;
-    margin: 0.5mm;
-    font-family: "native:MainRegular";
-    font-size: 2.5mm;
-    text-align: center;
-}
+ToggleButton.selected { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButton.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButton.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 
 /* ComponentGroup renames the edge controls of a group: updateUIIDs() rewrites
    them to ToggleButtonFirst, ToggleButtonLast or ToggleButtonOnly, and
@@ -955,6 +925,95 @@ RichTextComponent { background-color: transparent; padding: 1mm; margin: 0; }
 GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
 
 
+
+/* Every UIID above is completed to all four states below. A missing state is
+   not inherited: cn1-derive is read at base level only, and a lookup of
+   <UIID>.press# that finds nothing resolves against the global default style,
+   so the control drops its whole appearance for the duration of that state.
+   Where a state is meant to differ it is declared above and left alone here. */
+CalendarDate.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
+CalendarDate.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
+CalendarDateLabel.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; color: #49454f; text-align: center; background-color: transparent; }
+CalendarDateLabel.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; color: #49454f; text-align: center; background-color: transparent; }
+CalendarDateLabel.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; color: #49454f; text-align: center; background-color: transparent; }
+CalendarDayArea.selected { background-color: transparent; padding: 0; margin: 0; }
+CalendarDayArea.pressed { background-color: transparent; padding: 0; margin: 0; }
+CalendarDayArea.disabled { background-color: transparent; padding: 0; margin: 0; }
+CalendarTitleArea.selected { background-color: transparent; padding: 1mm; margin: 0; }
+CalendarTitleArea.pressed { background-color: transparent; padding: 1mm; margin: 0; }
+CalendarTitleArea.disabled { background-color: transparent; padding: 1mm; margin: 0; }
+ComboBoxFocus.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+ComboBoxFocus.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+ComboBoxFocus.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+CommandFocus.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+CommandFocus.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+CommandFocus.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+DialogCommandText.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color, #6750a4); text-align: center; }
+DialogCommandText.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color, #6750a4); text-align: center; }
+DialogCommandText.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color, #6750a4); text-align: center; }
+ErrorLabel.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; color: #b3261e; font-size: 1.9mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+ErrorLabel.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; color: #b3261e; font-size: 1.9mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+FloatingHint.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; color: #49454f; font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+FloatingHint.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; color: #49454f; font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+GlassTutorial.selected { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+GlassTutorial.pressed { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+GlassTutorial.disabled { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+ListRendererFocus.selected { background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+ListRendererFocus.pressed { background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+ListRendererFocus.disabled { background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+MediaPlayerBack.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); padding: 1.55mm 3.5mm 1.55mm 3.5mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; cn1-background-type: cn1-pill-border; text-align: center; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
+MediaPlayerFwd.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); padding: 1.55mm 3.5mm 1.55mm 3.5mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; cn1-background-type: cn1-pill-border; text-align: center; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
+MediaPlayerMax.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); padding: 1.55mm 3.5mm 1.55mm 3.5mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; cn1-background-type: cn1-pill-border; text-align: center; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
+MediaPlayerPause.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); padding: 1.55mm 3.5mm 1.55mm 3.5mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; cn1-background-type: cn1-pill-border; text-align: center; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
+MediaPlayerPlay.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); padding: 1.55mm 3.5mm 1.55mm 3.5mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; cn1-background-type: cn1-pill-border; text-align: center; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
+MenuButtonRight.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); padding: 1.55mm 3.5mm 1.55mm 3.5mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; cn1-background-type: cn1-pill-border; text-align: center; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
+PopupBody.selected { background-color: #f3edf7; padding: 1mm; margin: 0; }
+PopupBody.pressed { background-color: #f3edf7; padding: 1mm; margin: 0; }
+PopupBody.disabled { background-color: #f3edf7; padding: 1mm; margin: 0; }
+PopupContentPaneDownwards.selected { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneDownwards.pressed { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneDownwards.disabled { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneLeft.selected { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneLeft.pressed { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneLeft.disabled { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneRight.selected { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneRight.pressed { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneRight.disabled { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneUpwards.selected { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneUpwards.pressed { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneUpwards.disabled { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupFocus.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+PopupFocus.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+PopupFocus.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+PopupItem.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PopupItem.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
+PopupItem.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
+RichTextComponent.selected { background-color: transparent; padding: 1mm; margin: 0; }
+RichTextComponent.pressed { background-color: transparent; padding: 1mm; margin: 0; }
+RichTextComponent.disabled { background-color: transparent; padding: 1mm; margin: 0; }
+SpinnerSeparator.selected { background-color: #cac4d0; padding: 0; margin: 0; }
+SpinnerSeparator.pressed { background-color: #cac4d0; padding: 0; margin: 0; }
+SpinnerSeparator.disabled { background-color: #cac4d0; padding: 0; margin: 0; }
+StatusBarSideMenu.selected { background-color: transparent; padding: 0; margin: 0; }
+StatusBarSideMenu.pressed { background-color: transparent; padding: 0; margin: 0; }
+StatusBarSideMenu.disabled { background-color: transparent; padding: 0; margin: 0; }
+TODAY.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; color: var(--accent-color, #6750a4); font-family: "native:MainBold"; }
+TODAY.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; color: var(--accent-color, #6750a4); font-family: "native:MainBold"; }
+TODAY.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; color: var(--accent-color, #6750a4); font-family: "native:MainBold"; }
+TableCell.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableCell.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableCell.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TimeSpinnerHoursLabel.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; background-color: transparent; }
+TimeSpinnerHoursLabel.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; background-color: transparent; }
+TimeSpinnerHoursLabel.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; background-color: transparent; }
+TimeSpinnerMinutesLabel.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; background-color: transparent; }
+TimeSpinnerMinutesLabel.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; background-color: transparent; }
+TimeSpinnerMinutesLabel.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #49454f; background-color: transparent; }
+TreeNode.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #1d1b20; padding: 1.2mm 1.5mm 1.2mm 1.5mm; background-color: transparent; }
+
 @media (prefers-color-scheme: dark) {
     Component { color: #e6e0e9; background-color: #141218; }
     Form { background-color: #141218; padding: 0; margin: 0; }
@@ -1162,4 +1221,54 @@ GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm
     PhoneVerificationText { color: #cac4d0; }
     PhoneVerificationError { color: #f2b8b5; }
     PhoneVerificationLink { color: var(--accent-color-dark, #d0bcff); }
+
+    CalendarDate.pressed { color: #e6e0e9; background-color: transparent; }
+    CalendarDate.disabled { color: #e6e0e9; background-color: transparent; }
+    CalendarDateLabel.selected { color: #cac4d0; background-color: transparent; }
+    CalendarDateLabel.pressed { color: #cac4d0; background-color: transparent; }
+    CalendarDateLabel.disabled { color: #cac4d0; background-color: transparent; }
+    ComboBoxFocus.selected { background-color: var(--accent-container-color-dark, #4f378b); }
+    ComboBoxFocus.pressed { background-color: var(--accent-container-color-dark, #4f378b); }
+    ComboBoxFocus.disabled { background-color: var(--accent-container-color-dark, #4f378b); }
+    CommandFocus.selected { background-color: var(--accent-container-color-dark, #4f378b); }
+    CommandFocus.pressed { background-color: var(--accent-container-color-dark, #4f378b); }
+    CommandFocus.disabled { background-color: var(--accent-container-color-dark, #4f378b); }
+    DialogCommandText.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    DialogCommandText.pressed { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    DialogCommandText.disabled { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    ErrorLabel.selected { color: #f2b8b5; background-color: transparent; }
+    ErrorLabel.pressed { color: #f2b8b5; background-color: transparent; }
+    FloatingHint.selected { color: #cac4d0; background-color: transparent; }
+    FloatingHint.pressed { color: #cac4d0; background-color: transparent; }
+    ListRendererFocus.selected { background-color: var(--accent-container-color-dark, #4f378b); }
+    ListRendererFocus.pressed { background-color: var(--accent-container-color-dark, #4f378b); }
+    ListRendererFocus.disabled { background-color: var(--accent-container-color-dark, #4f378b); }
+    PopupBody.selected { background-color: #211f26; }
+    PopupBody.pressed { background-color: #211f26; }
+    PopupBody.disabled { background-color: #211f26; }
+    PopupContentPaneDownwards.selected { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneDownwards.pressed { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneDownwards.disabled { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneLeft.selected { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneLeft.pressed { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneLeft.disabled { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneRight.selected { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneRight.pressed { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneRight.disabled { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneUpwards.selected { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneUpwards.pressed { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    PopupContentPaneUpwards.disabled { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    SpinnerSeparator.selected { background-color: #49454f; }
+    SpinnerSeparator.pressed { background-color: #49454f; }
+    SpinnerSeparator.disabled { background-color: #49454f; }
+    TODAY.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    TODAY.pressed { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    TODAY.disabled { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+    TableCell.selected { color: #e6e0e9; background-color: transparent; }
+    TableCell.pressed { color: #e6e0e9; background-color: transparent; }
+    TableCell.disabled { color: #e6e0e9; background-color: transparent; }
+    TableHeader.selected { color: #cac4d0; background-color: transparent; }
+    TableHeader.pressed { color: #cac4d0; background-color: transparent; }
+    TableHeader.disabled { color: #cac4d0; background-color: transparent; }
+    TreeNode.pressed { color: #e6e0e9; background-color: transparent; }
 }
