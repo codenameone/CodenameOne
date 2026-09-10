@@ -1,15 +1,15 @@
 ---
-title: "A Small Heap Does Not Need a Large Garbage Budget"
+title: "The Collector and the Cache Have to Agree"
 slug: parparvm-gc-small-heaps
 url: /blog/parparvm-gc-small-heaps/
 date: '2026-09-12'
 author: Shai Almog
-description: "ParparVM experiments with Go-inspired GC pacing, measures a lower memory floor, and revisits parallel marking. The merged implementation keeps deployment control over the floor."
-feed_html: '<img src="https://www.codenameone.com/blog/parparvm-gc-small-heaps.jpg" alt="Less Room For Garbage" /> ParparVM experiments with Go-inspired GC pacing, measures a lower memory floor, and revisits parallel marking. The merged implementation keeps deployment control over the floor.'
+description: "ParparVM lowers memory in a small-backend GC experiment and adds real weak and soft references. Go-inspired pacing and ranked retention address garbage and useful cached data together."
+feed_html: '<img src="https://www.codenameone.com/blog/parparvm-gc-small-heaps.jpg" alt="Keep The Cache Lose The Garbage" /> ParparVM lowers memory in a small-backend GC experiment and adds real weak and soft references. Go-inspired pacing and ranked retention address garbage and useful cached data together.'
 series: ["release-2026-09-11"]
 ---
 
-![Less Room For Garbage](/blog/parparvm-gc-small-heaps.jpg)
+![Keep The Cache Lose The Garbage](/blog/parparvm-gc-small-heaps.jpg)
 
 A backend holding very little live data still reached 98 MB of resident memory. Its collector waited against a 24 MB allocation floor, and lowering that floor did not measurably hurt throughput in the trigger sweep. We were spending memory without buying speed.
 
@@ -92,16 +92,113 @@ long third = 1L << 33;  // 8589934592
 
 The fix casts the left operand appropriately. `LongShift` checks the shift variants against a reference built by repeated doubling. A collector benchmark that relies on incorrect arithmetic is not evidence of collector performance.
 
+## Collect garbage without throwing away useful work
+
+A lower collection floor addresses objects the application no longer needs. A cache raises a harder question: which objects are worth keeping? Decoding an image again on the next scroll costs time, but keeping every decoded image forever costs memory.
+
+[PR #5732](https://github.com/codenameone/CodenameOne/pull/5732) gives the collector real weak and soft references, including a policy that favors recently accessed data. The pacing and reference work belong together: collecting sooner is only useful if the collector can distinguish disposable cached data from permanent roots.
+
+## The old low-memory workaround
+
+ParparVM's `WeakReference` used to hold its referent in an ordinary object field. The translator emitted the same mark operation as for any strong reference. As long as the wrapper remained reachable, its supposedly weak referent remained reachable too. There was no SoftReference implementation to provide a separate policy.
+
+The iOS port worked around missing soft-reference behavior with a strong-reference table. A memory warning called `flushSoftRefMap()`, which replaced the table. That low-memory signal approximated "the VM may discard this cache," but only as a bulk operation.
+
+Image decoding, scaled images, RGB copies, rounded borders, and rasterized gradients all have reasons to cache disposable results. Their desired contract is simple: keep the result if useful, and return `null` when it must be reconstructed. A port-wide table held until a warning cannot express that contract precisely.
+
+## A weak field must stop being an ordinary edge
+
+The referent now lives in `Reference`. The translator recognizes that field and emits reference discovery instead of tracing it as an unconditional strong edge. The collector decides whether to retain a soft referent and later clears references whose objects are eligible for reclamation.
+
+| Reference kind | What it means for the referent |
+| --- | --- |
+| Strong | Keeps the object reachable |
+| Weak | Allows reclamation when no stronger reachability retains it |
+| Soft | Allows policy-based retention of otherwise disposable data |
+
+Application code must still handle a cache miss. This example illustrates direct SoftReference use on the updated ParparVM path:
+
+```java
+import java.lang.ref.SoftReference;
+import com.codename1.ui.Image;
+import java.io.IOException;
+
+final class PreviewCache {
+    private SoftReference<Image> cached;
+
+    Image get() throws IOException {
+        Image result = cached == null ? null : cached.get();
+        if (result == null) {
+            result = Image.createImage("/preview.png");
+            cached = new SoftReference<Image>(result);
+        }
+        return result;
+    }
+}
+```
+
+The local variable holds the successful result strongly while the caller uses it. A soft cache cannot promise a hit, and it is not suitable for data with no reconstruction path. This small example assumes access from one thread; a shared cache also needs its own synchronization policy.
+
+## Reading during collection is the dangerous case
+
+Suppose the collector scans a thread and moves on. That thread then calls `get()` and keeps the referent in a local. If the collector clears the reference and frees the object without noticing the read, Java code receives a dangling native pointer.
+
+The fix couples reference reads to the snapshot-at-the-beginning barrier machinery. A relevant read is logged while marking is active. Reference processing remains inside the termination loop, with the barrier armed, so new work can force another pass before sweeping.
+
+{{< mermaid >}}
+sequenceDiagram
+    participant App as Application thread
+    participant Ref as Reference
+    participant GC as Collector
+    GC->>App: Scan roots
+    App->>Ref: get()
+    Ref->>GC: Log referent if marking still needs it
+    Ref->>App: Return referent
+    GC->>GC: Drain new work before termination
+    GC->>Ref: Clear only sweep-eligible referents
+    GC->>GC: Sweep
+{{< /mermaid >}}
+
+Logging every reference read made the collector repeatedly reopen marking. The filter excludes objects already marked in the current epoch or still fresh, matching the conditions that would prevent clearing them. The PR reports termination passes dropping from 32 to one after that filtering.
+
+## Recency helps keep the cache useful
+
+The rank is the age since the last successful `get()`. A frequently read reference usually has a recent access and is therefore favored for retention. This is recency, not a permanent usage score or a guarantee that the most frequently used image can never be collected.
+
+The [RefPolicy benchmark](https://github.com/codenameone/CodenameOne/blob/b84362c66d/vm/benchmarks/src/com/bench/RefPolicy.java) ran five interleaved repetitions with simulated process-memory ceilings and matching checksums:
+
+| Ceiling | Policy | Cache hit rate | Footprint |
+| --- | --- | --- | --- |
+| 128 MB | Clear on pressure | 84.99% | 63.1 MB |
+| 128 MB | Ranked retention | 96.77% | 62.6 MB |
+| 160 MB | Clear on pressure | 87.99% | 91.0 MB |
+| 160 MB | Ranked retention | 97.44% | 82.1 MB |
+
+![Cache hit rate and footprint under the simulated 160 MB ceiling](/blog/soft-reference-policy.svg)
+
+*Reported RefPolicy results from PR #5732. The process ceiling is simulated; this is not a device scrolling benchmark.*
+
+Proper weak reclamation is the clearest result: 255 of 256 probe referents were cleared, versus zero under the old strong behavior. Ranked retention also beat the clear-on-pressure arm. It did not establish that recency beats every simpler retention policy; there was no matched-rate random-eviction control.
+
+## The VM change and the image-cache migration are separate
+
+This PR deliberately leaves the iOS `softReferenceMap` override and framework cache call sites in place. It supplies the collector semantics needed to migrate them. Claiming that every image cache already uses ranked references would skip that remaining integration work.
+
+The separation is useful for diagnosis. A collector change can be tested independently of a cache-policy change that affects every iOS application. The next step is to move disposable caches onto the new contract and measure decoding, hit rate, and resident memory together.
+
+
 ## Memory after the burst
 
-A lower, steadier memory profile needs several changes working together. Tagged boxes avoid allocations. Real weak references permit reclamation. Soft references let useful cached data survive without turning every cache entry into a permanent root. The {{< post-link path="/blog/parparvm-ranked-soft-references" text="cache follow-up" >}} covers that part.
+The lower-floor experiment reduced resident memory without a measurable throughput penalty in that workload. Ranked references kept more cache hits than a pressure-triggered flush while using less memory in the simulated-budget test. Together they give us a way to reduce garbage without making every return to a screen pay for its images again.
 
-A collector cannot flatten the memory required by a growing live data set. It can stop letting avoidable garbage dominate a small process, and it can avoid making the application wait unnecessarily for collection. That is the work we are measuring next: after the burst as well as during it.
+A collector cannot flatten the memory required by a growing live data set. We still need to migrate framework caches, measure real screens, and close the gap in worst pauses. The next article covers another part of that job: {{< post-link path="/blog/hashmap-misses-probe-sequence" text="maps and boxed values" >}} that leave fewer allocations for the collector in the first place.
+
+These changes also put delicate reference handling where we can review it once for every application. A cache read during collection must not become a dangling pointer. Keeping that guarantee inside the runtime is part of making ordinary Java a safe default on native targets, even as we change the representation underneath it.
 
 ---
 
 ## Discussion
 
-_Do you track memory after a workload subsides, or only its peak under load?_
+_Which costs more in your image-heavy screen: retaining decoded images or reconstructing them after a cache flush?_
 
 {{< giscus >}}

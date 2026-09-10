@@ -1,15 +1,15 @@
 ---
-title: "Our HashMap Was Fast Until the Key Was Missing"
+title: "Fixing the Map, Then the Objects Inside It"
 slug: hashmap-misses-probe-sequence
 url: /blog/hashmap-misses-probe-sequence/
-date: '2026-09-12'
+date: '2026-09-13'
 author: Shai Almog
-description: "A hit-only benchmark hid pathological misses in ParparVM HashMap. Perturbed probing preserves dense-key locality while reducing the reported miss-heavy workload from 32.7 seconds to 44.9 milliseconds."
-feed_html: '<img src="https://www.codenameone.com/blog/hashmap-misses-probe-sequence.jpg" alt="The Key Was Missing" /> A hit-only benchmark hid pathological misses in ParparVM HashMap. Perturbed probing preserves dense-key locality while reducing the reported miss-heavy workload from 32.7 seconds to 44.9 milliseconds.'
+description: "ParparVM fixes pathological map misses and extends tagged boxed values. Probe counts, allocation coverage, and regressions show where ordinary Java collections became cheaper."
+feed_html: '<img src="https://www.codenameone.com/blog/hashmap-misses-probe-sequence.jpg" alt="Faster Maps Fewer Boxes" /> ParparVM fixes pathological map misses and extends tagged boxed values. Probe counts, allocation coverage, and regressions show where ordinary Java collections became cheaper.'
 series: ["release-2026-09-11"]
 ---
 
-![The Key Was Missing](/blog/hashmap-misses-probe-sequence.jpg)
+![Faster Maps Fewer Boxes](/blog/hashmap-misses-probe-sequence.jpg)
 
 Three million `containsKey` calls took 32.7 seconds. The map benchmark we had been watching still looked healthy. It mostly asked for keys that existed.
 
@@ -92,16 +92,97 @@ Hashtable now avoids an `Entry` allocation per mapping and uses the compact layo
 
 IdentityHashMap supplied a different warning. HotSpot's identity hash is already scrambled; ParparVM's is derived from an aligned address. Copying the JDK's indexing expression preserved zero low bits and worsened collisions. Folding the high bits down worked better on the measured allocator distribution.
 
-## Test the question the application actually asks
+## The map is only part of the allocation bill
 
-A cache asks whether an item is missing. A decoder builds a map. A registry deletes and replaces entries. Those deserve separate measurements even if the container class is the same.
+Fixing the search still leaves the keys and values. A JSON parser may allocate a wrapper for every number it inserts. The application sees a map of values; the collector sees both the container and a stream of small objects that disappear with it.
 
-This is why the {{< post-link path="/blog/performance-work-between-benchmarks" text="weekly work" >}} includes new benchmarks alongside the fixes. We can improve the shared collection implementation once, preserve its Java behavior, and let applications benefit without replacing their maps with native code. First we have to ask the map the uncomfortable questions.
+ParparVM already avoided a separate allocation for `Integer.valueOf`. [PR #5735](https://github.com/codenameone/CodenameOne/pull/5735) extends tagged immediates to Short, Character, Float, Long, and Double. Eligible values fit in the reference-sized word that would otherwise point to a wrapper object.
+
+## The spare bits were already part of the contract
+
+On this 64-bit representation, aligned object addresses leave three low bits available. ParparVM's conservative root scan already rejects words with those alignment bits set. The encoding uses them as a type tag, with the remaining 61 bits carrying the payload.
+
+That alignment assumption is verified by `TagProbe` across more than 380,000 allocations in the implementation work. It is a property of this runtime and its allocator, not a portable trick Java application code should perform on references.
+
+{{< mermaid >}}
+flowchart LR
+    V[Boxed primitive value] --> F{Fits its tagged encoding?}
+    F -->|Yes| W[Type tag and payload in one word]
+    F -->|No| H[Ordinary heap wrapper]
+    W --> D[Dispatch according to the type tag]
+    H --> D
+    D --> J[Java wrapper behavior]
+{{< /mermaid >}}
+
+A tagged value may reside in a local variable, register, array, or map slot. There is no separate wrapper allocation. A value stored inside a heap collection is not a stack-allocated object.
+
+## Which values fit?
+
+| Wrapper | Representation covered by this work |
+| --- | --- |
+| Integer | Existing tagged path |
+| Short | Full value range |
+| Character | Full value range |
+| Float | Full bit-pattern payload fits |
+| Long | Values from `-2^60`, inclusive, to `2^60`, exclusive |
+| Double | Values whose low three mantissa bits are clear |
+
+Long and Double values outside those conditions use the existing heap path. Byte and Boolean already have bounded caches; they do not need another immediate code to avoid an unbounded allocation stream.
+
+```java
+Long small = Long.valueOf(42L);              // Tagged on ParparVM
+Long large = Long.valueOf(Long.MAX_VALUE);  // Heap fallback
+Double exact = Double.valueOf(12.5);        // Tagged
+Double fraction = Double.valueOf(0.1);      // Heap fallback
+```
+
+These comments describe the ParparVM representation, not a Java language guarantee. Use `equals()` for wrapper value equality. Code should not infer object identity or lifetime from whether an allocation happened.
+
+## The useful benchmark reports coverage
+
+An early workload used round quarters and reported 100% coverage for Long and Double. That made a partial representation look universal. The revised mixture reported 78% coverage for Long and 56% for Double.
+
+The PR records best-of-six interleaved comparisons against the Integer-only build, with matching checksums across the ablation arms:
+
+| Workload | Reported speedup |
+| --- | --- |
+| Long-key map | 2.30x |
+| Character boxing | 1.54x |
+| Double-list reduction | 1.43x |
+| Mixed boxed churn | 1.28x |
+| JSON-like parsing | 1.14x |
+
+The whole `Bench` suite remained at 1.00. These are targeted workload results, not an application-wide speed multiplier.
+
+An allocation census checks the mechanism independently of elapsed time. The JSON-like workload fell from **24.02 boxed allocations per map to 5.24**. Its expected remaining Double allocations were about 5.28 per map at the measured coverage. The agreement matters more than a convenient headline: allocations fell by roughly the amount the encoding predicts.
+
+## A type tag is also a dispatch obligation
+
+The existing inline `hashCode` and `equals` fast path was Integer-specific. Changing its condition from "is an Integer tag" to "is any tag" would silently use the wrong hash contract for another wrapper. It might still run quickly and never crash.
+
+The other wrapper types therefore reach their own implementations through the dispatch table. `BoxEdge` exercises the edge cases; deliberately widening that Integer guard made 115 lines of output diverge. The new test also found pre-existing issues in `Short.equals(null)` and Float formatting, including NaN and negative zero.
+
+The nursery write barrier needed a tag guard too. Every place that handles a value as an object must distinguish an immediate from the address of a heap object. Saving an allocation is useful only if reference scanning and dispatch agree about what occupies the slot.
+
+## The useful part of the Valhalla analogy
+
+Our [earlier runtime article](/blog/beating-hotspot-performance/) and [SIMD and allocation discussion](/blog/ios-density-scroll-and-accessibility/) explored ways to remove object overhead without changing application algorithms. "Poor man's Valhalla" captures that motivation.
+
+The boundary is substantial. This is not a general implementation of value classes. Mutable objects such as `Dimension` and `Rectangle` do not become immediate values, and arbitrary objects do not gain automatic stack allocation. The optimization covers specific wrapper representations with a defined fallback.
+
+
+## Measure the contents as well as the container
+
+A cache asks whether an item is missing. A decoder builds a map and boxes its numbers. A registry deletes and replaces entries. Measuring one successful lookup tells us very little about those other jobs.
+
+The map fixes and wider tagged values address separate costs in the same Java data structures. The probe sequence changes where we search; the encoding changes what occupies a key or value slot. Their benchmark ratios cannot be multiplied into a single speedup, but the allocation census gives the collector a concrete benefit: fewer objects to trace and reclaim.
+
+That is a useful result for the {{< post-link path="/blog/performance-work-between-benchmarks" text="week's performance work" >}}. App developers keep ordinary maps and wrapper APIs. Codename One handles probing, dispatch, and reference scanning together, including the edge cases that must remain correct when a reference no longer points to an object. A faster map is worth shipping only when a missing key, an unusual Double, and a collector scan still get the right answer.
 
 ---
 
 ## Discussion
 
-_What fraction of your production map lookups miss, and does your benchmark use that fraction?_
+_Does your map benchmark measure missing keys and boxed allocations, or only successful lookups?_
 
 {{< giscus >}}
