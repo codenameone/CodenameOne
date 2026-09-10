@@ -72,6 +72,34 @@ class RadioButtonTest extends UITestBase {
     }
 
     @Test
+    void testDisablingToggleRestoresTheUiidInsideAComponentGroup() {
+        // A horizontal ComponentGroup renames its members to ToggleButtonFirst,
+        // ToggleButton and ToggleButtonLast, and records what it replaced in
+        // $origUIID so it can put it back on removal. A restore that only matched
+        // the bare name skipped all of those, and the group then reinstated
+        // ToggleButton on a control that was no longer a toggle.
+        ComponentGroup group = new ComponentGroup();
+        group.setForceGroup(true);
+        group.setHorizontal(true);
+        RadioButton first = new RadioButton("One");
+        RadioButton last = new RadioButton("Two");
+        first.setToggle(true);
+        last.setToggle(true);
+        group.addComponent(first);
+        group.addComponent(last);
+        assertEquals("ToggleButtonFirst", first.getUIID());
+
+        first.setToggle(false);
+
+        assertFalse(first.isToggle());
+        assertEquals("RadioButton", first.getUIID());
+
+        group.removeComponent(first);
+        assertEquals("RadioButton", first.getUIID(),
+                "leaving the group must not reinstate the toggle UIID");
+    }
+
+    @Test
     void testCreateToggleAddsToGroupAndSetsToggleUiid() {
         ButtonGroup group = new ButtonGroup();
         RadioButton radio = RadioButton.createToggle("Choice", group);

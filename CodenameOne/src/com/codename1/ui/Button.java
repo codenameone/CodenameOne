@@ -1065,10 +1065,35 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
                 preToggleUIID = uiid;
                 setUIID("ToggleButton");
             }
-        } else if (preToggleUIID != null && "ToggleButton".equals(uiid)) {
+        } else if (preToggleUIID != null && isToggleUIID(uiid)) {
             setUIID(preToggleUIID);
+            // A horizontal ComponentGroup renames its members and remembers what it
+            // replaced in $origUIID, then puts that back when the control leaves the
+            // group. Left alone it would reinstate ToggleButton on a control that is
+            // no longer a toggle.
+            if (getClientProperty("$origUIID") != null) {
+                putClientProperty("$origUIID", preToggleUIID);
+            }
             preToggleUIID = null;
         }
+    }
+
+    /// True for the UIID setToggle assigns and for the three a horizontal
+    /// ComponentGroup renames its edge controls to. Matching only the bare name
+    /// would skip the restore for any toggle that happens to sit in a group.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the UIID to test
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a toggle UIID
+    private static boolean isToggleUIID(String uiid) {
+        return "ToggleButton".equals(uiid)
+                || "ToggleButtonFirst".equals(uiid)
+                || "ToggleButtonLast".equals(uiid)
+                || "ToggleButtonOnly".equals(uiid);
     }
 
     /// Overriden to workaround issue with caps text and different UIID's
