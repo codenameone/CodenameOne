@@ -764,6 +764,38 @@ static void cn1LinuxDumpNativeBacktrace(const char* label, siginfo_t* si, void* 
 #endif
         if (pc) cn1LinuxWriteHexKV("faultPC", pc);
         if (sp) cn1LinuxWriteHexKV("faultSP", sp);
+        /* The integer registers. Reading them costs nothing and touches no memory, and
+         * they are the only place the faulting POINTER survives: a wild address tells you
+         * a read went wrong, the register file tells you what the value WAS and which
+         * other register held the object it should have come from. gdb cannot supply this
+         * from the core -- the suite is built -O3 with LTO, so `info args` and
+         * `info locals` both answer "No locals" and every global reports "unknown type".
+         * The one 0x100000028 fault that reached a core was diagnosed this far only
+         * because faultAddr was printed here rather than recovered afterwards. */
+#if defined(__x86_64__)
+        {
+            static const char* const rn[16] = {
+                "rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp",
+                "r8","r9","r10","r11","r12","r13","r14","r15" };
+            static const int ri[16] = {
+                REG_RAX,REG_RBX,REG_RCX,REG_RDX,REG_RSI,REG_RDI,REG_RBP,REG_RSP,
+                REG_R8,REG_R9,REG_R10,REG_R11,REG_R12,REG_R13,REG_R14,REG_R15 };
+            int r;
+            for (r = 0; r < 16; r++) {
+                cn1LinuxWriteHexKV(rn[r], (unsigned long)uc->uc_mcontext.gregs[ri[r]]);
+            }
+        }
+#elif defined(__aarch64__)
+        {
+            char nm[8]; int r;
+            for (r = 0; r <= 30; r++) {
+                nm[0] = 'x';
+                if (r < 10) { nm[1] = (char)('0' + r); nm[2] = 0; }
+                else { nm[1] = (char)('0' + r / 10); nm[2] = (char)('0' + r % 10); nm[3] = 0; }
+                cn1LinuxWriteHexKV(nm, (unsigned long)uc->uc_mcontext.regs[r]);
+            }
+        }
+#endif
         pthread_attr_t at;
         if (pthread_getattr_np(pthread_self(), &at) == 0) {
             void* base = 0; size_t sz = 0;
@@ -771,6 +803,31 @@ static void cn1LinuxDumpNativeBacktrace(const char* label, siginfo_t* si, void* 
                 cn1LinuxWriteHexKV("stackLo", (unsigned long)(uintptr_t)base);
                 cn1LinuxWriteHexKV("stackSz", (unsigned long)sz);
                 if (sp) cn1LinuxWriteHexKV("stackUsed", (unsigned long)(((uintptr_t)base + sz) - sp));
+                /* The top of the faulting frame. Bounded by the real stack top, so this
+                 * reads only mapped memory and cannot fault a second time -- the faulting
+                 * ADDRESS is unmapped by definition and is deliberately not read.
+                 *
+                 * What it is for: a pointer-shaped fault whose low 32 bits are zero (the
+                 * 0x100000000 case) is either a 64-bit value read as an object or a 32-bit
+                 * write into a 64-bit slot, and the two look identical from the address
+                 * alone. The neighbouring words separate them -- an adjacent half of the
+                 * same 64-bit value is the first, an intact pointer beside a clobbered one
+                 * is the second. */
+                unsigned long hi = (unsigned long)(uintptr_t)base + (unsigned long)sz;
+                if (sp && sp >= (unsigned long)(uintptr_t)base && sp < hi) {
+                    unsigned long lim = sp + 32 * sizeof(unsigned long);
+                    if (lim > hi) { lim = hi; }
+                    unsigned long a;
+                    int slot = 0;
+                    char nm[16];
+                    for (a = sp; a + sizeof(unsigned long) <= lim; a += sizeof(unsigned long)) {
+                        nm[0]='s'; nm[1]='p'; nm[2]='[';
+                        nm[3]=(char)('0' + slot / 10); nm[4]=(char)('0' + slot % 10);
+                        nm[5]=']'; nm[6]=0;
+                        cn1LinuxWriteHexKV(nm, *(unsigned long*)(uintptr_t)a);
+                        slot++;
+                    }
+                }
             }
             pthread_attr_destroy(&at);
         }
