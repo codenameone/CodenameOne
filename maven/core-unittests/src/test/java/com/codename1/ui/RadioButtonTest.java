@@ -100,6 +100,31 @@ class RadioButtonTest extends UITestBase {
     }
 
     @Test
+    void testDisablingToggleRestoresTheUiidInsideAVerticalComponentGroup() {
+        // A vertical group keeps the default prefix, so its members are renamed
+        // GroupElementFirst and the like -- names with nothing toggle-ish about
+        // them -- while $origUIID still holds ToggleButton. Matching on the live
+        // UIID alone therefore missed this case entirely, and removing the control
+        // put ToggleButton back on a plain radio.
+        ComponentGroup group = new ComponentGroup();
+        group.setForceGroup(true);
+        RadioButton first = new RadioButton("One");
+        RadioButton last = new RadioButton("Two");
+        first.setToggle(true);
+        last.setToggle(true);
+        group.addComponent(first);
+        group.addComponent(last);
+        assertEquals("GroupElementFirst", first.getUIID());
+
+        first.setToggle(false);
+        group.removeComponent(first);
+
+        assertFalse(first.isToggle());
+        assertEquals("RadioButton", first.getUIID(),
+                "leaving a vertical group must not reinstate the toggle UIID");
+    }
+
+    @Test
     void testCreateToggleAddsToGroupAndSetsToggleUiid() {
         ButtonGroup group = new ButtonGroup();
         RadioButton radio = RadioButton.createToggle("Choice", group);

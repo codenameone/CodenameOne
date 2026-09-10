@@ -1065,13 +1065,22 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
                 preToggleUIID = uiid;
                 setUIID("ToggleButton");
             }
-        } else if (preToggleUIID != null && isToggleUIID(uiid)) {
-            setUIID(preToggleUIID);
-            // A horizontal ComponentGroup renames its members and remembers what it
-            // replaced in $origUIID, then puts that back when the control leaves the
-            // group. Left alone it would reinstate ToggleButton on a control that is
-            // no longer a toggle.
-            if (getClientProperty("$origUIID") != null) {
+        } else if (preToggleUIID != null) {
+            // Two places can be holding the toggle UIID, and which ones depends on
+            // the group this control is in -- horizontal groups rename members to
+            // ToggleButton*, vertical ones to GroupElement*, and an ungrouped
+            // control keeps the name setToggle assigned. So each is corrected on
+            // its own terms rather than by guessing the group's prefix:
+            //
+            //   - the live UIID, when it is still a toggle name;
+            //   - $origUIID, which is what a ComponentGroup puts back when the
+            //     control leaves it, and which holds ToggleButton whatever prefix
+            //     the group itself uses.
+            if (isToggleUIID(uiid)) {
+                setUIID(preToggleUIID);
+            }
+            Object saved = getClientProperty("$origUIID");
+            if (saved instanceof String && isToggleUIID((String) saved)) {
                 putClientProperty("$origUIID", preToggleUIID);
             }
             preToggleUIID = null;
