@@ -445,6 +445,7 @@ public abstract class Element implements BuildContext {
         if (newWidget == null) {
             if (child != null) {
                 deactivateChild(child);
+                markEnclosingLayoutDirty();
             }
             return null;
         }
@@ -468,7 +469,7 @@ public abstract class Element implements BuildContext {
             if (anchor >= 0) {
                 int prev = childHost.beginInsertion(anchor);
                 try {
-                    return inflateWidget(newWidget, newSlot);
+                    return inflatedChild(newWidget, newSlot);
                 } finally {
                     childHost.endInsertion(prev);
                 }
@@ -493,13 +494,45 @@ public abstract class Element implements BuildContext {
             if (childHost != null) {
                 int prev = childHost.beginInsertion(anchor);
                 try {
-                    return inflateWidget(newWidget, newSlot);
+                    return inflatedChild(newWidget, newSlot);
                 } finally {
                     childHost.endInsertion(prev);
                 }
             }
         }
-        return inflateWidget(newWidget, newSlot);
+        return inflatedChild(newWidget, newSlot);
+    }
+
+    /**
+     * Inflates a new child and invalidates the layout that was measured without it.
+     *
+     * <p>A cached layout is only valid for the children it was measured over, so an
+     * element that gains or loses one has a stale size and stale offsets for everything
+     * it does contain. Nothing used to say so: {@code updateChild} rebuilt the element
+     * tree and left every ancestor's {@code needsLayout} clear. The rebuild queue marks
+     * the branch it rebuilds, but a child inflated during a LAYOUT pass -- a LayoutBuilder
+     * building on a pass it had sat out -- never goes through that queue at all.</p>
+     *
+     * <p>Only a STRUCTURAL change invalidates. A child updated in place keeps its element,
+     * and whether that dirties layout is its own business: treating every rebuild as a
+     * layout change is what made the carousel stutter, one relayout of the page per frame
+     * of the drag.</p>
+     */
+    private Element inflatedChild(Widget newWidget, int newSlot) {
+        Element inflated = inflateWidget(newWidget, newSlot);
+        markEnclosingLayoutDirty();
+        return inflated;
+    }
+
+    /// Marks the nearest enclosing render element -- and through it every render
+    /// ancestor -- as needing layout.
+    private void markEnclosingLayoutDirty() {
+        for (Element a = this; a != null; a = a.parent) {
+            if (a instanceof RenderElement) {
+                ((RenderElement) a).markNeedsLayout();
+                return;
+            }
+        }
     }
 
     /// Where a child of {@code slot} should attach, or -1 when appending is already right.

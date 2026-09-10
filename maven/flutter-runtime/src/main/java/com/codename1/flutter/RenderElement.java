@@ -56,6 +56,26 @@ public abstract class RenderElement extends Element {
     private BoxConstraints lastDryConstraints;
     private boolean needsLayout = true;
 
+    /// True while this box is inside its own {@link #performLayout}.
+    private boolean inLayout;
+
+    /// Set when something invalidates this box WHILE it is being laid out.
+    ///
+    /// A layout is only valid for the children it was measured over, and a child can
+    /// appear in the middle of the pass that measures its parent: a LayoutBuilder sits
+    /// out a speculative measurement and inflates its subtree on a later one, which
+    /// happens underneath the enclosing Column's performLayout. The inflation marks the
+    /// Column dirty, but the Column then finished the very pass it had invalidated and
+    /// cleared the flag on its way out, so the mark was lost and the offsets it had
+    /// stored for the children it did NOT have were kept.
+    ///
+    /// The visible result was a screen with nothing on it. Returning from Reply's search
+    /// page rebuilt the mail list this way; every card was then positioned at the list's
+    /// origin with a pane of zero size, and a zero-sized pane clips the subtree it hosts,
+    /// so the cards were not merely stacked, they were invisible. Nothing recovered it
+    /// either, because every later pass hit the same clean cache.
+    private boolean remarkedDuringLayout;
+
     /** Offset of this box within its parent render element, set by the parent's performLayout. */
     private double relX;
     private double relY;
@@ -562,8 +582,22 @@ public abstract class RenderElement extends Element {
             layoutMissConstraints++;
         }
         lastConstraints = constraints;
-        size = timedPerformLayout(constraints);
-        needsLayout = false;
+        boolean wasInLayout = inLayout;
+        boolean wasRemarked = remarkedDuringLayout;
+        inLayout = true;
+        remarkedDuringLayout = false;
+        try {
+            size = timedPerformLayout(constraints);
+        } finally {
+            inLayout = wasInLayout;
+        }
+        // A box invalidated while it was being computed is not clean when it finishes.
+        needsLayout = remarkedDuringLayout;
+        if (remarkedDuringLayout) {
+            // ...and its cached constraints must not answer for the stale pass either.
+            lastConstraints = null;
+        }
+        remarkedDuringLayout = wasRemarked;
         trace(false, constraints, size);
         return size;
     }
@@ -596,11 +630,20 @@ public abstract class RenderElement extends Element {
      * Invalidates the cached layout of this box and all its render ancestors
      * so the next pass recomputes down this branch.
      */
+    /// Whether this box still owes a layout -- true when it has never been measured, or
+    /// when something invalidated it while it was being measured.
+    public boolean needsLayout() {
+        return needsLayout;
+    }
+
     public void markNeedsLayout() {
         for (Element a = this; a != null; a = a.parent) {
             if (a instanceof RenderElement) {
                 RenderElement r = (RenderElement) a;
                 r.needsLayout = true;
+                if (r.inLayout) {
+                    r.remarkedDuringLayout = true;
+                }
                 // The dry measurement is just as stale as the real one.
                 r.drySize = null;
                 r.lastDryConstraints = null;

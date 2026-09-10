@@ -143,11 +143,59 @@ public class BuildOwner {
         });
     }
 
+    /// How many times we look for hosts that appeared during the pass we just ran. One
+    /// extra round covers a subtree that builds late; the bound stops a tree that
+    /// somehow keeps producing hosts from looping here forever.
+    private static final int HOST_SETTLE_ROUNDS = 3;
+
+    /**
+     * Lays out the hosts that did not exist when this flush chose what to lay out.
+     *
+     * <p>The host set is collected from the rebuilt subtrees BEFORE anything is measured,
+     * which assumes every host exists by then. Not all do. A LayoutBuilder sits out a
+     * speculative measurement pass and inflates its subtree on a later one -- during the
+     * very revalidate above -- and each thing it inflates can bring a host of its own: an
+     * effect pane, a scroll pane. Those hosts were never in the set, so they were never
+     * laid out, and the elements inside them kept the offsets their parent had stored
+     * while they still measured zero.</p>
+     *
+     * <p>On screen that is a page with nothing on it. Coming back from Reply's search page
+     * rebuilt two elements and found seven hosts; the mail list underneath them owns
+     * thirty, one per card, all created while those seven were being laid out. Every card
+     * ended up at the list's origin inside a pane of zero size, and a zero-sized pane
+     * clips what it hosts, so the list was invisible rather than merely stacked. It stayed
+     * that way until some unrelated rebuild -- opening the mailbox drawer -- happened to
+     * find all thirty and lay them out.</p>
+     */
+    private static void revalidateHostsBornDuringLayout(List<Element> rebuiltRoots,
+            Set<RenderHost> alreadyDone) {
+        for (int round = 0; round < HOST_SETTLE_ROUNDS; round++) {
+            Set<RenderHost> found = new HashSet<RenderHost>();
+            for (Element e : rebuiltRoots) {
+                if (e.mounted) {
+                    if (e.host() != null) {
+                        found.add(e.host());
+                    }
+                    collectNestedHosts(e, found);
+                }
+            }
+            found.removeAll(alreadyDone);
+            if (found.isEmpty()) {
+                return;
+            }
+            alreadyDone.addAll(found);
+            for (RenderHost h : found) {
+                h.revalidate();
+            }
+        }
+    }
+
     void flushBuild() {
         long started = traceFrames ? System.currentTimeMillis() : 0;
         int rebuilt = 0;
         flushScheduled = false;
         Set<RenderHost> affectedHosts = new HashSet<RenderHost>();
+        List<Element> rebuiltRoots = new ArrayList<Element>();
         int guard = 0;
         while (!dirtyElements.isEmpty()) {
             if (++guard > 10000) {
@@ -179,11 +227,13 @@ public class BuildOwner {
             // never laid out - which renders as a page whose scaffold is present and whose
             // contents have simply vanished, with no error anywhere.
             collectNestedHosts(e, affectedHosts);
+            rebuiltRoots.add(e);
         }
         long built = traceFrames ? System.currentTimeMillis() : 0;
         for (RenderHost h : affectedHosts) {
             h.revalidate();
         }
+        revalidateHostsBornDuringLayout(rebuiltRoots, affectedHosts);
         if (traceFrames) {
             long now = System.currentTimeMillis();
             long buildMs = built - started;

@@ -48,15 +48,153 @@ public class FlutterRootLayout extends Layout {
         return host;
     }
 
+    /// How many times a root has been laid out, and what that cost.
+    ///
+    /// Read the PROFILE, not the count. Start-up runs 47 passes, which looks
+    /// alarming until the split shows one pass of ~549ms and 46 of ~1ms: the
+    /// count is a red herring and the cost is a single full layout, which is
+    /// where the transpiled widget tree is actually constructed (LayoutBuilder
+    /// builds during layout, as Flutter's does).
+    private static int rootPasses;
+    private static long rootMs;
+    private static long rootFirstMs = -1;
+    private static long rootWorstMs;
+    private static int rootDepth;
+    private static int rootMaxDepth;
+
+    /// The box the first few passes were given, in device pixels.
+    ///
+    /// A pass that runs against the WRONG box is not merely wasted: LayoutBuilder
+    /// builds during layout, so the whole widget tree is constructed against
+    /// that box — and an adaptive app asks the box which layout it is, so a
+    /// provisional size builds the wrong application.
+    private static final StringBuilder rootBoxes = new StringBuilder();
+    private static int rootBoxesRecorded;
+
+    private static void noteBox(BoxConstraints c) {
+        if (rootBoxesRecorded >= 6 || c == null) {
+            return;
+        }
+        rootBoxesRecorded++;
+        if (rootBoxes.length() > 0) {
+            rootBoxes.append(' ');
+        }
+        rootBoxes.append((int) c.maxWidth()).append('x').append((int) c.maxHeight());
+    }
+
+    /** Root layout passes so far, and their cost profile. */
+    public static String rootLayoutCost() {
+        return rootPasses + " root pass(es) in " + rootMs + "ms (first=" + rootFirstMs
+                + "ms worst=" + rootWorstMs + "ms maxNesting=" + rootMaxDepth
+                + " boxes=" + rootBoxes + ")";
+    }
+
+    /**
+     * Whether a root layout pass is running right now, anywhere in the app.
+     *
+     * <p>Layout is not re-entrant. While a pass is walking the tree, elements
+     * are being built and mounted underneath it (LayoutBuilder builds during
+     * layout, as Flutter's does), so anything that asks for a FRESH pass at
+     * that moment walks a tree that is half-replaced: ancestors are already
+     * detached from the elements still being laid out, and every
+     * {@code .of(context)} lookup made from inside the new pass answers
+     * "nothing here". The gallery's splash crashed exactly this way on the
+     * native build -- a PositionedTransition ticked while the first frame was
+     * laying out, forced a second pass from inside the first, and the backdrop
+     * then failed a {@code GalleryOptions.of(context)!} whose provider was
+     * four levels above a parent pointer that had already been cleared.</p>
+     *
+     * <p>Requests that arrive during a pass are recorded and run once the
+     * outermost pass finishes, so nothing is silently dropped.</p>
+     */
+    public static boolean inLayout() {
+        return rootDepth > 0;
+    }
+
+    private static final java.util.List<RenderHost> PENDING =
+            new java.util.ArrayList<RenderHost>();
+
+    /** Records a relayout request that arrived while a pass was in progress. */
+    static void deferRevalidate(RenderHost h) {
+        if (h != null && !PENDING.contains(h)) {
+            PENDING.add(h);
+        }
+    }
+
+    private static void runDeferred() {
+        if (PENDING.isEmpty()) {
+            return;
+        }
+        // Bounded: a deferred pass can itself defer, and without a ceiling two
+        // hosts that invalidate each other would spin here forever.
+        for (int round = 0; round < 4 && !PENDING.isEmpty(); round++) {
+            java.util.List<RenderHost> due = new java.util.ArrayList<RenderHost>(PENDING);
+            PENDING.clear();
+            for (int i = 0; i < due.size(); i++) {
+                due.get(i).revalidate();
+            }
+        }
+        PENDING.clear();
+    }
+
     @Override
     public void layoutContainer(Container parent) {
         RenderElement root = host.rootRenderElement();
         if (root == null) {
             return;
         }
+        long t0 = System.currentTimeMillis();
+        rootPasses++;
+        rootDepth++;
+        rootMaxDepth = Math.max(rootMaxDepth, rootDepth);
+        try {
+            layoutRoot(parent, root);
+        } finally {
+            long took = System.currentTimeMillis() - t0;
+            // Only top-level passes are added up: a nested pass is already
+            // inside its parent's elapsed time, and counting both makes the
+            // total look like multiples of the work actually done.
+            if (rootDepth == 1) {
+                rootMs += took;
+            }
+            if (rootFirstMs < 0) {
+                rootFirstMs = took;
+            }
+            rootWorstMs = Math.max(rootWorstMs, took);
+            rootDepth--;
+        }
+        if (rootDepth == 0) {
+            runDeferred();
+        }
+    }
+
+    /// How many times a single pass may re-run because it invalidated itself. Two extra
+    /// attempts is enough for the case this exists for -- one subtree that builds late,
+    /// and its parents remeasured once around it -- and a bound means a widget that
+    /// dirties itself unconditionally degrades to a stale frame rather than a hang.
+    private static final int SETTLE_ATTEMPTS = 3;
+
+    private void layoutRoot(Container parent, RenderElement root) {
         Style s = parent.getStyle();
-        root.layout(constraintsFor(parent));
-        root.position(s.getPaddingLeftNoRTL(), s.getPaddingTop());
+        BoxConstraints box = constraintsFor(parent);
+        noteBox(box);
+        // A pass can invalidate itself. A LayoutBuilder sits out a speculative measurement
+        // and inflates its subtree on a later one, underneath the performLayout of the box
+        // that contains it -- so by the time this pass finishes, the offsets it stored are
+        // for a set of children that has since changed. Running once and trusting the
+        // result left Reply's mail list with every card at the list's origin and a pane of
+        // zero size, which reads on screen as an empty page, and no later pass repaired it
+        // because they all hit the same clean cache.
+        //
+        // So: run, and if the tree says it is still dirty, run again with what it now
+        // knows. This settles on the second pass in practice.
+        for (int attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
+            root.layout(box);
+            root.position(s.getPaddingLeftNoRTL(), s.getPaddingTop());
+            if (!root.needsLayout()) {
+                return;
+            }
+        }
     }
 
     /**
