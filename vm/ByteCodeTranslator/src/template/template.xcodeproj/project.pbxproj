@@ -309,6 +309,10 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/template-src",
+					// Prebuilt pods can require Swift compatibility archives even in
+					// an Objective-C app. TOOLCHAIN_DIR can point at the Metal toolchain.
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(SDKROOT)/usr/lib/swift",
 				);
 			};
 			name = Debug;
@@ -352,6 +356,10 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/template-src",
+					// Prebuilt pods can require Swift compatibility archives even in
+					// an Objective-C app. TOOLCHAIN_DIR can point at the Metal toolchain.
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(SDKROOT)/usr/lib/swift",
 				);
 			};
 			name = Release;

@@ -38,10 +38,14 @@ import com.codename1.ads.spi.AdSessionCallback;
 import com.codename1.ads.spi.BannerAdSession;
 import com.codename1.ads.spi.FullScreenAdSession;
 import com.codename1.ads.spi.NativeAdProvider;
+import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -116,6 +120,8 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
         private final AdFormat format;
         private AdSessionCallback cb;
         private boolean loaded;
+        private Form adForm;
+        private Form previousForm;
 
         MockFullScreen(AdFormat format) {
             this.format = format;
@@ -147,13 +153,48 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
                 cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "No ad loaded"));
                 return;
             }
-            loaded = false;
-            cb.onShown();
-            cb.onImpression();
-            if (format == AdFormat.REWARDED || format == AdFormat.REWARDED_INTERSTITIAL) {
-                cb.onUserEarnedReward(new RewardItem("coins", 10));
+            if (adForm != null) {
+                cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "An ad is already showing"));
+                return;
             }
-            cb.onDismissed();
+            loaded = false;
+            previousForm = CN.getCurrentForm();
+            adForm = new Form("Mock advertisement", new BorderLayout());
+            adForm.add(BorderLayout.CENTER, new Label("Advertisement"));
+            Button close = new Button("Close ad");
+            close.addActionListener(evt -> closeAd(true));
+            adForm.add(BorderLayout.SOUTH, close);
+            adForm.setBackCommand(new Command("Close ad") {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    closeAd(true);
+                }
+            });
+            adForm.show();
+            cb.onShown();
+            // A listener may dispose the ad synchronously from onShown().
+            if (adForm != null) {
+                cb.onImpression();
+            }
+        }
+
+        private void closeAd(boolean notify) {
+            if (adForm == null) {
+                return;
+            }
+            Form closing = adForm;
+            Form previous = previousForm;
+            adForm = null;
+            previousForm = null;
+            if (previous != null && CN.getCurrentForm() == closing) {
+                previous.showBack();
+            }
+            if (notify) {
+                if (format == AdFormat.REWARDED || format == AdFormat.REWARDED_INTERSTITIAL) {
+                    cb.onUserEarnedReward(new RewardItem("coins", 10));
+                }
+                cb.onDismissed();
+            }
         }
 
         @Override
@@ -162,6 +203,8 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
 
         @Override
         public void dispose() {
+            loaded = false;
+            closeAd(false);
         }
     }
 

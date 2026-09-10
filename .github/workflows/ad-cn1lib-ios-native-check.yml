@@ -20,6 +20,8 @@ on:
       - 'maven/cn1-admob/**'
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
+      - 'scripts/check-admob-ios-link.sh'
+      - 'vm/ByteCodeTranslator/src/template/template.xcodeproj/project.pbxproj'
       - 'vm/ByteCodeTranslator/src/cn1_globals.h'
       - 'vm/ByteCodeTranslator/src/cn1_virtual_thread.h'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
@@ -29,6 +31,8 @@ on:
       - 'maven/cn1-admob/**'
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
+      - 'scripts/check-admob-ios-link.sh'
+      - 'vm/ByteCodeTranslator/src/template/template.xcodeproj/project.pbxproj'
       - 'vm/ByteCodeTranslator/src/cn1_globals.h'
       - 'vm/ByteCodeTranslator/src/cn1_virtual_thread.h'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
@@ -200,3 +204,16 @@ jobs:
                      -destination 'generic/platform=iOS Simulator' \
                      CODE_SIGNING_ALLOWED=NO \
                      build
+
+  link-admob-app:
+    name: Link AdMob app (${{ matrix.sdk }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [iphoneos, iphonesimulator]
+    steps:
+      - uses: actions/checkout@v6
+      - run: brew install xcodegen
+      - name: Link the native bridge and SDK into an app
+        run: scripts/check-admob-ios-link.sh "$RUNNER_TEMP/admob-link" "${{ matrix.sdk }}"
