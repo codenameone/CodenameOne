@@ -1791,6 +1791,14 @@ static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 // walks the page registry and its slots before their definitions.
 static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i);
 static CN1BibopPage* _Atomic bibopAllPages;
+#ifdef CN1_ALLOC_CENSUS
+// Defined far below, beside the BiBOP page structures they read. Declared up here
+// because the post-sweep hook that calls them is compiled earlier -- and OUTSIDE the
+// CN1_GC_VERIFY block just above, which is off in an ordinary census build.
+void cn1HeapAccounting(const char* label);
+void cn1AllocCensus(const char* label);
+#endif
+
 #ifdef CN1_GRACE_AUDIT
 static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE);
 #endif
@@ -4865,6 +4873,14 @@ void codenameOneGCSweep() {
     // permanently broken.
     cn1GcVerifyHeap(threadStateData);
 #endif
+#ifdef CN1_ALLOC_CENSUS
+    // Same reasoning as the verify hook above: post-sweep is when "live" means
+    // live. cn1HeapAccounting and cn1AllocCensus were written but never called
+    // from anywhere, so nothing could answer "what is the footprint made of".
+    if(getenv("CN1_HEAP_REPORT")) {
+        cn1HeapAccounting("post-sweep");
+    }
+#endif
 }
 
 JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
@@ -5525,6 +5541,10 @@ static int bibopTriggerHighSurvivalStreak = 0;
 // Non-static: the inlined bump fast path (cn1_globals.h) reads bibopCurrent[ci].
 __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 
+#ifdef CN1_ALLOC_CENSUS
+static void cn1BibopExitReport(void);
+#endif
+
 static void cn1BibopDoInit() {
     int ci = 0;
     // DIAGNOSTIC KNOB -- CN1_GC_TRIGGER_MB overrides how many uncollected bytes
@@ -5570,7 +5590,22 @@ static void cn1BibopDoInit() {
     // the same reading (see cn1PacingGrowthFloorBytes), so a zero here would arm that
     // bound at its absolute 512MB minimum no matter how much memory the host has.
     cn1RefreshFreeMemCache();
+#ifdef CN1_ALLOC_CENSUS
+    if(getenv("CN1_HEAP_REPORT")) {
+        atexit(cn1BibopExitReport);
+    }
+#endif
 }
+
+#ifdef CN1_ALLOC_CENSUS
+// Registered from cn1BibopDoInit under CN1_HEAP_REPORT. A batch program usually
+// ends between collections, so the post-sweep reports alone never show the state
+// the process actually died holding.
+static void cn1BibopExitReport(void) {
+    cn1HeapAccounting("exit");
+    cn1AllocCensus("exit");
+}
+#endif
 
 static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     int slotSize = cn1BibopClassSize[ci];

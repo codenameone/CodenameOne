@@ -15,6 +15,11 @@ set -e
 cd "$(dirname "$0")"
 REPO="$(cd ../.. && pwd)"
 OPT="${1:--O1}"
+# -O3 implies ThinLTO: that IS the documented release shape (vm/benchmarks/README.md),
+# and measured here it is the only rung that beats -O1 -- 1.45s against 1.61s for -O1,
+# 1.70s for -O2 and 1.73s for plain -O3. Benchmarking a bare -O3 binary and calling it
+# the release build understates it, so the flag is not left to the caller to remember.
+case "$OPT" in -O3) CN1_SELFHOST_CFLAGS="-flto=thin $CN1_SELFHOST_CFLAGS";; esac
 CC="${CN1_SELFHOST_CC:-clang}"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a working JDK 8}"
 OUT="$REPO/vm/selfhost/target"
