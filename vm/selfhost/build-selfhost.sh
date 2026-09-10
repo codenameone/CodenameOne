@@ -61,15 +61,23 @@ else
     rm -f "$MANIFEST.now"
 fi
 
-# 4. the self-host source set: every translator source except the ones stubs replace,
-#    the JavaScript target, and CastSemanticsVerifier (its own command-line tool).
+# 4. The self-host source set: every translator source except the ones a stub
+#    replaces, plus the two classes that carry their own main().
+#
+#    Only the sources that CANNOT compile against JavaAPI are stubbed, and the list
+#    is driven by what is in stubs/ rather than by a name pattern. A blanket
+#    "Javascript*" exclusion is what stubbed JavascriptNativeRegistry, which
+#    compiles fine and -- as the comment at its call site in Parser warns -- is
+#    consulted on EVERY target, not just JavaScript. Answering false there culled
+#    java.util.HashMap's getImpl/putImpl/removeImpl/containsKeyImpl/clearImpl and
+#    the two helpers only they call, and the native translator emitted seven
+#    methods as empty stubs that the JVM one emitted in full.
 SRC="$REPO/vm/ByteCodeTranslator/src"
 STUBS="$REPO/vm/selfhost/stubs"
 STUBBED=$(cd "$STUBS" && find . -name '*.java' | sed 's|.*/||;s|\.java$||' | tr '\n' '|' | sed 's/|$//')
 SRCLIST="$OUT/sources.txt"
 find "$SRC" -name '*.java' \
   | grep -vE "/($STUBBED)\.java$" \
-  | grep -vE '/Javascript[A-Za-z]*\.java$' \
   | grep -v '/CastSemanticsVerifier\.java$' \
   | grep -v '/NativeSignatureVerifierCli\.java$' > "$SRCLIST"
 find "$STUBS" -name '*.java' >> "$SRCLIST"
