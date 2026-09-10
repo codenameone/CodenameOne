@@ -1587,6 +1587,16 @@ public final class HttpServer {
         // is gone. With no request in flight there is no one left to race, so these
         // are safe to release here, and leaving them would leak a native session per
         // connection for the life of the process.
+        // The parked VIRTUAL THREADS first, because drop() cannot reclaim them.
+        // A connection parked between requests holds a handle in its host's table
+        // and no request in flight, so the wait above finds nothing to wait for and
+        // comes straight here. drop() then closes the descriptor and returns,
+        // leaving the handle -- and its native stack and VM thread registration --
+        // allocated. sweepDeadlines is what normally frees those, and it runs from
+        // the poll loop, which `running = false` has already ended. The process
+        // keeps every one of them, which matters precisely because
+        // releaseVirtualThreadSlot() exists so a server CAN be started again here.
+        freeParkedVirtualThreads();
         java.util.Iterator stranded = new java.util.ArrayList(liveConnections.keySet()).iterator();
         while(stranded.hasNext()) {
             drop(((Integer)stranded.next()).intValue());
@@ -1627,6 +1637,35 @@ public final class HttpServer {
      * process can have it. Only the holder releases it: a second server that fell
      * back to the pool must not free the running one's claim when it stops.
      */
+    /**
+     * Frees every virtual thread still parked on a connection, at shutdown.
+     *
+     * Only safe because nothing is running by the time it is called: the poll loop
+     * has stopped, so no host can resume one of these handles, and a handle that is
+     * freed while its thread could still be resumed is a use-after-free -- the same
+     * hazard the RUNNABLE path guards with poller.remove().
+     */
+    private void freeParkedVirtualThreads() {
+        VtHost[] hosts = vtHosts;
+        if(hosts == null) {
+            return;
+        }
+        for(int h = 0 ; h < hosts.length ; h++) {
+            VtHost host = hosts[h];
+            if(host == null) {
+                continue;
+            }
+            for(int fd = 0 ; fd < host.vtByFd.length ; fd++) {
+                long handle = host.handleFor(fd);
+                if(handle != 0) {
+                    host.setHandle(fd, 0);
+                    host.setDeadline(fd, 0);
+                    VirtualThread.free(handle);
+                }
+            }
+        }
+    }
+
     private void releaseVirtualThreadSlot() {
         if(virtualThreads) {
             ACTIVE_SERVER = null;
@@ -2740,6 +2779,35 @@ public final class HttpServer {
                     closedByPeer = true;
                     return false;
                 }
+                if(direct.length == 0) {
+                    // Nothing ready on a non-blocking descriptor, which means two
+                    // different things and only one of them is trouble.
+                    //
+                    // MIDWAY THROUGH a message it is not the peer leaving: the
+                    // headers arrived in one packet and the body is still coming,
+                    // and answering "closed" here dropped a valid upload. Those
+                    // reads go to the copying path, which parks on EAGAIN and owns
+                    // its buffer -- this one cannot park, because the storage is
+                    // per HOST thread and another virtual thread's read would
+                    // overwrite what this one is about to return.
+                    //
+                    // BETWEEN messages it is the ordinary quiet of a kept-alive
+                    // connection, and reporting it as closed is how a worker is
+                    // freed. Sending those to a parking read instead made the
+                    // suite 2.4x slower and stopped shedsIdleConnections shedding
+                    // anything -- the partial request sat until a deadline and was
+                    // answered 408 rather than dropped.
+                    //
+                    // parsedFromBuffer is precisely that distinction, and it is
+                    // already maintained for fill()'s benefit. Note a SPLIT header
+                    // block needs nothing here: after the first partial read
+                    // available() is non-zero, so it never takes this branch.
+                    if(!parsedFromBuffer) {
+                        closedByPeer = true;
+                        return false;
+                    }
+                    return fillCopying(scratch);
+                }
                 if(ZERO_COPY_MODE == 2) {
                     // Diagnostic bisection only -- see ZERO_COPY_MODE. Same read as
                     // mode 1, same heap array as mode 0, so whichever of the two the
@@ -2756,6 +2824,18 @@ public final class HttpServer {
                 borrowed = true;
                 return true;
             }
+            return fillCopying(scratch);
+        }
+
+        /**
+         * The copying read: into this connection's own scratch, then into a buffer
+         * sized for what is kept plus what arrived.
+         *
+         * Split out of fill() so the zero-copy path can defer to it when the
+         * descriptor has nothing ready. readFrom parks on EAGAIN for a virtual
+         * thread, which is the behaviour the shared-buffer read cannot safely have.
+         */
+        private boolean fillCopying(byte[] scratch) throws IOException {
             int n = readFrom(fd, session, scratch, 0, scratch.length);
             if(n <= 0) {
                 closedByPeer = true;

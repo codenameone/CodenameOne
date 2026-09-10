@@ -662,6 +662,57 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a chunk arriving after a pause is not mistaken for a hangup")
+    void aChunkInASecondPacketIsNotAHangup() throws Exception {
+        // Plaintext descriptors are NON-BLOCKING in virtual-thread mode, so a read
+        // with nothing ready gets EAGAIN, and reporting that as end of stream drops
+        // a request that was still arriving.
+        //
+        // It has to be CHUNKED to reach that read. A Content-Length body goes
+        // through fillTo(), which uses the copying path and parks correctly -- a
+        // first version of this test used one, passed with the fix reverted, and
+        // proved nothing. readChunked calls fill(), which takes the zero-copy
+        // branch once the buffered bytes run out, and that is the read in
+        // question.
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        socket.setSoTimeout(20000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            // Headers and the first chunk together, so the head is fully parsed and
+            // the buffered bytes are consumed before the gap.
+            out.write(("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+                    + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                    + "2\r\n[\"\r\n").getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            Thread.sleep(400);
+            try {
+                out.write("5\r\nsplit\r\n".getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                Thread.sleep(400);
+                out.write("2\r\n\"]\r\n0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            } catch (IOException closedDuringTheGap) {
+                // Said in words rather than as a raw socket error: when this
+                // regresses, the server has hung up mid-upload and the next write
+                // meets a closed socket. "Broken pipe" alone does not say that.
+                fail("the server closed the connection while the body was still "
+                        + "arriving, so a valid chunked upload was dropped: "
+                        + closedDuringTheGap);
+            }
+            byte[] response = readFullyBytes(socket.getInputStream());
+            assertEquals(200, status(response),
+                    "the chunks arrived in separate packets and the request was dropped:\n"
+                            + new String(response, StandardCharsets.UTF_8));
+            String text = new String(response, StandardCharsets.UTF_8);
+            assertTrue(text.indexOf("len=9") > 0,
+                    "every chunk must reach the handler, got:\n" + text);
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
     @DisplayName("chunked uploads are charged against the process budget too")
     void chunkedUploadsAreChargedAndReleased() throws Exception {
         // The budget bounded the fixed-length reader and nothing else, so a

@@ -220,6 +220,37 @@ static __thread char* cn1BackendReadStorage = 0;
 static __thread JAVA_INT cn1BackendReadCap = 0;
 
 /*
+ * A zero-length array handed back to mean "nothing ready", kept SEPARATE from the
+ * read buffer above.
+ *
+ * The first version of this signalled by setting the read array's own length to
+ * zero, which corrupts anything still borrowing it: that header is one object per
+ * host thread, and a connection parsing out of it saw buffer.length become 0
+ * underneath and died with an ArrayIndexOutOfBoundsException inside serveOne. The
+ * signal must not touch the buffer it is a signal about.
+ */
+static __thread struct JavaArrayPrototype* cn1BackendWouldBlockArray = 0;
+
+static struct JavaArrayPrototype* cn1BackendEnsureWouldBlockArray(void) {
+    if(cn1BackendWouldBlockArray == 0) {
+        cn1BackendWouldBlockArray = (struct JavaArrayPrototype*)
+                calloc(1, sizeof(struct JavaArrayPrototype));
+        if(cn1BackendWouldBlockArray == 0) {
+            return 0;
+        }
+        cn1BackendWouldBlockArray->__codenameOneParentClsReference = &class_array1__JAVA_BYTE;
+        cn1BackendWouldBlockArray->__codenameOneGcMark = -1;
+        cn1BackendWouldBlockArray->__heapPosition = -1;
+        cn1BackendWouldBlockArray->dimensions = 1;
+        cn1BackendWouldBlockArray->primitiveSize = sizeof(JAVA_ARRAY_BYTE);
+        cn1BackendWouldBlockArray->length = 0;
+        cn1BackendWouldBlockArray->data = 0;
+        cn1AddImmortalRoot((JAVA_OBJECT)cn1BackendWouldBlockArray);
+    }
+    return cn1BackendWouldBlockArray;
+}
+
+/*
  * Whether awaitReadable probes with poll() before parking. Read once; see the
  * discussion at the call site. 1 (probe) is the shipped default until the A/B
  * on an idle host says otherwise.
@@ -322,11 +353,15 @@ JAVA_OBJECT com_codename1_backend_ServerSocket_threadReadBufferImpl___int_R_byte
  * or that moved objects, could not do this.
  *
  * Returns null at end of stream or on error, which the caller treats as the peer
- * having gone away -- the same contract the copying path has.
+ * having gone away -- the same contract the copying path has. A ZERO-LENGTH array
+ * is the third answer: the descriptor had nothing ready. read() cannot produce it
+ * otherwise, since a zero-byte read IS end of stream, so the caller can tell the
+ * two apart.
  */
 JAVA_OBJECT com_codename1_backend_ServerSocket_readIntoThreadBufferImpl___int_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT fd, JAVA_INT capacity) {
     struct JavaArrayPrototype* a = cn1BackendEnsureReadArray(capacity);
     ssize_t n;
+    int readErrno;
     if(a == 0 || fd < 0) {
         return JAVA_NULL;
     }
@@ -340,7 +375,25 @@ JAVA_OBJECT com_codename1_backend_ServerSocket_readIntoThreadBufferImpl___int_in
     do {
         n = read(fd, cn1BackendReadStorage, (size_t)capacity);
     } while(n < 0 && errno == EINTR);
+    readErrno = errno;
     CN1_RESUME_THREAD;
+    if(n < 0 && (readErrno == EAGAIN || readErrno == EWOULDBLOCK)) {
+        // NOT end of stream. serveOne leaves plaintext descriptors non-blocking in
+        // virtual-thread mode, so a request whose bytes have not landed yet -- the
+        // headers in one packet and the first chunk in the next -- lands here, and
+        // reporting null dropped a perfectly good upload as though the peer had
+        // hung up.
+        //
+        // Answered rather than parked. readImpl parks on EAGAIN, but it reads into
+        // the CALLER'S array; this reads into a buffer that is __thread, so it is
+        // shared by every virtual thread multiplexed onto this host. Parking here
+        // hands the host to one of them, and its read would overwrite the storage
+        // this one is about to return -- trading a dropped upload for one request's
+        // bytes appearing inside another's. The caller falls back to the copying
+        // path instead, which parks correctly and owns its buffer.
+        struct JavaArrayPrototype* pending = cn1BackendEnsureWouldBlockArray();
+        return pending == 0 ? JAVA_NULL : (JAVA_OBJECT)pending;
+    }
     if(n <= 0) {
         return JAVA_NULL;
     }
