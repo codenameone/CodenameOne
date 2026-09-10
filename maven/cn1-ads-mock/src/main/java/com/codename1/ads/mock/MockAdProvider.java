@@ -43,6 +43,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
@@ -159,6 +160,10 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
             }
             loaded = false;
             previousForm = CN.getCurrentForm();
+            if (previousForm == null) {
+                // App-open ads may be presented before the first application form.
+                previousForm = new Form();
+            }
             adForm = new Form("Mock advertisement", new BorderLayout());
             adForm.add(BorderLayout.CENTER, new Label("Advertisement"));
             Button close = new Button("Close ad");
@@ -187,7 +192,13 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
             adForm = null;
             previousForm = null;
             if (previous != null && CN.getCurrentForm() == closing) {
-                previous.showBack();
+                if (previous instanceof Dialog) {
+                    // showBack() would enter another modal wait and prevent the
+                    // reward/dismissal callbacks from disposing the caller dialog.
+                    ((Dialog) previous).showModeless();
+                } else {
+                    previous.showBack();
+                }
             }
             if (notify) {
                 if (format == AdFormat.REWARDED || format == AdFormat.REWARDED_INTERSTITIAL) {

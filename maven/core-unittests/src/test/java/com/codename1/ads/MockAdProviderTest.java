@@ -27,11 +27,15 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MockAdProviderTest extends UITestBase {
@@ -100,4 +104,94 @@ class MockAdProviderTest extends UITestBase {
         assertSame(previous, CN.getCurrentForm());
         assertEquals(Arrays.asList("shown", "impression"), events);
     }
+
+    @FormTest
+    void modalDialogCanBeDisposedAndNavigatedAwayFromInDismissalCallback() {
+        MockAdProvider.install();
+        Dialog dialog = new Dialog("Modal caller");
+        Form destination = new Form("After dismissal");
+        RewardedAd ad = new RewardedAd("mock");
+        AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+        Timer watchdog = new Timer(true);
+        boolean[] started = {false};
+        ad.setAdListener(new AdListener() {
+            @Override public void onDismissed() {
+                events.add("dismissed");
+                assertSame(dialog, CN.getCurrentForm());
+                dialog.dispose();
+                destination.show();
+            }
+        });
+        ad.setOnUserEarnedRewardListener(reward -> events.add("reward"));
+        dialog.addShowListener(evt -> {
+            if (started[0]) {
+                return;
+            }
+            started[0] = true;
+            CN.callSerially(() -> {
+                try {
+                    ad.load();
+                    ad.show();
+                    Form showing = CN.getCurrentForm();
+                    // Unblock the broken implementation so failure is an assertion,
+                    // not a hung EDT. The fixed close delivers callbacks immediately.
+                    watchdog.schedule(new TimerTask() {
+                        @Override public void run() {
+                            CN.callSerially(() -> {
+                                if (!events.contains("dismissed")) {
+                                    events.add("watchdog");
+                                    dialog.dispose();
+                                }
+                            });
+                        }
+                    }, 1000);
+                    showing.getBackCommand().actionPerformed(new ActionEvent(showing));
+                } catch (Throwable t) {
+                    failure.set(t);
+                    dialog.dispose();
+                }
+            });
+        });
+        try {
+            dialog.show();
+            assertNull(failure.get(), "Dismissal callback must see the restored dialog");
+            assertEquals(Arrays.asList("reward", "dismissed"), events);
+            assertSame(destination, CN.getCurrentForm());
+        } finally {
+            watchdog.cancel();
+            ad.dispose();
+            dialog.dispose();
+        }
+    }
+
+    @FormTest
+    void appOpenAdWithoutPreviousFormCanCloseGoBackOrDispose() {
+        MockAdProvider.install();
+        for (int action = 0; action < 3; action++) {
+            events.clear();
+            implementation.setCurrentForm(null);
+            assertNull(CN.getCurrentForm());
+            AppOpenAd ad = new AppOpenAd("mock");
+            ad.setAdListener(listener());
+            ad.load();
+            ad.show();
+            Form showing = CN.getCurrentForm();
+            assertEquals("Mock advertisement", showing.getTitle());
+            if (action == 0) {
+                Button close = (Button) showing.getContentPane().getComponentAt(1);
+                close.pressed();
+                close.released();
+            } else if (action == 1) {
+                showing.getBackCommand().actionPerformed(new ActionEvent(showing));
+            } else {
+                ad.dispose();
+            }
+            assertNotNull(CN.getCurrentForm());
+            assertNotSame(showing, CN.getCurrentForm(), "Dismissal must remove the ad even at startup");
+            assertEquals(action == 2 ? Arrays.asList("shown", "impression")
+                    : Arrays.asList("shown", "impression", "dismissed"), events);
+            ad.dispose();
+        }
+    }
+
 }
