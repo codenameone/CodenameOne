@@ -2189,12 +2189,6 @@ public class BytecodeMethod implements SignatureSet {
         }
 
         if(includeStaticInitializer) {
-            // Completion flag, not class__X.initialized: that one is set BEFORE
-            // __CLINIT__ runs (it is also the recursion guard), so a guard on it can
-            // skip the initializer mid-<clinit>. See the forward declaration in
-            // ByteCodeClass.generateCCode.
-            b.append("if(__builtin_expect(!__atomic_load_n(&__").append(cls)
-             .append("_LOADED__, __ATOMIC_ACQUIRE), 0)) ");
             b.append("__STATIC_INITIALIZER_");
             b.append(cls);
             b.append("(threadStateData);\n    ");
