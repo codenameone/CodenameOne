@@ -533,12 +533,20 @@ typedef struct clazz*       JAVA_CLASS;
 #define BC_SWAP() swapStack(SP)
 
 
-#define POP_INT() (*pop(&SP)).data.i
-#define POP_OBJ() (*pop(&SP)).data.o
-#define POP_OBJ_NO_RELEASE() (*pop(&SP)).data.o
-#define POP_LONG() (*pop(&SP)).data.l
-#define POP_DOUBLE() (*pop(&SP)).data.d
-#define POP_FLOAT() (*pop(&SP)).data.f
+// (*--SP) rather than (*pop(&SP)), which is the same decrement-then-dereference
+// and avoids taking SP's address. A method that emits setjmp declares SP volatile
+// so longjmp cannot clobber it (see CN1_DECLARE_SP); &SP is then
+// `struct elementStruct *volatile *`, and pop() takes `struct elementStruct **`,
+// so every pop in such a method passed a pointer that discarded the very
+// qualifier the frame variant exists to apply. That was ~9,100 warnings in one
+// application build, and it was the compiler being right: writing through the
+// unqualified pointer is not the volatile access the declaration asked for.
+#define POP_INT() ((*--SP).data.i)
+#define POP_OBJ() ((*--SP).data.o)
+#define POP_OBJ_NO_RELEASE() ((*--SP).data.o)
+#define POP_LONG() ((*--SP).data.l)
+#define POP_DOUBLE() ((*--SP).data.d)
+#define POP_FLOAT() ((*--SP).data.f)
 
 #define PEEK_INT(offset) SP[-offset].data.i
 #define PEEK_OBJ(offset) SP[-offset].data.o
@@ -546,7 +554,10 @@ typedef struct clazz*       JAVA_CLASS;
 #define PEEK_DOUBLE(offset) SP[-offset].data.d
 #define PEEK_FLOAT(offset) SP[-offset].data.f
 
-#define POP_MANY(offset) popMany(threadStateData, offset, &SP)
+// Value in, value out, for the same reason as the POP_* macros above: popMany
+// has to move SP by an amount it computes from the slot types, and taking &SP
+// discarded volatile on the frames that declare it.
+#define POP_MANY(offset) (SP = cn1PopMany(threadStateData, offset, SP))
 
 #define BC_IADD() { \
     SP--; \
@@ -756,27 +767,27 @@ static inline JAVA_LONG cn1SaturateToLong(JAVA_DOUBLE cn1__d) {
 #define POP_MANY_AND_PUSH_OBJ(value, offset) {  \
     JAVA_OBJECT pObj = value; SP[-offset].type = CN1_TYPE_INVALID; \
     SP[-offset].data.o = pObj; SP[-offset].type = CN1_TYPE_OBJECT; \
-    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
+    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
 
 #define POP_MANY_AND_PUSH_INT(value, offset) {  \
     JAVA_INT pInt = value; SP[-offset].type = CN1_TYPE_INT; \
     SP[-offset].data.i = pInt; \
-    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
+    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
 
 #define POP_MANY_AND_PUSH_LONG(value, offset) {  \
     JAVA_LONG pLong = value; SP[-offset].type = CN1_TYPE_LONG; \
     SP[-offset].data.l = pLong; \
-    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
+    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
 
 #define POP_MANY_AND_PUSH_DOUBLE(value, offset) {  \
     JAVA_DOUBLE pDob = value; SP[-offset].type = CN1_TYPE_DOUBLE; \
     SP[-offset].data.d = pDob; \
-    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
+    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
 
 #define POP_MANY_AND_PUSH_FLOAT(value, offset) {  \
     JAVA_FLOAT pFlo = value; SP[-offset].type = CN1_TYPE_FLOAT; \
     SP[-offset].data.f = pFlo; \
-    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
+    SP = cn1PopMany(threadStateData, MAX(1, offset) - 1, SP); }
 
 
 #define BC_IDIV() SP--; SP[-1].data.i = SP[-1].data.i / (*SP).data.i
@@ -3378,11 +3389,10 @@ static inline struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, str
 
 // Inlined: POP_INT/POP_LONG/POP_OBJ hit this on every pop, including hot return paths
 // (return POP_LONG()). It was a non-inline call -- pure overhead for a pointer decrement.
-static inline struct elementStruct* pop(struct elementStruct**sp) {
-    --(*sp);
-    return *sp;
-}
-extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp);
+// Returns the new SP rather than writing through a pointer to it, so the caller's
+// SP keeps whatever qualifiers its frame gave it. The pointer-taking form
+// discarded volatile on every frame that declares SP volatile; see POP_MANY.
+extern struct elementStruct* cn1PopMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* sp);
 
 
 #define swapStack(sp) { \
