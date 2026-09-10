@@ -100,35 +100,73 @@ unless the two emitted identical C -- a speed number from a translator that emit
 different output is meaningless.
 
 Translating the self-hosting corpus (ASM + the translator's own classes, ~570
-classes) on an M-series Mac, release shape (`-O3 -flto=thin`), against JDK 8:
+classes) on a 64 GB / 16-core Mac, release shape (`-O3 -flto=thin`), against JDK 8:
 
-| | parpar | jdk8 | |
-|---|---:|---:|---|
-| wall clock (min of 3) | 7.06 s | 1.17 s | **jdk8 6.0x faster** |
-| peak phys_footprint | 1434 MB | 509 MB | **jdk8 2.8x smaller** |
+| | wall clock | peak footprint |
+|---|---:|---:|
+| jdk8 | 1.17 s | 509 MB |
+| parpar, as shipped | 6.7 - 8.7 s | 1434 MB |
+| parpar, pacing growth clamp disarmed | **1.39 - 1.52 s** | 1467 MB |
 
-**This is the opposite of what was hoped for, on both axes.** It is recorded here
-rather than buried because it is reproducible and cross-checked: `/usr/bin/time -l`
-independently reports 1328 MB and 501 MB, agreeing with the sampled `vmmap`
-figures. Building at `-O1` instead of `-O3 -flto=thin` changes nothing measurable,
-so code quality is not the bottleneck.
+**Nearly all of the wall-clock gap is one pacing policy, not collection work and
+not code quality.** Building at `-O1` instead of `-O3 -flto=thin` measures the
+same, and with the clamp disarmed the collector still runs its four cycles.
 
-The `user` versus `real` split says where the wall-clock gap comes from:
+### Where it goes
+
+`sample` on a default run puts 64% of the process's samples in one stack:
 
 ```
-parpar   6.29 real   7.31 user     -> ~1.2x parallelism
-jdk8     1.13 real   6.09 user     -> ~5.4x parallelism
+Ldc.getValueAsString -> cn1BibopAlloc -> cn1BibopMaybeGc
+  -> cn1PacingPark   (3491 of 5476 samples)
+     -> usleep -> nanosleep -> __semwait_signal   (3475)
 ```
 
-The two burn comparable CPU. HotSpot spends it across cores -- JIT compiler
-threads and parallel GC -- while the translated program is essentially
-single-threaded. So most of the 6x is concurrency the JVM has and ParparVM does
-not, rather than per-instruction code quality.
+The mutator is not marking or sweeping. It is asleep in the allocator's
+backpressure loop. `CN1_LOG_PACING_PARKS` reports only **two** park events for the
+whole run, so those two parks are seconds long each.
 
-Two things to be careful about before reading more into these numbers. The JVM's
-memory figure is bounded by its own heap ergonomics: it collects to stay under a
-default maximum, while the native binary has no such ceiling, so this compares
-what each process actually used and not the live set. And this is one corpus on
-one machine; `vm/benchmarks/run-benchmark.sh` measures tight compute loops, which
-is a different shape from a large allocation-heavy graph walk, and the published
-geomean-parity result there does not transfer to this workload.
+### Why
+
+`cn1BibopPacingCap` computes a generous cap -- `cn1CachedFreeMem / 8`, which is
+4 GB on this host -- and then clamps it:
+
+```c
+long capCeiling = trigger * CN1_BIBOP_GC_MAX_CAP_MULTIPLIER;   /* 8 */
+if(cap > capCeiling && cn1PacingPastGrowthFloor()) cap = capCeiling;
+```
+
+`cn1PacingPastGrowthFloor()` is true once the process footprint passes
+`CN1_PACING_GROWTH_FLOOR_BYTES`, which is **512 MB**. Early in the run the GC
+trigger is still at its own floor of 24 MB, so the ceiling is 24 x 8 = **192 MB**
+-- and `CN1_LOG_PACING_PARKS` reports exactly `minCapKb=196608`. A program whose
+live set is ~1.4 GB cannot stay inside a 192 MB allocation window, so it parks
+waiting for a collector that can never get under it.
+
+This is a policy calibrated for phone-sized heaps, where bounding RSS is worth
+real throughput. It has no scaling for a host with 64 GB of RAM: **disarming it
+cost 2% more memory (1434 -> 1467 MB) and returned 5x the speed.** Whether and how
+to scale it -- with available RAM, with a process budget, or by letting the
+trigger rise faster before the clamp engages -- is a policy decision for the VM
+owners, not something this project should decide. The reproduction is one
+`#define`:
+
+```bash
+CN1_SELFHOST_CFLAGS="-flto=thin -DCN1_PACING_GROWTH_FLOOR_BYTES=1099511627776LL" \
+  ./build-selfhost.sh -O3
+```
+
+A related but secondary defect **is** fixed here: `cn1RefreshFreeMemCache()` had
+exactly one caller, inside the mark cycle, so `cn1CachedFreeMem` was 0 until the
+first collection and the cap fell to its 72 MB floor rather than 192 MB during the
+window with the least reason to throttle anything. It is now primed in
+`cn1BibopDoInit`.
+
+### What is left, once pacing is out of the way
+
+Against JDK 8: **1.19x slower** and **2.9x more memory**. The time is ordinary
+AOT-versus-warmed-JIT territory. The memory gap is real and separate, and worth
+noting that the JVM figure is bounded by its own heap ergonomics -- it collects to
+stay under a default maximum, while the native binary has no such ceiling -- so
+this compares what each process used, not the live set.
+

@@ -5556,6 +5556,24 @@ static void cn1BibopDoInit() {
         atomic_store_explicit(&bibopBypassGeneration[i], 0, memory_order_relaxed);
         bibopHighSurvivalStreak[i] = 0;
     }
+    // Prime the free-memory snapshot the pacing cap is computed from.
+    //
+    // Its only other caller is the mark cycle, so until the FIRST collection
+    // cn1CachedFreeMem was 0 and cn1BibopPacingCap's `fm / 8` evaluated to 0, leaving
+    // the cap at its floor of trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER = 72MB --
+    // during exactly the window where there is least reason to throttle anything,
+    // since nothing has been collected yet. ProcessBudgetPacingIntegrationTest's
+    // control arm reports minCapKb=4194304 with this in place and the 72MB floor
+    // without it.
+    //
+    // This is NOT the whole story for an allocation-heavy program, and the rest is
+    // deliberately left alone: once the process passes CN1_PACING_GROWTH_FLOOR_BYTES
+    // (512MB) the growth bound below clamps the cap to trigger * 8, which is 192MB
+    // while the trigger is still at its own floor. Translating ~570 classes on a
+    // 64GB host, that clamp costs 6.7-8.7s against 1.4-1.5s with it disarmed, for
+    // 2% less peak footprint (1434MB vs 1467MB). Whether to scale it with host
+    // memory is a policy call, not a bug fix; see vm/selfhost/README.md.
+    cn1RefreshFreeMemCache();
 }
 
 static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
