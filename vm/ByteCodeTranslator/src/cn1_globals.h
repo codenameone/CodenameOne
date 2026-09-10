@@ -24,6 +24,28 @@
 #ifndef __CN1GLOBALS__
 #define __CN1GLOBALS__
 
+// A variable a frame macro declares for every method, which only some method
+// bodies go on to reference: SP is unused by a method that touches no operand
+// stack, methodBlockOffset by one with no try block, locals by one with no
+// locals, and so on. The declaration is unconditional because the macro cannot
+// know, and emitting a different macro per combination would multiply the frame
+// variants without making any generated code better.
+//
+// Saying so at the declaration is the C idiom for exactly this, and it is worth
+// more than silence: it suppresses only these variables, so a genuinely unused
+// variable anywhere else still reports. Before this, the six frame macros
+// produced roughly 48,000 -Wunused-variable warnings in one application build --
+// enough on their own to bury every real diagnostic in the log.
+//
+// Keyed on the compiler feature rather than the vendor: clang-cl defines
+// _MSC_VER as well as __clang__, so testing for MSVC first would silently drop
+// the attribute on the Windows port and leave that leg noisy.
+#if defined(__GNUC__) || defined(__clang__)
+    #define CN1_UNUSED __attribute__((unused))
+#else
+    #define CN1_UNUSED
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2310,7 +2332,7 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 
 #define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) jmp_buf destinationJump; \
 { \
-    int currentOffset = threadStateData->tryBlockOffset; \
+    int currentOffset CN1_UNUSED = threadStateData->tryBlockOffset; \
     if(CN1_TRY_SETJMP(destinationJump)) { \
         threadStateData->callStackOffset = currentCodenameOneCallStackOffset; \
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
@@ -2941,78 +2963,78 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // _VSP variant using the same test it already uses to decide whether locals are
 // volatile.
 #define CN1_DECLARE_SP(spQualifier, spPosition) \
-    struct elementStruct* spQualifier SP = &stack[spPosition];
+    struct elementStruct* spQualifier SP CN1_UNUSED = &stack[spPosition];
 
 // we need to zero out the values with memset otherwise we will run into a problem
 // when invoking release on pre-existing object which might be garbage
 #define DEFINE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
-    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, classNameId, methodNameId); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
-    int methodBlockOffset = threadStateData->tryBlockOffset;
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
 #define DEFINE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
 
 #define DEFINE_INSTANCE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
-    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, __cn1ThisObject, stackSize, localsStackSize, classNameId, methodNameId); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
-    int methodBlockOffset = threadStateData->tryBlockOffset;
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
 #define DEFINE_INSTANCE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
 
 #define DEFINE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
-    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_TRUE); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
-    int methodBlockOffset = threadStateData->tryBlockOffset;
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
 #define DEFINE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
-    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_TRUE); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
-    int methodBlockOffset = threadStateData->tryBlockOffset;
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
 #define DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
-    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_FALSE); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
-    int methodBlockOffset = threadStateData->tryBlockOffset;
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
 #define DEFINE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
-    struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
+    struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
     CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_FALSE); \
-    const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
-    int methodBlockOffset = threadStateData->tryBlockOffset;
+    const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
+    int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
 #define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
@@ -3032,7 +3054,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // elimination is GC-trivial here -- it changes nothing the collector sees.
 #define DEFINE_METHOD_STACK_FRAMELESS_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     struct elementStruct cn1_frameless_frame[(localsStackSize) + (stackSize)]; \
-    struct elementStruct* locals = &cn1_frameless_frame[0]; \
+    struct elementStruct* locals CN1_UNUSED = &cn1_frameless_frame[0]; \
     struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
     CN1_DECLARE_SP(spQualifier, spPosition)
 
