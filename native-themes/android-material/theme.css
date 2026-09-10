@@ -326,8 +326,8 @@ ToggleButton {
     font-size: 2.5mm;
     text-align: center;
 }
-ToggleButton.selected { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-ToggleButton.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButton.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButton.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButton.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 
 /* ComponentGroup renames the edge controls of a group: updateUIIDs() rewrites
@@ -339,16 +339,16 @@ ToggleButton.disabled { color: #a5a0ab; background-color: transparent; cn1-backg
    and every state is spelled out because cn1-derive is only read at base
    level. */
 ToggleButtonFirst { cn1-derive: ToggleButton; }
-ToggleButtonFirst.selected { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-ToggleButtonFirst.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonFirst.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonFirst.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonFirst.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonLast { cn1-derive: ToggleButton; }
-ToggleButtonLast.selected { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-ToggleButtonLast.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonLast.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonLast.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonLast.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonOnly { cn1-derive: ToggleButton; }
-ToggleButtonOnly.selected { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-ToggleButtonOnly.pressed { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonOnly.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonOnly.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonOnly.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 
 /* Material 3 OUTLINED text field: no fill, a thin outline, taller (more
@@ -860,7 +860,7 @@ TableHeader { cn1-derive: Label; color: #49454f; font-family: "native:MainBold";
 /* Autocomplete drops its suggestions into a popup list. */
 
 /* ComboBox and the popup it opens. */
-ComboBoxFocus { cn1-derive: Label; background-color: var(--accent-container-color, #eaddff); }
+ComboBoxFocus {  cn1-derive: Label; background-color: var(--accent-container-color, #eaddff); }
 PopupItem { cn1-derive: Label; }
 PopupFocus { cn1-derive: ComboBoxFocus; }
 
@@ -877,7 +877,7 @@ PopupContentPaneRight { background-color: #f3edf7; padding: 0; margin: 0; border
 CalendarTitleArea { background-color: transparent; padding: 1mm; margin: 0; }
 CalendarDayArea { background-color: transparent; padding: 0; margin: 0; }
 CalendarDate { cn1-derive: Label; color: #1d1b20; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
-CalendarDate.selected { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); }
+CalendarDate.selected {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #6750a4); }
 CalendarDateLabel { cn1-derive: SecondaryLabel; color: #49454f; text-align: center; background-color: transparent; }
 
 SpinnerSeparator { background-color: #cac4d0; padding: 0; margin: 0; }
@@ -885,7 +885,7 @@ TimeSpinnerHoursLabel { cn1-derive: SecondaryLabel; background-color: transparen
 TimeSpinnerMinutesLabel { cn1-derive: SecondaryLabel; background-color: transparent; }
 
 /* The focus style a list renderer applies to the focused row. */
-ListRendererFocus { background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+ListRendererFocus {  background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
 
 /* The strip a Form reserves for the platform status bar. */
 
@@ -897,7 +897,7 @@ MenuButtonRight { cn1-derive: TitleCommand; }
 StatusBarSideMenu { background-color: transparent; padding: 0; margin: 0; }
 
 /* Commands, as drawn by the menu rather than the Toolbar. */
-CommandFocus { cn1-derive: Label; background-color: var(--accent-container-color, #eaddff); }
+CommandFocus {  cn1-derive: Label; background-color: var(--accent-container-color, #eaddff); }
 DialogCommandText { cn1-derive: Label; color: var(--accent-color, #6750a4); text-align: center; }
 
 /* Media transport controls. */
@@ -941,12 +941,12 @@ CalendarDayArea.disabled { background-color: transparent; padding: 0; margin: 0;
 CalendarTitleArea.selected { background-color: transparent; padding: 1mm; margin: 0; }
 CalendarTitleArea.pressed { background-color: transparent; padding: 1mm; margin: 0; }
 CalendarTitleArea.disabled { background-color: transparent; padding: 1mm; margin: 0; }
-ComboBoxFocus.selected { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
-ComboBoxFocus.pressed { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
-ComboBoxFocus.disabled { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
-CommandFocus.selected { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
-CommandFocus.pressed { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
-CommandFocus.disabled { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+ComboBoxFocus.selected {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+ComboBoxFocus.pressed {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+ComboBoxFocus.disabled {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+CommandFocus.selected {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+CommandFocus.pressed {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+CommandFocus.disabled {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
 DialogCommandText.selected { background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color, #6750a4); text-align: center; }
 DialogCommandText.pressed { background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color, #6750a4); text-align: center; }
 DialogCommandText.disabled { background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color, #6750a4); text-align: center; }
@@ -957,9 +957,9 @@ FloatingHint.pressed { font-family: "native:MainRegular"; color: #49454f; font-s
 GlassTutorial.selected { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
 GlassTutorial.pressed { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
 GlassTutorial.disabled { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
-ListRendererFocus.selected { background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
-ListRendererFocus.pressed { background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
-ListRendererFocus.disabled { background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+ListRendererFocus.selected {  background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+ListRendererFocus.pressed {  background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+ListRendererFocus.disabled {  background-color: var(--accent-container-color, #eaddff); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
 MediaPlayerBack.selected { margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
 MediaPlayerFwd.selected { margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
 MediaPlayerMax.selected { margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: transparent; color: var(--accent-color, #6750a4); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
@@ -980,9 +980,9 @@ PopupContentPaneRight.disabled { background-color: #f3edf7; padding: 0; margin: 
 PopupContentPaneUpwards.selected { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
 PopupContentPaneUpwards.pressed { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
 PopupContentPaneUpwards.disabled { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
-PopupFocus.selected { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
-PopupFocus.pressed { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
-PopupFocus.disabled { color: #1d1b20; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+PopupFocus.selected {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+PopupFocus.pressed {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
+PopupFocus.disabled {  color: var(--accent-on-container-color, #21005d); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color, #eaddff); }
 PopupItem.selected { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
 PopupItem.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
 PopupItem.disabled { color: #1d1b20; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
@@ -1177,7 +1177,7 @@ MenuButtonRight.disabled { margin: 0.5mm; font-family: "native:MainRegular"; fon
        one is what resolves -- so a hard-coded light foreground would be used
        against the dark surface. */
     CalendarDate { cn1-derive: Label; color: #e6e0e9; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
-    CalendarDate.selected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); }
+    CalendarDate.selected {  color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); }
     CalendarDate.pressed { font-family: "native:MainRegular"; font-size: 2.5mm; color: #e6e0e9; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
     CalendarDate.disabled { font-family: "native:MainRegular"; font-size: 2.5mm; color: #e6e0e9; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
     CalendarDateLabel { cn1-derive: SecondaryLabel; color: #cac4d0; text-align: center; background-color: transparent; }
@@ -1192,14 +1192,14 @@ MenuButtonRight.disabled { margin: 0.5mm; font-family: "native:MainRegular"; fon
     CalendarTitleArea.selected { background-color: transparent; padding: 1mm; margin: 0; }
     CalendarTitleArea.pressed { background-color: transparent; padding: 1mm; margin: 0; }
     CalendarTitleArea.disabled { background-color: transparent; padding: 1mm; margin: 0; }
-    ComboBoxFocus { cn1-derive: Label; background-color: var(--accent-container-color-dark, #4f378b); }
-    ComboBoxFocus.selected { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
-    ComboBoxFocus.pressed { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
-    ComboBoxFocus.disabled { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
-    CommandFocus { cn1-derive: Label; background-color: var(--accent-container-color-dark, #4f378b); }
-    CommandFocus.selected { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
-    CommandFocus.pressed { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
-    CommandFocus.disabled { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    ComboBoxFocus {  cn1-derive: Label; background-color: var(--accent-container-color-dark, #4f378b); }
+    ComboBoxFocus.selected {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    ComboBoxFocus.pressed {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    ComboBoxFocus.disabled {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    CommandFocus {  cn1-derive: Label; background-color: var(--accent-container-color-dark, #4f378b); }
+    CommandFocus.selected {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    CommandFocus.pressed {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    CommandFocus.disabled {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
     DialogCommandText { cn1-derive: Label; color: var(--accent-color-dark, #d0bcff); text-align: center; }
     DialogCommandText.selected { background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color-dark, #d0bcff); text-align: center; }
     DialogCommandText.pressed { background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: var(--accent-color-dark, #d0bcff); text-align: center; }
@@ -1216,10 +1216,10 @@ MenuButtonRight.disabled { margin: 0.5mm; font-family: "native:MainRegular"; fon
     GlassTutorial.selected { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
     GlassTutorial.pressed { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
     GlassTutorial.disabled { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
-    ListRendererFocus { background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
-    ListRendererFocus.selected { background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
-    ListRendererFocus.pressed { background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
-    ListRendererFocus.disabled { background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+    ListRendererFocus {  background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+    ListRendererFocus.selected {  background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+    ListRendererFocus.pressed {  background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+    ListRendererFocus.disabled {  background-color: var(--accent-container-color-dark, #4f378b); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
     MediaPlayerBack.selected { margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.65mm 5mm 1.65mm 5mm; text-align: center; }
     MediaPlayerBack.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.65mm 5mm 1.65mm 5mm; }
     MediaPlayerBack.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.65mm 5mm 1.65mm 5mm; }
@@ -1258,9 +1258,9 @@ MenuButtonRight.disabled { margin: 0.5mm; font-family: "native:MainRegular"; fon
     PopupContentPaneUpwards.selected { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
     PopupContentPaneUpwards.pressed { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
     PopupContentPaneUpwards.disabled { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
-    PopupFocus.selected { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
-    PopupFocus.pressed { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
-    PopupFocus.disabled { color: #e6e0e9; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    PopupFocus.selected {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    PopupFocus.pressed {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
+    PopupFocus.disabled {  color: var(--accent-on-container-color-dark, #eaddff); padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; background-color: var(--accent-container-color-dark, #4f378b); }
     PopupItem.selected { color: #e6e0e9; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
     PopupItem.pressed { color: #e6e0e9; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
     PopupItem.disabled { color: #e6e0e9; background-color: transparent; padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
@@ -1291,17 +1291,17 @@ MenuButtonRight.disabled { margin: 0.5mm; font-family: "native:MainRegular"; fon
     TimeSpinnerMinutesLabel.pressed { padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #cac4d0; background-color: transparent; }
     TimeSpinnerMinutesLabel.disabled { padding: 0.5mm 1.5mm 0.5mm 1.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; color: #cac4d0; background-color: transparent; }
     ToggleButton { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButton.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButton.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButton.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButton.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButton.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonFirst.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonFirst.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonFirst.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonFirst.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonFirst.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonLast.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonLast.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonLast.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonLast.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonLast.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonOnly.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonOnly.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonOnly.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonOnly.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonOnly.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     TreeNode { cn1-derive: Label; color: #e6e0e9; padding: 1.2mm 1.5mm 1.2mm 1.5mm; background-color: transparent; }
     TreeNode.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
