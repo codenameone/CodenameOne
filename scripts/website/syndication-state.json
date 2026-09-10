@@ -2014,6 +2014,11 @@
       "medium": {
         "url": "https://medium.com/p/cf0f03201d2b/edit",
         "syndicated_at": "2026-09-09T19:01:46+00:00"
+      },
+      "devto": {
+        "id": 4625689,
+        "url": "https://dev.to/codenameone/build-hints-that-fail-before-the-build-server-3c6o",
+        "syndicated_at": "2026-09-10T17:03:01+00:00"
       }
     }
   }
