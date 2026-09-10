@@ -1324,6 +1324,28 @@ class InviteResilienceTest extends UITestBase {
 
     @Test
     @EdtTest
+    void thekillSwitchStillLetsAnInstallReferrerClaimLand() {
+        // An install-referrer claim is exact AND deferred: the code came back
+        // through the store, which is the whole reason the Android path is the
+        // deterministic one. Keying the guard on the deferred flag therefore
+        // dropped the best answer the device will ever have -- the same
+        // saved-code exemption the lookup start honours, broken from the
+        // returning end.
+        Invites.checkForInvite();
+        int inFlight = Invites.currentLookupEpochForTest();
+
+        Invites.setAttributionWindow(0);
+
+        Invites.handleResolution(InviteTestSupport.resolvedJson("REF9", "c1", "sms"),
+                Invites.MATCH_REFERRER, true, inFlight);
+
+        InviteAttribution a = Invites.getAttribution();
+        assertNotNull(a, "the kill switch discarded an exact install-referrer claim");
+        assertEquals("REF9", a.getCode());
+    }
+
+    @Test
+    @EdtTest
     void turningOnReattributionLetsTheStateBeReadAgain() {
         // loadState() reads the pending record only when re-attribution is on,
         // so a process that cached STATE_RESOLVED before the setter ran would

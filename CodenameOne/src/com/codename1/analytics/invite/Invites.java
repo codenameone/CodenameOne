@@ -2158,13 +2158,19 @@ public final class Invites {
         // switched off. The window is checked against the answer rather than
         // against the request.
         //
-        // Only the DEFERRED answer. The switch turns off the statistical
+        // Only the STATISTICAL answer. The switch turns off the fingerprint
         // lookup, not an exact code the device is holding: hasSavedCode()
-        // exempts one where the lookup begins, and cancelling a direct claim
+        // exempts one where the lookup begins, and cancelling an exact claim
         // here would break the same exemption from the other end. That is also
         // why this is not an epoch bump -- the epoch is global and would
-        // discard the direct claim with it.
-        if (deferred && attributionWindow == 0) {
+        // discard the exact claim with it.
+        //
+        // Keyed on the match type rather than on `deferred`, which was the
+        // first spelling and was wrong: an install-referrer claim is exact AND
+        // deferred -- the code came back through the store, which is the whole
+        // reason the Android path is the deterministic one -- so the kill
+        // switch dropped the best answer the device will ever have.
+        if (MATCH_FINGERPRINT.equals(matchType) && attributionWindow == 0) {
             return;
         }
         try {
