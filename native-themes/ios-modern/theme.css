@@ -1186,9 +1186,10 @@ TimeSpinnerMinutesLabel { cn1-derive: SecondaryLabel; background-color: transpar
 ListRendererFocus { background-color: rgba(0,122,255,0.14); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
 
 
-MenuButtonRight { cn1-derive: FlatButton; }
-MenuButtonRight.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
-MenuButtonRight.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
+/* SideMenuBar drops this icon-only button into the TitleArea's east slot, so
+   it takes the compact title-command treatment. FlatButton would give it a
+   content button's horizontal padding and pill, widening the title bar. */
+MenuButtonRight { cn1-derive: TitleCommand; }
 StatusBarSideMenu { background-color: transparent; padding: 0; margin: 0; }
 
 CommandFocus { cn1-derive: Label; background-color: rgba(0,122,255,0.14); }
@@ -1255,7 +1256,6 @@ MediaPlayerFwd.selected { color: #000000; padding: 1.1mm 2.8mm 1.1mm 2.8mm; marg
 MediaPlayerMax.selected { color: #000000; padding: 1.1mm 2.8mm 1.1mm 2.8mm; margin: 1mm 2mm 1mm 2mm; font-family: "native:MainLight"; font-size: 2.7mm; background-color: rgba(255,255,255,0.82); cn1-background-type: cn1-pill-border; text-align: center; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 MediaPlayerPause.selected { color: #000000; padding: 1.1mm 2.8mm 1.1mm 2.8mm; margin: 1mm 2mm 1mm 2mm; font-family: "native:MainLight"; font-size: 2.7mm; background-color: rgba(255,255,255,0.82); cn1-background-type: cn1-pill-border; text-align: center; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 MediaPlayerPlay.selected { color: #000000; padding: 1.1mm 2.8mm 1.1mm 2.8mm; margin: 1mm 2mm 1mm 2mm; font-family: "native:MainLight"; font-size: 2.7mm; background-color: rgba(255,255,255,0.82); cn1-background-type: cn1-pill-border; text-align: center; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
-MenuButtonRight.selected { color: #000000; padding: 1.1mm 2.8mm 1.1mm 2.8mm; margin: 1mm 2mm 1mm 2mm; font-family: "native:MainLight"; font-size: 2.7mm; background-color: rgba(255,255,255,0.82); cn1-background-type: cn1-pill-border; text-align: center; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 PopupBody.selected { background-color: rgba(249,249,249,0.94); padding: 1mm; margin: 0; }
 PopupBody.pressed { background-color: rgba(249,249,249,0.94); padding: 1mm; margin: 0; }
 PopupBody.disabled { background-color: rgba(249,249,249,0.94); padding: 1mm; margin: 0; }
@@ -1355,8 +1355,6 @@ TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2
     /* Dark base and selected for the FlatButton aliases. A dark state that
        does not exist resolves to the LIGHT rule of the same name, so a focused
        media control in dark mode was picking up the light accent. */
-    MenuButtonRight { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
-    MenuButtonRight.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
     MediaPlayerPlay { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
     MediaPlayerPlay.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
     MediaPlayerPause { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
@@ -1367,8 +1365,6 @@ TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2
     MediaPlayerBack.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
     MediaPlayerMax { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
     MediaPlayerMax.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
-    MenuButtonRight.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
-    MenuButtonRight.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
     MediaPlayerPlay.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
     MediaPlayerPlay.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
     MediaPlayerPause.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
@@ -1634,4 +1630,41 @@ TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2
     TableHeader.pressed { color: #8e8e93; background-color: transparent; }
     TableHeader.disabled { color: #8e8e93; background-color: transparent; }
     TreeNode.pressed { color: #ffffff; background-color: transparent; }
+
+    /* Dark counterparts for every rule above that names a colour. A light-only
+       state rule is not skipped in dark mode -- with no $Dark entry the light
+       one is what resolves -- so a hard-coded light foreground would be used
+       against the dark surface. */
+    CalendarDayArea { background-color: transparent; padding: 0; margin: 0; }
+    CalendarDayArea.selected { background-color: transparent; padding: 0; margin: 0; }
+    CalendarDayArea.pressed { background-color: transparent; padding: 0; margin: 0; }
+    CalendarDayArea.disabled { background-color: transparent; padding: 0; margin: 0; }
+    CalendarTitleArea { background-color: transparent; padding: 1mm; margin: 0; }
+    CalendarTitleArea.selected { background-color: transparent; padding: 1mm; margin: 0; }
+    CalendarTitleArea.pressed { background-color: transparent; padding: 1mm; margin: 0; }
+    CalendarTitleArea.disabled { background-color: transparent; padding: 1mm; margin: 0; }
+    GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+    GlassTutorial.selected { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+    GlassTutorial.pressed { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+    GlassTutorial.disabled { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+    PopupFocus.selected { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; background-color: rgba(10,132,255,0.22); }
+    PopupFocus.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; background-color: rgba(10,132,255,0.22); }
+    PopupFocus.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; background-color: rgba(10,132,255,0.22); }
+    PopupItem.selected { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; }
+    PopupItem.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; }
+    PopupItem.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; }
+    RichTextComponent { background-color: transparent; padding: 1mm; margin: 0; }
+    RichTextComponent.selected { background-color: transparent; padding: 1mm; margin: 0; }
+    RichTextComponent.pressed { background-color: transparent; padding: 1mm; margin: 0; }
+    RichTextComponent.disabled { background-color: transparent; padding: 1mm; margin: 0; }
+    StatusBarSideMenu { background-color: transparent; padding: 0; margin: 0; }
+    StatusBarSideMenu.selected { background-color: transparent; padding: 0; margin: 0; }
+    StatusBarSideMenu.pressed { background-color: transparent; padding: 0; margin: 0; }
+    StatusBarSideMenu.disabled { background-color: transparent; padding: 0; margin: 0; }
+    TimeSpinnerHoursLabel.selected { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
+    TimeSpinnerHoursLabel.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
+    TimeSpinnerHoursLabel.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
+    TimeSpinnerMinutesLabel.selected { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
+    TimeSpinnerMinutesLabel.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
+    TimeSpinnerMinutesLabel.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
 }
