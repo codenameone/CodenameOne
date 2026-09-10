@@ -1401,11 +1401,11 @@ TableHeader.disabled { margin: 0; color: #6c6c70; font-family: "native:MainBold"
     ErrorLabel { cn1-derive: SecondaryLabel; color: #ff453a; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
     ErrorLabel.selected { font-family: "native:MainRegular"; color: #ff453a; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
     ErrorLabel.pressed { font-family: "native:MainRegular"; color: #ff453a; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
-    ErrorLabel.disabled { font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; color: #38383a; background-color: transparent; }
+    ErrorLabel.disabled { font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; color: #636366; background-color: transparent; }
     FloatingHint { cn1-derive: SecondaryLabel; color: #8e8e93; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
     FloatingHint.selected { font-family: "native:MainRegular"; color: #8e8e93; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
     FloatingHint.pressed { font-family: "native:MainRegular"; color: #8e8e93; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
-    FloatingHint.disabled { font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; color: #38383a; background-color: transparent; }
+    FloatingHint.disabled { font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; color: #636366; background-color: transparent; }
     TableCell { cn1-derive: Label; color: #ffffff; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
     TableCell.selected { margin: 0; font-family: "native:MainRegular"; color: #ffffff; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
     TableCell.pressed { margin: 0; font-family: "native:MainRegular"; color: #ffffff; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
