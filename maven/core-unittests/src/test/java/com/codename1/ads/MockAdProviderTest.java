@@ -29,6 +29,9 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.TextField;
 import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
@@ -442,6 +445,78 @@ class MockAdProviderTest extends UITestBase {
         } finally {
             second.dispose();
             first.dispose();
+        }
+    }
+
+    @FormTest
+    void overlayKeepsTypingAndFocusTraversalAwayFromHostControls() {
+        MockAdProvider.install();
+        Form host = CN.getCurrentForm();
+        int[] typed = {0};
+        TextField input = new TextField() {
+            @Override public void keyPressed(int key) { typed[0]++; }
+        };
+        Button underlying = new Button("Underlying action");
+        Label label = new Label("Not focusable");
+        host.addAll(input, underlying, label);
+        host.revalidate();
+        input.requestFocus();
+        assertSame(input, host.getFocused());
+        InterstitialAd ad = new InterstitialAd("mock");
+        try {
+            ad.load();
+            ad.show();
+            Component close = adOverlay(host).getComponentAt(1);
+            assertSame(close, host.getFocused());
+            host.keyPressed('a');
+            host.keyReleased('a');
+            for (int key : new int[]{Display.GAME_UP, Display.GAME_DOWN, Display.GAME_LEFT, Display.GAME_RIGHT}) {
+                host.keyPressed(key);
+                host.keyReleased(key);
+                assertSame(close, host.getFocused());
+            }
+            assertNull(host.getNextComponent(close), "Tab must not reach a covered control");
+            assertNull(host.getPreviousComponent(close), "Shift-Tab must not reach a covered control");
+            assertEquals(0, typed[0]);
+            ad.dispose();
+            assertSame(input, host.getFocused());
+            assertTrue(input.isFocusable());
+            assertTrue(underlying.isFocusable());
+            assertFalse(label.isFocusable());
+        } finally {
+            ad.dispose();
+        }
+    }
+
+    @FormTest
+    void keyboardCloseDoesNotAlsoTriggerHostDefaultCommand() {
+        MockAdProvider.install();
+        Form host = CN.getCurrentForm();
+        Button underlying = new Button("Underlying action");
+        underlying.addActionListener(evt -> events.add("underlying"));
+        host.add(underlying);
+        host.revalidate();
+        underlying.requestFocus();
+        Command defaultCommand = new Command("Default action") {
+            @Override public void actionPerformed(ActionEvent evt) { events.add("default"); }
+        };
+        host.setDefaultCommand(defaultCommand);
+        InterstitialAd ad = new InterstitialAd("mock");
+        ad.setAdListener(listener());
+        try {
+            ad.load();
+            ad.show();
+            host.keyPressed(Display.GAME_FIRE);
+            host.keyReleased(Display.GAME_FIRE);
+            CountDownLatch drained = new CountDownLatch(1);
+            CN.callSerially(drained::countDown);
+            waitFor(drained, 1000);
+            assertEquals(Arrays.asList("shown", "impression", "dismissed"), events);
+            assertNoAd(host);
+            assertSame(underlying, host.getFocused());
+            assertSame(defaultCommand, host.getDefaultCommand());
+        } finally {
+            ad.dispose();
         }
     }
 

@@ -42,6 +42,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -49,6 +50,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import java.util.ArrayList;
 
 /// A deterministic, network-free ad provider for tests and screenshots. It
 /// renders fixed, labelled "ads" with stable colours, text and sizes (no
@@ -126,6 +128,9 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
         private Container overlay;
         private Container layer;
         private Form host;
+        private Component previousFocus;
+        private final ArrayList<Component> blockedFocus = new ArrayList<Component>();
+        private Command previousDefault;
         private Command previousBack;
         private Command closeCommand;
 
@@ -197,9 +202,25 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
             overlay.setUIID("Form");
             overlay.getAllStyles().setBgTransparency(255);
             overlay.add(BorderLayout.CENTER, new Label("Mock advertisement"));
-            Button close = new Button("Close ad");
+            Button close = new Button("Close ad") {
+                @Override
+                public void keyReleased(int keyCode) {
+                    // Finish Form.keyReleased() before restoring the host's default
+                    // command, so this same Enter press cannot activate it too.
+                    CN.callSerially(() -> super.keyReleased(keyCode));
+                }
+            };
             close.addActionListener(evt -> closeAd(true));
             overlay.add(BorderLayout.SOUTH, close);
+            previousFocus = host.getFocused();
+            for (Component component : ComponentSelector.select("*", host)) {
+                if (component.isFocusable()) {
+                    blockedFocus.add(component);
+                    component.setFocusable(false);
+                }
+            }
+            previousDefault = host.getDefaultCommand();
+            host.setDefaultCommand(null);
             previousBack = host.getBackCommand();
             closeCommand = new Command("Close ad") {
                 @Override
@@ -211,6 +232,7 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
             layer.setLayout(new LayeredLayout());
             layer.add(overlay);
             host.revalidate();
+            close.requestFocus();
             cb.onShown();
             // A listener may dispose the ad synchronously from onShown().
             if (overlay != null) {
@@ -230,7 +252,19 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
             if (host.getBackCommand() == closeCommand) {
                 host.setBackCommand(previousBack);
             }
+            for (Component component : blockedFocus) {
+                component.setFocusable(true);
+            }
+            blockedFocus.clear();
+            if (host.getDefaultCommand() == null) {
+                host.setDefaultCommand(previousDefault);
+            }
+            if (previousFocus == null || previousFocus.getComponentForm() == host) {
+                host.setFocused(previousFocus);
+            }
             host.revalidate();
+            previousFocus = null;
+            previousDefault = null;
             layer = null;
             host = null;
             previousBack = null;
