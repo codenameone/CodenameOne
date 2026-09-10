@@ -21,7 +21,6 @@
 # Regenerate with scripts/check-native-warnings.py --leg ios-sim-debug --write-baseline
 
 generated|*|-Wimplicitly-unsigned-literal|integer literal is too large to be represented in a signed integer type, interpreting as unsigned|4 instance(s) when the baseline was written; not yet triaged
-generated|*|-Wincompatible-pointer-types-discards-qualifiers|passing ? to parameter of type ? discards qualifiers|9094 instance(s) when the baseline was written; not yet triaged
 generated|*|-Wparentheses-equality|equality comparison with extraneous parentheses|42 instance(s) when the baseline was written; not yet triaged
 generated|*|-Wunused-variable|unused variable ?|50967 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/AudioPlayer.m|-Wincomplete-implementation|method definition for ? not found|2 instance(s) when the baseline was written; not yet triaged
