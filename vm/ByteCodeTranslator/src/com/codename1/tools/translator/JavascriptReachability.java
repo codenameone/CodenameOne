@@ -378,48 +378,55 @@ final class JavascriptReachability {
             return walkInterfaces(startClass, normalized, desc, new HashSet<String>());
         }
 
+        /**
+         * BREADTH-first, because that is what {@code jvm.resolveVirtual} does:
+         * it collects every interface of the class chain, then walks that queue
+         * FIFO and pushes each interface's own super-interfaces on the TAIL.
+         *
+         * A depth-first walk picks a different method, and picks it wrongly.
+         * For {@code C implements Left, Right} where {@code Left} only inherits
+         * {@code Root.f()} and {@code Right} overrides it, depth-first descends
+         * Left -> Root and answers {@code Root.f()} before it has looked at
+         * Right; the runtime answers {@code Right.f()}. If the root default is
+         * synchronous and the override suspends, the analysis picks the sync
+         * dispatcher for a call the runtime resolves to a generator -- the
+         * ``cn1_ivs ... (CHA unsound)`` failure.
+         */
         private BytecodeMethod walkInterfaces(String clsName, String name, String desc, Set<String> visited) {
-            if (clsName == null || !visited.add(clsName)) {
-                return null;
-            }
-            ByteCodeClass cls = byName.get(clsName);
-            if (cls == null) {
-                return null;
-            }
-            if (cls.getBaseInterfaces() != null) {
-                for (String iface : cls.getBaseInterfaces()) {
-                    BytecodeMethod found = interfaceMethod(
-                            JavascriptNameUtil.sanitizeClassName(iface), name, desc, visited);
-                    if (found != null) {
-                        return found;
+            java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>();
+            String current = clsName;
+            Set<String> chain = new HashSet<String>();
+            while (current != null && chain.add(current)) {
+                ByteCodeClass cls = byName.get(current);
+                if (cls == null) {
+                    break;
+                }
+                if (cls.getBaseInterfaces() != null) {
+                    for (String iface : cls.getBaseInterfaces()) {
+                        pending.add(JavascriptNameUtil.sanitizeClassName(iface));
                     }
                 }
+                String base = cls.getBaseClass();
+                current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
             }
-            String base = cls.getBaseClass();
-            return base == null ? null
-                    : walkInterfaces(JavascriptNameUtil.sanitizeClassName(base), name, desc, visited);
-        }
-
-        private BytecodeMethod interfaceMethod(String ifaceName, String name, String desc, Set<String> visited) {
-            if (ifaceName == null || !visited.add(ifaceName)) {
-                return null;
-            }
-            ByteCodeClass iface = byName.get(ifaceName);
-            if (iface == null) {
-                return null;
-            }
-            for (BytecodeMethod m : iface.getMethods()) {
-                if (!m.isEliminated() && !m.isAbstract()
-                        && name.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
-                    return m;
+            while (!pending.isEmpty()) {
+                String ifaceName = pending.poll();
+                if (ifaceName == null || !visited.add(ifaceName)) {
+                    continue;
                 }
-            }
-            if (iface.getBaseInterfaces() != null) {
-                for (String up : iface.getBaseInterfaces()) {
-                    BytecodeMethod found = interfaceMethod(
-                            JavascriptNameUtil.sanitizeClassName(up), name, desc, visited);
-                    if (found != null) {
-                        return found;
+                ByteCodeClass iface = byName.get(ifaceName);
+                if (iface == null) {
+                    continue;
+                }
+                for (BytecodeMethod m : iface.getMethods()) {
+                    if (!m.isEliminated() && !m.isAbstract()
+                            && name.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                        return m;
+                    }
+                }
+                if (iface.getBaseInterfaces() != null) {
+                    for (String up : iface.getBaseInterfaces()) {
+                        pending.add(JavascriptNameUtil.sanitizeClassName(up));
                     }
                 }
             }
