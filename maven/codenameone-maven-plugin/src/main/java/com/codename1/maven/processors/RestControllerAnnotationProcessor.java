@@ -1073,6 +1073,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("    public com.codename1.backend.HttpServer.Response handle(\n")
           .append("            com.codename1.backend.HttpServer.Request request) throws Exception {\n");
         sb.append("        String httpMethod = request.getMethod();\n");
+        // Checked ONCE, here, rather than inside the matcher: bindFrom answers a
+        // boolean, so a decoder that refused would only turn a malformed escape
+        // into "no route" -- a 404 for what is a syntax error the client can fix.
+        sb.append("        if (!wellFormedEscapes(request.getTarget())) {\n");
+        sb.append("            return request.respond(400, \"text/plain; charset=utf-8\",\n");
+        sb.append("                    utf8(\"malformed percent-escape in the request target\"));\n");
+        sb.append("        }\n");
 
         String current = null;
         boolean open = false;
@@ -1806,6 +1813,27 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("        } catch (java.io.UnsupportedEncodingException err) {\n");
         sb.append("            return new String(out, 0, length);\n");
         sb.append("        }\n");
+        sb.append("    }\n\n");
+        sb.append("    /**\n");
+        sb.append("     * Every % in a target must introduce two hex digits.\n");
+        sb.append("     *\n");
+        sb.append("     * A malformed escape used to decode as literal text, so /users/%ZZ\n");
+        sb.append("     * reached the handler as those four characters -- and /users/%252F,\n");
+        sb.append("     * a correctly escaped %2F, arrived as whatever a raw %2F would.\n");
+        sb.append("     * Aliasing like that is how a check in front of a handler is passed\n");
+        sb.append("     * by one spelling and defeated by another.\n");
+        sb.append("     */\n");
+        sb.append("    private static boolean wellFormedEscapes(String value) {\n");
+        sb.append("        if (value == null) { return true; }\n");
+        sb.append("        for (int i = 0 ; i < value.length() ; i++) {\n");
+        sb.append("            if (value.charAt(i) != '%') { continue; }\n");
+        sb.append("            if (i + 2 >= value.length()) { return false; }\n");
+        sb.append("            if (hex(value.charAt(i + 1)) < 0 || hex(value.charAt(i + 2)) < 0) {\n");
+        sb.append("                return false;\n");
+        sb.append("            }\n");
+        sb.append("            i += 2;\n");
+        sb.append("        }\n");
+        sb.append("        return true;\n");
         sb.append("    }\n\n");
         sb.append("    private static int hex(char c) {\n");
         sb.append("        if (c >= '0' && c <= '9') { return c - '0'; }\n");

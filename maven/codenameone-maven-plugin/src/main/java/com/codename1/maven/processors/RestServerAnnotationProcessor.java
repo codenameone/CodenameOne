@@ -851,6 +851,10 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("     * returning null and no route at all both come back as null.\n");
         sb.append("     */\n");
         sb.append("    public Object dispatch(String method, String rawPath, java.util.Map headers, Object body) throws Exception {\n");
+        sb.append("        if(!wellFormedEscapes(rawPath)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"malformed percent-escape in the "
+                + "request target: \" + rawPath);\n");
+        sb.append("        }\n");
         sb.append("        String path = stripQuery(rawPath);\n");
         sb.append("        String query = queryOf(rawPath);\n");
         sb.append("        String[] seg = split(path);\n");
@@ -1271,12 +1275,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        int pendingLen = 0;\n");
         sb.append("        for(int i = 0 ; i < value.length() ; i++) {\n");
         sb.append("            char c = value.charAt(i);\n");
-        sb.append("            if(c == '%' && i + 2 < value.length()) {\n");
-        sb.append("                try {\n");
-        sb.append("                    pending[pendingLen++] = (byte)Integer.parseInt(value.substring(i + 1, i + 3), 16);\n");
-        sb.append("                    i += 2;\n");
-        sb.append("                    continue;\n");
-        sb.append("                } catch (NumberFormatException err) { }\n");
+        // Integer.parseInt(_, 16) accepts a SIGN, so "%+1" decoded as 1 and "%-1"
+        // as -1 -- two more spellings of a byte the client never wrote. Two hex
+        // digits, tested as digits.
+        sb.append("            if(c == '%' && i + 2 < value.length()\n");
+        sb.append("                    && hex(value.charAt(i + 1)) >= 0 && hex(value.charAt(i + 2)) >= 0) {\n");
+        sb.append("                pending[pendingLen++] =\n");
+        sb.append("                        (byte)((hex(value.charAt(i + 1)) << 4) | hex(value.charAt(i + 2)));\n");
+        sb.append("                i += 2;\n");
+        sb.append("                continue;\n");
         sb.append("            }\n");
         sb.append("            if(pendingLen > 0) {\n");
         sb.append("                out.append(decodeUtf8(pending, pendingLen));\n");
@@ -1289,6 +1296,25 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        return out.toString();\n");
         sb.append("    }\n\n");
         sb.append("    /** The gathered escape bytes as text. Malformed input keeps its bytes rather than throwing. */\n");
+        sb.append("    private static int hex(char c) {\n");
+        sb.append("        if(c >= '0' && c <= '9') { return c - '0'; }\n");
+        sb.append("        if(c >= 'a' && c <= 'f') { return c - 'a' + 10; }\n");
+        sb.append("        if(c >= 'A' && c <= 'F') { return c - 'A' + 10; }\n");
+        sb.append("        return -1;\n");
+        sb.append("    }\n\n");
+        sb.append("    /** Every % must introduce two hex digits; see the router's copy. */\n");
+        sb.append("    private static boolean wellFormedEscapes(String value) {\n");
+        sb.append("        if(value == null) { return true; }\n");
+        sb.append("        for(int i = 0 ; i < value.length() ; i++) {\n");
+        sb.append("            if(value.charAt(i) != '%') { continue; }\n");
+        sb.append("            if(i + 2 >= value.length()) { return false; }\n");
+        sb.append("            if(hex(value.charAt(i + 1)) < 0 || hex(value.charAt(i + 2)) < 0) {\n");
+        sb.append("                return false;\n");
+        sb.append("            }\n");
+        sb.append("            i += 2;\n");
+        sb.append("        }\n");
+        sb.append("        return true;\n");
+        sb.append("    }\n\n");
         sb.append("    private static String decodeUtf8(byte[] bytes, int length) {\n");
         sb.append("        try {\n");
         sb.append("            return new String(bytes, 0, length, \"UTF-8\");\n");

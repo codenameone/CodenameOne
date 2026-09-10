@@ -906,6 +906,31 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aMalformedEscapeIsA400AndNotALiteral() throws Exception {
+        // %ZZ is not a character, and decoding it as the three literal characters
+        // handed the controller a value no client can have meant. Worse, it
+        // ALIASES: %252F is a correctly escaped %2F, and if a bad escape passes
+        // through as text then a check written against one spelling is defeated
+        // by the other.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes/{id}\")\n"
+                + "    public String byId(@PathVariable(\"id\") String id) { return \"id=\" + id; }\n"
+                + "}\n");
+        // A GOOD escape still decodes: %41 is 'A'.
+        assertEquals("id=A", router.text("GET", "/notes/%41"));
+
+        // JUnit 4: message first.
+        assertEquals("a non-hex escape is a syntax error the client can fix, so 400",
+                400, Router.statusOf(router.call("GET", "/notes/%ZZ", null)));
+        assertEquals("and so is a truncated one",
+                400, Router.statusOf(router.call("GET", "/notes/%2", null)));
+    }
+
+    @Test
     public void twoControllersOfTheSameShapeAreRefused() throws Exception {
         // The bootstrap chains the routers and returns the first non-null answer,
         // so a collision ACROSS controllers hides the later one exactly as a

@@ -573,6 +573,22 @@ public class SelfTest {
                     ? "refused" : "other: " + message;
         }
         check("a negative connectTimeout is refused", "refused", outcome);
+
+        // And at the API below the URL parser, where a caller can reach it
+        // directly. The two arms disagreed: Java SE fails immediately out of
+        // Socket.connect while the packaged native reads every non-positive value
+        // as "block with no deadline", so the same call hangs for the OS TCP
+        // timeout once packaged. Zero keeps its documented meaning.
+        String tcpOutcome;
+        try {
+            Tcp.connect("127.0.0.1", 1, -1);
+            tcpOutcome = "accepted";
+        } catch (IllegalArgumentException refused) {
+            tcpOutcome = "refused";
+        } catch (Exception other) {
+            tcpOutcome = "other: " + other;
+        }
+        check("a negative TCP connect timeout is refused", "refused", tcpOutcome);
     }
 
     private static void json() throws Exception {

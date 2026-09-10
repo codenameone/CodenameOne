@@ -575,6 +575,65 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void theDispatcherRefusesAMalformedEscape() throws Exception {
+        // The same rule as the router's, in the other generator -- and the
+        // decoder here had a second hole besides: Integer.parseInt(_, 16) accepts
+        // a sign, so "%+1" decoded to the byte 1. Two more spellings of a value
+        // the client never wrote.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.NoteApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface NoteApi {\n"
+                + "    @GET(\"/notes/{id}\")\n"
+                + "    void byId(@Path(\"id\") String id, OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.NoteApiServer");
+        final Object[] seen = new Object[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        seen[0] = args[0];
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.NoteApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+
+        dispatch.invoke(dispatcher, "GET", "/notes/%41", null, null);
+        assertEquals("a well-formed escape still decodes", "A", seen[0]);
+
+        seen[0] = null;
+        try {
+            dispatch.invoke(dispatcher, "GET", "/notes/%ZZ", null, null);
+            fail("a non-hex escape should be refused, not passed through as text");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(String.valueOf(expected.getCause()),
+                    expected.getCause() instanceof IllegalArgumentException);
+        }
+        assertNull("the handler must not have run", seen[0]);
+
+        try {
+            dispatch.invoke(dispatcher, "GET", "/notes/%+1", null, null);
+            fail("a signed hex pair is not a hex pair");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(String.valueOf(expected.getCause()),
+                    expected.getCause() instanceof IllegalArgumentException);
+        }
+    }
+
+    @Test
     public void twoDynamicRoutesThatOverlapAreRefused() throws Exception {
         // Different shapes, and /a/b/c satisfies both. Neither is more specific, so
         // literal-first ordering cannot break the tie and dispatch answers with

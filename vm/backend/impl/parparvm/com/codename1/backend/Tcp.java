@@ -47,6 +47,15 @@ public final class Tcp {
         if(port < 0 || port > 65535) {
             throw new IllegalArgumentException("port out of range: " + port);
         }
+        // And the timeout, for the same reason one line up: the native side reads
+        // every NON-POSITIVE value as "block with no deadline", so a negative one
+        // hangs a packaged server for the OS TCP timeout while the Java SE arm
+        // fails immediately out of Socket.connect. Zero keeps its documented
+        // meaning; below zero is not a shorter wait, it is a different API.
+        if(timeoutMillis < 0) {
+            throw new IllegalArgumentException("connect timeout must not be negative: "
+                    + timeoutMillis);
+        }
         long h = connectImpl(host, port, timeoutMillis);
         if(h == 0) {
             throw new IOException("Connection to " + host + ":" + port + " failed");
