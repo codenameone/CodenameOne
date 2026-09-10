@@ -221,6 +221,24 @@ public final class Invites {
 
     private static boolean deferredStarted;
 
+    /// The pending record that could not be written, held until it can be.
+    ///
+    /// `Storage` can fail -- a full disk, a revoked sandbox -- and every
+    /// caller here had already changed the in-memory state by the time it did.
+    /// A direct link was the worst case: `handleUrl` committed STATE_PENDING
+    /// and issued the claim, and if that request also failed, the exact code
+    /// existed nowhere. The retry then read a record with no code in it and
+    /// fell back to the install referrer or the fingerprint -- answering a
+    /// question the device already had an exact answer to, with a guess or not
+    /// at all.
+    ///
+    /// Held only while the durable copy is missing: a successful write clears
+    /// it, so this can never disagree with what is on the disk. It does not
+    /// survive the process, and cannot -- that is what the durable record is
+    /// for -- but a transient failure is over within one launch far more often
+    /// than not.
+    private static Map<String, String> pendingFallback;
+
     // When the last claim or match was issued. flush() restarts only once this
     // has aged out: retrying a request that is still outstanding spends an
     // attempt without a failure having been observed, and the attempt budget is
@@ -303,6 +321,14 @@ public final class Invites {
                 unacknowledged.add(invite.getCode());
                 postRegistration(pendingRegistration);
             } else {
+                // Marked unacknowledged, exactly as the branch above does.
+                //
+                // isRegistered() reads absence from BOTH the outbox and this
+                // set as acknowledgement, and neither holds this code: the
+                // outbox write is what failed, and nothing was sent. So the
+                // one invite the server is guaranteed never to have seen was
+                // the one reported as registered.
+                unacknowledged.add(invite.getCode());
                 // Nothing leaves the device without consent, and that outranks
                 // saving the registration. drainOutbox() carries the same guard;
                 // this path had none, so a storage failure was the one way an
@@ -546,7 +572,7 @@ public final class Invites {
             // written, so without this there is nothing for markTerminal to
             // carry, and a user who grants consent afterwards has the exact
             // claim replaced by a referrer read or a statistical match.
-            Map<String, String> denied = InviteStore.read(InviteStore.PENDING);
+            Map<String, String> denied = readPending();
             if (denied == null) {
                 denied = new LinkedHashMap<String, String>();
             }
@@ -554,7 +580,7 @@ public final class Invites {
             denied.put("codeSource", "universal_link");
             denied.put("codeMatch", MATCH_DIRECT);
             denied.put("codeDeferred", "false");
-            InviteStore.write(InviteStore.PENDING, denied);
+            writePending(denied);
             // Told, not silently dropped. checkForInvite() records the url as
             // consumed and skips the deferred path after this, so this is the
             // only chance the listener gets for this install -- and a
@@ -599,7 +625,7 @@ public final class Invites {
         // are holding the code for, so a referrer read is no longer a better
         // answer waiting to happen.
         pending.remove("referrerRetry");
-        InviteStore.write(InviteStore.PENDING, pending);
+        writePending(pending);
         setState(STATE_PENDING);
         // A deferred fingerprint or referrer lookup may already be on the wire,
         // and this direct claim supersedes it. Without the bump both answers
@@ -649,6 +675,11 @@ public final class Invites {
         state = STATE_NONE;
         deferredStarted = false;
         deliveredThisRun = false;
+        // The in-memory pending copy goes with the rest of the loaded state.
+        // Keeping it made "forget what you loaded" leave behind the one record
+        // that had never reached the disk, so a test -- or an application
+        // deliberately re-reading -- saw a record no launch could ever see.
+        pendingFallback = null;
     }
 
     /// Where attribution has got to: one of the `STATE_` constants.
@@ -671,7 +702,7 @@ public final class Invites {
             return;
         }
         stateLoaded = true;
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> pending = readPending();
         // Reduced to a value first. The obvious spelling -- null-check the
         // record inside the condition, then assign the static below it -- is
         // the shape PMD reads as an unsynchronized lazy singleton, and the
@@ -876,6 +907,7 @@ public final class Invites {
     public static void reset() {
         lookupEpoch++;
         InviteStore.delete(InviteStore.PENDING);
+        forgetPendingFallback();
         InviteStore.delete(InviteStore.ATTRIBUTION);
         InviteStore.delete(InviteStore.OUTBOX);
         Preferences.delete(PREF_CONSUMED_ARG);
@@ -1224,10 +1256,10 @@ public final class Invites {
     private static void setState(int s) {
         state = s;
         stateLoaded = true;
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> pending = readPending();
         if (pending != null) {
             pending.put("state", String.valueOf(s));
-            InviteStore.write(InviteStore.PENDING, pending);
+            writePending(pending);
         }
     }
 
@@ -1249,6 +1281,7 @@ public final class Invites {
             return false;
         }
         InviteStore.delete(InviteStore.PENDING);
+        forgetPendingFallback();
         state = STATE_RESOLVED;
         stateLoaded = true;
         deferredStarted = false;
@@ -1257,7 +1290,7 @@ public final class Invites {
     }
 
     private static boolean hasSavedCode() {
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> pending = readPending();
         String code = InviteStore.get(pending, "code", null);
         return code != null && code.length() > 0;
     }
@@ -1292,7 +1325,7 @@ public final class Invites {
         // has run yet, so nothing wrote one. Copying nulls left the reopened
         // marker with expiresAt 0, and beginDeferred reads that as "no window",
         // so an arbitrarily old install could still run a fingerprint match.
-        Map<String, String> before = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> before = readPending();
         long markedAt = System.currentTimeMillis();
         done.put("firstLaunch", InviteStore.get(before, "firstLaunch",
                 String.valueOf(markedAt)));
@@ -1327,7 +1360,7 @@ public final class Invites {
                 "codeReferrer"}) {
             InviteStore.put(done, key, InviteStore.get(before, key, null));
         }
-        if (!InviteStore.write(InviteStore.PENDING, done)) {
+        if (!writePending(done)) {
             // Nothing is committed. Reporting a terminal outcome the device
             // cannot remember meant the same lookup and the same callback
             // repeated after every restart -- or, worse, the delivery flag
@@ -1352,7 +1385,7 @@ public final class Invites {
         if (s != STATE_NONE_FOUND && s != STATE_DECLINED) {
             return null;
         }
-        Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> marker = readPending();
         if (marker == null || InviteStore.getBoolean(marker, "delivered", false)) {
             return null;
         }
@@ -1364,18 +1397,76 @@ public final class Invites {
     // process exits, so telling the listener about a delivery the device cannot
     // remember means telling it again on the next launch.
     private static boolean markUnavailableDelivered() {
-        Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> marker = readPending();
         if (marker == null) {
             // Nothing durable to mark. The answer is still terminal in memory
             // and the run's own guard prevents a repeat within it.
             return true;
         }
         marker.put("delivered", "true");
-        return InviteStore.write(InviteStore.PENDING, marker);
+        return writePending(marker);
+    }
+
+    /// Writes the pending record, keeping an in-memory copy while that fails.
+    ///
+    /// - `record`: the record to persist
+    ///
+    /// #### Returns
+    ///
+    /// true when it reached storage
+    private static boolean writePending(Map<String, String> record) {
+        boolean written = InviteStore.write(InviteStore.PENDING, record);
+        // Cleared on success rather than left behind, so the fallback can never
+        // shadow a newer durable record.
+        pendingFallback = written ? null : record;
+        return written;
+    }
+
+    /// Forgets the in-memory copy, for the paths that delete the record.
+    private static void forgetPendingFallback() {
+        pendingFallback = null;
+    }
+
+    /// Reads the pending record, preferring the copy a failed write left behind.
+    ///
+    /// The held copy is always the newer of the two, because it exists only
+    /// between a write that failed and the next one that succeeds -- so the
+    /// record still on the disk is whatever was there BEFORE the change that
+    /// could not be saved. Reading the disk first was the shape of the bug this
+    /// exists to close: a direct link's exact code was written into a record
+    /// that never landed, the stale one underneath it had no code, and the
+    /// retry answered with the install referrer or a fingerprint instead.
+    ///
+    /// Persisting is retried here rather than on a timer, which is the next
+    /// time anything wanted the record anyway.
+    ///
+    /// #### Returns
+    ///
+    /// the record, or null when there is none
+    /// The pending record as the feature itself sees it, for tests.
+    ///
+    /// Package private: the tests have to be able to tell the durable record
+    /// apart from the copy held after a failed write, and going through
+    /// `InviteStore` directly cannot.
+    ///
+    /// #### Returns
+    ///
+    /// the record, or null
+    static Map<String, String> pendingRecordForTest() {
+        return readPending();
+    }
+
+    private static Map<String, String> readPending() {
+        Map<String, String> held = pendingFallback;
+        if (held != null) {
+            writePending(held);
+            return held;
+        }
+        return InviteStore.read(InviteStore.PENDING);
     }
 
     private static Map<String, String> pendingRecord() {
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> pending = readPending();
         if (pending != null) {
             return pending;
         }
@@ -1386,7 +1477,7 @@ public final class Invites {
         pending.put("attempts", "0");
         pending.put("state", String.valueOf(STATE_PENDING));
         captureProfile(pending);
-        InviteStore.write(InviteStore.PENDING, pending);
+        writePending(pending);
         return pending;
     }
 
@@ -1428,7 +1519,7 @@ public final class Invites {
         // was a real answer about this install and stays. Reopening reads the
         // condition itself, never a second stored copy of it.
         if (s == STATE_NONE_FOUND || s == STATE_DECLINED) {
-            Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+            Map<String, String> marker = readPending();
             String why = InviteStore.get(marker, "reason", null);
             boolean reopen = (REASON_UNSUPPORTED.equals(why) && attributionWindow != 0)
                     || (REASON_CONSENT_DENIED.equals(why) && !explicitlyDenied());
@@ -1478,7 +1569,7 @@ public final class Invites {
                 // costs five property reads and is the same profile the first
                 // launch would have taken.
                 captureProfile(marker);
-                InviteStore.write(InviteStore.PENDING, marker);
+                writePending(marker);
                 state = STATE_PENDING;
                 stateLoaded = true;
                 s = STATE_PENDING;
@@ -1635,7 +1726,7 @@ public final class Invites {
                             InviteStore.put(pending, "codeReferrer",
                                     rawReferrer == null ? "" : rawReferrer);
                             pending.remove("referrerRetry");
-                            InviteStore.write(InviteStore.PENDING, pending);
+                            writePending(pending);
                             claim(code, "install_referrer",
                                     rawReferrer == null ? "" : rawReferrer,
                                     MATCH_REFERRER, true);
@@ -1692,7 +1783,7 @@ public final class Invites {
     // later, so a no-match from the statistical fallback stays pending instead
     // of becoming the final word.
     private static void fallBackToMatch(boolean retryable) {
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> pending = readPending();
         if (pending != null) {
             if (retryable) {
                 pending.put("referrerRetry", "true");
@@ -1704,13 +1795,13 @@ public final class Invites {
                 // pending and every launch asked again until the attempt cap.
                 pending.remove("referrerRetry");
             }
-            InviteStore.write(InviteStore.PENDING, pending);
+            writePending(pending);
         }
         fallBackToMatchImpl();
     }
 
     private static void fallBackToMatchImpl() {
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> pending = readPending();
         if (pending == null) {
             return;
         }
@@ -1751,7 +1842,7 @@ public final class Invites {
         if (!allowed()) {
             return;
         }
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        Map<String, String> pending = readPending();
         if (pending != null) {
             bumpAttempts(pending);
         }
@@ -1766,7 +1857,7 @@ public final class Invites {
     private static void bumpAttempts(Map<String, String> pending) {
         pending.put("attempts",
                 String.valueOf(InviteStore.getInt(pending, "attempts", 0) + 1));
-        InviteStore.write(InviteStore.PENDING, pending);
+        writePending(pending);
     }
 
     private static Map<String, Object> identity() {
@@ -1928,7 +2019,7 @@ public final class Invites {
                 // throw that away for a statistical guess. Bounded by the
                 // attempt cap and the attribution window, both checked in
                 // beginDeferred().
-                Map<String, String> outstanding = InviteStore.read(InviteStore.PENDING);
+                Map<String, String> outstanding = readPending();
                 if (outstanding != null
                         && "true".equals(InviteStore.get(outstanding, "referrerRetry", null))) {
                     // Deliberately silent. attributionUnavailable() is the
@@ -1960,6 +2051,7 @@ public final class Invites {
                     // replacement attempt is dropped and the install goes back
                     // to what it was.
                     InviteStore.delete(InviteStore.PENDING);
+                    forgetPendingFallback();
                     state = STATE_RESOLVED;
                     stateLoaded = true;
                     deferredStarted = false;
@@ -2047,7 +2139,7 @@ public final class Invites {
         // record that carried the fact across the reopen.
         Map<String, String> previous = InviteStore.read(InviteStore.ATTRIBUTION);
         if (previous == null) {
-            previous = InviteStore.read(InviteStore.PENDING);
+            previous = readPending();
         }
         record.put("delivered",
                 String.valueOf(InviteStore.getBoolean(previous, "delivered", false)));
@@ -2068,11 +2160,11 @@ public final class Invites {
             // install terminal instead of performing the retry this promises --
             // so the very last response, the one most likely to be the only one
             // left, could never be stored.
-            Map<String, String> retry = InviteStore.read(InviteStore.PENDING);
+            Map<String, String> retry = readPending();
             if (retry != null) {
                 int spent = InviteStore.getInt(retry, "attempts", 0);
                 retry.put("attempts", String.valueOf(spent > 0 ? spent - 1 : 0));
-                if (!InviteStore.write(InviteStore.PENDING, retry)) {
+                if (!writePending(retry)) {
                     // The refund failed for the same reason the attribution did
                     // -- the store is unwritable -- so the durable count is
                     // still at the cap and the next flush would settle the
@@ -2087,6 +2179,7 @@ public final class Invites {
             return;
         }
         InviteStore.delete(InviteStore.PENDING);
+        forgetPendingFallback();
         resolved = a;
         attributionLoaded = true;
         state = STATE_RESOLVED;

@@ -515,6 +515,62 @@ class InviteResilienceTest extends UITestBase {
                 "a registration was transmitted before consent was given");
     }
 
+    @FormTest
+    void anInviteTheServerNeverSawIsNotReportedAsRegistered() {
+        // isRegistered() reads absence from BOTH the outbox and the in-memory
+        // unacknowledged set as acknowledgement. On this path neither holds the
+        // code -- the outbox write is what failed, and consent forbade sending
+        // -- so the one invite the server is guaranteed never to have seen was
+        // the one reported as registered, and an application that waits for
+        // isRegistered() before sharing would hand out a link with no campaign,
+        // channel or preview behind it.
+        Analytics.setConsent(null);
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+        InviteStore.failNextOutboxWriteForTest();
+
+        Invite invite = Invites.create(InviteRequest.create().campaign("launch").build());
+        assertNotNull(invite, "minting is offline and must still work");
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "a registration was transmitted before consent was given");
+        assertFalse(Invites.isRegistered(invite),
+                "an invite that was neither queued nor sent reported itself registered");
+    }
+
+    @FormTest
+    void aFailedPendingWriteDoesNotLoseTheDirectCode() {
+        // handleUrl() commits STATE_PENDING and issues the claim before it
+        // knows the record reached the disk. When the write failed and the
+        // claim failed too, the exact code existed nowhere: the retry read a
+        // record with no code in it and fell back to the install referrer or
+        // the fingerprint -- answering with a guess, or not at all, a question
+        // the device had an exact answer to. The copy is held in memory until a
+        // write succeeds, which the next read of the record retries.
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+        // The record has to EXIST first, so the failing write is the one that
+        // adds the code rather than the one that creates the record. That is
+        // also the harder case: a stale record with no code in it sits on the
+        // disk underneath the copy that never landed, and reading the disk
+        // first found it and answered with a guess.
+        Invites.checkForInvite();
+        assertNull(InviteStore.get(InviteStore.read(InviteStore.PENDING), "code", null),
+                "the fixture already has a code, so the assertion below proves nothing");
+        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT7"),
+                "the link was not recognised at all");
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+
+        // And the next read of the record still has the code, and persists it.
+        Map<String, String> record = Invites.pendingRecordForTest();
+        assertNotNull(record, "the failed write was never retried");
+        assertEquals("DIRECT7", InviteStore.get(record, "code", null),
+                "the exact code was lost, so the retry will guess instead");
+        assertEquals(Invites.MATCH_DIRECT, InviteStore.get(record, "codeMatch", null),
+                "the direct claim lost its provenance");
+    }
+
     @Test
     @EdtTest
     void flushDoesNotSpendAnAttemptOnALookupThatIsStillOutstanding() {
