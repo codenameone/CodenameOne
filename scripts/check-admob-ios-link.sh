@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROBE="${1:-$(mktemp -d /tmp/cn1-admob-link.XXXXXX)}"
 SDK="${2:-iphoneos}"
+# Use Java 8, matching the translator build in CI.
+mvn -B -f "$ROOT/vm/pom.xml" -pl ByteCodeTranslator -am -DskipTests package
 mkdir -p "$PROBE/Sources"
 cp "$ROOT"/maven/cn1-admob/ios/src/main/objectivec/* "$PROBE/Sources/"
 cp "$ROOT"/vm/ByteCodeTranslator/src/{cn1_globals.h,cn1_virtual_thread.h} "$PROBE/"
@@ -29,34 +31,73 @@ int main(int argc, char** argv) {
     }
 }
 OBJC
-python3 - "$ROOT" "$PROBE" <<'PY'
-import json, pathlib, re, sys
-root, probe = map(pathlib.Path, sys.argv[1:])
+# Translate a minimal Java entry point, with the shipped library hint. The
+# resulting framework references and library search paths stay intact below.
+cat > "$PROBE/AdMobLinkProbe.java" <<'JAVA'
+public class AdMobLinkProbe {
+    public static void main(String[] args) {}
+}
+JAVA
+javac -d "$PROBE/Sources" "$PROBE/AdMobLinkProbe.java"
+LIBS="$(sed -n 's/^codename1\.arg\.ios\.add_libs=;*//p' \
+    "$ROOT/maven/cn1-admob/common/codenameone_library_appended.properties")"
+java -jar "$ROOT/vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar" ios \
+    "$PROBE/Sources" "$PROBE/generated" AdMobLinkProbe com.codenameone.test \
+    AdMobLinkProbe 1.0 ios "${LIBS:-none}"
+PROJECT="$PROBE/generated/dist"
+cp "$PROBE"/{cn1_globals.h,cn1_virtual_thread.h,cn1_class_method_index.h,Prefix.pch} "$PROJECT/"
+plutil -convert json -o "$PROBE/project.json" "$PROJECT/AdMobLinkProbe.xcodeproj/project.pbxproj"
+python3 - "$ROOT" "$PROBE" "$PROJECT" "$LIBS" <<'PYTHON'
+import json, pathlib, plistlib, re, sys
+root, probe, project = map(pathlib.Path, sys.argv[1:4])
 props = root / 'maven/cn1-admob/common'
 pod = re.search(r'^codename1.arg.ios.pods=(.+)$', (props / 'codenameone_library_required.properties').read_text(), re.M).group(1)
 name, version = pod.split(' ', 1)
-(probe / 'Podfile').write_text("platform :ios, '14.0'\ntarget 'AdMobLinkProbe' do\n  use_frameworks!\n  pod '%s', '%s'\nend\n" % (name, version))
-# Consume the same search paths and library hints as a generated CN1 app.
-template = (root / 'vm/ByteCodeTranslator/src/template/template.xcodeproj/project.pbxproj').read_text()
-blocks = re.findall(r'LIBRARY_SEARCH_PATHS = \((.*?)\);', template, re.S)
-paths = re.findall(r'"([^"]+)"', blocks[0])
-assert all(re.findall(r'"([^"]+)"', block) == paths for block in blocks)
-paths = [p for p in paths if 'template-src' not in p]
-appended = (props / 'codenameone_library_appended.properties').read_text()
-match = re.search(r'^codename1.arg.ios.add_libs=(.*)$', appended, re.M)
-libs = [] if not match else [v for v in match.group(1).split(';') if v]
-settings = {'CLANG_ENABLE_MODULES': 'YES', 'CLANG_ENABLE_OBJC_ARC': 'NO',
-            'CODE_SIGNING_ALLOWED': 'NO', 'GENERATE_INFOPLIST_FILE': 'YES',
-            'GCC_PREFIX_HEADER': 'Prefix.pch', 'GCC_PRECOMPILE_PREFIX_HEADER': 'NO',
-            'HEADER_SEARCH_PATHS': ['$(inherited)', '$(SRCROOT)'],
-            'LIBRARY_SEARCH_PATHS': paths, 'OTHER_LDFLAGS': ['$(inherited)', '-ObjC'],
-            'DEAD_CODE_STRIPPING': 'NO'}
-project = {'name': 'AdMobLinkProbe', 'options': {'bundleIdPrefix': 'com.codenameone.test', 'deploymentTarget': {'iOS': '14.0'}},
-           'targets': {'AdMobLinkProbe': {'type': 'application', 'platform': 'iOS', 'sources': ['Sources'],
-                       'dependencies': [{'sdk': lib} for lib in libs], 'settings': {'base': settings}}}}
-(probe / 'project.yml').write_text(json.dumps(project, indent=2))
-PY
-(cd "$PROBE" && xcodegen generate && pod install)
-xcodebuild -workspace "$PROBE/AdMobLinkProbe.xcworkspace" -scheme AdMobLinkProbe \
+(project / 'Podfile').write_text("platform :ios, '14.0'\ntarget 'AdMobLinkProbe' do\n  use_frameworks!\n  pod '%s', '%s'\nend\n" % (name, version))
+data = json.loads((probe / 'project.json').read_text())
+objects = data['objects']
+# A successful link alone is insufficient: other frameworks may supply C++
+# transitively. Verify the shipped hint is an explicit SDK library input before
+# trimming the application scaffolding.
+app = next(obj for obj in objects.values() if obj['isa'] == 'PBXNativeTarget' and obj['name'] == 'AdMobLinkProbe')
+frameworks = next(objects[ref] for ref in app['buildPhases'] if objects[ref]['isa'] == 'PBXFrameworksBuildPhase')
+linked = {objects[ref]['fileRef'] for ref in frameworks['files']}
+resources = next(objects[ref] for ref in app['buildPhases'] if objects[ref]['isa'] == 'PBXResourcesBuildPhase')
+copied = {objects[ref]['fileRef'] for ref in resources['files']}
+for lib in filter(None, sys.argv[4].split(';')):
+    if lib.endswith('.tbd'):
+        matches = [(ref, obj) for ref, obj in objects.items()
+                   if obj['isa'] == 'PBXFileReference' and obj.get('name') == lib]
+        assert len(matches) == 1, 'Missing SDK library reference: ' + lib
+        ref, obj = matches[0]
+        assert obj.get('path') == 'usr/lib/' + lib and obj.get('sourceTree') == 'SDKROOT', obj
+        assert obj.get('lastKnownFileType') == 'sourcecode.text-based-dylib-definition', obj
+        assert ref in linked and ref not in copied, 'Library hint is not a linker input: ' + lib
+# Only replace translated runtime sources with the callback stubs above. Keep
+# the translator's Frameworks phase, SDK paths and LIBRARY_SEARCH_PATHS verbatim.
+source_names = {'main.m', 'com_codename1_ads_admob_AdMobNativeImpl.m'}
+for obj in objects.values():
+    if obj['isa'] == 'PBXSourcesBuildPhase':
+        obj['files'] = [ref for ref in obj['files']
+                        if objects[objects[ref]['fileRef']].get('path') in source_names]
+    elif obj['isa'] == 'PBXResourcesBuildPhase':
+        obj['files'] = []
+    elif obj['isa'] == 'XCBuildConfiguration':
+        settings = obj['buildSettings']
+        settings.pop('INFOPLIST_FILE', None)
+        settings.update({'CLANG_ENABLE_MODULES': 'YES', 'CODE_SIGNING_ALLOWED': 'NO',
+                         'GENERATE_INFOPLIST_FILE': 'YES', 'IPHONEOS_DEPLOYMENT_TARGET': '14.0',
+                         'PRODUCT_BUNDLE_IDENTIFIER': 'com.codenameone.test.AdMobLinkProbe',
+                         'GCC_PREFIX_HEADER': 'Prefix.pch', 'GCC_PRECOMPILE_PREFIX_HEADER': 'NO',
+                         'HEADER_SEARCH_PATHS': ['$(inherited)', '$(SRCROOT)'],
+                         'OTHER_LDFLAGS': ['$(inherited)', '-ObjC'], 'DEAD_CODE_STRIPPING': 'NO'})
+# Fail explicitly if staging stopped including the real bridge or entry point.
+sources = next(objects[ref] for ref in app['buildPhases'] if objects[ref]['isa'] == 'PBXSourcesBuildPhase')
+assert len(sources['files']) == len(source_names), sources
+with (project / 'AdMobLinkProbe.xcodeproj/project.pbxproj').open('wb') as output:
+    plistlib.dump(data, output)
+PYTHON
+(cd "$PROJECT" && pod install)
+xcodebuild -workspace "$PROJECT/AdMobLinkProbe.xcworkspace" -scheme AdMobLinkProbe \
     -configuration Release -sdk "$SDK" -derivedDataPath "$PROBE/build-$SDK" \
     CODE_SIGNING_ALLOWED=NO build

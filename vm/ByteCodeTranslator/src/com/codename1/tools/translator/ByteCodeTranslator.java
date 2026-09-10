@@ -936,10 +936,10 @@ public class ByteCodeTranslator {
             fileListEntry.append(file);
             fileListEntry.append(" */ = {isa = PBXFileReference; lastKnownFileType = ");
             fileListEntry.append(getFileType(file));
-            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".a")) {
+            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || file.endsWith(".a")) {
                 fileListEntry.append("; name = \"");
                 fileListEntry.append(file);
-                if(file.endsWith(".dylib")) {
+                if(file.endsWith(".dylib") || file.endsWith(".tbd")) {
                     fileListEntry.append("\"; path = \"usr/lib/");
                     fileListEntry.append(file);
                     fileListEntry.append("\"; sourceTree = SDKROOT; };\n");
@@ -1021,7 +1021,7 @@ public class ByteCodeTranslator {
                     fileThreeEntry.append(" */,\n");
                 }
             } else {
-                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
+                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
                     frameworks.append("				0");
                     frameworks.append(referenceValue);
                     frameworks.append("18E9ABBC002F3D1D /* ");
@@ -1408,6 +1408,9 @@ public class ByteCodeTranslator {
         }
         if(s.endsWith(".dylib")) {
             return "compiled.mach-o.dylib";
+        }
+        if(s.endsWith(".tbd")) {
+            return "sourcecode.text-based-dylib-definition";
         }
         if(s.endsWith(".h")) {
             return "sourcecode.c.h";
