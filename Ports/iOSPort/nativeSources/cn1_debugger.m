@@ -38,6 +38,9 @@
 #ifdef CN1_ON_DEVICE_DEBUG
 
 #import <Foundation/Foundation.h>
+#if !TARGET_OS_WATCH
+#import "CN1AppleUI.h"
+#endif
 #include <pthread.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
