@@ -868,6 +868,7 @@ public final class Invites {
     ///
     /// - `value`: true for last touch
     public static void setReattribution(boolean value) {
+        boolean wasOn = reattribution;
         reattribution = value;
         // The cached state was derived under the old value. loadState() reads
         // the pending record only when re-attribution is on, so a process that
@@ -875,6 +876,31 @@ public final class Invites {
         // replacement again -- and setInviteListener(), which most applications
         // call first, is enough to cache it.
         stateLoaded = false;
+        // Turning it OFF discards a replacement RESPONSE already in flight.
+        //
+        // Changing the setting alone only changed how the state is read: an
+        // outstanding replacement still passed handleResolution()'s epoch guard
+        // and overwrote the first-touch attribution the setting had just said
+        // to keep. The epoch bump fails it on arrival.
+        //
+        // The durable replacement record deliberately stays. Turning the
+        // setting off and on again is a supported round trip -- there is a test
+        // named for it -- and deleting the record would lose a link the user
+        // really did open. What is cancelled is the request, not the invite.
+        //
+        // Guarded on there BEING an attribution, because that is what makes an
+        // outstanding lookup a replacement. On a device with no attribution yet
+        // the lookup in flight is the first one, and turning last touch off
+        // says nothing about it -- discarding it there would lose an ordinary
+        // install's attribution outright.
+        if (wasOn && !value && getAttribution() != null) {
+            lookupEpoch++;
+            // Nothing is outstanding once the epoch has moved, so a later
+            // resume can issue its own request rather than waiting out a retry
+            // delay for one that can no longer be acted on.
+            lookupIssuedAt = 0;
+            deferredStarted = false;
+        }
     }
 
     /// Whether last touch attribution is enabled.
@@ -2482,7 +2508,50 @@ public final class Invites {
         // Re-posting an entry that did land is harmless: the server keys on
         // the code and treats a repeat from the same inviter as idempotent.
         for (String json : outbox) {
-            postRegistration(json);
+            postRegistration(withCurrentConsent(json));
+        }
+    }
+
+    /// Rewrites a queued registration's consent flag to what consent says now.
+    ///
+    /// The body is serialized at mint time, and under the default opt-in mode
+    /// an invite is very often minted BEFORE the prompt is answered -- so the
+    /// stored JSON carries `consentAnalytics:false`. Draining is already gated
+    /// on consent having been granted, but the field travels with the body and
+    /// the analytics transport reads it as the proof that the gate was
+    /// satisfied. Sent unchanged, a registration queued before the grant
+    /// arrived looking unconsented and could be refused, and the link it
+    /// describes would keep its code and lose its campaign, payload and
+    /// preview for good.
+    ///
+    /// Rewritten rather than rebuilt: everything else in the entry -- the code
+    /// and the metadata -- is what the invite was minted with and must not be
+    /// re-derived from today's state.
+    ///
+    /// - `json`: the queued registration
+    ///
+    /// #### Returns
+    ///
+    /// the registration with a current consent flag, or the original when it
+    /// cannot be parsed
+    private static String withCurrentConsent(String json) {
+        if (json == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> body =
+                    new JSONParser().parseJSON(new java.io.StringReader(json));
+            if (body == null) {
+                return json;
+            }
+            body.put("consentAnalytics", Boolean.valueOf(allowed()));
+            return JSONParser.mapToJson(body);
+        } catch (Throwable t) {
+            // An entry that cannot be parsed is still worth sending as it is:
+            // the alternative is dropping a registration whose metadata exists
+            // nowhere else.
+            Log.e(t);
+            return json;
         }
     }
 

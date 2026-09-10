@@ -2979,22 +2979,32 @@ public class AndroidGradleBuilder extends Executor {
                 debug("Invite attribution: adding the App Links filter for " + inviteHost);
                 request.putArgument("android.xintent_filter", withAppLinks);
             }
-            // launchMode decides whether a link reaching an app that is
-            // already running is delivered to it at all. singleTop (the
-            // default) and singleTask both route through onNewIntent;
-            // "standard" starts a SECOND activity and a second lifecycle, and
-            // the invite is simply lost. Refused rather than warned: a warning
-            // in a build log is exactly the thing nobody reads, and the
-            // symptom on the device is a feature that silently never fires.
+            // launchMode decides WHICH delivery path a link takes, not whether
+            // it arrives.
+            //
+            // singleTop (the default) and singleTask route a link into the
+            // running activity through onNewIntent. "standard" starts a SECOND
+            // activity instead -- and that activity's `currentForm` is an
+            // INSTANCE field, so it is null, `wasStopped` is true, and the
+            // generated run() goes on to createStartInvocation(): the
+            // application's start() runs and reads the link out of getAppArg()
+            // exactly as it does on a cold launch.
+            //
+            // This refused the build outright until a review round pointed at
+            // that field. It was wrong: the invite is delivered, and refusing
+            // rejected a configuration the app already built and shipped with.
+            // Warned instead, because the delivery is real but the path is the
+            // colder one and the second activity is a surprise worth naming.
             String launchMode = request.getArg("android.activity.launchMode", "singleTop");
             if ("standard".equals(launchMode)) {
-                throw new BuildException("This app uses invite attribution "
-                        + "(com.codename1.analytics.invite), which needs an invite link to reach "
-                        + "the running activity, but android.activity.launchMode is \"standard\". "
-                        + "A link then starts a second activity instead of being delivered to the "
-                        + "running one, and the invite is lost. Use singleTop (the default) or "
-                        + "singleTask, or set android.invite.appLinks=false and handle the link "
-                        + "yourself.");
+                warn("This app uses invite attribution "
+                        + "(com.codename1.analytics.invite) with "
+                        + "android.activity.launchMode=\"standard\". An invite link then starts a "
+                        + "second activity rather than reaching the running one, so the invite "
+                        + "arrives through the application's start() instead of onNewIntent(). "
+                        + "That works, and it is what a cold launch does anyway -- but "
+                        + "checkForInvite() has to be called from start(), and singleTop (the "
+                        + "default) or singleTask avoids the second activity entirely.");
             }
         }
 

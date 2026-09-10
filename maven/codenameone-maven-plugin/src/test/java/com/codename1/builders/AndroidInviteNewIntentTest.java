@@ -59,6 +59,10 @@ public class AndroidInviteNewIntentTest {
     private static final String BUILDER =
             "src/main/java/com/codename1/builders/AndroidGradleBuilder.java";
 
+    /** The port source, relative to the plugin module the tests run in. */
+    private static final String ANDROID_PORT =
+            "../../Ports/Android/src/com/codename1/impl/android/AndroidImplementation.java";
+
     private String source() throws IOException {
         File builder = new File(BUILDER);
         assertTrue(builder.isFile(), "the builder must be readable: " + builder.getAbsolutePath());
@@ -90,6 +94,49 @@ public class AndroidInviteNewIntentTest {
                 "the generated onNewIntent touches invite state off the EDT");
         assertTrue(block.contains("if(!Display.isInitialized())"),
                 "the generated onNewIntent can run before Display exists");
+    }
+
+    @Test
+    void theConsumedUrlIsClearedOnAcopyNotOnTheCallersIntent() throws IOException {
+        // dispatchNewIntentUrl runs from CodenameOneActivity.onNewIntent, and
+        // the ordinary way to extend that is super.onNewIntent(intent) followed
+        // by the subclass reading intent.getData(). Clearing the data on THAT
+        // object set it to null underneath the override, so custom deep-link
+        // routing that worked before lost the url entirely.
+        File port = new File(ANDROID_PORT);
+        assertTrue(port.isFile(), "the port must be readable: " + port.getAbsolutePath());
+        String source = new String(Files.readAllBytes(port.toPath()), StandardCharsets.UTF_8);
+        int at = source.indexOf("static void dispatchNewIntentUrl(");
+        assertTrue(at > 0, "dispatchNewIntentUrl is gone");
+        String block = source.substring(at, source.indexOf("\n    }", at));
+        assertTrue(!block.contains("intent.setData(null)"),
+                "the caller's intent is mutated, so a subclass reading it after "
+                        + "super.onNewIntent() finds no data");
+        assertTrue(block.contains("new android.content.Intent(intent)")
+                        && block.contains("consumed.setData(null)"),
+                "the url is no longer consumed on a copy");
+    }
+
+    @Test
+    void standardLaunchModeIsWarnedAboutRatherThanRefused() throws IOException {
+        // It refused the build outright until a review round pointed at the
+        // generated stub's `private Form currentForm` -- an INSTANCE field. A
+        // standard-mode App Link starts a SECOND activity, whose copy of that
+        // field is null, so wasStopped is true and the generated run() reaches
+        // createStartInvocation(): the application's start() runs and reads the
+        // link out of getAppArg() exactly as on a cold launch. The invite is
+        // delivered, and refusing rejected a configuration the app already
+        // built and shipped with.
+        String source = source();
+        int guard = source.indexOf("\"standard\".equals(launchMode)");
+        assertTrue(guard > 0, "the launch-mode guard is gone");
+        int end = source.indexOf("\n            }", guard);
+        assertTrue(end > guard, "the guard block moved");
+        String block = source.substring(guard, end);
+        assertTrue(block.contains("warn("),
+                "a working launch mode is refused instead of warned about");
+        assertTrue(!block.contains("throw new BuildException"),
+                "standard launch mode still fails the build");
     }
 
     @Test

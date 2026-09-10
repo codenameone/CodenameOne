@@ -565,6 +565,44 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void aqueuedRegistrationIsSentWithTodaysConsentNotYesterdays() {
+        // The body is serialized at mint time, and under the default opt-in
+        // mode an invite is very often minted BEFORE the prompt is answered --
+        // so the stored JSON carries consentAnalytics:false. Draining is gated
+        // on consent having been granted, but the flag travels WITH the body
+        // and the analytics transport reads it as the proof that the gate was
+        // satisfied. Sent unchanged, a registration queued before the grant
+        // arrived looking unconsented and could be refused, and the link it
+        // describes would keep its code and lose its campaign, payload and
+        // preview for good.
+        Analytics.setConsent(null);
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+
+        Invite invite = Invites.create(InviteRequest.create().campaign("launch").build());
+        assertNotNull(invite);
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "the registration was transmitted before consent was given");
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+        Invites.flush();
+
+        String body = null;
+        for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
+            String candidate = implementation.getQueuedRequests().get(i).getRequestBody();
+            if (candidate != null && candidate.indexOf(invite.getCode()) >= 0) {
+                body = candidate;
+            }
+        }
+        assertNotNull(body, "the queued registration was never drained");
+        assertTrue(body.indexOf("\"consentAnalytics\":true") >= 0
+                        || body.indexOf("\"consentAnalytics\": true") >= 0,
+                "the registration went out with the consent it was minted under: " + body);
+        assertTrue(body.indexOf("launch") >= 0,
+                "rewriting the consent flag lost the metadata the outbox exists to keep");
+    }
+
+    @FormTest
     void aFailedPendingWriteDoesNotLoseTheDirectCode() {
         // handleUrl() commits STATE_PENDING and issues the claim before it
         // knows the record reached the disk. When the write failed and the
@@ -1216,6 +1254,33 @@ class InviteResilienceTest extends UITestBase {
 
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
                 "the cached state hid the durable replacement");
+    }
+
+    @Test
+    @EdtTest
+    void turningReattributionOffDiscardsAreplacementAlreadyInFlight() {
+        // Changing the setting only changed how the state is READ. An
+        // outstanding replacement response still passed handleResolution()'s
+        // epoch guard and overwrote the first-touch attribution the setting had
+        // just said to keep -- so an application that turned last touch off
+        // could still have a user's cohort change underneath its reports, once,
+        // by a request that was already on the wire.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST8", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        Invites.setReattribution(true);
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND8");
+        int inFlight = Invites.currentLookupEpochForTest();
+
+        Invites.setReattribution(false);
+
+        // The response that was already on the wire lands now.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("SECOND8", "c1", "sms"),
+                Invites.MATCH_DIRECT, false, inFlight);
+
+        InviteAttribution a = Invites.getAttribution();
+        assertNotNull(a);
+        assertEquals("FIRST8", a.getCode(),
+                "an in-flight replacement overwrote first touch after last touch was turned off");
     }
 
     @Test
