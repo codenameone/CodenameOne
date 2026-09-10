@@ -149,6 +149,45 @@ SwitchMorph (droplet stretch/squash).
 | Menu / ExposedDropdown | ComboBox / Command menu | not started |
 | Card / ElevatedCard | Container card UIIDs | not started |
 
+## UIIDs the framework assigns
+
+`ToggleButton` shipped unstyled for as long as both themes existed: the UIID is
+written by framework code, no theme defined it, and the control fell through to
+the `Component` default with no shape at all. That is a silent failure -- nothing
+errors, the control simply looks wrong -- so the whole surface was enumerated
+rather than sampled. Every `setUIID("...")` literal in `CodenameOne/src` was
+checked against both themes: 128 names, of which 73 appeared in neither.
+
+Both themes now define the live ones, including the `TextComponent` /
+`FloatingHint` / `ErrorLabel` trio behind the modern form API, the `ComboBox`
+and popup families, the `Calendar` grid, `TreeNode`, and the `ToggleButton*`
+edge names `ComponentGroup` renames its controls to.
+
+### Deliberately still undefined
+
+Nineteen names are left alone, in two groups.
+
+**Retired components.** `RSSReader`, `HTMLComponent` and `HTMLTable`, the
+feature-phone soft keys (`SoftButton`, `SoftButtonLeft`, `SoftButtonRight`) and
+`VKBButton`. Nothing a current application builds reaches them.
+
+**Names where the unstyled default is the better answer**, measured rather than
+assumed. Defining a UIID is a visual change, and for these it was a change for
+the worse:
+
+| UIID | What defining it did |
+|---|---|
+| `icon` | `SpanLabel` and `SpanButton` lost the icon spacing the default gives them; the text crowded the glyph |
+| `Emblem` | same, for `MultiButton`'s trailing badge |
+| `StatusBar` | collapsed the strip a `Form` reserves at the top, so iOS content ran into the status bar |
+| `TouchCommand` | deriving it from `Button` gave title-bar commands a filled pill |
+| `Scroll`, `ScrollThumb`, `HorizontalScroll`, `HorizontalScrollThumb` | sizing the scrollbar changes the content width of every scrollable form, which re-wrapped text in unrelated figures |
+
+Each was caught by rendering the guide's figure set before and after and
+comparing: the scrollbar rules alone moved a `SpanLabel` figure by 21 pixels.
+Sizing a scrollbar or a status bar is a layout decision that deserves its own
+change with its own before-and-after, not a line in a gap-filling sweep.
+
 ## How to add a component
 
 1. Add the YAML entry (`fidelity-tests.yaml`): id, `material:` intent, native

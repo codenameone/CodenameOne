@@ -430,7 +430,7 @@ ToggleButton.selected {
 }
 ToggleButton.pressed {
     color: #ffffff;
-    background-color: #0064d1;
+    background-color: var(--accent-color, #007aff);
     cn1-background-type: cn1-pill-border;
     padding: 1.1mm 2.6mm 1.1mm 2.6mm;
     margin: 1mm 0.4mm 1mm 0.4mm;
@@ -448,6 +448,25 @@ ToggleButton.disabled {
     font-size: 2.7mm;
     text-align: center;
 }
+
+/* ComponentGroup renames the edge controls of a group to <prefix>First,
+   <prefix>Last or <prefix>Only, and UIManager does not fall back from those to
+   ToggleButton. iOS sets ComponentGroupBool by default, so a segmented group
+   here would otherwise lose the styling on everything except its middle
+   control. Each state is written out because cn1-derive is read at base level
+   only. */
+ToggleButtonFirst { cn1-derive: ToggleButton; }
+ToggleButtonFirst.selected {    color: #ffffff; background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonFirst.pressed {    color: #ffffff; background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonFirst.disabled {    color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonLast { cn1-derive: ToggleButton; }
+ToggleButtonLast.selected {    color: #ffffff; background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonLast.pressed {    color: #ffffff; background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonLast.disabled {    color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonOnly { cn1-derive: ToggleButton; }
+ToggleButtonOnly.selected {    color: #ffffff; background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonOnly.pressed {    color: #ffffff; background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonOnly.disabled {    color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
 
 TextField {
     color: #000000;
@@ -1139,6 +1158,99 @@ PhoneVerificationLink {
     padding: 1.5mm;
 }
 
+
+/* ---------------------------------------------------------------------------
+ * UIIDs the framework assigns that no theme defined.
+ *
+ * Same enumeration as the Material theme: every setUIID("...") literal in
+ * CodenameOne/src that appeared in neither theme, so the control had no style
+ * and fell through to the Component default. The retired components
+ * (RSSReader, HTMLComponent, HTMLTable, the feature-phone soft keys and
+ * VKBButton) are left undefined deliberately.
+ * ------------------------------------------------------------------------- */
+
+/* TextComponent: wrapper, floating hint, error line. */
+TextComponent { background-color: transparent; padding: 0.5mm 0 1mm 0; margin: 0; }
+FloatingHint { cn1-derive: SecondaryLabel; color: #6c6c70; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+FloatingHint.disabled { color: #c6c6c8; background-color: transparent; }
+/* systemRed, the colour iOS uses for validation failures. */
+ErrorLabel { cn1-derive: SecondaryLabel; color: #ff3b30; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+ErrorLabel.disabled { color: #c6c6c8; background-color: transparent; }
+
+TextFieldSearch { cn1-derive: TextField; margin: 0.5mm 1mm 0.5mm 1mm; }
+TextHintSearch { cn1-derive: TextHint; }
+
+TreeNode { cn1-derive: Label; color: #1c1c1e; padding: 1.2mm 1.5mm 1.2mm 1.5mm; background-color: transparent; }
+TreeNode.selected { color: var(--accent-color, #007aff); background-color: transparent; }
+TreeNode.disabled { color: #c6c6c8; background-color: transparent; }
+
+
+TableCell { cn1-derive: Label; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader { cn1-derive: Label; color: #6c6c70; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+
+SignatureButton { cn1-derive: FlatButton; }
+
+PullToRefresh { background-color: transparent; padding: 1.5mm; margin: 0; }
+RefreshLabel { cn1-derive: SecondaryLabel; color: #6c6c70; background-color: transparent; }
+
+AutoCompletePopup { background-color: rgba(249,249,249,0.94); padding: 0; margin: 0; border: 0.1mm solid #c6c6c8; }
+AutoCompleteList { background-color: rgba(249,249,249,0.94); padding: 0; margin: 0; }
+
+ComboBox { cn1-derive: TextField; }
+ComboBoxItem { cn1-derive: Label; color: #1c1c1e; padding: 1.8mm 2mm 1.8mm 2mm; background-color: transparent; }
+ComboBoxItem.selected { color: #ffffff; background-color: var(--accent-color, #007aff); }
+ComboBoxFocus { cn1-derive: ComboBoxItem; background-color: rgba(0,122,255,0.14); }
+ComboBoxList { background-color: transparent; padding: 0; margin: 0; }
+PopupItem { cn1-derive: ComboBoxItem; }
+PopupFocus { cn1-derive: ComboBoxFocus; }
+PopupContentPane { background-color: rgba(249,249,249,0.94); padding: 0; margin: 0; border: 0.1mm solid #c6c6c8; }
+
+PopupDialog { background-color: rgba(249,249,249,0.94); padding: 0; margin: 0; }
+PopupDialogTitle { cn1-derive: DialogTitle; }
+PopupBody { background-color: rgba(249,249,249,0.94); padding: 1mm; margin: 0; }
+PopupContentPaneUpwards { cn1-derive: PopupContentPane; }
+PopupContentPaneDownwards { cn1-derive: PopupContentPane; }
+PopupContentPaneLeft { cn1-derive: PopupContentPane; }
+PopupContentPaneRight { cn1-derive: PopupContentPane; }
+
+
+CalendarTitleArea { background-color: transparent; padding: 1mm; margin: 0; }
+CalendarDayArea { background-color: transparent; padding: 0; margin: 0; }
+CalendarDate { cn1-derive: Label; color: #1c1c1e; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
+CalendarDate.selected { color: #ffffff; background-color: var(--accent-color, #007aff); }
+CalendarDateLabel { cn1-derive: SecondaryLabel; color: #6c6c70; text-align: center; background-color: transparent; }
+TODAY { cn1-derive: CalendarDate; color: var(--accent-color, #007aff); font-family: "native:MainBold"; }
+
+SpinnerSeparator { background-color: #c6c6c8; padding: 0; margin: 0; }
+TimeSpinnerHoursLabel { cn1-derive: SecondaryLabel; background-color: transparent; }
+TimeSpinnerMinutesLabel { cn1-derive: SecondaryLabel; background-color: transparent; }
+
+ListRendererFocus { background-color: rgba(0,122,255,0.14); padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+
+
+MenuButton { cn1-derive: FlatButton; }
+MenuButtonRight { cn1-derive: FlatButton; }
+StatusBarSideMenu { background-color: transparent; padding: 0; margin: 0; }
+RightSideNavigationPanel { background-color: rgba(249,249,249,0.94); padding: 0; margin: 0; }
+RightSideCommand { cn1-derive: Command; }
+
+Command { cn1-derive: Label; color: #1c1c1e; padding: 1.8mm 2mm 1.8mm 2mm; background-color: transparent; }
+CommandList { background-color: transparent; padding: 0; margin: 0; }
+CommandFocus { cn1-derive: Command; background-color: rgba(0,122,255,0.14); }
+DialogCommandText { cn1-derive: Command; color: var(--accent-color, #007aff); text-align: center; }
+
+MediaPlayerPlay { cn1-derive: FlatButton; }
+MediaPlayerPause { cn1-derive: FlatButton; }
+MediaPlayerFwd { cn1-derive: FlatButton; }
+MediaPlayerBack { cn1-derive: FlatButton; }
+MediaPlayerMax { cn1-derive: FlatButton; }
+
+MapZoomIn { cn1-derive: FlatButton; }
+MapZoomOut { cn1-derive: FlatButton; }
+RichTextComponent { background-color: transparent; padding: 1mm; margin: 0; }
+
+GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm; margin: 0; }
+
 @media (prefers-color-scheme: dark) {
     Component { color: #ffffff; background-color: #000000; }
     Form { background-color: #1c1c1e; padding: 0; margin: 0; }
@@ -1165,8 +1277,51 @@ PhoneVerificationLink {
        same reason as the buttons above: it is not carried into $Dark<UIID>. */
     ToggleButton { color: #ffffff; background-color: rgba(58,58,60,0.78); cn1-background-type: cn1-pill-border; }
     ToggleButton.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
-    ToggleButton.pressed { color: #ffffff; background-color: #64b1ff; cn1-background-type: cn1-pill-border; }
+    ToggleButton.pressed { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
     ToggleButton.disabled { color: #636366; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; }
+
+    ToggleButtonFirst { color: #ffffff; background-color: rgba(58,58,60,0.78); cn1-background-type: cn1-pill-border; }
+    ToggleButtonFirst.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ToggleButtonFirst.pressed { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ToggleButtonFirst.disabled { color: #636366; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; }
+    ToggleButtonLast { color: #ffffff; background-color: rgba(58,58,60,0.78); cn1-background-type: cn1-pill-border; }
+    ToggleButtonLast.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ToggleButtonLast.pressed { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ToggleButtonLast.disabled { color: #636366; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; }
+    ToggleButtonOnly { color: #ffffff; background-color: rgba(58,58,60,0.78); cn1-background-type: cn1-pill-border; }
+    ToggleButtonOnly.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ToggleButtonOnly.pressed { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ToggleButtonOnly.disabled { color: #636366; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; }
+
+    /* Dark palette for the UIIDs filled in above. */
+    FloatingHint { color: #8e8e93; background-color: transparent; }
+    FloatingHint.disabled { color: #48484a; background-color: transparent; }
+    ErrorLabel { color: #ff453a; background-color: transparent; }
+    ErrorLabel.disabled { color: #48484a; background-color: transparent; }
+    TreeNode { color: #ffffff; background-color: transparent; }
+    TreeNode.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
+    TreeNode.disabled { color: #48484a; background-color: transparent; }
+    TableCell { color: #ffffff; background-color: transparent; }
+    TableHeader { color: #8e8e93; background-color: transparent; }
+    RefreshLabel { color: #8e8e93; background-color: transparent; }
+    AutoCompletePopup { background-color: rgba(28,28,30,0.94); border: 0.1mm solid #38383a; }
+    AutoCompleteList { background-color: rgba(28,28,30,0.94); }
+    ComboBoxItem { color: #ffffff; background-color: transparent; }
+    ComboBoxItem.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); }
+    ComboBoxFocus { background-color: rgba(10,132,255,0.22); }
+    PopupContentPane { background-color: rgba(28,28,30,0.94); border: 0.1mm solid #38383a; }
+    PopupDialog { background-color: rgba(28,28,30,0.94); }
+    PopupBody { background-color: rgba(28,28,30,0.94); }
+    CalendarDate { color: #ffffff; background-color: transparent; }
+    CalendarDate.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); }
+    CalendarDateLabel { color: #8e8e93; background-color: transparent; }
+    TODAY { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
+    SpinnerSeparator { background-color: #38383a; }
+    ListRendererFocus { background-color: rgba(10,132,255,0.22); }
+    RightSideNavigationPanel { background-color: rgba(28,28,30,0.94); }
+    Command { color: #ffffff; background-color: transparent; }
+    CommandFocus { background-color: rgba(10,132,255,0.22); }
+    DialogCommandText { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
     FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 
     /* Prominent filled button: white label on the OPAQUE dark accent pill. */
