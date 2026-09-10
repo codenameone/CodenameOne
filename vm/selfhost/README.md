@@ -161,17 +161,74 @@ against every string already interned. On a self-hosting translation the pool ho
 answers the same question directly; the list stays the source of truth, so the
 emitted indices are unchanged and gate A still passes byte-identical.
 
-### What is left: memory, and it is live data
+### What is left: memory
 
-The remaining gap is **2.8x peak footprint**, and it is not the collector's fault.
-Sweeping the GC trigger from 8 MB to 256 MB -- from four cycles to two -- moves peak
-by less than 15% and never below 1.27 GB, so this is retained data rather than
-uncollected garbage. It is also not a fixed startup cost: the ratio is 2.37x on a
-hello-world corpus and 2.73x on the full one, so it scales with the object graph.
+The remaining gap is peak footprint. Sweeping the GC trigger from 8 MB to 256 MB --
+four cycles down to two -- moves peak by less than 15%, so this is retained data
+rather than uncollected garbage, and page-pool slack is about 2 MB, so it is not
+fragmentation either. `CN1_HEAP_REPORT` on a census build prints the split.
 
-Two candidates are already ruled out. The object header is 16 bytes
-(`struct JavaObjectPrototype`), comparable to HotSpot's. And compact strings are not
-it: JDK 8 has none and still fits in ~500 MB. BiBOP size-class rounding (32, 48, 64,
-80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512) costs maybe 10-15%, not
-180%. Finding the rest is the next piece of work.
+Two allocation defects came out of the per-class census and are fixed:
 
+- **`IdentityHashMap` allocated an `Entry` on every `next()`**, even for key and
+  value iteration, where the entry was built only to read one field back out of it
+  and drop it. 1,366,140 of them, 43.7 MB, all garbage. `java.util.HashMap` already
+  had separate key/value/entry iterators for exactly this reason and this map had
+  been missed; it now has the same split.
+- **`ArrayList()` eagerly allocated `Object[10]`**, a 128-byte slot for every list,
+  including one never added to. It now shares a zero-length array until the first
+  growth. The first growth allocates exactly ten and not the twelve the general
+  growth path would pick, because ten keeps a small list in the size class it
+  already occupied -- growing to twelve would have traded a win on empty lists for
+  a loss on every list of one to ten elements.
+
+Measured together on the self-hosting corpus:
+
+| | before | after |
+|---|---:|---:|
+| allocations | 10,160,401 objects / 991 MB | 8,706,929 / 940 MB |
+| legacy-heap objects | 729,174 | 444,783 |
+| Java live heap | 860 MB | 770 MB |
+| process peak | 1467 MB | 1324 MB |
+
+`CollectionSemanticsIntegrationTest` holds both against a real JDK -- empty-list
+operations, the three growth paths, identity semantics, null keys and values
+through each of the three views, iterator removal, and a rehash. It was confirmed
+to fail when the key iterator stops mapping the table's sentinel back to null.
+
+**`HashMap` was investigated and deliberately left alone.** It eagerly allocates
+three arrays (keys, values, meta) at capacity 16, which looks like the same defect,
+but the maps in this workload are populated rather than empty. Rebuilding with a
+default capacity of 1 -- the cheapest probe for "how much of that table is wasted"
+-- made everything worse, because the maps then regrow repeatedly:
+
+| default capacity | Object[] allocs | int[] allocs | Java live |
+|---|---:|---:|---:|
+| 16 (current) | 1,324,987 | 213,725 | 770 MB |
+| 1 (probe) | 1,802,249 | 452,356 | 882 MB |
+
+Growth there is also post-insert by design, so the shared-empty-table trick that
+works for ArrayList would have the put path writing into the shared table. Not
+worth it for an unmeasured win in the hottest class in the runtime.
+
+### String: the NSString field is free
+
+`java.lang.String` carries a `long nsString` for the Apple targets' direct NSString
+mapping, and the obvious question is what that costs everywhere else. Measured:
+nothing.
+
+```
+sizeof(obj__java_lang_String) = 48      nsString at offset 40
+```
+
+The fields before it end at 36 and the struct is 8-aligned, so four of those eight
+bytes were padding already. Without the field the struct is 40 bytes -- and BiBOP's
+size classes are 32, 48, 64, ..., so 40 and 48 both land in the same 48-byte slot.
+Removing it would save zero bytes per String while costing the Apple targets a
+side table and a lookup. Keep it.
+
+The strings themselves are still the largest single consumer (`char[]`, 368 MB
+allocated). Note that a compact Latin-1 path already exists for the concat
+fast path -- `cn1FusedLatin1Begin` allocates the String and a `byte[]` payload in
+one BiBOP slot -- so the remaining `char[]` volume is strings built some other way.
+That is the next thing to look at.

@@ -125,12 +125,38 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
 
         final MapEntry.Type<E, KT, VT> type;
 
+        /**
+         * Which of the three views this iterator serves.
+         *
+         * Keys and values come straight out of the table; only entrySet has to
+         * materialise an Entry, and only there can the caller observe one. The
+         * generic {@code type} callback cannot express that, because it takes a
+         * MapEntry -- so serving a key iterator through it allocated an Entry per
+         * next() purely to read one field back out and drop it. Measured on a
+         * self-hosting translation of the ParparVM translator: 1,366,140 such
+         * entries, 43.7MB, all garbage. java.util.HashMap already had separate
+         * key/value/entry iterators for exactly this reason; this one was missed.
+         */
+        static final int KIND_ENTRY = 0;
+        static final int KIND_KEY = 1;
+        static final int KIND_VALUE = 2;
+
+        final int kind;
+
         boolean canRemove = false;
 
         IdentityHashMapIterator(MapEntry.Type<E, KT, VT> value,
                 IdentityHashMap<KT, VT> hm) {
             associatedMap = hm;
             type = value;
+            kind = KIND_ENTRY;
+            expectedModCount = hm.modCount;
+        }
+
+        IdentityHashMapIterator(int iteratorKind, IdentityHashMap<KT, VT> hm) {
+            associatedMap = hm;
+            type = null;
+            kind = iteratorKind;
             expectedModCount = hm.modCount;
         }
 
@@ -152,19 +178,26 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             }
         }
 
+        @SuppressWarnings("unchecked")
         public E next() {
             checkConcurrentMod();
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
 
-            IdentityHashMapEntry<KT, VT> result = associatedMap
-                    .getEntry(position);
             lastPosition = position;
             position += 2;
-
             canRemove = true;
-            return type.get(result);
+
+            if (kind == KIND_KEY) {
+                Object key = associatedMap.elementData[lastPosition];
+                return (E) (key == NULL_OBJECT ? null : key);
+            }
+            if (kind == KIND_VALUE) {
+                Object value = associatedMap.elementData[lastPosition + 1];
+                return (E) (value == NULL_OBJECT ? null : value);
+            }
+            return type.get(associatedMap.getEntry(lastPosition));
         }
 
         public void remove() {
@@ -687,11 +720,7 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
                 @Override
                 public Iterator<K> iterator() {
                     return new IdentityHashMapIterator<K, K, V>(
-                            new MapEntry.Type<K, K, V>() {
-                                public K get(MapEntry<K, V> entry) {
-                                    return entry.key;
-                                }
-                            }, IdentityHashMap.this);
+                            IdentityHashMapIterator.KIND_KEY, IdentityHashMap.this);
                 }
             };
         }
@@ -739,11 +768,7 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
                 @Override
                 public Iterator<V> iterator() {
                     return new IdentityHashMapIterator<V, K, V>(
-                            new MapEntry.Type<V, K, V>() {
-                                public V get(MapEntry<K, V> entry) {
-                                    return entry.value;
-                                }
-                            }, IdentityHashMap.this);
+                            IdentityHashMapIterator.KIND_VALUE, IdentityHashMap.this);
                 }
 
                 @Override
