@@ -49,16 +49,18 @@ class MockAdProviderTest extends UITestBase {
     @org.junit.jupiter.api.BeforeEach
     void resetEvents() { events.clear(); }
 
-    private Container adLayer(Form form) {
-        return form.getFormLayeredPane(MockAdProvider.class, true);
+    private Container adContent(Form form) {
+        return form.getContentPane();
     }
 
-    private Container adOverlay(Form form) {
-        return (Container) adLayer(form).getComponentAt(0);
+    private void drainEdt() {
+        CountDownLatch drained = new CountDownLatch(1);
+        CN.callSerially(() -> CN.callSerially(drained::countDown));
+        waitFor(drained, 1000);
     }
 
     private void assertNoAd(Form form) {
-        assertEquals(0, adLayer(form).getComponentCount());
+        assertSame(form, CN.getCurrentForm());
     }
 
     private AdListener listener() {
@@ -70,7 +72,7 @@ class MockAdProviderTest extends UITestBase {
     }
 
     @FormTest
-    void interstitialOverlayStaysVisibleUntilClosed() {
+    void interstitialFormStaysVisibleUntilClosed() {
         Form previous = CN.getCurrentForm();
         Command previousBack = new Command("Application back");
         previous.setBackCommand(previousBack);
@@ -80,22 +82,26 @@ class MockAdProviderTest extends UITestBase {
         ad.load();
         ad.show();
         Form showing = CN.getCurrentForm();
-        assertSame(previous, showing);
-        assertEquals(showing.getWidth(), adOverlay(showing).getWidth());
-        assertEquals(showing.getHeight(), adOverlay(showing).getHeight());
-        assertEquals("Mock advertisement", ((Label) adOverlay(showing).getComponentAt(0)).getText());
+        assertNotSame(previous, showing);
+        assertFalse(showing instanceof Dialog);
+        assertEquals(implementation.getDisplayWidth(), showing.getWidth());
+        assertEquals(implementation.getDisplayHeight(), showing.getHeight());
+        assertEquals("Mock advertisement", ((Label) adContent(showing).getComponentAt(0)).getText());
         assertEquals(Arrays.asList("shown", "impression"), events);
         Command closeCommand = showing.getBackCommand();
-        Button close = (Button) adOverlay(showing).getComponentAt(1);
+        Button close = (Button) adContent(showing).getComponentAt(1);
         close.pressed();
         close.released();
+        drainEdt();
         assertSame(previous, CN.getCurrentForm());
         assertEquals(Arrays.asList("shown", "impression", "dismissed"), events);
         closeCommand.actionPerformed(new ActionEvent(showing));
-        assertNoAd(showing);
-        assertSame(previousBack, showing.getBackCommand());
+        drainEdt();
+        assertNoAd(previous);
+        assertSame(previousBack, previous.getBackCommand());
         assertEquals(3, events.size(), "Closing twice must not repeat callbacks");
         ad.dispose();
+        drainEdt();
     }
 
     @FormTest
@@ -110,9 +116,11 @@ class MockAdProviderTest extends UITestBase {
         Form showing = CN.getCurrentForm();
         assertEquals(Arrays.asList("shown", "impression"), events);
         showing.getBackCommand().actionPerformed(new ActionEvent(showing));
+        drainEdt();
         assertSame(previous, CN.getCurrentForm());
         assertEquals(Arrays.asList("shown", "impression", "reward", "dismissed"), events);
         ad.dispose();
+        drainEdt();
     }
 
     @FormTest
@@ -125,12 +133,13 @@ class MockAdProviderTest extends UITestBase {
         ad.load();
         ad.show();
         ad.dispose();
+        drainEdt();
         assertSame(previous, CN.getCurrentForm());
         assertEquals(Arrays.asList("shown", "impression"), events);
     }
 
     @FormTest
-    void overlayLeavesModalCallerAvailableToDismissalCallback() {
+    void adRestoresModalCallerBeforeDismissalCallback() {
         MockAdProvider.install();
         Dialog dialog = new Dialog("Modal caller");
         Form destination = new Form("After dismissal");
@@ -142,21 +151,31 @@ class MockAdProviderTest extends UITestBase {
                 assertSame(dialog, CN.getCurrentForm());
                 assertNoAd(dialog);
                 dialog.dispose();
+                drainEdt();
                 destination.show();
             }
         });
         ad.setOnUserEarnedRewardListener(reward -> events.add("reward"));
-        dialog.addShowListener(evt -> CN.callSerially(() -> {
-            try {
-                ad.load();
-                ad.show();
-                dialog.getBackCommand().actionPerformed(new ActionEvent(dialog));
-            } catch (Throwable t) {
-                failure.set(t);
-            } finally {
-                dialog.dispose();
+        boolean[] started = {false};
+        dialog.addShowListener(evt -> {
+            if (started[0]) {
+                return;
             }
-        }));
+            started[0] = true;
+            CN.callSerially(() -> {
+                try {
+                    ad.load();
+                    ad.show();
+                    CN.getCurrentForm().getBackCommand().actionPerformed(new ActionEvent(dialog));
+                    drainEdt();
+                } catch (Throwable t) {
+                    failure.set(t);
+                } finally {
+                    dialog.dispose();
+                    drainEdt();
+                }
+            });
+        });
         try {
             dialog.show();
             assertNull(failure.get());
@@ -164,6 +183,7 @@ class MockAdProviderTest extends UITestBase {
             assertSame(destination, CN.getCurrentForm());
         } finally {
             ad.dispose();
+            drainEdt();
         }
     }
 
@@ -179,22 +199,25 @@ class MockAdProviderTest extends UITestBase {
             ad.load();
             ad.show();
             Form showing = CN.getCurrentForm();
-            assertEquals("Mock advertisement", ((Label) adOverlay(showing).getComponentAt(0)).getText());
+            assertEquals("Mock advertisement", ((Label) adContent(showing).getComponentAt(0)).getText());
             if (action == 0) {
-                Button close = (Button) adOverlay(showing).getComponentAt(1);
+                Button close = (Button) adContent(showing).getComponentAt(1);
                 close.pressed();
                 close.released();
+                drainEdt();
             } else if (action == 1) {
                 showing.getBackCommand().actionPerformed(new ActionEvent(showing));
+                drainEdt();
             } else {
                 ad.dispose();
+                drainEdt();
             }
             assertNotNull(CN.getCurrentForm());
-            assertSame(showing, CN.getCurrentForm());
-            assertNoAd(showing);
+            assertNotSame(showing, CN.getCurrentForm());
             assertEquals(action == 2 ? Arrays.asList("shown", "impression")
                     : Arrays.asList("shown", "impression", "dismissed"), events);
             ad.dispose();
+            drainEdt();
         }
     }
 
@@ -208,18 +231,23 @@ class MockAdProviderTest extends UITestBase {
             ad.load();
             ad.show();
             ad.dispose();
+            drainEdt();
             assertSame(caller, CN.getCurrentForm());
             caller.dispose();
+            drainEdt();
             boolean[] disposedDuringShow = {false};
             caller.addShowListener(evt -> CN.callSerially(() -> {
                 disposedDuringShow[0] = true;
                 caller.dispose();
+                drainEdt();
             }));
             caller.show();
             assertFalse(disposedDuringShow[0], "A reused modeless caller must not wait for disposal");
         } finally {
             ad.dispose();
+            drainEdt();
             caller.dispose();
+            drainEdt();
         }
     }
 
@@ -232,11 +260,12 @@ class MockAdProviderTest extends UITestBase {
         Form destination = new Form("Application destination");
         destination.show();
         ad.dispose();
+        drainEdt();
         assertSame(destination, CN.getCurrentForm());
     }
 
     @FormTest
-    void disposalRemovesOverlayWithoutChangingNestedDialogs() {
+    void disposedAdReturnsToCallerAfterNestedDialogsClose() {
         MockAdProvider.install();
         Form application = CN.getCurrentForm();
         for (int depth = 1; depth <= 2; depth++) {
@@ -252,12 +281,15 @@ class MockAdProviderTest extends UITestBase {
                     overlays[i].showModeless();
                 }
                 ad.dispose();
+                drainEdt();
                 ad.dispose();
+                drainEdt();
                 assertSame(overlays[depth - 1], CN.getCurrentForm(),
                         "Disposing an underlying ad must leave the top dialog visible");
                 assertEquals(Arrays.asList("shown", "impression"), events);
                 for (int i = depth - 1; i >= 0; i--) {
                     overlays[i].dispose();
+                    drainEdt();
                     assertSame(i == 0 ? application : overlays[i - 1], CN.getCurrentForm(),
                             "Dialog disposal must restore its original caller");
                 }
@@ -265,9 +297,11 @@ class MockAdProviderTest extends UITestBase {
                 for (int i = depth - 1; i >= 0; i--) {
                     if (overlays[i] != null) {
                         overlays[i].dispose();
+                        drainEdt();
                     }
                 }
                 ad.dispose();
+                drainEdt();
                 application.show();
             }
         }
@@ -285,17 +319,21 @@ class MockAdProviderTest extends UITestBase {
             destination.show();
             unrelated.showModeless();
             ad.dispose();
+            drainEdt();
             assertSame(unrelated, CN.getCurrentForm());
             unrelated.dispose();
+            drainEdt();
             assertSame(destination, CN.getCurrentForm());
         } finally {
             ad.dispose();
+            drainEdt();
             unrelated.dispose();
+            drainEdt();
         }
     }
 
     @FormTest
-    void workerShowThenDisposeRemovesQueuedOverlay() throws Exception {
+    void workerShowThenDisposeRestoresCaller() throws Exception {
         MockAdProvider.install();
         Form previous = CN.getCurrentForm();
         InterstitialAd ad = new InterstitialAd("mock");
@@ -317,14 +355,13 @@ class MockAdProviderTest extends UITestBase {
             worker.join(1000);
             assertFalse(worker.isAlive(), "Worker operations must not wait for the EDT");
             assertNull(failure.get());
-            CountDownLatch drained = new CountDownLatch(1);
-            CN.callSerially(drained::countDown);
-            waitFor(drained, 1000);
-            assertSame(previous, CN.getCurrentForm(), "Queued presentation must not change the current form");
+            drainEdt();
+            assertSame(previous, CN.getCurrentForm(), "Queued disposal must restore the original form");
             assertNoAd(previous);
             assertEquals(Arrays.asList("shown", "impression"), events);
         } finally {
             ad.dispose();
+            drainEdt();
             previous.show();
         }
     }
@@ -338,14 +375,15 @@ class MockAdProviderTest extends UITestBase {
             @Override public void onShown() {
                 events.add("shown");
                 assertTrue(CN.isEdt());
-                assertSame(previous, CN.getCurrentForm());
-                assertEquals(1, adLayer(previous).getComponentCount());
+                assertNotSame(previous, CN.getCurrentForm());
+                assertEquals(2, adContent(CN.getCurrentForm()).getComponentCount());
                 ad.dispose();
             }
             @Override public void onImpression() { events.add("impression"); }
         });
         ad.load();
         ad.show();
+        drainEdt();
         assertSame(previous, CN.getCurrentForm());
         assertEquals(Arrays.asList("shown"), events);
     }
@@ -372,14 +410,13 @@ class MockAdProviderTest extends UITestBase {
             assertNull(failure.get());
             // An EDT caller can dispose before the queued load/show get a turn.
             ad.dispose();
-            CountDownLatch drained = new CountDownLatch(1);
-            CN.callSerially(drained::countDown);
-            waitFor(drained, 1000);
+            drainEdt();
             assertSame(previous, CN.getCurrentForm());
             assertNoAd(previous);
             assertTrue(events.isEmpty(), "A disposed session must ignore pending presentation");
         } finally {
             ad.dispose();
+            drainEdt();
             previous.show();
         }
     }
@@ -401,23 +438,28 @@ class MockAdProviderTest extends UITestBase {
             first.load();
             second.load();
             first.show();
-            Command firstClose = host.getBackCommand();
+            Form showing = CN.getCurrentForm();
+            Command firstClose = showing.getBackCommand();
             second.show();
             assertEquals(Arrays.asList("rejected"), events);
             assertTrue(second.isLoaded(), "Rejected presentation must not consume the loaded ad");
-            assertSame(firstClose, host.getBackCommand());
-            assertEquals(1, adLayer(host).getComponentCount());
+            assertSame(firstClose, showing.getBackCommand());
+            assertSame(showing, CN.getCurrentForm());
             first.dispose();
+            drainEdt();
             assertSame(applicationBack, host.getBackCommand());
             second.show();
             assertEquals(Arrays.asList("rejected", "shown"), events);
-            host.getBackCommand().actionPerformed(new ActionEvent(host));
+            CN.getCurrentForm().getBackCommand().actionPerformed(new ActionEvent(host));
+            drainEdt();
             assertEquals(Arrays.asList("rejected", "shown", "dismissed"), events);
             assertSame(applicationBack, host.getBackCommand());
             assertNoAd(host);
         } finally {
             second.dispose();
+            drainEdt();
             first.dispose();
+            drainEdt();
         }
     }
 
@@ -433,23 +475,28 @@ class MockAdProviderTest extends UITestBase {
             first.load();
             second.load();
             first.show();
-            Command firstClose = host.getBackCommand();
-            Container firstOverlay = adOverlay(host);
+            Form showing = CN.getCurrentForm();
+            Command firstClose = showing.getBackCommand();
+            Container firstContent = adContent(CN.getCurrentForm());
             second.show();
             second.dispose();
-            assertSame(firstClose, host.getBackCommand());
-            assertSame(firstOverlay, adOverlay(host));
+            drainEdt();
+            assertSame(firstClose, showing.getBackCommand());
+            assertSame(firstContent, adContent(CN.getCurrentForm()));
             firstClose.actionPerformed(new ActionEvent(host));
+            drainEdt();
             assertSame(applicationBack, host.getBackCommand());
             assertNoAd(host);
         } finally {
             second.dispose();
+            drainEdt();
             first.dispose();
+            drainEdt();
         }
     }
 
     @FormTest
-    void overlayKeepsTypingAndFocusTraversalAwayFromHostControls() {
+    void adFormKeepsTypingAndFocusTraversalAwayFromHostControls() {
         MockAdProvider.install();
         Form host = CN.getCurrentForm();
         int[] typed = {0};
@@ -466,25 +513,28 @@ class MockAdProviderTest extends UITestBase {
         try {
             ad.load();
             ad.show();
-            Component close = adOverlay(host).getComponentAt(1);
-            assertSame(close, host.getFocused());
-            host.keyPressed('a');
-            host.keyReleased('a');
+            Form showing = CN.getCurrentForm();
+            Component close = adContent(showing).getComponentAt(1);
+            assertSame(close, showing.getFocused());
+            showing.keyPressed('a');
+            showing.keyReleased('a');
             for (int key : new int[]{Display.GAME_UP, Display.GAME_DOWN, Display.GAME_LEFT, Display.GAME_RIGHT}) {
-                host.keyPressed(key);
-                host.keyReleased(key);
-                assertSame(close, host.getFocused());
+                showing.keyPressed(key);
+                showing.keyReleased(key);
+                assertSame(close, showing.getFocused());
             }
-            assertNull(host.getNextComponent(close), "Tab must not reach a covered control");
-            assertNull(host.getPreviousComponent(close), "Shift-Tab must not reach a covered control");
+            assertNull(showing.getNextComponent(close), "Tab must not reach a covered control");
+            assertNull(showing.getPreviousComponent(close), "Shift-Tab must not reach a covered control");
             assertEquals(0, typed[0]);
             ad.dispose();
+            drainEdt();
             assertSame(input, host.getFocused());
             assertTrue(input.isFocusable());
             assertTrue(underlying.isFocusable());
             assertFalse(label.isFocusable());
         } finally {
             ad.dispose();
+            drainEdt();
         }
     }
 
@@ -506,17 +556,45 @@ class MockAdProviderTest extends UITestBase {
         try {
             ad.load();
             ad.show();
-            host.keyPressed(Display.GAME_FIRE);
-            host.keyReleased(Display.GAME_FIRE);
-            CountDownLatch drained = new CountDownLatch(1);
-            CN.callSerially(drained::countDown);
-            waitFor(drained, 1000);
+            Form showing = CN.getCurrentForm();
+            showing.keyPressed(Display.GAME_FIRE);
+            showing.keyReleased(Display.GAME_FIRE);
+            drainEdt();
             assertEquals(Arrays.asList("shown", "impression", "dismissed"), events);
             assertNoAd(host);
             assertSame(underlying, host.getFocused());
             assertSame(defaultCommand, host.getDefaultCommand());
         } finally {
             ad.dispose();
+            drainEdt();
+        }
+    }
+
+    @FormTest
+    void fullScreenAdBlocksHostKeyAndGameKeyListeners() {
+        MockAdProvider.install();
+        Form host = CN.getCurrentForm();
+        host.addKeyListener('x', evt -> events.add("shortcut"));
+        host.addKeyListener(Display.GAME_FIRE, evt -> events.add("enter"));
+        host.addGameKeyListener(Display.GAME_FIRE, evt -> events.add("game-fire"));
+        InterstitialAd ad = new InterstitialAd("mock");
+        try {
+            ad.load();
+            ad.show();
+            Form showing = CN.getCurrentForm();
+            showing.keyPressed('x');
+            showing.keyReleased('x');
+            showing.keyPressed(Display.GAME_FIRE);
+            showing.keyReleased(Display.GAME_FIRE);
+            drainEdt();
+            assertTrue(events.isEmpty(), "Ad input must not invoke covered form shortcuts: " + events);
+            assertSame(host, CN.getCurrentForm());
+            host.keyReleased('x');
+            host.keyReleased(Display.GAME_FIRE);
+            assertEquals(Arrays.asList("shortcut", "enter", "game-fire"), events);
+        } finally {
+            ad.dispose();
+            drainEdt();
         }
     }
 

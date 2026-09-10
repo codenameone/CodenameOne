@@ -42,15 +42,13 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
-import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.LayeredLayout;
-import java.util.ArrayList;
 
 /// A deterministic, network-free ad provider for tests and screenshots. It
 /// renders fixed, labelled "ads" with stable colours, text and sizes (no
@@ -118,21 +116,15 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
     }
 
     /// Deterministic full screen ad: fires the lifecycle events and presents a
-    /// full-screen overlay with a Close button.
+    /// separate Form with a Close button.
     private static final class MockFullScreen implements FullScreenAdSession {
         private final AdFormat format;
         private AdSessionCallback cb;
         // Mutated on the EDT; readiness may be queried by a worker.
         private volatile boolean loaded;
         private boolean disposed;
-        private Container overlay;
-        private Container layer;
-        private Form host;
-        private Component previousFocus;
-        private final ArrayList<Component> blockedFocus = new ArrayList<Component>();
-        private Command previousDefault;
-        private Command previousBack;
-        private Command closeCommand;
+        private MockAdForm adForm;
+        private static MockAdForm activeForm;
 
         MockFullScreen(AdFormat format) {
             this.format = format;
@@ -178,102 +170,94 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
                 cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "No ad loaded"));
                 return;
             }
-            if (overlay != null) {
+            if (activeForm != null) {
                 cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "An ad is already showing"));
                 return;
             }
-            Form target = CN.getCurrentForm();
-            if (target == null) {
-                target = new Form();
-                target.show();
-            }
-            Container targetLayer = target.getFormLayeredPane(MockAdProvider.class, true);
-            // Sessions share this layer. Reject overlap before consuming the ad
-            // or replacing the active session's Back command.
-            if (targetLayer.getComponentCount() != 0) {
-                cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "An ad is already showing"));
-                return;
+            Form previous = CN.getCurrentForm();
+            if (previous == null) {
+                previous = new Form();
             }
             loaded = false;
-            host = target;
-            layer = targetLayer;
-            overlay = new Container(new BorderLayout());
-            overlay.setGrabsPointerEvents(true);
-            overlay.setUIID("Form");
-            overlay.getAllStyles().setBgTransparency(255);
-            overlay.add(BorderLayout.CENTER, new Label("Mock advertisement"));
-            Button close = new Button("Close ad") {
-                @Override
-                public void keyReleased(int keyCode) {
-                    // Finish Form.keyReleased() before restoring the host's default
-                    // command, so this same Enter press cannot activate it too.
-                    CN.callSerially(() -> super.keyReleased(keyCode));
-                }
-            };
+            adForm = new MockAdForm(previous);
+            activeForm = adForm;
+            Button close = new Button("Close ad");
             close.addActionListener(evt -> closeAd(true));
-            overlay.add(BorderLayout.SOUTH, close);
-            previousFocus = host.getFocused();
-            for (Component component : ComponentSelector.select("*", host)) {
-                if (component.isFocusable()) {
-                    blockedFocus.add(component);
-                    component.setFocusable(false);
-                }
-            }
-            previousDefault = host.getDefaultCommand();
-            host.setDefaultCommand(null);
-            previousBack = host.getBackCommand();
-            closeCommand = new Command("Close ad") {
+            adForm.add(BorderLayout.CENTER, new Label("Mock advertisement"));
+            adForm.add(BorderLayout.SOUTH, close);
+            adForm.setBackCommand(new Command("Close ad") {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
                     closeAd(true);
                 }
-            };
-            host.setBackCommand(closeCommand);
-            layer.setLayout(new LayeredLayout());
-            layer.add(overlay);
-            host.revalidate();
+            });
+            adForm.show();
             close.requestFocus();
             cb.onShown();
-            // A listener may dispose the ad synchronously from onShown().
-            if (overlay != null) {
+            if (adForm != null) {
                 cb.onImpression();
             }
         }
 
         private void closeAd(boolean notify) {
-            if (overlay == null) {
+            if (adForm == null) {
                 return;
             }
-            overlay.remove();
-            overlay = null;
-            if (layer.getComponentCount() == 0) {
-                layer.remove();
-            }
-            if (host.getBackCommand() == closeCommand) {
-                host.setBackCommand(previousBack);
-            }
-            for (Component component : blockedFocus) {
-                component.setFocusable(true);
-            }
-            blockedFocus.clear();
-            if (host.getDefaultCommand() == null) {
-                host.setDefaultCommand(previousDefault);
-            }
-            if (previousFocus == null || previousFocus.getComponentForm() == host) {
-                host.setFocused(previousFocus);
-            }
-            host.revalidate();
-            previousFocus = null;
-            previousDefault = null;
-            layer = null;
-            host = null;
-            previousBack = null;
-            closeCommand = null;
-            if (notify) {
-                if (format == AdFormat.REWARDED || format == AdFormat.REWARDED_INTERSTITIAL) {
-                    cb.onUserEarnedReward(new RewardItem("coins", 10));
+            MockAdForm closing = adForm;
+            adForm = null;
+            closing.closed = true;
+            // Restore on the EDT queue so a modal caller can show again without
+            // blocking dispose(), and deliver callbacks after it becomes current.
+            CN.callSerially(() -> {
+                if (activeForm == closing) {
+                    activeForm = null;
                 }
-                cb.onDismissed();
+                closing.restorePrevious(() -> {
+                    if (notify) {
+                        if (format == AdFormat.REWARDED || format == AdFormat.REWARDED_INTERSTITIAL) {
+                            cb.onUserEarnedReward(new RewardItem("coins", 10));
+                        }
+                        cb.onDismissed();
+                    }
+                });
+            });
+        }
+
+        private static final class MockAdForm extends Form {
+            private final Form previous;
+            private boolean closed;
+
+            MockAdForm(Form previous) {
+                super(new BorderLayout());
+                this.previous = previous;
+                // If an application dialog covered the ad when it was disposed,
+                // return to the caller when that dialog eventually uncovers it.
+                addShowListener(evt -> {
+                    if (closed) {
+                        CN.callSerially(() -> restorePrevious(null));
+                    }
+                });
+            }
+
+            private void restorePrevious(Runnable afterRestore) {
+                if (CN.getCurrentForm() != this) {
+                    if (afterRestore != null) {
+                        afterRestore.run();
+                    }
+                    return;
+                }
+                if (afterRestore != null) {
+                    // A modal Dialog can flush the EDT before becoming current.
+                    // Its show event, rather than a queued task, marks restoration.
+                    previous.addShowListener(new ActionListener<ActionEvent>() {
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+                            previous.removeShowListener(this);
+                            afterRestore.run();
+                        }
+                    });
+                }
+                previous.showBack();
             }
         }
 
