@@ -87,6 +87,7 @@ class BackendHttpIntegrationTest {
     private static int busyPort;
     private static Process smallUploadServer;
     private static int smallUploadPort;
+    private static Path smallUploadLog;
 
     /** Larger than any plausible socket send buffer, so a slow reader stalls the write. */
     private static final int HUGE_BYTES = 8 * 1024 * 1024;
@@ -175,8 +176,16 @@ class BackendHttpIntegrationTest {
         // And a small HTTP/2 body ceiling, so that one can be reached with a
         // few megabytes as well.
         run.environment().put("CN1_HTTP_MAX_H2_BODY_MB", "4");
+        // A DELIBERATELY invalid rate. Zero is a divisor in fillTo() and in
+        // requireChunkedProgress(), so an unguarded server throws
+        // ArithmeticException on the first body needing a second read and
+        // drops the connection with no response at all. Set here rather than
+        // on its own fixture so every upload test on this port carries the
+        // proof, and named in a test below so it cannot be deleted as noise.
+        run.environment().put("CN1_HTTP_MIN_BODY_RATE", "0");
         run.redirectErrorStream(true);
-        run.redirectOutput(work.resolve("upload-server.log").toFile());
+        smallUploadLog = work.resolve("upload-server.log");
+        run.redirectOutput(smallUploadLog.toFile());
         smallUploadServer = run.start();
         if (!waitForPort(smallUploadPort, 30000)) {
             smallUploadServer.destroy();
@@ -710,6 +719,64 @@ class BackendHttpIntegrationTest {
         } finally {
             socket.close();
         }
+    }
+
+    @Test
+    @DisplayName("an invalid minimum rate falls back instead of dividing by zero")
+    void aZeroMinimumBodyRateDoesNotKillTheConnection() throws Exception {
+        // CN1_HTTP_MIN_BODY_RATE=0 reaches a division in both body readers. The
+        // ArithmeticException that follows is caught as an ordinary read failure,
+        // so the connection is dropped WITHOUT a response -- a setting that looks
+        // like a tuning knob and silently makes every upload fail.
+        //
+        // This fixture server runs with that value on purpose, so the upload tests
+        // above already depend on the fallback; this one says so out loud.
+        Assumptions.assumeTrue(smallUploadPort > 0,
+                "the small-budget server did not start");
+        // The clamp SAYS SO on stderr, and the fixture's output is captured, so
+        // this is what actually bites when the guard is removed: the two runtimes
+        // disagree about what a zero divisor does -- Java SE throws
+        // ArithmeticException and drops the connection, ParparVM answers 0 and
+        // quietly loses the rate part of the deadline -- so behaviour alone cannot
+        // catch it on both. The message can.
+        String log = new String(java.nio.file.Files.readAllBytes(smallUploadLog),
+                StandardCharsets.UTF_8);
+        // JUnit 5 here: condition first, message second.
+        assertTrue(log.indexOf("CN1_HTTP_MIN_BODY_RATE=0 is below the minimum") >= 0,
+                "the server did not report refusing CN1_HTTP_MIN_BODY_RATE=0:\n" + log);
+
+        // And it still serves. The body has to arrive in a SECOND packet: sent in
+        // one write it is already buffered when fillTo() looks, so the method
+        // returns before it ever computes the allowance -- a first version of this
+        // test did exactly that and passed with the guard removed.
+        byte[] body = ("[\"" + repeat('a', 4096) + "\"]").getBytes(StandardCharsets.UTF_8);
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", smallUploadPort), 5000);
+        socket.setSoTimeout(20000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write(("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+                    + "Content-Length: " + body.length + "\r\nConnection: close\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            Thread.sleep(300);
+            out.write(body);
+            out.flush();
+            byte[] response = readFullyBytes(socket.getInputStream());
+            assertEquals(200, status(response),
+                    "a body needing a second read must still be served:\n"
+                            + new String(response, StandardCharsets.UTF_8));
+        } finally {
+            socket.close();
+        }
+    }
+
+    private static String repeat(char c, int count) {
+        StringBuilder sb = new StringBuilder(count);
+        for (int i = 0; i < count; i++) {
+            sb.append(c);
+        }
+        return sb.toString();
     }
 
     @Test

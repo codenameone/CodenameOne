@@ -1049,7 +1049,7 @@ public final class HttpServer {
      * buys call depth rather than data. 64KB holds a few hundred nested Java
      * frames, well past what an HTTP handler needs, and is mapped lazily too.
      */
-    private static final int VT_STACK_BYTES = envInt("CN1_HTTP_VT_STACK", 64 * 1024);
+    private static final int VT_STACK_BYTES = envIntAtLeast("CN1_HTTP_VT_STACK", 64 * 1024, 1);
 
     /**
      * How often a virtual-thread host sweeps its deadlines, however busy it is.
@@ -1077,7 +1077,7 @@ public final class HttpServer {
      * get them. Set CN1_HTTP_MIN_BODY_RATE to change it.
      */
     private static final int MIN_BODY_BYTES_PER_SECOND =
-            envInt("CN1_HTTP_MIN_BODY_RATE", 8192);
+            envIntAtLeast("CN1_HTTP_MIN_BODY_RATE", 8192, 1);
 
     /**
      * Ceiling on open connections. Past it a connection is accepted and closed
@@ -1086,6 +1086,36 @@ public final class HttpServer {
      * to 0 for no ceiling.
      */
     private static final int MAX_CONNECTIONS = envInt("CN1_HTTP_MAX_CONNECTIONS", 4096);
+
+    /**
+     * A tunable that must be at least `minimum`, or the default is used instead.
+     *
+     * Some of these settings are DIVISORS or array sizes, and a zero reaches very
+     * different places on the two runtimes: Java SE throws ArithmeticException,
+     * which the reader catches as an ordinary read failure and drops the
+     * connection with no response, while ParparVM answers 0 for an integer
+     * division by zero -- so the packaged binary silently loses the rate part of
+     * its own deadline instead. Neither is what anyone typed 0 hoping for, and a
+     * setting that behaves differently in the dev loop than in production is the
+     * exact divergence this backend keeps being reviewed for.
+     *
+     * Package-visible so the runtime self-test can check the clamp itself on both
+     * arms; the values it guards are read once at class initialisation, which no
+     * test can reach.
+     */
+    static int atLeast(String name, int value, int minimum) {
+        if(value >= minimum) {
+            return value;
+        }
+        System.err.println(name + "=" + value + " is below the minimum of " + minimum
+                + "; using the default instead");
+        return -1;
+    }
+
+    private static int envIntAtLeast(String name, int fallback, int minimum) {
+        int value = envInt(name, fallback);
+        return atLeast(name, value, minimum) < 0 ? fallback : value;
+    }
 
     private static int envInt(String name, int fallback) {
         String v = System.getenv(name);
@@ -5047,7 +5077,7 @@ public final class HttpServer {
      * CN1_HTTP_TARGET_CACHE=0 restores the old behaviour for A/B.
      */
     private static final int TARGET_CACHE_SLOTS =
-            envInt("CN1_HTTP_TARGET_CACHE", 64);
+            envIntAtLeast("CN1_HTTP_TARGET_CACHE", 64, 0);
 
     /**
      * Read straight into the thread's reusable buffer instead of a fresh array.
