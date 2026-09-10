@@ -65,6 +65,12 @@ class ToggleButtonFigure implements GuideFigure {
         hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
         hi.show();
         // end::the-components-of-codename-one-java-156[]
+        // Focus lands on the first focusable control by default, and a focused
+        // toggle resolves sel# -- the accent ring -- whether or not it is
+        // checked. That would draw the one control the sample checks as though
+        // it were not. Focus an unchecked control instead, so the two filled
+        // rows read as checked and the ring reads as focus.
+        hi.setFocused(rb1);
         return hi;
     }
 }

@@ -319,7 +319,14 @@ ToggleButton {
     font-size: 2.5mm;
     text-align: center;
 }
-ToggleButton.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+/* sel# is not the checked look. Button.isPressedStyle() sends a checked toggle
+   to press# when it has no focus and to sel# when it does, and an unchecked
+   toggle with focus lands on sel# as well -- so that one slot means "focused",
+   for either value. Painting the checked fill there made a focused unchecked
+   radio indistinguishable from the checked one beside it. sel# is the base
+   appearance with an accent ring instead: focus stays visible and never claims
+   a value the control does not have. */
+ToggleButton.selected { color: #1d1b20; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid var(--accent-color, #6750a4); padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButton.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButton.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 
@@ -332,15 +339,15 @@ ToggleButton.disabled { color: #a5a0ab; background-color: transparent; cn1-backg
    and every state is spelled out because cn1-derive is only read at base
    level. */
 ToggleButtonFirst { cn1-derive: ToggleButton; }
-ToggleButtonFirst.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonFirst.selected { cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
 ToggleButtonFirst.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonFirst.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonLast { cn1-derive: ToggleButton; }
-ToggleButtonLast.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonLast.selected { cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
 ToggleButtonLast.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonLast.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonOnly { cn1-derive: ToggleButton; }
-ToggleButtonOnly.selected {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+ToggleButtonOnly.selected { cn1-derive: ToggleButton; border: 0.25mm solid var(--accent-color, #6750a4); }
 ToggleButtonOnly.pressed {  color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #79747e; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 ToggleButtonOnly.disabled { color: #a5a0ab; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #cac4d0; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 
@@ -1020,19 +1027,19 @@ TableHeader.disabled { margin: 0; font-size: 2.5mm; color: #49454f; font-family:
     TableHeader.pressed { margin: 0; font-size: 2.5mm; color: #cac4d0; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
     TableHeader.disabled { margin: 0; font-size: 2.5mm; color: #cac4d0; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
     ToggleButton { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButton.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButton.selected { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid var(--accent-color-dark, #d0bcff); padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButton.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButton.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonFirst { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonLast { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonOnly { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonFirst.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonFirst.selected { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid var(--accent-color-dark, #d0bcff); padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonFirst.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonFirst.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonLast.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonLast.selected { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid var(--accent-color-dark, #d0bcff); padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonLast.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonLast.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
-    ToggleButtonOnly.selected {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
+    ToggleButtonOnly.selected { color: #e6e0e9; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid var(--accent-color-dark, #d0bcff); padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonOnly.pressed {  color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
     ToggleButtonOnly.disabled { color: #5c5967; background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; padding: 1.55mm 4mm 1.55mm 4mm; margin: 0.5mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; }
 }

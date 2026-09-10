@@ -736,7 +736,10 @@ image:img/generated/components-toggle-buttons-android.png[Toggle buttons under A
 image:img/generated/components-toggle-buttons-ios.png[Toggle buttons under the iOS theme,scaledwidth=35%]
 
 Both themes draw the selection as a change of fill rather than of label color alone, so a
-selected toggle stays readable for someone who can't separate the two hues.
+selected toggle stays readable for someone who can't separate the two hues. The outlined row in
+each figure is the one holding focus: focus is drawn as a ring precisely so it can't be mistaken
+for a value, since the framework resolves a focused toggle through the same style whether
+it's checked or not.
 
 That's half the story though: to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
 
