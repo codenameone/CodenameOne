@@ -1497,6 +1497,11 @@ public final class HttpServer {
         out.put("connectionsRefused", new Long(connectionsRefused.get()));
         out.put("tls", tls == null ? "off" : "on");
         out.put("http2Connections", new Integer(http2Sessions.size()));
+        // A descriptor handed to a Response and not yet closed. Reported
+        // because nothing else can see one that escapes: the process limit is
+        // enormous, so a leak surfaces hours later as a server that cannot
+        // accept sockets, with nothing pointing at the cause.
+        out.put("openStaticFiles", new Integer(StaticFiles.openFileCount()));
         return out;
     }
 
@@ -3357,6 +3362,7 @@ public final class HttpServer {
                 // startup hook costs an atomic store on a path that is already
                 // creating a session.
                 Http2.setMaxBodyBytes(MAX_OPEN_H2_BODY_BYTES);
+                Http2.setMaxFileBodies(MAX_OPEN_H2_FILES);
                 h2 = Http2.create();
                 http2Sessions.put(new Integer(fd), h2);
                 // The SETTINGS preface has to reach the client before anything else.
@@ -3401,8 +3407,16 @@ public final class HttpServer {
                     // where a status code can be produced: the decoder has no way
                     // to answer 400, and returning null there would have made a
                     // malformed body indistinguishable from an absent one.
-                    h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
-                            asciiBytes("the request body is not valid UTF-8"));
+                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                            asciiBytes("the request body is not valid UTF-8"))) {
+                        // The explanation is itself a body, and under a full
+                        // process budget respond() takes nothing and says so. This
+                        // path ignored that and moved on, so the stream was left
+                        // unanswered until the connection timed out -- a client
+                        // that sent bad bytes under load simply hung. The status
+                        // still has to arrive; only the sentence is optional.
+                        h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
+                    }
                     requestsServed.incrementAndGet();
                     continue;
                 }
@@ -3491,8 +3505,19 @@ public final class HttpServer {
                     // into an OutOfMemoryError -- which the catch above does not catch,
                     // because it is an Error. The descriptor belongs to the session
                     // from here, so nothing on this side closes it.
-                    h2.respondFile(stream.getId(), response.status, contentType,
-                            extra, response.fileFd, response.fileOffset, response.fileLength);
+                    if(h2.respondFile(stream.getId(), response.status, contentType,
+                            extra, response.fileFd, response.fileOffset, response.fileLength)) {
+                        // The session owns it from here and frees it natively.
+                        StaticFiles.handOverFile(response.fileFd);
+                    } else {
+                        // Refused by the descriptor ceiling, which means the
+                        // session took NOTHING -- the fd is still ours to close.
+                        // The Java-side check above is now an early-out rather
+                        // than the enforcement; this is the enforcement, and it
+                        // happens in the same step that takes the descriptor.
+                        StaticFiles.closeFile(response.fileFd);
+                        h2.respond(stream.getId(), 503, "text/plain", extra, null);
+                    }
                 } else {
                     // A HEAD describes the representation it is not sending, and
                     // that is the whole point of asking: over HTTP/1 this server
@@ -3507,6 +3532,15 @@ public final class HttpServer {
                     // adding it here unconditionally made the SAME response valid
                     // over one protocol and invalid over the other, which is the
                     // exact divergence this fix existed to remove.
+                    // The descriptor is NOT closed here, and a review that says
+                    // it leaks is reading one branch short: responseBodyFor()
+                    // below closes it in a finally, which is the entire reason it
+                    // is called on a path that wants no body. Closing it here as
+                    // well was measured at exactly one extra close per request --
+                    // openStaticFiles ran to -10 over ten HEADs -- and a double
+                    // close is worse than the leak it was meant to fix, because
+                    // the number is reusable the instant the first close returns
+                    // and the second one then lands on whatever took it.
                     if(headOnly && !statusForbidsLength(response.status)) {
                         long described;
                         if(response.fileFd >= 0) {

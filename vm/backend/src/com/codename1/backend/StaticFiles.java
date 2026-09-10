@@ -237,7 +237,7 @@ public final class StaticFiles implements HttpServer.Handler {
             }
 
             release = false; // the server owns the descriptor from here
-            return HttpServer.Response.file(status, contentType(decoded), fd, offset, length, headers);
+            return HttpServer.Response.file(status, contentType(decoded), trackFile(fd), offset, length, headers);
         } finally {
             if(release) {
                 FileIo.close(fd);
@@ -250,8 +250,21 @@ public final class StaticFiles implements HttpServer.Handler {
             return true;
         }
         // The separator matters: "/srv/wwwroot-evil" starts with "/srv/www" but is
-        // not inside it.
-        return real.startsWith(root.endsWith("/") ? root : root + "/");
+        // not inside it. EITHER separator, though: FileIo.realPath answers
+        // backslashes on Windows, so requiring root + "/" refused every ordinary
+        // child there -- and since openBeneath() is unsupported in the Java SE
+        // runtime, every request in a Windows dev loop reaches this fallback and
+        // was answered 403. The packaged server is POSIX-only; the developer
+        // running cn1:backend is not.
+        String base = root;
+        if(base.endsWith("/") || base.endsWith("\\")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if(!real.startsWith(base) || real.length() <= base.length()) {
+            return false;
+        }
+        char next = real.charAt(base.length());
+        return next == '/' || next == '\\';
     }
 
     /**
@@ -462,8 +475,48 @@ public final class StaticFiles implements HttpServer.Handler {
         return out;
     }
 
+    /**
+     * Descriptors handed to a Response and not yet closed.
+     *
+     * Telemetry, and the only way a leak here is visible at all: a descriptor
+     * that escapes is not counted by anything else, the process limit is in the
+     * hundreds of thousands, and the failure arrives much later as a server that
+     * cannot accept sockets. An HTTP/2 HEAD of a static file leaked one per
+     * request precisely because nothing said so.
+     */
+    private static final java.util.concurrent.atomic.AtomicInteger OPEN_FILES =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    static int openFileCount() {
+        return OPEN_FILES.get();
+    }
+
+    /** Counted where the descriptor becomes a Response's to own. */
+    static int trackFile(int fd) {
+        if(fd >= 0) {
+            OPEN_FILES.incrementAndGet();
+        }
+        return fd;
+    }
+
+    /**
+     * Gives up tracking WITHOUT closing: the HTTP/2 session owns this descriptor
+     * now and frees it natively, so counting it here would climb for ever.
+     *
+     * The count means "descriptors this side still has to close" -- anything the
+     * session holds is reported separately by Http2.pendingBodyFiles(). Mixing
+     * the two made an ordinary h2 GET look like a leak, which is how this
+     * distinction got noticed.
+     */
+    static void handOverFile(int fd) {
+        if(fd >= 0) {
+            OPEN_FILES.decrementAndGet();
+        }
+    }
+
     static void closeFile(int fd) {
         if(fd >= 0) {
+            OPEN_FILES.decrementAndGet();
             FileIo.close(fd);
         }
     }

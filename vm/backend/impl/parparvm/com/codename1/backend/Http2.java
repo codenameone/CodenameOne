@@ -199,6 +199,17 @@ public final class Http2 {
     }
 
     /**
+     * The ceiling for outstanding FILE-backed bodies across the process.
+     *
+     * Enforced natively for the same reason as the byte ceiling: the slot has to
+     * be taken in the same step as the descriptor, or every worker finishing at
+     * once passes the check before any of them counts.
+     */
+    public static void setMaxFileBodies(int limit) {
+        setMaxFileBodiesImpl(limit);
+    }
+
+    /**
      * Responds with a range of an open file, without reading it into the heap.
      *
      * HTTP/2 cannot use sendfile -- the bytes have to become DATA frames -- but that
@@ -212,13 +223,21 @@ public final class Http2 {
      * The descriptor is owned by the session from here: it is closed when the stream
      * reaches EOF, when it is reset early, and when the session is torn down.
      */
-    public void respondFile(int streamId, int status, String contentType, List extraHeaders,
+    public boolean respondFile(int streamId, int status, String contentType, List extraHeaders,
             int fd, long offset, long length) throws IOException {
-        if(respondFileImpl(session, streamId, String.valueOf(status),
-                headerLines(contentType, extraHeaders), fd, offset, length) != 0) {
+        int rc = respondFileImpl(session, streamId, String.valueOf(status),
+                headerLines(contentType, extraHeaders), fd, offset, length);
+        if(rc == OVER_BODY_BUDGET) {
+            // The descriptor ceiling was reached and NOTHING was taken -- the
+            // caller still owns the fd and has to close it. Reported rather than
+            // thrown because it is an ordinary load condition.
+            return false;
+        }
+        if(rc != 0) {
             throw new IOException("Could not submit an HTTP/2 file response on stream "
                     + streamId);
         }
+        return true;
     }
 
     /**
@@ -329,6 +348,8 @@ public final class Http2 {
     private static native int respondFileImpl(long session, int streamId, String status,
             String headerLines, int fd, long offset, long length);
     private static native void setMaxBodyBytesImpl(long limit);
+
+    private static native void setMaxFileBodiesImpl(int limit);
 
     private static native int respondImpl(long session, int streamId, String status,
                                           String headerLines, byte[] body);

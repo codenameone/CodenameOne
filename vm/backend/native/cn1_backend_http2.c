@@ -163,6 +163,31 @@ static _Atomic long cn1H2PendingBodyBytes = 0;
    below the limit and then both allocate. Set once from Java at startup. */
 static _Atomic long cn1H2MaxBodyBytes = 0;
 
+/* The ceiling cn1H2OpenFileBodies is reserved against, or 0 for none. Same
+   reasoning as the byte ceiling above: tested in Java and taken in C is two
+   steps with a gap, so every worker finishing a file response at once passed
+   the check before any of them incremented, and the process-wide cap was really
+   the cap plus one per concurrent worker -- each holding a DESCRIPTOR. */
+static _Atomic long cn1H2MaxFileBodies = 0;
+
+/* Reserves one descriptor slot, atomically. Returns 0 when the ceiling is
+   reached, in which case nothing is taken. */
+static int cn1H2ReserveFileBody(void) {
+    long limit = atomic_load_explicit(&cn1H2MaxFileBodies, memory_order_relaxed);
+    long current = atomic_load_explicit(&cn1H2OpenFileBodies, memory_order_relaxed);
+    for(;;) {
+        if(limit > 0 && current + 1 > limit) {
+            return 0;
+        }
+        if(atomic_compare_exchange_weak_explicit(&cn1H2OpenFileBodies, &current,
+                                                 current + 1,
+                                                 memory_order_relaxed,
+                                                 memory_order_relaxed)) {
+            return 1;
+        }
+    }
+}
+
 /* Reserves `bytes` against the ceiling, atomically. Returns 0 when the
    reservation would cross it, in which case nothing is added. */
 static int cn1H2ReserveBodyBytes(long bytes) {
@@ -708,6 +733,11 @@ JAVA_VOID com_codename1_backend_Http2_setMaxBodyBytesImpl___long(CODENAME_ONE_TH
     atomic_store_explicit(&cn1H2MaxBodyBytes, (long)limit, memory_order_relaxed);
 }
 
+/* The ceiling for outstanding file-backed response bodies across the process. */
+JAVA_VOID com_codename1_backend_Http2_setMaxFileBodiesImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_INT limit) {
+    atomic_store_explicit(&cn1H2MaxFileBodies, (long)limit, memory_order_relaxed);
+}
+
 /* Takes everything nghttp2 wants written, and empties the buffer. */
 JAVA_OBJECT com_codename1_backend_Http2_drainImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
@@ -1113,6 +1143,13 @@ JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String
         free(headerCopy);
         return -1;
     }
+    /* RESERVED before the descriptor is taken, not counted after. */
+    if(!cn1H2ReserveFileBody()) {
+        free(pending);
+        free(statusCopy);
+        free(headerCopy);
+        return -2;
+    }
     pending->streamId = streamId;
     pending->data = NULL;
     pending->fd = fd;
@@ -1121,7 +1158,6 @@ JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String
     pending->offset = 0;
     pending->next = s->bodies;
     s->bodies = pending;
-    atomic_fetch_add_explicit(&cn1H2OpenFileBodies, 1, memory_order_relaxed);
 
     provider.source.ptr = pending;
     provider.read_callback = cn1H2ReadBody;

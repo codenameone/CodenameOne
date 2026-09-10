@@ -1578,6 +1578,10 @@ class BackendHttpIntegrationTest {
 
     /** The :status of one h2c GET, decoded from the HEADERS block. */
     private int h2StatusFor(int onPort, String path) throws Exception {
+        return h2StatusFor(onPort, path, "GET");
+    }
+
+    private int h2StatusFor(int onPort, String path, String method) throws Exception {
         Socket socket = new Socket();
         socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
         socket.setSoTimeout(20000);
@@ -1593,7 +1597,7 @@ class BackendHttpIntegrationTest {
             windowUpdate[3] = (byte) (increment & 0xff);
             out.write(frame(8, 0, 0, windowUpdate));
             ByteArrayOutputStream block = new ByteArrayOutputStream();
-            hpackLiteral(block, ":method", "GET");
+            hpackLiteral(block, ":method", method);
             hpackLiteral(block, ":path", path);
             hpackLiteral(block, ":scheme", "http");
             hpackLiteral(block, ":authority", "127.0.0.1");
@@ -1620,9 +1624,7 @@ class BackendHttpIntegrationTest {
                     break;
                 }
                 if (type == 1 && payload.length > 0) {
-                    // 0x88 is the indexed :status 200; 503 has no static index, so
-                    // it arrives as a literal on name index 8.
-                    status = (payload[0] & 0xff) == 0x88 ? 200 : 503;
+                    status = hpackStatus(payload);
                     done = (flags & 0x01) != 0;
                 } else if (type == 0) {
                     done = (flags & 0x01) != 0;
@@ -1706,6 +1708,55 @@ class BackendHttpIntegrationTest {
         } finally {
             socket.close();
         }
+    }
+
+    @Test
+    @DisplayName("an h2 HEAD of a static file closes its descriptor exactly once")
+    void http2HeadOfAFileClosesItOnce() throws Exception {
+        // A review reported this as a LEAK: the bodiless branch never closes the
+        // descriptor, so repeated HEADs exhaust the process. It is not -- the
+        // responseBodyFor() call below that branch closes it in a finally, which
+        // is why it is called at all on a path that wants no body.
+        //
+        // Adding a close there anyway made it a DOUBLE close, and this is what
+        // says so: the count runs NEGATIVE, one per request. That is worse than
+        // the reported bug, because a descriptor number is reusable the moment
+        // the first close returns and the second lands on whoever took it.
+        //
+        // Both directions are pinned here on purpose. Zero is the answer; a
+        // positive number is the leak the review predicted and a negative one is
+        // the "fix" for it.
+        int before = openStaticFiles();
+        for (int i = 0; i < 10; i++) {
+            assertEquals(200, h2StatusFor(port, "/static/big.bin", "HEAD"),
+                    "the HEAD itself must be answered");
+        }
+        assertEquals(before, openStaticFiles(),
+                "ten HEADs must leave the descriptor count exactly where it was");
+    }
+
+    /** The server's own count of descriptors handed out and not yet closed. */
+    private int openStaticFiles() throws Exception {
+        String metrics = body(request("GET", "/healthz", null, null));
+        int at = metrics.indexOf("\"openStaticFiles\"");
+        assertTrue(at >= 0, "the server does not report openStaticFiles: " + metrics);
+        int colon = metrics.indexOf(':', at);
+        int end = colon + 1;
+        // The MINUS matters. A first version scanned for digits only, so the -10
+        // that a double close produces was read as 10 and reported as the leak
+        // being looked for -- the measurement agreed with the hypothesis by
+        // discarding the character that disproved it.
+        while (end < metrics.length() && "-0123456789".indexOf(metrics.charAt(end)) < 0) {
+            end++;
+        }
+        int start = end;
+        if (end < metrics.length() && metrics.charAt(end) == '-') {
+            end++;
+        }
+        while (end < metrics.length() && "0123456789".indexOf(metrics.charAt(end)) >= 0) {
+            end++;
+        }
+        return Integer.parseInt(metrics.substring(start, end));
     }
 
     @Test
@@ -1978,6 +2029,67 @@ class BackendHttpIntegrationTest {
                 }
                 if (index == nameIndex) {
                     return hpackDigits(block, valueAt);
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * The :status of a HEADERS block, decoded rather than guessed.
+     *
+     * A first version read "first byte is 0x88, so 200, otherwise 503". That is
+     * true only when nghttp2 happens to emit the indexed form first, and a 200
+     * carrying content-length did not -- so a perfectly good response was
+     * reported as the failure the test was looking for, which is the worst
+     * direction for a guess to be wrong in.
+     *
+     * :status occupies static-table entries 8 through 14 (200, 204, 206, 304,
+     * 400, 404, 500); anything else arrives as a literal against name index 8.
+     */
+    private static int hpackStatus(byte[] block) {
+        int[] indexed = { 0, 0, 0, 0, 0, 0, 0, 0, 200, 204, 206, 304, 400, 404, 500 };
+        int at = 0;
+        while (at < block.length) {
+            int b = block[at] & 0xff;
+            int prefixBits;
+            boolean hasValue;
+            if ((b & 0x80) != 0) {
+                prefixBits = 7;
+                hasValue = false;
+            } else if ((b & 0xC0) == 0x40) {
+                prefixBits = 6;
+                hasValue = true;
+            } else if ((b & 0xE0) == 0x20) {
+                prefixBits = 5;
+                hasValue = false;
+            } else {
+                prefixBits = 4;
+                hasValue = true;
+            }
+            int[] cursor = { at };
+            int index = hpackInteger(block, cursor, prefixBits);
+            if (index < 0) {
+                return -1;
+            }
+            at = cursor[0];
+            if (!hasValue && index >= 8 && index <= 14) {
+                return indexed[index];
+            }
+            if (index == 0) {
+                at = hpackSkipString(block, at);
+                if (at < 0) {
+                    return -1;
+                }
+            }
+            if (hasValue) {
+                int valueAt = at;
+                at = hpackSkipString(block, at);
+                if (at < 0) {
+                    return -1;
+                }
+                if (index == 8) {
+                    return (int) hpackDigits(block, valueAt);
                 }
             }
         }

@@ -118,9 +118,13 @@ public final class Http2 {
      * Unsupported here for the same reason the rest of this class is: the local run
      * does not terminate TLS, so it never speaks HTTP/2.
      */
-    public void respondFile(int streamId, int status, String contentType, List extraHeaders,
+    public boolean respondFile(int streamId, int status, String contentType, List extraHeaders,
             int fd, long offset, long length) throws IOException {
         throw new IOException(UNSUPPORTED);
+    }
+
+    /** No session here, so there is no descriptor ceiling to enforce. */
+    public static void setMaxFileBodies(int limit) {
     }
 
     public boolean respond(int streamId, int status, String contentType, List extraHeaders,
