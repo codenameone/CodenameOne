@@ -230,7 +230,7 @@ When attribution resolves it's also written as persistent analytics dimensions (
 
 The App Store carries no referrer parameter of its own, so on iOS a deferred install -- one where the friend didn't already have the app -- can only be matched statistically, on a coarse device profile within a short window. That match is occasionally wrong, and `getConfidence()` reports how much to trust it. Report it as an estimate, and don't pay a referral bounty on it without saying so.
 
-`Invites.setAttributionWindow(0)` switches deferred attribution off entirely if you would rather not use it.
+`Invites.setAttributionWindow(0)` switches the statistical match off if you would rather not use it. It doesn't turn deferred attribution off altogether: an exact code the device is already holding -- one that came back through the Play install referrer, or arrived on a link -- is still claimed and still reported, because there's nothing to guess about it. What the window governs is the match that needs a window to mean anything.
 
 ==== Consent
 

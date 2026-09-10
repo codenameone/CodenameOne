@@ -140,6 +140,26 @@ public class AndroidInviteNewIntentTest {
     }
 
     @Test
+    void inviteUsageInsideAsubmittedLibraryIsFoundToo() throws IOException {
+        // The scan over the application's own classes cannot see a cn1lib that
+        // encapsulates invites, so usesInvites stayed false and the whole
+        // Android integration went missing at once: no App Links filter, no
+        // onNewIntent splice, the install-referrer package deleted from the
+        // generated sources, and the Play Install Referrer dependency never
+        // selected. The library compiled against an API nothing switched on.
+        String source = source();
+        assertTrue(source.contains("INVITE_LIB_PREFIXES"),
+                "invite prefixes are not scanned inside submitted libraries");
+        assertTrue(source.contains("foldInInviteLibraryUsage"),
+                "the library scan does not fold into usesInvites");
+        // Fed to the CATALOG as well as to the flag: the flag decides the
+        // manifest and the sources, the catalog adds the dependency and the
+        // API 21 floor.
+        assertTrue(source.contains("for (String invitePrefix : foldInInviteLibraryUsage(libsDir))"),
+                "the library prefixes never reach the feature catalog");
+    }
+
+    @Test
     void theInviteReferenceOnlyExistsForAppsThatUseInvites() throws IOException {
         String source = source();
         int splice = source.indexOf("String inviteNewIntent = \"\";");

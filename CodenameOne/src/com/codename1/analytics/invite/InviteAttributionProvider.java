@@ -74,8 +74,20 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
             return;
         }
         if (!last.equals(seen)) {
-            Invites.eraseInternal();
-            Preferences.set(PREF_LAST_CLIENT_ID, seen);
+            // The baseline moves only once the erasure is durable.
+            //
+            // Recording the new id regardless meant a failed marker write ended
+            // the erasure for good: the held copy is retried by the next read of
+            // the record, but a process that exits before one loses it, and the
+            // next launch sees no change of identity, does not erase again, and
+            // finds a state indistinguishable from a fresh install -- free to
+            // start deferred attribution and be handed the same inviter back
+            // under the new id. Leaving the baseline where it is costs one
+            // repeated erasure and is the only thing here that survives the
+            // process.
+            if (Invites.eraseInternal()) {
+                Preferences.set(PREF_LAST_CLIENT_ID, seen);
+            }
         }
     }
 

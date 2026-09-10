@@ -779,6 +779,40 @@ public class AndroidGradleBuilder extends Executor {
         "com/codename1/vpn/tunnel/",
     };
 
+    /// The invite entry points, for the same library scan.
+    ///
+    /// Both of them, because an application can reference either alone: the
+    /// button without the facade, or the facade without the button. The second
+    /// is an exact class rather than a package, and matching it as a prefix is
+    /// the same answer -- a class name starts with itself.
+    private static final String[] INVITE_LIB_PREFIXES = {
+        "com/codename1/analytics/invite/",
+        "com/codename1/components/InviteButton",
+    };
+
+    /// Folds invite usage found inside submitted libraries into the scanner's
+    /// flags.
+    ///
+    /// A library that encapsulates invites was invisible to the scan over the
+    /// application's own classes, so usesInvites stayed false and every part of
+    /// the Android integration went missing at once: no App Links filter, no
+    /// onNewIntent splice, the install-referrer package deleted from the
+    /// generated sources, and the Play Install Referrer dependency never
+    /// selected. The library compiled against an API nothing had switched on.
+    ///
+    /// @param libsDir the submitted-libraries folder
+    /// @return the prefixes found, for the feature catalog
+    private java.util.Set<String> foldInInviteLibraryUsage(java.io.File libsDir) {
+        java.util.Set<String> found =
+                LibraryClassPrefixScan.prefixesFound(libsDir, INVITE_LIB_PREFIXES);
+        if (found.isEmpty()) {
+            return found;
+        }
+        debug("Invite usage found inside a submitted library: " + found);
+        usesInvites = true;
+        return found;
+    }
+
     /// Folds call and VPN usage found inside submitted libraries into the
     /// scanner's flags.
     ///
@@ -2664,6 +2698,14 @@ public class AndroidGradleBuilder extends Executor {
         // by startsWith, and a prefix starts with itself.
         for (String callVpnPrefix : callVpnFromLibraries) {
             aiAcc.consume(callVpnPrefix);
+        }
+        // Invites, for the same two reasons. The flag decides the App Links
+        // filter, the onNewIntent splice and whether the install-referrer
+        // package survives; the CATALOG is what adds the Play Install Referrer
+        // dependency and lifts minSdk to 21. Setting only the flag left the
+        // referrer sources in the project with nothing to compile them against.
+        for (String invitePrefix : foldInInviteLibraryUsage(libsDir)) {
+            aiAcc.consume(invitePrefix);
         }
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(libsDir);

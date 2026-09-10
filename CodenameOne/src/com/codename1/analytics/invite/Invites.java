@@ -1002,7 +1002,7 @@ public final class Invites {
 
     // Package private: the analytics provider hook calls this when the client
     // id changes underneath us, which is what an erasure request looks like.
-    static void eraseInternal() {
+    static boolean eraseInternal() {
         reset();
         // A tombstone, so the erasure is not undone by the next ordinary
         // launch.
@@ -1030,10 +1030,25 @@ public final class Invites {
         erased.put("state", String.valueOf(STATE_NONE_FOUND));
         erased.put("reason", REASON_ERASED);
         erased.put("delivered", "true");
-        if (writePending(erased)) {
-            state = STATE_NONE_FOUND;
-            stateLoaded = true;
+        if (!writePending(erased)) {
+            // The caller is told, because the caller is what remembers that the
+            // erasure happened.
+            //
+            // The held copy is retried by the next read of the record -- but if
+            // the process exits before one, it is gone, and the provider had
+            // already recorded the new client id as its baseline. The next
+            // launch then sees no change, does not erase again, and finds
+            // STATE_NONE: a fresh install as far as everything here is
+            // concerned, free to start deferred attribution and be handed the
+            // same inviter back. Leaving the baseline alone is what makes the
+            // erasure happen again instead.
+            Log.p("invite: the erasure marker could not be persisted; it will be applied "
+                    + "again rather than reported as done", Log.WARNING);
+            return false;
         }
+        state = STATE_NONE_FOUND;
+        stateLoaded = true;
+        return true;
     }
 
     // Package private: called from the provider when consent changes.
@@ -1950,6 +1965,18 @@ public final class Invites {
 
     private static void requestMatch(Map<String, String> pending) {
         if (!explicitlyAllowed()) {
+            // Nothing is outstanding after this, and saying so is what lets a
+            // later grant act immediately.
+            //
+            // Under OPT_OUT with no choice on record the referrer read IS
+            // permitted, so a Play install that comes back empty falls through
+            // to here -- where the statistical match needs an explicit grant
+            // and declines. The referrer's own lookupIssuedAt was still set, so
+            // onConsentChanged() saw a lookup in flight, did not start the
+            // match the grant had just permitted, and nothing retried it: the
+            // attribution stayed pending until some unrelated flush, check or
+            // relaunch happened along.
+            lookupIssuedAt = 0;
             return;
         }
         bumpAttempts(pending);
