@@ -356,6 +356,102 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void aJsonStringWhereANumberIsDeclaredIsRefused() throws Exception {
+        // The value has already been TYPED by the parser here, so "7" against an
+        // int field is the client disagreeing with the contract -- and the
+        // generated client could never have produced it. Parsing it anyway left
+        // the handler unable to tell a number from a string that looks like one.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.Counter",
+                "package com.example;\n"
+                + "public class Counter {\n"
+                + "    public int count;\n"
+                + "    public Counter() {}\n"
+                + "}\n");
+        sources.put("com.example.CountApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface CountApi {\n"
+                + "    @POST(\"/count\")\n"
+                + "    void put(@Body Counter c, OnComplete<Response<Counter>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Method fromMap = loader.loadClass("com.example.CounterJson").getMethod("fromMap", Map.class);
+
+        Map asNumber = new java.util.LinkedHashMap();
+        asNumber.put("count", Long.valueOf(7));
+        assertEquals(7, loader.loadClass("com.example.Counter").getField("count")
+                .get(fromMap.invoke(null, asNumber)));
+
+        Map asText = new java.util.LinkedHashMap();
+        asText.put("count", "7");
+        try {
+            fromMap.invoke(null, asText);
+            fail("a JSON string where an int is declared should be refused");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(String.valueOf(expected.getCause()),
+                    expected.getCause() instanceof IllegalArgumentException);
+        }
+
+        // An ABSENT field is still zero -- the rule is about a wrong type, not a
+        // missing one.
+        Map absent = new java.util.LinkedHashMap();
+        assertEquals(0, loader.loadClass("com.example.Counter").getField("count")
+                .get(fromMap.invoke(null, absent)));
+        loader.close();
+    }
+
+    @Test
+    public void aTextBindingStillParsesItsText() throws Exception {
+        // The other half of the rule, and the reason the two paths are separate: a
+        // QUERY parameter really does arrive as text, so parsing it is not
+        // leniency, it is the only thing that could work. Tightening the JSON
+        // decoders must not reach this.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.QueryApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface QueryApi {\n"
+                + "    @GET(\"/count\")\n"
+                + "    void get(@Query(\"n\") int n, OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.QueryApiServer");
+        final Object[] seen = new Object[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        seen[0] = args[0];
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.QueryApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+        dispatch.invoke(dispatcher, "GET", "/count?n=7", null, null);
+        assertEquals(Integer.valueOf(7), seen[0]);
+        loader.close();
+    }
+
+    @Test
     public void twoDynamicRoutesThatOverlapAreRefused() throws Exception {
         // Different shapes, and /a/b/c satisfies both. Neither is more specific, so
         // literal-first ordering cannot break the tie and dispatch answers with

@@ -1531,7 +1531,18 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("            }\n");
         sb.append("            return (int)asLong;\n");
         sb.append("        }\n");
-        sb.append("        return v == null ? 0 : Integer.parseInt(String.valueOf(v).trim());\n");
+        // A JSON STRING is not a number. These helpers decode a value the parser
+        // has already typed, so "123" where the contract declares an int is the
+        // client disagreeing with the contract -- and parsing it anyway means the
+        // handler cannot tell the two apart, while the equivalent request to the
+        // generated CLIENT could never have produced it. The text bindings are a
+        // different path on purpose: a query parameter really does arrive as text,
+        // and fromText/parseInt still parse it.
+        sb.append("        if (v != null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"a JSON number is required, not \"\n");
+        sb.append("                    + v.getClass().getName() + \": \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return 0;\n");
         sb.append("    }\n");
         sb.append("    private static short asShort(Object v) {\n");
         sb.append("        int narrowed = asInt(v);\n");
@@ -1547,8 +1558,23 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        }\n");
         sb.append("        return (byte)narrowed;\n");
         sb.append("    }\n");
-        sb.append("    private static long asLong(Object v) { return v instanceof Number ? integral(v, \"long\") : (v == null ? 0L : Long.parseLong(String.valueOf(v).trim())); }\n");
-        sb.append("    private static double asDouble(Object v) { return v instanceof Number ? ((Number)v).doubleValue() : (v == null ? 0d : Double.parseDouble(String.valueOf(v).trim())); }\n");
+        // Same rule as asInt above, and for the same reason.
+        sb.append("    private static long asLong(Object v) {\n");
+        sb.append("        if (v instanceof Number) { return integral(v, \"long\"); }\n");
+        sb.append("        if (v != null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"a JSON number is required, not \"\n");
+        sb.append("                    + v.getClass().getName() + \": \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return 0L;\n");
+        sb.append("    }\n");
+        sb.append("    private static double asDouble(Object v) {\n");
+        sb.append("        if (v instanceof Number) { return ((Number)v).doubleValue(); }\n");
+        sb.append("        if (v != null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"a JSON number is required, not \"\n");
+        sb.append("                    + v.getClass().getName() + \": \" + v);\n");
+        sb.append("        }\n");
+        sb.append("        return 0d;\n");
+        sb.append("    }\n");
         // A cast to float SATURATES: a perfectly ordinary finite 1e100 becomes
         // infinity, which is not a number JSON can express and is not the one the
         // client sent. The scalar text path refuses it; a DTO field has to as
