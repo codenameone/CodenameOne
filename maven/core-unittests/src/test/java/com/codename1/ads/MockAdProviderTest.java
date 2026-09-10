@@ -381,4 +381,68 @@ class MockAdProviderTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void overlappingAdIsRejectedAndCanRetryAfterFirstIsDisposed() {
+        MockAdProvider.install();
+        Form host = CN.getCurrentForm();
+        Command applicationBack = new Command("Application back");
+        host.setBackCommand(applicationBack);
+        InterstitialAd first = new InterstitialAd("first");
+        AppOpenAd second = new AppOpenAd("second");
+        second.setAdListener(new AdListener() {
+            @Override public void onShowFailed(AdError error) { events.add("rejected"); }
+            @Override public void onShown() { events.add("shown"); }
+            @Override public void onDismissed() { events.add("dismissed"); }
+        });
+        try {
+            first.load();
+            second.load();
+            first.show();
+            Command firstClose = host.getBackCommand();
+            second.show();
+            assertEquals(Arrays.asList("rejected"), events);
+            assertTrue(second.isLoaded(), "Rejected presentation must not consume the loaded ad");
+            assertSame(firstClose, host.getBackCommand());
+            assertEquals(1, adLayer(host).getComponentCount());
+            first.dispose();
+            assertSame(applicationBack, host.getBackCommand());
+            second.show();
+            assertEquals(Arrays.asList("rejected", "shown"), events);
+            host.getBackCommand().actionPerformed(new ActionEvent(host));
+            assertEquals(Arrays.asList("rejected", "shown", "dismissed"), events);
+            assertSame(applicationBack, host.getBackCommand());
+            assertNoAd(host);
+        } finally {
+            second.dispose();
+            first.dispose();
+        }
+    }
+
+    @FormTest
+    void disposingRejectedAdLeavesVisibleAdAndBackCommandAlone() {
+        MockAdProvider.install();
+        Form host = CN.getCurrentForm();
+        Command applicationBack = new Command("Application back");
+        host.setBackCommand(applicationBack);
+        InterstitialAd first = new InterstitialAd("first");
+        InterstitialAd second = new InterstitialAd("second");
+        try {
+            first.load();
+            second.load();
+            first.show();
+            Command firstClose = host.getBackCommand();
+            Container firstOverlay = adOverlay(host);
+            second.show();
+            second.dispose();
+            assertSame(firstClose, host.getBackCommand());
+            assertSame(firstOverlay, adOverlay(host));
+            firstClose.actionPerformed(new ActionEvent(host));
+            assertSame(applicationBack, host.getBackCommand());
+            assertNoAd(host);
+        } finally {
+            second.dispose();
+            first.dispose();
+        }
+    }
+
 }

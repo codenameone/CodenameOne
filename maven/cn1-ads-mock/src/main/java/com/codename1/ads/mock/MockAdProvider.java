@@ -177,12 +177,21 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
                 cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "An ad is already showing"));
                 return;
             }
-            loaded = false;
-            host = CN.getCurrentForm();
-            if (host == null) {
-                host = new Form();
-                host.show();
+            Form target = CN.getCurrentForm();
+            if (target == null) {
+                target = new Form();
+                target.show();
             }
+            Container targetLayer = target.getFormLayeredPane(MockAdProvider.class, true);
+            // Sessions share this layer. Reject overlap before consuming the ad
+            // or replacing the active session's Back command.
+            if (targetLayer.getComponentCount() != 0) {
+                cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "An ad is already showing"));
+                return;
+            }
+            loaded = false;
+            host = target;
+            layer = targetLayer;
             overlay = new Container(new BorderLayout());
             overlay.setGrabsPointerEvents(true);
             overlay.setUIID("Form");
@@ -199,7 +208,6 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
                 }
             };
             host.setBackCommand(closeCommand);
-            layer = host.getFormLayeredPane(MockAdProvider.class, true);
             layer.setLayout(new LayeredLayout());
             layer.add(overlay);
             host.revalidate();
