@@ -1177,7 +1177,10 @@ CalendarDayArea { background-color: transparent; padding: 0; margin: 0; }
 CalendarDate { cn1-derive: Label; color: #1c1c1e; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; }
 CalendarDate.selected { color: #ffffff; background-color: var(--accent-color, #007aff); }
 CalendarDateLabel { cn1-derive: SecondaryLabel; color: #6c6c70; text-align: center; background-color: transparent; }
-TODAY { cn1-derive: CalendarDate; color: var(--accent-color, #007aff); font-family: "native:MainBold"; }
+/* DateTimeRenderer swaps the spinner row's UIID to TODAY for the current date
+   and restores it afterwards, so this has to be the same row with an accent:
+   deriving anything else changes the row height mid-wheel. */
+TODAY { cn1-derive: SpinnerRenderer; color: var(--accent-color, #007aff); font-family: "native:MainBold"; }
 
 SpinnerSeparator { background-color: #c6c6c8; padding: 0; margin: 0; }
 TimeSpinnerHoursLabel { cn1-derive: SecondaryLabel; background-color: transparent; }
@@ -1286,9 +1289,6 @@ SpinnerSeparator.disabled { background-color: #c6c6c8; padding: 0; margin: 0; }
 StatusBarSideMenu.selected { background-color: transparent; padding: 0; margin: 0; }
 StatusBarSideMenu.pressed { background-color: transparent; padding: 0; margin: 0; }
 StatusBarSideMenu.disabled { background-color: transparent; padding: 0; margin: 0; }
-TODAY.selected { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; color: var(--accent-color, #007aff); font-family: "native:MainBold"; }
-TODAY.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; color: var(--accent-color, #007aff); font-family: "native:MainBold"; }
-TODAY.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.2mm; margin: 0.2mm; background-color: transparent; text-align: center; color: var(--accent-color, #007aff); font-family: "native:MainBold"; }
 TableCell.selected { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
 TableCell.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
 TableCell.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
@@ -1302,6 +1302,16 @@ TimeSpinnerMinutesLabel.selected { color: #000000; background-color: transparent
 TimeSpinnerMinutesLabel.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #3c3c43; background-color: transparent; }
 TimeSpinnerMinutesLabel.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #3c3c43; background-color: transparent; }
 TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.2mm 1.5mm 1.2mm 1.5mm; background-color: transparent; }
+
+
+/* Every UIID above is completed to all four states below. A missing state is
+   not inherited: cn1-derive is read at base level only, and a lookup of
+   <UIID>.press# that finds nothing resolves against the global default style,
+   so the control drops its whole appearance for the duration of that state.
+   Where a state is meant to differ it is declared above and left alone here. */
+MenuButtonRight.selected { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
+MenuButtonRight.pressed { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
+MenuButtonRight.disabled { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
 
 @media (prefers-color-scheme: dark) {
     Component { color: #ffffff; background-color: #000000; }
@@ -1391,7 +1401,6 @@ TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2
     CalendarDate { color: #ffffff; background-color: transparent; }
     CalendarDate.selected { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); }
     CalendarDateLabel { color: #8e8e93; background-color: transparent; }
-    TODAY { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
     SpinnerSeparator { background-color: #38383a; }
     ListRendererFocus { background-color: rgba(10,132,255,0.22); }
     CommandFocus { background-color: rgba(10,132,255,0.22); }
@@ -1620,9 +1629,6 @@ TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2
     SpinnerSeparator.selected { background-color: #38383a; }
     SpinnerSeparator.pressed { background-color: #38383a; }
     SpinnerSeparator.disabled { background-color: #38383a; }
-    TODAY.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
-    TODAY.pressed { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
-    TODAY.disabled { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
     TableCell.selected { color: #ffffff; background-color: transparent; }
     TableCell.pressed { color: #ffffff; background-color: transparent; }
     TableCell.disabled { color: #ffffff; background-color: transparent; }
@@ -1667,4 +1673,12 @@ TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2
     TimeSpinnerMinutesLabel.selected { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
     TimeSpinnerMinutesLabel.pressed { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
     TimeSpinnerMinutesLabel.disabled { color: #000000; background-color: transparent; padding: 1mm 2mm 1mm 2mm; margin: 0; font-family: "native:MainRegular"; color: #8e8e93; background-color: transparent; }
+
+    /* Dark counterparts for every rule above that names a colour. A light-only
+       state rule is not skipped in dark mode -- with no $Dark entry the light
+       one is what resolves -- so a hard-coded light foreground would be used
+       against the dark surface. */
+    MenuButtonRight.selected { color: var(--accent-color-dark, #0a84ff); background-color: rgba(58,58,60,0.78); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
+    MenuButtonRight.pressed { color: var(--accent-color-dark, #0a84ff); background-color: rgba(58,58,60,0.78); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
+    MenuButtonRight.disabled { color: var(--accent-color-dark, #0a84ff); background-color: rgba(58,58,60,0.78); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
 }
