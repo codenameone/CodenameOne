@@ -166,6 +166,28 @@ public class OpenContainer<T> extends StatelessWidget {
         return surface;
     }
 
+    /// Distinguishes one open container's surface from every other one on screen.
+    private static int surfaceSerial;
+
+    /**
+     * Gives this container's closed surface a name the transition can find it by, and
+     * returns that name (null when it has no component of its own to grow from).
+     */
+    private static String nameClosedSurface(BuildContext context) {
+        if (!(context instanceof com.codename1.flutter.Element)) {
+            return null;
+        }
+        com.codename1.flutter.RenderElement r = com.codename1.flutter.RenderElement
+                .findRenderElement((com.codename1.flutter.Element) context);
+        com.codename1.ui.Component c = r == null ? null : r.component();
+        if (c == null) {
+            return null;
+        }
+        String name = "cn1-open-container-" + (++surfaceSerial);
+        c.setName(name);
+        return name;
+    }
+
     /** Pushes the opened page; closing it pops back and reports through {@code onClosed}. */
     private void open(BuildContext context) {
         if (openBuilder == null) {
@@ -173,11 +195,22 @@ public class OpenContainer<T> extends StatelessWidget {
         }
         // The route carries the container transform's identity and duration, so the
         // Navigator animates it as an expanding surface rather than as a page push.
+        // Named at TAP time, not at build time. The name has to identify the one surface
+        // the user actually touched -- a mail list is a column of these -- and a widget is
+        // rebuilt often enough that a name assigned during build belongs to whichever
+        // instance built last. The element under this context is stable and is the one in
+        // front of the user right now.
+        final String source = nameClosedSurface(context);
         com.codename1.flutter.navigation.MaterialPageRoute<T> route =
                 new com.codename1.flutter.navigation.MaterialPageRoute<T>() {
                     @Override
                     public boolean isContainerTransform() {
                         return true;
+                    }
+
+                    @Override
+                    public String containerTransformSource() {
+                        return source;
                     }
 
                     @Override

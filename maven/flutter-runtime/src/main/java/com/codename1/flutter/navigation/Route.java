@@ -77,6 +77,17 @@ public abstract class Route<T> {
     }
 
     /**
+     * The name of the component this route grows out of, or null.
+     *
+     * <p>Set for a container transform: the transition grows the incoming page from the
+     * bounds of the thing that was tapped, so it needs to be able to find that thing in
+     * the outgoing Form.</p>
+     */
+    public String containerTransformSource() {
+        return null;
+    }
+
+    /**
      * Whether this route is an expanding container transform rather than a page push. The
      * real effect grows the tapped card into the page; a route is a Form of its own here,
      * so the closest honest approximation is a cross-fade, which at least reads as the

@@ -189,6 +189,13 @@ public class Navigator extends StatelessWidget {
             FlutterUI.unmountTree(e.rootElement);
         }
         if (e.previousForm != null) {
+            // The way out mirrors the way in. showBack() plays the transition of the form
+            // being RETURNED TO, in reverse -- and that form carries whatever animation
+            // brought IT on screen, which has nothing to do with the route being dismissed.
+            // Leaving it alone is why closing the compose page slid the inbox in from the
+            // side after the compose page had grown out of the button: the push was a
+            // container transform and the pop was the inbox's own page transition.
+            RouteTransitions.apply(e.previousForm, e.route);
             e.previousForm.showBack();
         }
     }
