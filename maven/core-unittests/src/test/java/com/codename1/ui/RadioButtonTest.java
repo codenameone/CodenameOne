@@ -128,6 +128,32 @@ class RadioButtonTest extends UITestBase {
     }
 
     @Test
+    void testTogglingOffAndOnInsideAGroupLeavesTheGroupHoldingTheToggleUiid() {
+        // The group saves what it replaced and restores it on removal, so both
+        // directions of setToggle have to keep that saved name in step. Only the
+        // disable direction did: re-enabling saw a group alias as the live UIID,
+        // recognised nothing, and left the group holding RadioButton for a control
+        // that was a toggle again.
+        ComponentGroup group = new ComponentGroup();
+        group.setForceGroup(true);
+        group.setHorizontal(true);
+        RadioButton first = new RadioButton("One");
+        RadioButton last = new RadioButton("Two");
+        first.setToggle(true);
+        last.setToggle(true);
+        group.addComponent(first);
+        group.addComponent(last);
+
+        first.setToggle(false);
+        first.setToggle(true);
+
+        assertTrue(first.isToggle());
+        group.removeComponent(first);
+        assertEquals("ToggleButton", first.getUIID(),
+                "a control that is a toggle again must not leave the group as a radio");
+    }
+
+    @Test
     void testCreateToggleAddsToGroupAndSetsToggleUiid() {
         ButtonGroup group = new ButtonGroup();
         RadioButton radio = RadioButton.createToggle("Choice", group);

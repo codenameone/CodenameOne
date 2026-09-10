@@ -1065,6 +1065,16 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
                 preToggleUIID = uiid;
                 setUIID("ToggleButton");
             }
+            // Grouped, the live UIID is the group's alias and says nothing about
+            // what this control is, so the name that matters is the one the group
+            // saved to restore on removal. Entering toggle mode has to move that to
+            // ToggleButton, exactly as leaving it moves it back, or a control
+            // toggled while inside a group is handed a radio UIID on the way out.
+            Object saved = getClientProperty("$origUIID");
+            if (saved instanceof String && !isToggleUIID((String) saved)) {
+                preToggleUIID = (String) saved;
+                putClientProperty("$origUIID", "ToggleButton");
+            }
         } else if (preToggleUIID != null) {
             // Two places can be holding the toggle UIID, and which ones depends on
             // the group this control is in -- horizontal groups rename members to
