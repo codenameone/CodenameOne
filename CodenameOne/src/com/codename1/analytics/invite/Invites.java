@@ -1286,9 +1286,18 @@ public final class Invites {
         // moment consent was granted. A user who answers the prompt a week
         // later would then have run a fresh fingerprint lookup and reported
         // invite_install for somebody else's click.
+        //
+        // Started here when there is no prior record, which is the ordinary
+        // shape of a first launch by someone who had already refused: nothing
+        // has run yet, so nothing wrote one. Copying nulls left the reopened
+        // marker with expiresAt 0, and beginDeferred reads that as "no window",
+        // so an arbitrarily old install could still run a fingerprint match.
         Map<String, String> before = InviteStore.read(InviteStore.PENDING);
-        InviteStore.put(done, "firstLaunch", InviteStore.get(before, "firstLaunch", null));
-        InviteStore.put(done, "expiresAt", InviteStore.get(before, "expiresAt", null));
+        long markedAt = System.currentTimeMillis();
+        done.put("firstLaunch", InviteStore.get(before, "firstLaunch",
+                String.valueOf(markedAt)));
+        done.put("expiresAt", InviteStore.get(before, "expiresAt",
+                String.valueOf(markedAt + attributionWindow)));
         // And the delivery state, for the same reason the resolved record
         // inherits it: a reopened lookup that ends terminally has still been
         // answered once, and dropping the flag here delivered a second
@@ -1350,13 +1359,19 @@ public final class Invites {
         return InviteStore.get(marker, "reason", REASON_NO_MATCH);
     }
 
-    private static void markUnavailableDelivered() {
+    // Returns false when the delivery could not be recorded. Same reasoning as
+    // the resolved side: deliveredThisRun only suppresses duplicates until the
+    // process exits, so telling the listener about a delivery the device cannot
+    // remember means telling it again on the next launch.
+    private static boolean markUnavailableDelivered() {
         Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
         if (marker == null) {
-            return;
+            // Nothing durable to mark. The answer is still terminal in memory
+            // and the run's own guard prevents a repeat within it.
+            return true;
         }
         marker.put("delivered", "true");
-        InviteStore.write(InviteStore.PENDING, marker);
+        return InviteStore.write(InviteStore.PENDING, marker);
     }
 
     private static Map<String, String> pendingRecord() {
@@ -2007,7 +2022,15 @@ public final class Invites {
             if (retry != null) {
                 int spent = InviteStore.getInt(retry, "attempts", 0);
                 retry.put("attempts", String.valueOf(spent > 0 ? spent - 1 : 0));
-                InviteStore.write(InviteStore.PENDING, retry);
+                if (!InviteStore.write(InviteStore.PENDING, retry)) {
+                    // The refund failed for the same reason the attribution did
+                    // -- the store is unwritable -- so the durable count is
+                    // still at the cap and the next flush would settle the
+                    // install rather than retry. Nothing here can fix that, so
+                    // it is said out loud instead of being assumed away.
+                    Log.p("invite: the attempt could not be refunded, so a later retry may "
+                            + "settle this install instead of asking again", Log.WARNING);
+                }
             }
             Log.p("invite: the attribution could not be persisted, so the lookup stays "
                     + "pending and will be retried", Log.WARNING);
@@ -2126,9 +2149,18 @@ public final class Invites {
         if (a == null) {
             return;
         }
-        deliveredThisRun = true;
         r.put("delivered", "true");
-        InviteStore.write(InviteStore.ATTRIBUTION, r);
+        if (!InviteStore.write(InviteStore.ATTRIBUTION, r)) {
+            // deliveredThisRun only suppresses duplicates until the process
+            // exits, so calling the listener on a delivery the device cannot
+            // remember means inviteReceived() fires again on the next launch --
+            // against the exactly-once contract. Better to deliver late, on a
+            // launch where the flag can be written, than twice.
+            Log.p("invite: the delivery could not be recorded, so the attribution will be "
+                    + "delivered on a later launch instead of twice", Log.WARNING);
+            return;
+        }
+        deliveredThisRun = true;
         try {
             listener.inviteReceived(a);
         } catch (Throwable t) {
@@ -2153,8 +2185,12 @@ public final class Invites {
             undelivered = reason;
             return;
         }
+        if (!markUnavailableDelivered()) {
+            Log.p("invite: the delivery could not be recorded, so this answer will be "
+                    + "reported on a later launch instead of twice", Log.WARNING);
+            return;
+        }
         deliveredThisRun = true;
-        markUnavailableDelivered();
         try {
             target.attributionUnavailable(reason);
         } catch (Throwable t) {

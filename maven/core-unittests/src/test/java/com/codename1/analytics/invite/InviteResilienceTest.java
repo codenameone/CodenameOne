@@ -1379,4 +1379,52 @@ class InviteResilienceTest extends UITestBase {
         assertTrue(Invites.getState() != Invites.STATE_NONE_FOUND,
                 "the state was committed without its marker");
     }
+
+    @Test
+    @EdtTest
+    void aFirstTimeDenialStartsItsOwnClock() {
+        // Someone who had already refused reaches this on a first launch, when
+        // nothing has written a pending record yet. Copying the absent clock
+        // left expiresAt at 0, which beginDeferred reads as "no window", so an
+        // arbitrarily old install could still run a fingerprint match after a
+        // later grant.
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_DECLINED, Invites.getState());
+
+        Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(marker);
+        assertTrue(InviteStore.getLong(marker, "expiresAt", 0) > System.currentTimeMillis(),
+                "the denial marker carries no window, so a reopening would have none");
+        assertTrue(InviteStore.getLong(marker, "firstLaunch", 0) > 0);
+    }
+
+    @FormTest
+    void aDeliveryThatCannotBeRecordedIsNotMadeTwice() {
+        // deliveredThisRun suppresses duplicates only until the process exits,
+        // so calling the listener on a delivery the device cannot remember
+        // means inviteReceived() fires again on the next launch.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("ONCE1", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+
+        final int[] received = new int[1];
+        InviteListener l = new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+                received[0]++;
+            }
+
+            public void attributionUnavailable(String reason) {
+            }
+        };
+        InviteStore.failNextWriteForTest(InviteStore.ATTRIBUTION);
+        Invites.setInviteListener(l);
+        assertEquals(0, received[0],
+                "the listener was told about a delivery the device cannot remember");
+
+        // A later launch, with storage working, delivers it exactly once.
+        Invites.forgetLoadedState();
+        Invites.setInviteListener(null);
+        Invites.setInviteListener(l);
+        assertEquals(1, received[0], "the attribution was never delivered at all");
+    }
 }
