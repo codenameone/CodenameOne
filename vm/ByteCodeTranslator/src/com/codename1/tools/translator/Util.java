@@ -626,6 +626,39 @@ public class Util {
      * NativeSignatureVerifier.mode() already reached for getenv for exactly this
      * reason; this generalizes it rather than adding a second convention.
      */
+    /**
+     * Memoized ParparVM name mangling: '/' and '$' both become '_'.
+     *
+     * The tree contains 95 hand-written copies of
+     * {@code x.replace('/', '_').replace('$', '_')}, 54 of them in the
+     * per-instruction emit classes (Invoke, Field, CustomInvoke, Ldc), so the
+     * SAME owner string is re-mangled once per emitted instruction. The distinct
+     * inputs are bounded by the class count (5782 on the hellocodenameone
+     * corpus) while the calls run into the millions.
+     *
+     * String.replace already returns {@code this} when the character is absent,
+     * so the '$' pass is usually free; the '/' pass is the one that allocates a
+     * char[] and a String every time. Caching turns that into one lookup.
+     *
+     * Not synchronized: the translator parses and emits on a single thread --
+     * Parser.writeOutput is one sequential loop with no executor and a single
+     * writeFile call site.
+     */
+    private static final java.util.Map<String, String> MANGLE_CACHE =
+            new java.util.HashMap<String, String>();
+
+    public static String mangle(String name) {
+        if (name == null) {
+            return null;
+        }
+        String m = MANGLE_CACHE.get(name);
+        if (m == null) {
+            m = name.replace('/', '_').replace('$', '_');
+            MANGLE_CACHE.put(name, m);
+        }
+        return m;
+    }
+
     public static String getProperty(String key, String defaultValue) {
         String value = System.getProperty(key);
         if (value == null) {

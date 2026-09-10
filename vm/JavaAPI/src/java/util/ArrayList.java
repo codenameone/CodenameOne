@@ -361,6 +361,75 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         }
     }
 
+    /**
+     * Direct-array iterator, overriding AbstractList's generic SimpleListIterator.
+     *
+     * The inherited one was the single hottest method in a large translation --
+     * 16.45% of mutator self-time on the 5782-class hellocodenameone corpus, more
+     * than twice the next entry. Three costs per element, none inherent:
+     *
+     *   - a try/catch around the body, to turn IndexOutOfBoundsException into
+     *     NoSuchElementException. ParparVM has no zero-cost exception tables, so a
+     *     try block is a setjmp -- once per element, in the hottest loop in the
+     *     program. An explicit bounds test costs a compare.
+     *   - size() and get() as VIRTUAL calls on the outer list, with no JIT to
+     *     inline them.
+     *   - the index recomputed as size() - numLeft every iteration instead of
+     *     being carried in a cursor.
+     *
+     * MEASURED after: the iteration path fell from 25.5% of mutator self-time to
+     * 12.4%, ArrayList.get from 7.42% to 0.55%, and _setjmp from 1.61% to zero.
+     *
+     * Semantics are unchanged: same ConcurrentModificationException on structural
+     * modification, same NoSuchElementException past the end, remove() still
+     * works. Reads array[firstIndex + i] exactly as get(int) does.
+     *
+     * Applies to every `for (x : list)` in every translated application whatever
+     * the loop's static type, because dispatch lands on the concrete ArrayList.
+     */
+    private class ArrayListIterator implements Iterator<E> {
+        private int cursor;
+        private int lastReturned = -1;
+        private int expectedModCount = modCount;
+
+        public boolean hasNext() {
+            return cursor < size;
+        }
+
+        public E next() {
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+            }
+            int i = cursor;
+            if (i >= size) {
+                throw new NoSuchElementException();
+            }
+            cursor = i + 1;
+            lastReturned = i;
+            return array[firstIndex + i];
+        }
+
+        public void remove() {
+            if (lastReturned < 0) {
+                throw new IllegalStateException();
+            }
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+            }
+            ArrayList.this.remove(lastReturned);
+            if (lastReturned < cursor) {
+                cursor--;
+            }
+            lastReturned = -1;
+            expectedModCount = modCount;
+        }
+    }
+
+    @Override
+    public Iterator<E> iterator() {
+        return new ArrayListIterator();
+    }
+
     @Override
     public E get(int location) {
         if (location < 0 || location >= size) {

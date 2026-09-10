@@ -804,6 +804,26 @@ public class Parser extends ClassVisitor {
                 neliminated++;
             }
 
+            // Fuse all-String StringBuilder concat chains into String.cn1ConcatN
+            // BEFORE the cull, not during code generation.
+            //
+            // The cull decides what to keep from the dependency graph, and the graph
+            // is only told about a call when the instruction is added. A rewrite that
+            // runs later -- inside BytecodeMethod.optimize(), which happens during
+            // generateCCode -- inserts calls to methods the cull has already deleted,
+            // and a deleted method is emitted as `return 0;`. That is not a build
+            // error: cn1ConcatN silently answered null, java.io.File got a null path,
+            // and the translator died in File.getParentFile with a SIGSEGV nowhere
+            // near a concat. Running here, the references exist before anything is
+            // eliminated. See BytecodeMethod.fuseStringBuilderConcat.
+            if (BytecodeMethod.optimizerOn) {
+                for (ByteCodeClass fuseCls : classes) {
+                    for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
+                        fuseMtd.fuseStringBuilderConcat();
+                    }
+                }
+            }
+
             // loop over methods and start eliminating the body of unused methods
             if (BytecodeMethod.optimizerOn) {
                 if(ByteCodeTranslator.verbose) {

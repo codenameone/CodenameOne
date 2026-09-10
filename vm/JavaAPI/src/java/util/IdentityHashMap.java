@@ -161,15 +161,16 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         }
 
         public boolean hasNext() {
-            while (position < associatedMap.elementData.length) {
-                // if this is an empty spot, go to the next one
-                if (associatedMap.elementData[position] == null) {
-                    position += 2;
-                } else {
-                    return true;
-                }
+            // elementData hoisted into a local: it was re-loaded from the outer map
+            // on every comparison AND on every array access, twice per probe step.
+            Object[] data = associatedMap.elementData;
+            int p = position;
+            int len = data.length;
+            while (p < len && data[p] == null) {
+                p += 2;
             }
-            return false;
+            position = p;
+            return p < len;
         }
 
         void checkConcurrentMod() throws ConcurrentModificationException {
@@ -180,13 +181,37 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
 
         @SuppressWarnings("unchecked")
         public E next() {
-            checkConcurrentMod();
-            if (!hasNext()) {
+            // The concurrent-modification test and the null-skipping scan are
+            // INLINED here rather than reached through checkConcurrentMod() and
+            // hasNext().
+            //
+            // An enhanced-for already pays two interface dispatches per element
+            // (hasNext then next); routing next() through two more non-inlined
+            // calls made it four, and ParparVM has no JIT to fold them away.
+            // MEASURED on the 5782-class hellocodenameone translation:
+            // IdentityHashMapIterator.next 6.43% of mutator self-time with
+            // checkConcurrentMod a further 1.84%, second only to the ArrayList
+            // iterator.
+            //
+            // Behaviour is unchanged: same ConcurrentModificationException on a
+            // structural change, same NoSuchElementException past the end, and
+            // position still advances past empty slots exactly as hasNext() did.
+            if (expectedModCount != associatedMap.modCount) {
+                throw new ConcurrentModificationException();
+            }
+            Object[] data = associatedMap.elementData;
+            int p = position;
+            int len = data.length;
+            while (p < len && data[p] == null) {
+                p += 2;
+            }
+            if (p >= len) {
+                position = p;
                 throw new NoSuchElementException();
             }
 
-            lastPosition = position;
-            position += 2;
+            lastPosition = p;
+            position = p + 2;
             canRemove = true;
 
             if (kind == KIND_KEY) {

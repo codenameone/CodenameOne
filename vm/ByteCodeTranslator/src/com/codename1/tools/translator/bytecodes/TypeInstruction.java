@@ -254,9 +254,15 @@ public class TypeInstruction extends Instruction {
                     // reaches it as a root (its pointer rides the operand stack) and
                     // scans its fields, so any heap objects it references stay live.
                     // It is never freed; it simply dies when the frame unwinds.
-                    b.append("if(__builtin_expect(!class__");
+                    // ACQUIRE: this guard SKIPS the initialiser when the flag is
+                    // set, so it never takes the class monitor and cannot rely on
+                    // the monitor's release. Pairs with the __ATOMIC_RELEASE store
+                    // in ByteCodeClass. A plain load here let a thread see the flag
+                    // set while the vtable / classToInterfaceMap rows it describes
+                    // were still invisible.
+                    b.append("if(__builtin_expect(!__atomic_load_n(&class__");
                     b.append(type);
-                    b.append(".initialized, 0)) __STATIC_INITIALIZER_");
+                    b.append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
                     b.append(type);
                     b.append("(threadStateData); memset(&__cn1stk_");
                     b.append(stackAllocId);

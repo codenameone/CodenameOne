@@ -6328,6 +6328,11 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_PACING_GROWTH_FLOOR_BYTES
 #define CN1_PACING_GROWTH_FLOOR_BYTES (512LL*1024*1024)
 #endif
+// Ceiling on how far a mutator may run ahead of a cycle in flight, regardless of
+// how much RAM the host has. See the measurement table in cn1BibopPacingCap.
+#ifndef CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES
+#define CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES (1024L*1024*1024)
+#endif
 // How stale a below-floor footprint reading may be before the bound re-probes it. The
 // probe is task_info on Apple and one /proc read on Linux -- a microsecond or two -- and
 // it is taken at most once per interval across the whole process, and only when the bound
@@ -6602,8 +6607,73 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
         if(capCeiling < base) {
             capCeiling = base;
         }
+        // FLOOR the clamp at the point where run-ahead stops paying, when the host
+        // can afford it.
+        //
+        // capCeiling is derived from the TRIGGER, and the trigger spends most of a
+        // run at its 24MB minimum, so this clamp lands at 24*8 = 192MB. Confirmed
+        // at runtime, not inferred: `[PACING] minCapKb=196608`. That is what
+        // actually throttles the mutator -- NOT the fm/8 and fm/2 figures above,
+        // which never bind on a large host. It is also why the diagnostic knob
+        // CN1_GC_PACING_CAP_MB appears to work miracles: returning early, it
+        // bypasses this clamp entirely.
+        //
+        // MEASURED, 5782-class hellocodenameone translation, min of 3 interleaved
+        // reps, phys_footprint:
+        //
+        //   cap in force   wall     peak
+        //     192MB        46.3s    9736MB     <- this clamp, as it stood
+        //    1024MB        23.8s    8325MB
+        //    2048MB        22.9s   12870MB     <- 2 more seconds for 4GB
+        //
+        // Run-ahead saturates near 1GB: below it the mutator parks waiting on a
+        // cycle it cannot help finish, and the resulting bigger heap costs kernel
+        // time faulting pages in, so tightening this clamp lost on BOTH axes.
+        //
+        // Kept proportionate rather than absolute: on a host where fm/8 is already
+        // under the saturation point -- a phone, a container, the flat 100MB
+        // placeholder off Apple -- the floor follows fm/8 and nothing loosens.
+        {
+            long runAhead = CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES;
+            if(fm > 0 && runAhead > fm / 8) {
+                runAhead = fm / 8;
+            }
+            if(capCeiling < runAhead) {
+                capCeiling = runAhead;
+            }
+        }
         if(cap > capCeiling && cn1PacingPastGrowthFloor()) {
             cap = capCeiling;
+        }
+    }
+    // FINAL absolute bound on run-ahead. Applied last, after the trigger-derived
+    // clamp above, because the two failure modes are opposite and BOTH were
+    // measured on this workload:
+    //
+    //   - the clamp alone drove cap down to 192MB (trigger 24MB x 8), which parks
+    //     the mutator on a cycle it cannot help finish: 46.3s / 9736MB.
+    //   - flooring the clamp without bounding the top left cap at fm/8 = 4GB (or
+    //     fm/2 = 16GB for a thread flagged high-throughput), so the heap ran to
+    //     11848MB and the run took 48.0s -- worse on both axes.
+    //
+    // Pinning run-ahead near 1GB gives 23.8s / 8325MB. The saturation is real: at
+    // 2GB the run is 22.9s but the footprint is 12870MB, i.e. 2 more GB per second
+    // saved. So the useful range is narrow and this is its top.
+    //
+    // Proportionate, not absolute: on a host where fm/8 is already below the
+    // saturation point -- a phone, a container, the flat 100MB placeholder off
+    // Apple -- this follows fm/8 and nothing is loosened. `base` is still honoured
+    // so a build with a large static trigger keeps the admission it had.
+    {
+        long runAhead = CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES;
+        if(fm > 0 && runAhead > fm / 8) {
+            runAhead = fm / 8;
+        }
+        if(cap > runAhead) {
+            cap = runAhead;
+        }
+        if(cap < base) {
+            cap = base;
         }
     }
     if(cn1PacingTraceOn()) {
