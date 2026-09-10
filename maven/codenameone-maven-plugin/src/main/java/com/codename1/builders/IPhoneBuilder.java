@@ -6677,6 +6677,7 @@ public class IPhoneBuilder extends Executor {
                     // that the change will work for all builds.  I made it "only" for the cocoapods version
                     // to prevent inadvertent breaking of versioned builds etc...
                     if (runPods) {
+                        AdMobIosLinkSettings.apply(pbx, iosPods);
                         replaceAllInFile(pbx, "ARCHS = [^;]+;", "ARCHS = \"\\$(ARCHS_STANDARD)\";");
                         replaceAllInFile(pbx, "VALID_ARCHS = [^;]+;", "VALID_ARCHS = \"\\$(ARCHS_STANDARD)\";");
                     } else {

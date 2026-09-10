@@ -45,6 +45,37 @@ java -jar "$ROOT/vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar" ios \
     "$PROBE/Sources" "$PROBE/generated" AdMobLinkProbe com.codenameone.test \
     AdMobLinkProbe 1.0 ios "${LIBS:-none}"
 PROJECT="$PROBE/generated/dist"
+# Apply exactly the AdMob-only app settings used by IPhoneBuilder. The shared
+# translator template must remain free of Swift paths for unrelated apps.
+cat > "$PROBE/ApplyAdMobSettings.java" <<'JAVA'
+package com.codename1.builders;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+public class ApplyAdMobSettings {
+    public static void main(String[] args) throws Exception {
+        File project = new File(args[0]);
+        byte[] original = Files.readAllBytes(project.toPath());
+        if (new String(original, "UTF-8").contains("/usr/lib/swift")) {
+            throw new AssertionError("Swift paths leaked into the shared translator template");
+        }
+        AdMobIosLinkSettings.apply(project, "UnrelatedPod");
+        if (!Arrays.equals(original, Files.readAllBytes(project.toPath()))) {
+            throw new AssertionError("AdMob settings changed an unrelated project");
+        }
+        Properties hints = new Properties();
+        try (InputStream input = new FileInputStream(args[1])) { hints.load(input); }
+        AdMobIosLinkSettings.apply(project, hints.getProperty("codename1.arg.ios.pods"));
+    }
+}
+JAVA
+mkdir -p "$PROBE/link-settings"
+javac -d "$PROBE/link-settings" \
+    "$ROOT/maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AdMobIosLinkSettings.java" \
+    "$PROBE/ApplyAdMobSettings.java"
+java -cp "$PROBE/link-settings" com.codename1.builders.ApplyAdMobSettings \
+    "$PROJECT/AdMobLinkProbe.xcodeproj/project.pbxproj" \
+    "$ROOT/maven/cn1-admob/common/codenameone_library_required.properties"
 cp "$PROBE"/{cn1_globals.h,cn1_virtual_thread.h,cn1_class_method_index.h,Prefix.pch} "$PROJECT/"
 plutil -convert json -o "$PROBE/project.json" "$PROJECT/AdMobLinkProbe.xcodeproj/project.pbxproj"
 python3 - "$ROOT" "$PROBE" "$PROJECT" "$LIBS" <<'PYTHON'
@@ -74,7 +105,7 @@ for lib in filter(None, sys.argv[4].split(';')):
         assert obj.get('lastKnownFileType') == 'sourcecode.text-based-dylib-definition', obj
         assert ref in linked and ref not in copied, 'Library hint is not a linker input: ' + lib
 # Only replace translated runtime sources with the callback stubs above. Keep
-# the translator's Frameworks phase, SDK paths and LIBRARY_SEARCH_PATHS verbatim.
+# the translator's Frameworks phase and the builder's AdMob-only search paths.
 source_names = {'main.m', 'com_codename1_ads_admob_AdMobNativeImpl.m'}
 for obj in objects.values():
     if obj['isa'] == 'PBXSourcesBuildPhase':
