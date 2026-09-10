@@ -278,6 +278,15 @@ class CleanTargetLinuxIntegrationTest {
                 "cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
                 "-DCMAKE_BUILD_TYPE=Release", "-G", "Ninja",
                 "-DCMAKE_C_COMPILER=" + cc, "-DCMAKE_ASM_COMPILER=" + cc));
+        // Full DWARF into the <exe>.debug companion when CI asks for it. The generated
+        // project defaults to -g1, which is lines and function names and nothing about
+        // variables or types -- so a post-mortem of a crash from this suite answers
+        // "No locals" for every frame and the core cannot be decoded past the backtrace.
+        // That is what left an intermittent SIGSEGV here undiagnosed across four
+        // occurrences. The binary stays stripped either way; only the companion grows.
+        if (Boolean.parseBoolean(System.getenv("CN1_LINUX_FULL_DEBUG"))) {
+            configure.add("-DCN1_DEBUG_INFO_LEVEL=3");
+        }
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");

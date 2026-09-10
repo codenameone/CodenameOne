@@ -1434,7 +1434,16 @@ public class ByteCodeTranslator {
         // <exe>.debug companion: the shipped executable carries no symbol table,
         // debug info or .eh_frame, while crashes still symbolize from the .debug
         // file (function name = the mangled Java method, plus generated-C lines).
-        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE -g1 -fno-asynchronous-unwind-tables -fno-unwind-tables)\n");
+        // -g1 is lines + function names and NOTHING about variables or types, which is
+        // why a post-mortem of a crash from this build answers "No locals", "No
+        // arguments" and "unknown type" for every global -- the core is fine, the DWARF
+        // simply does not describe the data. That is the right default for a shipping
+        // binary, where the companion exists to turn an address back into a Java method.
+        // It is the wrong one for a CI build whose whole job is to be autopsied, so the
+        // level is a cache variable: unset it and nothing changes for anybody.
+        writer.append("set(CN1_DEBUG_INFO_LEVEL \"1\" CACHE STRING\n");
+        writer.append("    \"DWARF level for the <exe>.debug companion: 1 = lines + function names (lean, the default), 3 = full variable and type information (autopsyable)\")\n");
+        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE -g${CN1_DEBUG_INFO_LEVEL} -fno-asynchronous-unwind-tables -fno-unwind-tables)\n");
         writer.append("if(NOT (CMAKE_BUILD_TYPE STREQUAL \"Debug\" OR CMAKE_BUILD_TYPE STREQUAL \"RelWithDebInfo\"))\n");
         writer.append("    find_program(CN1_OBJCOPY NAMES objcopy llvm-objcopy gobjcopy)\n");
         writer.append("    if(CN1_OBJCOPY)\n");
