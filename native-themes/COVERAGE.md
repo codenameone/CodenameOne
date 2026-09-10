@@ -152,41 +152,61 @@ SwitchMorph (droplet stretch/squash).
 ## UIIDs the framework assigns
 
 `ToggleButton` shipped unstyled for as long as both themes existed: the UIID is
-written by framework code, no theme defined it, and the control fell through to
-the `Component` default with no shape at all. That is a silent failure -- nothing
-errors, the control simply looks wrong -- so the whole surface was enumerated
-rather than sampled. Every `setUIID("...")` literal in `CodenameOne/src` was
-checked against both themes: 128 names, of which 73 appeared in neither.
+written by framework code, nothing defined it, and the control fell through with
+no shape at all. Nothing errors in that situation -- the control simply looks
+wrong -- so the whole surface was enumerated rather than sampled.
 
-Both themes now define the live ones, including the `TextComponent` /
-`FloatingHint` / `ErrorLabel` trio behind the modern form API, the `ComboBox`
-and popup families, the `Calendar` grid, `TreeNode`, and the `ToggleButton*`
-edge names `ComponentGroup` renames its controls to.
+Enumerating it takes two passes, and the second one matters. Every
+`setUIID("...")` literal in `CodenameOne/src` gives 128 names, of which 73 are
+absent from both theme files. But absent from the CSS is not the same as
+unstyled: `UIManager.resetThemeProps()` seeds defaults for a long list of UIIDs,
+each behind a guard of the form
+
+```java
+if (installedTheme == null || !installedTheme.containsKey("RightSideCommand.derive")) {
+    themeProps.put("RightSideCommand.derive", "SideCommand");
+    themeProps.put("RightSideCommand.align", rightAlign);
+}
+```
+
+so a theme that defines one of those names **suppresses** the framework's own
+setup rather than filling a hole. Twenty-one of the 73 are seeded that way. The
+real gap is the remainder: names in neither the CSS nor `resetThemeProps`.
+
+Both themes now define those, including `ToggleButton` and the `ToggleButton*`
+edge names `ComponentGroup` renames its controls to, `FloatingHint`, `TreeNode`,
+the `Calendar` grid, the media transport and the directional popup panes.
+
+### Three deliberate overrides
+
+| UIID | What the framework seeds | Why the theme overrides it |
+|---|---|---|
+| `TableCell` | `transparency` only, no padding | every table rendered with cells nearly touching their borders |
+| `TableHeader` | `transparency` only | the header was no heavier than a row |
+| `ErrorLabel` | `derive: FloatingHint` plus a generic red | the platform error colours differ: `#b3261e` on Material, `#ff3b30` on iOS |
+
+`FloatingHint` is worth its own note: the framework never defines it, and yet
+`ErrorLabel`, `InputComponentAction` and `DescriptionLabel` are all seeded to
+derive **from** it. Three UIIDs inheriting from one nothing defined.
 
 ### Deliberately still undefined
 
-Nineteen names are left alone, in two groups.
+**Retired components.** `RSSReader`, `HTMLComponent`, `HTMLTable`, the
+feature-phone soft keys and `VKBButton`.
 
-**Retired components.** `RSSReader`, `HTMLComponent` and `HTMLTable`, the
-feature-phone soft keys (`SoftButton`, `SoftButtonLeft`, `SoftButtonRight`) and
-`VKBButton`. Nothing a current application builds reaches them.
-
-**Names where the unstyled default is the better answer**, measured rather than
-assumed. Defining a UIID is a visual change, and for these it was a change for
-the worse:
+**Names where the unstyled default is the better answer**, measured by rendering
+the guide's figure set before and after rather than assumed:
 
 | UIID | What defining it did |
 |---|---|
-| `icon` | `SpanLabel` and `SpanButton` lost the icon spacing the default gives them; the text crowded the glyph |
+| `icon` | `SpanLabel` and `SpanButton` lost the icon spacing the default gives them |
 | `Emblem` | same, for `MultiButton`'s trailing badge |
-| `StatusBar` | collapsed the strip a `Form` reserves at the top, so iOS content ran into the status bar |
-| `TouchCommand` | deriving it from `Button` gave title-bar commands a filled pill |
-| `Scroll`, `ScrollThumb`, `HorizontalScroll`, `HorizontalScrollThumb` | sizing the scrollbar changes the content width of every scrollable form, which re-wrapped text in unrelated figures |
+| `StatusBar` | collapsed the strip a `Form` reserves, so iOS content ran into the system bar |
+| `Scroll`, `ScrollThumb`, `HorizontalScroll`, `HorizontalScrollThumb` | the framework seeds these with a measured padding; overriding it changes the content width of every scrollable form, which re-wrapped text in unrelated figures |
 
-Each was caught by rendering the guide's figure set before and after and
-comparing: the scrollbar rules alone moved a `SpanLabel` figure by 21 pixels.
-Sizing a scrollbar or a status bar is a layout decision that deserves its own
-change with its own before-and-after, not a line in a gap-filling sweep.
+The scrollbar rules alone moved a `SpanLabel` figure by 21 pixels. Sizing a
+scrollbar or a status bar is a layout decision that deserves its own change with
+its own before-and-after, not a line in a gap-filling sweep.
 
 ## How to add a component
 

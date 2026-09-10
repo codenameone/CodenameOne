@@ -863,7 +863,6 @@ PhoneVerificationLink {
    above the field once it has content, and an error line beneath it. All three
    were undefined, so the control the guide recommends over a raw TextField
    rendered with default styling. */
-TextComponent { background-color: transparent; padding: 0.5mm 0 1mm 0; margin: 0; }
 FloatingHint { cn1-derive: SecondaryLabel; color: #49454f; font-size: 1.9mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
 FloatingHint.disabled { color: #a9a8aa; background-color: transparent; }
 /* M3 error role; the line sits under the field and carries the message. */
@@ -871,8 +870,6 @@ ErrorLabel { cn1-derive: SecondaryLabel; color: #b3261e; font-size: 1.9mm; paddi
 ErrorLabel.disabled { color: #a9a8aa; background-color: transparent; }
 
 /* Toolbar search mode swaps the title for a field with its own two UIIDs. */
-TextFieldSearch { cn1-derive: TextField; margin: 0.5mm 1mm 0.5mm 1mm; }
-TextHintSearch { cn1-derive: TextHint; }
 
 /* Tree rows. */
 TreeNode { cn1-derive: Label; color: #1d1b20; padding: 1.2mm 1.5mm 1.2mm 1.5mm; background-color: transparent; }
@@ -887,35 +884,23 @@ TableCell { cn1-derive: Label; color: #1d1b20; padding: 1.5mm 2mm 1.5mm 2mm; bac
 TableHeader { cn1-derive: Label; color: #49454f; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
 
 /* Signature capture opens through this button. */
-SignatureButton { cn1-derive: FlatButton; }
 
 /* Pull to refresh: the pulled-down area and its label. */
-PullToRefresh { background-color: transparent; padding: 1.5mm; margin: 0; }
-RefreshLabel { cn1-derive: SecondaryLabel; color: #49454f; background-color: transparent; }
 
 /* Autocomplete drops its suggestions into a popup list. */
-AutoCompletePopup { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
-AutoCompleteList { background-color: #f3edf7; padding: 0; margin: 0; }
 
 /* ComboBox and the popup it opens. */
-ComboBox { cn1-derive: TextField; }
-ComboBoxItem { cn1-derive: Label; color: #1d1b20; padding: 1.8mm 2mm 1.8mm 2mm; background-color: transparent; }
-ComboBoxItem.selected { color: var(--accent-on-container-color, #21005d); background-color: var(--accent-container-color, #eaddff); }
-ComboBoxFocus { cn1-derive: ComboBoxItem; background-color: var(--accent-container-color, #eaddff); }
-ComboBoxList { background-color: transparent; padding: 0; margin: 0; }
-PopupItem { cn1-derive: ComboBoxItem; }
+ComboBoxFocus { cn1-derive: Label; background-color: var(--accent-container-color, #eaddff); }
+PopupItem { cn1-derive: Label; }
 PopupFocus { cn1-derive: ComboBoxFocus; }
-PopupContentPane { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
 
 /* InteractionDialog and the popup dialog family. The four directional content
    panes are separate UIIDs because a popup can open in any direction. */
-PopupDialog { background-color: #f3edf7; padding: 0; margin: 0; }
-PopupDialogTitle { cn1-derive: DialogTitle; }
 PopupBody { background-color: #f3edf7; padding: 1mm; margin: 0; }
-PopupContentPaneUpwards { cn1-derive: PopupContentPane; }
-PopupContentPaneDownwards { cn1-derive: PopupContentPane; }
-PopupContentPaneLeft { cn1-derive: PopupContentPane; }
-PopupContentPaneRight { cn1-derive: PopupContentPane; }
+PopupContentPaneUpwards { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneDownwards { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneLeft { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
+PopupContentPaneRight { background-color: #f3edf7; padding: 0; margin: 0; border: 0.2mm solid #cac4d0; }
 
 
 /* Calendar grid. */
@@ -937,17 +922,12 @@ ListRendererFocus { background-color: var(--accent-container-color, #eaddff); pa
 /* The strip a Form reserves for the platform status bar. */
 
 /* Side menu chrome. */
-MenuButton { cn1-derive: FlatButton; }
 MenuButtonRight { cn1-derive: FlatButton; }
 StatusBarSideMenu { background-color: transparent; padding: 0; margin: 0; }
-RightSideNavigationPanel { background-color: #f3edf7; padding: 0; margin: 0; }
-RightSideCommand { cn1-derive: Command; }
 
 /* Commands, as drawn by the menu rather than the Toolbar. */
-Command { cn1-derive: Label; color: #1d1b20; padding: 1.8mm 2mm 1.8mm 2mm; background-color: transparent; }
-CommandList { background-color: transparent; padding: 0; margin: 0; }
-CommandFocus { cn1-derive: Command; background-color: var(--accent-container-color, #eaddff); }
-DialogCommandText { cn1-derive: Command; color: var(--accent-color, #6750a4); text-align: center; }
+CommandFocus { cn1-derive: Label; background-color: var(--accent-container-color, #eaddff); }
+DialogCommandText { cn1-derive: Label; color: var(--accent-color, #6750a4); text-align: center; }
 
 /* Media transport controls. */
 MediaPlayerPlay { cn1-derive: FlatButton; }
@@ -957,8 +937,6 @@ MediaPlayerBack { cn1-derive: FlatButton; }
 MediaPlayerMax { cn1-derive: FlatButton; }
 
 /* Map zoom controls and the rich text editor surface. */
-MapZoomIn { cn1-derive: FlatButton; }
-MapZoomOut { cn1-derive: FlatButton; }
 RichTextComponent { background-color: transparent; padding: 1mm; margin: 0; }
 
 /* The tutorial overlay drawn over a form. */
@@ -1027,14 +1005,7 @@ GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm
     TreeNode.disabled { color: #5c5967; background-color: transparent; }
     TableCell { color: #e6e0e9; background-color: transparent; }
     TableHeader { color: #cac4d0; background-color: transparent; }
-    RefreshLabel { color: #cac4d0; background-color: transparent; }
-    AutoCompletePopup { background-color: #211f26; border: 0.2mm solid #49454f; }
-    AutoCompleteList { background-color: #211f26; }
-    ComboBoxItem { color: #e6e0e9; background-color: transparent; }
-    ComboBoxItem.selected { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); }
     ComboBoxFocus { background-color: var(--accent-container-color-dark, #4f378b); }
-    PopupContentPane { background-color: #211f26; border: 0.2mm solid #49454f; }
-    PopupDialog { background-color: #211f26; }
     PopupBody { background-color: #211f26; }
     CalendarDate { color: #e6e0e9; background-color: transparent; }
     CalendarDate.selected { color: var(--accent-on-color-dark, #381e72); background-color: var(--accent-color-dark, #d0bcff); }
@@ -1042,8 +1013,6 @@ GlassTutorial { color: #ffffff; background-color: rgba(0,0,0,0.72); padding: 2mm
     TODAY { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
     SpinnerSeparator { background-color: #49454f; }
     ListRendererFocus { background-color: var(--accent-container-color-dark, #4f378b); }
-    RightSideNavigationPanel { background-color: #211f26; }
-    Command { color: #e6e0e9; background-color: transparent; }
     CommandFocus { background-color: var(--accent-container-color-dark, #4f378b); }
     DialogCommandText { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
     FlatButton.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
