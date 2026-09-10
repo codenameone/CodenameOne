@@ -241,4 +241,63 @@ class MockAdProviderTest extends UITestBase {
         assertSame(destination, CN.getCurrentForm());
     }
 
+    @FormTest
+    void disposalSplicesAdOutOfNestedDialogs() {
+        MockAdProvider.install();
+        Form application = CN.getCurrentForm();
+        for (int depth = 1; depth <= 2; depth++) {
+            events.clear();
+            InterstitialAd ad = new InterstitialAd("mock");
+            ad.setAdListener(listener());
+            Dialog[] overlays = new Dialog[depth];
+            try {
+                ad.load();
+                ad.show();
+                for (int i = 0; i < depth; i++) {
+                    overlays[i] = new Dialog("Application overlay " + i);
+                    overlays[i].showModeless();
+                }
+                ad.dispose();
+                ad.dispose();
+                assertSame(overlays[depth - 1], CN.getCurrentForm(),
+                        "Disposing an underlying ad must leave the top dialog visible");
+                assertEquals(Arrays.asList("shown", "impression"), events);
+                for (int i = depth - 1; i >= 0; i--) {
+                    overlays[i].dispose();
+                    assertSame(i == 0 ? application : overlays[i - 1], CN.getCurrentForm(),
+                            "Dialog disposal must skip the removed ad and restore its caller");
+                }
+            } finally {
+                for (int i = depth - 1; i >= 0; i--) {
+                    if (overlays[i] != null) {
+                        overlays[i].dispose();
+                    }
+                }
+                ad.dispose();
+                application.show();
+            }
+        }
+    }
+
+    @FormTest
+    void disposalDoesNotUndoNavigationToAnUnrelatedDialog() {
+        MockAdProvider.install();
+        InterstitialAd ad = new InterstitialAd("mock");
+        Form destination = new Form("Application destination");
+        Dialog unrelated = new Dialog("Unrelated dialog");
+        try {
+            ad.load();
+            ad.show();
+            destination.show();
+            unrelated.showModeless();
+            ad.dispose();
+            assertSame(unrelated, CN.getCurrentForm());
+            unrelated.dispose();
+            assertSame(destination, CN.getCurrentForm());
+        } finally {
+            ad.dispose();
+            unrelated.dispose();
+        }
+    }
+
 }

@@ -1187,6 +1187,21 @@ public class Dialog extends Form implements AbstractDialog {
         deregisterAnimated(this);
     }
 
+    /// Returns the form beneath this dialog in the navigation stack. This may be
+    /// another dialog when dialogs are nested.
+    ///
+    /// #### Returns
+    ///
+    /// the previous form, or null when no previous form is associated with this dialog
+    ///
+    /// #### See also
+    ///
+    /// - `#setPreviousForm(Form)`
+    @Override
+    public Form getPreviousForm() {
+        return super.getPreviousForm();
+    }
+
     /// When the dialog is disposed this form will show. Notice that this can only be set after show was invoked!
     ///
     /// #### Parameters

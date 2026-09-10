@@ -44,6 +44,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
@@ -187,8 +188,14 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
             }
             Dialog closing = adForm;
             adForm = null;
-            if (CN.getCurrentForm() != closing) {
-                // Application code may already have navigated away from the ad.
+            Form current = CN.getCurrentForm();
+            while (current instanceof Dialog && current != closing) {
+                current = ((Dialog) current).getPreviousForm();
+            }
+            if (current != closing) {
+                // Suppress restoration only after unrelated navigation. If an
+                // upper dialog still points to the ad, dispose() needs this link
+                // to splice the ad out of the active dialog stack.
                 closing.setPreviousForm(null);
             }
             closing.dispose();
