@@ -307,6 +307,46 @@ It is all malloc'd heap; there is no large non-heap component. (An earlier note
 here claimed ~600MB was "not the Java heap" -- that compared an exit-time census
 against the whole-run peak and was wrong.)
 
+### The second grace cycle: vestigial in origin, load-bearing today
+
+A dead object needs three cycles because the sweep keeps it twice -- once as `fresh`
+(never marked) and once as `aging` (`mark == V-1`). The first is load-bearing. The
+second arrived in November 2014, commit `31528ecfa6`:
+
+```
+-  if(o->__codenameOneGcMark != currentGcMarkValue) {      // free what was not marked
++  if(o->__codenameOneGcMark < currentGcMarkValue - 1) {   // keep one extra generation
+```
+
+message: "Delayed GCing of elements to prevent them from being collected due to a
+race condition with the GC thread". **That collector had no SATB barrier** -- zero
+matches for satb or snapshot at that commit -- so keeping an extra generation made a
+lost-object race improbable rather than impossible.
+
+**It was removed, measured, and put back.** Removing it is verifier-green and
+gauntlet-green and gives byte-identical self-hosting output, and it is worth about
+**2-3% of peak** (1334 -> 1322 MB, 1349 -> 1302 MB). Not worth it, because four later
+mechanisms have since been built on the rule:
+
+- Two `java.lang.ref` clearing sites that must use **exactly** the sweep's liveness
+  test. Their comment spells out the failure: "FAILING to clear one the sweep frees
+  hands get() a dangling pointer", and on ParparVM a dangling read is a native crash
+  no Java catch can see.
+- The fast-sweep page shortcut, whose `gcGraceEpoch < V-1` bound is derived from the
+  per-slot rule. Its comment records what happened when the two disagreed: "testing
+  != V let it drop whole pages holding V-1 slots... 26,924 slots in one run. That is
+  what left kept objects pointing into reclaimed memory" -- issue 5425.
+- The legacy and BiBOP sweeps ageing in step, so a matured `Hashtable.Entry` at V-1
+  is never kept while its page-resident payload at V-1 has already gone.
+
+And the verifier does not cover the coupling: the measurement above changed the sweep
+without changing the ref-clearing sites, which is precisely the dangling-`get()` bug,
+and it still came back green.
+
+So the rule started as a band-aid and is now structural. Removing it means changing
+all four together and re-deriving the fast-sweep bound, for 2-3%. The churn is worth
+more and risks nothing.
+
 ### String: the NSString field is free
 
 `java.lang.String` carries a `long nsString` for the Apple targets' direct NSString
