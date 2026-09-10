@@ -45,37 +45,6 @@ java -jar "$ROOT/vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar" ios \
     "$PROBE/Sources" "$PROBE/generated" AdMobLinkProbe com.codenameone.test \
     AdMobLinkProbe 1.0 ios "${LIBS:-none}"
 PROJECT="$PROBE/generated/dist"
-# Apply exactly the AdMob-only app settings used by IPhoneBuilder. The shared
-# translator template must remain free of Swift paths for unrelated apps.
-cat > "$PROBE/ApplyAdMobSettings.java" <<'JAVA'
-package com.codename1.builders;
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
-public class ApplyAdMobSettings {
-    public static void main(String[] args) throws Exception {
-        File project = new File(args[0]);
-        byte[] original = Files.readAllBytes(project.toPath());
-        if (new String(original, "UTF-8").contains("/usr/lib/swift")) {
-            throw new AssertionError("Swift paths leaked into the shared translator template");
-        }
-        AdMobIosLinkSettings.apply(project, "UnrelatedPod");
-        if (!Arrays.equals(original, Files.readAllBytes(project.toPath()))) {
-            throw new AssertionError("AdMob settings changed an unrelated project");
-        }
-        Properties hints = new Properties();
-        try (InputStream input = new FileInputStream(args[1])) { hints.load(input); }
-        AdMobIosLinkSettings.apply(project, hints.getProperty("codename1.arg.ios.pods"));
-    }
-}
-JAVA
-mkdir -p "$PROBE/link-settings"
-javac -d "$PROBE/link-settings" \
-    "$ROOT/maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AdMobIosLinkSettings.java" \
-    "$PROBE/ApplyAdMobSettings.java"
-java -cp "$PROBE/link-settings" com.codename1.builders.ApplyAdMobSettings \
-    "$PROJECT/AdMobLinkProbe.xcodeproj/project.pbxproj" \
-    "$ROOT/maven/cn1-admob/common/codenameone_library_required.properties"
 cp "$PROBE"/{cn1_globals.h,cn1_virtual_thread.h,cn1_class_method_index.h,Prefix.pch} "$PROJECT/"
 plutil -convert json -o "$PROBE/project.json" "$PROJECT/AdMobLinkProbe.xcodeproj/project.pbxproj"
 python3 - "$ROOT" "$PROBE" "$PROJECT" "$LIBS" <<'PYTHON'
@@ -105,7 +74,7 @@ for lib in filter(None, sys.argv[4].split(';')):
         assert obj.get('lastKnownFileType') == 'sourcecode.text-based-dylib-definition', obj
         assert ref in linked and ref not in copied, 'Library hint is not a linker input: ' + lib
 # Only replace translated runtime sources with the callback stubs above. Keep
-# the translator's Frameworks phase and the builder's AdMob-only search paths.
+# the translator's Frameworks phase, SDK paths and library search paths.
 source_names = {'main.m', 'com_codename1_ads_admob_AdMobNativeImpl.m'}
 for obj in objects.values():
     if obj['isa'] == 'PBXSourcesBuildPhase':
@@ -129,6 +98,32 @@ with (project / 'AdMobLinkProbe.xcodeproj/project.pbxproj').open('wb') as output
     plistlib.dump(data, output)
 PYTHON
 (cd "$PROJECT" && pod install)
+# Mirror IPhoneBuilder's existing Swift-source handling after pod integration.
+# Do not supply custom Swift library search paths to make the probe link.
+ruby - "$PROJECT" <<'RUBY'
+require 'xcodeproj'
+root = ARGV[0]
+project = Xcodeproj::Project.open(File.join(root, 'AdMobLinkProbe.xcodeproj'))
+app = project.targets.find { |target| target.name == 'AdMobLinkProbe' }
+Dir.glob(File.join(root, 'AdMobLinkProbe-src', '**', '*.swift')).each do |path|
+  relative = Pathname.new(path).relative_path_from(Pathname.new(root)).to_s
+  ref = project.files.find { |file| file.path == relative } || project.main_group.new_file(relative)
+  app.source_build_phase.add_file_reference(ref, true) unless app.source_build_phase.files_references.include?(ref)
+  app.resources_build_phase.remove_file_reference(ref)
+end
+unless Dir.glob(File.join(root, '**', '*.swift')).empty?
+  File.write(File.join(root, 'cn1-Bridging-Header.h'), "// Codename One generated Swift bridging header\n")
+  project.build_configurations.each { |config| config.build_settings['SWIFT_VERSION'] = '5.0' }
+  app.build_configurations.each do |config|
+    config.build_settings['DEFINES_MODULE'] = 'YES'
+    config.build_settings['SWIFT_OBJC_BRIDGING_HEADER'] = '$(SRCROOT)/cn1-Bridging-Header.h'
+  end
+end
+support = app.source_build_phase.files_references.select { |file| File.basename(file.path) == 'CN1AdMobSwiftSupport.swift' }
+raise 'The shipped AdMob Swift source is missing from the app compile phase' unless support.size == 1
+raise 'AdMob Swift source must not be copied as a resource' if app.resources_build_phase.files_references.include?(support.first)
+project.save
+RUBY
 xcodebuild -workspace "$PROJECT/AdMobLinkProbe.xcworkspace" -scheme AdMobLinkProbe \
     -configuration Release -sdk "$SDK" -derivedDataPath "$PROBE/build-$SDK" \
     CODE_SIGNING_ALLOWED=NO build
