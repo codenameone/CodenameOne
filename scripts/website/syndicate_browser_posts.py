@@ -16,15 +16,14 @@ Usage:
 
     # First-time setup, watch the browser, take screenshots of the editor:
     python3 scripts/website/syndicate_browser_posts.py \
-        --platforms foojay --validate-only --headed --today 2026-05-08
+        --platforms hashnode --validate-only --headed
 
     # Real syndication (headless, daily-cron style):
-    python3 scripts/website/syndicate_browser_posts.py --platforms foojay
+    python3 scripts/website/syndicate_browser_posts.py --platforms hashnode
 
 Required env vars per platform (script auto-skips a platform when its creds
 are missing, just like the API script):
 
-    foojay     : FOOJAY_USER, FOOJAY_PASSWORD
     hashnode   : a signed-in session, resolved in priority order —
                    1. HASHNODE_STORAGE_STATE env var (base64 Playwright
                       storageState; this is how CI would receive it),
@@ -52,6 +51,9 @@ the session is resolved automatically (see the per-platform env-var note
 above): being logged in to Hashnode in Firefox is enough, so the
 platform no longer silently drops out when a shell forgets to export a
 secret.
+
+Foojay moved to GitHub article bundles in September 2026; its submission
+flow now lives in ``syndicate_foojay_posts.py``.
 
 HackerNoon was previously supported here but removed: HackerNoon
 charges business sites for canonical URL support, which makes it
@@ -103,7 +105,7 @@ SCREENSHOT_DIR = Path(__file__).resolve().parents[2] / "docs" / "website" / "rep
 # profile; see _resolve_hashnode_storage_state). CI holds none of those so
 # the platform is skipped automatically in cron runs; the maintainer runs
 # the script locally, where a logged-in Firefox session is enough.
-DEFAULT_PLATFORMS = "foojay,hashnode"
+DEFAULT_PLATFORMS = "hashnode"
 
 _UA_STR = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) AppleWebKit/537.36 "
@@ -300,293 +302,6 @@ def _save_screenshot(page, slug: str, label: str) -> Path:
     except Exception:  # noqa: BLE001 — never let a screenshot failure mask the real error
         return path
     return path
-
-
-class FoojayAdapter:
-    """foojay.io — Playwright login + REST API draft creation.
-
-    Pure UI submission to foojay does not work reliably: Cloudflare in front
-    of foojay challenges form POSTs to /wp-admin/post.php and drops the
-    form payload during the challenge, so the draft is never created. The
-    REST API is not subject to the same challenge, but Wordfence has
-    Application Passwords disabled, so token auth is also out.
-
-    The working hybrid: drive wp-login.php with Playwright to obtain a real
-    user session (cookies), pull the WP REST nonce from /wp-admin/, then
-    POST the draft through /wp-json/wp/v2/posts with cookie + X-WP-Nonce
-    auth. Behaves "as a website user" end-to-end while sidestepping both
-    the app-password block and the Cloudflare POST challenge.
-    """
-
-    name = "foojay"
-    LOGIN_URL = "https://foojay.io/wp-login.php"
-    BASE_URL = "https://foojay.io"
-    REST_POSTS_ENDPOINT = "https://foojay.io/wp-json/wp/v2/posts"
-    REST_TAGS_ENDPOINT = "https://foojay.io/wp-json/wp/v2/tags"
-    REST_MEDIA_ENDPOINT = "https://foojay.io/wp-json/wp/v2/media"
-    XMLRPC_ENDPOINT = "https://foojay.io/xmlrpc.php"
-
-    # Pre-resolved category and tag IDs (from /wp-json/wp/v2/categories?search=java
-    # and /wp-json/wp/v2/tags?slug=codenameone). The tag is created lazily on
-    # first use if it does not yet exist.
-    JAVA_CATEGORY_ID = 1722
-    CODENAMEONE_TAG_SLUG = "codenameone"
-    CODENAMEONE_TAG_NAME = "Codename One"
-
-    USER_SELECTORS = ["#user_login"]
-    PASSWORD_SELECTORS = ["#user_pass"]
-    SUBMIT_SELECTORS = ["#wp-submit"]
-
-    @staticmethod
-    def is_configured() -> bool:
-        return bool(os.environ.get("FOOJAY_USER") and os.environ.get("FOOJAY_PASSWORD"))
-
-    @staticmethod
-    def accepts(post: Post) -> bool:
-        # foojay only receives the weekly Friday digest post; the deep-dive
-        # posts published on other weekdays are not syndicated there.
-        return post.date.weekday() == 4
-
-    def login(self, page) -> None:
-        page.goto(self.LOGIN_URL, wait_until="domcontentloaded")
-        _find_first(page, self.USER_SELECTORS).fill(os.environ["FOOJAY_USER"])
-        _find_first(page, self.PASSWORD_SELECTORS).fill(os.environ["FOOJAY_PASSWORD"])
-        _find_first(page, self.SUBMIT_SELECTORS).click()
-        try:
-            page.wait_for_url("**/wp-admin/**", timeout=90000)
-        except Exception:  # noqa: BLE001
-            page.wait_for_selector("#wpadminbar", timeout=30000)
-
-    def submit_draft(self, page, ctx: AdapterContext) -> dict[str, Any]:
-        # Land on wp-admin so wpApiSettings (which carries the nonce) is in scope.
-        page.goto("https://foojay.io/wp-admin/", wait_until="domcontentloaded", timeout=60000)
-        nonce = page.evaluate(
-            "() => (window.wpApiSettings && window.wpApiSettings.nonce) || null"
-        )
-        if not nonce:
-            raise AdapterError("could not extract wpApiSettings.nonce from /wp-admin/")
-
-        if ctx.validate_only:
-            shot = _save_screenshot(page, ctx.post.slug, "foojay-editor")
-            return {"validated": True, "screenshot": str(shot), "nonce_acquired": True}
-
-        cookies = page.context.cookies("https://foojay.io/")
-        cookie_header = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
-
-        # Resolve / create the codenameone tag.
-        tag_id = self._ensure_tag(cookie_header, nonce)
-        # Upload the cover image into the WP media library and use the
-        # returned media ID as the post's featured image.
-        featured_media_id: int | None = None
-        if ctx.post.cover_image:
-            try:
-                featured_media_id = self._upload_featured_media(
-                    cookie_header, nonce, ctx.post.cover_image, ctx.post.title
-                )
-            except Exception as err:  # noqa: BLE001 — featured image is best-effort
-                print(f"  [foojay] featured image upload failed (non-fatal): {err}", file=sys.stderr)
-
-        # Yoast canonical (_yoast_wpseo_canonical) is not registered for REST
-        # writes on this Yoast install. We send it in `meta` regardless (it's
-        # silently ignored if rejected, accepted if registered) AND surface it
-        # as a hidden HTML comment at the top of the body so the editor can
-        # spot the original URL when filling Yoast's metabox.
-        excerpt = str(ctx.post.front_matter.get("description") or "").strip()
-        canonical_prefix = f"<!-- Original / canonical: {ctx.post.canonical_url} -->\n\n"
-
-        payload: dict[str, Any] = {
-            "title": ctx.post.title,
-            "content": canonical_prefix + ctx.body_markdown,
-            "status": "draft",
-            "categories": [self.JAVA_CATEGORY_ID],
-            "tags": [tag_id] if tag_id else [],
-            "meta": {
-                "_yoast_wpseo_canonical": ctx.post.canonical_url,
-                "_yoast_wpseo_title": ctx.post.title,
-                "_yoast_wpseo_metadesc": excerpt[:155] if excerpt else "",
-            },
-        }
-        if featured_media_id:
-            payload["featured_media"] = featured_media_id
-        if excerpt:
-            payload["excerpt"] = excerpt[:500]
-
-        data = self._rest_post(self.REST_POSTS_ENDPOINT, cookie_header, nonce, payload)
-        post_id = data.get("id")
-        if not post_id:
-            raise AdapterError(f"REST response missing post id: {data}")
-
-        # Yoast meta (canonical / SEO title / metadesc) is not REST-writable on
-        # foojay's Yoast install. wp-admin form-submit is blocked by Cloudflare.
-        # XML-RPC's wp.editPost with custom_fields bypasses both restrictions
-        # and successfully writes the underscore-prefixed meta keys.
-        yoast_set = False
-        try:
-            self._set_yoast_meta_via_xmlrpc(
-                post_id=post_id,
-                canonical=ctx.post.canonical_url,
-                seo_title=ctx.post.title,
-                metadesc=_trim_for_meta_description(excerpt),
-            )
-            yoast_set = True
-        except Exception as err:  # noqa: BLE001 — Yoast meta is best-effort
-            print(f"  [foojay] XML-RPC Yoast meta write failed (non-fatal): {err}", file=sys.stderr)
-
-        return {
-            "id": post_id,
-            "url": f"https://foojay.io/wp-admin/post.php?post={post_id}&action=edit",
-            "preview_url": data.get("link"),
-            "featured_media_id": featured_media_id,
-            "yoast_meta_set": yoast_set,
-            "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        }
-
-    # ----- helpers -----
-
-    def _ensure_tag(self, cookie_header: str, nonce: str) -> int | None:
-        """Return the WP tag id for `codenameone`, creating it if missing."""
-        import urllib.parse as _up
-        try:
-            existing = self._rest_get(
-                f"{self.REST_TAGS_ENDPOINT}?slug={_up.quote(self.CODENAMEONE_TAG_SLUG)}",
-                cookie_header,
-                nonce,
-            )
-            if isinstance(existing, list) and existing:
-                return existing[0].get("id")
-            created = self._rest_post(
-                self.REST_TAGS_ENDPOINT,
-                cookie_header,
-                nonce,
-                {"name": self.CODENAMEONE_TAG_NAME, "slug": self.CODENAMEONE_TAG_SLUG},
-            )
-            return created.get("id")
-        except Exception as err:  # noqa: BLE001 — tag is best-effort
-            print(f"  [foojay] tag resolve/create failed (non-fatal): {err}", file=sys.stderr)
-            return None
-
-    def _upload_featured_media(self, cookie_header: str, nonce: str,
-                               image_url: str, title: str) -> int:
-        """Download the cover image and POST it into WP's media library."""
-        import urllib.request as _ur
-        # Download bytes
-        req = _ur.Request(image_url, headers={"User-Agent": _UA_STR})
-        with _ur.urlopen(req, timeout=120) as resp:
-            image_bytes = resp.read()
-            content_type = resp.headers.get("Content-Type", "image/jpeg")
-        filename = image_url.rsplit("/", 1)[-1].split("?", 1)[0] or "cover.jpg"
-
-        upload = _ur.Request(self.REST_MEDIA_ENDPOINT, data=image_bytes, method="POST")
-        upload.add_header("Content-Type", content_type)
-        upload.add_header("Content-Disposition", f'attachment; filename="{filename}"')
-        upload.add_header("X-WP-Nonce", nonce)
-        upload.add_header("Cookie", cookie_header)
-        upload.add_header("User-Agent", _UA_STR)
-        with _ur.urlopen(upload, timeout=120) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        media_id = data.get("id")
-        if not media_id:
-            raise RuntimeError(f"media upload returned no id: {str(data)[:200]}")
-        # Set a friendlier title on the media item.
-        try:
-            self._rest_post(
-                f"{self.REST_MEDIA_ENDPOINT}/{media_id}", cookie_header, nonce,
-                {"title": title, "alt_text": title},
-            )
-        except Exception:  # noqa: BLE001
-            # The media-item title and alt text are cosmetic — the upload
-            # itself already succeeded and the post will reference the
-            # returned media id regardless. Swallow any follow-up rename
-            # error so the caller still gets the upload result.
-            pass
-        return media_id
-
-    def _set_yoast_meta_via_xmlrpc(self, post_id: int, canonical: str,
-                                   seo_title: str, metadesc: str) -> None:
-        """Update Yoast SEO post meta via XML-RPC's wp.editPost custom_fields.
-
-        REST silently drops these meta keys (not registered for REST writes)
-        and the wp-admin form-submit path is challenged by Cloudflare.
-        XML-RPC accepts underscore-prefixed meta keys via custom_fields and
-        is not Cloudflare-protected on foojay.
-        """
-        import urllib.error as _ue
-        import urllib.request as _ur
-        import xml.sax.saxutils as _su
-
-        user = os.environ["FOOJAY_USER"]
-        pwd = os.environ["FOOJAY_PASSWORD"]
-
-        def cf_member(key: str, value: str) -> str:
-            return (
-                "<value><struct>"
-                f"<member><name>key</name><value><string>{_su.escape(key)}</string></value></member>"
-                f"<member><name>value</name><value><string>{_su.escape(value)}</string></value></member>"
-                "</struct></value>"
-            )
-
-        custom_fields_xml = "".join([
-            cf_member("_yoast_wpseo_canonical", canonical),
-            cf_member("_yoast_wpseo_title", seo_title),
-            cf_member("_yoast_wpseo_metadesc", metadesc),
-        ])
-        envelope = (
-            '<?xml version="1.0"?>'
-            '<methodCall><methodName>wp.editPost</methodName><params>'
-            "<param><value><int>1</int></value></param>"
-            f"<param><value><string>{_su.escape(user)}</string></value></param>"
-            f"<param><value><string>{_su.escape(pwd)}</string></value></param>"
-            f"<param><value><int>{int(post_id)}</int></value></param>"
-            "<param><value><struct>"
-            f"<member><name>custom_fields</name><value><array><data>{custom_fields_xml}</data></array></value></member>"
-            "</struct></value></param>"
-            "</params></methodCall>"
-        )
-        req = _ur.Request(
-            self.XMLRPC_ENDPOINT,
-            data=envelope.encode("utf-8"),
-            method="POST",
-        )
-        req.add_header("Content-Type", "text/xml")
-        req.add_header("User-Agent", _UA_STR)
-        try:
-            with _ur.urlopen(req, timeout=60) as response:
-                body = response.read().decode("utf-8", errors="replace")
-        except _ue.HTTPError as err:
-            detail = err.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"xmlrpc HTTP {err.code}: {detail}") from err
-        if "<fault>" in body:
-            raise RuntimeError(f"xmlrpc fault: {body[:500]}")
-        if "<boolean>1</boolean>" not in body:
-            raise RuntimeError(f"xmlrpc unexpected response: {body[:500]}")
-
-    def _rest_get(self, url: str, cookie_header: str, nonce: str) -> Any:
-        import urllib.request as _ur
-        req = _ur.Request(url, method="GET")
-        req.add_header("Accept", "application/json")
-        req.add_header("X-WP-Nonce", nonce)
-        req.add_header("Cookie", cookie_header)
-        req.add_header("User-Agent", _UA_STR)
-        with _ur.urlopen(req, timeout=60) as response:
-            return json.loads(response.read().decode("utf-8"))
-
-    def _rest_post(self, url: str, cookie_header: str, nonce: str,
-                   payload: dict[str, Any]) -> dict[str, Any]:
-        import urllib.error as _ue
-        import urllib.request as _ur
-        req = _ur.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-        req.add_header("Content-Type", "application/json")
-        req.add_header("Accept", "application/json")
-        req.add_header("X-WP-Nonce", nonce)
-        req.add_header("Cookie", cookie_header)
-        req.add_header("User-Agent", _UA_STR)
-        try:
-            with _ur.urlopen(req, timeout=120) as response:
-                raw = response.read().decode("utf-8")
-        except _ue.HTTPError as err:
-            detail = err.read().decode("utf-8", errors="replace")
-            raise AdapterError(f"REST POST {url} failed HTTP {err.code}: {detail}") from err
-        return json.loads(raw) if raw else {}
 
 
 class HashnodeAdapter:
@@ -1133,7 +848,6 @@ class HashnodeAdapter:
 
 
 ADAPTERS: dict[str, Callable[[], Any]] = {
-    "foojay": FoojayAdapter,
     "hashnode": HashnodeAdapter,
 }
 
@@ -1142,7 +856,6 @@ ADAPTERS: dict[str, Callable[[], Any]] = {
 # quiet; locally they almost always mean a missing/expired session, which is
 # exactly how Hashnode silently fell out of the rotation after #4956.
 SETUP_HINTS: dict[str, str] = {
-    "foojay": "set FOOJAY_USER and FOOJAY_PASSWORD",
     "hashnode": (
         "log in to Hashnode in Firefox, or capture a session with "
         "`python3 scripts/website/export_storage_state.py --site hashnode --from-firefox-profile`"
@@ -1179,8 +892,7 @@ def run_adapter(adapter, post: Post, body_markdown: str, headed: bool, validate_
         # Adapters that authenticate via a saved Playwright storageState
         # (Hashnode, and historically Medium/DZone) expose a
         # `storage_state_path()` classmethod that returns a path to the
-        # decoded JSON. FoojayAdapter logs in with user+password and does
-        # not define it.
+        # decoded JSON.
         storage_state_method = getattr(adapter, "storage_state_path", None)
         if callable(storage_state_method):
             try:
