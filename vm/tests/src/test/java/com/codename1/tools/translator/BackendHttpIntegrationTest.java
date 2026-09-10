@@ -427,6 +427,25 @@ class BackendHttpIntegrationTest {
         int traversal = status(request("GET", "/static/..%2f..%2fetc%2fpasswd", null, null));
         assertTrue(traversal == 403 || traversal == 404,
                 "a traversal must not be served, got " + traversal);
+
+        // Valid hex that is NOT valid UTF-8. %C3%28 is a truncated two-byte
+        // sequence, and new String(_, "UTF-8") answers U+FFFD instead of failing --
+        // so this path resolved to whatever a name genuinely containing U+FFFD
+        // resolves to, while a bad hex DIGIT was already refused. One file, two
+        // spellings, and only one of them checked.
+        assertEquals(400, status(request("GET", "/static/%C3%28.html", null, null)),
+                "malformed UTF-8 in a static path must be refused");
+
+        // A signed hex pair is not a hex pair: Integer.parseInt(_, 16) accepts
+        // "+1", which spelled the byte 1 a third way.
+        assertEquals(400, status(request("GET", "/static/%+1.html", null, null)),
+                "a signed escape must be refused");
+
+        // And a WELL-FORMED multi-byte name still resolves, which is the direction
+        // this kind of guard breaks.
+        assertEquals(404, status(request("GET", "/static/caf%C3%A9.html", null, null)),
+                "a valid accented name must reach the lookup and 404 on its own merits, "
+                        + "not be rejected as malformed");
     }
 
     @Test

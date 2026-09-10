@@ -704,6 +704,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             p.genericJavaType = genericType;
+            if (optionalCannotBeAbsent(p)) {
+                ctx.error(cls, "Parameter " + (i + 1) + " of " + cls.getBinaryName() + "."
+                        + m.getName() + " is declared required=false but is a " + p.javaType
+                        + ", which cannot hold \"absent\": the converter substitutes 0 or "
+                        + "false and the handler cannot tell that from a client that sent "
+                        + "one. Give it a defaultValue, so the code says what a missing "
+                        + "value means. (A boxed type would carry null, but path, query "
+                        + "and header parameters bind to String and the primitives only, "
+                        + "so that is not a way out here.)");
+                return null;
+            }
             String badKey = "BODY".equals(p.kind) ? unusableMapKey(genericType) : null;
             if (badKey != null) {
                 // Separate from the element rule below, and with its own message,
@@ -788,6 +799,21 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // submits it as :status, so a handler that worked perfectly answers with
         // something the client rejects or cannot frame. Three digits is the whole
         // of what HTTP defines.
+        // A method that builds its OWN Response carries its own status, and
+        // emitRoute returns that Response untouched -- so @ResponseStatus(201) on
+        // such a method reads like a promise and sends whatever the handler put in
+        // the object, usually 200. Refused rather than applied: overwriting the
+        // status of a Response the handler constructed would be the more
+        // surprising of the two, since it may already carry headers and a body
+        // chosen to match it.
+        if (status != null && isResponseType(route.returnJavaType)) {
+            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns a "
+                    + "Response AND declares @ResponseStatus(" + route.status + "). The "
+                    + "Response carries its own status, and that is the one that gets "
+                    + "sent, so the annotation would be silently ignored. Set the status "
+                    + "on the Response, or return a value and keep the annotation.");
+            return null;
+        }
         if (route.status < 200 || route.status > 599) {
             ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares "
                     + "@ResponseStatus(" + route.status + "), which cannot be a handler's "
@@ -1201,6 +1227,25 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * check that did not exist. A declared default supplies the value instead,
      * so it makes the parameter satisfiable and no guard is emitted.
      */
+    /**
+     * Whether this parameter can express "the client did not send it".
+     *
+     * required=false on a PRIMITIVE cannot: the converter substitutes 0 or false,
+     * and the handler has no way to tell that from a client that sent zero. The
+     * annotation documents optional as null-bearing, so the declaration promises
+     * something the type cannot carry.
+     */
+    private static boolean optionalCannotBeAbsent(Param p) {
+        if (p.required || (p.defaultValue != null && p.defaultValue.length() > 0)) {
+            return false;
+        }
+        if ("PATH".equals(p.kind) || "REQUEST".equals(p.kind) || "BODY".equals(p.kind)) {
+            return false;
+        }
+        return p.javaType != null && p.javaType.indexOf('.') < 0
+                && !"void".equals(p.javaType);
+    }
+
     private static void emitRequiredGuards(StringBuilder sb, Route route, String pad) {
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);

@@ -1024,6 +1024,107 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aResponseReturnWithAResponseStatusIsRefused() throws Exception {
+        // The Response the handler builds carries its own status and is returned
+        // untouched, so the annotation is a promise nothing keeps: @ResponseStatus
+        // (201) on a method that returns Response.text(200, ...) sends 200.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.HttpServer;\n"
+                + "@RestController\n"
+                + "public class Bad {\n"
+                + "    @PostMapping(\"/notes\")\n"
+                + "    @ResponseStatus(201)\n"
+                + "    public HttpServer.Response add() {\n"
+                + "        return HttpServer.Response.text(200, \"ok\");\n"
+                + "    }\n"
+                + "}\n"));
+        assertTrue("an ignored @ResponseStatus should not compile", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("silently ignored") >= 0);
+    }
+
+    @Test
+    public void aResponseReturnWithoutAResponseStatusIsFine() throws Exception {
+        // The shape the rule protects: returning a Response is the escape hatch,
+        // and it must stay usable.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.HttpServer;\n"
+                + "public class Fine {\n"
+                + "}\n"));
+        assertFalse("a class with no controller annotation is not our business: "
+                + ctx.getErrors(), ctx.hasErrors());
+
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.HttpServer;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/notes\")\n"
+                + "    public HttpServer.Response add() {\n"
+                + "        return HttpServer.Response.text(201, \"made\");\n"
+                + "    }\n"
+                + "}\n");
+        assertEquals("the handler's own status is the one that is sent",
+                201, Router.statusOf(router.call("POST", "/notes", null)));
+    }
+
+    @Test
+    public void anOptionalPrimitiveWithoutADefaultIsRefused() throws Exception {
+        // required=false says "the client may omit this", and an int cannot hold
+        // that: the converter substitutes 0 and the handler cannot tell an omitted
+        // value from a client that sent zero.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Bad {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all(@RequestParam(value = \"limit\", required = false)\n"
+                + "                      int limit) { return \"\" + limit; }\n"
+                + "}\n"));
+        assertTrue("an optional primitive should not compile", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("cannot hold") >= 0);
+    }
+
+    @Test
+    public void anOptionalParameterWithADefaultIsFine() throws Exception {
+        // The way out of the rule has to keep working, or the rule is just a wall.
+        // Note the remedy is a defaultValue and NOT a boxed type: path, query and
+        // header parameters bind to String and the primitives only, which is why
+        // the error message does not suggest one.
+        ProcessorContext defaulted = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Defaulted {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all(@RequestParam(value = \"limit\", required = false,\n"
+                + "                      defaultValue = \"10\") int limit) { return \"\" + limit; }\n"
+                + "}\n"));
+        assertFalse("a default answers the question: " + defaulted.getErrors(),
+                defaulted.hasErrors());
+
+        // And a String stays optional without one: it can already be null.
+        ProcessorContext text = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Text {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all(@RequestParam(value = \"q\", required = false)\n"
+                + "                      String q) { return \"\" + q; }\n"
+                + "}\n"));
+        assertFalse("a String carries absent as null: " + text.getErrors(),
+                text.hasErrors());
+    }
+
+    @Test
     public void twoControllersOfTheSameShapeAreRefused() throws Exception {
         // The bootstrap chains the routers and returns the first non-null answer,
         // so a collision ACROSS controllers hides the later one exactly as a

@@ -527,6 +527,20 @@ public final class StaticFiles implements HttpServer.Handler {
     }
 
     /** Null for a malformed escape rather than a partially decoded path. */
+    /** A hex digit's value, or -1. Deliberately not Integer.parseInt: that takes a sign. */
+    private static int hexDigit(char c) {
+        if(c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if(c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if(c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
     static String decode(String value) {
         if(value.indexOf('%') < 0) {
             return value;
@@ -542,6 +556,9 @@ public final class StaticFiles implements HttpServer.Handler {
             char c = value.charAt(iter);
             if(c != '%') {
                 if(pendingLength > 0) {
+                    if(!Utf8.isValid(pending, 0, pendingLength)) {
+                        return null;
+                    }
                     out.append(utf8(pending, pendingLength));
                     pendingLength = 0;
                 }
@@ -551,15 +568,27 @@ public final class StaticFiles implements HttpServer.Handler {
             if(iter + 2 >= value.length()) {
                 return null;
             }
-            try {
-                pending[pendingLength++] =
-                        (byte)Integer.parseInt(value.substring(iter + 1, iter + 3), 16);
-            } catch (NumberFormatException err) {
+            // Two HEX DIGITS, tested as digits. Integer.parseInt(_, 16) accepts a
+            // sign, so "%+1" decoded to the byte 1 and "%-1" to -1 -- two more
+            // spellings of an octet the client never wrote.
+            int hi = hexDigit(value.charAt(iter + 1));
+            int lo = hexDigit(value.charAt(iter + 2));
+            if(hi < 0 || lo < 0) {
                 return null;
             }
+            pending[pendingLength++] = (byte)((hi << 4) | lo);
             iter += 2;
         }
         if(pendingLength > 0) {
+            // The bytes have to BE UTF-8, not merely be spelled in valid hex.
+            // %C3%28 is a truncated two-byte sequence, and new String(_, "UTF-8")
+            // answers U+FFFD rather than failing -- so that path resolved to the
+            // same file as one genuinely containing U+FFFD, while a bad hex digit
+            // two lines up was already a 400. One file, two spellings, and only
+            // one of them checked.
+            if(!Utf8.isValid(pending, 0, pendingLength)) {
+                return null;
+            }
             out.append(utf8(pending, pendingLength));
         }
         return out.toString();
