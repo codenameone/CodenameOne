@@ -456,6 +456,12 @@ public final class HttpServer {
          * representation and every lookup below falls back to it.
          */
         Request(String method, String target, String version, Map headers, String body) {
+            // pathLength is NOT set here, and does not need to be: it carries a
+            // field initializer (= -1) and javac copies those into every
+            // constructor -- this one's bytecode opens with iconst_m1/putfield.
+            // The sibling constructor assigns it again explicitly, which makes
+            // this one look like it forgot; a review has already read it that way
+            // once and filed it as "every HTTP/2 route 404s", which it does not.
             this.method = method;
             this.target = target;
             this.version = version;
@@ -3043,7 +3049,31 @@ public final class HttpServer {
         }
     }
 
+    /**
+     * Serves one connection, releasing it even if the failure is an ERROR.
+     *
+     * Every catch below is `catch (Exception)`, and an Error is not one: a
+     * StackOverflowError out of a recursive parser, or an AssertionError from a
+     * handler, walks past all of them and leaves serveOne without reaching any
+     * drop(). By then the descriptor has been removed from its poller and is
+     * still in liveConnections, so nothing will ever close it -- one stranded
+     * socket per occurrence, and the process runs out of them. The Error itself
+     * is rethrown: this releases the connection, it does not pretend the failure
+     * did not happen.
+     *
+     * A wrapper rather than a try around the body, because the body has many
+     * returns and the point is that EVERY one of them is covered.
+     */
     private void serveOne(int fd) {
+        try {
+            serveOneRelease(fd);
+        } catch (Error err) {
+            drop(fd);
+            throw err;
+        }
+    }
+
+    private void serveOneRelease(int fd) {
         long session;
         try {
             // A POOL worker owns its descriptor and blocks on it: there is no one to

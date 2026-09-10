@@ -928,6 +928,18 @@ public class RestControllerAnnotationProcessorTest {
                 400, Router.statusOf(router.call("GET", "/notes/%ZZ", null)));
         assertEquals("and so is a truncated one",
                 400, Router.statusOf(router.call("GET", "/notes/%2", null)));
+
+        // Two hex digits is not enough. %C3%28 is a truncated two-byte sequence,
+        // and new String(_, "UTF-8") answers U+FFFD rather than failing -- so the
+        // handler saw exactly what %EF%BF%BD%28 produces. One value, two spellings.
+        assertEquals("malformed UTF-8 inside valid escapes is still a 400",
+                400, Router.statusOf(router.call("GET", "/notes/%C3%28", null)));
+
+        // And WELL-FORMED multi-byte UTF-8 still decodes, which is the direction a
+        // guard like this breaks if it is written carelessly: %C3%A9 is a single
+        // accented letter, not two characters and not an error.
+        assertEquals("id=" + new String(new byte[] { (byte) 0xC3, (byte) 0xA9 }, "UTF-8"),
+                router.text("GET", "/notes/%C3%A9"));
     }
 
     @Test
