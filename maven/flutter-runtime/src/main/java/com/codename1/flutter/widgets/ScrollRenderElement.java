@@ -161,6 +161,52 @@ public abstract class ScrollRenderElement extends RenderElement {
         return true;
     }
 
+    /// The direction last reported to the widgets above this scroll view.
+    private com.codename1.flutter.rendering.ScrollDirection reportedDirection =
+            com.codename1.flutter.rendering.ScrollDirection.idle;
+
+    /**
+     * Raises a {@code UserScrollNotification} when the drag turns around.
+     *
+     * <p>Flutter raises one when the user starts or stops dragging rather than per pixel,
+     * so reporting only a CHANGE of direction is both the right shape and the reason this
+     * is cheap: a listener that moves chrome runs once per turn, not once per frame.</p>
+     *
+     * <p>Moving further into the content is {@code reverse} -- the direction the content
+     * travels, not the finger. That is the sense Reply reads: reverse folds the bar away,
+     * forward brings it back.</p>
+     */
+    private void noteScroll(int now, int before) {
+        // Only while the finger is actually down. Flutter raises this from the DRAG, so
+        // momentum, the settle at the end of a fling and the bounce at an edge never
+        // speak -- and here they were the loudest thing in the room. Reading down the
+        // list overshot to 666 and settled back to 609, so the drag ENDED by reporting
+        // the direction opposite to the one the user made, and dragging back up bounced
+        // past zero and reported the other one. The bar folded away when you scrolled
+        // back to the top and reappeared as you read on: the right animation, driven
+        // backwards, which is worse than none.
+        Component c = component();
+        if (c instanceof ScrollPane && !((ScrollPane) c).userDragging()) {
+            // Between drags there is no user direction. Clearing it means the next drag
+            // reports its first move rather than being swallowed as "no change".
+            reportedDirection = com.codename1.flutter.rendering.ScrollDirection.idle;
+            return;
+        }
+        if (now == before) {
+            return;
+        }
+        com.codename1.flutter.rendering.ScrollDirection d = now > before
+                ? com.codename1.flutter.rendering.ScrollDirection.reverse
+                : com.codename1.flutter.rendering.ScrollDirection.forward;
+        if (d == reportedDirection) {
+            return;
+        }
+        reportedDirection = d;
+        UserScrollNotification n = new UserScrollNotification();
+        n.direction(d);
+        n.dispatch(this);
+    }
+
     private RenderHost innerHost() {
         if (innerHost == null) {
             innerHost = new RenderHost();
@@ -202,12 +248,41 @@ public abstract class ScrollRenderElement extends RenderElement {
             pane.setScrollVisible(false);
         }
         innerHost().container(pane);
+        // Flutter reports a drag's direction to the widgets above the scroll view, and
+        // apps steer real chrome with it: Reply folds its bottom bar away while you read
+        // down a list and brings it back when you turn around. Nothing ever raised one of
+        // these, so every NotificationListener in the gallery was inert.
+        pane.addScrollListener(new com.codename1.ui.events.ScrollListener() {
+            @Override
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                noteScroll(horizontal() ? scrollX : scrollY,
+                        horizontal() ? oldscrollX : oldscrollY);
+            }
+        });
         return pane;
     }
 
     /** The scrolling pane itself, so a subclass can add behaviour such as page snapping. */
     protected Container createPane(com.codename1.ui.layouts.Layout layout) {
-        return new Container(layout);
+        return new ScrollPane(layout);
+    }
+
+    /**
+     * The scrolling container, with one thing added: whether the user's finger is on it.
+     *
+     * <p>Codename One knows, but keeps {@code isDragActivated} protected, and the answer is
+     * what separates a drag from everything else the scroll offset does by itself.</p>
+     */
+    public static class ScrollPane extends Container {
+
+        public ScrollPane(com.codename1.ui.layouts.Layout layout) {
+            super(layout);
+        }
+
+        /** Whether this pane is currently being dragged by the user. */
+        public boolean userDragging() {
+            return isDragActivated();
+        }
     }
 
     @Override

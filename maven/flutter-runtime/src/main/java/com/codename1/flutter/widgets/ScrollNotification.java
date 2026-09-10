@@ -73,8 +73,42 @@ public class ScrollNotification {
         this.direction = v;
     }
 
-    /** Dispatches this notification up to the nearest ancestor listener. */
+    /**
+     * Delivers this notification to every {@link NotificationListener} above {@code target},
+     * innermost first, stopping at the first one that returns true -- Flutter's
+     * {@code Notification.dispatch}.
+     *
+     * <p>{@link #get$depth()} counts the scroll views the notification has bubbled THROUGH,
+     * not the listeners. That is the distinction the gallery relies on: Reply hides its
+     * bottom bar on {@code UserScrollNotification(depth: 0)}, so that dragging the image
+     * carousel inside a mail card -- a scroll view of its own, whose notifications reach
+     * the same listener at depth 1 -- does not move the bar.</p>
+     */
     public boolean dispatch(BuildContext target) {
+        if (!(target instanceof com.codename1.flutter.Element)) {
+            return false;
+        }
+        context(target);
+        long depth = 0;
+        com.codename1.flutter.Element from = (com.codename1.flutter.Element) target;
+        for (com.codename1.flutter.Element a = from.parent(); a != null; a = a.parent()) {
+            if (a instanceof ScrollRenderElement) {
+                depth++;
+                continue;
+            }
+            if (!(a.widget() instanceof NotificationListener)) {
+                continue;
+            }
+            dart.runtime.Funcs.Func1<ScrollNotification, Boolean> cb =
+                    ((NotificationListener<?>) a.widget()).getOnNotification();
+            if (cb == null) {
+                continue;
+            }
+            depth(depth);
+            if (Boolean.TRUE.equals(cb.call(this))) {
+                return true;
+            }
+        }
         return false;
     }
 }

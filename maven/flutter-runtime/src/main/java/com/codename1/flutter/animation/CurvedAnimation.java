@@ -37,9 +37,41 @@ public class CurvedAnimation extends Animation<Double> {
     private Curve curve = Curves.linear;
     private Curve reverseCurve;
 
-    /** Named-parameter setter for {@code parent:}. */
+    /// Whether we have already subscribed to {@link #parent}.
+    private boolean following;
+
+    /**
+     * Named-parameter setter for {@code parent:}.
+     *
+     * <p>Subscribing here is what makes this animation tick. A CurvedAnimation only
+     * reshapes another animation's value; it is never driven by a clock of its own, so
+     * unless it follows its parent it never notifies anybody and every widget listening
+     * to it sits at the value it happened to be built with.</p>
+     *
+     * <p>This class always claimed to forward registration to the parent and never did:
+     * {@code addListener} was inherited unchanged, so it filed the listener on an object
+     * that nothing ever notified. Anything animated through a curve was therefore
+     * motionless -- which in the mail study is the bottom bar that should fold away as you
+     * read down the list, driven by a controller behind {@code Easing.legacy}.</p>
+     */
     public void parent(Animation<Double> v) {
         this.parent = v;
+        if (v == null || following) {
+            return;
+        }
+        following = true;
+        v.addListener(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                notifyListeners();
+            }
+        });
+        v.addStatusListener(new Funcs.VoidFunc1<AnimationStatus>() {
+            @Override
+            public void call(AnimationStatus s) {
+                notifyStatusListeners(s);
+            }
+        });
     }
 
     /** Named-parameter setter for {@code curve:}. */
