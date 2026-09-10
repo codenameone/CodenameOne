@@ -698,6 +698,29 @@ public final class Invites {
     // and re-deriving it from storage on every call would read the disk for
     // every uninvited install. No locking -- the facade runs on the EDT.
     private static void loadState() {
+        // The held record is reconciled BEFORE the cached answer is trusted.
+        //
+        // markTerminal() deliberately does not set the state when its write
+        // fails, so the record held for retry can be terminal while memory
+        // still says pending -- and getState() is public API. Answering PENDING
+        // out of a cache the device's own record already contradicts is wrong
+        // on its own terms, whatever the caller then does with it.
+        //
+        // It is NOT, measured, what a review round claimed: that flush() would
+        // act on the stale answer, reopen the marker and issue a fresh lookup
+        // without the profile markTerminal strips. It does not, because every
+        // path that reopens or rewrites the record reads it first, and that
+        // read drains the held copy and invalidates the cache before anything
+        // is written. Traced end to end with the drain here removed: flush()
+        // enters its restart branch on the stale PENDING and still finishes
+        // with the state and the marker both terminal.
+        //
+        // Kept anyway, because "the answer is only ever wrong to callers that
+        // go on to correct it" is an invariant nobody can see from here.
+        Map<String, String> held = pendingFallback;
+        if (held != null && writePending(held)) {
+            stateLoaded = false;
+        }
         if (stateLoaded) {
             return;
         }
@@ -1474,6 +1497,10 @@ public final class Invites {
     /// #### Returns
     ///
     /// the record, or null
+    static boolean pendingFallbackPresentForTest() {
+        return pendingFallback != null;
+    }
+
     static Map<String, String> pendingRecordForTest() {
         return readPending();
     }
@@ -1482,22 +1509,14 @@ public final class Invites {
         Map<String, String> held = pendingFallback;
         if (held != null) {
             if (writePending(held)) {
-                // The cached state is invalidated, not left as it was.
+                // Invalidated here TOO, not only in loadState().
                 //
-                // markTerminal() deliberately does NOT set the state when its
-                // write fails, so the record held here can be terminal while
-                // memory still says pending. Persisting it without saying so
-                // left the two disagreeing: a later flush read the cached
-                // pending state, treated the lookup as live, rewrote the
-                // terminal marker back to STATE_PENDING and issued another
-                // lookup -- with the device profile markTerminal had stripped,
-                // so it could not have matched anyway.
-                //
-                // Invalidating rather than assigning, because what the record
-                // means depends on the re-attribution setting and on whether an
-                // attribution exists, and loadState() is the one place that
-                // knows. The cost is one extra read of a record just written,
-                // and only after a storage failure.
+                // Whichever of the two drains the held record first is the one
+                // that has to say so. loadState() reconciles before any state
+                // decision is made, which is what beginDeferred() needs; but a
+                // caller that reads the record directly can get here first, and
+                // then loadState() finds nothing left to drain and trusts a
+                // cached answer the record has already contradicted.
                 stateLoaded = false;
             }
             return held;

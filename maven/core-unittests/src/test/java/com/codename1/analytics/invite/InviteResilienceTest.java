@@ -1506,8 +1506,22 @@ class InviteResilienceTest extends UITestBase {
 
         assertEquals(0, told[0],
                 "an answer the device cannot remember was reported to the listener");
-        assertTrue(Invites.getState() != Invites.STATE_NONE_FOUND,
-                "the state was committed without its marker");
+        // The disk carries no terminal marker, which is the condition this
+        // guards: the state must not be terminal while the only copy of that
+        // answer is in memory. Read through InviteStore rather than through
+        // Invites, because the accessor now reconciles the held copy first --
+        // which is the point of the assertion below.
+        assertNotEquals(Invites.STATE_NONE_FOUND,
+                InviteStore.getInt(InviteStore.read(InviteStore.PENDING), "state",
+                        Invites.STATE_PENDING),
+                "the terminal marker reached the disk, so this proves nothing");
+
+        // And the answer is deferred rather than dropped: the held record is
+        // persisted by the next read and the state then agrees with it. Before
+        // the record was held at all this stayed pending for ever, so the same
+        // lookup ran again on every launch and the listener heard nothing.
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "the terminal answer was neither recorded nor reachable afterwards");
     }
 
     @Test
@@ -1586,6 +1600,43 @@ class InviteResilienceTest extends UITestBase {
         // And the state agrees with the record that is now on the disk.
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
                 "the cached state still says pending, so a flush will reopen a settled lookup");
+    }
+
+    @Test
+    @EdtTest
+    void getStateNeverAnswersFromAcacheTheRecordContradicts() {
+        // markTerminal() deliberately does not set the state when its write
+        // fails, so the record held for retry can be terminal while memory
+        // still says pending. Every path that ACTS on the state reads the
+        // record and reconciles on the way, so the disagreement never reached a
+        // write -- but getState() is public API, and answering PENDING out of a
+        // cache the device's own record already contradicts is wrong on its own
+        // terms. Reconciled at the top of loadState(), which every state
+        // decision comes through.
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+
+        Invites.setAttributionWindow(0);
+        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+
+        // Nothing has read the record yet, so the terminal answer is still only
+        // in memory and the cached state still says pending -- the precondition
+        // this is about.
+        assertTrue(Invites.pendingFallbackPresentForTest(),
+                "the record was already persisted, so this proves nothing");
+
+        // getState() is public API and must not answer out of a cache the
+        // device's own record contradicts. Asserted before anything else
+        // touches the record, because every path that acts on the state reads
+        // the record and reconciles on the way -- so this is the one caller
+        // that can observe the disagreement.
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "getState() answered from a cache the held record contradicts");
+        assertEquals(Invites.STATE_NONE_FOUND,
+                InviteStore.getInt(InviteStore.read(InviteStore.PENDING), "state", -1),
+                "asking for the state did not persist the record it answered from");
     }
 
     @Test
