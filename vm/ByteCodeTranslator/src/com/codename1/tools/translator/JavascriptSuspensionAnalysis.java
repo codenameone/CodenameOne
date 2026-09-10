@@ -858,6 +858,37 @@ final class JavascriptSuspensionAnalysis {
         }
     }
 
+    /**
+     * Folds every {@code dispatch:} cause onto the bare signature it concerns.
+     *
+     * A receiver-resolved edge records {@code dispatch:<owner>.<name+desc>} and
+     * a fallback edge records {@code dispatch:<name+desc>}. Section 2 ranks by
+     * signature, so it has to count both; reading only the bare key counted
+     * the fallback path alone, which is the minority once call sites resolve
+     * against their receiver -- the ranking then understated exactly the
+     * signatures the owner-aware path handles.
+     *
+     * Splitting on the first {@code '.'} is exact: class names are sanitized to
+     * identifier characters, and a JVM descriptor uses {@code '/'} rather than
+     * {@code '.'}, so the only dot present is the owner separator.
+     */
+    private static Map<String, Integer> aggregateDispatchCauses(Map<String, Integer> causeCount) {
+        Map<String, Integer> bySig = new HashMap<String, Integer>();
+        for (Map.Entry<String, Integer> entry : causeCount.entrySet()) {
+            String cause = entry.getKey();
+            if (!cause.startsWith("dispatch:")) {
+                continue;
+            }
+            String rest = cause.substring("dispatch:".length());
+            int dot = rest.indexOf('.');
+            String sig = dot < 0 ? rest : rest.substring(dot + 1);
+            Integer prev = bySig.get(sig);
+            bySig.put(sig, Integer.valueOf(
+                    (prev == null ? 0 : prev.intValue()) + entry.getValue().intValue()));
+        }
+        return bySig;
+    }
+
     /** ``owner.name+descriptor``, the identity used throughout the report. */
     private static String qualify(BytecodeMethod m) {
         return m.getClsName() + "." + m.getMethodName() + m.getSignature();
@@ -911,10 +942,15 @@ final class JavascriptSuspensionAnalysis {
             out.println("# dispatchSites counts every INVOKEVIRTUAL / INVOKEINTERFACE on the");
             out.println("# signature, receiver-resolved and fallback alike -- NOT the number");
             out.println("# that end up emitting yield*, which depends on each site's receiver.");
+            out.println("# firstCauseMethods aggregates BOTH cause spellings for the");
+            out.println("# signature: the receiver-resolved ``dispatch:<owner>.<sig>`` and the");
+            out.println("# fallback ``dispatch:<sig>``. Reading only the bare key counted the");
+            out.println("# fallback path alone, which is the minority under RTA.");
             out.println("# SIG <dispatchSites> <firstCauseMethods> <name+descriptor>");
+            Map<String, Integer> dispatchCauseBySig = aggregateDispatchCauses(causeCount);
             for (String sig : sigs) {
                 Integer siteCount = sites.get(sig);
-                Integer firstCause = causeCount.get("dispatch:" + sig);
+                Integer firstCause = dispatchCauseBySig.get(sig);
                 out.println("SIG " + (siteCount == null ? 0 : siteCount.intValue())
                         + " " + (firstCause == null ? 0 : firstCause.intValue())
                         + " " + sig);
