@@ -66,7 +66,7 @@ public final class Db {
     /**
      * Runs a statement that returns no rows. Returns the number of rows changed.
      */
-    public int execute(String sql, Object[] params) throws IOException {
+    public synchronized int execute(String sql, Object[] params) throws IOException {
         long stmt = prepare(sql, params);
         try {
             int rc = stepImpl(stmt);
@@ -90,7 +90,7 @@ public final class Db {
      * Runs a query and returns every row as a column-name to value map. Values are
      * String, Long, Double or null, which is exactly what the JSON writer accepts.
      */
-    public List query(String sql, Object[] params) throws IOException {
+    public synchronized List query(String sql, Object[] params) throws IOException {
         long stmt = prepare(sql, params);
         try {
             List rows = new ArrayList();
@@ -124,7 +124,24 @@ public final class Db {
      * exists to prevent, and getting the rollback right by hand at every call site
      * is how it gets missed.
      */
-    public Object transaction(Work body) throws Exception {
+    /**
+     * Synchronized because a TRANSACTION is not one call.
+     *
+     * SQLite serializes each API call on a connection, which is what made "one
+     * shared connection is correct, and SQLite serializes it" look true. It
+     * serializes the calls, not the BEGIN/body/COMMIT sequence around them: a
+     * second handler sharing this Db can execute between another's BEGIN and
+     * COMMIT and have its write committed -- or rolled back -- by a request that
+     * knows nothing about it, or meet "cannot start a transaction within a
+     * transaction" and fail for a reason its own code cannot explain.
+     *
+     * The monitor is reentrant, which is what makes this work: transaction() holds
+     * it for the whole callback and the execute() calls inside it re-enter freely.
+     * A pooled connection is used by one thread at a time anyway, so the cost
+     * there is an uncontended lock; a shared one is serialized, which is exactly
+     * what correctness requires of it.
+     */
+    public synchronized Object transaction(Work body) throws Exception {
         execute("BEGIN IMMEDIATE", null);
         boolean committed = false;
         try {

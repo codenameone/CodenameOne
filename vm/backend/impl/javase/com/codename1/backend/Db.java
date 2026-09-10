@@ -84,7 +84,7 @@ public final class Db {
         }
     }
 
-    public int execute(String sql, Object[] params) throws IOException {
+    public synchronized int execute(String sql, Object[] params) throws IOException {
         Connection c = live();
         try {
             if(params == null || params.length == 0) {
@@ -121,7 +121,7 @@ public final class Db {
         }
     }
 
-    public List query(String sql, Object[] params) throws IOException {
+    public synchronized List query(String sql, Object[] params) throws IOException {
         Connection c = live();
         try {
             PreparedStatement statement = c.prepareStatement(sql);
@@ -141,7 +141,24 @@ public final class Db {
         }
     }
 
-    public Object transaction(Work body) throws Exception {
+    /**
+     * Synchronized because a TRANSACTION is not one call.
+     *
+     * SQLite serializes each API call on a connection, which is what made "one
+     * shared connection is correct, and SQLite serializes it" look true. It
+     * serializes the calls, not the BEGIN/body/COMMIT sequence around them: a
+     * second handler sharing this Db can execute between another's BEGIN and
+     * COMMIT and have its write committed -- or rolled back -- by a request that
+     * knows nothing about it, or meet "cannot start a transaction within a
+     * transaction" and fail for a reason its own code cannot explain.
+     *
+     * The monitor is reentrant, which is what makes this work: transaction() holds
+     * it for the whole callback and the execute() calls inside it re-enter freely.
+     * A pooled connection is used by one thread at a time anyway, so the cost
+     * there is an uncontended lock; a shared one is serialized, which is exactly
+     * what correctness requires of it.
+     */
+    public synchronized Object transaction(Work body) throws Exception {
         // BEGIN IMMEDIATE, not setAutoCommit(false), because that is what the
         // PACKAGED arm does and the two must not disagree about concurrency.
         // setAutoCommit(false) leaves the JDBC driver on SQLite's DEFERRED

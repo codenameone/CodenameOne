@@ -633,6 +633,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             AnnotationValues requestParam = annotations.get(REQUEST_PARAM);
             AnnotationValues requestHeader = annotations.get(REQUEST_HEADER);
             AnnotationValues requestBody = annotations.get(REQUEST_BODY);
+            // EXACTLY one. The chain below is priority-ordered, so a parameter
+            // carrying both @RequestHeader("Authorization") and @RequestParam("token")
+            // silently bound whichever came first and read from a source the
+            // declaration does not name -- which for an authentication input is the
+            // difference between a header a proxy controls and a query string the
+            // caller writes. The contract client processor already refuses this.
+            int bindings = (pathVariable != null ? 1 : 0) + (requestParam != null ? 1 : 0)
+                    + (requestHeader != null ? 1 : 0) + (requestBody != null ? 1 : 0);
+            if (bindings > 1) {
+                ctx.error(cls, "Parameter " + (i + 1) + " of " + cls.getBinaryName() + "."
+                        + m.getName() + " carries more than one binding annotation. One "
+                        + "parameter reads from one place: keep @PathVariable, "
+                        + "@RequestParam, @RequestHeader or @RequestBody, and drop the "
+                        + "others.");
+                return null;
+            }
             if (pathVariable != null) {
                 p.kind = "PATH";
                 p.name = pathVariable.getStringOrDefault("value", "");
@@ -1403,6 +1419,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     }
 
     /** The index first, then the compile classpath -- the same order as the caller. */
+    static AnnotatedClass resolveClass(ProcessorContext ctx, String internalName) {
+        return resolve(ctx, internalName);
+    }
+
     private static AnnotatedClass resolve(ProcessorContext ctx, String internalName) {
         AnnotatedClass found = ctx.lookup(internalName);
         return found != null ? found : fromCompileClasspath(ctx, internalName);

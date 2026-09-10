@@ -53,7 +53,10 @@ public class PetServer {
         final GreeterService service;
         if(dbPath == null || ":memory:".equals(dbPath)) {
             // An in-memory database cannot be pooled: each connection would get its
-            // own. One shared connection is correct here, and SQLite serializes it.
+            // own. One shared connection is correct here -- and Db serializes a
+            // whole transaction, which is the part SQLite does NOT do for you: it
+            // serializes each call, so without that a second request could execute
+            // between another's BEGIN and COMMIT.
             pool = null;
             service = new GreeterService(Db.open(":memory:"));
         } else {

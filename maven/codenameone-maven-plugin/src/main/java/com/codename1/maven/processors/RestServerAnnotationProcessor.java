@@ -465,8 +465,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                     out.add(f);
                 }
             }
+            // The compile CLASSPATH as well as the project's own output. lookup()
+            // sees only what this build compiled, so a DTO extending a class from a
+            // dependency stopped the walk there -- and this method's whole promise
+            // is that inherited fields are included. Every one of them was silently
+            // dropped from toMap() and fromMap(), on both ends of the wire. The
+            // controller processor already resolves hierarchies this way.
             String superName = at.getSuperInternalName();
-            at = superName == null ? null : ctx.lookup(superName);
+            at = superName == null ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, superName);
         }
         return out;
     }
@@ -776,6 +783,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         try {
             List<java.io.File> cp = new ArrayList<java.io.File>();
             cp.add(ctx.getOutputClassDir());
+            // The compile CLASSPATH too, as the controller processor already does.
+            // The generated codec names the types it transfers, and once the field
+            // walk above started crossing into dependencies it began naming THEIR
+            // types as well -- so without this, the fix for the missing inherited
+            // fields turned a silent omission into a build failure, which is worse
+            // than the bug it was fixing.
+            for (String element : ctx.getCompileClasspath()) {
+                cp.add(new java.io.File(element));
+            }
             JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
         } catch (IOException ioe) {
             throw new ProcessingException("Could not compile generated @RestClient server sources: "

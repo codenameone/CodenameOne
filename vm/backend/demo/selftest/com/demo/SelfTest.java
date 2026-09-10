@@ -205,6 +205,7 @@ public class SelfTest {
         json();
         httpDate();
         database();
+        sharedTransactionsDoNotInterleave();
         pool();
         foreignBuffer();
         fairness();
@@ -770,6 +771,65 @@ public class SelfTest {
                 Http1Date.format(Http1Date.parse("Sat, 29 Feb 2020 12:00:00 GMT")));
         check("garbage yields -1", "-1", String.valueOf(Http1Date.parse("not a date")));
         check("null yields -1", "-1", String.valueOf(Http1Date.parse(null)));
+    }
+
+    /**
+     * Two threads, one shared Db, transactions that must not interleave.
+     *
+     * SQLite serializes each API CALL on a connection, which is what made "one
+     * shared connection is correct, SQLite serializes it" look true. It does not
+     * serialize a BEGIN/body/COMMIT sequence: without the lock, one thread's
+     * BEGIN IMMEDIATE lands while another transaction is open and fails with
+     * "cannot start a transaction within a transaction", or worse, a write from
+     * one request is committed -- or rolled back -- by another that knows nothing
+     * about it. Both are silent data corruption in the second case.
+     */
+    private static void sharedTransactionsDoNotInterleave() throws Exception {
+        final Db db = Db.open(":memory:");
+        try {
+            db.execute("CREATE TABLE pair (tag TEXT)", null);
+            final List failures = new ArrayList();
+            Thread[] threads = new Thread[4];
+            for(int t = 0 ; t < threads.length ; t++) {
+                final String tag = "t" + t;
+                threads[t] = new Thread(new Runnable() {
+                    public void run() {
+                        for(int round = 0 ; round < 15 ; round++) {
+                            try {
+                                db.transaction(new Db.Work() {
+                                    public Object run(Db inner) throws Exception {
+                                        // TWO writes, so an interleaving is visible
+                                        // as an odd count for this tag.
+                                        inner.execute("INSERT INTO pair (tag) VALUES (?)",
+                                                new Object[]{tag});
+                                        inner.execute("INSERT INTO pair (tag) VALUES (?)",
+                                                new Object[]{tag});
+                                        return null;
+                                    }
+                                });
+                            } catch (Exception err) {
+                                synchronized(failures) {
+                                    failures.add(String.valueOf(err));
+                                }
+                                return;
+                            }
+                        }
+                    }
+                });
+                threads[t].start();
+            }
+            for(int t = 0 ; t < threads.length ; t++) {
+                threads[t].join(30000);
+            }
+            check("concurrent transactions on one connection all succeed", "0",
+                    String.valueOf(failures.size())
+                            + (failures.isEmpty() ? "" : " -> " + failures.get(0)));
+            List rows = db.query("SELECT COUNT(*) AS n FROM pair", null);
+            check("every transaction wrote both of its rows", "120",
+                    String.valueOf(((Map)rows.get(0)).get("n")));
+        } finally {
+            db.close();
+        }
     }
 
     private static void database() throws Exception {

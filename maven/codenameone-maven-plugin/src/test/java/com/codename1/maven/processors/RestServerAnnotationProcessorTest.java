@@ -40,6 +40,9 @@ import java.lang.reflect.Proxy;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -631,6 +634,64 @@ public class RestServerAnnotationProcessorTest {
             assertTrue(String.valueOf(expected.getCause()),
                     expected.getCause() instanceof IllegalArgumentException);
         }
+    }
+
+    @Test
+    public void aFieldInheritedFromADependencyIsTransferred() throws Exception {
+        // transferredFields() promises the superclass's fields, and stopped at the
+        // first superclass this build did not compile: lookup() sees only the
+        // project's own output. A DTO extending a class from a DEPENDENCY therefore
+        // lost every inherited field from toMap() and fromMap() -- silently, and on
+        // both ends of the wire, so the two agreed about a value neither sent.
+        File dependency = tmp.newFolder();
+        Map<String, String> base = new java.util.LinkedHashMap<String, String>();
+        base.put("com.dep.Animal",
+                "package com.dep;\n"
+                + "public class Animal {\n"
+                + "    public String species;\n"
+                + "    public Animal() {}\n"
+                + "}\n");
+        JavaSourceCompiler.compile(base, dependency, Arrays.asList(testClassesDir()));
+
+        List<File> withDependency = new java.util.ArrayList<File>();
+        withDependency.add(testClassesDir());
+        withDependency.add(dependency);
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.Cat",
+                "package com.example;\n"
+                + "public class Cat extends com.dep.Animal {\n"
+                + "    public String name;\n"
+                + "    public Cat() {}\n"
+                + "}\n");
+        sources.put("com.example.CatApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface CatApi {\n"
+                + "    @POST(\"/cat\")\n"
+                + "    void add(@Body Cat cat, OnComplete<Response<Cat>> callback);\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, withDependency);
+
+        ProcessorContext ctx = runProcessor(classes,
+                java.util.Arrays.asList(dependency.getAbsolutePath()));
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), dependency.toURI().toURL(),
+                        testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> codec = loader.loadClass("com.example.CatJson");
+        Map inbound = new java.util.LinkedHashMap();
+        inbound.put("name", "Tom");
+        inbound.put("species", "cat");
+        Object decoded = codec.getMethod("fromMap", Map.class).invoke(null, inbound);
+        assertEquals("the inherited field must survive the round trip",
+                "cat", loader.loadClass("com.dep.Animal").getField("species").get(decoded));
+        loader.close();
     }
 
     @Test
@@ -1398,10 +1459,22 @@ public class RestServerAnnotationProcessorTest {
     }
 
     private ProcessorContext runProcessor(File classesDir) throws Exception {
+        return runProcessor(classesDir, Collections.<String>emptyList());
+    }
+
+    /**
+     * With a compile CLASSPATH, the way both real mojos build the context.
+     *
+     * Without one, a superclass supplied by a dependency is invisible -- which is
+     * the whole point of the test that uses this.
+     */
+    private ProcessorContext runProcessor(File classesDir, List<String> classpath)
+            throws Exception {
         Map<String, AnnotatedClass> index = ClassScanner.scan(classesDir);
         RestServerAnnotationProcessor proc = new RestServerAnnotationProcessor();
         ProcessorContext ctx = new ProcessorContext(classesDir, tmp.newFolder(),
-                index, new SystemStreamLog());
+                index, new SystemStreamLog(), tmp.newFolder(), new Properties(), null,
+                Collections.<String>emptyList(), "UTF-8", classpath);
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
             if (!cls.getClassAnnotations().isEmpty()) proc.processClass(cls, ctx);

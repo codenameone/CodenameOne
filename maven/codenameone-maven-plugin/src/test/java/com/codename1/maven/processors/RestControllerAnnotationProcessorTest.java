@@ -988,6 +988,30 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aParameterWithTwoBindingAnnotationsIsRefused() throws Exception {
+        // The binding chain is priority-ordered, so this used to bind the header
+        // and ignore the @RequestParam without a word. For an authentication input
+        // that is the difference between a header a proxy controls and a query
+        // string the caller writes -- and the declaration named both, so nobody
+        // reading the code could tell which one won.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Bad {\n"
+                + "    @GetMapping(\"/whoami\")\n"
+                + "    public String who(@RequestHeader(\"Authorization\")\n"
+                + "                      @RequestParam(\"token\") String token) {\n"
+                + "        return token;\n"
+                + "    }\n"
+                + "}\n"));
+        assertTrue("two binding annotations on one parameter should not compile",
+                ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("more than one binding annotation") >= 0);
+    }
+
+    @Test
     public void twoControllersOfTheSameShapeAreRefused() throws Exception {
         // The bootstrap chains the routers and returns the first non-null answer,
         // so a collision ACROSS controllers hides the later one exactly as a
