@@ -4729,6 +4729,14 @@ static void cn1GcReportStaleIndexSkip(void) {
 
 void codenameOneGCSweep() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+#ifdef CN1_ALLOC_CENSUS
+    // BEFORE the sweep on purpose. This is the only point where the four slot
+    // states are still distinguishable -- the sweep stamps every fresh object with
+    // the current mark, after which "traced" and "kept by grace" look identical.
+    if(getenv("CN1_HEAP_REPORT")) {
+        cn1LiveCensus("pre-sweep");
+    }
+#endif
     // THE MARK THIS SWEEP WOULD ACT ON MAY BE INCOMPLETE. cn1GcPageIndexStale says the
     // page index could not be rebuilt, so every reference into a page registered since
     // the last successful rebuild failed to resolve and its object was never marked --
@@ -7414,10 +7422,35 @@ void cn1HeapAccounting(const char* label) {
  * the GC verifier uses.
  */
 #define CN1_LIVE_CENSUS_SLOTS 8192
-struct CN1LiveRow { struct clazz* c; long count; long long bytes; long reachable; };
+// Four states a slot can be in when the SWEEP is about to look at it. Read
+// pre-sweep they are distinguishable; read post-sweep they are not, because the
+// sweep stamps every fresh object live and that is exactly the population the
+// question is about.
+#define CN1_LB_TRACED 0   /* mark == currentGcMarkValue: traced live this cycle   */
+#define CN1_LB_FRESH  1   /* mark == -1: allocated since the mark, gets one grace */
+#define CN1_LB_AGING  2   /* mark == V-1: not traced, kept one more cycle anyway  */
+#define CN1_LB_DEAD   3   /* older: this sweep reclaims it                        */
+#define CN1_LB_COUNT  4
+struct CN1LiveRow { struct clazz* c; long count; long long bytes; long b[CN1_LB_COUNT]; };
 static struct CN1LiveRow cn1LiveRows[CN1_LIVE_CENSUS_SLOTS];
 
-static void cn1LiveTally(struct clazz* c, long long bytes, int reachable) {
+static int cn1LiveBucket(int m) {
+    // -1 must be tested before the "older than V-1" arm: it is numerically less
+    // than V-1 for any live epoch, so the ordering is what keeps a fresh object
+    // out of the reclaimable bucket.
+    if(m == -1) {
+        return CN1_LB_FRESH;
+    }
+    if(m == currentGcMarkValue) {
+        return CN1_LB_TRACED;
+    }
+    if(m == currentGcMarkValue - 1) {
+        return CN1_LB_AGING;
+    }
+    return CN1_LB_DEAD;
+}
+
+static void cn1LiveTally(struct clazz* c, long long bytes, int bucket) {
     if(c == 0) {
         return;
     }
@@ -7430,7 +7463,7 @@ static void cn1LiveTally(struct clazz* c, long long bytes, int reachable) {
         if(cn1LiveRows[i].c == c) {
             cn1LiveRows[i].count++;
             cn1LiveRows[i].bytes += bytes;
-            cn1LiveRows[i].reachable += reachable;
+            cn1LiveRows[i].b[bucket]++;
             return;
         }
     }
@@ -7443,7 +7476,11 @@ static void cn1LiveTally(struct clazz* c, long long bytes, int reachable) {
 void cn1LiveCensus(const char* label) {
     memset(cn1LiveRows, 0, sizeof(cn1LiveRows));
     long long bibopBytes = 0, legacyBytes = 0;
-    long bibopObjs = 0, legacyObjs = 0, bibopReach = 0, legacyReach = 0;
+    long bibopObjs = 0, legacyObjs = 0;
+    long totals[CN1_LB_COUNT];
+    for(int i = 0 ; i < CN1_LB_COUNT ; i++) {
+        totals[i] = 0;
+    }
 
     CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
     while(p != 0) {
@@ -7460,13 +7497,11 @@ void cn1LiveCensus(const char* label) {
             if(m == CN1_BIBOP_FREE_MARK) {
                 continue;
             }
-            cn1LiveTally(o->__codenameOneParentClsReference, (long long)p->slotSize,
-                         m == currentGcMarkValue ? 1 : 0);
+            int bucket = cn1LiveBucket(m);
+            cn1LiveTally(o->__codenameOneParentClsReference, (long long)p->slotSize, bucket);
             bibopBytes += (long long)p->slotSize;
             bibopObjs++;
-            if(m == currentGcMarkValue) {
-                bibopReach++;
-            }
+            totals[bucket]++;
         }
         p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
     }
@@ -7486,25 +7521,26 @@ void cn1LiveCensus(const char* label) {
 #if defined(__APPLE__)
         sz = (long long)malloc_size((void*)o);
 #endif
-        cn1LiveTally(o->__codenameOneParentClsReference, sz,
-                     o->__codenameOneGcMark == currentGcMarkValue ? 1 : 0);
+        int lbucket = cn1LiveBucket(o->__codenameOneGcMark);
+        cn1LiveTally(o->__codenameOneParentClsReference, sz, lbucket);
         legacyBytes += sz;
         legacyObjs++;
-        if(o->__codenameOneGcMark == currentGcMarkValue) {
-            legacyReach++;
-        }
+        totals[lbucket]++;
     }
 
-    // OCCUPIED is what costs memory; REACHABLE is what the last mark actually
-    // proved live. The gap between them is garbage the collector has not got to,
-    // and telling them apart is the whole point -- "a million live iterators" and
-    // "a million dead iterators still holding slots" call for opposite fixes.
-    fprintf(stderr, "[LIVE:%s] occupied %ld objects %.2fMB | reachable %ld (%.0f%%) "
-            "| bibop %ld/%.2fMB legacy %ld/%.2fMB\n",
-            label, bibopObjs + legacyObjs, (bibopBytes + legacyBytes) / 1048576.0,
-            bibopReach + legacyReach,
-            100.0 * (bibopReach + legacyReach) / ((bibopObjs + legacyObjs) > 0 ? (bibopObjs + legacyObjs) : 1),
-            bibopObjs, bibopBytes / 1048576.0, legacyObjs, legacyBytes / 1048576.0);
+    // OCCUPIED is what costs memory. The four buckets say WHY each object is still
+    // occupying a slot, and they call for different fixes: traced means the program
+    // really is holding it, fresh and aging mean the collector is holding it under
+    // the grace and aging rules, and dead means this sweep is about to return it.
+    long occupied = bibopObjs + legacyObjs;
+    fprintf(stderr, "[LIVE:%s] occupied %ld objects %.2fMB | traced %ld (%.0f%%) "
+            "fresh %ld (%.0f%%) aging %ld (%.0f%%) dead %ld (%.0f%%) | bibop %.2fMB legacy %.2fMB\n",
+            label, occupied, (bibopBytes + legacyBytes) / 1048576.0,
+            totals[CN1_LB_TRACED], 100.0 * totals[CN1_LB_TRACED] / (occupied > 0 ? occupied : 1),
+            totals[CN1_LB_FRESH],  100.0 * totals[CN1_LB_FRESH]  / (occupied > 0 ? occupied : 1),
+            totals[CN1_LB_AGING],  100.0 * totals[CN1_LB_AGING]  / (occupied > 0 ? occupied : 1),
+            totals[CN1_LB_DEAD],   100.0 * totals[CN1_LB_DEAD]   / (occupied > 0 ? occupied : 1),
+            bibopBytes / 1048576.0, legacyBytes / 1048576.0);
     for(int shown = 0 ; shown < 30 ; shown++) {
         int best = -1;
         for(int i = 0 ; i < CN1_LIVE_CENSUS_SLOTS ; i++) {
@@ -7516,11 +7552,15 @@ void cn1LiveCensus(const char* label) {
         if(best < 0) {
             break;
         }
-        fprintf(stderr, "[LIVE:%s]   %8.2fMB %9ld objs %4lld B/obj  reach %9ld (%3.0f%%)  %s\n",
+        long rc = cn1LiveRows[best].count > 0 ? cn1LiveRows[best].count : 1;
+        fprintf(stderr, "[LIVE:%s]   %8.2fMB %9ld objs %4lld B/obj  traced %3.0f%% fresh %3.0f%% "
+                "aging %3.0f%% dead %3.0f%%  %s\n",
                 label, cn1LiveRows[best].bytes / 1048576.0, cn1LiveRows[best].count,
-                cn1LiveRows[best].bytes / (cn1LiveRows[best].count > 0 ? cn1LiveRows[best].count : 1),
-                cn1LiveRows[best].reachable,
-                100.0 * cn1LiveRows[best].reachable / (cn1LiveRows[best].count > 0 ? cn1LiveRows[best].count : 1),
+                cn1LiveRows[best].bytes / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_TRACED] / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_FRESH] / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_AGING] / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_DEAD] / rc,
                 cn1LiveRows[best].c->clsName ? cn1LiveRows[best].c->clsName : "?");
         cn1LiveRows[best].bytes = 0;
     }

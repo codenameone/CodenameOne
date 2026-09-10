@@ -240,23 +240,59 @@ the last sweep, with fresh marks, it says 75%.
 
 ### What the census says about this workload
 
-At the last completed sweep: 295 MB occupied, **75% of it reachable**. So the heap
-is genuinely full of live data, not garbage the collector failed to reclaim. The
-trajectory across cycles is 41 MB, 107 MB, 295 MB -- and then the run ends at
-769 MB, because only three or four cycles complete in a 1.4 s program while the
-mark thread sits at 97% CPU in `gcMarkObject`.
+The `[LIVE]` report is printed **pre-sweep**, which is the only point where the four
+reasons a slot is still occupied are distinguishable: `traced` (the current mark
+reached it), `fresh` (allocated since the mark, kept by the grace rule), `aging`
+(known dead, kept one more cycle) and `dead` (this sweep returns it). Post-sweep
+the grace stamp makes the first two identical, and the first version of this census
+reported one as the other.
 
-Collecting harder does not fix it, which is the useful negative result:
+At the last cycle of a self-hosting translation:
 
-| mark threads | wall | cycles | peak |
+```
+occupied 4,441,347 objects 349MB
+  traced 47%   fresh 30%   aging 14%   dead 9%
+```
+
+**Only 47% of the occupied heap is traced live. The rest is held by collector
+policy, not by the program.** Per class the split is sharper still -- `char[]` is
+**5% traced and 76% fresh**, i.e. almost pure churn caught between cycles:
+
+```
+ 68.84MB  726070 objs   99 B/obj  traced 49% fresh 20% aging 19% dead 12%  java.lang.Object[]
+ 51.17MB  483395 objs  110 B/obj  traced  5% fresh 76% aging 13% dead  6%  char[]
+ 26.12MB  363289 objs   75 B/obj  traced 57% fresh 27% aging 10% dead  5%  java.lang.String
+ 15.09MB  240879 objs   65 B/obj  traced  5% fresh 62% aging 21% dead 13%  boolean[]
+```
+
+The mechanism is the sweep's own rule, confirmed directly by
+`experiments/PinProbe`: a dead object needs **three cycles** to have its slot
+returned -- one of grace while it is fresh, one of aging, then reclamation. A
+translation completes three or four cycles in 1.4s, so most of what it allocates is
+never eligible to be freed and the heap grows towards total allocation volume
+(940MB allocated, 1.3GB peak, ~150-300MB genuinely live).
+
+Collecting faster helps, but does not change the ratio, because the grace rule
+keeps everything allocated since the last mark whatever the rate:
+
+| | cycles | peak | traced at last cycle |
 |---|---:|---:|---:|
-| 1 | 1.40 s | 4 | 1256 MB |
-| 4 | 1.25 s | 9 | 1243 MB |
-| 8 | 1.47 s | 8 | 1223 MB |
+| 1 mark thread | 3 | 1320 MB | 47% |
+| `-DCN1_GC_MARK_THREADS=4` | 8 | **1172 MB** | 25% |
+| 4 threads + `CN1_GC_TRIGGER_MB=24` | 7 | 1259 MB | 39% |
 
-`-DCN1_GC_MARK_THREADS=4` more than doubles the cycles and is slightly faster, but
-peak barely moves. Combined with 75% reachability, that says the live set really is
-this large rather than the collector being behind.
+So the dominant lever is **allocation churn**, and the `[ALLOC]` census names it:
+`char[]` 368MB, `Object[]` 196MB, `String` 77MB, `SimpleListIterator` 40MB. Cutting
+an allocation removes roughly three cycles of occupancy, not one object.
+
+Two hypotheses this ruled OUT, both of which looked plausible:
+
+- **Conservative stack roots pinning dead objects.** `experiments/PinProbe` shows
+  the marks are precise and depth makes no difference: a dropped batch reads 100%
+  kept on the cycle after it is allocated (the grace stamp) and 0% on the next,
+  identically whether it was allocated in a shallow frame, under a 400-deep
+  recursion, or with the stack scrubbed afterwards.
+- **Fragmentation.** `[JHEAP]` puts page-pool slack at ~2MB of 715MB.
 
 Where the process memory sits, from `vmmap --summary` around peak:
 
@@ -267,20 +303,9 @@ MALLOC_SMALL          232.0M / 111.7M dirty            legacy heap
 Stack                  12.2M /   0.2M
 ```
 
-It is all malloc'd heap; there is no large non-heap component. (An earlier note in
-this file claimed ~600 MB was "not the Java heap" -- that compared an exit-time
-census against the whole-run peak and was wrong.)
-
-Two leads the census opens and does not settle:
-
-- Per-object width against the JDK: `String` 73 B, `ArrayList` 48 B, `Object[]`
-  100 B average. The JDK's String is ~32 B and its ArrayList ~40 B.
-- 295,907 `SimpleListIterator` objects were 72% *reachable* at a fresh sweep, and
-  a stack-local iterator should be dead the moment its loop ends. ParparVM scans
-  stacks conservatively (`CN1_CONSERVATIVE_GC_ROOTS` is defined unconditionally),
-  so a stale stack word that looks like a pointer keeps its object alive -- which
-  a deeply recursive, allocation-heavy program produces a lot of. Plausible, not
-  proven, and worth measuring before acting on.
+It is all malloc'd heap; there is no large non-heap component. (An earlier note
+here claimed ~600MB was "not the Java heap" -- that compared an exit-time census
+against the whole-run peak and was wrong.)
 
 ### String: the NSString field is free
 
