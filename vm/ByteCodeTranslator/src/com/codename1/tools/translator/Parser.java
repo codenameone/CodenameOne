@@ -446,6 +446,16 @@ public class Parser extends ClassVisitor {
     }
 
     private static final ArrayList<String> constantPool = new ArrayList<>();
+    // Index of constantPool, so addToConstantPool does not have to scan it.
+    //
+    // The list stays the source of truth -- writeOutput emits it in order and the
+    // emitted indices are positions in it -- and this only answers "where is s", the
+    // question ArrayList.indexOf was answering with a String.equals against every
+    // entry already interned. On a self-hosting translation the pool holds ~200k
+    // strings and that scan was the single largest cost on the mutator thread:
+    // String.equals 11.2%, the iterator 10.3%, indexOf 6.2% and ArrayList.get 5.1%
+    // of samples, all of it here.
+    private static final Map<String, Integer> constantPoolIndex = new HashMap<String, Integer>();
     
     // Name -> class index, replacing the O(N) linear scans that getClassObject /
     // getClassByName / ByteCodeClass.findClass used to do. Those run per dependency
@@ -481,12 +491,14 @@ public class Parser extends ClassVisitor {
      * Adds the given string to the hardcoded constant pool strings returns the offset in the pool
      */
     public static int addToConstantPool(String s) {
-        int i = constantPool.indexOf(s);
-        if(i < 0) {
-            constantPool.add(s);
-            return constantPool.size() - 1;
+        Integer existing = constantPoolIndex.get(s);
+        if(existing != null) {
+            return existing.intValue();
         }
-        return i;
+        int index = constantPool.size();
+        constantPool.add(s);
+        constantPoolIndex.put(s, Integer.valueOf(index));
+        return index;
     }
     
     

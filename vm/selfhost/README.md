@@ -94,79 +94,84 @@ the translator that a second runtime made visible.
 
 ## Performance
 
-`bench-selfhost.sh` runs both translators over the same corpus, interleaved, and
-reports the minimum wall clock and the peak `phys_footprint`. Ratios are refused
-unless the two emitted identical C -- a speed number from a translator that emits
-different output is meaningless.
+`bench-selfhost.sh` runs each arm over the same corpus, interleaved, and reports the
+minimum wall clock and the peak `phys_footprint`. It refuses to print ratios unless
+every arm emitted identical C. The reference JVM is **JDK 25** -- what HotSpot can
+actually do; JDK 8 is kept only because it is what the builders currently fork.
 
 Translating the self-hosting corpus (ASM + the translator's own classes, ~570
-classes) on a 64 GB / 16-core Mac, release shape (`-O3 -flto=thin`), against JDK 8:
+classes) on a 64 GB / 16-core Mac, release shape (`-O3 -flto=thin`):
 
 | | wall clock | peak footprint |
 |---|---:|---:|
-| jdk8 | 1.17 s | 509 MB |
-| parpar, as shipped | 6.7 - 8.7 s | 1434 MB |
-| parpar, pacing growth clamp disarmed | **1.39 - 1.52 s** | 1467 MB |
+| parpar | 1.84 s | 1443 MB |
+| jdk25 | 1.56 s | 516 MB |
+| jdk8 | 2.27 s | 502 MB |
 
-**Nearly all of the wall-clock gap is one pacing policy, not collection work and
-not code quality.** Building at `-O1` instead of `-O3 -flto=thin` measures the
-same, and with the clamp disarmed the collector still runs its four cycles.
+**vs JDK 25: 1.18x slower, 2.79x more memory. vs JDK 8: 1.24x faster.**
 
-### Where it goes
+Two fixes got it there from 6x slower; both are described below. Wall clock on this
+machine is only meaningful when it is quiet -- at load 113 the same benchmark
+produced samples from 3.6 s to 24 s for every arm, JVM included. CPU time
+(`user+sys`) is far more robust to contention, and by that measure the two are
+level or better: parpar 4.35 s against jdk25 4.82 s on a loaded host.
 
-`sample` on a default run puts 64% of the process's samples in one stack:
+### Fix 1: the mutator slept instead of allocating
+
+`sample` on the original build put 64% of the process's samples in one stack, and
+the mutator was not marking or sweeping -- it was asleep:
 
 ```
 Ldc.getValueAsString -> cn1BibopAlloc -> cn1BibopMaybeGc
-  -> cn1PacingPark   (3491 of 5476 samples)
-     -> usleep -> nanosleep -> __semwait_signal   (3475)
+  -> cn1PacingPark -> usleep -> nanosleep -> __semwait_signal
 ```
 
-The mutator is not marking or sweeping. It is asleep in the allocator's
-backpressure loop. `CN1_LOG_PACING_PARKS` reports only **two** park events for the
-whole run, so those two parks are seconds long each.
+`CN1_LOG_PACING_PARKS` reported only **two** park events for the whole run, so each
+was seconds long. `cn1BibopPacingCap` computed a generous cap -- `cn1CachedFreeMem/8`,
+4 GB here -- and then clamped it to `trigger * 8` once the footprint passed
+`CN1_PACING_GROWTH_FLOOR_BYTES`. That floor was a flat **512 MB**, and early in the
+run the trigger is still at its own 24 MB floor, so the ceiling was **192 MB**
+(`minCapKb=196608` confirmed it). A program with a ~1.4 GB live set cannot stay
+inside a 192 MB allocation window, so it parked against a collector that could
+never get under it.
 
-### Why
+A fixed 512 MB says "this process has grown"; it does not say the machine is under
+pressure, and the bound exists for pressure. The floor now scales:
+`max(512MB, availableMemory/4)`. Where `cn1_available_memory` is the flat 100 MB
+placeholder (Linux, Windows, the non-Apple fallback) the absolute floor still wins
+and behaviour is unchanged; the floor can only ever rise, never fall. This is the
+no-per-process-ceiling path only -- where a ceiling exists (iOS's dirty-memory
+limit, or an explicit budget) `cn1PacingPark` takes the bounded branch and never
+reaches this code. `ProcessBudgetPacingIntegrationTest` confirms both halves: its
+control arm reports `minCapKb=4194304` with no parks, and its budget-bounded arm
+still holds a 120 MB limit at a 60 MB peak across 427 parks.
 
-`cn1BibopPacingCap` computes a generous cap -- `cn1CachedFreeMem / 8`, which is
-4 GB on this host -- and then clamps it:
+`cn1RefreshFreeMemCache()` also had exactly one caller, inside the mark cycle, so
+`cn1CachedFreeMem` was 0 until the first collection and both the cap and this floor
+fell to their absolute minimums during the window with the least reason to throttle.
+It is primed in `cn1BibopDoInit` now.
 
-```c
-long capCeiling = trigger * CN1_BIBOP_GC_MAX_CAP_MULTIPLIER;   /* 8 */
-if(cap > capCeiling && cn1PacingPastGrowthFloor()) cap = capCeiling;
-```
+### Fix 2: the constant pool was O(n^2)
 
-`cn1PacingPastGrowthFloor()` is true once the process footprint passes
-`CN1_PACING_GROWTH_FLOOR_BYTES`, which is **512 MB**. Early in the run the GC
-trigger is still at its own floor of 24 MB, so the ceiling is 24 x 8 = **192 MB**
--- and `CN1_LOG_PACING_PARKS` reports exactly `minCapKb=196608`. A program whose
-live set is ~1.4 GB cannot stay inside a 192 MB allocation window, so it parks
-waiting for a collector that can never get under it.
+With pacing out of the way, the main thread's own profile was dominated by
+`Parser.addToConstantPool`, which did `constantPool.indexOf(s)` -- a `String.equals`
+against every string already interned. On a self-hosting translation the pool holds
+~200k strings: `String.equals` 11.2%, the list iterator 10.3%, `indexOf` 6.2% and
+`ArrayList.get` 5.1% of main-thread samples, all of it there. A `HashMap` side index
+answers the same question directly; the list stays the source of truth, so the
+emitted indices are unchanged and gate A still passes byte-identical.
 
-This is a policy calibrated for phone-sized heaps, where bounding RSS is worth
-real throughput. It has no scaling for a host with 64 GB of RAM: **disarming it
-cost 2% more memory (1434 -> 1467 MB) and returned 5x the speed.** Whether and how
-to scale it -- with available RAM, with a process budget, or by letting the
-trigger rise faster before the clamp engages -- is a policy decision for the VM
-owners, not something this project should decide. The reproduction is one
-`#define`:
+### What is left: memory, and it is live data
 
-```bash
-CN1_SELFHOST_CFLAGS="-flto=thin -DCN1_PACING_GROWTH_FLOOR_BYTES=1099511627776LL" \
-  ./build-selfhost.sh -O3
-```
+The remaining gap is **2.8x peak footprint**, and it is not the collector's fault.
+Sweeping the GC trigger from 8 MB to 256 MB -- from four cycles to two -- moves peak
+by less than 15% and never below 1.27 GB, so this is retained data rather than
+uncollected garbage. It is also not a fixed startup cost: the ratio is 2.37x on a
+hello-world corpus and 2.73x on the full one, so it scales with the object graph.
 
-A related but secondary defect **is** fixed here: `cn1RefreshFreeMemCache()` had
-exactly one caller, inside the mark cycle, so `cn1CachedFreeMem` was 0 until the
-first collection and the cap fell to its 72 MB floor rather than 192 MB during the
-window with the least reason to throttle anything. It is now primed in
-`cn1BibopDoInit`.
-
-### What is left, once pacing is out of the way
-
-Against JDK 8: **1.19x slower** and **2.9x more memory**. The time is ordinary
-AOT-versus-warmed-JIT territory. The memory gap is real and separate, and worth
-noting that the JVM figure is bounded by its own heap ergonomics -- it collects to
-stay under a default maximum, while the native binary has no such ceiling -- so
-this compares what each process used, not the live set.
+Two candidates are already ruled out. The object header is 16 bytes
+(`struct JavaObjectPrototype`), comparable to HotSpot's. And compact strings are not
+it: JDK 8 has none and still fits in ~500 MB. BiBOP size-class rounding (32, 48, 64,
+80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512) costs maybe 10-15%, not
+180%. Finding the rest is the next piece of work.
 

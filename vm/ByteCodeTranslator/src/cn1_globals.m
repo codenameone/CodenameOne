@@ -5566,13 +5566,9 @@ static void cn1BibopDoInit() {
     // control arm reports minCapKb=4194304 with this in place and the 72MB floor
     // without it.
     //
-    // This is NOT the whole story for an allocation-heavy program, and the rest is
-    // deliberately left alone: once the process passes CN1_PACING_GROWTH_FLOOR_BYTES
-    // (512MB) the growth bound below clamps the cap to trigger * 8, which is 192MB
-    // while the trigger is still at its own floor. Translating ~570 classes on a
-    // 64GB host, that clamp costs 6.7-8.7s against 1.4-1.5s with it disarmed, for
-    // 2% less peak footprint (1434MB vs 1467MB). Whether to scale it with host
-    // memory is a policy call, not a bug fix; see vm/selfhost/README.md.
+    // Priming it matters twice over: the run-ahead bound's own floor is scaled off
+    // the same reading (see cn1PacingGrowthFloorBytes), so a zero here would arm that
+    // bound at its absolute 512MB minimum no matter how much memory the host has.
     cn1RefreshFreeMemCache();
 }
 
@@ -6459,14 +6455,48 @@ static long long cn1PacingFootprintNow(void) {
     return fp;
 }
 
+// The footprint at which the run-ahead bound starts applying, scaled to the memory
+// this host actually has.
+//
+// A fixed 512MB says "this process has grown"; it does not say the machine is under
+// any pressure, and the bound exists for pressure. On a host with tens of GB free, a
+// process holding a couple of GB is nowhere near runaway, and clamping it there
+// parks the mutator against a collector that cannot get under the ceiling: measured
+// at 6.7-8.7s versus 1.4s for the same work, to save 2% of peak footprint.
+//
+// So take the larger of the absolute floor and a quarter of available memory. Two
+// properties this has to keep:
+//
+//  - Where cn1_available_memory is the flat 100MB placeholder (Linux, Windows, and
+//    the non-Apple fallback), fm/4 is 25MB, the absolute floor wins, and behaviour is
+//    bit-for-bit what it was. Nothing changes on a platform where we cannot measure.
+//  - It only ever RAISES the floor, so the bound can only engage later than before,
+//    never earlier. It cannot make a constrained host more permissive than it was.
+//
+// This is the no-per-process-ceiling path only. Where a ceiling exists -- iOS's dirty
+// memory limit, or an explicit process budget -- cn1PacingPark takes the bounded
+// branch instead and never reaches cn1BibopPacingCap, so none of this loosens the
+// admission control that keeps an app inside its own limit.
+static long long cn1PacingGrowthFloorBytes(void) {
+    long long floor = CN1_PACING_GROWTH_FLOOR_BYTES;
+    long fm = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
+    if(fm > 0) {
+        long long scaled = (long long)fm / 4;
+        if(scaled > floor) {
+            floor = scaled;
+        }
+    }
+    return floor;
+}
+
 static JAVA_BOOLEAN cn1PacingPastGrowthFloor(void) {
+    long long floor = cn1PacingGrowthFloorBytes();
     // Once the cache is over the floor the bound is engaged and a syscall to re-confirm
     // it buys nothing, so this stays ahead of the probe.
-    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed)
-            > CN1_PACING_GROWTH_FLOOR_BYTES) {
+    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed) > floor) {
         return JAVA_TRUE;
     }
-    return cn1PacingFootprintNow() > CN1_PACING_GROWTH_FLOOR_BYTES;
+    return cn1PacingFootprintNow() > floor;
 }
 
 static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
