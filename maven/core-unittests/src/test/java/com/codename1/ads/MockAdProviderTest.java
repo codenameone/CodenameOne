@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CountDownLatch;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MockAdProviderTest extends UITestBase {
@@ -297,6 +298,93 @@ class MockAdProviderTest extends UITestBase {
         } finally {
             ad.dispose();
             unrelated.dispose();
+        }
+    }
+
+    @FormTest
+    void workerShowThenDisposeDoesNotStrandQueuedDialog() throws Exception {
+        MockAdProvider.install();
+        Form previous = CN.getCurrentForm();
+        InterstitialAd ad = new InterstitialAd("mock");
+        ad.setAdListener(listener());
+        AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+        Thread worker = new Thread(() -> {
+            try {
+                ad.load();
+                ad.show();
+                ad.dispose();
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        }, "mock-ad-worker");
+        try {
+            // Keep the EDT here until the worker has queued both operations.
+            // invokeAndBlock would pump the queue and hide the failing ordering.
+            worker.start();
+            worker.join(1000);
+            assertFalse(worker.isAlive(), "Worker operations must not wait for the EDT");
+            assertNull(failure.get());
+            CountDownLatch drained = new CountDownLatch(1);
+            CN.callSerially(drained::countDown);
+            waitFor(drained, 1000);
+            assertSame(previous, CN.getCurrentForm(), "Queued presentation must not resurrect a disposed ad");
+            assertEquals(Arrays.asList("shown", "impression"), events);
+        } finally {
+            ad.dispose();
+            previous.show();
+        }
+    }
+
+    @FormTest
+    void onShownCanDisposeSynchronouslyWithoutAnImpression() {
+        MockAdProvider.install();
+        Form previous = CN.getCurrentForm();
+        InterstitialAd ad = new InterstitialAd("mock");
+        ad.setAdListener(new AdListener() {
+            @Override public void onShown() {
+                events.add("shown");
+                assertTrue(CN.isEdt());
+                assertNotSame(previous, CN.getCurrentForm());
+                ad.dispose();
+            }
+            @Override public void onImpression() { events.add("impression"); }
+        });
+        ad.load();
+        ad.show();
+        assertSame(previous, CN.getCurrentForm());
+        assertEquals(Arrays.asList("shown"), events);
+    }
+
+    @FormTest
+    void edtDisposalCancelsAlreadyQueuedWorkerPresentation() throws Exception {
+        MockAdProvider.install();
+        Form previous = CN.getCurrentForm();
+        InterstitialAd ad = new InterstitialAd("mock");
+        ad.setAdListener(listener());
+        AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+        Thread worker = new Thread(() -> {
+            try {
+                ad.load();
+                ad.show();
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        }, "mock-ad-queued-presentation");
+        try {
+            worker.start();
+            worker.join(1000);
+            assertFalse(worker.isAlive());
+            assertNull(failure.get());
+            // An EDT caller can dispose before the queued load/show get a turn.
+            ad.dispose();
+            CountDownLatch drained = new CountDownLatch(1);
+            CN.callSerially(drained::countDown);
+            waitFor(drained, 1000);
+            assertSame(previous, CN.getCurrentForm());
+            assertTrue(events.isEmpty(), "A disposed session must ignore pending presentation");
+        } finally {
+            ad.dispose();
+            previous.show();
         }
     }
 

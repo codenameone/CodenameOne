@@ -120,7 +120,9 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
     private static final class MockFullScreen implements FullScreenAdSession {
         private final AdFormat format;
         private AdSessionCallback cb;
-        private boolean loaded;
+        // Mutated on the EDT; readiness may be queried by a worker.
+        private volatile boolean loaded;
+        private boolean disposed;
         private Dialog adForm;
 
         MockFullScreen(AdFormat format) {
@@ -138,6 +140,13 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
 
         @Override
         public void load(AdRequest request) {
+            if (!CN.isEdt()) {
+                CN.callSerially(() -> load(request));
+                return;
+            }
+            if (disposed) {
+                return;
+            }
             loaded = true;
             cb.onLoaded();
         }
@@ -149,6 +158,13 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
 
         @Override
         public void show() {
+            if (!CN.isEdt()) {
+                CN.callSerially(this::show);
+                return;
+            }
+            if (disposed) {
+                return;
+            }
             if (!loaded) {
                 cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "No ad loaded"));
                 return;
@@ -213,6 +229,11 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
 
         @Override
         public void dispose() {
+            if (!CN.isEdt()) {
+                CN.callSerially(this::dispose);
+                return;
+            }
+            disposed = true;
             loaded = false;
             closeAd(false);
         }
