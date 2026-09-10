@@ -229,6 +229,18 @@ class InviteResilienceTest extends UITestBase {
         Invites.checkForInvite();
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
                 "a re-enabled window did not reopen the lookup");
+        // And the window it was reopened with is a real one. The marker was
+        // written while the kill switch was on, so it recorded
+        // expiresAt = firstLaunch + 0 -- a window already over at the instant
+        // it was created. Reopening kept it, the expiry check settled the
+        // lookup again on the same pass, and shipping a non-zero window later
+        // could never work. Asserted on the record rather than only through the
+        // state, because whether the state assertion above catches it depends
+        // on which other test in this class ran first.
+        Map<String, String> reopened = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(reopened);
+        assertTrue(InviteStore.getLong(reopened, "expiresAt", 0) > System.currentTimeMillis(),
+                "the reopened lookup carries the kill switch's zero-length window");
     }
 
     @Test
@@ -1034,6 +1046,41 @@ class InviteResilienceTest extends UITestBase {
         assertNotNull(resumed);
         assertEquals(originalExpiry, InviteStore.getLong(resumed, "expiresAt", 0),
                 "granting consent restarted the attribution window");
+    }
+
+    @Test
+    @EdtTest
+    void reopeningAfterConsentCapturesTheDeviceProfileAgain() {
+        // The other half of the same reopen. markTerminal() carries the timing,
+        // the delivery flag and the direct-link code and nothing that describes
+        // the device -- deliberately, because a refusal deletes the
+        // fingerprint. So the marker converted back to pending held empty
+        // strings and zero screen dimensions, and the resumed match sent the
+        // server the network and the country to score on and nothing else,
+        // which is below the threshold. Granting consent inside the original
+        // window could not recover the invite it was granted for.
+        Invites.checkForInvite();
+        Map<String, String> first = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(first);
+        String platform = InviteStore.get(first, "platform", "");
+        assertTrue(platform.length() > 0, "the first launch captured no platform");
+
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+        Map<String, String> denied = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(denied);
+        assertEquals("", InviteStore.get(denied, "platform", ""),
+                "the refused marker kept a device profile it promised to delete");
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+
+        Map<String, String> resumed = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(resumed);
+        assertEquals(platform, InviteStore.get(resumed, "platform", ""),
+                "the reopened lookup carries no platform, so it cannot match");
+        assertTrue(InviteStore.getLong(resumed, "screenWidth", 0) > 0,
+                "the reopened lookup carries no screen dimensions");
+        assertTrue(InviteStore.get(resumed, "locale", "").length() > 0,
+                "the reopened lookup carries no locale");
     }
 
     @Test

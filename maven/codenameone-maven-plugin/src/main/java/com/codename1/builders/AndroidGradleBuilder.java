@@ -6005,6 +6005,34 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // An App Link that arrives while the activity is already resumed never
+        // reaches the application's start(). The lifecycle generated below
+        // returns early when wasStopped is false -- it just re-shows the
+        // current form -- so the documented checkForInvite() call in start()
+        // does not run, and the app arg the port stored a moment ago is cleared
+        // again by the next onStop(). The invite is silently lost: no claim, no
+        // invite_opened, for a delivery that worked perfectly.
+        //
+        // Generated rather than done in the port, because AndroidImplementation
+        // referencing the invite package would make PlatformFeatureCatalog
+        // match it for EVERY application -- a Play Install Referrer dependency
+        // and an API 21 floor on apps that never heard of invites. This splice
+        // lands only in an app whose classes actually use them, which is the
+        // same condition the registration above rides on.
+        String inviteNewIntent = "";
+        if (usesInvites) {
+            inviteNewIntent = "    protected void onNewIntent(android.content.Intent intent) {\n"
+                    + "        super.onNewIntent(intent);\n"
+                    + "        if(!Display.isInitialized()) {\n"
+                    + "            return;\n"
+                    + "        }\n"
+                    + "        Display.getInstance().callSerially(new Runnable() {\n"
+                    + "            public void run() {\n"
+                    + "                com.codename1.analytics.invite.Invites.checkForInvite();\n"
+                    + "            }\n"
+                    + "        });\n"
+                    + "    }\n\n";
+        }
         String inviteRegisterInstall = "";
         if (usesInvites) {
             inviteRegisterInstall = "            com.codename1.analytics.invite.Invites"
@@ -6379,6 +6407,7 @@ public class AndroidGradleBuilder extends Executor {
                             + "            currentForm = null;\n"
                             + "        }\n"
                             + "    }\n\n"
+                            + inviteNewIntent
                             + "    protected void onPause() {\n"
                             + "        super.onPause();\n"
                             + "        synchronized(LOCK) {\n"

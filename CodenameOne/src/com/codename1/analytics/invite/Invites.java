@@ -1385,19 +1385,35 @@ public final class Invites {
         pending.put("expiresAt", String.valueOf(now + attributionWindow));
         pending.put("attempts", "0");
         pending.put("state", String.valueOf(STATE_PENDING));
-        Display d = Display.getInstance();
-        if (d != null) {
-            InviteStore.put(pending, "platform", d.getPlatformName());
-            InviteStore.put(pending, "osVersion", d.getProperty("OSVer", ""));
-            InviteStore.put(pending, "deviceModel",
-                    d.getProperty("DeviceHardwareModel", d.getProperty("DeviceName", "")));
-            pending.put("screenWidth", String.valueOf(d.getDisplayWidth()));
-            pending.put("screenHeight", String.valueOf(d.getDisplayHeight()));
-        }
-        Locale loc = Locale.getDefault();
-        InviteStore.put(pending, "locale", loc == null ? "" : loc.toString());
+        captureProfile(pending);
         InviteStore.write(InviteStore.PENDING, pending);
         return pending;
+    }
+
+    /// Writes the coarse device profile the deferred lookup is matched on.
+    ///
+    /// Separate from `pendingRecord()` because it is needed twice. A terminal
+    /// marker deliberately carries none of it -- a refused profile is deleted,
+    /// which is the promise the consent path makes -- so a marker that is
+    /// later reopened has to capture it again rather than restore it. Sending
+    /// the empty strings and zero dimensions the terminal marker really does
+    /// hold left the server with the network and the country and nothing else,
+    /// which scores below the threshold: a consent grant inside the original
+    /// window could not recover the invite it was granted for.
+    ///
+    /// - `record`: the pending record to fill in
+    private static void captureProfile(Map<String, String> record) {
+        Display d = Display.getInstance();
+        if (d != null) {
+            InviteStore.put(record, "platform", d.getPlatformName());
+            InviteStore.put(record, "osVersion", d.getProperty("OSVer", ""));
+            InviteStore.put(record, "deviceModel",
+                    d.getProperty("DeviceHardwareModel", d.getProperty("DeviceName", "")));
+            record.put("screenWidth", String.valueOf(d.getDisplayWidth()));
+            record.put("screenHeight", String.valueOf(d.getDisplayHeight()));
+        }
+        Locale loc = Locale.getDefault();
+        InviteStore.put(record, "locale", loc == null ? "" : loc.toString());
     }
 
     private static void beginDeferred() {
@@ -1427,7 +1443,41 @@ public final class Invites {
                 // one review round at a time, which is what this shape exists
                 // to stop happening again.
                 marker.put("state", String.valueOf(STATE_PENDING));
+                if (REASON_UNSUPPORTED.equals(why)) {
+                    // The window is recomputed for THIS reopening, and only
+                    // this one.
+                    //
+                    // A marker written while the kill switch was on recorded
+                    // expiresAt = firstLaunch + 0, so its window was already
+                    // over at the instant it was created. Reopening it kept
+                    // that zero-length window, the expiry check below settled
+                    // the lookup again as "expired" on the same pass, and
+                    // shipping a non-zero window later -- the documented way to
+                    // ask again -- could therefore never work.
+                    //
+                    // firstLaunch is a fact about this install and stays; the
+                    // window is a policy the application sets and the current
+                    // one applies. The consent reopening is left alone: its
+                    // marker was written under a real window, and recomputing
+                    // there would change a value that is already right.
+                    long began = InviteStore.getLong(marker, "firstLaunch",
+                            System.currentTimeMillis());
+                    marker.put("expiresAt", String.valueOf(began + attributionWindow));
+                }
                 marker.remove("reason");
+                // And the device profile is CAPTURED AGAIN, not restored.
+                //
+                // markTerminal() carries the timing, the delivery flag and the
+                // direct-link code and nothing that describes the device --
+                // deliberately, because a refusal deletes the fingerprint. So
+                // the marker being converted here holds none of it, and the
+                // resumed requestMatch() sent empty strings and zero screen
+                // dimensions: the server had the network and the country to
+                // score on, which is not enough to match, so granting consent
+                // inside the original window recovered nothing. Recapturing
+                // costs five property reads and is the same profile the first
+                // launch would have taken.
+                captureProfile(marker);
                 InviteStore.write(InviteStore.PENDING, marker);
                 state = STATE_PENDING;
                 stateLoaded = true;
