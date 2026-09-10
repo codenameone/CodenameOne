@@ -148,6 +148,13 @@ public final class Invites {
     /// This platform cannot recover a deferred invite.
     public static final String REASON_UNSUPPORTED = "unsupported";
 
+    // Not public, and never delivered to a listener. It is the marker an
+    // erasure leaves behind so the automatic lookup does not start again, and
+    // an application has no decision to make about it -- the reasons above are
+    // answers about an invite, this is a record that there is no longer anyone
+    // to answer about.
+    static final String REASON_ERASED = "erased";
+
     /// The analytics category every invite event is reported under.
     public static final String CATEGORY = "referral";
 
@@ -625,6 +632,11 @@ public final class Invites {
         // are holding the code for, so a referrer read is no longer a better
         // answer waiting to happen.
         pending.remove("referrerRetry");
+        // And any terminal reason the record was carrying, which is what makes
+        // a direct link the one thing that reopens an erased install: the
+        // tombstone eraseInternal() leaves is a state and a reason, and this
+        // overwrites both rather than reopening around them.
+        pending.remove("reason");
         writePending(pending);
         setState(STATE_PENDING);
         // A deferred fingerprint or referrer lookup may already be on the wire,
@@ -992,6 +1004,36 @@ public final class Invites {
     // id changes underneath us, which is what an erasure request looks like.
     static void eraseInternal() {
         reset();
+        // A tombstone, so the erasure is not undone by the next ordinary
+        // launch.
+        //
+        // reset() deletes the records and leaves the state at STATE_NONE, which
+        // is indistinguishable from a fresh install -- so the next routine
+        // checkForInvite() built a new profile and started deferred matching
+        // again. Inside the original click window, which on iOS is the normal
+        // path, the server can match the same device to the same click and
+        // restore the very inviter dimensions the user asked to be rid of,
+        // under their new client id. The erasure would have lasted until the
+        // next launch.
+        //
+        // The marker carries a state and a reason and NOTHING else: no code, no
+        // fingerprint, no identifier, nothing the erasure was meant to remove.
+        // It is marked delivered because there is no answer owed to anyone --
+        // the install had one and it has just been erased -- and its reason is
+        // not one beginDeferred() reopens, so the automatic lookup stays off.
+        //
+        // A direct link still reopens attribution: handleUrl() overwrites the
+        // state and clears the reason, which is the right asymmetry. Somebody
+        // who erases their identity and then taps a new invite is asking for
+        // that invite; somebody who erases it and reopens the app is not.
+        Map<String, String> erased = new LinkedHashMap<String, String>();
+        erased.put("state", String.valueOf(STATE_NONE_FOUND));
+        erased.put("reason", REASON_ERASED);
+        erased.put("delivered", "true");
+        if (writePending(erased)) {
+            state = STATE_NONE_FOUND;
+            stateLoaded = true;
+        }
     }
 
     // Package private: called from the provider when consent changes.
@@ -1962,9 +2004,30 @@ public final class Invites {
 
     private static void send(String url, String json, String matchType, boolean deferred,
             boolean registration) {
+        send(url, json, json, matchType, deferred, registration);
+    }
+
+    /// Sends `json`, and remembers `outboxKey` as the entry to retire when the
+    /// server accepts it.
+    ///
+    /// The two are the same string everywhere except one place: a queued
+    /// registration is rewritten on the way out so its consent flag is current,
+    /// and the entry sitting in the outbox is still the original. Passing the
+    /// rewritten body as the key made `outbox.remove(...)` match nothing, so
+    /// the registration was resent on every flush for ever and isRegistered()
+    /// never became true.
+    ///
+    /// - `url`: where to send it
+    /// - `json`: the body to transmit
+    /// - `outboxKey`: the stored entry this acknowledges, or null
+    /// - `matchType`: how the attribution was reached
+    /// - `deferred`: whether this is the statistical path
+    /// - `registration`: whether this is a mint registration
+    private static void send(String url, String json, String outboxKey, String matchType,
+            boolean deferred, boolean registration) {
         try {
             InviteConnection req = new InviteConnection(matchType, deferred, registration,
-                    registration ? json : null, lookupEpoch);
+                    registration ? outboxKey : null, lookupEpoch);
             req.setUrl(url);
             req.setPost(true);
             req.setContentType("application/json");
@@ -2084,6 +2147,24 @@ public final class Invites {
         // them straight back, under the new identity, and undo the very
         // operation the user asked for.
         if (epoch != lookupEpoch || !allowed()) {
+            return;
+        }
+        // And the kill switch is read HERE, not only where the lookup starts.
+        //
+        // setAttributionWindow(0) turns off deferred attribution, but a
+        // statistical request queued a moment earlier is already on the wire
+        // and carries the epoch it was issued with -- so its answer used to
+        // land, persist and report an attribution the application had just
+        // switched off. The window is checked against the answer rather than
+        // against the request.
+        //
+        // Only the DEFERRED answer. The switch turns off the statistical
+        // lookup, not an exact code the device is holding: hasSavedCode()
+        // exempts one where the lookup begins, and cancelling a direct claim
+        // here would break the same exemption from the other end. That is also
+        // why this is not an epoch bump -- the epoch is global and would
+        // discard the direct claim with it.
+        if (deferred && attributionWindow == 0) {
             return;
         }
         try {
@@ -2508,7 +2589,10 @@ public final class Invites {
         // Re-posting an entry that did land is harmless: the server keys on
         // the code and treats a repeat from the same inviter as idempotent.
         for (String json : outbox) {
-            postRegistration(withCurrentConsent(json));
+            // The body is rewritten, the KEY is not. The outbox still holds the
+            // original string, and that is what has to be removed when the
+            // server accepts it.
+            postRegistration(withCurrentConsent(json), json);
         }
     }
 
@@ -2556,7 +2640,15 @@ public final class Invites {
     }
 
     private static void postRegistration(String json) {
-        send(getLinkBase() + PATH_MINT, json, MATCH_DIRECT, false, true);
+        postRegistration(json, json);
+    }
+
+    /// Posts `body`, retiring `outboxKey` from the outbox when it lands.
+    ///
+    /// - `body`: the registration to transmit
+    /// - `outboxKey`: the stored entry it stands for
+    private static void postRegistration(String body, String outboxKey) {
+        send(getLinkBase() + PATH_MINT, body, outboxKey, MATCH_DIRECT, false, true);
     }
 
     // Called from the registration response, once its status has been checked.

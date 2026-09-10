@@ -114,7 +114,46 @@ class InviteConsentAndErasureTest extends UITestBase {
         // destroying data it never asked to lose.
         assertEquals("pro", dims.get("plan"));
         assertNull(Invites.getAttribution());
-        assertEquals(Invites.STATE_NONE, Invites.getState());
+        // Terminal, not STATE_NONE. STATE_NONE is indistinguishable from a
+        // fresh install, and that is precisely what let the erasure be undone:
+        // the next ordinary checkForInvite() built a new profile and started
+        // deferred matching again, and inside the original click window the
+        // server can match the same device to the same click and restore the
+        // same inviter under the new client id. The tombstone carries a state
+        // and a reason and nothing else.
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+    }
+
+    @FormTest
+    void anerasedInstallDoesNotStartLookingAgainByItself() {
+        // The erasure has to survive the next launch, not just the moment it
+        // happens. Nothing personal is kept to achieve it -- the marker is a
+        // state and a reason -- but the automatic lookup must not restart, or
+        // the server can hand the same inviter back under the new identity.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution());
+
+        Analytics.resetClientId();
+        implementation.clearQueuedRequests();
+
+        // The next ordinary launch.
+        Invites.forgetLoadedState();
+        Invites.checkForInvite();
+
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "an erased install started deferred matching again by itself");
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "an erased install sent a fresh device profile to the server");
+
+        // And a NEW invite still reopens it: erasing an identity is not a
+        // decision about an invite the person taps afterwards.
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/AFTER1"));
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "a direct invite could not reopen attribution after an erasure");
     }
 
     @FormTest

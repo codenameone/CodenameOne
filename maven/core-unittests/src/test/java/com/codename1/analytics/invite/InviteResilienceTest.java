@@ -603,6 +603,55 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void arewrittenRegistrationStillRetiresItsOriginalOutboxEntry() {
+        // The body is rewritten on the way out so its consent flag is current;
+        // the entry sitting in the outbox is still the original. Passing the
+        // rewritten string as the acknowledgement key made outbox.remove()
+        // match nothing, so the registration was resent on every flush for ever
+        // and isRegistered() never became true -- a fix for one silent failure
+        // that introduced a louder one.
+        Analytics.setConsent(null);
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+
+        Invite invite = Invites.create(InviteRequest.create().campaign("launch").build());
+        assertNotNull(invite);
+        List<String> queued = InviteStore.readOutbox();
+        assertEquals(1, queued.size(), "the registration was not queued");
+        String stored = queued.get(0);
+        assertTrue(stored.indexOf("false") >= 0,
+                "the fixture was queued with consent already granted");
+
+        Analytics.setConsent(AnalyticsConsent.granted());
+        Invites.flush();
+
+        // The server accepts it. The connection has to hand back the ORIGINAL
+        // entry, or nothing is retired.
+        Invites.InviteConnection req = null;
+        for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
+            ConnectionRequest r = implementation.getQueuedRequests().get(i);
+            if (r instanceof Invites.InviteConnection
+                    && r.getRequestBody() != null
+                    && r.getRequestBody().indexOf(invite.getCode()) >= 0) {
+                req = (Invites.InviteConnection) r;
+            }
+        }
+        assertNotNull(req, "the queued registration was never sent");
+        try {
+            req.readResponse(new ByteArrayInputStream(
+                    "{\"registered\":true}".getBytes("UTF-8")));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        req.postResponse();
+
+        assertEquals(0, InviteStore.readOutbox().size(),
+                "the acknowledged registration stayed in the outbox and will be resent for ever");
+        assertTrue(Invites.isRegistered(invite),
+                "an acknowledged registration never reports itself registered");
+    }
+
+    @FormTest
     void aFailedPendingWriteDoesNotLoseTheDirectCode() {
         // handleUrl() commits STATE_PENDING and issues the claim before it
         // knows the record reached the disk. When the write failed and the
@@ -1230,6 +1279,47 @@ class InviteResilienceTest extends UITestBase {
 
         assertNull(told[0], "the kill switch discarded an exact code we were holding");
         assertEquals(Invites.STATE_PENDING, Invites.getState());
+    }
+
+    @Test
+    @EdtTest
+    void thekillSwitchAlsoRefusesAmatchAlreadyOnTheWire() {
+        // setAttributionWindow(0) changed only the value future calls read. A
+        // statistical request queued a moment earlier carries the epoch it was
+        // issued with, so its answer still landed, persisted and reported an
+        // attribution the application had just switched off.
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+        int inFlight = Invites.currentLookupEpochForTest();
+
+        Invites.setAttributionWindow(0);
+
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LATE1", "c1", "sms"),
+                Invites.MATCH_FINGERPRINT, true, inFlight);
+
+        assertNull(Invites.getAttribution(),
+                "a statistical answer landed after the kill switch was thrown");
+    }
+
+    @Test
+    @EdtTest
+    void thekillSwitchStillLetsAnExactAnswerLand() {
+        // The switch turns off the STATISTICAL lookup, not an exact code the
+        // device is holding -- hasSavedCode() exempts one where the lookup
+        // begins, and refusing a direct claim on the way back in would break
+        // the same exemption from the other end. This is why the guard reads
+        // the deferred flag rather than bumping the epoch, which is global.
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/EXACT7");
+        int inFlight = Invites.currentLookupEpochForTest();
+
+        Invites.setAttributionWindow(0);
+
+        Invites.handleResolution(InviteTestSupport.resolvedJson("EXACT7", "c1", "sms"),
+                Invites.MATCH_DIRECT, false, inFlight);
+
+        InviteAttribution a = Invites.getAttribution();
+        assertNotNull(a, "the kill switch discarded an exact answer we had asked for");
+        assertEquals("EXACT7", a.getCode());
     }
 
     @Test
