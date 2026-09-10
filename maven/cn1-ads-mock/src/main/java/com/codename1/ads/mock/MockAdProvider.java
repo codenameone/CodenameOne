@@ -43,12 +43,12 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 
 /// A deterministic, network-free ad provider for tests and screenshots. It
 /// renders fixed, labelled "ads" with stable colours, text and sizes (no
@@ -116,14 +116,18 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
     }
 
     /// Deterministic full screen ad: fires the lifecycle events and presents a
-    /// fixed close-able form.
+    /// full-screen overlay with a Close button.
     private static final class MockFullScreen implements FullScreenAdSession {
         private final AdFormat format;
         private AdSessionCallback cb;
         // Mutated on the EDT; readiness may be queried by a worker.
         private volatile boolean loaded;
         private boolean disposed;
-        private Dialog adForm;
+        private Container overlay;
+        private Container layer;
+        private Form host;
+        private Command previousBack;
+        private Command closeCommand;
 
         MockFullScreen(AdFormat format) {
             this.format = format;
@@ -169,52 +173,60 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
                 cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "No ad loaded"));
                 return;
             }
-            if (adForm != null) {
+            if (overlay != null) {
                 cb.onShowFailed(new AdError(AdError.CODE_INTERNAL, "mock", "An ad is already showing"));
                 return;
             }
             loaded = false;
-            // Dialog disposal restores its caller directly, without re-showing a
-            // modal caller or changing how that caller behaves on later shows.
-            // It also supplies a fallback form when presented during app startup.
-            adForm = new Dialog("Mock advertisement", new BorderLayout());
-            adForm.setNativeWindowMode(false);
-            adForm.setAutoDispose(false);
-            adForm.add(BorderLayout.CENTER, new Label("Advertisement"));
+            host = CN.getCurrentForm();
+            if (host == null) {
+                host = new Form();
+                host.show();
+            }
+            overlay = new Container(new BorderLayout());
+            overlay.setGrabsPointerEvents(true);
+            overlay.setUIID("Form");
+            overlay.getAllStyles().setBgTransparency(255);
+            overlay.add(BorderLayout.CENTER, new Label("Mock advertisement"));
             Button close = new Button("Close ad");
             close.addActionListener(evt -> closeAd(true));
-            adForm.add(BorderLayout.SOUTH, close);
-            adForm.setBackCommand(new Command("Close ad") {
+            overlay.add(BorderLayout.SOUTH, close);
+            previousBack = host.getBackCommand();
+            closeCommand = new Command("Close ad") {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
                     closeAd(true);
                 }
-            });
-            adForm.showAtPosition(0, 0, 0, 0, false);
+            };
+            host.setBackCommand(closeCommand);
+            layer = host.getFormLayeredPane(MockAdProvider.class, true);
+            layer.setLayout(new LayeredLayout());
+            layer.add(overlay);
+            host.revalidate();
             cb.onShown();
             // A listener may dispose the ad synchronously from onShown().
-            if (adForm != null) {
+            if (overlay != null) {
                 cb.onImpression();
             }
         }
 
         private void closeAd(boolean notify) {
-            if (adForm == null) {
+            if (overlay == null) {
                 return;
             }
-            Dialog closing = adForm;
-            adForm = null;
-            Form current = CN.getCurrentForm();
-            while (current instanceof Dialog && current != closing) {
-                current = ((Dialog) current).getPreviousForm();
+            overlay.remove();
+            overlay = null;
+            if (layer.getComponentCount() == 0) {
+                layer.remove();
             }
-            if (current != closing) {
-                // Suppress restoration only after unrelated navigation. If an
-                // upper dialog still points to the ad, dispose() needs this link
-                // to splice the ad out of the active dialog stack.
-                closing.setPreviousForm(null);
+            if (host.getBackCommand() == closeCommand) {
+                host.setBackCommand(previousBack);
             }
-            closing.dispose();
+            host.revalidate();
+            layer = null;
+            host = null;
+            previousBack = null;
+            closeCommand = null;
             if (notify) {
                 if (format == AdFormat.REWARDED || format == AdFormat.REWARDED_INTERSTITIAL) {
                     cb.onUserEarnedReward(new RewardItem("coins", 10));
