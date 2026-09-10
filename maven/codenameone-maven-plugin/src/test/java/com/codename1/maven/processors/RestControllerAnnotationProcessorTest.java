@@ -879,6 +879,33 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void processingTwiceWithoutCleaningStillWorks() throws Exception {
+        // The second pass of an incremental build scans target/classes, which by
+        // then contains the FIRST pass's NotesRouter. The collision check looked it
+        // up unconditionally and reported the processor's own output as a
+        // user-defined class it would overwrite -- so every project using
+        // @RestController failed its second `mvn process-classes` and only a clean
+        // could get it building again.
+        File classes = compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/notes\")\n"
+                + "    public String all() { return \"[]\"; }\n"
+                + "}\n");
+        ProcessorContext first = run(classes);
+        assertFalse("the first pass should be clean: " + first.getErrors(),
+                first.hasErrors());
+        assertTrue("the first pass must have written the router it then trips over",
+                new File(classes, "com/example/NotesRouter.class").isFile());
+
+        ProcessorContext second = run(classes);
+        assertFalse("processing twice without a clean must work: " + second.getErrors(),
+                second.hasErrors());
+    }
+
+    @Test
     public void twoControllersOfTheSameShapeAreRefused() throws Exception {
         // The bootstrap chains the routers and returns the first non-null answer,
         // so a collision ACROSS controllers hides the later one exactly as a

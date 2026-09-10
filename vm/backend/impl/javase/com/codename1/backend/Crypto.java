@@ -126,6 +126,14 @@ public final class Crypto {
     }
 
     public static String hashPassword(String password) throws IOException {
+        // A null password is a MISSING one, not an empty one. utf8(null) answers an
+        // empty array, so a handler that passed a DTO field the client never sent
+        // got a perfectly valid verifier -- and verifyPassword("", thatHash) then
+        // succeeds, which turns an omitted credential into an empty-password
+        // account. verifyPassword already refuses null; this is the other half.
+        if(password == null) {
+            throw new IllegalArgumentException("a password is required");
+        }
         byte[] salt = randomBytes(PASSWORD_SALT_BYTES);
         byte[] hash = pbkdf2(utf8(password), salt, PASSWORD_ITERATIONS, PASSWORD_HASH_BYTES);
         return "pbkdf2$" + PASSWORD_ITERATIONS + "$" + Base64Url.encode(salt)

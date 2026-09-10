@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -448,6 +449,128 @@ public class RestServerAnnotationProcessorTest {
                 String.class, String.class, java.util.Map.class, Object.class);
         dispatch.invoke(dispatcher, "GET", "/count?n=7", null, null);
         assertEquals(Integer.valueOf(7), seen[0]);
+        loader.close();
+    }
+
+    @Test
+    public void processingAContractTwiceWithoutCleaningStillWorks() throws Exception {
+        // Same rule as the controller half: the second pass of an incremental
+        // build scans target/classes and finds the ApiServer, ApiDispatcher and
+        // DTO codecs the first pass wrote. Reported as existing application
+        // classes, an unchanged contract could be processed exactly once per
+        // clean output directory.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.NoteApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface NoteApi {\n"
+                + "    @GET(\"/notes\")\n"
+                + "    void all(OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext first = runProcessor(classes);
+        assertNoErrors(first);
+        assertTrue("the first pass must have written the dispatcher it then trips over",
+                new File(classes, "com/example/NoteApiDispatcher.class").isFile());
+
+        ProcessorContext second = runProcessor(classes);
+        assertFalse("processing twice without a clean must work: " + second.getErrors(),
+                second.hasErrors());
+    }
+
+    @Test
+    public void aRealCollisionIsStillRefused() throws Exception {
+        // The marker must not turn the guard off. A class the DEVELOPER wrote with
+        // the generated name carries no marker, and generating over it would
+        // silently replace their code in the output directory.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.NoteApiDispatcher",
+                "package com.example;\n"
+                + "public class NoteApiDispatcher {\n"
+                + "    public String mine() { return \"handwritten\"; }\n"
+                + "}\n");
+        sources.put("com.example.NoteApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface NoteApi {\n"
+                + "    @GET(\"/notes\")\n"
+                + "    void all(OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        assertTrue("a hand-written class of that name must still be protected",
+                ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("already exists") >= 0);
+    }
+
+    @Test
+    public void disjointSuffixesAreNotTheSameShape() throws Exception {
+        // The matcher supports embedded placeholders now, so these two are
+        // perfectly writable -- but the duplicate-shape check collapsed each whole
+        // segment to "{}", making them identical and refusing the contract.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.FileApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface FileApi {\n"
+                + "    @GET(\"/{name}.json\")\n"
+                + "    void json(@Path(\"name\") String name,\n"
+                + "              OnComplete<Response<String>> callback);\n"
+                + "    @GET(\"/{name}.xml\")\n"
+                + "    void xml(@Path(\"name\") String name,\n"
+                + "             OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        assertFalse("no request satisfies both, so they are not duplicates: "
+                + ctx.getErrors(), ctx.hasErrors());
+    }
+
+    @Test
+    public void aRelativeTemplateStillMatchesTheRequest() throws Exception {
+        // A contract written without the leading slash resolves against a base URL
+        // ending in "/", so the CLIENT requests /notes. The server split the
+        // template to one segment while the incoming path splits to two, so the
+        // route could never match -- a contract that works as a client and answers
+        // nothing as a server.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.RelApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface RelApi {\n"
+                + "    @GET(\"notes\")\n"
+                + "    void all(OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.RelApiServer");
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.RelApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+        assertNotNull("the route the client requests must be the one the server answers",
+                dispatch.invoke(dispatcher, "GET", "/notes", null, null));
         loader.close();
     }
 

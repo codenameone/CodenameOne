@@ -261,6 +261,17 @@ public class SelfTest {
         check("password verifies", "true", String.valueOf(Crypto.verifyPassword("hunter2", stored)));
         check("wrong password rejected", "false", String.valueOf(Crypto.verifyPassword("hunter3", stored)));
         check("empty password rejected", "false", String.valueOf(Crypto.verifyPassword("", stored)));
+        // A null password must not become an empty-password account: utf8(null) is
+        // an empty array, so hashing one produced a verifier that "" satisfies.
+        // Asserted on BOTH runtimes, because the two have separate Crypto arms.
+        String nullOutcome;
+        try {
+            Crypto.hashPassword(null);
+            nullOutcome = "accepted";
+        } catch (IllegalArgumentException refused) {
+            nullOutcome = "refused";
+        }
+        check("a null password is refused", "refused", nullOutcome);
         // A stored row with empty salt and hash decoded to two EMPTY arrays, not
         // nulls, so the null check let it through, pbkdf2 derived zero bytes and
         // comparing empty with empty was true: that row accepted every password.
