@@ -1071,6 +1071,21 @@ TreeNode.pressed { color: #1d1b20; background-color: transparent; padding: 0.5mm
     PopupContentPaneDownwards { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
     PopupContentPaneLeft { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
     PopupContentPaneRight { background-color: #211f26; padding: 0; margin: 0; border: 0.2mm solid #49454f; }
+    /* Dark base and selected for the FlatButton aliases. A dark state that
+       does not exist resolves to the LIGHT rule of the same name, so a focused
+       media control in dark mode was picking up the light accent. */
+    MenuButtonRight { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MenuButtonRight.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerPlay { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerPlay.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerPause { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerPause.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerFwd { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerFwd.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerBack { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerBack.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerMax { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
+    MediaPlayerMax.selected { color: var(--accent-color-dark, #d0bcff); background-color: transparent; cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
     MenuButtonRight.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }
     MenuButtonRight.disabled { background-color: transparent; color: #5c5967; cn1-background-type: cn1-pill-border; border: 0.25mm solid #49454f; }
     MediaPlayerPlay.pressed { background-color: transparent; color: var(--accent-color-dark, #d0bcff); cn1-background-type: cn1-pill-border; border: 0.25mm solid #938f99; }

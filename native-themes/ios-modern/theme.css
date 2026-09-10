@@ -1352,6 +1352,21 @@ TreeNode.pressed { color: #000000; background-color: transparent; padding: 1mm 2
     PopupContentPaneDownwards { background-color: rgba(28,28,30,0.94); padding: 0; margin: 0; border: 0.1mm solid #38383a; }
     PopupContentPaneLeft { background-color: rgba(28,28,30,0.94); padding: 0; margin: 0; border: 0.1mm solid #38383a; }
     PopupContentPaneRight { background-color: rgba(28,28,30,0.94); padding: 0; margin: 0; border: 0.1mm solid #38383a; }
+    /* Dark base and selected for the FlatButton aliases. A dark state that
+       does not exist resolves to the LIGHT rule of the same name, so a focused
+       media control in dark mode was picking up the light accent. */
+    MenuButtonRight { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MenuButtonRight.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerPlay { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerPlay.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerPause { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerPause.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerFwd { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerFwd.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerBack { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerBack.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerMax { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    MediaPlayerMax.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
     MenuButtonRight.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
     MenuButtonRight.disabled { color: #636366; background-color: rgba(134,127,122,0.55); cn1-background-type: cn1-pill-border; }
     MediaPlayerPlay.pressed { color: #ffffff; background-color: rgba(110,105,100,0.80); cn1-background-type: cn1-pill-border; }
