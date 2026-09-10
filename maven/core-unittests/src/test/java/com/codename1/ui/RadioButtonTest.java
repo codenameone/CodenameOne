@@ -92,7 +92,10 @@ class RadioButtonTest extends UITestBase {
         first.setToggle(false);
 
         assertFalse(first.isToggle());
-        assertEquals("RadioButton", first.getUIID());
+        assertEquals("ToggleButtonFirst", first.getUIID(),
+                "the live UIID belongs to the group while the control is in it: the "
+                        + "group renames every member for the segmented edges and does "
+                        + "not re-apply that when the UIID changes under it");
 
         group.removeComponent(first);
         assertEquals("RadioButton", first.getUIID(),

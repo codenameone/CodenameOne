@@ -1076,7 +1076,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             //   - $origUIID, which is what a ComponentGroup puts back when the
             //     control leaves it, and which holds ToggleButton whatever prefix
             //     the group itself uses.
-            if (isToggleUIID(uiid)) {
+            // While the control is still in a group the live UIID belongs to the
+            // group: a horizontal one renames every member, toggle or not, to give
+            // the bar its segmented edges, and it does not re-apply that when the
+            // UIID changes under it. Resetting it here would strip the member's
+            // styling until the next structural or theme update. $origUIID is not
+            // the test for that -- ComponentGroup sets it once and never clears it,
+            // so it says "was grouped at some point" rather than "is grouped now".
+            if (!(getParent() instanceof ComponentGroup) && isToggleUIID(uiid)) {
                 setUIID(preToggleUIID);
             }
             Object saved = getClientProperty("$origUIID");
