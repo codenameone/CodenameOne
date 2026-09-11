@@ -163,6 +163,16 @@ public class PetServer {
                     extra.put("X Bad", "space-in-name");
                     extra.put(" X-Fold", "obsolete-folding");
                     extra.put("X:Colon", "colon-in-name");
+                    // A value taken STRAIGHT FROM THE REQUEST. The four above are
+                    // malformed names the handler wrote itself; this is the shape
+                    // the value rule actually exists for -- a handler reflecting a
+                    // parameter into a header -- and it is the only one a client
+                    // controls. ?v=%C4%8A decodes to U+010A, which is not '\n' to
+                    // a char test and is byte 0x0A once narrowed for the wire.
+                    String reflected = request.queryParam("v");
+                    if(reflected != null) {
+                        extra.put("X-Reflected", reflected);
+                    }
                     return new HttpServer.Response(200, "text/plain",
                             "raw".getBytes("UTF-8"), extra);
                 }

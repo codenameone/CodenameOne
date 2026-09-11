@@ -1160,6 +1160,50 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a reflected header value cannot smuggle a newline through a wide char")
+    void aWideCharInAHeaderValueCannotSplitTheResponse() throws Exception {
+        // ?v=%C4%8A decodes to U+010A. The old value rule compared CHARS against
+        // '\r', '\n' and NUL, and U+010A is none of them -- but both writers
+        // narrow with a plain (byte) cast, so it reached the wire as 0x0A. A
+        // handler reflecting a parameter into a header, which is the exact shape
+        // that rule exists to protect, could therefore be made to write a real
+        // newline into the header block: response splitting.
+        byte[] response = raw("GET /rawheader?v=%C4%8A HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n");
+        String text = new String(response, StandardCharsets.ISO_8859_1);
+        int blank = text.indexOf("\r\n\r\n");
+        assertTrue(blank > 0, "no header section:\n" + text);
+        String head = text.substring(0, blank);
+        // A BARE LF, wherever it landed -- one not preceded by CR. Every line in
+        // the header block legitimately ends CRLF, so searching for '\n' alone
+        // finds those and says nothing. An injected U+010A arrives as a lone 0x0A
+        // after ": ", which is what this looks for. Asserting only on the absence
+        // of "X-Reflected" would pass if the header were emitted with the newline
+        // still inside it.
+        for(int at = 0 ; at < head.length() ; at++) {
+            if(head.charAt(at) == '\n') {
+                assertTrue(at > 0 && head.charAt(at - 1) == '\r',
+                        "a bare LF reached the header block at " + at + ":\n"
+                                + head.replace('\r', '.').replace('\n', '!'));
+            }
+        }
+        assertEquals(-1, head.indexOf("X-Reflected"),
+                "the reflected value should have been dropped entirely:\n" + head);
+        assertTrue(head.startsWith("HTTP/1.1 200"), "the reply should still be a 200:\n" + text);
+        assertTrue(head.indexOf("X-Good: ok") >= 0,
+                "the well formed headers beside it must still be sent:\n" + head);
+
+        // A value that is merely NON-ASCII is still legal: obs-text is 0x80-0xFF,
+        // so narrowing it is lossless and this must not have become stricter than
+        // RFC 9110. %C3%A9 decodes to U+00E9, which fits in one byte.
+        byte[] accented = raw("GET /rawheader?v=%C3%A9 HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n");
+        String accentedText = new String(accented, StandardCharsets.ISO_8859_1);
+        assertTrue(accentedText.indexOf("X-Reflected: \u00e9") >= 0,
+                "an obs-text value is legal and must still be sent:\n" + accentedText);
+    }
+
+    @Test
     @DisplayName("a 205 carries neither content nor a length that claims any")
     void resetContentIsBodilessAndZeroLength() throws Exception {
         // RFC 9110 15.3.6: a Reset Content response cannot contain content and
@@ -1699,6 +1743,33 @@ class BackendHttpIntegrationTest {
         }
         assertEquals(503, h2StatusFor(smallUploadPort, "/bulk?size=" + (6 * 1024 * 1024)),
                 "and the ceiling still applies afterwards");
+    }
+
+    @Test
+    @DisplayName("h2 refuses an unsupported method the same way HTTP/1 does")
+    void unsupportedMethodsAreRefusedOverHttp2() throws Exception {
+        // The HTTP/1 request line answers 501 for anything outside KNOWN_METHODS,
+        // and the h2 path built a Request from :method and dispatched it. So the
+        // two protocols on ONE server disagreed about the same request: "BREW"
+        // reached application code over h2 and never over HTTP/1, where a
+        // generated router turns it into a 404 and a hand-written handler may
+        // treat anything that is not a GET as a write.
+        assertEquals(501, h2StatusFor(port, "/healthz", "BREW"),
+                "an extension method should be refused before the handler");
+        // Methods are case SENSITIVE, which is the half a folded comparison would
+        // have missed.
+        assertEquals(501, h2StatusFor(port, "/healthz", "get"),
+                "a lowercase method is not GET");
+        // And the supported ones still route, which is what this must not trade.
+        assertEquals(200, h2StatusFor(port, "/healthz", "GET"),
+                "GET must still be served over h2");
+
+        // The same two over HTTP/1, so the agreement is asserted rather than
+        // assumed -- the point of the fix is that the answers match.
+        String brewed = new String(raw("BREW /healthz HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n"), StandardCharsets.UTF_8);
+        assertTrue(brewed.startsWith("HTTP/1.1 501"),
+                "HTTP/1 should answer 501 for BREW:\n" + brewed);
     }
 
     /** The :status of one h2c GET, decoded from the HEADERS block. */

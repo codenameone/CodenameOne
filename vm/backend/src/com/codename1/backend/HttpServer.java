@@ -1778,13 +1778,6 @@ public final class HttpServer {
         }
     }
 
-    /** The methods this server routes. Anything else is 501, not a 404. */
-    private static boolean isKnownMethod(String method) {
-        return "GET".equals(method) || "HEAD".equals(method) || "POST".equals(method)
-                || "PUT".equals(method) || "DELETE".equals(method) || "PATCH".equals(method)
-                || "OPTIONS".equals(method);
-    }
-
     /**
      * The server a virtual thread belongs to.
      *
@@ -3464,6 +3457,22 @@ public final class HttpServer {
                     requestsServed.incrementAndGet();
                     continue;
                 }
+                if(!isKnownMethod(stream.getMethod())) {
+                    // 501 before the handler, for the same reason the HTTP/1
+                    // request line answers 501: the path may well exist, the verb
+                    // is what is unknown. Without this the two protocols
+                    // DISAGREED on the same server -- "BREW", or a lowercase
+                    // "get", was refused over HTTP/1 and handed to application
+                    // code over h2, where a generated router turns it into a 404
+                    // and a hand-written handler may treat anything that is not a
+                    // GET as a write.
+                    if(!h2.respond(stream.getId(), 501, "text/plain", new ArrayList(),
+                            asciiBytes("unsupported method"))) {
+                        h2.respond(stream.getId(), 501, "text/plain", new ArrayList(), null);
+                    }
+                    requestsServed.incrementAndGet();
+                    continue;
+                }
                 Request request = new Request(stream.getMethod(), stream.getPath(),
                         "HTTP/2", headers, stream.getBodyAsString());
                 Response response;
@@ -3867,14 +3876,55 @@ public final class HttpServer {
         return true;
     }
 
+    /**
+     * Whether this value may be written as a field value.
+     *
+     * RFC 9110's field-value carries HTAB, SP, VCHAR (0x21-0x7E) and obs-text
+     * (0x80-0xFF). Every other C0 character, and DEL, is a delimiter to somebody:
+     * over HTTP/1 they produce a malformed field, and an HTTP/2 submission
+     * carrying one can be rejected outright and take the whole response with it.
+     *
+     * THE TEST IS ON THE BYTE THAT WILL BE EMITTED, not on the char, and that is
+     * the part worth reading twice. Both writers narrow with a plain cast --
+     * Buffer.put does out[n] = (byte)charAt(i), and asciiBytes the same -- so
+     * '\u010A' is not '\n' to a char comparison and is byte 0x0A on the wire.
+     * The old rule tested \r, \n and NUL as CHARS and so passed it. A handler
+     * reflecting a query parameter into a header -- exactly the shape this guard
+     * exists for -- therefore turned ?v=%C4%8A into a real newline in the header
+     * block, which is response splitting and a cache-poisoning primitive: the
+     * defect the comment beside the caller says is being prevented. Anything
+     * above 0xFF cannot be spelled in one byte at all and is refused for the same
+     * reason rather than being narrowed into whatever it happens to alias.
+     */
     private static boolean isHeaderSafe(String value) {
         for(int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            if(c == '\r' || c == '\n' || c == 0) {
+            if(c == '\t') {
+                continue;
+            }
+            if(c < 0x20 || c == 0x7f || c > 0xff) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Whether this is one of the methods this server routes. Anything else is
+     * 501, not a 404 -- the path may well exist, the verb is what is unknown.
+     *
+     * Derived from KNOWN_METHODS rather than spelling the seven out again. The
+     * version this replaced did spell them out, and had no callers at all, so a
+     * method added to KNOWN_METHODS would have been routed by the HTTP/1 parser
+     * and refused here with nothing to notice the disagreement.
+     */
+    private static boolean isKnownMethod(String method) {
+        for(int iter = 0 ; iter < KNOWN_METHODS.length ; iter++) {
+            if(KNOWN_METHODS[iter].equals(method)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The same token rule as isHeaderName, over a slice of the read buffer. */
