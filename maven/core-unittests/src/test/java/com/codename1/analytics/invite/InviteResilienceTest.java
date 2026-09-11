@@ -463,7 +463,7 @@ class InviteResilienceTest extends UITestBase {
 
         source.answer("CLIPACK1", 1700000000L);
 
-        assertEquals(1, source.persistedCount(),
+        assertEquals(1, source.discardedCount(),
                 "a durable handoff was never acknowledged");
     }
 
@@ -488,9 +488,35 @@ class InviteResilienceTest extends UITestBase {
 
         assertTrue(Invites.pendingFallbackPresentForTest(),
                 "the record was saved after all, so this proves nothing");
-        assertEquals(0, source.persistedCount(),
+        assertEquals(0, source.discardedCount(),
                 "the source was told to discard the only copy of the code while the "
                         + "write that was supposed to keep it kept failing");
+    }
+
+    @FormTest
+    void forgettingDiscardsAHandoffNothingHasReadYet() {
+        // The acknowledgement paths all cover a code THIS process read. A code
+        // the clip left that nothing has consumed is still in the shared
+        // container, and reset() -- or an erasure -- used to clear the store
+        // and leave it there.
+        //
+        // The container is read on launch, so the next check finds it and
+        // attributes the device to exactly the inviter that was erased; until
+        // then the raw code sits on disk naming them. Forgetting has to reach
+        // it, which means asking the source without any record to go on.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        InviteTestSupport.PendingHandoffSource source = InviteTestSupport.pendingHandoff;
+        assertEquals(0, source.discardedCount(),
+                "the fixture starts from a discard, so the count below proves nothing");
+
+        // No checkForInvite(): nothing has read the handoff, which is the case.
+        Invites.reset();
+
+        assertEquals(1, source.discardedCount(),
+                "an unconsumed handoff survived the reset, so the clip's container "
+                        + "still holds a code naming the inviter and the next launch "
+                        + "re-attributes the device to them");
     }
 
     @FormTest
@@ -518,7 +544,7 @@ class InviteResilienceTest extends UITestBase {
 
         assertFalse(Invites.pendingFallbackPresentForTest(),
                 "the retry did not persist the held record, so this proves nothing");
-        assertEquals(1, source.persistedCount(),
+        assertEquals(1, source.discardedCount(),
                 "the record became durable through the retry and the clip was never "
                         + "told, so its container keeps the code and a launch after an "
                         + "erasure restores the attribution that was erased");

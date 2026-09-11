@@ -111,7 +111,7 @@ public class IOSAppClipHandoff implements AppClipHandoffSource {
     /// handoff, settled an invited install as no_match for ever. Nothing
     /// reports that: the clip ran, the store carried the person across, and
     /// the install simply looks organic.
-    public void handoffPersisted() {
+    public void discardHandoff() {
         if (appGroup == null || appGroup.length() == 0) {
             return;
         }

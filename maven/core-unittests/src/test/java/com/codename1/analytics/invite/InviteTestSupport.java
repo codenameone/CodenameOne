@@ -55,16 +55,16 @@ final class InviteTestSupport {
             callback = cb;
         }
 
-        /** Counts the acknowledgements, which is what the iOS source clears on. */
-        private int persisted;
+        /** Counts the discards, which is what the iOS source clears on. */
+        private int discarded;
 
-        public void handoffPersisted() {
-            persisted++;
+        public void discardHandoff() {
+            discarded++;
         }
 
-        /** How many handoffs the framework reported as durably stored. */
-        int persistedCount() {
-            return persisted;
+        /** How many times the framework said it was done with the handoff. */
+        int discardedCount() {
+            return discarded;
         }
 
         /** True once Invites has asked. */
@@ -113,8 +113,6 @@ final class InviteTestSupport {
         // the instant it starts -- correct on a device with no App Clip, and
         // useless for testing anything that happens while one is in flight.
         // A case that wants an answer installs its own.
-        pendingHandoff = new PendingHandoffSource();
-        Invites.registerAppClipHandoffSource(pendingHandoff);
         Invites.lookupRetryDelay = 30000L;
         // Any unspent write failure a previous case armed is disarmed here.
         // It used to disarm itself, because one failure consumed it; a case
@@ -123,6 +121,12 @@ final class InviteTestSupport {
         // way to fail.
         InviteStore.failWritesForTest(null, 0);
         Invites.reset();
+        // Registered AFTER the reset, which now tells the source to discard
+        // whatever the clip left -- forgetting has to reach a handoff nothing
+        // has read yet. Registering first counted that discard against the
+        // fixture and made every case start from one.
+        pendingHandoff = new PendingHandoffSource();
+        Invites.registerAppClipHandoffSource(pendingHandoff);
         Preferences.delete(Invites.PREF_SLUG);
         Preferences.delete(Invites.PREF_CONSUMED_ARG);
         // reset() clears the records; clearProviders() above dropped the

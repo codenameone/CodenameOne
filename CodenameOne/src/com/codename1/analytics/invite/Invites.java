@@ -35,6 +35,7 @@ import com.codename1.share.ShareResult;
 import com.codename1.share.ShareResultListener;
 import com.codename1.ui.Display;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.security.Hash;
 import com.codename1.util.Base64;
 import java.io.IOException;
 import java.io.InputStream;
@@ -342,11 +343,16 @@ public final class Invites {
             throw new IllegalArgumentException("request is null");
         }
         ensureProvider();
-        String code = newCode();
+        String[] minted = newCode();
+        String code = minted[0];
+        // The proof goes to queueRegistration and NOWHERE else. It is not on
+        // Invite, which is public and handed to the application, and it is not
+        // in the url, which is the thing everybody can read.
+        String proof = minted[1];
         long now = System.currentTimeMillis();
         Invite invite = new Invite(code, buildUrl(code), request.getCampaign(),
                 request.getChannel(), request.getPayload(), now);
-        if (!queueRegistration(invite, request)) {
+        if (!queueRegistration(invite, request, proof)) {
             // The outbox could not be persisted, and the invite has already
             // been minted -- so the choice is between sending now and losing
             // the registration for good. Send now: if it lands, the link is
@@ -1159,6 +1165,21 @@ public final class Invites {
         // killed request when it reaches the front of the queue, and kills the
         // connection outright if it is already being sent.
         killQueuedRequests();
+        // The App Clip's container too, and the case that needs it is the one
+        // where the handoff was never CONSUMED.
+        //
+        // Acknowledging on a durable write covers a code this process read.
+        // A code the clip left that nothing has read yet is still sitting in
+        // the shared container -- reset() or an erasure before the first
+        // checkForInvite() clears the store and leaves it there. The container
+        // is read on launch, so the next check finds it and attributes the
+        // device to exactly the inviter the erasure was asked to forget, and
+        // in the meantime the raw code sits on disk naming them.
+        //
+        // Unconditional, because "was it consumed?" is not knowable from here
+        // and the answer does not change what to do: forgetting means the copy
+        // goes either way. A source with nothing to discard does nothing.
+        discardAnyHandoff();
         boolean cleared = InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
         // ATTRIBUTION names the inviter, and the OUTBOX is the queued
@@ -1541,23 +1562,60 @@ public final class Invites {
         return c != null && !c.isAnalytics();
     }
 
-    private static String newCode() {
+    /// Mints a code and the secret that proves who minted it.
+    ///
+    /// The code is the truncated SHA-256 of a random secret, and the SECRET is
+    /// what registration sends. The code is public by construction -- it is in
+    /// the share url -- so deriving it this way is what makes minting it a
+    /// thing only its creator can do.
+    ///
+    /// A code used to be the random bytes themselves, on the reasoning that it
+    /// "identifies an invite and authorizes nothing". That is true of every
+    /// path except the one that CREATES the server row: an invite shared while
+    /// its registration is still in the offline outbox is a public code with
+    /// no row behind it, and the server took the first registration of an
+    /// unknown code as its owner. A recipient of that link, running the same
+    /// shipped app and holding the build key that ships inside it, could
+    /// register it first under their own client id -- and then own the link,
+    /// while the real inviter's registration was refused as a different
+    /// inviter. Every install and every payout on a link they were merely sent
+    /// went to them.
+    ///
+    /// Truncated to the length the old code had, so urls do not change shape;
+    /// 22 base64 characters is 132 bits, which is preimage resistance nobody
+    /// is going to spend.
+    ///
+    /// #### Returns
+    ///
+    /// the code at index 0, and the proof to register it with at index 1
+    private static String[] newCode() {
         byte[] raw = new byte[16];
         try {
             Util.secureRandomBytes(raw);
         } catch (Throwable t) {
-            // A code identifies an invite and authorizes nothing, so a weaker
-            // source degrades uniqueness, not security. Reported once rather
-            // than failing the invite.
+            // Weaker randomness now costs more than uniqueness -- a guessable
+            // secret is a forgeable proof -- but failing the mint outright
+            // would take the feature down on whatever platform is degraded,
+            // and the fallback is still a SecureRandom-seeded generator.
+            // Reported once rather than failing the invite.
             Log.e(t);
             FALLBACK_RANDOM.nextBytes(raw);
         }
-        String s = Base64.encodeUrlSafe(raw);
-        int pad = s.indexOf('=');
-        if (pad > 0) {
-            s = s.substring(0, pad);
+        String proof = trimPadding(Base64.encodeUrlSafe(raw));
+        String code = trimPadding(Base64.encodeUrlSafe(Hash.sha256(raw)));
+        if (code.length() > CODE_CHARS) {
+            code = code.substring(0, CODE_CHARS);
         }
-        return s;
+        return new String[] {code, proof};
+    }
+
+    /// The code length, which is what the server truncates the digest to
+    /// before comparing. Both sides have to agree or no mint is ever accepted.
+    private static final int CODE_CHARS = 22;
+
+    private static String trimPadding(String s) {
+        int pad = s.indexOf('=');
+        return pad > 0 ? s.substring(0, pad) : s;
     }
 
     private static String buildUrl(String code) {
@@ -1952,6 +2010,27 @@ public final class Invites {
     ///
     /// Every path that persists goes through `writePending`, so acknowledging
     /// here covers the retries without any of them having to remember to.
+    /// Tells the source to drop its copy, whatever the framework's reason.
+    ///
+    /// Separate from `ackHandoff` because the obligation flag does not apply:
+    /// forgetting has to reach a handoff this process never read, and there is
+    /// no record to check a codeSource against.
+    private static void discardAnyHandoff() {
+        AppClipHandoffSource source = appClipSource;
+        // Nothing is owed any more either way, so the flag goes with it -- or a
+        // later write of an unrelated record would ask the source to discard a
+        // handoff that is already gone.
+        handoffAwaitingAck = false;
+        if (source == null) {
+            return;
+        }
+        try {
+            source.discardHandoff();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     private static void ackHandoff(Map<String, String> record) {
         if (!handoffAwaitingAck || !"app_clip".equals(record.get("codeSource"))) {
             return;
@@ -1965,7 +2044,7 @@ public final class Invites {
             return;
         }
         try {
-            source.handoffPersisted();
+            source.discardHandoff();
         } catch (Throwable t) {
             Log.e(t);
         }
@@ -2497,7 +2576,7 @@ public final class Invites {
                         // may be this write or a later retry of it.
                         // And the source may let go of its own copy only
                         // once ours is durable -- which writePending() reports
-                        // by calling handoffPersisted(), here or on whichever
+                        // by calling discardHandoff(), here or on whichever
                         // later retry succeeds.
                         //
                         // The container the clip wrote is the ONLY durable
@@ -3522,9 +3601,15 @@ public final class Invites {
         }
     }
 
-    private static boolean queueRegistration(Invite invite, InviteRequest request) {
+    private static boolean queueRegistration(Invite invite, InviteRequest request,
+            String proof) {
         Map<String, Object> body = identity();
         body.put("code", invite.getCode());
+        // Carried in the queued body, so a registration retried days later from
+        // the durable outbox still proves it was this device that minted the
+        // code. Held nowhere else: the outbox goes with an erasure, and the
+        // proof goes with it.
+        body.put("proof", proof);
         putIfSet(body, "campaign", invite.getCampaign());
         putIfSet(body, "channel", invite.getChannel());
         putIfSet(body, "payload", invite.getPayload());

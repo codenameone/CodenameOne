@@ -63,9 +63,8 @@ public interface AppClipHandoffSource {
     /// - `callback`: receives the answer, never null
     void requestHandoff(AppClipHandoffCallback callback);
 
-    /// Told that the code from the last handoff is now stored somewhere that
-    /// survives the process, so a source holding the only other copy may
-    /// discard it.
+    /// Told that the framework is done with the handoff, so a source holding
+    /// the only other copy must discard it.
     ///
     /// The iOS source hands over a value it reads out of the container it
     /// shares with the App Clip, and that container is the ONLY durable copy
@@ -75,9 +74,20 @@ public interface AppClipHandoffSource {
     /// install as no_match for ever. So the read leaves the container alone
     /// and this is what empties it.
     ///
-    /// Called at most once per handoff, and never when the write failed: the
-    /// code stays where it is and the next launch reads it again, which is the
-    /// outcome a retry can still fix. A source with nothing to discard --
-    /// anything that did not hand over its only copy -- does nothing here.
-    void handoffPersisted();
+    /// Two things end the framework's interest, and BOTH have to empty the
+    /// container, which is why this is one method rather than a
+    /// "persisted" one:
+    ///
+    /// - the code reached durable storage, so the copy is redundant. Never
+    ///   called while the write is still failing: the code stays where it is
+    ///   and the next launch reads it again, which is the outcome a retry can
+    ///   still fix.
+    /// - the framework is FORGETTING -- [Invites#reset] or an erasure. A
+    ///   handoff that was never consumed is still a code naming an inviter,
+    ///   and the container is read on launch, so one left behind re-attributes
+    ///   the device afterwards and undoes exactly what was erased.
+    ///
+    /// A source with nothing to discard -- anything that did not hand over its
+    /// only copy -- does nothing here.
+    void discardHandoff();
 }

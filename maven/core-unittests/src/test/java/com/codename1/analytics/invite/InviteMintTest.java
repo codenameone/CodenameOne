@@ -24,6 +24,8 @@ package com.codename1.analytics.invite;
 
 import com.codename1.analytics.AnalyticsEvent;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.security.Hash;
+import com.codename1.util.Base64;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import java.util.HashSet;
@@ -206,4 +208,54 @@ class InviteMintTest extends UITestBase {
                 "a burst of " + burst + " invites did not send one request each");
     }
 
+    @FormTest
+    void theCodeIsTheTruncatedDigestOfTheProof() {
+        // The CONTRACT with the server, pinned on both sides against the same
+        // vector. The server accepts a registration for an unknown code only
+        // when the proof digests to it, so a disagreement about the digest,
+        // the alphabet, the padding or the truncation refuses every mint --
+        // safe, and not a failure anybody would enjoy diagnosing from either
+        // repository alone. InviteService.provesCreation has the twin of this.
+        byte[] secret = new byte[16];
+        for (int i = 0; i < secret.length; i++) {
+            secret[i] = (byte) (i + 1);
+        }
+        String proof = Base64.encodeUrlSafe(secret);
+        String digest = Base64.encodeUrlSafe(Hash.sha256(secret));
+
+        assertEquals("AQIDBAUGBwgJCgsMDQ4PEA", proof,
+                "the proof encoding drifted from the one the server decodes");
+        assertEquals("Xfur7t8xi_M8CSfEPXYw9R", digest.substring(0, 22),
+                "the code derivation drifted from the one the server verifies");
+    }
+
+    @FormTest
+    void aMintedCodeIsNotItsOwnProof() {
+        // The whole point: the code is public -- it is in the share url -- and
+        // must not be enough to register itself. Before this, an invite shared
+        // while its registration sat in the offline outbox could be registered
+        // by whoever was sent the link, and every install and payout on it
+        // went to them.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+
+        Invite invite = Invites.create(InviteRequest.create().campaign("spring").build());
+
+        assertEquals(22, invite.getCode().length(),
+                "the code length changed, which the server truncates to");
+        boolean carriesProof = false;
+        for (ConnectionRequest r : implementation.getQueuedRequests()) {
+            String body = r.getRequestBody();
+            if (body != null && body.contains("\"proof\"")) {
+                carriesProof = true;
+                assertFalse(body.contains("\"proof\":\"" + invite.getCode() + "\""),
+                        "the proof is the code, so anyone holding the link can register it");
+            }
+        }
+        assertTrue(carriesProof,
+                "the registration carried no proof, so the server cannot tell the "
+                        + "minter from anyone who was sent the link");
+        assertFalse(invite.getUrl().contains("AQIDBAUGBwgJCgsMDQ4PEA"),
+                "the url carries a proof");
+    }
 }
