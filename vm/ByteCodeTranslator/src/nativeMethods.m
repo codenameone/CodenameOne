@@ -1766,12 +1766,8 @@ JAVA_OBJECT java_lang_Long_toString___long_int_R_java_lang_String(CODENAME_ONE_T
 #define CN1_SB_PTR(s) ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)((struct obj__java_lang_String*)(s))->java_lang_String_value)->data + ((struct obj__java_lang_String*)(s))->java_lang_String_offset)
 #define CN1_SB_LEN(s) (((struct obj__java_lang_String*)(s))->java_lang_String_count)
 
-// The caller owns the enteringNativeAllocations() bracket: it holds the source
-// Strings and raw interior pointers into their byte[]s across BOTH this call and
-// the fused attempt before it, so the protected region has to start there, not
-// here. Setting it again here would clear it on return while the caller is still
-// holding those references.
 static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE* const* parts, const int* lens, int n, int total) {
+    enteringNativeAllocations();
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, total, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) (*dat).data;
     int o = 0;
@@ -1781,20 +1777,11 @@ static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE*
     struct obj__java_lang_String* ss = (struct obj__java_lang_String*)so;
     ss->java_lang_String_value = (JAVA_OBJECT)dat;
     ss->java_lang_String_count = total;
+    finishedNativeAllocations();
     return so;
 }
 
 JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b) {
-    enteringNativeAllocations();
-    // GC SAFETY: p[] are raw interior pointers into the source Strings' byte[]s,
-    // and a, b, ... are plain C locals. cn1FusedLatin1Begin ALLOCATES, and this
-    // build has precise roots -- CN1_CONSERVATIVE_GC_ROOTS is defined by no build
-    // in the tree, so the native stack is NOT scanned and none of those are roots.
-    // A collection during that allocation could therefore reclaim the very byte[]s
-    // the copy below reads, and the freed block can be handed to another
-    // allocation while this loop is still walking it. Every other native
-    // allocation path in this file brackets for exactly this reason; the fused
-    // concat was the one that did not.
     JAVA_ARRAY_BYTE* p[2] = { CN1_SB_PTR(a), CN1_SB_PTR(b) };
     int l[2] = { CN1_SB_LEN(a), CN1_SB_LEN(b) };
     int total = l[0] + l[1];
@@ -1804,27 +1791,12 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String
         int o = 0;
         for(int q = 0 ; q < 2 ; q++) { for(int i = 0 ; i < l[q] ; i++) dst[o + i] = p[q][i]; o += l[q]; }
         cn1FusedLatin1End(so, total);
-        finishedNativeAllocations();
         return so;
     }
-    {
-        JAVA_OBJECT fb = cn1ConcatFallback(threadStateData, p, l, 2, total);
-        finishedNativeAllocations();
-        return fb;
-    }
+    return cn1ConcatFallback(threadStateData, p, l, 2, total);
 }
 
 JAVA_OBJECT java_lang_String_cn1FusedConcat3___java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c) {
-    enteringNativeAllocations();
-    // GC SAFETY: p[] are raw interior pointers into the source Strings' byte[]s,
-    // and a, b, ... are plain C locals. cn1FusedLatin1Begin ALLOCATES, and this
-    // build has precise roots -- CN1_CONSERVATIVE_GC_ROOTS is defined by no build
-    // in the tree, so the native stack is NOT scanned and none of those are roots.
-    // A collection during that allocation could therefore reclaim the very byte[]s
-    // the copy below reads, and the freed block can be handed to another
-    // allocation while this loop is still walking it. Every other native
-    // allocation path in this file brackets for exactly this reason; the fused
-    // concat was the one that did not.
     JAVA_ARRAY_BYTE* p[3] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c) };
     int l[3] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c) };
     int total = l[0] + l[1] + l[2];
@@ -1834,27 +1806,12 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat3___java_lang_String_java_lang_String
         int o = 0;
         for(int q = 0 ; q < 3 ; q++) { for(int i = 0 ; i < l[q] ; i++) dst[o + i] = p[q][i]; o += l[q]; }
         cn1FusedLatin1End(so, total);
-        finishedNativeAllocations();
         return so;
     }
-    {
-        JAVA_OBJECT fb = cn1ConcatFallback(threadStateData, p, l, 3, total);
-        finishedNativeAllocations();
-        return fb;
-    }
+    return cn1ConcatFallback(threadStateData, p, l, 3, total);
 }
 
 JAVA_OBJECT java_lang_String_cn1FusedConcat4___java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c, JAVA_OBJECT d) {
-    enteringNativeAllocations();
-    // GC SAFETY: p[] are raw interior pointers into the source Strings' byte[]s,
-    // and a, b, ... are plain C locals. cn1FusedLatin1Begin ALLOCATES, and this
-    // build has precise roots -- CN1_CONSERVATIVE_GC_ROOTS is defined by no build
-    // in the tree, so the native stack is NOT scanned and none of those are roots.
-    // A collection during that allocation could therefore reclaim the very byte[]s
-    // the copy below reads, and the freed block can be handed to another
-    // allocation while this loop is still walking it. Every other native
-    // allocation path in this file brackets for exactly this reason; the fused
-    // concat was the one that did not.
     JAVA_ARRAY_BYTE* p[4] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c), CN1_SB_PTR(d) };
     int l[4] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c), CN1_SB_LEN(d) };
     int total = l[0] + l[1] + l[2] + l[3];
@@ -1864,27 +1821,12 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat4___java_lang_String_java_lang_String
         int o = 0;
         for(int q = 0 ; q < 4 ; q++) { for(int i = 0 ; i < l[q] ; i++) dst[o + i] = p[q][i]; o += l[q]; }
         cn1FusedLatin1End(so, total);
-        finishedNativeAllocations();
         return so;
     }
-    {
-        JAVA_OBJECT fb = cn1ConcatFallback(threadStateData, p, l, 4, total);
-        finishedNativeAllocations();
-        return fb;
-    }
+    return cn1ConcatFallback(threadStateData, p, l, 4, total);
 }
 
 JAVA_OBJECT java_lang_String_cn1FusedConcat5___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c, JAVA_OBJECT d, JAVA_OBJECT e) {
-    enteringNativeAllocations();
-    // GC SAFETY: p[] are raw interior pointers into the source Strings' byte[]s,
-    // and a, b, ... are plain C locals. cn1FusedLatin1Begin ALLOCATES, and this
-    // build has precise roots -- CN1_CONSERVATIVE_GC_ROOTS is defined by no build
-    // in the tree, so the native stack is NOT scanned and none of those are roots.
-    // A collection during that allocation could therefore reclaim the very byte[]s
-    // the copy below reads, and the freed block can be handed to another
-    // allocation while this loop is still walking it. Every other native
-    // allocation path in this file brackets for exactly this reason; the fused
-    // concat was the one that did not.
     JAVA_ARRAY_BYTE* p[5] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c), CN1_SB_PTR(d), CN1_SB_PTR(e) };
     int l[5] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c), CN1_SB_LEN(d), CN1_SB_LEN(e) };
     int total = l[0] + l[1] + l[2] + l[3] + l[4];
@@ -1894,14 +1836,9 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat5___java_lang_String_java_lang_String
         int o = 0;
         for(int q = 0 ; q < 5 ; q++) { for(int i = 0 ; i < l[q] ; i++) dst[o + i] = p[q][i]; o += l[q]; }
         cn1FusedLatin1End(so, total);
-        finishedNativeAllocations();
         return so;
     }
-    {
-        JAVA_OBJECT fb = cn1ConcatFallback(threadStateData, p, l, 5, total);
-        finishedNativeAllocations();
-        return fb;
-    }
+    return cn1ConcatFallback(threadStateData, p, l, 5, total);
 }
 
 JAVA_DOUBLE java_lang_Math_cos___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
