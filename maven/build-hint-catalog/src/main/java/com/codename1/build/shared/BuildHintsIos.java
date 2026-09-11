@@ -245,7 +245,7 @@ final class BuildHintsIos {
                         + "segment of the invite url, and `clicked`, a number holding the tap "
                         + "time as whole seconds since the epoch. `clicked` may be omitted, and "
                         + "the App Clip is the only thing that ever observes that time -- the "
-                        + "invocation never reaches our redirect -- so a clip that drops it "
+                        + "invocation never reaches the redirect -- so a clip that drops it "
                         + "leaves every attribution dated zero. A code containing a newline is "
                         + "rejected on the way in.\n"
                         + "\n"
@@ -254,11 +254,11 @@ final class BuildHintsIos {
                         + "the write IS the attribution -- there is no second chance to make "
                         + "it.\n"
                         + "\n"
-                        + "Do NOT clear the entry after writing it. The installed app reads it, "
+                        + "Don't clear the entry after writing it. The installed app reads it, "
                         + "keeps it until its own record is durable, and clears it then; a clip "
                         + "that clears its own copy destroys the code whenever that write fails "
-                        + "or the process exits in between, and the install is reported as "
-                        + "organic for ever."));
+                        + "or the process exits first, and the install is then reported as "
+                        + "organic permanently."));
 
         h.add(new Hint("ios.invite.appGroup")
                 .group(HintGroup.IOS)
