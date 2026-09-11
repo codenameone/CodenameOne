@@ -14103,7 +14103,10 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     memcpy((*dat).data, chars, length * sizeof(JAVA_ARRAY_BYTE));
     java_lang_String___INIT_____byte_1ARRAY_java_lang_String(threadStateData, s, (JAVA_OBJECT)dat, utf8String);
     struct obj__java_lang_String* nnn = (struct obj__java_lang_String*)s;
-    nnn->java_lang_String_nsString = str;
+    // The field is a JAVA_LONG carrying a retained NSString peer -- the read side
+    // casts back with (void*)s->java_lang_String_nsString, so say so on the way in
+    // rather than letting the compiler convert a pointer to an integer silently.
+    nnn->java_lang_String_nsString = (JAVA_LONG)(uintptr_t)str;
     [str retain];
     // The retained NSString peer must be released when this String's slot is
     // reclaimed. With String.finalize() gone, peer release happens in the BiBOP
