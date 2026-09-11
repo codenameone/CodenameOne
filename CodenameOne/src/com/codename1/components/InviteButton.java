@@ -26,6 +26,7 @@ import com.codename1.analytics.invite.Invite;
 import com.codename1.analytics.invite.InviteRequest;
 import com.codename1.analytics.invite.Invites;
 import com.codename1.share.ShareResultListener;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.events.ActionEvent;
 
@@ -66,6 +67,11 @@ public class InviteButton extends ShareButton {
     // is overridden to answer with the application's listener, so the chain is
     // otherwise unreachable from outside a real press.
     ShareResultListener chain;
+    // True from a press until the next EDT cycle, which is when ShareButton's
+    // deferred runnable has already presented. Its ONLY job is to collapse
+    // presses that arrive before that; it is never a "share in progress"
+    // flag, because nothing guarantees a share ever reports.
+    private boolean presenting;
 
     /// Default constructor.
     public InviteButton() {
@@ -209,27 +215,47 @@ public class InviteButton extends ShareButton {
     /// {@inheritDoc}
     @Override
     public void actionPerformed(ActionEvent evt) {
-        // A press while a share is still outstanding does NOTHING, rather than
-        // reusing the code and presenting a second time.
+        // A press is dropped only while ANOTHER PRESS IS STILL ON ITS WAY to
+        // the share sheet -- not for as long as a share is outstanding.
         //
         // ShareButton defers to the next EDT cycle and then shares
         // unconditionally, so two presses within one cycle enqueue two
-        // presentations. Reusing the invite made both carry the same code,
-        // which was the point, but it left the rest: two native sheets
-        // attempted, the application's result listener called twice, and --
-        // because the first result takes `outstanding` -- the second share
-        // reported to nobody. A real share missing from the funnel is the
-        // worst of those, and it is the one the reuse introduced.
+        // presentations: two native sheets attempted, the application's
+        // listener called twice, and -- because the first result takes
+        // `outstanding` -- the second share reported to nobody.
         //
-        // Safe to swallow the press because the outcome always arrives:
-        // Display.share() documents that the listener is invoked even where
-        // the platform cannot report a result, with a null package name, so
-        // `outstanding` cannot be left set by a share that never answers.
-        if (outstanding != null) {
+        // Keying that on `outstanding` instead would have been a far worse
+        // bug than the one it fixed. Display.share() documents that the
+        // listener always runs, but on Android the API 22+ chooser callback
+        // deliberately does not: "Android does not expose a dismissal signal
+        // for the chooser, so the listener simply does not fire on user-cancel"
+        // (AndroidImplementation.buildShareChooserWithCallback). A user who
+        // opens the sheet and backs out would leave `outstanding` set with
+        // nothing to clear it, and the button would never share again until
+        // the form was rebuilt.
+        //
+        // This flag cannot do that: it is cleared on the next EDT cycle
+        // whatever happens, by a runnable queued behind the one ShareButton
+        // itself queues. Nothing about the sheet, the platform or the user's
+        // answer can hold it.
+        if (presenting) {
             return;
         }
+        presenting = true;
         mintForShare();
         presentShare(evt);
+        Display d = Display.getInstance();
+        if (d == null) {
+            // No EDT to clear it on, so it was never set.
+            presenting = false;
+            return;
+        }
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                presenting = false;
+            }
+        });
     }
 
     /// Hands the press to [ShareButton], which presents the sheet.

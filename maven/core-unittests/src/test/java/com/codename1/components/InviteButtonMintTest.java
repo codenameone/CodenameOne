@@ -152,6 +152,61 @@ public class InviteButtonMintTest extends UITestBase {
     }
 
     @FormTest
+    void aShareThatNeverReportsDoesNotKillTheButton() {
+        // The guard must not be keyed on an outstanding share. Display.share()
+        // documents that the listener always runs, and on Android it does not:
+        // the API 22+ chooser callback fires only when a target is picked,
+        // because "Android does not expose a dismissal signal for the chooser"
+        // (AndroidImplementation.buildShareChooserWithCallback). A user who
+        // opens the sheet and backs out reports NOTHING, and a guard waiting
+        // for that report would leave the button dead until the form was
+        // rebuilt -- a far worse bug than the double presentation it fixes.
+        Invites.reset();
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+        final int[] presented = new int[1];
+        InviteButton button = new InviteButton("Invite a friend") {
+            @Override
+            void presentShare(ActionEvent evt) {
+                presented[0]++;
+            }
+        };
+
+        button.actionPerformed(new ActionEvent(button));
+        // The cancellation: no result, ever. Only an EDT cycle passes.
+        pumpEdt();
+        button.actionPerformed(new ActionEvent(button));
+
+        assertEquals(2, presented[0],
+                "a cancelled share left the button unable to share again, which on "
+                        + "Android is every user who opens the sheet and backs out");
+    }
+
+    /// Lets the runnables a press queued run, which is what the next EDT cycle
+    /// does on a device.
+    private static void pumpEdt() {
+        final boolean[] done = new boolean[1];
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                done[0] = true;
+            }
+        });
+        for (int i = 0; i < 50 && !done[0]; i++) {
+            com.codename1.ui.Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(5);
+                    } catch (InterruptedException e) {
+                        // nothing to do
+                    }
+                }
+            });
+        }
+    }
+
+    @FormTest
     void aPressAfterTheSheetAnsweredWorksAgain() {
         // The guard must not be a latch: swallowing every later press would
         // make the button dead after one share. Safe to swallow at all only
@@ -172,6 +227,9 @@ public class InviteButtonMintTest extends UITestBase {
         button.actionPerformed(new ActionEvent(button));
         Invite first = button.getInvite();
         button.chain.onResult(ShareResult.sharedTo("com.example.chat"));
+        // A result cannot arrive in the cycle that presented the sheet, so the
+        // press that follows one is always in a later cycle.
+        pumpEdt();
         button.actionPerformed(new ActionEvent(button));
         Invite second = button.getInvite();
 
