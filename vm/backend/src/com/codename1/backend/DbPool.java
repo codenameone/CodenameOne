@@ -66,6 +66,15 @@ public final class DbPool {
         try {
             for(int iter = 0 ; iter < size ; iter++) {
                 Db db = Db.open(path);
+                // REGISTERED before it is configured. setBusyTimeout or
+                // enableWriteAheadLog can throw -- WAL is refused on some
+                // filesystems, which is exactly the case someone meets in
+                // production and not in a test -- and the catch below closes the
+                // pool, which could only ever close what `all` already held. This
+                // connection was not in it yet, so its native SQLite handle had no
+                // path to a close() at all: every retry leaked another descriptor.
+                pool.all.add(db);
+                pool.idle.add(db);
                 db.setBusyTimeout(busyTimeoutMillis);
                 if(iter == 0) {
                     // WAL is a property of the database file, not of the connection,
@@ -73,8 +82,6 @@ public final class DbPool {
                     // own busy timeout.
                     db.enableWriteAheadLog();
                 }
-                pool.all.add(db);
-                pool.idle.add(db);
             }
         } catch (IOException err) {
             pool.close();

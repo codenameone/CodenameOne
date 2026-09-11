@@ -448,6 +448,42 @@ public final class S3 {
         }
     }
 
+    /**
+     * A numeric XML entity's code point, or -1 for anything that is not one.
+     *
+     * Deliberately not Integer.parseInt: it accepts a leading sign and any Unicode
+     * digit Character.digit knows, so "&#x+41;" and "&#+65;" both decoded to "A" --
+     * two more spellings of a character, in a decoder whose output becomes object
+     * keys. com.codename1.backend.Hex is the same rule for HTTP and URI input; it
+     * is package-private there, and this is a different package, so rather than
+     * widen an internal utility to public for one caller the rule is stated once
+     * more here, next to the only other place that needs it.
+     */
+    private static int entityCodePoint(String text, int from, int radix) {
+        if(from >= text.length()) {
+            return -1;
+        }
+        long value = 0;
+        for(int iter = from ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            int digit;
+            if(c >= '0' && c <= '9') {
+                digit = c - '0';
+            } else if(radix == 16 && c >= 'a' && c <= 'f') {
+                digit = c - 'a' + 10;
+            } else if(radix == 16 && c >= 'A' && c <= 'F') {
+                digit = c - 'A' + 10;
+            } else {
+                return -1;
+            }
+            value = value * radix + digit;
+            if(value > 0x10FFFF) {
+                return -1;
+            }
+        }
+        return (int)value;
+    }
+
     static String unescape(String value) {
         if(value.indexOf('&') < 0) {
             return value;
@@ -479,12 +515,30 @@ public final class S3 {
             } else if("apos".equals(entity)) {
                 out.append('\'');
             } else if(entity.length() > 1 && entity.charAt(0) == '#') {
-                try {
-                    int code = entity.charAt(1) == 'x' || entity.charAt(1) == 'X'
-                            ? Integer.parseInt(entity.substring(2), 16)
-                            : Integer.parseInt(entity.substring(1));
-                    out.append((char)code);
-                } catch (NumberFormatException err) {
+                // appendCodePoint, not a cast. A cast to char keeps the low 16
+                // bits, so the perfectly legal &#x1F600; became U+F600 -- a
+                // private-use character -- and an object key or a continuation
+                // token carrying an emoji came back corrupted. A truncated token
+                // pages from the wrong place, which is a wrong ANSWER rather than
+                // an error.
+                //
+                boolean hexEntity = entity.charAt(1) == 'x' || entity.charAt(1) == 'X';
+                int code = hexEntity ? entityCodePoint(entity, 2, 16)
+                                     : entityCodePoint(entity, 1, 10);
+                if(code >= 0 && code <= 0x10FFFF) {
+                    // The surrogate pair BY HAND. StringBuilder.appendCodePoint
+                    // does not exist in vm/JavaAPI, so it compiles against the JDK
+                    // for the Java SE arm and fails the translated build -- which
+                    // is the rule that core code may only call what the VM
+                    // actually defines.
+                    if(code > 0xFFFF) {
+                        int astral = code - 0x10000;
+                        out.append((char)(0xD800 + (astral >> 10)));
+                        out.append((char)(0xDC00 + (astral & 0x3FF)));
+                    } else {
+                        out.append((char)code);
+                    }
+                } else {
                     out.append('&').append(entity).append(';');
                 }
             } else {

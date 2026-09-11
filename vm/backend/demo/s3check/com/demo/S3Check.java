@@ -136,6 +136,24 @@ public class S3Check {
         List listed = s3.listObjects(bucket, "folder/", 100);
         check("the key is listed", "true", String.valueOf(listed.contains(key)));
 
+        // A key outside the BMP, round-tripped through a real listing.
+        //
+        // Note what this does NOT prove. The entity decoder truncated a numeric
+        // reference above U+FFFF by casting it to char, and MinIO returns this key
+        // as raw UTF-8 rather than as &#x1F600; -- so this check passes with that
+        // bug present. It was written to prove the fix and does not; it is kept
+        // because a supplementary key surviving put/list end to end is worth
+        // holding on to, and the next reader should not mistake it for coverage of
+        // the entity path. That path is package-private and no server here emits
+        // it, so the narrowing fix rests on language semantics instead: a cast to
+        // char keeps the low 16 bits, which is not a judgement call.
+        String emoji = "folder/grinning-" + new String(Character.toChars(0x1F600)) + ".txt";
+        s3.putObject(bucket, emoji, content, "text/plain");
+        List withEmoji = s3.listObjects(bucket, "folder/", 100);
+        check("a supplementary code point survives the listing", "true",
+                String.valueOf(withEmoji.contains(emoji)));
+        s3.deleteObject(bucket, emoji);
+
         // A presigned URL is the whole point of this for a mobile client: it must
         // work with NO credentials on the request.
         String url = s3.presignGet(bucket, key, 300);
