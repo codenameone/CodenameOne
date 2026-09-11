@@ -1137,16 +1137,7 @@ public final class Invites {
         // kill() is enough for the case that matters: NetworkManager skips a
         // killed request when it reaches the front of the queue, and kills the
         // connection outright if it is already being sent.
-        while (!outstandingRegistrations.isEmpty()) {
-            InviteConnection req = outstandingRegistrations.elementAt(0);
-            outstandingRegistrations.removeElementAt(0);
-            try {
-                req.kill();
-            } catch (Throwable t) {
-                Log.e(t);
-            }
-        }
-        inFlight.clear();
+        killQueuedRegistrations();
         boolean cleared = InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
         // ATTRIBUTION names the inviter, and the OUTBOX is the queued
@@ -1395,6 +1386,17 @@ public final class Invites {
         // end of the window. The epoch bump additionally discards any response
         // already in flight.
         lookupEpoch++;
+        // The epoch stops an ANSWER being acted on; it does not stop a REQUEST
+        // going out, and a registration is not answered at all. One queued
+        // behind other network work would have transmitted the client id, the
+        // campaign and the payload after consent was withdrawn -- the
+        // transmission the withdrawal exists to prevent, sent by a request that
+        // was already past every gate when it was queued.
+        //
+        // The durable outbox is deliberately left alone: the entries are what a
+        // later grant sends, and withdrawing consent is not a request to forget
+        // the invites this person minted.
+        killQueuedRegistrations();
         // Nothing is outstanding once the epoch has moved: any response still
         // on the wire fails the guard. Saying so here is what lets a later
         // grant resume immediately rather than waiting out a retry delay for a
@@ -3260,6 +3262,30 @@ public final class Invites {
     // And a hard ceiling, for the same reason the outbox has one: a bound that
     // does not depend on a clock being sane.
     private static final int MAX_OUTSTANDING = 32;
+
+    /// Kills every registration handed to NetworkManager and not yet answered.
+    ///
+    /// Shared by the erasure and by a consent withdrawal, which need the same
+    /// thing for different reasons: one must not transmit an identity the user
+    /// asked to be rid of, the other must not transmit anything at all. Neither
+    /// is served by the epoch, which only decides whether an ANSWER is acted
+    /// on -- a registration is never answered, and a queued request has already
+    /// passed every gate it will ever pass.
+    ///
+    /// The durable outbox is untouched. What is queued is a copy; the outbox is
+    /// the record, and it is what a later grant sends.
+    private static void killQueuedRegistrations() {
+        while (!outstandingRegistrations.isEmpty()) {
+            InviteConnection req = outstandingRegistrations.elementAt(0);
+            outstandingRegistrations.removeElementAt(0);
+            try {
+                req.kill();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+        inFlight.clear();
+    }
 
     /// Drops a remembered registration, and KILLS it on the way out.
     ///

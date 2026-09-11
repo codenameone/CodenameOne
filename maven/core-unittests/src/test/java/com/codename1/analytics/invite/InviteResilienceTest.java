@@ -238,6 +238,42 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void withdrawingConsentKillsARegistrationAlreadyOnItsWay() {
+        // The epoch decides whether an ANSWER is acted on, and a registration
+        // is never answered -- so a request queued behind other network work
+        // went out with the client id, the campaign and the payload after
+        // consent was withdrawn, which is the transmission the withdrawal
+        // exists to prevent. The durable outbox is left alone on purpose: those
+        // entries are what a later grant sends.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+        implementation.clearQueuedRequests();
+
+        assertNotNull(Invites.create(InviteRequest.create().campaign("spring").build()),
+                "minting is offline and must still work");
+        java.util.List<com.codename1.io.ConnectionRequest> queued =
+                implementation.getQueuedRequests();
+        assertTrue(queued.size() > 0, "the fixture queued no registration at all");
+
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+
+        int checked = 0;
+        for (com.codename1.io.ConnectionRequest r : queued) {
+            if (r instanceof Invites.InviteConnection) {
+                assertTrue(((Invites.InviteConnection) r).killedForTest(),
+                        "a registration queued before the withdrawal was still on its way "
+                                + "out with the data consent was just refused for");
+                checked++;
+            }
+        }
+        assertTrue(checked > 0, "no invite request was queued, so nothing was asserted");
+        assertFalse(InviteStore.readOutbox().isEmpty(),
+                "the durable outbox was discarded, so a later grant has nothing to send");
+    }
+
+    @FormTest
     void anErasureKillsARegistrationItCannotCatchOnTheDisk() {
         // create() hands the registration json to NetworkManager and returns,
         // so an erasure a moment later has two copies to deal with and used to

@@ -49,6 +49,10 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
     // and the flag is what stops a service bind on every launch.
     private static final String PREF_ATTEMPTED = "cn1$invite$referrerAttempted";
 
+    /// The installation the flag above belongs to. See
+    /// [#forgetAflagRestoredFromAnotherInstallation].
+    private static final String PREF_INSTALL_TIME = "cn1$invite$referrerInstallTime";
+
     private boolean retried;
 
     // Whether the framework has been given its one answer FOR THIS EXCHANGE.
@@ -75,8 +79,65 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
 
     @Override
     public boolean isSupported() {
-        return AndroidNativeUtil.getContext() != null
-                && !Preferences.get(PREF_ATTEMPTED, false);
+        Context context = AndroidNativeUtil.getContext();
+        if (context == null) {
+            return false;
+        }
+        forgetAflagRestoredFromAnotherInstallation(context);
+        return !Preferences.get(PREF_ATTEMPTED, false);
+    }
+
+    /// Clears the one-shot flag when it came from a DIFFERENT installation.
+    ///
+    /// Android's auto-backup is on by default -- `AndroidGradleBuilder` leaves
+    /// `android:allowBackup` alone -- so a reinstall or a device migration
+    /// restores this app's files, this flag among them. Restored, it says the
+    /// referrer has already been read, and the new installation never asks: its
+    /// own Play referrer, which is the one exact answer this whole path
+    /// exists for, is thrown away before anything looks at it.
+    ///
+    /// `firstInstallTime` is what separates the two. It survives an app
+    /// UPDATE, so an ordinary upgrade is not mistaken for a new install, and a
+    /// restore into a new installation carries the OLD value in preferences
+    /// while the package manager reports the new one. Unknown means this code
+    /// is running for the first time on an install that predates it, which is
+    /// not evidence of anything and stamps rather than clears.
+    ///
+    /// #### What this does NOT cover
+    ///
+    /// Only the flag this class owns. A restore also brings back the invite
+    /// records themselves -- the resolved attribution above all -- so a device
+    /// migrated from another one can still report the previous installation's
+    /// inviter as its own. Fixing that needs a core entry point meaning "this
+    /// is a new installation, forget the last one but stay attributable", and
+    /// the one public method that comes close, `Invites.reset()`, is the
+    /// erasure: it writes a terminal marker, which would leave the new install
+    /// permanently unattributable -- worse than the problem. iOS has the same
+    /// exposure through device transfer and no equivalent signal here at all.
+    /// Left as a deliberate gap rather than guessed at.
+    private void forgetAflagRestoredFromAnotherInstallation(Context context) {
+        try {
+            long current = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).firstInstallTime;
+            if (current <= 0L) {
+                return;
+            }
+            long known = Preferences.get(PREF_INSTALL_TIME, 0L);
+            if (known == 0L) {
+                Preferences.set(PREF_INSTALL_TIME, current);
+                return;
+            }
+            if (known != current) {
+                Preferences.set(PREF_INSTALL_TIME, current);
+                Preferences.set(PREF_ATTEMPTED, false);
+            }
+        } catch (Throwable t) {
+            // A package manager that cannot describe this app's own package is
+            // not a state to guess in: leaving the flag alone keeps the
+            // ordinary behaviour rather than re-reading a referrer that may
+            // genuinely have been consumed.
+            com.codename1.io.Log.e(t);
+        }
     }
 
     @Override
