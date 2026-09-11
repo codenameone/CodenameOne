@@ -340,7 +340,14 @@ public class AdMobNativeImpl {
             public void run() {
                 AdView adView = new AdView(activity);
                 adView.setAdUnitId(adUnitId);
-                adView.setAdSize(mapSize(activity, sizeType, widthDp));
+                AdSize size = mapSize(activity, sizeType, widthDp);
+                adView.setAdSize(size);
+                // AndroidPeer reads measured dimensions in its default peer mode.
+                // The AdView has no parent yet, so Android has not measured it:
+                // wrapping it now would cache a 1px preferred height in CN1.
+                adView.measure(
+                        View.MeasureSpec.makeMeasureSpec(size.getWidthInPixels(activity), View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(size.getHeightInPixels(activity), View.MeasureSpec.EXACTLY));
                 banners.put(handle, adView);
                 out[0] = adView;
             }
