@@ -12376,8 +12376,23 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.dst_subfolder_spec = \"16\"\n"
                 + "embed_phase.dst_path = \"$(CONTENTS_FOLDER_PATH)/AppClips\"\n"
                 + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
-                + "embed_phase.add_file_reference(fileref)\n"
-                + "clip_target.build_configurations.each{|e| \n");
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Same guard every other iOS-only target here carries, and this
+            // one needs it more than most: an App Clip does not exist on the
+            // Mac at all. Left unfiltered, the Catalyst destination builds a
+            // target whose whole product type is unsupported there and then
+            // tries to place it inside the Mac app, which fails the archive --
+            // for a slice that could never have used it. The iOS app keeps its
+            // clip; the Mac slice ships without one, which costs nothing,
+            // because a Mac install was never attributed through a clip.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target"
+                    + " && d.target.uuid == clip_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("clip_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
             sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
                     + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");

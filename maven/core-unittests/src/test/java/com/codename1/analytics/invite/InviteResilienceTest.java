@@ -128,6 +128,40 @@ class InviteResilienceTest extends UITestBase {
 
     @Test
     @EdtTest
+    void aCodeTheServerHasNotSeenYetIsNotSettledAsOrganic() {
+        // The offline-mint window. An invite minted with no network is handed
+        // over before its registration reaches the server, so a claim can
+        // arrive first -- and the server has never heard of the code. Read as
+        // a final "no invite", that settled the install as organic
+        // permanently, seconds before the code became claimable, which loses
+        // exactly the attribution the offline mint exists to preserve.
+        Invites.checkForInvite();
+        Invites.handleResolution("{\"resolved\":false,\"retry\":true}",
+                Invites.MATCH_APP_CLIP, true);
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "a not-yet answer was treated as a final no");
+
+        // And the real answer still lands when the registration catches up.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LATE1", "spring", "sms"),
+                Invites.MATCH_APP_CLIP, true);
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState());
+        assertNotNull(Invites.getAttribution(), "the late answer was refused");
+    }
+
+    @Test
+    @EdtTest
+    void aPlainNoIsStillFinalEvenBesideTheRetryAnswer() {
+        // The retry flag must not soften the ordinary case. Most installs are
+        // not invited, and an uninvited one that keeps asking contacts the
+        // server on every launch for ever.
+        Invites.checkForInvite();
+        Invites.handleResolution("{\"resolved\":false,\"retry\":false}",
+                Invites.MATCH_APP_CLIP, true);
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+    }
+
+    @Test
+    @EdtTest
     void theTerminalMarkerKeepsNoDeviceProfile() {
         // It is durable and it is empty: the profile existed to be matched,
         // and there is nothing left to match it against.
@@ -473,6 +507,75 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleUrl("https://cloud.codenameone.com/i/acme/CODE1");
         assertEquals(Invites.REASON_CONSENT_DENIED, told[0],
                 "a refused direct link told the listener nothing");
+    }
+
+    @Test
+    @EdtTest
+    void aTransientReferrerFailureIsNotSettledAsOrganic() {
+        // The Play service was busy, the bind did not take, or it dropped
+        // before answering. None of those is an answer about this install, and
+        // the source keeps its once-only flag unset precisely so a later
+        // launch can read the exact referrer.
+        //
+        // On Android the retry marker was written and then ignored: there is
+        // no App Clip to fall through to, so control reached the settle path
+        // immediately and wrote a PERMANENT no-match over a referrer that was
+        // readable the whole time.
+        // Android, so there is no clip to fall through to -- which is the
+        // whole point: the settle path is reached immediately instead of
+        // parking on a handoff that would keep the lookup alive by itself.
+        Invites.registerAppClipHandoffSource(null);
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onUnavailable(Invites.REASON_NO_MATCH);
+            }
+        });
+        Invites.checkForInvite();
+
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "a transient store failure was settled as a final no");
+        assertFalse(Invites.getState() == Invites.STATE_NONE_FOUND);
+
+        // And the exact answer still lands when the store recovers.
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=LATER1", 0L, 0L);
+            }
+        });
+        Invites.flush();
+        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
+        assertEquals("LATER1", InviteStore.get(pending, "code", null),
+                "the retried referrer was never read");
+    }
+
+    @Test
+    @EdtTest
+    void anExactReferrerAnswerOfNoInviteIsStillFinal() {
+        // The referrer was READ and carries no invite: a real answer, and a
+        // permanent one. The retry path must not swallow this case, or an
+        // ordinary uninvited install asks again on every launch for ever.
+        Invites.registerAppClipHandoffSource(null);
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=google-play&utm_medium=organic", 0L, 0L);
+            }
+        });
+        Invites.checkForInvite();
+
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "an exact 'no invite' answer was left pending");
     }
 
     @Test

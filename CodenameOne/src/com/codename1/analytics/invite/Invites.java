@@ -2135,6 +2135,27 @@ public final class Invites {
         if (abandonReplacement()) {
             return;
         }
+        // A transient referrer failure is not an answer about this install.
+        //
+        // fallBackToMatch(true) records referrerRetry for exactly that case --
+        // the Play service was busy, the bind did not take, the service
+        // dropped before it answered -- and then hands over to the clip
+        // handoff. On Android there is no clip, so control arrives here
+        // immediately and wrote a PERMANENT no-match over a referrer that was
+        // there the whole time and readable on the next launch. The retry
+        // marker was consulted on the server's answer and nowhere else, so
+        // this path discarded it.
+        //
+        // Silent, like the matching branch in handleResolution:
+        // attributionUnavailable() means no invite will ever be attributed,
+        // and this is the opposite of terminal. The attempt cap and the
+        // attribution window still bound how long it can go on.
+        Map<String, String> outstanding = readPending();
+        if (outstanding != null
+                && "true".equals(InviteStore.get(outstanding, "referrerRetry", null))) {
+            setState(STATE_PENDING);
+            return;
+        }
         if (markTerminal(reason)) {
             notifyUnavailable(reason);
         }
@@ -2350,6 +2371,23 @@ public final class Invites {
             }
             applySlug(payload);
             if (!truthy(json.get("resolved"))) {
+                if (truthy(json.get("retry"))) {
+                    // "Not yet", not "no". The server has never seen this code
+                    // at all, which during the offline-mint window is the
+                    // normal state of a perfectly good invite: the inviter
+                    // minted it with no network and their registration has not
+                    // landed yet. Settling here reported an invited install as
+                    // organic, permanently, seconds before the code became
+                    // claimable.
+                    //
+                    // Silent for the same reason the referrer retry below is:
+                    // attributionUnavailable() means no invite will ever be
+                    // attributed, and this is the opposite of terminal. The
+                    // existing attempt cap and attribution window bound how
+                    // long this can go on.
+                    setState(STATE_PENDING);
+                    return;
+                }
                 // Not terminal while a deterministic answer is still
                 // reachable. The Play referrer failed transiently -- the store
                 // was busy, the bind did not take -- and the source keeps its

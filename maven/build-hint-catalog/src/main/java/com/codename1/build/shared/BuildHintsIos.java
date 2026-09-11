@@ -228,7 +228,7 @@ final class BuildHintsIos {
                 .platform("ios")
                 .doc("Whether the build generates and embeds the App Clip that makes invite "
                         + "attribution exact on iOS. The App Store carries no referrer of its "
-                        + "own, so without the clip an iOS install cannot be attributed at all. "
+                        + "own, so without the clip an iOS install can't be attributed at all. "
                         + "Set it to `false` only if you ship an App Clip of your own; the build "
                         + "then writes no clip, and the app reports every install as organic "
                         + "unless your clip writes the handoff itself. Ignored when "
