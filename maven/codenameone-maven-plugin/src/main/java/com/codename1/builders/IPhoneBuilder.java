@@ -12375,6 +12375,20 @@ public class IPhoneBuilder extends Executor {
                         request.getArg(key, ""));
             }
         }
+        // The name the product will ACTUALLY be built under, which is not
+        // necessarily the target name: ios.invite.buildSettings.PRODUCT_NAME
+        // can override it. The embed reference below names a file in
+        // BUILT_PRODUCTS_DIR, so hard-coding the target name made such a build
+        // fail while copying a product that was never produced.
+        String productName = effectiveExtensionProductName(
+                buildSettingsMap.get("PRODUCT_NAME"), name);
+        if (productName == null) {
+            throw new BuildException("ios.invite.buildSettings.PRODUCT_NAME is \""
+                    + buildSettingsMap.get("PRODUCT_NAME") + "\", which this build"
+                    + " cannot evaluate, so it cannot know what the App Clip's"
+                    + " product will be called or embed it in the app. Use a"
+                    + " literal name, or $(TARGET_NAME).");
+        }
         // Guarded so re-running the script does not create a duplicate target;
         // the build re-executes fix_xcode_schemes.rb after dependency
         // integration.
@@ -12392,7 +12406,7 @@ public class IPhoneBuilder extends Executor {
         sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
                 + "main_app_target.add_dependency(clip_target)\n"
                 + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
-                + name + ".app', \"BUILT_PRODUCTS_DIR\")\n"
+                + productName + ".app', \"BUILT_PRODUCTS_DIR\")\n"
                 + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
                 + "p.name=='Embed App Clips'} || "
                 + "main_app_target.new_copy_files_build_phase('Embed App Clips')\n"
