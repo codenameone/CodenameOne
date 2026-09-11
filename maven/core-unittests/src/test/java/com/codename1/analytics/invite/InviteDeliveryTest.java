@@ -22,6 +22,9 @@
  */
 package com.codename1.analytics.invite;
 
+import com.codename1.analytics.Analytics;
+import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import java.util.ArrayList;
@@ -245,6 +248,53 @@ class InviteDeliveryTest extends UITestBase {
 
         assertEquals(1, told[0], "a platform with no App Clip left the listener waiting");
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+    }
+
+    @FormTest
+    void aclipCodeIsWrittenDownBeforeItIsSent() {
+        // The claim is one fail-silent request, and a fresh install is exactly
+        // when the device is most likely to be offline. The clip has already
+        // cleared its own copy by the time it answers, so a code that lived
+        // only in the callback was gone for good the moment that request
+        // failed.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+
+        Invites.checkForInvite();
+        InviteTestSupport.pendingHandoff.answer("CLIPSAVE");
+
+        Map<String, String> record = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(record);
+        assertEquals("CLIPSAVE", InviteStore.get(record, "code", null),
+                "the clip's code was never written down, so a failed claim loses it");
+        assertEquals(Invites.MATCH_APP_CLIP, InviteStore.get(record, "codeMatch", null),
+                "the saved code lost its provenance");
+    }
+
+    @FormTest
+    void aclipAnswerThatOutlivedItsLookupIsIgnored() {
+        // The read is asynchronous and everything that supersedes a lookup
+        // bumps the epoch. A direct link arriving while the clip read is
+        // outstanding is the case that shows it: the link is an exact answer
+        // about THIS install, and a clip code read before it must not overwrite
+        // the record it just wrote.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+
+        Invites.checkForInvite();
+        assertTrue(InviteTestSupport.pendingHandoff.wasAsked());
+
+        // A link is tapped while the clip read is still outstanding.
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECTWINS"));
+        assertEquals("DIRECTWINS",
+                InviteStore.get(InviteStore.read(InviteStore.PENDING), "code", null));
+
+        // The clip finally answers, with something else.
+        InviteTestSupport.pendingHandoff.answer("STALECLIP");
+
+        assertEquals("DIRECTWINS",
+                InviteStore.get(InviteStore.read(InviteStore.PENDING), "code", null),
+                "a clip answer from before the link overwrote the newer exact claim");
     }
 
     @FormTest

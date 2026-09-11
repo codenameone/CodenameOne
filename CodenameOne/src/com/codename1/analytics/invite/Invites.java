@@ -225,6 +225,11 @@ public final class Invites {
     // with this application. Registered by the build the same way, and absent
     // on every platform that has no clip.
     private static AppClipHandoffSource appClipSource;
+
+    // Set when an erasure could not remove the durable records, and cleared
+    // when a later attempt does. Nothing that transmits may run while it is
+    // set: the records still on the disk describe the identity being erased.
+    private static boolean erasurePending;
     private static InviteAttribution resolved;
     private static boolean attributionLoaded;
     private static int state = STATE_NONE;
@@ -1003,9 +1008,8 @@ public final class Invites {
     /// true when nothing readable is left behind
     static boolean resetVerified() {
         lookupEpoch++;
-        InviteStore.delete(InviteStore.PENDING);
+        boolean cleared = InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
-        boolean cleared = true;
         // ATTRIBUTION names the inviter, and the OUTBOX is the queued
         // registration JSON -- which carries the OLD client id along with the
         // campaign, payload and preview. Both have to actually go.
@@ -1016,8 +1020,11 @@ public final class Invites {
         // drainOutbox() transmitted a pre-erasure registration under the new
         // identity once storage recovered.
         //
-        // The pending record is a lookup in progress and identifies nobody
-        // after this, so it is deleted without gating on it.
+        // The PENDING record is gated too. It looks like bookkeeping -- a
+        // state, a deadline, an attempt count -- but it also carries the code
+        // a direct link left on the device, and a code names an inviter. A
+        // surviving one re-links the new identity to the old invite on the
+        // next launch, which is the thing being erased.
         cleared &= InviteStore.delete(InviteStore.ATTRIBUTION);
         cleared &= InviteStore.delete(InviteStore.OUTBOX);
         Preferences.delete(PREF_CONSUMED_ARG);
@@ -1068,6 +1075,7 @@ public final class Invites {
         if (!cleared) {
             Log.p("invite: the attribution record could not be deleted, so the erasure is "
                     + "not complete and will be attempted again", Log.WARNING);
+            erasurePending = true;
             return false;
         }
         // A tombstone, so the erasure is not undone by the next ordinary
@@ -1110,10 +1118,12 @@ public final class Invites {
             // erasure happen again instead.
             Log.p("invite: the erasure marker could not be persisted; it will be applied "
                     + "again rather than reported as done", Log.WARNING);
+            erasurePending = true;
             return false;
         }
         state = STATE_NONE_FOUND;
         stateLoaded = true;
+        erasurePending = false;
         return true;
     }
 
@@ -2018,15 +2028,45 @@ public final class Invites {
         }
         bumpAttempts(pending);
         lookupIssuedAt = System.currentTimeMillis();
+        // The epoch this read was issued under, checked when it answers.
+        //
+        // The read is asynchronous, and everything that supersedes a lookup
+        // bumps the epoch: an erasure, a consent withdrawal, a direct link
+        // arriving while this was outstanding. Without the check a clip code
+        // read before an erasure could restore the attribution it removed, or
+        // overwrite the newer exact claim that superseded it -- and the
+        // unavailable branch could settle a lookup that is no longer the one
+        // this answer belongs to.
+        final int issued = lookupEpoch;
         source.requestHandoff(new AppClipHandoffCallback() {
             public void onHandoff(final String code, final long clickedSeconds) {
                 onEdt(new Runnable() {
                     public void run() {
+                        if (issued != lookupEpoch) {
+                            return;
+                        }
                         lookupIssuedAt = 0;
                         if (code == null || code.length() == 0) {
                             settleNoHandoff(REASON_NO_MATCH);
                             return;
                         }
+                        // WRITTEN DOWN before it is sent.
+                        //
+                        // The claim is one fail-silent request. If it does not
+                        // land -- offline first launch, which is exactly when a
+                        // fresh install happens -- the code existed only in
+                        // this callback, the clip had already cleared its own
+                        // copy, and the invite was gone for good. Persisting it
+                        // first is what makes the retry possible, and it is
+                        // what handleUrl() does with a direct code for the same
+                        // reason.
+                        Map<String, String> record = pendingRecord();
+                        InviteStore.put(record, "code", code);
+                        record.put("codeSource", "app_clip");
+                        record.put("codeMatch", MATCH_APP_CLIP);
+                        record.put("codeDeferred", "true");
+                        record.put("codeReferrer", "");
+                        writePending(record);
                         // Claimed exactly as a referrer code is: the trip
                         // through the store is what makes both of them exact,
                         // and the server treats them the same way.
@@ -2038,6 +2078,9 @@ public final class Invites {
             public void onUnavailable(final String reason) {
                 onEdt(new Runnable() {
                     public void run() {
+                        if (issued != lookupEpoch) {
+                            return;
+                        }
                         lookupIssuedAt = 0;
                         settleNoHandoff(reason == null ? REASON_NO_MATCH : reason);
                     }
@@ -2664,6 +2707,16 @@ public final class Invites {
     private static void drainOutbox() {
         if (!allowed()) {
             return;
+        }
+        if (erasurePending) {
+            // An erasure could not delete the queue, and these entries carry
+            // the OLD client id along with the campaign, payload and preview.
+            // Sending them once storage recovers is exactly the transmission
+            // the erasure was asked to prevent, so the erasure is retried and
+            // nothing is drained until it succeeds.
+            if (!eraseInternal()) {
+                return;
+            }
         }
         List<String> outbox = InviteStore.readOutbox();
         if (outbox.isEmpty()) {

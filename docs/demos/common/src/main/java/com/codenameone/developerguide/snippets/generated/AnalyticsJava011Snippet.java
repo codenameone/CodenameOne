@@ -63,9 +63,9 @@ class AnalyticsJava011Snippet {
         Invites.setInviteListener(new InviteListener() {
             public void inviteReceived(InviteAttribution attribution) {
                 // attribution.getCampaign(), getCode(), getPayload()
-                if (Invites.MATCH_FINGERPRINT.equals(attribution.getMatchType())) {
-                    // A statistical match. Credit it, but do not pay a bounty
-                    // on it without saying so.
+                if (Invites.MATCH_APP_CLIP.equals(attribution.getMatchType())) {
+                    // An iOS App Clip received the link and handed the code
+                    // over. Exact, like every other match type.
                 }
             }
 

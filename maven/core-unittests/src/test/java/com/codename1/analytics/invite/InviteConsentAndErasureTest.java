@@ -197,6 +197,30 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
+    void asurvivingOutboxIsNotDrainedUntilTheErasureFinishes() {
+        // Reporting the failure was not enough on its own. The entries carry
+        // the OLD client id, so the next flush would transmit exactly what the
+        // erasure was asked to prevent as soon as storage recovered -- an
+        // erasure that ends by sending the erased identity to the server.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.create(InviteRequest.create().campaign("launch").build());
+        assertFalse(InviteStore.readOutbox().isEmpty(), "the fixture queued nothing");
+
+        InviteStore.failNextDeleteForTest(InviteStore.OUTBOX);
+        assertFalse(Invites.eraseInternal(), "the fixture's erasure did not fail");
+
+        implementation.clearQueuedRequests();
+        Invites.flush();
+
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "a pre-erasure registration was transmitted after the erasure failed");
+        // And the retry inside flush() finished the job, so the queue is gone.
+        assertTrue(InviteStore.readOutbox().isEmpty(),
+                "the erasure was never retried");
+    }
+
+    @FormTest
     void registeringTheProviderIsNotMistakenForAnErasure() {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
