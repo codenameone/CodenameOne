@@ -3909,6 +3909,48 @@ public final class HttpServer {
         return true;
     }
 
+    /**
+     * Whether the request target's percent escapes decode to valid UTF-8.
+     *
+     * <p>Decodes exactly as Request.percentDecode does, so the two cannot disagree
+     * about what the handler will see. '+' is not folded to a space here because
+     * both are ASCII and neither changes whether the run is valid UTF-8.
+     *
+     * <p>A target with no '%' in it cannot decode to anything but itself, so the
+     * scan for one is the whole cost on the overwhelming majority of requests and
+     * nothing is allocated for them.
+     */
+    private static boolean targetDecodesToUtf8(byte[] raw, int from, int to) {
+        boolean encoded = false;
+        for(int iter = from ; iter < to ; iter++) {
+            if(raw[iter] == '%') {
+                encoded = true;
+                break;
+            }
+        }
+        if(!encoded) {
+            return true;
+        }
+        byte[] out = new byte[to - from];
+        int length = 0;
+        int pos = from;
+        while(pos < to) {
+            int c = raw[pos] & 0xff;
+            if(c == '%' && pos + 2 < to) {
+                int hi = Request.hexDigit(raw[pos + 1] & 0xff);
+                int lo = Request.hexDigit(raw[pos + 2] & 0xff);
+                if(hi >= 0 && lo >= 0) {
+                    out[length++] = (byte)((hi << 4) | lo);
+                    pos += 3;
+                    continue;
+                }
+            }
+            out[length++] = (byte)c;
+            pos++;
+        }
+        return Utf8.isValid(out, 0, length);
+    }
+
     /** Whether {@code at} is a '%' followed by two hex digits. */
     private static boolean isPercentTriplet(String value, int at) {
         return at + 2 < value.length()
@@ -4253,6 +4295,27 @@ public final class HttpServer {
 
         int targetStart = firstSpace + 1;
         int targetLength = secondSpace - targetStart;
+        // Valid hex that is NOT valid UTF-8, which is a different thing from a bad
+        // escape and was the one still unchecked here. "?name=%C3%28" is a
+        // truncated two-byte sequence, and new String(_, "UTF-8") answers U+FFFD
+        // rather than failing -- so the handler received "\uFFFD(" and the request
+        // became indistinguishable from "?name=%EF%BF%BD%28", which spells that
+        // value legitimately. Two request spellings, one handler input, and a
+        // frontend that validates UTF-8 rejects only one of them: the same
+        // proxy-versus-origin disagreement as a malformed Host.
+        //
+        // Refused here rather than in queryParam, which returns a String and has
+        // no way to say "malformed" -- answering null there would make a bad
+        // parameter look absent, which is worse than either. The same decision
+        // this PR already took for a request BODY and for a static file path; the
+        // target was the remaining hole.
+        //
+        // Note this does not reject a malformed ESCAPE. percentDecode passes "%zz"
+        // through as literal bytes, browsers do send a bare '%', and tightening
+        // that is a separate question from whether what DID decode is text.
+        if(!targetDecodesToUtf8(raw, targetStart, targetStart + targetLength)) {
+            throw new ProtocolException(400, "the request target is not valid UTF-8");
+        }
         // The origin-form target when it had to be built rather than pointed at.
         String synthesized = null;
         // The authority of an absolute-form target. RFC 9112 3.2.2 says a server

@@ -1776,6 +1776,41 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("valid hex that is not valid UTF-8 is refused in the target")
+    void malformedUtf8InTheTargetIsRefused() throws Exception {
+        // %C3%28 is well formed hex and a TRUNCATED two-byte sequence. new String(_,
+        // "UTF-8") answers U+FFFD instead of failing, so the handler received
+        // "\uFFFD(" and the request became indistinguishable from the legitimate
+        // spelling of that value, %EF%BF%BD%28. A frontend that validates UTF-8
+        // rejects one and passes the other; this backend answered both the same.
+        assertEquals(400, statusOf(raw("GET /healthz?name=%C3%28 HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "malformed UTF-8 in a query value must be refused");
+        assertEquals(400, statusOf(raw("GET /he%C3%28althz HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "and in the path, which decodes the same way");
+
+        // WELL-FORMED multi-byte text still gets through, which is the direction a
+        // guard like this breaks. %C3%A9 is e-acute.
+        assertEquals(200, statusOf(raw("GET /healthz?name=%C3%A9 HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "a valid accented query value must still be served");
+        // And the legitimate spelling of U+FFFD itself is text, not a forgery.
+        assertEquals(200, statusOf(raw("GET /healthz?name=%EF%BF%BD%28 HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "the real encoding of U+FFFD is valid UTF-8");
+        // A target with no escapes at all takes the fast path and must be unaffected.
+        assertEquals(200, statusOf(raw("GET /healthz?name=plain HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "an unencoded target must be unaffected");
+        // A malformed ESCAPE is deliberately NOT what this rejects: percentDecode
+        // passes it through as literal bytes and browsers do send a bare '%'.
+        assertEquals(200, statusOf(raw("GET /healthz?pct=100%25andmore HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "an encoded percent sign is ordinary text");
+    }
+
+    @Test
     @DisplayName("a Host that is not an authority is refused before the handler")
     void malformedHostAuthoritiesAreRefused() throws Exception {
         // Missing, duplicate and disagreeing Host headers were already 400. What
