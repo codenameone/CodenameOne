@@ -211,6 +211,7 @@ public class SelfTest {
         fairness();
         web();
         clientTls();
+        rotatedCaBundlesAreReRead();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -1121,6 +1122,115 @@ public class SelfTest {
     }
 
     /** Reads to end of stream. Only used on the small self-test responses. */
+    /**
+     * A CA bundle replaced at the SAME PATH is re-read, rather than served from
+     * the process's context cache.
+     *
+     * <p>The packaged arm caches one OpenSSL SSL_CTX per CA path, because building
+     * one per connection would parse the whole bundle on every handshake. Keying
+     * that cache on the path alone was wrong: a bundle is a mount, and mounts are
+     * rotated under a stable name -- a Kubernetes secret, cert-manager, an RDS
+     * refresh. The path never changes, so a long-lived backend went on trusting
+     * the roots it read at startup and every connection failed the moment the
+     * service presented a certificate signed by the new one, with a restart as
+     * the only remedy. The Java SE arm reads the file per upgrade and so never
+     * had the bug, which is the kind of divergence this whole file exists to find.
+     *
+     * <p>Rotating to a bundle that CANNOT load is what makes the check decisive.
+     * A failed build is not cached, so rotating good-to-good would pass with or
+     * without the fix; rotating good-to-broken can only be refused by a process
+     * that went back to the file. The restore afterwards proves the cache
+     * recovers, and that the context in use was never corrupted by the attempt.
+     */
+    private static void rotatedCaBundlesAreReRead() throws Exception {
+        if(System.getenv("CN1_SELFTEST_NETWORK") == null) {
+            note("CA rotation check skipped: set CN1_SELFTEST_NETWORK=1 to run it");
+            return;
+        }
+        String source = System.getenv("CN1_SELFTEST_CA_BUNDLE");
+        if(source == null) {
+            note("CA rotation check skipped: set CN1_SELFTEST_CA_BUNDLE to a PEM bundle "
+                    + "that verifies api.github.com");
+            return;
+        }
+        byte[] good = readFile(source);
+        if(good.length == 0) {
+            note("CA rotation check skipped: " + source + " is empty");
+            return;
+        }
+        String bundle = "/tmp/cn1-selftest-ca-" + System.currentTimeMillis() + ".pem";
+        writeFile(bundle, good);
+        check("the copied bundle verifies", "verified", tlsOutcome(bundle));
+
+        // Rotate IN PLACE. A PEM that parses to no usable root is refused by
+        // SSL_CTX_load_verify_locations, so a process that re-read the file
+        // cannot complete this handshake and one serving its cached context can.
+        writeFile(bundle, bytes("-----BEGIN CERTIFICATE-----\n"
+                + "bm90IGEgY2VydGlmaWNhdGU=\n"
+                + "-----END CERTIFICATE-----\n"));
+        check("a rotated CA bundle is re-read, not served from the cache",
+                "refused", tlsOutcome(bundle));
+
+        // And back. The trailing comment keeps the SIZE different from the first
+        // write, so the two are distinguishable even where the filesystem's
+        // timestamps are too coarse to separate writes this close together.
+        byte[] restored = new byte[good.length + 32];
+        System.arraycopy(good, 0, restored, 0, good.length);
+        System.arraycopy(bytes("\n# cn1-selftest restored bundle\n"), 0,
+                restored, good.length, 32);
+        writeFile(bundle, restored);
+        check("and a restored bundle verifies again", "verified", tlsOutcome(bundle));
+        new java.io.File(bundle).delete();
+    }
+
+    /** "verified" if api.github.com validates against the bundle at `path`. */
+    private static String tlsOutcome(String path) {
+        Tcp connection = null;
+        try {
+            connection = Tcp.connect("api.github.com", 443, 15000);
+            connection.startTls("api.github.com", path);
+            return "verified";
+        } catch (Exception refused) {
+            return "refused";
+        } finally {
+            if(connection != null) {
+                try {
+                    connection.close();
+                } catch (Exception ignored) {
+                    // Closing a socket whose handshake failed has nothing to report.
+                }
+            }
+        }
+    }
+
+    private static byte[] readFile(String path) throws Exception {
+        java.io.File file = new java.io.File(path);
+        byte[] out = new byte[(int) file.length()];
+        java.io.FileInputStream in = new java.io.FileInputStream(file);
+        try {
+            int at = 0;
+            while(at < out.length) {
+                int read = in.read(out, at, out.length - at);
+                if(read < 0) {
+                    break;
+                }
+                at += read;
+            }
+            return out;
+        } finally {
+            in.close();
+        }
+    }
+
+    private static void writeFile(String path, byte[] data) throws Exception {
+        java.io.FileOutputStream out = new java.io.FileOutputStream(path);
+        try {
+            out.write(data, 0, data.length);
+        } finally {
+            out.close();
+        }
+    }
+
     private static String readAll(Tcp connection) throws Exception {
         StringBuilder out = new StringBuilder();
         byte[] buffer = new byte[4096];

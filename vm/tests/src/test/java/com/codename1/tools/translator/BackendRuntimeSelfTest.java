@@ -83,6 +83,10 @@ class BackendRuntimeSelfTest {
         run.environment().put("CN1_SELFTEST_DB", work.resolve("pool.db").toString());
         if (System.getenv("CN1_SELFTEST_NETWORK") != null) {
             run.environment().put("CN1_SELFTEST_NETWORK", "1");
+            String bundle = caBundle();
+            if (bundle != null) {
+                run.environment().put("CN1_SELFTEST_CA_BUNDLE", bundle);
+            }
         }
         run.redirectErrorStream(true);
         Process p = run.start();
@@ -135,4 +139,31 @@ class BackendRuntimeSelfTest {
     private static String tail(String text) {
         return text.length() > 3000 ? text.substring(text.length() - 3000) : text;
     }
+
+    /**
+     * A PEM bundle the self-test's CA-rotation check can copy and rotate.
+     *
+     * <p>DERIVED rather than merely passed through, because a check that needs an
+     * environment variable nobody sets is a check that never runs -- it reports
+     * "skipped" and reads as green. The variable still wins when it is set, for a
+     * host whose bundle is somewhere else.
+     */
+    private static String caBundle() {
+        String named = System.getenv("CN1_SELFTEST_CA_BUNDLE");
+        if (named != null) {
+            return named;
+        }
+        String[] candidates = {
+            "/etc/ssl/certs/ca-certificates.crt",  // Debian, Ubuntu
+            "/etc/pki/tls/certs/ca-bundle.crt",    // RHEL, Fedora
+            "/etc/ssl/cert.pem",                   // macOS, Alpine
+        };
+        for (String candidate : candidates) {
+            if (java.nio.file.Files.isReadable(java.nio.file.Paths.get(candidate))) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
 }

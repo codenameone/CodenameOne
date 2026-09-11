@@ -59,6 +59,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h> /* inet_pton, for telling an IP literal from a DNS name */
+#include <sys/stat.h> /* stat: a CA bundle rotated in place must not keep its old roots */
 #endif
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -75,6 +76,46 @@ static int cn1ClientTlsInitialised = 0;
 static SSL_CTX* cn1ClientTlsContexts[CN1_TLS_CONTEXT_SLOTS];
 static char cn1ClientTlsRoots[CN1_TLS_CONTEXT_SLOTS][1024];
 static int cn1ClientTlsContextCount = 0;
+
+/*
+ * The identity of the file each cached context was BUILT FROM, so a bundle
+ * rotated in place is noticed.
+ *
+ * Keying the cache on the path alone was wrong: a CA bundle is a mount, and
+ * mounts are rotated under a stable name -- a Kubernetes secret or configmap,
+ * cert-manager, an RDS bundle refresh. The path never changes, so a process that
+ * cached a context at startup went on trusting the OLD roots for its whole life
+ * and every new connection failed the moment the service switched to a
+ * certificate signed by the new one, with a restart as the only remedy. The Java
+ * SE arm has no such cache and reads the file per upgrade, so the two arms
+ * disagreed about a deployment that is meant to be routine.
+ *
+ * st_ino and st_dev catch the atomic-rename form (Kubernetes swaps a symlink, so
+ * stat -- which follows it -- lands on a different inode), size and mtime catch a
+ * rewrite in place. The nanoseconds matter: a bundle rewritten within the same
+ * second at the same size and inode is otherwise indistinguishable.
+ */
+#if defined(__APPLE__)
+#define CN1_TLS_MTIME_NS(st) ((long)(st).st_mtimespec.tv_nsec)
+#else
+#define CN1_TLS_MTIME_NS(st) ((long)(st).st_mtim.tv_nsec)
+#endif
+struct cn1ClientTlsStamp {
+    int valid;
+    dev_t dev;
+    ino_t ino;
+    off_t size;
+    time_t mtime;
+    long mtimeNs;
+};
+static struct cn1ClientTlsStamp cn1ClientTlsStamps[CN1_TLS_CONTEXT_SLOTS];
+
+static int cn1ClientTlsStampMatches(const struct cn1ClientTlsStamp* stamp,
+                                    const struct stat* st) {
+    return stamp->dev == st->st_dev && stamp->ino == st->st_ino
+            && stamp->size == st->st_size && stamp->mtime == st->st_mtime
+            && stamp->mtimeNs == CN1_TLS_MTIME_NS(*st);
+}
 /*
  * The cache is shared by every request thread, so building an entry has to be
  * exclusive. Two threads opening their first TLS connection at once could pick the
@@ -106,12 +147,28 @@ static SSL_CTX* cn1ClientTlsEnsureContextLocked(const char* caFile) {
     const char* key = caFile == 0 ? "" : caFile;
     SSL_CTX* ctx;
     int iter;
+    int slot = -1;
+    struct stat st;
+    int stamped = 0;
+    if(key[0] != 0 && stat(key, &st) == 0) {
+        stamped = 1;
+    }
     for(iter = 0 ; iter < cn1ClientTlsContextCount ; iter++) {
         if(strcmp(cn1ClientTlsRoots[iter], key) == 0) {
-            return cn1ClientTlsContexts[iter];
+            /* An unstattable file keeps the cached context rather than failing:
+             * the roots we already loaded are the ones this process has been
+             * using, and a bundle that vanished for an instant mid-rotation is
+             * not a reason to refuse every connection. The stamp is left alone
+             * either way, so the next connect looks again. */
+            if(!stamped || !cn1ClientTlsStamps[iter].valid
+                    || cn1ClientTlsStampMatches(&cn1ClientTlsStamps[iter], &st)) {
+                return cn1ClientTlsContexts[iter];
+            }
+            slot = iter;
+            break;
         }
     }
-    if(cn1ClientTlsContextCount >= CN1_TLS_CONTEXT_SLOTS) {
+    if(slot < 0 && cn1ClientTlsContextCount >= CN1_TLS_CONTEXT_SLOTS) {
         snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError),
                  "too many distinct TLS trust roots (limit %d)", CN1_TLS_CONTEXT_SLOTS);
         return 0;
@@ -152,10 +209,37 @@ static SSL_CTX* cn1ClientTlsEnsureContextLocked(const char* caFile) {
         return 0;
     }
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, 0);
-    strcpy(cn1ClientTlsRoots[cn1ClientTlsContextCount], key);
-    cn1ClientTlsContexts[cn1ClientTlsContextCount] = ctx;
-    /* The count LAST: a reader that sees it has already seen both writes above it. */
-    cn1ClientTlsContextCount++;
+    /* BUILD FIRST, SWAP SECOND. Every failure above returns with the existing
+     * entry untouched, so a rotation caught halfway -- the file replaced but not
+     * yet readable, or briefly holding a truncated bundle -- leaves the old
+     * context serving connections instead of emptying the slot and handing the
+     * next caller a null. The stamp is only written for a context that loaded,
+     * so the rebuild is retried until one does. */
+    if(slot >= 0) {
+        /* Drops OUR reference only. SSL_new took its own, so a handshake still
+         * running against the old roots finishes on them and frees the context
+         * when its SSL does. */
+        SSL_CTX_free(cn1ClientTlsContexts[slot]);
+    } else {
+        slot = cn1ClientTlsContextCount;
+        strcpy(cn1ClientTlsRoots[slot], key);
+    }
+    cn1ClientTlsContexts[slot] = ctx;
+    if(stamped) {
+        cn1ClientTlsStamps[slot].dev = st.st_dev;
+        cn1ClientTlsStamps[slot].ino = st.st_ino;
+        cn1ClientTlsStamps[slot].size = st.st_size;
+        cn1ClientTlsStamps[slot].mtime = st.st_mtime;
+        cn1ClientTlsStamps[slot].mtimeNs = CN1_TLS_MTIME_NS(st);
+        /* valid LAST, so the fields it vouches for are all written. */
+        cn1ClientTlsStamps[slot].valid = 1;
+    } else {
+        cn1ClientTlsStamps[slot].valid = 0;
+    }
+    if(slot == cn1ClientTlsContextCount) {
+        /* The count LAST: a reader that sees it has already seen both writes above it. */
+        cn1ClientTlsContextCount++;
+    }
     return ctx;
 }
 
