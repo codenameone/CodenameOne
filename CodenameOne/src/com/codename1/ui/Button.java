@@ -1071,7 +1071,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             // ToggleButton, exactly as leaving it moves it back, or a control
             // toggled while inside a group is handed a radio UIID on the way out.
             Object saved = getClientProperty("$origUIID");
-            if (saved instanceof String && !isToggleUIID((String) saved)) {
+            if (isDefaultToggleableUIID(saved)) {
                 preToggleUIID = (String) saved;
                 putClientProperty("$origUIID", "ToggleButton");
             }
@@ -1093,7 +1093,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             // styling until the next structural or theme update. $origUIID is not
             // the test for that -- ComponentGroup sets it once and never clears it,
             // so it says "was grouped at some point" rather than "is grouped now".
-            if (!(getParent() instanceof ComponentGroup) && isToggleUIID(uiid)) {
+            if (!groupOwnsUIID() && isToggleUIID(uiid)) {
                 setUIID(preToggleUIID);
             }
             Object saved = getClientProperty("$origUIID");
@@ -1102,6 +1102,35 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             }
             preToggleUIID = null;
         }
+    }
+
+    /// Whether a ComponentGroup is currently holding this control's UIID. Being
+    /// inside one is not enough: updateUIIDs() returns without renaming anything
+    /// when ComponentGroupBool is off and the group is not forced -- the default,
+    /// and what Android Material ships -- and in that case the live UIID is still
+    /// ours to restore. The group records what it replaced, so the presence of
+    /// that record is what says it took ownership.
+    ///
+    /// #### Returns
+    ///
+    /// true if a group renamed this control
+    private boolean groupOwnsUIID() {
+        return getParent() instanceof ComponentGroup && getClientProperty("$origUIID") != null;
+    }
+
+    /// Whether the given saved UIID is one setToggle is allowed to convert. An
+    /// application that assigned its own UIID keeps it: the original code only
+    /// ever converted the two defaults, and the guide says as much.
+    ///
+    /// #### Parameters
+    ///
+    /// - `saved`: the value recorded by a ComponentGroup
+    ///
+    /// #### Returns
+    ///
+    /// true for the default CheckBox and RadioButton UIIDs
+    private static boolean isDefaultToggleableUIID(Object saved) {
+        return "CheckBox".equals(saved) || "RadioButton".equals(saved);
     }
 
     /// True for the UIID setToggle assigns and for the three a horizontal

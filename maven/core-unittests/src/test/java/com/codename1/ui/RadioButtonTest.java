@@ -154,6 +154,45 @@ class RadioButtonTest extends UITestBase {
     }
 
     @Test
+    void testTogglingInsideAnInactiveGroupStillRestoresTheUiid() {
+        // ComponentGroupBool is off by default -- Android Material never sets it --
+        // and an unforced group then returns from updateUIIDs without renaming
+        // anything. The live UIID is still the control's own in that case, so
+        // skipping the restore merely because the parent is a group left a plain
+        // radio wearing the toggle style.
+        ComponentGroup group = new ComponentGroup();
+        RadioButton radio = new RadioButton("Choice");
+        radio.setToggle(true);
+        group.addComponent(radio);
+        assertEquals("ToggleButton", radio.getUIID());
+
+        radio.setToggle(false);
+
+        assertEquals("RadioButton", radio.getUIID());
+    }
+
+    @Test
+    void testTogglingInsideAGroupKeepsAnApplicationsOwnUiid() {
+        // setToggle has only ever converted the two default UIIDs; a UIID the
+        // application chose is left alone. The grouped path has to honour that too,
+        // or the group hands back ToggleButton instead of the custom name.
+        ComponentGroup group = new ComponentGroup();
+        group.setForceGroup(true);
+        group.setHorizontal(true);
+        RadioButton custom = new RadioButton("Choice");
+        custom.setUIID("MyChoice");
+        RadioButton other = new RadioButton("Other");
+        group.addComponent(custom);
+        group.addComponent(other);
+
+        custom.setToggle(true);
+        group.removeComponent(custom);
+
+        assertEquals("MyChoice", custom.getUIID(),
+                "a UIID the application set must survive toggle mode");
+    }
+
+    @Test
     void testCreateToggleAddsToGroupAndSetsToggleUiid() {
         ButtonGroup group = new ButtonGroup();
         RadioButton radio = RadioButton.createToggle("Choice", group);
