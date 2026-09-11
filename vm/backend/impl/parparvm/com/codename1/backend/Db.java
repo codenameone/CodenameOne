@@ -223,6 +223,20 @@ public final class Db {
         if(stmt == 0) {
             throw new IOException("Could not prepare: " + errorImpl(handle) + " [" + sql + "]");
         }
+        // THE COUNT HAS TO MATCH, both ways. Binding more than the statement has
+        // is SQLITE_RANGE and bind() refuses it -- but binding FEWER said nothing
+        // at all: SQLite leaves an unbound parameter as NULL, so an insert or an
+        // update committed a row the caller never wrote, and the Java SE JDBC arm
+        // throws for the same call. One API, two answers, and the one that stays
+        // quiet is the one that reaches production.
+        int expected = parameterCountImpl(stmt);
+        int supplied = params == null ? 0 : params.length;
+        if(supplied != expected) {
+            finalizeImpl(stmt);
+            throw new IOException("the statement has " + expected + " parameter"
+                    + (expected == 1 ? "" : "s") + " and " + supplied
+                    + " were supplied [" + sql + "]");
+        }
         if(params != null) {
             for(int iter = 0 ; iter < params.length ; iter++) {
                 bind(stmt, iter + 1, params[iter]);
@@ -273,6 +287,7 @@ public final class Db {
     private static native int bindNullImpl(long stmt, int index);
     private static native int bindBlobImpl(long stmt, int index, byte[] value);
     private static native int stepImpl(long stmt);
+    private static native int parameterCountImpl(long stmt);
     private static native int columnCountImpl(long stmt);
     private static native String columnNameImpl(long stmt, int index);
     private static native int columnTypeImpl(long stmt, int index);

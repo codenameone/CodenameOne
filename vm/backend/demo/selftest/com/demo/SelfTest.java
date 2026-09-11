@@ -625,6 +625,104 @@ public class SelfTest {
     }
 
     /**
+     * A credential inside its refresh MARGIN is not an expired credential.
+     *
+     * <p>S3.credentials() refreshes early, at CREDENTIAL_REFRESH_MARGIN before
+     * expiry, and now keeps the cached credential when that refresh fails -- a
+     * metadata service that blinks must not become an outage of every S3 call
+     * minutes before AWS would stop honouring what is in hand. That fallback is
+     * decided by isExpiring(0), so what it means has to be exactly "already
+     * expired" and nothing looser.
+     *
+     * <p>This pins the contract the fallback rests on. The fallback ITSELF is not
+     * covered here: reaching it needs a credential inside its margin AND a
+     * failing Credentials.resolve(), and there is no seam to inject either --
+     * S3's constructor is private and resolve() reads the real environment.
+     */
+    private static void expiryMarginIsDistinctFromExpiry() throws Exception {
+        long now = System.currentTimeMillis();
+        // Two minutes of life left: inside a five-minute refresh margin, and not
+        // expired. This is the state the fallback exists for.
+        Credentials soon = new Credentials("id", "secret", "token", now + 120000);
+        check("a credential inside the margin wants refreshing", "true",
+                String.valueOf(soon.isExpiring(300000)));
+        check("but it has NOT expired", "false", String.valueOf(soon.isExpiring(0)));
+
+        Credentials gone = new Credentials("id", "secret", "token", now - 1000);
+        check("a past expiry has expired", "true", String.valueOf(gone.isExpiring(0)));
+
+        Credentials plenty = new Credentials("id", "secret", "token", now + 3600000);
+        check("an hour of life needs no refresh", "false",
+                String.valueOf(plenty.isExpiring(300000)));
+    }
+
+    /**
+     * A statement runs with exactly as many parameters as it has placeholders.
+     *
+     * <p>SQLite leaves an UNBOUND parameter as NULL and says nothing, so passing
+     * fewer values than the SQL has placeholders committed a row the caller never
+     * wrote -- an insert or an update quietly storing NULL where a value belonged.
+     * The Java SE arm throws for the same call, which is the worse half of it: the
+     * dev loop refuses what production accepts.
+     *
+     * <p>Asserted on BOTH arms with one expectation. Too MANY parameters was
+     * already refused (SQLITE_RANGE) and is checked here so it stays that way.
+     */
+    private static void boundParametersMustMatchThePlaceholders() throws Exception {
+        String path = "/tmp/cn1-selftest-params-" + System.currentTimeMillis() + ".db";
+        Database db = Database.open(path);
+        try {
+            db.execute("DROP TABLE IF EXISTS pairs", null);
+            db.execute("CREATE TABLE pairs (a TEXT, b TEXT)", null);
+
+            // The correct call first, so the rest cannot pass by the table being
+            // broken or the statement never preparing.
+            db.execute("INSERT INTO pairs (a, b) VALUES (?, ?)",
+                    new Object[]{"one", "two"});
+            check("a matched statement inserts", "1",
+                    String.valueOf(db.query("SELECT a FROM pairs WHERE b = ?",
+                            new Object[]{"two"}).size()));
+
+            String tooFew;
+            try {
+                db.execute("INSERT INTO pairs (a, b) VALUES (?, ?)", new Object[]{"only"});
+                tooFew = "accepted";
+            } catch (Exception refused) {
+                tooFew = "refused";
+            }
+            check("too few parameters are refused", "refused", tooFew);
+
+            String noneAtAll;
+            try {
+                db.execute("INSERT INTO pairs (a, b) VALUES (?, ?)", null);
+                noneAtAll = "accepted";
+            } catch (Exception refused) {
+                noneAtAll = "refused";
+            }
+            check("no parameters at all are refused", "refused", noneAtAll);
+
+            String tooMany;
+            try {
+                db.execute("INSERT INTO pairs (a, b) VALUES (?, ?)",
+                        new Object[]{"a", "b", "c"});
+                tooMany = "accepted";
+            } catch (Exception refused) {
+                tooMany = "refused";
+            }
+            check("too many parameters are refused", "refused", tooMany);
+
+            // And nothing was written by the refused calls: the row count is still
+            // the one successful insert. A refusal that has already committed is
+            // not a refusal.
+            check("a refused statement wrote nothing", "1",
+                    String.valueOf(db.query("SELECT a FROM pairs", null).size()));
+        } finally {
+            db.close();
+            new java.io.File(path).delete();
+        }
+    }
+
+    /**
      * A URL component keeps its non-ASCII characters when something ELSE in it
      * needed escaping.
      *
@@ -820,6 +918,8 @@ public class SelfTest {
         negativeConnectTimeoutsAreRefused();
         malformedPortsAreRefused();
         urlComponentsKeepTheirUnicode();
+        boundParametersMustMatchThePlaceholders();
+        expiryMarginIsDistinctFromExpiry();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");

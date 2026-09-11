@@ -89,6 +89,10 @@ JAVA_INT com_codename1_backend_Db_stepImpl___long_R_int(CODENAME_ONE_THREAD_STAT
     return -1;
 }
 
+JAVA_INT com_codename1_backend_Db_parameterCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
+    return 0;
+}
+
 JAVA_INT com_codename1_backend_Db_columnCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
     return 0;
 }
@@ -231,6 +235,19 @@ JAVA_INT com_codename1_backend_Db_stepImpl___long_R_int(CODENAME_ONE_THREAD_STAT
         return 0;
     }
     return -1;
+}
+
+/*
+ * How many placeholders the prepared statement has.
+ *
+ * SQLite leaves an unbound parameter as NULL and says nothing, so a caller that
+ * passed fewer values than the SQL has placeholders committed a row it did not
+ * write -- where the Java SE JDBC arm throws for the same call. The count is what
+ * lets the Java side refuse it before stepping.
+ */
+JAVA_INT com_codename1_backend_Db_parameterCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle) {
+    sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
+    return stmt == NULL ? 0 : sqlite3_bind_parameter_count(stmt);
 }
 
 JAVA_INT com_codename1_backend_Db_columnCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle) {

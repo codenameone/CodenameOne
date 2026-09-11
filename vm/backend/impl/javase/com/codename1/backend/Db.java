@@ -87,9 +87,17 @@ public final class Db {
     public synchronized int execute(String sql, Object[] params) throws IOException {
         Connection c = live();
         try {
-            if(params == null || params.length == 0) {
+            if((params == null || params.length == 0) && sql.indexOf('?') < 0) {
                 // PRAGMA and the transaction verbs are not all preparable on every
                 // driver, so a parameterless statement goes through Statement.
+                //
+                // Only one with NO PLACEHOLDER IN IT, though. Routing every
+                // paramless call here meant "INSERT ... VALUES (?, ?)" with null
+                // params never reached a PreparedStatement at all, so the count
+                // check below could not see it and SQLite inserted two NULLs. A
+                // PRAGMA or a transaction verb carries no '?', so the reason this
+                // branch exists is untouched; a statement that does carry one has
+                // a parameter count to answer for and goes the other way.
                 Statement statement = c.createStatement();
                 try {
                     statement.execute(sql);
@@ -292,6 +300,22 @@ public final class Db {
     }
 
     private static void bind(PreparedStatement statement, Object[] params) throws SQLException {
+        // THE COUNT HAS TO MATCH. Passing FEWER values than the statement has
+        // placeholders left the rest unbound, and sqlite-jdbc executes that
+        // happily with every unbound parameter reading as NULL -- so an insert or
+        // an update committed a row the caller never wrote and nothing said so.
+        //
+        // Measured, and not what review assumed: the claim was that this arm
+        // already threw where the packaged one did not. It does not. Both arms
+        // accepted it, which makes this a shared defect rather than a divergence,
+        // and both now refuse it with the same message. Too MANY parameters was
+        // already refused here, by the driver's own range check.
+        int expected = statement.getParameterMetaData().getParameterCount();
+        int supplied = params == null ? 0 : params.length;
+        if(supplied != expected) {
+            throw new SQLException("the statement has " + expected + " parameter"
+                    + (expected == 1 ? "" : "s") + " and " + supplied + " were supplied");
+        }
         if(params == null) {
             return;
         }

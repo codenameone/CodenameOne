@@ -2176,44 +2176,56 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
     if(n > gcSatbPeak) {
         gcSatbPeak = n;                    // what the log actually had to hold
     }
-    if(n > gcSatbScratchCap) {
-        long nc = n < 8192 ? 8192 : n;
-        JAVA_OBJECT* ns = (JAVA_OBJECT*)realloc(gcSatbScratch, (size_t)nc * sizeof(JAVA_OBJECT));
-        if(ns != 0) {
-            gcSatbScratch = ns;
-            gcSatbScratchCap = nc;
-        } else {
-            // realloc failed and left the OLD, smaller buffer and capacity in place.
-            // Copying n entries into it writes past the allocation, and does so with
-            // the collector running over the same heap. Take only what fits.
-            n = gcSatbScratchCap;
-        }
-    }
-    if(n > 0 && gcSatbScratch != 0) {
-        memcpy(gcSatbScratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
-        // Whatever did not fit STAYS in the log for the next take. A dropped SATB
-        // entry is a reference the mark never sees, so the object it named is swept
-        // while it is still live -- a use-after-free one collection later and
-        // nowhere near here. Holding the tail costs one more take and cannot do that.
-        {
-            long left = gcSatbTop - n;
-            if(left > 0) {
-                memmove(gcSatbStack, gcSatbStack + n, (size_t)left * sizeof(JAVA_OBJECT));
+    if(n > 0) {
+        // SWAP THE TWO BUFFERS, which is what the comment above this function has
+        // always said this does. Staging into a scratch buffer that had to be
+        // grown put a realloc on the take path, and a realloc can fail: the
+        // version this replaces then took only what fitted and left the rest
+        // queued, on the reasoning that the tail costs one more take.
+        //
+        // THAT REASONING WAS WRONG, and review found the hole in it. The drain
+        // loop stops when a batch marks nothing new, and the regress that would
+        // otherwise pick the tail up is bounded by CN1_SATB_MAX_REOPENS -- so a
+        // tail bigger than the cap's worth of takes is still queued when the
+        // sweep starts. The cap's safety argument does not cover those entries:
+        // it rests on a reference stored after the fixpoint being already marked
+        // or fresh, while a retained DELETION-barrier entry names exactly the
+        // object that is neither. Reclaiming it is a use-after-free a collection
+        // later and nowhere near here.
+        //
+        // A swap cannot half-succeed, so the failure mode is gone rather than
+        // handled: the caller gets the buffer the batch is already in, and the
+        // log continues in the one the caller finished with. The log grows on
+        // demand in cn1SatbAppend, whose own OOM path is the drop accounting
+        // below, so a smaller buffer arriving here costs at most one realloc
+        // there. It also drops the memcpy from every take.
+        JAVA_OBJECT* takenBuffer = gcSatbStack;
+        long takenCap = gcSatbCap;
+        gcSatbStack = gcSatbScratch;
+        gcSatbCap = gcSatbScratchCap;
+        gcSatbScratch = takenBuffer;
+        gcSatbScratchCap = takenCap;
+        gcSatbTop = 0;
+        // Hand the log back a capacity worth having. The two buffers alternate, so
+        // without this a take can leave the log holding whichever of them is
+        // smaller -- on the first take, nothing at all -- and the next burst pays
+        // a doubling storm to climb back, during a mark, which is the worst time
+        // for it. Sizing it to the batch just taken tracks the working set the way
+        // the doubling did before the swap.
+        //
+        // A FAILURE HERE IS HARMLESS, which is the difference from the realloc this
+        // change removed: the log is empty at this instant, so there is nothing to
+        // lose or half-copy, and cn1SatbAppend grows on demand anyway with its own
+        // drop accounting if it cannot. Safety does not depend on this succeeding;
+        // only the allocation pattern does.
+        if(gcSatbCap < n) {
+            JAVA_OBJECT* grown =
+                    (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+            if(grown != 0) {
+                gcSatbStack = grown;
+                gcSatbCap = n;
             }
-            gcSatbTop = left;
         }
-    } else {
-        // Nothing could be staged; leave the log intact rather than clearing it.
-        // Counted as a drop even though nothing is LOST here: the caller is told
-        // the batch was empty, and cn1GcProcessReferences reads an empty batch as
-        // "termination can finish". A referent Reference.get() has handed out would
-        // then be cleared on the strength of a batch the mark never saw. The entries
-        // themselves stay in the log for the next take, which is why the partial
-        // path above does not count one: nothing there goes unseen.
-        if(gcSatbTop > 0) {
-            atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
-        }
-        n = 0;
     }
     pthread_mutex_unlock(&gcSatbMutex);
     *out = gcSatbScratch;
@@ -4370,13 +4382,14 @@ void codenameOneGCMark() {
             cn1GcSatbEntries += n;
 #endif
             if(n == 0) {
-                // A ZERO HERE IS NOT ALWAYS "NOTHING SLIPPED IN". cn1SatbTake reports an
-                // empty batch both when the log was empty and when it could not grow its
-                // scratch buffer and threw the entries away -- it records the second case
-                // in cn1SatbDrops, but this catch runs AFTER cn1GcProcessReferences made
-                // its last drop check, so nothing would otherwise look at the new value.
-                // A getter that logged successfully and had its batch discarded here would
-                // then keep a pointer the following sweep frees.
+                // A ZERO HERE IS NOT ALWAYS "NOTHING SLIPPED IN". cn1SatbTake now swaps
+                // the log's buffer out whole, so a zero from IT does mean the log was
+                // empty -- but an APPEND can still have failed to grow the log under OOM
+                // and dropped the entry on the mutator's side, and it records that in
+                // cn1SatbDrops. This catch runs AFTER cn1GcProcessReferences made its last
+                // drop check, so nothing would otherwise look at the new value. A getter
+                // whose log append was dropped would then keep a pointer the following
+                // sweep frees.
                 //
                 // Retaining is the answer rather than another clear pass: the barrier is
                 // coming down, so there is no sound basis left for deciding anything is

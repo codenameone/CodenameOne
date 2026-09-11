@@ -84,7 +84,24 @@ public final class S3 {
      */
     private Credentials credentials() throws IOException {
         if(fromEnvironment && credentials.isExpiring(CREDENTIAL_REFRESH_MARGIN)) {
-            credentials = Credentials.resolve();
+            try {
+                credentials = Credentials.resolve();
+            } catch (IOException err) {
+                // A FAILED REFRESH IS NOT AN EXPIRED CREDENTIAL, and the margin is
+                // the whole reason: it exists so the refresh can be attempted early
+                // and retried. Letting the failure out turned a metadata service
+                // that blinked -- ECS, EKS and IMDS all being ordinary HTTP
+                // endpoints that can time out -- into an outage of every S3
+                // operation, up to five minutes before AWS itself would have
+                // stopped honouring what is already in hand.
+                //
+                // isExpiring(0) is the real question: only when the credential has
+                // ACTUALLY expired is there nothing left to sign with, and then the
+                // failure is the honest answer.
+                if(credentials.isExpiring(0)) {
+                    throw err;
+                }
+            }
         }
         return credentials;
     }
