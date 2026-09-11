@@ -31,8 +31,10 @@ import org.objectweb.asm.Opcodes;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -43,6 +45,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -70,20 +73,14 @@ public class HeavyLoadBenchmarkTest {
         Path iosBundleJar = findDependencyJar("codenameone-ios-7.0.214-bundle.jar");
         if (iosBundleJar == null) iosBundleJar = findDependencyJar("bundle");
 
-        // Locate HelloCodenameOne sources
-        Path helloSrc = findPath("scripts", "hellocodenameone", "common", "src", "main", "java");
-
         // Ensure jars exist
         Assertions.assertTrue(Files.exists(javaApiJar), "JavaAPI.jar not found at " + javaApiJar);
 
-        boolean hasCore = coreJar != null;
-        if (!hasCore) {
-            System.out.println("WARNING: CodenameOne Core jar not found in dependencies.");
-        }
+        Assertions.assertNotNull(coreJar, "CodenameOne Core jar is required by the benchmark sample");
 
         List<Path> jarsToScan = new ArrayList<>();
         jarsToScan.add(javaApiJar);
-        if (coreJar != null) jarsToScan.add(coreJar);
+        jarsToScan.add(coreJar);
         if (iosPortJar != null) jarsToScan.add(iosPortJar);
 
         System.out.println("Scanning " + jarsToScan.size() + " jars...");
@@ -98,34 +95,22 @@ public class HeavyLoadBenchmarkTest {
 
         // Compile the benchmark main - Setup Compiler
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        String cp = javaApiJar.toString();
-        if (hasCore) {
-            cp += File.pathSeparator + coreJar.toString();
-        }
+        String cp = javaApiJar.toString() + File.pathSeparator + coreJar.toString();
         if (iosPortJar != null) {
             cp += File.pathSeparator + iosPortJar.toString();
         }
 
-        // Compile HelloCodenameOne first if available
-        if (helloSrc != null && hasCore) {
-            System.out.println("Compiling HelloCodenameOne from " + helloSrc);
-            List<String> helloSources = Files.walk(helloSrc)
-                    .filter(p -> p.toString().endsWith(".java"))
-                    .map(Path::toString)
-                    .collect(Collectors.toList());
-            if (!helloSources.isEmpty()) {
-                List<String> compileArgs = new ArrayList<>();
-                compileArgs.add("-cp");
-                compileArgs.add(cp);
-                compileArgs.add("-d");
-                compileArgs.add(classesDir.toString());
-                compileArgs.addAll(helloSources);
-                int helloResult = compiler.run(null, null, null, compileArgs.toArray(new String[0]));
-                Assertions.assertEquals(0, helloResult,
-                        "Compilation of HelloCodenameOne failed; refusing to benchmark an incomplete workload");
-                System.out.println("Compiled HelloCodenameOne successfully.");
-            }
+        // Keep the sample compatible with the pinned 7.0.214 jars. The live
+        // hellocodenameone app uses Java 17 and newer framework APIs, so it is
+        // not a reproducible workload for this Java 8 translation benchmark.
+        Path sampleSrc = tempDir.resolve("sample-src");
+        Files.createDirectories(sampleSrc);
+        try (InputStream sample = HeavyLoadBenchmarkTest.class.getResourceAsStream(
+                "/com/codename1/tools/translator/benchmark/HelloCodenameOne.java")) {
+            Assertions.assertNotNull(sample, "Benchmark sample source is missing");
+            Files.copy(sample, sampleSrc.resolve("HelloCodenameOne.java"));
         }
+        compileSample(compiler, cp, sampleSrc, classesDir);
 
         // Scan jars for public classes
         List<String> publicClasses = new ArrayList<>();
@@ -223,6 +208,28 @@ public class HeavyLoadBenchmarkTest {
         writeReport(duration, profiler.getHotspots(20));
     }
 
+    static void compileSample(JavaCompiler compiler, String classpath, Path sourceDir,
+                              Path classesDir) throws IOException {
+        Assertions.assertNotNull(compiler, "A JDK compiler is required for the benchmark sample");
+        List<String> sources;
+        try (Stream<Path> paths = Files.walk(sourceDir)) {
+            sources = paths.filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java"))
+                    .sorted()
+                    .map(Path::toString)
+                    .collect(Collectors.toList());
+        }
+        Assertions.assertFalse(sources.isEmpty(), "Benchmark sample contains no Java sources");
+        List<String> args = new ArrayList<>(Arrays.asList(
+                "-source", "8", "-target", "8", "-cp", classpath, "-d", classesDir.toString()));
+        args.addAll(sources);
+        ByteArrayOutputStream diagnostics = new ByteArrayOutputStream();
+        int result = compiler.run(null, diagnostics, diagnostics, args.toArray(new String[0]));
+        Assertions.assertEquals(0, result,
+                "Compilation of benchmark sample failed; refusing to benchmark an incomplete workload\n"
+                        + diagnostics.toString("UTF-8"));
+        System.out.println("Compiled benchmark sample successfully.");
+    }
+
     private void runTranslator(String classpath, Path outputDir) throws Exception {
         // This benchmark deliberately translates the PUBLISHED codenameone-ios
         // 7.0.214 jar and its bundled nativeios sources, because it wants a large
@@ -318,27 +325,6 @@ public class HeavyLoadBenchmarkTest {
             }
         }
         return classes;
-    }
-
-    private Path findJar(String... parts) {
-        return findPath(parts);
-    }
-
-    private Path findPath(String... parts) {
-        // Try paths relative to vm/tests, vm, and root
-        Path p = Paths.get("..", "..");
-        for (String part : parts) p = p.resolve(part);
-        if (Files.exists(p)) return p.normalize().toAbsolutePath();
-
-        p = Paths.get("..");
-        for (String part : parts) p = p.resolve(part);
-        if (Files.exists(p)) return p.normalize().toAbsolutePath();
-
-        p = Paths.get(".");
-        for (String part : parts) p = p.resolve(part);
-        if (Files.exists(p)) return p.normalize().toAbsolutePath();
-
-        return null;
     }
 
     private Path findDependencyJar(String namePart) {
