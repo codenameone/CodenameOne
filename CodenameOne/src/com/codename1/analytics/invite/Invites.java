@@ -3311,11 +3311,14 @@ public final class Invites {
     // client id and the code it was claiming. Both are precisely the identity
     // the user asked to be rid of.
     //
-    // A Vector because these are touched from two threads: added on the EDT
-    // when the request is queued, removed from the network thread when it
-    // fails. That is the same boundary the map above already straddles, and it
-    // is a real one -- not the single-threaded EDT the rest of this class runs
-    // on.
+    // A Vector, and the reason is NOT what an earlier version of this comment
+    // claimed. It said these were touched from the network thread as well;
+    // they are not. postResponse() is handed to callSerially, so the release
+    // runs on the EDT, and the network thread's own hook -- handleException()
+    // -- never runs for these requests at all, because they are fail-silent
+    // and NetworkManager only logs. The collection is EDT-only like the rest
+    // of this class; the Vector is simply what it was written with and costs
+    // nothing to keep.
     private static final java.util.Vector<InviteConnection> outstanding =
             new java.util.Vector<InviteConnection>();
 
@@ -3642,6 +3645,23 @@ public final class Invites {
         if (acknowledged != null) {
             unacknowledged.remove(acknowledged);
         }
+        // Read-modify-write, and deliberately unguarded: this runs on the EDT,
+        // and so does everything else that touches the outbox.
+        //
+        // A review round read it as a race -- a response landing on the
+        // network thread while the EDT mints, so one overwrites the other's
+        // queue -- and asked for a lock. There is no such interleaving:
+        // ConnectionRequest hands postResponse() to
+        // Display.getInstance().callSerially(), so it runs on the EDT like
+        // create(), flush() and reset(). The network thread's own hook,
+        // handleException(), touches the in-flight marks and never the outbox
+        // -- and for these requests it does not run at all, because they are
+        // fail-silent and NetworkManager only logs.
+        //
+        // A lock here would be the wrong answer to a question nobody asked:
+        // this framework is single-threaded on the EDT by design, and the one
+        // real boundary -- the native callbacks -- is marshalled with
+        // callSerially before it reaches any of this.
         List<String> outbox = InviteStore.readOutbox();
         if (outbox.remove(json)) {
             InviteStore.writeOutbox(outbox);

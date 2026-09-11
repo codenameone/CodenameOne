@@ -80,7 +80,10 @@ public class InviteButton extends ShareButton {
         super.setShareResultListener(new ShareResultListener() {
             @Override
             public void onResult(com.codename1.share.ShareResult result) {
+                // Taken and CLEARED, so the next press mints again and this
+                // outcome can only ever be reported once.
                 Invite current = invite;
+                invite = null;
                 if (current != null) {
                     Invites.reportShareResult(current, result);
                 }
@@ -188,6 +191,20 @@ public class InviteButton extends ShareButton {
     /// {@inheritDoc}
     @Override
     public void actionPerformed(ActionEvent evt) {
+        mintForShare();
+        // ShareButton defers the share by one EDT cycle, so setting the text
+        // in mintForShare() is in time.
+        super.actionPerformed(evt);
+    }
+
+    /// Mints the invite this press will share, or keeps the one still
+    /// outstanding, and sets the text.
+    ///
+    /// Package private so a test can drive it without the share sheet: the
+    /// sheet is the one part of a press that cannot run headless, and the
+    /// question this answers -- how many invites two presses mint -- is
+    /// decided before it opens.
+    Invite mintForShare() {
         InviteRequest.Builder b = InviteRequest.create();
         if (campaign != null) {
             b.campaign(campaign);
@@ -198,13 +215,27 @@ public class InviteButton extends ShareButton {
         if (payload != null) {
             b.payload(payload);
         }
-        invite = Invites.create(b.build());
+        // One outstanding invite at a time, and a second press before the
+        // first sheet has answered reuses it rather than minting another.
+        //
+        // The share sheet is modal, so a double tap does not open two of them
+        // -- it mints two codes and shares the later one, leaving the first
+        // registered, counted as invite_created, and never shared by anybody.
+        // Worse, the result is reported against whichever invite the field
+        // held when it arrived, so with two sheets the answer for one could be
+        // recorded against the other.
+        //
+        // Reusing removes both: the outcome belongs to exactly one invite by
+        // construction. Sharing one code more than once is the ordinary shape
+        // of a referral anyway -- a code is not per recipient, it is the
+        // inviter's -- so nothing is lost by not minting a second.
+        if (invite == null) {
+            invite = Invites.create(b.build());
+        }
         String text = message == null || message.length() == 0
                 ? invite.getUrl() : message + " " + invite.getUrl();
         setTextToShare(text);
-        // ShareButton defers the share by one EDT cycle, so setting the text
-        // here is in time.
-        super.actionPerformed(evt);
+        return invite;
     }
 
     /// {@inheritDoc}
