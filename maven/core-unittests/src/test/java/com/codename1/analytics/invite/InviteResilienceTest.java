@@ -494,6 +494,39 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void anAcknowledgementThatFailedIsRetriedByTheNextWrite() {
+        // The obligation is cleared only when the copy really went. It used to
+        // be dropped before the answer was read, so a removal the container
+        // refused -- or a flush that never reached the disk, which is what the
+        // native side now reports -- counted as done. The code then sat in the
+        // shared container for good: nothing asked again, and the container is
+        // read on launch, so it returns if the framework's record is ever lost.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        InviteTestSupport.PendingHandoffSource source = InviteTestSupport.pendingHandoff;
+        Invites.checkForInvite();
+        assertTrue(source.wasAsked(), "the fixture never reached the clip handoff");
+
+        source.discardFails = true;
+        source.answer("ACKRETRY1", 1700000000L);
+        assertTrue(source.discardedCount() > 0,
+                "the fixture never attempted a discard, so this proves nothing");
+
+        // The container still holds it, so the next durable write of THIS
+        // record must ask again rather than assume. That write is the claim
+        // retry: it bumps the attempt count and saves the same app_clip
+        // record, which is what the acknowledgement hangs off.
+        int attempted = source.discardedCount();
+        source.discardFails = false;
+        Invites.lookupRetryDelay = 0;
+        Invites.checkForInvite();
+
+        assertTrue(source.discardedCount() > attempted,
+                "a discard the container refused was treated as done, so the code "
+                        + "stays in the shared container and nothing ever asks again");
+    }
+
+    @FormTest
     void aHandoffOnlyFailureStillLatchesTheErasure() {
         // resetVerified() reports the failure, and reset() decides whether to
         // LATCH by asking what survived -- which was answered by reading the

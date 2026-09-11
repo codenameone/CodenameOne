@@ -2147,18 +2147,35 @@ public final class Invites {
             return;
         }
         AppClipHandoffSource source = appClipSource;
-        // Cleared whether or not there is still a source to tell: the flag
-        // tracks this process's obligation, and a source that has gone away
-        // cannot be handed anything.
-        handoffAwaitingAck = false;
         if (source == null) {
+            // Nothing left to tell, and nothing it could still be holding
+            // that this process can reach.
+            handoffAwaitingAck = false;
             return;
         }
+        boolean gone;
         try {
-            source.discardHandoff();
+            gone = source.discardHandoff();
         } catch (Throwable t) {
             Log.e(t);
+            gone = false;
         }
+        // Cleared ONLY when the copy really went, which is the same rule
+        // discardAnyHandoff() follows and this one did not.
+        //
+        // The obligation was dropped before the answer was even read, so a
+        // removal the container refused -- or a flush that never reached the
+        // disk, which is exactly what the native side now reports -- was
+        // treated as done. The code then sat in the shared container for good:
+        // no later durable write asked again, and the container is read on
+        // launch, so it comes back if the framework's own record is ever lost
+        // or cleared.
+        //
+        // Left pending instead, and every later durable write retries it.
+        if (gone) {
+            handoffAwaitingAck = false;
+        }
+        handoffSurvived = !gone;
     }
 
     /// Forgets the in-memory copy, for the paths that delete the record.
