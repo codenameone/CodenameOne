@@ -689,16 +689,31 @@ public final class Analytics {
             b.append(sanitize(e.getKey())).append('\t').append(sanitize(e.getValue()));
             first = false;
         }
-        Preferences.set(PREF_DIMENSIONS, b.toString());
-        // Stamped with the identity these dimensions belong to. This is what
-        // makes a surviving file distinguishable from a current one after a
-        // restart, when nothing in memory remembers that an erasure was asked
-        // for.
+        // ONE save for both keys. Preferences.set(String, Object) calls save()
+        // per key, so the two used to be two serializations of the whole map
+        // with a window between them -- and a comment here claimed they landed
+        // together because they share a record, which was simply wrong.
+        //
+        // The batched form makes that true instead of assumed. It is worth
+        // being precise about what it does and does not fix, because the
+        // obvious story is not the real one: save() writes the ENTIRE map, so
+        // a failed first save followed by a successful second still persisted
+        // both new values -- the "old dimensions under a new owner" state is
+        // not reachable that way. What the window really allowed was the
+        // reverse, a save that landed followed by one that did not, leaving
+        // new dimensions under the PREVIOUS stamp. loadDimensions() reads that
+        // as foreign and drops them, which is conservative and correct, and
+        // reconcileDimensions() puts them back from the durable record. One
+        // save removes the window rather than the consequence.
+        //
         // clientId() rather than the field: the field is null until something
         // materialises the id, and stamping a placeholder would make the file
         // read as foreign on the next launch and drop the dimensions this call
         // was in the middle of saving.
-        Preferences.set(PREF_DIMENSIONS_OWNER, clientId());
+        Map<String, Object> record = new LinkedHashMap<String, Object>();
+        record.put(PREF_DIMENSIONS, b.toString());
+        record.put(PREF_DIMENSIONS_OWNER, clientId());
+        Preferences.set(record);
     }
 
     // Replaces the delimiter characters so the persisted form parses back

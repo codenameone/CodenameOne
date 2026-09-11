@@ -149,6 +149,30 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void queuedRegistrationsDoNotAccumulateWithoutBound() {
+        // Every invite request is fail-silent, and NetworkManager's fail-silent
+        // branch only LOGS a transport failure -- it calls neither
+        // handleIOException nor the request's handleException -- so a
+        // registration that never reaches the server has no completion to hang
+        // cleanup on. The set that remembers queued registrations for the
+        // erasure's sake would otherwise hold every request body a long
+        // offline session ever minted.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+
+        for (int i = 0; i < 80; i++) {
+            assertNotNull(Invites.create(InviteRequest.create().campaign("c" + i).build()),
+                    "minting is offline and must still work");
+        }
+
+        assertTrue(Invites.outstandingRegistrationCountForTest() <= 32,
+                "queued registrations accumulated without bound: "
+                        + Invites.outstandingRegistrationCountForTest());
+    }
+
+    @FormTest
     void anErasureKillsARegistrationItCannotCatchOnTheDisk() {
         // create() hands the registration json to NetworkManager and returns,
         // so an erasure a moment later has two copies to deal with and used to

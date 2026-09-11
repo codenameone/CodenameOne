@@ -2520,6 +2520,8 @@ public final class Invites {
             req.setRequestBody(json);
             req.setFailSilently(true);
             if (registration) {
+                req.queuedAt = System.currentTimeMillis();
+                pruneOutstanding();
                 outstandingRegistrations.addElement(req);
             }
             NetworkManager.getInstance().addToQueue(req);
@@ -2540,6 +2542,9 @@ public final class Invites {
         // The outbox entry this request carries, so a success can retire
         // exactly that one rather than the whole queue.
         private final String outboxEntry;
+        // When this was handed to NetworkManager, so a request nothing will
+        // ever call back about can still be let go of. See pruneOutstanding().
+        private long queuedAt;
         private String payload;
         // Set by the error hook below. ConnectionRequest reads the body of an
         // error response by default and then runs the ordinary success path
@@ -3222,6 +3227,52 @@ public final class Invites {
     // on.
     private static final java.util.Vector<InviteConnection> outstandingRegistrations =
             new java.util.Vector<InviteConnection>();
+
+    // How long a queued registration is remembered for the erasure's sake.
+    //
+    // Generous on purpose. The point of remembering one is to kill it if an
+    // erasure arrives, so pruning early is what would break -- but nothing
+    // else can free these: every invite request is fail-silent, and
+    // NetworkManager's fail-silent branch only logs, so a transport failure
+    // calls neither postResponse() nor handleException() and the entry has no
+    // completion to hang cleanup on. Five minutes is far longer than a request
+    // can plausibly sit in the queue and short enough that an offline process
+    // minting invites cannot accumulate request bodies without bound.
+    private static final long OUTSTANDING_MAX_AGE_MS = 5L * 60000L;
+
+    // And a hard ceiling, for the same reason the outbox has one: a bound that
+    // does not depend on a clock being sane.
+    private static final int MAX_OUTSTANDING = 32;
+
+    // Package private so a test can assert the bound rather than trust it.
+    static int outstandingRegistrationCountForTest() {
+        return outstandingRegistrations.size();
+    }
+
+    /// Forgets registrations old enough that nothing is coming back for them.
+    ///
+    /// The in-flight marks are pruned on the same pass. `issuedRecently()`
+    /// drops an entry it happens to look at, so a mark whose outbox entry has
+    /// since been retired was never looked at again and stayed for the life of
+    /// the process.
+    private static void pruneOutstanding() {
+        long now = System.currentTimeMillis();
+        for (int i = outstandingRegistrations.size() - 1; i >= 0; i--) {
+            InviteConnection req = outstandingRegistrations.elementAt(i);
+            if (now - req.queuedAt >= OUTSTANDING_MAX_AGE_MS) {
+                outstandingRegistrations.removeElementAt(i);
+            }
+        }
+        while (outstandingRegistrations.size() >= MAX_OUTSTANDING) {
+            outstandingRegistrations.removeElementAt(0);
+        }
+        for (String json : new ArrayList<String>(inFlight.keySet())) {
+            Long at = inFlight.get(json);
+            if (at == null || now - at.longValue() >= IN_FLIGHT_WINDOW_MS) {
+                inFlight.remove(json);
+            }
+        }
+    }
 
     /// How long an entry stays skippable after its request goes out.
     ///
