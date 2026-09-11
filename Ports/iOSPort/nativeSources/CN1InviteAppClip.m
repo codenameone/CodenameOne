@@ -121,4 +121,26 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_consumeAppClipInviteHandoff___java_
     return fromNSString(CN1_THREAD_STATE_PASS_ARG joined);
 }
 
-#endif
+#else
+
+// Stubs when CN1_INCLUDE_INVITE_APPCLIP is not defined: the build generated no
+// App Clip and nothing registers IOSAppClipHandoff, so these natives are
+// unreachable. ParparVM still needs the symbols to satisfy the native-method
+// declarations on IOSNative.java, which are unconditional -- without them an
+// ordinary application that never heard of invites fails to LINK, which is the
+// worst place for this feature to be felt.
+//
+// The answers are the ones a device with no clip would give anyway, so nothing
+// depends on which branch compiled.
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppClipHandoffSupported___java_lang_String_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
+    return JAVA_FALSE;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_consumeAppClipInviteHandoff___java_lang_String_R_java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
+    return JAVA_NULL;
+}
+
+#endif // CN1_INCLUDE_INVITE_APPCLIP

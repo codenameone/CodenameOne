@@ -152,6 +152,18 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                             // read exactly.
                             unavailable(issued, callback, Invites.REASON_NO_MATCH);
                             break;
+                        case InstallReferrerClient.InstallReferrerResponse.SERVICE_DISCONNECTED:
+                            // The SAME transient state the disconnect callback
+                            // reports, arriving through the response code
+                            // instead -- and it is a separate path, so
+                            // handling one and not the other left this one
+                            // falling into the terminal default below. That
+                            // burnt the once-only flag and permanently refused
+                            // another read, for an invited install whose exact
+                            // Play referrer was still there on the next
+                            // connection.
+                            unavailable(issued, callback, Invites.REASON_NO_MATCH);
+                            break;
                         default:
                             // FEATURE_NOT_SUPPORTED is the ordinary answer on a
                             // device with no Play Store -- a sideload, an
