@@ -3909,6 +3909,13 @@ public final class HttpServer {
         return true;
     }
 
+    /** Whether {@code at} is a '%' followed by two hex digits. */
+    private static boolean isPercentTriplet(String value, int at) {
+        return at + 2 < value.length()
+                && Hex.digit(value.charAt(at + 1)) >= 0
+                && Hex.digit(value.charAt(at + 2)) >= 0;
+    }
+
     /**
      * Whether this is a legal HTTP authority: a host, bracketed if it is an IPv6
      * literal, optionally followed by ":" and a port.
@@ -3930,8 +3937,19 @@ public final class HttpServer {
             }
             for(int iter = 1 ; iter < close ; iter++) {
                 char c = value.charAt(iter);
+                if(c == '%') {
+                    // Same rule as the reg-name below: a '%' opens a triplet or it
+                    // is not a '%'. The only percent this form has any use for is
+                    // the "%25" that introduces an RFC 6874 zone id, and that is
+                    // two hex digits like any other.
+                    if(!isPercentTriplet(value, iter)) {
+                        return false;
+                    }
+                    iter += 2;
+                    continue;
+                }
                 boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
-                        || (c >= 'A' && c <= 'F') || c == ':' || c == '.' || c == '%';
+                        || (c >= 'A' && c <= 'F') || c == ':' || c == '.';
                 if(!ok) {
                     return false;
                 }
@@ -3947,13 +3965,25 @@ public final class HttpServer {
             }
             for(int iter = 0 ; iter < hostEnd ; iter++) {
                 char c = value.charAt(iter);
+                if(c == '%') {
+                    // pct-encoded is "%" HEXDIG HEXDIG, and accepting a bare '%'
+                    // as an ordinary character meant "bad%zz.example" passed here
+                    // -- an authority a conforming frontend rejects or normalises,
+                    // which is the same proxy-versus-origin disagreement this
+                    // validator exists to close, reintroduced one level down.
+                    if(!isPercentTriplet(value, iter)) {
+                        return false;
+                    }
+                    iter += 2;
+                    continue;
+                }
                 // RFC 3986 reg-name: unreserved / pct-encoded / sub-delims. Not
                 // '@', not a space, not a control character -- and the point of
                 // spelling the set out is that everything absent from it is
                 // refused rather than tolerated.
                 boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                         || (c >= '0' && c <= '9')
-                        || c == '-' || c == '.' || c == '_' || c == '~' || c == '%'
+                        || c == '-' || c == '.' || c == '_' || c == '~'
                         || c == '!' || c == '$' || c == '&' || c == '\''
                         || c == '(' || c == ')' || c == '*' || c == '+'
                         || c == ',' || c == ';' || c == '=';

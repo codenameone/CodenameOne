@@ -1793,6 +1793,14 @@ class BackendHttpIntegrationTest {
             "exam ple.com",         // a space inside the authority
             "[::1",                 // an unterminated IPv6 literal
             ":8080",                // no host at all
+            // A '%' opens a pct-encoded triplet or it is not a '%'. Accepting it
+            // as an ordinary character let an authority through that a conforming
+            // frontend rejects or normalises -- the same proxy-versus-origin
+            // disagreement this check exists to close, one level down.
+            "bad%zz.example",       // two characters, neither of them hex
+            "bad%4.example",        // one hex digit is not two
+            "bad%",                 // and a triplet that runs off the end
+            "[fe80::1%]",           // the same rule inside the bracketed form
         };
         for(int iter = 0 ; iter < bad.length ; iter++) {
             byte[] response = raw("GET /healthz HTTP/1.1\r\nHost: " + bad[iter]
@@ -1812,6 +1820,7 @@ class BackendHttpIntegrationTest {
             "[::1]:8080",
             "xn--80ak6aa92e.com",   // punycode, which is how a client sends an IDN
             "example.com.",         // a fully qualified name keeps its root dot
+            "ok%41.example",        // a COMPLETE triplet is legal and must pass
         };
         for(int iter = 0 ; iter < good.length ; iter++) {
             byte[] response = raw("GET /healthz HTTP/1.1\r\nHost: " + good[iter]
