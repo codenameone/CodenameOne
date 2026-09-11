@@ -12373,7 +12373,32 @@ public class IPhoneBuilder extends Executor {
         // the way the port is.
         buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "YES");
         buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
-        buildSettingsMap.put("ASSETCATALOG_COMPILER_APPICON_NAME", "");
+        // An App Clip is a full application bundle and App Store validation
+        // rejects one with no icon, so the clip carries a catalog of its own.
+        //
+        // Blanking this setting -- which is what was here -- produced an
+        // invite-enabled archive that could not be uploaded at all, for a
+        // target the developer never asked to maintain. The host's icons are
+        // copied rather than a placeholder generated: a clip card showing a
+        // different icon than the app it installs is its own confusion, and
+        // the person seeing it has not installed anything yet.
+        //
+        // appendFilesToXcodeProjGroup already adds an .xcassets directory as a
+        // single resource -- it has to, or Xcode fails with "Multiple commands
+        // produce Contents.json" -- so staging it here is all that is needed.
+        File clipIcons = new File(distDir, name + "/Images.xcassets");
+        File hostIcons = new File(distDir, request.getMainClass() + "-src/Images.xcassets");
+        if (hostIcons.isDirectory()) {
+            copyDirectory(hostIcons, clipIcons);
+            buildSettingsMap.put("ASSETCATALOG_COMPILER_APPICON_NAME", "AppIcon");
+        } else {
+            // No host catalog to copy, which means this build has no icons at
+            // all and the app target has the same problem. Said out loud
+            // rather than shipping a setting that names a catalog that is not
+            // there, which fails the build instead of the upload.
+            log("Invite attribution: the application has no Images.xcassets, so the App Clip "
+                    + "ships without an icon and the archive will be rejected");
+        }
         for (String key : request.getArgs()) {
             if (key.startsWith("ios.invite.buildSettings.")) {
                 buildSettingsMap.put(
@@ -12412,7 +12437,7 @@ public class IPhoneBuilder extends Executor {
         sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
                 + "main_app_target.add_dependency(clip_target)\n"
                 + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
-                + productName + ".app', \"BUILT_PRODUCTS_DIR\")\n"
+                + escapeRuby(productName) + ".app', \"BUILT_PRODUCTS_DIR\")\n"
                 + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
                 + "p.name=='Embed App Clips'} || "
                 + "main_app_target.new_copy_files_build_phase('Embed App Clips')\n"

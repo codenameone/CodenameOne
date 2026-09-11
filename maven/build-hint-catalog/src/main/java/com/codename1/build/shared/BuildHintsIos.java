@@ -232,9 +232,11 @@ final class BuildHintsIos {
                         + "Set it to `false` only if you ship an App Clip of your own: the "
                         + "build then generates no clip, but the app still carries the shared "
                         + "app group and the reader, so a clip of yours that writes the "
-                        + "documented handoff is still picked up. Ignored when "
-                        + "`ios.invite.universalLinks` is `false`, because iOS can only offer a "
-                        + "clip for a link the app has an associated domain for."));
+                        + "documented handoff is still picked up. This is the ONLY hint that "
+                        + "suppresses the clip: `ios.invite.universalLinks=false` means you "
+                        + "manage the associated domains yourself and leaves the clip, the "
+                        + "shared app group and the reader in place, because an app that "
+                        + "configured its own domains correctly still needs them."));
 
         h.add(new Hint("ios.invite.appGroup")
                 .group(HintGroup.IOS)
