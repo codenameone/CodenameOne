@@ -447,6 +447,9 @@ public class SelfTest {
             "Sun, 06 Nov 1994 08:49:37",       // truncated
             "Sun, 31 Feb 1994 08:49:37 GMT",   // a day that does not exist
             "Sun, 06 Nov 1994 25:00:00 GMT",   // hour out of range
+            "Sun, 06 Nov 9999 -1:-1:-1 GMT",   // negative fields fit the fixed width
+            "Sun, 06 Nov 9999 +1:+1:+1 GMT",   // and so does a signed one
+            "Sun,  6 Nov 1994 08:49:37 GMT",   // space-padded day, an asctime habit
             "Sunday, 06-Nov-94 08:49:37 GMT",  // RFC 850, deliberately unsupported
         };
         for(int iter = 0 ; iter < bad.length ; iter++) {
@@ -551,6 +554,54 @@ public class SelfTest {
     }
 
     /**
+     * An explicitly spelled port that is not a real port is refused by the
+     * PARSER, rather than reaching an engine that reads it as "unset".
+     *
+     * <p>Both Postgres.connect and MySql.connect substitute their default for any
+     * non-positive port, so "host:-1" -- which Integer.parseInt accepts, the sign
+     * fitting inside no width limit -- connected to 5432 or 3306 without a word.
+     * A mistyped deployment setting then reaches a live database nobody named, at
+     * the address the URL did name, and the only evidence is that it worked.
+     */
+    private static void malformedPortsAreRefused() throws Exception {
+        String[] bad = new String[] {
+            "postgres://u:p@127.0.0.1:-1/db",      // the finding: a sign parses
+            "postgres://u:p@127.0.0.1:+5432/db",   // the same leniency, other sign
+            "postgres://u:p@127.0.0.1:0/db",       // port 0 is not connectable
+            "postgres://u:p@127.0.0.1:65536/db",   // past the port space
+            "postgres://u:p@127.0.0.1:/db",        // spelled, and empty
+        };
+        for(int iter = 0 ; iter < bad.length ; iter++) {
+            String outcome;
+            try {
+                Database.open(bad[iter]);
+                outcome = "accepted";
+            } catch (Exception refused) {
+                String message = String.valueOf(refused.getMessage());
+                // The parser's wording, and the absence of the password. An
+                // engine-side connect failure would also throw here, which is
+                // why this matches the message rather than merely "it threw".
+                outcome = message.indexOf("Not a port number") >= 0
+                        && message.indexOf("p@") < 0 ? "refused" : "other: " + message;
+            }
+            check("a malformed port is refused: " + bad[iter], "refused", outcome);
+        }
+        // An ABSENT port still takes the engine default rather than being
+        // refused, which is the behaviour this must not have broken. There is no
+        // server on 5432 in this environment, so the check is that it got as far
+        // as trying to connect -- any answer except the parser's refusal.
+        String absent;
+        try {
+            Database.open("postgres://u:p@127.0.0.1/db?connectTimeout=1");
+            absent = "connected";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            absent = message.indexOf("Not a port number") >= 0 ? "refused" : "reached the engine";
+        }
+        check("an absent port still defaults", "reached the engine", absent);
+    }
+
+    /**
      * A negative connectTimeout is refused by the PARSER, so both arms fail the
      * same way. Left to the arms, Java SE threw IllegalArgumentException out of
      * Socket.connect while the packaged client read any non-positive value as
@@ -645,6 +696,7 @@ public class SelfTest {
         patchIsASendableVerb();
         repeatedOutboundHeadersSurvive();
         negativeConnectTimeoutsAreRefused();
+        malformedPortsAreRefused();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");

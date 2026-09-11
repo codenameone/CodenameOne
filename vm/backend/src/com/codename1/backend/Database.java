@@ -320,9 +320,18 @@ public final class Database {
                 int bracket = rest.lastIndexOf(']');
                 if(colon > bracket) {
                     out.host = strip(rest.substring(0, colon));
-                    try {
-                        out.port = Integer.parseInt(rest.substring(colon + 1).trim());
-                    } catch (NumberFormatException err) {
+                    // An EXPLICIT port has to be a real one. Integer.parseInt accepts
+                    // a sign, so "host:-1" parsed cleanly and handed -1 downstream,
+                    // where Postgres.connect and MySql.connect both read any
+                    // non-positive port as "unset" and substituted 5432 / 3306 --
+                    // a mistyped deployment setting silently connecting to the
+                    // default port of a database nobody meant to reach, rather than
+                    // failing at startup where it can be seen. An ABSENT port still
+                    // takes the default; out.port was seeded with it above, and this
+                    // branch runs only when the URL spelled one out.
+                    String portText = rest.substring(colon + 1).trim();
+                    out.port = portNumber(portText);
+                    if(out.port < 1) {
                         // The URL carries the PASSWORD, and this string goes to a
                         // log. describe() exists because of that and omits it; an
                         // error path that pastes the whole URL undoes the care
@@ -336,6 +345,28 @@ public final class Database {
             }
             applyQuery(out, query);
             return out;
+        }
+
+        /**
+         * {@code text} as a TCP port, or -1 unless it is 1 to 65535 written in
+         * plain ASCII digits. Every rejected spelling -- a sign, a decimal point,
+         * an empty string, a number past the port space -- answers the same way,
+         * so the caller has one test rather than a parse plus a range check that
+         * could disagree.
+         */
+        private static int portNumber(String text) {
+            if(text.length() < 1 || text.length() > 5) {
+                return -1;
+            }
+            int out = 0;
+            for(int iter = 0 ; iter < text.length() ; iter++) {
+                char c = text.charAt(iter);
+                if(c < '0' || c > '9') {
+                    return -1;
+                }
+                out = out * 10 + (c - '0');
+            }
+            return (out < 1 || out > 65535) ? -1 : out;
         }
 
         private static void applyQuery(Url out, String query) throws IOException {

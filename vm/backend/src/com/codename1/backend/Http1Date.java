@@ -93,7 +93,7 @@ public final class Http1Date {
             return -1;
         }
         try {
-            int day = Integer.parseInt(v.substring(5, 7).trim());
+            int day = digits(v, 5, 2);
             String monthName = v.substring(8, 11);
             int month = -1;
             for(int iter = 0 ; iter < MONTHS.length ; iter++) {
@@ -105,25 +105,58 @@ public final class Http1Date {
             if(month < 0) {
                 return -1;
             }
-            int year = Integer.parseInt(v.substring(12, 16).trim());
-            int hour = Integer.parseInt(v.substring(17, 19).trim());
-            int minute = Integer.parseInt(v.substring(20, 22).trim());
-            int second = Integer.parseInt(v.substring(23, 25).trim());
+            int year = digits(v, 12, 4);
+            int hour = digits(v, 17, 2);
+            int minute = digits(v, 20, 2);
+            int second = digits(v, 23, 2);
+            // A field that was not N plain digits reads -1 here, and every field
+            // below is tested for it. The check matters because the separators
+            // above pin only the WIDTH: "-1" is two characters, so
+            // "Sun, 06 Nov 9999 -1:-1:-1 GMT" passed the shape test intact and
+            // Integer.parseInt read each field as -1. Upper bounds alone then let
+            // it through -- a year-9999 timestamp a few seconds short, which
+            // StaticFiles.isNotModified() reads as newer than any file and answers
+            // 304 to a malformed conditional request. digits() also refuses the
+            // '+1' and ' 1' spellings the old trim()-then-parse accepted; the one
+            // form this method claims to support is IMF-fixdate, whose fields are
+            // 2DIGIT and 4DIGIT with a leading zero.
+            //
             // Ranges, for the same reason: daysFromCivil answers for day 99 as
             // readily as for day 9, and the answer is a different date than the
             // one written. A second of 60 is allowed because a leap second is
             // spelled that way.
-            if(day < 1 || day > daysInMonth(year, month) || hour > 23 || minute > 59
-                    || second > 60 || year < 1) {
+            if(day < 1 || year < 1 || hour < 0 || minute < 0 || second < 0
+                    || day > daysInMonth(year, month) || hour > 23 || minute > 59
+                    || second > 60) {
                 return -1;
             }
             long days = daysFromCivil(year, month, day);
             return ((days * 86400L) + hour * 3600L + minute * 60L + second) * 1000L;
-        } catch (NumberFormatException err) {
-            return -1;
         } catch (IndexOutOfBoundsException err) {
+            // Unreachable while the shape test above pins the length at 29, and
+            // kept as the backstop for a future edit to these offsets: this runs
+            // once per conditional request, so a mistake here must answer "not a
+            // date" rather than drop the connection.
             return -1;
         }
+    }
+
+    /**
+     * The {@code len} characters at {@code from} as a number, or -1 unless every
+     * one of them is an ASCII digit. Written out rather than deferring to
+     * Integer.parseInt, which accepts a sign and whose failure is an exception on
+     * a path that takes one per malformed request.
+     */
+    private static int digits(String v, int from, int len) {
+        int out = 0;
+        for(int iter = from ; iter < from + len ; iter++) {
+            char c = v.charAt(iter);
+            if(c < '0' || c > '9') {
+                return -1;
+            }
+            out = out * 10 + (c - '0');
+        }
+        return out;
     }
 
     /** Days in a month, so a date that does not exist is not silently moved. */
