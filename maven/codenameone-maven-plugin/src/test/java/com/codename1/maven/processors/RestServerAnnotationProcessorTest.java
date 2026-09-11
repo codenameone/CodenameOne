@@ -336,6 +336,126 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void headIsAnsweredByTheGetRoute() throws Exception {
+        // RFC 9110 defines HEAD as GET without the content, HttpServer routes it,
+        // and it strips the body itself on both protocols. The generated
+        // dispatcher required the verb to equal GET exactly, so a contract-served
+        // path answered 404 to a HEAD that the SAME path served through
+        // @RestController answered normally. Two generators in one product
+        // disagreeing about one request.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.HeadApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface HeadApi {\n"
+                + "    @GET(\"/thing\")\n"
+                + "    void read(OnComplete<Response<String>> callback);\n"
+                + "    @POST(\"/thing\")\n"
+                + "    void write(@Body String body, OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.HeadApiServer");
+        final String[] called = new String[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        called[0] = m.getName();
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.HeadApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+        Method hasRoute = dispatcherClass.getMethod("hasRoute", String.class, String.class);
+
+        assertTrue("HEAD must have a route wherever GET does",
+                (Boolean) hasRoute.invoke(dispatcher, "HEAD", "/thing"));
+        called[0] = null;
+        assertNotNull("HEAD must reach the GET handler",
+                dispatch.invoke(dispatcher, "HEAD", "/thing", null, null));
+        assertEquals("and it must be the GET operation that runs", "read", called[0]);
+
+        // The two halves that must not have moved: GET still works, and HEAD is
+        // not a skeleton key to the other verbs.
+        called[0] = null;
+        assertNotNull(dispatch.invoke(dispatcher, "GET", "/thing", null, null));
+        assertEquals("read", called[0]);
+        assertFalse("HEAD must not match a route that is not a GET",
+                (Boolean) hasRoute.invoke(dispatcher, "HEAD", "/missing"));
+        assertNull("an unrelated verb still does not match",
+                dispatch.invoke(dispatcher, "DELETE", "/thing", null, null));
+    }
+
+    @Test
+    public void aFlagStyleQueryBindsAsPresentAndEmpty() throws Exception {
+        // "?flag" with no '=' is PRESENT and empty.
+        // HttpServer.Request.queryParam answers "" for it deliberately, and the
+        // generated helper required the '=' and answered null -- so the same bytes
+        // bound one way through a @RestController and another through a contract,
+        // which reaches required-versus-default handling before the handler sees it.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.FlagApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface FlagApi {\n"
+                + "    @GET(\"/search\")\n"
+                + "    void search(@Query(\"flag\") String flag,\n"
+                + "                OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.FlagApiServer");
+        final Object[] seen = new Object[1];
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        seen[0] = args[0];
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.FlagApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+
+        seen[0] = "unset";
+        assertNotNull(dispatch.invoke(dispatcher, "GET", "/search?flag", null, null));
+        assertEquals("a binding with no '=' is present and empty", "", seen[0]);
+
+        // The spellings around it must not have moved.
+        seen[0] = "unset";
+        assertNotNull(dispatch.invoke(dispatcher, "GET", "/search?flag=", null, null));
+        assertEquals("an explicit empty value is still empty", "", seen[0]);
+        seen[0] = "unset";
+        assertNotNull(dispatch.invoke(dispatcher, "GET", "/search?flag=on", null, null));
+        assertEquals("a value still binds", "on", seen[0]);
+        seen[0] = "unset";
+        assertNotNull(dispatch.invoke(dispatcher, "GET", "/search?other", null, null));
+        assertNull("a parameter that is genuinely absent is still null", seen[0]);
+        seen[0] = "unset";
+        assertNotNull(dispatch.invoke(dispatcher, "GET", "/search?flagged", null, null));
+        assertNull("and a name this one is a prefix of is not this one", seen[0]);
+    }
+
+    @Test
     public void twoPlaceholdersInOneSegmentAreRefusedWithAReason() throws Exception {
         // Supporting one embedded placeholder does not mean guessing at two.
         // "{a}-{b}" gives no way to decide where the first value ends, and a

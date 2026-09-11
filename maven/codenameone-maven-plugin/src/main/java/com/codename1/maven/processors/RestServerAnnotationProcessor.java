@@ -908,7 +908,23 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     private static String routeCondition(Op op) {
         String[] template = splitTemplate(op.pathTemplate);
         StringBuilder sb = new StringBuilder();
-        sb.append('"').append(op.verb).append("\".equals(method) && seg.length == ").append(template.length);
+        if ("GET".equals(op.verb)) {
+            // HEAD is answered by the GET route. RFC 9110 defines HEAD as GET
+            // without the content, HttpServer routes it, and it suppresses the body
+            // itself on both protocols -- so the handler needs to know nothing about
+            // it. Without this the generated dispatcher required the verb to equal
+            // GET exactly and answered 404, while the SAME path served through
+            // @RestController's router answered normally: one product, two
+            // generators, and a client that works against one of them.
+            //
+            // There is no conflict to worry about: the contract annotations are
+            // GetMapping/PostMapping/PutMapping/DeleteMapping/PatchMapping, so a
+            // HEAD route cannot be declared and cannot already exist.
+            sb.append("(\"GET\".equals(method) || \"HEAD\".equals(method))");
+        } else {
+            sb.append('"').append(op.verb).append("\".equals(method)");
+        }
+        sb.append(" && seg.length == ").append(template.length);
         for (int i = 0; i < template.length; i++) {
             if (!isPlaceholder(template[i])) {
                 sb.append(" && \"").append(RestClientAnnotationProcessor.escape(template[i]))
@@ -1220,7 +1236,16 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // filter%5Bname%5D, which is what the generated client sends -- otherwise
         // never matched the annotation text, and the two halves of one contract
         // failed to bind to each other.
-        sb.append("            if(eq > 0 && decodeQuery(pairs[i].substring(0, eq)).equals(name)) return decodeQuery(pairs[i].substring(eq + 1));\n");
+        // A binding with no '=' is PRESENT and empty, not absent. "?flag" is the
+        // flag spelling, and HttpServer.Request.queryParam answers "" for it
+        // deliberately -- so requiring the '=' here made the same request bind one
+        // way through a @RestController and another through a contract, which
+        // reaches required-versus-default handling and primitive conversion and
+        // hands the handler different inputs for identical bytes.
+        sb.append("            String rawName = eq < 0 ? pairs[i] : pairs[i].substring(0, eq);\n");
+        sb.append("            if(rawName.length() > 0 && decodeQuery(rawName).equals(name)) {\n");
+        sb.append("                return eq < 0 ? \"\" : decodeQuery(pairs[i].substring(eq + 1));\n");
+        sb.append("            }\n");
         sb.append("        }\n");
         sb.append("        return null;\n");
         sb.append("    }\n\n");

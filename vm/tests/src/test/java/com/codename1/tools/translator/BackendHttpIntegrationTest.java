@@ -514,7 +514,37 @@ class BackendHttpIntegrationTest {
         assertEquals(304, status(request("GET", "/static/index.html", null,
                 new String[]{"If-None-Match: " + etag})));
 
-        String lastModified = header(first, "Last-Modified");
+        // If-None-Match is a LIST, so a tag among others matches...
+        assertEquals(304, status(request("GET", "/static/index.html", null,
+                new String[]{"If-None-Match: \"other\", " + etag + ", \"third\""})),
+                "a matching tag anywhere in the list is a match");
+        // ...and the weak form of the same tag names the same representation,
+        // which is the comparison If-None-Match takes.
+        assertEquals(304, status(request("GET", "/static/index.html", null,
+                new String[]{"If-None-Match: W/" + etag})),
+                "If-None-Match uses weak comparison");
+        assertEquals(304, status(request("GET", "/static/index.html", null,
+                new String[]{"If-None-Match: *"})), "* matches any representation");
+
+        // A DIFFERENT tag that merely embeds this one's characters is not this
+        // one. Review reported the old substring test as taking "prefix<tag>" for
+        // <tag>; it did not, because the tag is compared WITH its quotes and the
+        // opening quote is followed by 'p' there. Asserted anyway, both because
+        // the claim deserves an answer that is checked rather than argued and
+        // because the list reader replacing it has to agree.
+        String inner = etag.substring(1, etag.length() - 1);
+        assertEquals(200, status(request("GET", "/static/index.html", null,
+                new String[]{"If-None-Match: \"prefix" + inner + "\""})),
+                "a tag that embeds this one is a different tag");
+        assertEquals(200, status(request("GET", "/static/index.html", null,
+                new String[]{"If-None-Match: \"" + inner + "suffix\""})),
+                "and so is one this tag is a prefix of");
+        // The unquoted spelling is not a validator at all.
+        assertEquals(200, status(request("GET", "/static/index.html", null,
+                new String[]{"If-None-Match: " + inner})),
+                "a bare, unquoted tag is malformed and must not answer 304");
+
+                String lastModified = header(first, "Last-Modified");
         assertNotNull(lastModified, "a static response must carry Last-Modified");
         assertEquals(304, status(request("GET", "/static/index.html", null,
                 new String[]{"If-Modified-Since: " + lastModified})));

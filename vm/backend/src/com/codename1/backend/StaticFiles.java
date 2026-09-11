@@ -313,12 +313,71 @@ public final class StaticFiles implements HttpServer.Handler {
         return parsed >= 0 && parsed / 1000 == modified / 1000;
     }
 
+    /**
+     * Whether If-None-Match names this representation, read as the comma
+     * separated list of validators it is.
+     *
+     * <p>Weak comparison, which is the one If-None-Match takes (RFC 9110 13.1.2):
+     * W/"x" and "x" name the same representation, so the W/ marker is skipped
+     * rather than being grounds to refuse.
+     *
+     * <p>REVIEW ASKED FOR THIS AGAINST AN EXAMPLE THAT DOES NOT ACTUALLY MATCH.
+     * The reading was that the old `ifNoneMatch.indexOf(etag) >= 0` would take
+     * "prefix10-20" for "10-20". It would not: etag is built WITH its quotes
+     * three lines above the call, so the needle is the seven characters
+     * {@code "10-20"} including both of them, and in {@code "prefix10-20"} the
+     * opening quote is followed by 'p'. An ETag cannot contain a quote either
+     * (RFC 9110 etagc excludes DQUOTE), so no other single validator's quoted
+     * form can embed ours, and for a well formed field the substring test agreed
+     * with list membership in every case.
+     *
+     * <p>It is replaced anyway, because being right for that reason means being
+     * right only while the tag stays quoted. Whoever later writes an unquoted
+     * validator -- or compares a tag this method does not build -- turns a
+     * correct line into a cache-poisoning one without touching it. Reading the
+     * list is the same work and does not depend on anything three lines away.
+     */
+    private static boolean etagListMatches(String header, String etag) {
+        String value = header.trim();
+        if("*".equals(value)) {
+            return true;
+        }
+        int at = 0;
+        while(at < value.length()) {
+            char c = value.charAt(at);
+            if(c == ' ' || c == '\t' || c == ',') {
+                at++;
+                continue;
+            }
+            if((c == 'W' || c == 'w') && at + 1 < value.length()
+                    && value.charAt(at + 1) == '/') {
+                at += 2;
+            }
+            if(at >= value.length() || value.charAt(at) != '"') {
+                // Not a validator, so the field is malformed. Answering false
+                // sends the representation, which is the safe direction: a wrong
+                // 304 is a body the client never receives and cannot ask for
+                // again until its cache expires.
+                return false;
+            }
+            int close = value.indexOf('"', at + 1);
+            if(close < 0) {
+                return false;
+            }
+            if(value.substring(at, close + 1).equals(etag)) {
+                return true;
+            }
+            at = close + 1;
+        }
+        return false;
+    }
+
     private static boolean isNotModified(HttpServer.Request request, String etag, long modified) {
         String ifNoneMatch = request.getHeader("if-none-match");
         if(ifNoneMatch != null) {
             // An ETag match wins outright; a date is only consulted when there is
             // no ETag to compare, as HTTP requires.
-            return ifNoneMatch.indexOf(etag) >= 0 || "*".equals(ifNoneMatch.trim());
+            return etagListMatches(ifNoneMatch, etag);
         }
         String ifModifiedSince = request.getHeader("if-modified-since");
         if(ifModifiedSince == null) {
