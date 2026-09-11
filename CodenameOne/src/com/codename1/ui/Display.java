@@ -1624,14 +1624,25 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `err`: the throwable that escaped the dispatch loop
-    private void reportEdtException(Throwable err) {
+    private void reportEdtException(final Throwable err) {
         try {
             Log.e(err);
         } catch (Throwable ignore) {
             // Logging is the one thing that cannot report its own failure.
         }
-        try {
-            if (crashReporter != null) {
+        // Each reporter is isolated from the others, not just from the dispatch loop.
+        // One enclosing try would have kept the thread alive but let the FIRST throwing
+        // reporter silence every later one: a CrashReporter that fails would take
+        // handleEDTException and the application's own error handler down with it, so
+        // the application would never hear about an exception its port had already
+        // recovered from. Reporting to four places should not be all-or-nothing.
+        //
+        // Written out rather than routed through a helper taking a Runnable: this class
+        // compiles at Java 5, where that means an anonymous inner class per step, and
+        // three of them carry no outer state -- which SpotBugs reports, correctly, as
+        // SIC_INNER_SHOULD_BE_STATIC_ANON.
+        if (crashReporter != null) {
+            try {
                 // Hand the actual throwable to the registered reporter
                 // BEFORE impl.handleEDTException gets a chance to short
                 // circuit (legacy AndroidImplementation returns true
@@ -1639,23 +1650,56 @@ public final class Display extends CN1Constants {
                 // silently lose the exception for anyone hooking via
                 // setCrashReporter -- including CrashProtection).
                 crashReporter.exception(err);
+            } catch (Throwable t) {
+                logReportingFailure("CrashReporter", t);
             }
+        }
+        try {
             CodenameOneThread.handleException(err);
-            if (!impl.handleEDTException(err)) {
-                if (errorHandler != null) {
+        } catch (Throwable t) {
+            logReportingFailure("CodenameOneThread.handleException", t);
+        }
+        // handleEDTException decides whether the application still needs telling, so a
+        // port that throws here must not be read as "handled" -- that would swallow the
+        // exception entirely rather than merely failing to report it once.
+        boolean handled = false;
+        try {
+            handled = impl.handleEDTException(err);
+        } catch (Throwable t) {
+            logReportingFailure("handleEDTException", t);
+        }
+        if (!handled) {
+            if (errorHandler != null) {
+                try {
                     errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
-                } else {
+                } catch (Throwable t) {
+                    logReportingFailure("EDT error handler", t);
+                }
+            } else {
+                try {
                     Dialog.show("Error", "An internal application error occurred: " + err, "OK", null);
+                } catch (Throwable t) {
+                    logReportingFailure("error dialog", t);
                 }
             }
-        } catch (Throwable reportingFailure) {
-            try {
-                Log.p("Reporting an exception on the event dispatch thread threw; "
-                        + "the dispatch thread continues. Original exception logged above.");
-                Log.e(reportingFailure);
-            } catch (Throwable ignore) {
-                // As above: nothing left to report with.
-            }
+        }
+    }
+
+    /// Records that one step of the exception reporting above failed, without letting
+    /// that failure reach the dispatch loop.
+    ///
+    /// #### Parameters
+    ///
+    /// - `what`: which reporter failed, so the failing one can be identified
+    /// - `reportingFailure`: what it threw
+    private static void logReportingFailure(String what, Throwable reportingFailure) {
+        try {
+            Log.p("Reporting an exception on the event dispatch thread failed in " + what
+                    + "; the remaining reporters and the dispatch thread continue."
+                    + " The original exception is logged above.");
+            Log.e(reportingFailure);
+        } catch (Throwable ignore) {
+            // Logging is the one thing that cannot report its own failure.
         }
     }
 

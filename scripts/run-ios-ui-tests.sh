@@ -788,7 +788,11 @@ if [ "${CN1_WARNING_CENSUS:-0}" = "1" ]; then
     ri_log "STAGE:WARNING_CENSUS_FAILED -> see the census output above"
     exit 12
   fi
-  if ! "$REPO_ROOT/scripts/check-native-warnings.sh" "${CN1_WARNING_ARGS[@]}" --probe > /dev/null; then
+  # GITHUB_STEP_SUMMARY is cleared for the probe: the tool writes the census to that
+  # file directly, so redirecting stdout does not stop a second one being published --
+  # and the probe's census contains the synthetic warning it injects, which would read
+  # as a real finding to anyone looking at the step summary.
+  if ! GITHUB_STEP_SUMMARY= "$REPO_ROOT/scripts/check-native-warnings.sh" "${CN1_WARNING_ARGS[@]}" --probe > /dev/null; then
     ri_log "STAGE:WARNING_CENSUS_FAILED -> the gate did not react to an injected warning"
     exit 12
   fi

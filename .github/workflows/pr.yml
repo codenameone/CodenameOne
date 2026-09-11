@@ -27,6 +27,13 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The native warning gate's parser self-test runs from this workflow and nowhere
+      # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
+      # change to the parser, its fixture or a baseline could merge without the one check
+      # that would have caught it ever running.
+      - 'scripts/check-native-warnings.py'
+      - 'scripts/check-native-warnings.sh'
+      - 'scripts/native-warnings/**'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -78,6 +85,13 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The native warning gate's parser self-test runs from this workflow and nowhere
+      # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
+      # change to the parser, its fixture or a baseline could merge without the one check
+      # that would have caught it ever running.
+      - 'scripts/check-native-warnings.py'
+      - 'scripts/check-native-warnings.sh'
+      - 'scripts/native-warnings/**'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could

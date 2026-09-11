@@ -33,6 +33,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -130,6 +131,54 @@ class EdtExceptionReportingTest {
 
         assertDoesNotThrow(() -> report(display, ORIGINAL),
                 "a registered CrashReporter that throws must not end the dispatch thread");
+    }
+
+    @Test
+    void aThrowingCrashReporterDoesNotSilenceTheLaterReporters() throws Exception {
+        // Isolating the reporters from the dispatch thread is not enough on its own: with
+        // one enclosing try, the FIRST reporter to throw takes every later one with it,
+        // so an application whose CrashReporter fails never hears about the exception at
+        // all through its own error handler. Each step has to be isolated from the
+        // others too.
+        DisplayContext ctx = new DisplayContext();
+        Display display = ctx.makeDisplay();
+        when(ctx.getImpl().handleEDTException(any(Throwable.class))).thenReturn(false);
+        set(display, "crashReporter", (com.codename1.system.CrashReport) (t) -> {
+            throw new IllegalStateException("crash reporter threw while reporting");
+        });
+        final Throwable[] delivered = new Throwable[1];
+        EventDispatcher handler = new EventDispatcher();
+        handler.addListener((ActionListener) evt -> delivered[0] = (Throwable) evt.getSource());
+        set(display, "errorHandler", handler);
+
+        report(display, ORIGINAL);
+
+        assertSame(ORIGINAL, delivered[0],
+                "the application's error handler must still receive the original exception "
+                + "after an earlier reporter threw");
+    }
+
+    @Test
+    void aThrowingImplementationHandlerStillReachesTheApplication() throws Exception {
+        // handleEDTException decides whether the application still needs telling, so a
+        // port that throws must not be read as "handled" -- that would swallow the
+        // exception entirely rather than merely failing to report it once.
+        DisplayContext ctx = new DisplayContext();
+        CodenameOneImplementation impl = mock(CodenameOneImplementation.class);
+        when(impl.handleEDTException(any(Throwable.class)))
+                .thenThrow(new IllegalStateException("port handler threw while reporting"));
+        ctx.setImpl(impl);
+        Display display = ctx.makeDisplay();
+        final Throwable[] delivered = new Throwable[1];
+        EventDispatcher handler = new EventDispatcher();
+        handler.addListener((ActionListener) evt -> delivered[0] = (Throwable) evt.getSource());
+        set(display, "errorHandler", handler);
+
+        report(display, ORIGINAL);
+
+        assertSame(ORIGINAL, delivered[0],
+                "a port whose handleEDTException throws must not be treated as having "
+                + "handled the exception");
     }
 
     @Test
