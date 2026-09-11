@@ -74,6 +74,10 @@ class BackendJavaSeRuntimeTest {
         // A real file: an in-memory database cannot be pooled, since every
         // connection would get its own.
         env.put("CN1_SELFTEST_DB", work.resolve("pool.db").toString());
+        // Small enough that the response-size check can serve one byte past it
+        // without serving the 64MB default. Every other web check here fetches
+        // a few hundred bytes, so the bound is invisible to them.
+        env.put("CN1_WEB_MAX_RESPONSE_MB", "1");
         if (System.getenv("CN1_SELFTEST_NETWORK") != null) {
             env.put("CN1_SELFTEST_NETWORK", "1");
             String bundle = caBundle();

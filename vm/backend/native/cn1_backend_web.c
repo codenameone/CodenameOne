@@ -79,11 +79,49 @@ static size_t cn1WebHeader(void* contents, size_t size, size_t count, void* user
    become memory corruption. */
 #define CN1_WEB_MAX_BODY_BYTES ((size_t)0x7fffffff)
 
+/*
+ * What an outbound response is ALLOWED to be, which is a different question from
+ * what one can be represented as.
+ *
+ * The ceiling above is an integer-safety bound and nothing else: it stops a
+ * length narrowing to a negative array size. It is no protection from the
+ * machine, because the body is accumulated whole before Java sees any of it, so
+ * an endless or merely huge upstream response reallocs until the container is
+ * OOM-killed -- long before 2GB, and with the low-speed timeout no help at all
+ * when the bytes are arriving quickly.
+ *
+ * CN1_WEB_MAX_RESPONSE_MB is the practical bound, defaulting to the same 64MB
+ * CN1_HTTP_MAX_UPLOAD_MB uses for the inbound direction. The Java SE arm reads
+ * the SAME variable with the SAME default -- it had no bound of any kind -- so
+ * the two arms refuse the same response. Exceeding it aborts the transfer, which
+ * libcurl reports as CURLE_WRITE_ERROR and Web turns into an IOException: a
+ * failed download rather than a dead process.
+ */
+#define CN1_WEB_DEFAULT_MAX_RESPONSE_MB 64
+static size_t cn1WebResponseLimit(void) {
+    const char* text = getenv("CN1_WEB_MAX_RESPONSE_MB");
+    long mb = CN1_WEB_DEFAULT_MAX_RESPONSE_MB;
+    if(text != NULL && text[0] != 0) {
+        char* end = NULL;
+        long parsed = strtol(text, &end, 10);
+        /* All digits and in range, or the default. A misconfigured bound must not
+           silently become a smaller one than the caller believes. */
+        if(end != NULL && *end == 0 && parsed >= 1 && parsed <= 2047) {
+            mb = parsed;
+        }
+    }
+    return (size_t)mb * 1024u * 1024u;
+}
+
 static size_t cn1WebWrite(void* contents, size_t size, size_t count, void* userp) {
     CN1WebResponse* r = (CN1WebResponse*)userp;
     size_t total = size * count;
+    size_t allowed = cn1WebResponseLimit();
     if(total > CN1_WEB_MAX_BODY_BYTES - r->length) {
         return 0; /* aborts the transfer; libcurl reports CURLE_WRITE_ERROR */
+    }
+    if(r->length + total > allowed) {
+        return 0; /* over the practical bound; same abort, same IOException */
     }
     char* grown = (char*)realloc(r->data, r->length + total + 1);
     if(grown == NULL) {

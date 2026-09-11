@@ -1369,6 +1369,17 @@ public final class HttpServer {
      */
     public static HttpServer start(String host, int port, int backlog, int workerCount,
                                    Handler handler, Tls tls) throws IOException {
+        // BEFORE THE BIND, because the two arms failed this differently and both
+        // badly. Java SE's Executors.newFixedThreadPool throws for a non-positive
+        // count -- but only after the listener and the reactor are open, so the
+        // port stayed bound and a caller retrying on it met "address already in
+        // use" instead of the argument error. The packaged runtime's thread pool
+        // simply created no workers and handed back a server that accepts
+        // connections and queues them forever, which is worse than either. One
+        // check here and neither can happen.
+        if(workerCount < 1) {
+            throw new IOException("workerCount must be at least 1, not " + workerCount);
+        }
         ServerSocket listener = ServerSocket.bind(host, port, backlog);
         Reactor reactor;
         try {

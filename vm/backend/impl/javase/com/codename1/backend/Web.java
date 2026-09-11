@@ -143,6 +143,35 @@ public final class Web {
         return request("POST", url, headers, json == null ? new byte[0] : json.getBytes("UTF-8"));
     }
 
+    /**
+     * The ceiling on one outbound response body, from CN1_WEB_MAX_RESPONSE_MB.
+     *
+     * Defaults to the 64MB CN1_HTTP_MAX_UPLOAD_MB uses for the inbound direction.
+     * A value that is not 1..2047 plain digits is IGNORED rather than clamped: a
+     * misconfigured bound must not silently become a different one than the
+     * caller believes it set.
+     */
+    private static long maxResponseBytes() {
+        long mb = 64;
+        String text = System.getenv("CN1_WEB_MAX_RESPONSE_MB");
+        if(text != null && text.length() > 0) {
+            long parsed = 0;
+            boolean digits = text.length() <= 4;
+            for(int iter = 0 ; digits && iter < text.length() ; iter++) {
+                char c = text.charAt(iter);
+                if(c < '0' || c > '9') {
+                    digits = false;
+                } else {
+                    parsed = parsed * 10 + (c - '0');
+                }
+            }
+            if(digits && parsed >= 1 && parsed <= 2047) {
+                mb = parsed;
+            }
+        }
+        return mb * 1024L * 1024L;
+    }
+
     public static Result request(String method, String url, List headers, byte[] body)
             throws IOException {
         if(url == null) {
@@ -225,9 +254,23 @@ public final class Web {
             InputStream in = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             if(in != null) {
+                // BOUNDED. This arm had no ceiling at all, so an endless or merely
+                // huge upstream response grew this buffer until the JVM died --
+                // and a read timeout is no help when the bytes arrive quickly.
+                // The packaged arm reads the SAME variable with the SAME default,
+                // so the two refuse the same response; see
+                // CN1_WEB_MAX_RESPONSE_MB in cn1_backend_web.c.
+                long allowed = maxResponseBytes();
                 byte[] chunk = new byte[8192];
                 int n;
+                long total = 0;
                 while((n = in.read(chunk)) > 0) {
+                    total += n;
+                    if(total > allowed) {
+                        throw new IOException("Request to " + url + " failed: the response "
+                                + "is larger than the " + (allowed / (1024 * 1024))
+                                + "MB CN1_WEB_MAX_RESPONSE_MB allows");
+                    }
                     buffer.write(chunk, 0, n);
                 }
             }

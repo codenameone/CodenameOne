@@ -597,6 +597,135 @@ public class SelfTest {
      * be wrong. Echoed back by a server here rather than inspected, because the
      * two arms have no shared way to ask what they sent.
      */
+    /**
+     * A server asked for no workers is refused, and does not keep the port.
+     *
+     * <p>The two arms failed this differently and both badly. Java SE's
+     * Executors.newFixedThreadPool throws for a non-positive count, but only
+     * after the listener and reactor are open, so the port stayed bound and the
+     * caller's retry met "address already in use" rather than the argument error.
+     * The packaged runtime's pool created no workers at all and returned a server
+     * that accepts connections and queues them forever -- a server that is
+     * listening and can never answer.
+     *
+     * <p>Rebinding the SAME port afterwards is the half that proves the listener
+     * was not leaked; asserting only that it threw would pass either way.
+     */
+    private static void aServerWithNoWorkersIsRefusedBeforeBinding() throws Exception {
+        // PORT 0 EVERY TIME. An earlier version of this check released a port and
+        // rebound it to prove the listener was not leaked, and that races any
+        // other process on the machine -- it failed under parallel test forks,
+        // which is a flake I would have introduced to catch someone else's bug.
+        //
+        // It buys nothing either, because the MESSAGE already separates the three
+        // outcomes. Validated before the bind: an IOException naming workerCount.
+        // Validated by the Java SE executor after the bind: an
+        // IllegalArgumentException that says nothing about workerCount, so this
+        // reads "other". Not validated at all, which is what the packaged pool
+        // did: a server comes back and this reads "accepted". Each arm's bug has
+        // its own answer here, and none of them needs a fixed port.
+        //
+        // That the port is not retained follows from the check preceding the bind
+        // rather than from an assertion here; measured once against the unfixed
+        // build, the rebind failed with "Could not bind 127.0.0.1:53103".
+        int[] counts = new int[]{0, -1};
+        String[] refusals = new String[counts.length];
+        for(int iter = 0 ; iter < counts.length ; iter++) {
+            try {
+                HttpServer bad = HttpServer.start("127.0.0.1", 0, 16, counts[iter],
+                        new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request) {
+                                return HttpServer.Response.text(200, "ok");
+                            }
+                        });
+                bad.stop(1000);
+                refusals[iter] = "accepted";
+            } catch (Exception refused) {
+                String message = String.valueOf(refused.getMessage());
+                refusals[iter] = message.indexOf("workerCount") >= 0
+                        ? "refused" : "other: " + message;
+            }
+        }
+        check("a server with no workers is refused", "refused", refusals[0]);
+        check("and a negative worker count too", "refused", refusals[1]);
+
+        // One worker is a legal server, which is the boundary the check sits on.
+        HttpServer good = HttpServer.start("127.0.0.1", 0, 16, 1,
+                new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return HttpServer.Response.text(200, "ok");
+                    }
+                });
+        try {
+            check("one worker is accepted", "true", String.valueOf(good.getPort() > 0));
+        } finally {
+            good.stop(1000);
+        }
+    }
+
+    /**
+     * An outbound response bigger than the bound is refused, not accumulated.
+     *
+     * <p>Both arms buffer a response whole before the caller sees any of it, so an
+     * endless or merely huge upstream reply grew memory until the process died --
+     * the packaged arm up to a 2GB integer-safety ceiling, and the Java SE arm
+     * with no ceiling at all. A read timeout is no help when the bytes are
+     * arriving quickly; only a size bound is.
+     *
+     * <p>Served from a LOCAL server so the check needs no network and no patience:
+     * the body is one byte over whatever CN1_WEB_MAX_RESPONSE_MB says. The test
+     * harnesses set that to 1MB, and the check skips when it is unset or large,
+     * because serving 64MB to prove the default would cost more than it is worth.
+     */
+    private static void anOversizedResponseIsRefusedNotAccumulated() throws Exception {
+        String configured = System.getenv("CN1_WEB_MAX_RESPONSE_MB");
+        int limitMb = 0;
+        if(configured != null) {
+            try {
+                limitMb = Integer.parseInt(configured.trim());
+            } catch (NumberFormatException ignored) {
+                limitMb = 0;
+            }
+        }
+        if(limitMb < 1 || limitMb > 4) {
+            note("response-size bound skipped: set CN1_WEB_MAX_RESPONSE_MB to 1..4 to run it");
+            return;
+        }
+        final int limitBytes = limitMb * 1024 * 1024;
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                // "/over" is one byte past the bound; "/under" is comfortably inside
+                // it, so the refusal below cannot be the server failing to serve.
+                int size = request.getTarget().indexOf("/over") >= 0
+                        ? limitBytes + 1 : 1024;
+                return new HttpServer.Response(200, "application/octet-stream",
+                        new byte[size]);
+            }
+        });
+        try {
+            String base = "http://127.0.0.1:" + server.getPort();
+            String under;
+            try {
+                Web.Result r = Web.request("GET", base + "/under", null, null);
+                under = r == null ? "null" : String.valueOf(r.getBody().length);
+            } catch (Exception err) {
+                under = "threw: " + err.getMessage();
+            }
+            check("a response inside the bound still arrives", "1024", under);
+
+            String over;
+            try {
+                Web.Result r = Web.request("GET", base + "/over", null, null);
+                over = "accepted " + (r == null ? "null" : String.valueOf(r.getBody().length));
+            } catch (Exception refused) {
+                over = "refused";
+            }
+            check("a response past the bound is refused", "refused", over);
+        } finally {
+            server.stop(1000);
+        }
+    }
+
     private static void repeatedOutboundHeadersSurvive() throws Exception {
         HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
             public HttpServer.Response handle(HttpServer.Request request) {
@@ -915,6 +1044,8 @@ public class SelfTest {
         patchIsASendableVerb();
         outboundHeadersCannotCarryANewline();
         repeatedOutboundHeadersSurvive();
+        anOversizedResponseIsRefusedNotAccumulated();
+        aServerWithNoWorkersIsRefusedBeforeBinding();
         negativeConnectTimeoutsAreRefused();
         malformedPortsAreRefused();
         urlComponentsKeepTheirUnicode();
