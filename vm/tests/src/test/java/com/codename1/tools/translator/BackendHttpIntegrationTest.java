@@ -1803,6 +1803,15 @@ class BackendHttpIntegrationTest {
         assertEquals(200, statusOf(raw("GET /healthz?name=plain HTTP/1.1\r\nHost: x\r\n"
                 + "Connection: close\r\n\r\n")),
                 "an unencoded target must be unaffected");
+        // AND OVER h2, which is the half a parser-only fix leaves behind: the
+        // handler cannot tell which protocol carried the request, so one server
+        // answering 400 on HTTP/1 and 200 on h2 is the same divergence as the
+        // method check above.
+        assertEquals(400, h2StatusFor(port, "/healthz?name=%C3%28"),
+                "malformed UTF-8 must be refused over h2 as well");
+        assertEquals(200, h2StatusFor(port, "/healthz?name=%C3%A9"),
+                "and a valid accented value must still be served over h2");
+
         // A malformed ESCAPE is deliberately NOT what this rejects: percentDecode
         // passes it through as literal bytes and browsers do send a bare '%'.
         assertEquals(200, statusOf(raw("GET /healthz?pct=100%25andmore HTTP/1.1\r\nHost: x\r\n"

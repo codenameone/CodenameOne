@@ -243,10 +243,27 @@ static SSL_CTX* cn1ClientTlsEnsureContextLocked(const char* caFile) {
     return ctx;
 }
 
+/*
+ * The caller gets a context it OWNS A REFERENCE TO, and must SSL_CTX_free it.
+ *
+ * Returning the cache's raw pointer was safe only while contexts were never
+ * freed. Rotation made them mortal: between this unlock and the caller's
+ * SSL_new, another thread can notice the same bundle changed, rebuild the slot
+ * and drop the cache's reference -- which was the only one -- so the first
+ * thread hands OpenSSL freed memory. Taking the reference here, under the same
+ * mutex that guards the slot, closes the window at its only edge; the caller
+ * releases it the moment SSL_new has taken its own.
+ */
 static SSL_CTX* cn1ClientTlsEnsureContext(const char* caFile) {
     SSL_CTX* ctx;
     pthread_mutex_lock(&cn1ClientTlsMutex);
     ctx = cn1ClientTlsEnsureContextLocked(caFile);
+    if(ctx != 0 && SSL_CTX_up_ref(ctx) != 1) {
+        /* Cannot happen short of a corrupted refcount, and answering NULL fails
+         * the connection rather than handing back a pointer we do not own. */
+        cn1ClientTlsRecordError("could not retain the TLS context");
+        ctx = 0;
+    }
     pthread_mutex_unlock(&cn1ClientTlsMutex);
     return ctx;
 }
@@ -317,6 +334,12 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
         return 0;
     }
     ssl = SSL_new(ctx);
+    /* Done with OUR reference either way: on success the SSL took one of its own
+     * and outlives the cache entry if that entry is rotated away underneath it,
+     * and on failure there is nothing to keep it for. Released here rather than
+     * on each of the exits below, so a later error path cannot forget it. */
+    SSL_CTX_free(ctx);
+    ctx = 0;
     if(ssl == 0) {
         cn1ClientTlsRecordError("could not create a TLS session");
         free(h);

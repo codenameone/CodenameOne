@@ -3457,6 +3457,19 @@ public final class HttpServer {
                     requestsServed.incrementAndGet();
                     continue;
                 }
+                if(!targetDecodesToUtf8(stream.getPath())) {
+                    // The same rule the HTTP/1 request line takes, because the
+                    // handler cannot tell which protocol carried it. Fixing this in
+                    // the parser alone left "?name=%C3%28" refused over HTTP/1 and
+                    // served over h2 -- one server, two answers, which is the shape
+                    // of defect this whole file keeps closing.
+                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                            asciiBytes("the request target is not valid UTF-8"))) {
+                        h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
+                    }
+                    requestsServed.incrementAndGet();
+                    continue;
+                }
                 if(!isKnownMethod(stream.getMethod())) {
                     // 501 before the handler, for the same reason the HTTP/1
                     // request line answers 501: the path may well exist, the verb
@@ -3907,6 +3920,30 @@ public final class HttpServer {
             }
         }
         return true;
+    }
+
+    /**
+     * The same question for an h2 :path, which arrives already decoded into a
+     * String rather than as a slice of the read buffer.
+     *
+     * <p>Re-encoding to UTF-8 first is what makes the two agree: a literal
+     * non-ASCII character in the path is text that came from valid bytes and
+     * re-encodes to valid bytes, while the percent escapes -- the only part that
+     * can be malformed -- decode and are checked exactly as they are on the
+     * HTTP/1 side.
+     */
+    private static boolean targetDecodesToUtf8(String target) {
+        if(target == null || target.indexOf('%') < 0) {
+            return true;
+        }
+        try {
+            byte[] raw = target.getBytes("UTF-8");
+            return targetDecodesToUtf8(raw, 0, raw.length);
+        } catch (java.io.UnsupportedEncodingException err) {
+            // UTF-8 is required of every VM this runs on; the checked exception is
+            // the API's, not a case that can happen.
+            return true;
+        }
     }
 
     /**
