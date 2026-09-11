@@ -66,7 +66,6 @@ port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wdeprecated-dec
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wenum-conversion|implicit conversion from enumeration type ? (aka ?) to different enumeration type ? (aka ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wenum-conversion|implicit conversion from enumeration type ? to different enumeration type ? (aka ?)|4 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wincompatible-pointer-types|incompatible pointer types initializing ? (aka ?) with an expression of type ? (aka ?)|2 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wint-conversion|incompatible pointer to integer conversion assigning to ? (aka ?) from ?|3 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wobjc-method-access|instance method ? not found (return type defaults to ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wobjc-missing-super-calls|method possibly missing a [super awakeFromNib] call|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wpointer-sign|passing ? (aka ?) to parameter of type ? converts between pointers to integer types with different sign|2 instance(s) when the baseline was written; not yet triaged
@@ -105,7 +104,6 @@ port|Ports/iOSPort/nativeSources/FillRect.m|-Wdeprecated-declarations|? is depre
 port|Ports/iOSPort/nativeSources/FillRect.m|-Wunused-variable|unused variable ?|3 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/GLUIImage.m|-Wenum-conversion|implicit conversion from enumeration type ? to different enumeration type ? (aka ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/GLUIImage.m|-Wpointer-sign|passing ? to parameter of type ? (aka ?) converts between pointers to integer types with different sign|4 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/IOSNative.m|-Wconditional-type-mismatch|pointer/integer type mismatch in conditional expression (? and ? (aka ?))|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wdeprecated-declarations|? is deprecated: first deprecated in iOS ? - OpenGLES API deprecated. (Define GLES_SILENCE_DEPRECATION to silence these warnings)|2 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wdeprecated-declarations|? is deprecated: first deprecated in iOS ? - Should not be used for applications that support multiple scenes as it returns a key window across all connected scenes|4 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wdeprecated-declarations|? is deprecated: first deprecated in iOS ? - The segmentedControlStyle property no longer has any effect|4 instance(s) when the baseline was written; not yet triaged
@@ -131,10 +129,6 @@ port|Ports/iOSPort/nativeSources/IOSNative.m|-Wformat|values of type ? should no
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wincompatible-pointer-types-discards-qualifiers|initializing ? with an expression of type ? discards qualifiers|2 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wincompatible-pointer-types|incompatible pointer types assigning to ? (aka ?) from ? (aka ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wincompatible-pointer-types|incompatible pointer types passing ? (aka ?) to parameter of type ?|1 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/IOSNative.m|-Wint-conversion|incompatible integer to pointer conversion passing ? (aka ?) to parameter of type ?|3 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/IOSNative.m|-Wint-conversion|incompatible pointer to integer conversion initializing ? (aka ?) with an expression of type ?|1 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/IOSNative.m|-Wint-conversion|incompatible pointer to integer conversion passing ? to parameter of type ? (aka ?)|2 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/IOSNative.m|-Wint-conversion|incompatible pointer to integer conversion returning ? from a function with result type ? (aka ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wnonnull|null passed to a callee that requires a non-null argument|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wobjc-method-access|instance method ? not found (return type defaults to ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? (aka ?) to ? (aka ?)|6 instance(s) when the baseline was written; not yet triaged
@@ -167,7 +161,6 @@ port|Ports/iOSPort/nativeSources/UIWebViewEventDelegate.m|-Wshorten-64-to-32|imp
 port|Ports/iOSPort/nativeSources/UIWebViewEventDelegate.m|-Wunused-variable|unused variable ?|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/WebSocketImpl.m|-Wunsupported-availability-guard|@available does not guard availability here; use if (@available) instead|6 instance(s) when the baseline was written; not yet triaged
 runtime|cn1_globals.m|-Wformat|format specifies type ? but the argument has type ?|2 instance(s) when the baseline was written; not yet triaged
-runtime|cn1_globals.m|-Wint-conversion|incompatible pointer to integer conversion assigning to ? (aka ?) from ?|2 instance(s) when the baseline was written; not yet triaged
 runtime|cn1_globals.m|-Wpointer-to-int-cast|cast to smaller integer type ? (aka ?) from ? (aka ?)|2 instance(s) when the baseline was written; not yet triaged
 runtime|cn1_globals.m|-Wunused-function|unused function ?|6 instance(s) when the baseline was written; not yet triaged
 runtime|cn1_globals.m|-Wunused-variable|unused variable ?|8 instance(s) when the baseline was written; not yet triaged
