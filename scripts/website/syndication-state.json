@@ -2044,6 +2044,10 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-09-11T17:01:55+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/722f79a6115e/edit",
+        "syndicated_at": "2026-09-11T19:01:34+00:00"
       }
     }
   }
