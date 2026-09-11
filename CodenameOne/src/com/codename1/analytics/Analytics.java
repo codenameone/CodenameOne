@@ -71,6 +71,17 @@ public final class Analytics {
     private static final String PREF_CONSENT_AD = "cn1$analyticsConsentAdStorage";
     private static final String PREF_DIMENSIONS = "cn1$analyticsDimensions";
 
+    // The client id the persisted dimensions were written under.
+    //
+    // Preferences.set discards the write-failure boolean, so an erasure that
+    // could not reach the disk removed the reserved dimensions from memory and
+    // left them in the file: the next launch loaded them back and attached the
+    // erased referral identity to the NEW client id, which is the one thing
+    // resetClientId() exists to prevent. Verifying the write closes that
+    // inside the process; this closes it across a restart, where no in-memory
+    // retry survives to run.
+    private static final String PREF_DIMENSIONS_OWNER = "cn1$analyticsDimensionsOwner";
+
     private static final Object LOCK = new Object();
     private static final List<AnalyticsProvider> PROVIDERS = new ArrayList<AnalyticsProvider>();
     // App-scoped segmentation dimensions ("plan", "role", ...) that the cloud
@@ -527,13 +538,28 @@ public final class Analytics {
         return clientId;
     }
 
+    // Package private test seam: makes the store look the way it does after an
+    // erasure whose write never landed -- the reserved dimensions still in the
+    // file, stamped with the identity that has since been reset -- and drops
+    // the in-memory copy so the next read comes off the disk, which is what the
+    // next process would do. There is no other way to produce a failed
+    // Preferences write from a test.
+    static void simulateSurvivingDimensionsForTest(String raw, String owner) {
+        synchronized (LOCK) {
+            Preferences.set(PREF_DIMENSIONS, raw);
+            Preferences.set(PREF_DIMENSIONS_OWNER, owner);
+            DIMENSIONS.clear();
+            dimensionsLoaded = false;
+        }
+    }
+
     /// The prefix reserved for dimensions the framework writes on your behalf.
     /// Do not use it for your own dimensions: everything under it is cleared by
     /// [#resetClientId].
     public static final String RESERVED_DIMENSION_PREFIX = "cn1_";
 
     // Must be called while holding LOCK.
-    private static void clearReservedDimensions() {
+    private static boolean clearReservedDimensions() {
         loadDimensions();
         boolean changed = false;
         Iterator<Map.Entry<String, String>> it = DIMENSIONS.entrySet().iterator();
@@ -545,9 +571,20 @@ public final class Analytics {
                 changed = true;
             }
         }
-        if (changed) {
-            persistDimensions();
+        if (!changed) {
+            return true;
         }
+        if (persistDimensions()) {
+            return true;
+        }
+        // One retry, because the common cause is transient. If it still will
+        // not land, the entries are gone from memory and still in the file --
+        // and the stamp written beside them now names the NEW client id's
+        // predecessor, so loadDimensions() drops them on the next launch
+        // rather than attaching them to the fresh identity.
+        Log.p("analytics: the reserved dimensions could not be erased from storage; "
+                + "they will be dropped on the next launch instead", Log.WARNING);
+        return persistDimensions();
     }
 
     // Must be called while holding LOCK. Lazily loads the persisted dimensions
@@ -563,6 +600,14 @@ public final class Analytics {
         if (stored == null || stored.length() == 0) {
             return;
         }
+        // Whose dimensions these are. An erasure that could not reach the disk
+        // leaves the reserved entries in the file under the PREVIOUS identity;
+        // loading them would attach the referral identity the user asked to be
+        // rid of to their new client id, one launch later and with nothing in
+        // memory left to notice. An absent stamp is treated as current, so a
+        // file written before this existed is not discarded.
+        String owner = Preferences.get(PREF_DIMENSIONS_OWNER, null);
+        boolean foreign = owner != null && clientId != null && !owner.equals(clientId);
         String[] rows = split(stored, '\n');
         for (String row : rows) {
             if (row.length() == 0) {
@@ -574,18 +619,44 @@ public final class Analytics {
             }
             String key = row.substring(0, tab);
             String value = row.substring(tab + 1);
-            if (key.length() > 0) {
-                DIMENSIONS.put(key, value);
+            if (key.length() == 0) {
+                continue;
             }
+            if (foreign && key.startsWith(RESERVED_DIMENSION_PREFIX)) {
+                // The framework's own dimensions, belonging to an identity
+                // that has since been reset. Dropped rather than loaded: this
+                // is the erasure finishing late, and the alternative is
+                // handing the new client id the referral it was reset to
+                // forget.
+                //
+                // The APPLICATION's dimensions are kept. They are not what an
+                // erasure asked about, and losing a plan or role the app set
+                // would be a second bug in the name of fixing the first.
+                continue;
+            }
+            DIMENSIONS.put(key, value);
+        }
+        if (foreign) {
+            // Rewritten under the current identity so the drop happens once.
+            // If this write fails too the next launch simply repeats it, which
+            // is the correct outcome either way.
+            persistDimensions();
         }
     }
 
     // Must be called while holding LOCK.
-    private static void persistDimensions() {
-        if (DIMENSIONS.isEmpty()) {
-            Preferences.set(PREF_DIMENSIONS, "");
-            return;
-        }
+    /// Writes the dimensions and says whether the write really landed.
+    ///
+    /// `Preferences.set` returns nothing and swallows its own failure, so a
+    /// full or read-only store looked exactly like a successful write. The
+    /// value is read back instead of trusted, because for an erasure the
+    /// difference is the whole operation: entries removed only from the
+    /// in-memory map come back on the next launch.
+    ///
+    /// #### Returns
+    ///
+    /// true when the stored value matches what was written
+    private static boolean persistDimensions() {
         StringBuilder b = new StringBuilder();
         boolean first = true;
         for (Map.Entry<String, String> e : DIMENSIONS.entrySet()) {
@@ -595,7 +666,13 @@ public final class Analytics {
             b.append(sanitize(e.getKey())).append('\t').append(sanitize(e.getValue()));
             first = false;
         }
-        Preferences.set(PREF_DIMENSIONS, b.toString());
+        String value = b.toString();
+        Preferences.set(PREF_DIMENSIONS, value);
+        // Stamped with the identity these dimensions belong to, so a restart
+        // can tell a surviving file from a current one even when the write
+        // above failed and nothing in memory remembers.
+        Preferences.set(PREF_DIMENSIONS_OWNER, clientId == null ? "" : clientId);
+        return value.equals(Preferences.get(PREF_DIMENSIONS, null));
     }
 
     // Replaces the delimiter characters so the persisted form parses back

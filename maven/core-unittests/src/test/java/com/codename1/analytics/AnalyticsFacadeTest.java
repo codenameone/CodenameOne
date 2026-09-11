@@ -62,6 +62,50 @@ class AnalyticsFacadeTest extends UITestBase {
     }
 
     @FormTest
+    void reservedDimensionsThatOutlivedAnErasureAreDroppedOnTheNextLaunch() {
+        // Preferences.set discards its write-failure boolean, so an erasure
+        // that could not reach the disk removed the reserved dimensions from
+        // memory and left them in the file. The next launch loaded them back
+        // and attached the referral identity the user asked to be rid of to
+        // their NEW client id -- one launch later, with nothing in memory left
+        // to notice.
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        String current = Analytics.clientId();
+
+        // The file as a failed erasure leaves it: framework dimensions and an
+        // application dimension, stamped with the identity that has gone.
+        Analytics.simulateSurvivingDimensionsForTest(
+                "cn1_campaign\tspring\ncn1_invite\tinstall_confirmed\nplan\tpro",
+                "an-erased-client-id");
+
+        Map<String, String> loaded = Analytics.getDimensions();
+        assertNull(loaded.get("cn1_campaign"),
+                "an erased referral came back and attached itself to the new client id");
+        assertNull(loaded.get("cn1_invite"));
+        // The APPLICATION's own dimension is not what an erasure asked about,
+        // and losing it would be a second bug in the name of fixing the first.
+        assertEquals("pro", loaded.get("plan"),
+                "the application's own dimension was destroyed by someone else's erasure");
+        assertEquals(current, Analytics.clientId(), "the fixture changed the identity");
+    }
+
+    @FormTest
+    void dimensionsFromTheCurrentIdentityAreKept() {
+        // The drop is keyed on the STAMP, not on the prefix, or an ordinary
+        // launch would throw away the referral dimensions every time.
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        Analytics.simulateSurvivingDimensionsForTest(
+                "cn1_campaign\tspring\nplan\tpro", Analytics.clientId());
+
+        Map<String, String> loaded = Analytics.getDimensions();
+        assertEquals("spring", loaded.get("cn1_campaign"),
+                "a live referral was discarded on an ordinary launch");
+        assertEquals("pro", loaded.get("plan"));
+    }
+
+    @FormTest
     void setUserIdRequiresPersonalizationConsent() {
         Analytics.clearProviders();
         Analytics.setConsentMode(ConsentMode.OPT_IN);
