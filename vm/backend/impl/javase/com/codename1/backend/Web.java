@@ -174,9 +174,7 @@ public final class Web {
 
     public static Result request(String method, String url, List headers, byte[] body)
             throws IOException {
-        if(url == null) {
-            throw new IOException("No URL");
-        }
+        Urls.requireHttp(url);
         HeaderLines.validate(headers);
         HttpURLConnection connection;
         try {

@@ -56,9 +56,33 @@ typedef struct {
     char error[CURL_ERROR_SIZE];
 } CN1WebResponse;
 
+/*
+ * A BACKSTOP under libcurl's own aggregate header cap, and not the thing that
+ * enforces this today. Worth stating plainly, because review asked for it on the
+ * grounds that libcurl bounds a single header LINE and nothing bounds how many
+ * arrive -- and that is not true of the libcurl shipped here. Measured, with this
+ * check compiled out, a 1.8MB header block was refused by libcurl itself:
+ *
+ *     Too large response headers: 307397 > 307200
+ *
+ * So the accumulator was never actually unbounded on this build. This sits ABOVE
+ * that 300KB cap deliberately: it changes nothing where the cap exists, and
+ * catches a libcurl built without it rather than second-guessing the one that
+ * has it. One megabyte is far past anything real either way -- an origin
+ * server's whole block is tens of kilobytes, and the Java SE arm inherits the
+ * JDK's 384KB, which is what refuses the same response there.
+ *
+ * Fixed rather than configurable, unlike the body bound: a caller can want a
+ * large DOWNLOAD, and nobody wants a large header block.
+ */
+#define CN1_WEB_MAX_HEADER_BYTES ((size_t)(1024 * 1024))
+
 static size_t cn1WebHeader(void* contents, size_t size, size_t count, void* userp) {
     CN1WebResponse* r = (CN1WebResponse*)userp;
     size_t total = size * count;
+    if(total > CN1_WEB_MAX_HEADER_BYTES - r->headerLength) {
+        return 0; /* aborts the transfer; libcurl reports CURLE_WRITE_ERROR */
+    }
     char* grown = (char*)realloc(r->headers, r->headerLength + total + 1);
     if(grown == NULL) {
         return 0; /* tells libcurl to abort the transfer */
@@ -218,6 +242,27 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         return 0;
     }
     curl_easy_setopt(curl, CURLOPT_URL, urlCopy);
+    /* HTTP AND HTTPS, AND NOTHING ELSE, on the first request and on every
+       redirect. libcurl otherwise speaks whatever its build enabled, and the
+       builds shipped here enable file:// -- measured, "file:///etc/hosts" came
+       back as 684 bytes of the file. Urls.requireHttp refuses that on the Java
+       side of both arms; this is the second lock on the same door, and the one
+       that also covers a REDIRECT into file:// or ftp://, which no check on the
+       caller's URL can see.
+
+       CURLOPT_PROTOCOLS_STR is the current spelling and CURLOPT_PROTOCOLS the
+       one before it, deprecated in 7.85.0. Guarded on the VERSION rather than
+       #ifdef, because these are enum members and not macros -- the same trap
+       CURLOPT_PATH_AS_IS fell into below, where an #ifdef was silently always
+       false and the option was never set on any libcurl. */
+#if LIBCURL_VERSION_NUM >= 0x075500
+    curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
+    curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+#else
+    curl_easy_setopt(curl, CURLOPT_PROTOCOLS, (long)(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+    curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS,
+                     (long)(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+#endif
     /* The path goes out exactly as the caller wrote it.
        libcurl otherwise resolves "." and ".." before sending, while the SigV4
        signature was computed over the UNNORMALISED path -- so an S3 key with a dot

@@ -164,9 +164,7 @@ public final class Web {
      * - `headers`: a list of "Name: value" strings, or null
      */
     public static Result request(String method, String url, List headers, byte[] body) throws IOException {
-        if(url == null) {
-            throw new IOException("No URL");
-        }
+        Urls.requireHttp(url);
         HeaderLines.validate(headers);
         StringBuilder joined = new StringBuilder();
         if(headers != null) {

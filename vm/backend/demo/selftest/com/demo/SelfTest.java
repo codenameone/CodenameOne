@@ -664,6 +664,66 @@ public class SelfTest {
     }
 
     /**
+     * Web fetches http and https and NOTHING else.
+     *
+     * <p>The packaged arm hands the URL to libcurl with every protocol its build
+     * enabled, and the shipped builds enable file://. So an application that
+     * passes a caller-controlled URL to Web.request -- a webhook target, an avatar
+     * URL, anything a user supplies -- could be asked for "file:///etc/passwd" and
+     * would put the file in the handler-visible response body. The class documents
+     * an HTTP client and the Java SE arm cannot do anything else, HttpURLConnection
+     * being the only thing it opens.
+     *
+     * <p>Read of a file that certainly exists and certainly has content, so a
+     * refusal cannot be mistaken for an empty read.
+     */
+    private static void onlyHttpUrlsAreFetched() throws Exception {
+        String[] forbidden = new String[] {
+            "file:///etc/hosts",
+            "file://localhost/etc/hosts",
+            "ftp://127.0.0.1/pub/x",
+            "gopher://127.0.0.1/x",
+            "dict://127.0.0.1/d:x",
+        };
+        for(int iter = 0 ; iter < forbidden.length ; iter++) {
+            String outcome;
+            try {
+                Web.Result r = Web.request("GET", forbidden[iter], null, null);
+                byte[] body = r == null ? null : r.getBody();
+                outcome = "fetched " + (body == null ? 0 : body.length) + " bytes";
+            } catch (Exception refused) {
+                // THE SCHEME RULE, by name. A bare "it threw" is satisfied by
+                // anything -- measured, the Java SE arm threw ClassCastException
+                // out of the HttpURLConnection cast for file://, so this check
+                // passed there before the rule existed and tested nothing. It is
+                // also exactly the failure CLAUDE.md says never to rely on, since
+                // ParparVM's CHECKCAST does not throw at all.
+                String message = String.valueOf(refused.getMessage());
+                outcome = message.indexOf("http and https") >= 0
+                        ? "refused" : "other: " + refused.getClass().getName()
+                                + ": " + message;
+            }
+            check("a non-HTTP url is refused: " + forbidden[iter], "refused", outcome);
+        }
+
+        // And http still works, which is the direction this breaks. Served
+        // locally so the check needs no network.
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return HttpServer.Response.text(200, "reachable");
+            }
+        });
+        try {
+            Web.Result r = Web.request("GET",
+                    "http://127.0.0.1:" + server.getPort() + "/", null, null);
+            check("http is still fetched", "reachable",
+                    r == null ? "null" : String.valueOf(r.getBodyAsString()).trim());
+        } finally {
+            server.stop(1000);
+        }
+    }
+
+    /**
      * An outbound response bigger than the bound is refused, not accumulated.
      *
      * <p>Both arms buffer a response whole before the caller sees any of it, so an
@@ -696,6 +756,21 @@ public class SelfTest {
             public HttpServer.Response handle(HttpServer.Request request) {
                 // "/over" is one byte past the bound; "/under" is comfortably inside
                 // it, so the refusal below cannot be the server failing to serve.
+                if(request.getTarget().indexOf("/headers") >= 0) {
+                    // Past the native's fixed 1MB header ceiling, in LINES rather
+                    // than in one enormous line: libcurl refuses a single line
+                    // over its own cap, so only the count reaches the accumulator.
+                    StringBuilder filler = new StringBuilder();
+                    for(int c = 0 ; c < 600 ; c++) {
+                        filler.append('x');
+                    }
+                    Map many = new LinkedHashMap();
+                    for(int h = 0 ; h < 3000 ; h++) {
+                        many.put("X-Filler-" + h, filler.toString());
+                    }
+                    return new HttpServer.Response(200, "text/plain",
+                            "headers".getBytes(), many);
+                }
                 int size = request.getTarget().indexOf("/over") >= 0
                         ? limitBytes + 1 : 1024;
                 return new HttpServer.Response(200, "application/octet-stream",
@@ -721,6 +796,30 @@ public class SelfTest {
                 over = "refused";
             }
             check("a response past the bound is refused", "refused", over);
+
+            // THE HEADERS TOO, which the body bound does not cover. libcurl caps
+            // one header LINE and nothing caps how many arrive, so an upstream
+            // streaming legal header lines could exhaust this process before a
+            // body existed at all.
+            //
+            // THE REASON, not just that it threw. Any failure would satisfy a bare
+            // "refused" -- and measurement showed the refusal here comes from the
+            // HTTP stack's own aggregate cap on both arms, libcurl's 300KB
+            // ("Too large response headers") and the JDK's 384KB ("Header size too
+            // big"), rather than from anything this project added. Matching the
+            // reason is what keeps this a check on header SIZE and what would
+            // notice if a stack ever stopped enforcing it.
+            String headers;
+            try {
+                Web.Result r = Web.request("GET", base + "/headers", null, null);
+                headers = "accepted " + (r == null ? "null"
+                        : String.valueOf(r.getBodyAsString()).length());
+            } catch (Exception refused) {
+                String message = String.valueOf(refused.getMessage());
+                boolean aboutHeaders = message.indexOf("eader") >= 0;
+                headers = aboutHeaders ? "refused" : "other: " + message;
+            }
+            check("an oversized header block is refused", "refused", headers);
         } finally {
             server.stop(1000);
         }
@@ -1045,6 +1144,7 @@ public class SelfTest {
         outboundHeadersCannotCarryANewline();
         repeatedOutboundHeadersSurvive();
         anOversizedResponseIsRefusedNotAccumulated();
+        onlyHttpUrlsAreFetched();
         aServerWithNoWorkersIsRefusedBeforeBinding();
         negativeConnectTimeoutsAreRefused();
         malformedPortsAreRefused();

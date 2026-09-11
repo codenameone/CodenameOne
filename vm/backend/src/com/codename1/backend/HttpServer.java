@@ -1461,18 +1461,38 @@ public final class HttpServer {
             server.vtHosts = new VtHost[hostCount];
             // One cache line per host, so the stripes never share one.
             server.servedStripes = new long[hostCount * SERVED_STRIPE_STRIDE];
-            for(int iter = 0 ; iter < hostCount ; iter++) {
-                server.vtHosts[iter] = new VtHost(iter == 0 ? reactor : Reactor.create());
-            }
-            server.pollers = new Thread[hostCount];
-            for(int iter = 0 ; iter < hostCount ; iter++) {
-                final int index = iter;
-                server.pollers[iter] = new Thread(new Runnable() {
-                    public void run() {
-                        server.runVirtualThreadHost(index);
-                    }
-                });
-                server.pollers[iter].start();
+            // UNDER CLEANUP, because everything from here can fail and the caller
+            // gets no HttpServer to close when it does. Reactor.create() is a
+            // descriptor and Thread.start() is a thread, so descriptor or memory
+            // exhaustion throws HERE -- after the listener is bound, after the
+            // reactor is open, and after ACTIVE_SERVER and VT_SLOT_TAKEN were
+            // claimed above. Left as it was, the port stayed bound so a retry met
+            // "address already in use", and the slot stayed taken so every later
+            // server in the process fell back off virtual threads permanently --
+            // from a failure that was transient.
+            try {
+                for(int iter = 0 ; iter < hostCount ; iter++) {
+                    server.vtHosts[iter] = new VtHost(iter == 0 ? reactor : Reactor.create());
+                }
+                server.pollers = new Thread[hostCount];
+                for(int iter = 0 ; iter < hostCount ; iter++) {
+                    final int index = iter;
+                    server.pollers[iter] = new Thread(new Runnable() {
+                        public void run() {
+                            server.runVirtualThreadHost(index);
+                        }
+                    });
+                    server.pollers[iter].start();
+                }
+            } catch (IOException err) {
+                abandonStart(listener, server);
+                throw err;
+            } catch (RuntimeException err) {
+                // Thread.start() answers with one of these, and OutOfMemoryError
+                // is not caught on purpose: there is nothing left to clean up
+                // with.
+                abandonStart(listener, server);
+                throw err;
             }
         } else {
             server.loop = new Thread(new Runnable() {
@@ -1483,6 +1503,26 @@ public final class HttpServer {
             server.loop.start();
         }
         return server;
+    }
+
+    /**
+     * Undoes a start that failed after the listener was bound.
+     *
+     * <p>The order matters and is the same as stop()'s: stop the loops, wait for
+     * them to leave their reactors, then close. A poller already started is
+     * inside its reactor, and closing that under it is the use-after-free stop()
+     * goes out of its way to avoid -- a failed start is not a reason to take the
+     * process down with it.
+     */
+    private static void abandonStart(ServerSocket listener, HttpServer server) {
+        server.running = false;
+        if(server.pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
+            server.closePollers();
+        }
+        listener.close();
+        // Last, so a server starting concurrently cannot take the slot while this
+        // one is still closing the reactors it claimed with it.
+        server.releaseVirtualThreadSlot();
     }
 
     public int getPort() {
