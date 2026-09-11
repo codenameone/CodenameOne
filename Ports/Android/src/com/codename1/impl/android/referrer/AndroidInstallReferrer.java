@@ -32,6 +32,8 @@ import com.codename1.analytics.invite.Invites;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
+import java.util.HashMap;
+import java.util.Map;
 
 /// Reads the Play Store install referrer, which is the deterministic half of
 /// invite attribution on Android: the invite code makes the whole round trip
@@ -128,8 +130,17 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                 return;
             }
             if (known != current) {
-                Preferences.set(PREF_INSTALL_TIME, current);
-                Preferences.set(PREF_ATTEMPTED, false);
+                // ONE save for both. Preferences.set(String, Object) saves per
+                // key, and the order that reads most naturally is the one that
+                // loses: the new install time lands, the process exits before
+                // the flag is cleared, and the next launch compares equal --
+                // detection never fires again and this installation's Play
+                // referrer is gone for good. Batched, the pair is one write and
+                // there is no in-between to die in.
+                Map<String, Object> restored = new HashMap<String, Object>();
+                restored.put(PREF_INSTALL_TIME, Long.valueOf(current));
+                restored.put(PREF_ATTEMPTED, Boolean.FALSE);
+                Preferences.set(restored);
             }
         } catch (Throwable t) {
             // A package manager that cannot describe this app's own package is
