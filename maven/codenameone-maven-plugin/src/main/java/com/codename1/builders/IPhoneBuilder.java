@@ -12285,17 +12285,23 @@ public class IPhoneBuilder extends Executor {
     private void resolveInviteAppClipGroup(BuildRequest request) throws BuildException {
         inviteAppClipGroup = "";
         inviteAppClipTargetWanted = false;
-        // NOT gated on ios.invite.appClip, and that separation is the point.
+        // Gated on usesInvites and NOTHING else, which is the point.
         //
-        // That hint says "do not GENERATE a clip", which a developer sets when
-        // they ship one of their own. It used to suppress the receiving side
-        // too -- the app group, the native define and the registration of
-        // IOSAppClipHandoff -- so a custom clip could write the documented
-        // handoff into the documented container and nothing in the
-        // application ever read it. Every install settled as no_match, for a
-        // clip that did its job.
-        if (!usesInvites
-                || !"true".equals(request.getArg("ios.invite.universalLinks", "true"))) {
+        // Both hints here say "do not do this FOR me", and both were reading
+        // as "turn the feature off". ios.invite.appClip says do not generate a
+        // clip, which a developer sets when they ship one of their own;
+        // ios.invite.universalLinks says do not inject the associated domain,
+        // which they set when they manage the entitlement by hand. Either one
+        // used to suppress the receiving side as well -- the app group, the
+        // native define and the registration of IOSAppClipHandoff -- so a
+        // correctly configured app whose own clip wrote the documented handoff
+        // into the documented container had nothing reading it, and every iOS
+        // install settled as no_match.
+        //
+        // What each hint governs is applied where that thing is done: the
+        // domain append is guarded by universalLinks at its own call site, and
+        // target generation by appClip just below.
+        if (!usesInvites) {
             return;
         }
         String group = request.getArg("ios.invite.appGroup",

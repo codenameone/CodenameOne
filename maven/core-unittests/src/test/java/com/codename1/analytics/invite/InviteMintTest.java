@@ -184,4 +184,26 @@ class InviteMintTest extends UITestBase {
                 });
         assertTrue(e2.getMessage().contains("campaign"), e2.getMessage());
     }
+    @FormTest
+    void aburstOfInvitesSendsOneRequestEach() {
+        // Entries leave the outbox only when their OWN response acknowledges
+        // them, which is right -- the campaign, channel, payload and preview
+        // cannot be reconstructed from a click -- but it leaves an entry
+        // drainable while its request is outstanding. create() calls flush()
+        // unconditionally, so a burst reposted the whole queue each time: N
+        // invites produced N(N+1)/2 requests, and the 512-entry cap puts that
+        // past 131,000 for a full queue.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        implementation.clearQueuedRequests();
+
+        int burst = 6;
+        for (int i = 0; i < burst; i++) {
+            Invites.create(InviteRequest.create().campaign("c" + i).build());
+        }
+
+        assertEquals(burst, implementation.getQueuedRequests().size(),
+                "a burst of " + burst + " invites did not send one request each");
+    }
+
 }

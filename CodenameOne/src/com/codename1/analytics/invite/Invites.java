@@ -382,7 +382,10 @@ public final class Invites {
         putIfSet(p, "campaign", request.getCampaign());
         putIfSet(p, "channel", request.getChannel());
         Analytics.autoEvent("invite_created", CATEGORY, p);
-        flush();
+        // Skipping what is already on the wire. Every create() flushes, so
+        // without this a burst of N invites sent N(N+1)/2 requests -- each
+        // mint resending every earlier one, none of which needed it.
+        flush(true);
         return invite;
     }
 
@@ -974,8 +977,15 @@ public final class Invites {
     /// deferred match. Called for you on the paths that matter; exposed for
     /// an application that knows it has just regained connectivity.
     public static void flush() {
+        flush(false);
+    }
+
+    /// - `skipInFlight`: true for the flush create() issues itself, which must
+    ///   not resend a queue that is already going out; false for the public
+    ///   call, which exists precisely to resend after a network came back.
+    private static void flush(boolean skipInFlight) {
         ensureProvider();
-        drainOutbox();
+        drainOutbox(skipInFlight);
         // A deferred lookup that failed because the first launch was offline
         // leaves deferredStarted set, and nothing else clears it inside the
         // process: the request is fail-silent, so no callback runs. Without
@@ -2403,7 +2413,28 @@ public final class Invites {
         }
 
         @Override
+        protected void handleException(Exception err) {
+            // The transport failed, so postResponse() never runs. Without this
+            // the entry stayed marked in flight for the life of the process
+            // and no later flush would retry it -- trading an amplification
+            // bug for a lost registration, which is the worse of the two.
+            releaseInFlight();
+            super.handleException(err);
+        }
+
+        private void releaseInFlight() {
+            if (registration && outboxEntry != null) {
+                inFlight.remove(outboxEntry);
+            }
+        }
+
+        @Override
         protected void postResponse() {
+            // Cleared before the failure check, because a failed send has to be
+            // retryable by the next drain: this mark exists only to stop one
+            // burst of invites reposting the whole queue, not to retire an
+            // entry.
+            releaseInFlight();
             // Reading the body of an error response is on by default
             // (ConnectionRequest.readResponseForErrorsDefault), and the error
             // path falls through to postResponse() exactly as a 200 does. So
@@ -2876,6 +2907,21 @@ public final class Invites {
     // the durable store is the thing that just failed.
     private static final List<String> unacknowledged = new ArrayList<String>();
 
+    // Outbox entries with a request already on the wire, keyed by the entry
+    // exactly as the queue holds it.
+    //
+    // Entries leave the queue only when their OWN response acknowledges them,
+    // which is right -- the metadata cannot be reconstructed from a click --
+    // but it means an entry stays drainable while its request is outstanding.
+    // create() calls flush() unconditionally, so minting invites in a burst
+    // reposted the whole queue each time: N invites produced N(N+1)/2
+    // requests, and the 512-entry cap puts that over 131,000. Each invite
+    // needs exactly one.
+    //
+    // Not persisted: a process that dies with requests outstanding should
+    // retry them, and an empty set on the next launch is what makes it.
+    private static final List<String> inFlight = new ArrayList<String>();
+
     /// Records that a queued registration was evicted to keep the outbox
     /// under its cap.
     ///
@@ -2941,7 +2987,19 @@ public final class Invites {
         return InviteStore.writeOutbox(outbox);
     }
 
+    /// The ordinary drain: entries with a request already on the wire are
+    /// skipped.
     private static void drainOutbox() {
+        drainOutbox(true);
+    }
+
+    /// - `skipInFlight`: false for an explicit [#flush], which is the
+    ///   documented "I have just regained connectivity" call and must resend
+    ///   an entry whose request went out over a dead network and will never
+    ///   answer. true everywhere else, including the flush create() issues
+    ///   itself -- that one is what turned a burst of N invites into N(N+1)/2
+    ///   requests, and no invite in a burst needs its predecessors resent.
+    private static void drainOutbox(boolean skipInFlight) {
         if (!allowed()) {
             return;
         }
@@ -2968,6 +3026,13 @@ public final class Invites {
         // Re-posting an entry that did land is harmless: the server keys on
         // the code and treats a repeat from the same inviter as idempotent.
         for (String json : outbox) {
+            if (skipInFlight && inFlight.contains(json)) {
+                // Already on the wire. Its response will remove it or leave it
+                // for the next drain; sending it again buys nothing and is how
+                // one burst of invites became thousands of requests.
+                continue;
+            }
+            inFlight.add(json);
             // The body is rewritten, the KEY is not. The outbox still holds the
             // original string, and that is what has to be removed when the
             // server accepts it.
