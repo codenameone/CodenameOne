@@ -1108,14 +1108,16 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// inside one is not enough: updateUIIDs() returns without renaming anything
     /// when ComponentGroupBool is off and the group is not forced -- the default,
     /// and what Android Material ships -- and in that case the live UIID is still
-    /// ours to restore. The group records what it replaced, so the presence of
-    /// that record is what says it took ownership.
+    /// ours to restore. The group is asked directly rather than inferred from the
+    /// UIID it saved, because restoreUIID leaves that saved value in place when
+    /// grouping is switched off, so it outlives the ownership it recorded.
     ///
     /// #### Returns
     ///
     /// true if a group renamed this control
     private boolean groupOwnsUIID() {
-        return getParent() instanceof ComponentGroup && getClientProperty("$origUIID") != null;
+        Container parent = getParent();
+        return parent instanceof ComponentGroup && ((ComponentGroup) parent).isGroupingActive();
     }
 
     /// Whether the given saved UIID is one setToggle is allowed to convert. An

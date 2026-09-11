@@ -193,6 +193,33 @@ class RadioButtonTest extends UITestBase {
     }
 
     @Test
+    void testRestoreWorksAfterGroupingIsSwitchedOff() {
+        // refreshTheme with grouping off calls restoreUIID, which puts the live
+        // UIID back but leaves $origUIID set. Reading that marker as ownership
+        // therefore kept reporting "the group has it" long after the group had
+        // given it back, and the restore was skipped.
+        ComponentGroup group = new ComponentGroup();
+        group.setForceGroup(true);
+        group.setHorizontal(true);
+        RadioButton radio = new RadioButton("Choice");
+        RadioButton other = new RadioButton("Other");
+        radio.setToggle(true);
+        other.setToggle(true);
+        group.addComponent(radio);
+        group.addComponent(other);
+        assertEquals("ToggleButtonFirst", radio.getUIID());
+
+        group.setForceGroup(false);
+        group.refreshTheme(false);
+        assertEquals("ToggleButton", radio.getUIID(), "the group gives the UIID back");
+
+        radio.setToggle(false);
+
+        assertEquals("RadioButton", radio.getUIID(),
+                "with the group no longer grouping, the UIID is the control's to restore");
+    }
+
+    @Test
     void testCreateToggleAddsToGroupAndSetsToggleUiid() {
         ButtonGroup group = new ButtonGroup();
         RadioButton radio = RadioButton.createToggle("Choice", group);
