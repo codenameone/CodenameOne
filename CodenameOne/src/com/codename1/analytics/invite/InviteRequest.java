@@ -58,6 +58,18 @@ public final class InviteRequest {
     /// The longest accepted [Builder#campaign] or [Builder#channel].
     public static final int MAX_TOKEN_LENGTH = 64;
 
+    /// The longest accepted preview image address.
+    public static final int MAX_IMAGE_URL_LENGTH = 512;
+
+    /// The longest accepted custom parameter name.
+    public static final int MAX_PARAM_KEY_LENGTH = 64;
+
+    /// The longest accepted custom parameter value.
+    public static final int MAX_PARAM_VALUE_LENGTH = 256;
+
+    /// The most custom parameters an invite may carry.
+    public static final int MAX_PARAMETERS = 16;
+
     private final String campaign;
     private final String channel;
     private final String payload;
@@ -285,6 +297,29 @@ public final class InviteRequest {
             checkLength("payload", payload, MAX_PAYLOAD_LENGTH);
             checkLength("title", title, MAX_TITLE_LENGTH);
             checkLength("description", description, MAX_DESCRIPTION_LENGTH);
+            // Bounded HERE, with everything else, because these two were the
+            // way past every other bound.
+            //
+            // The request is serialized into the registration json and that
+            // json is persisted in the outbox, before anything has been sent
+            // and before any server has seen it. The outbox caps its ENTRY
+            // COUNT, which bounds nothing if one entry can be any size: an
+            // unbounded image address, or a parameter map an application
+            // filled in a loop, is written straight to storage. Refusing is
+            // the same answer the payload, title and description already give,
+            // and it arrives at the call that built the request rather than as
+            // a storage failure days later.
+            checkLength("imageUrl", imageUrl, MAX_IMAGE_URL_LENGTH);
+            if (parameters.size() > MAX_PARAMETERS) {
+                throw new IllegalArgumentException(
+                        "an invite carries at most " + MAX_PARAMETERS + " parameters");
+            }
+            for (java.util.Iterator<java.util.Map.Entry<String, String>> it =
+                    parameters.entrySet().iterator(); it.hasNext();) {
+                java.util.Map.Entry<String, String> e = it.next();
+                checkLength("parameter name", e.getKey(), MAX_PARAM_KEY_LENGTH);
+                checkLength("parameter " + e.getKey(), e.getValue(), MAX_PARAM_VALUE_LENGTH);
+            }
             return new InviteRequest(this);
         }
 

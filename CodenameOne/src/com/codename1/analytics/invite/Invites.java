@@ -896,12 +896,63 @@ public final class Invites {
     /// the Codename One cloud, honouring the `cloudServerURL` display
     /// property.
     ///
+    /// **Set the `invite.domain` build hint to the same host.** This changes
+    /// where links are MINTED and nothing else. The Android intent filter and
+    /// the iOS associated-domain entitlement are written at BUILD time from
+    /// that hint, so a host set only here is a host the installed app does not
+    /// claim: every invite link opens the browser instead of the app, and
+    /// neither the OS nor the framework reports anything. A mismatch is logged
+    /// once, because it cannot be refused -- pointing at a staging service and
+    /// accepting the browser is a legitimate thing to do.
+    ///
     /// #### Parameters
     ///
     /// - `url`: the base address, with no trailing path
     public static void setLinkBase(String url) {
         linkBase = url;
+        warnIfNotTheRegisteredHost(url);
     }
+
+    /// Says so when links will be minted for a host the build did not register.
+    ///
+    /// The builders stamp the host they registered into the app, which is what
+    /// `getLinkBase()` prefers, so the two can simply be compared. Reported
+    /// rather than refused, and reported once: an application that sets this
+    /// on every start should not fill the log.
+    private static void warnIfNotTheRegisteredHost(String url) {
+        if (url == null || url.length() == 0 || linkBaseWarned) {
+            return;
+        }
+        Display d = Display.getInstance();
+        String registered = d == null ? null : d.getProperty(PROPERTY_DOMAIN, null);
+        if (registered == null || registered.length() == 0) {
+            // Nothing was registered, so there is nothing to disagree with --
+            // the default host is in the filter and the entitlement.
+            registered = DEFAULT_BASE_URL;
+        }
+        // hostOf() wants a scheme and the registered value may be a bare
+        // host, which is exactly what getLinkBase() compensates for when it
+        // reads the same property.
+        String a = hostOf(withScheme(url));
+        String b = hostOf(withScheme(registered));
+        if (a == null || b == null || a.equalsIgnoreCase(b)) {
+            return;
+        }
+        linkBaseWarned = true;
+        Log.p("Invites.setLinkBase(" + a + ") does not match the host this build "
+                + "registered (" + b + "). Links will be minted for " + a + ", but the "
+                + "Android intent filter and the iOS associated domains name " + b + ", so "
+                + "an installed app will NOT open its own invite links. Set the "
+                + "invite.domain build hint to " + a + " as well.");
+    }
+
+    /// A bare host is what the build hint usually carries; hostOf() needs a
+    /// scheme to find one.
+    private static String withScheme(String url) {
+        return url == null || url.indexOf("://") >= 0 ? url : "https://" + url;
+    }
+
+    private static boolean linkBaseWarned;
 
     /// The link service base address in use.
     ///

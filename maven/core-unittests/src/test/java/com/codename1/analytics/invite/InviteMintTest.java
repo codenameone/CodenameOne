@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InviteMintTest extends UITestBase {
@@ -257,5 +258,58 @@ class InviteMintTest extends UITestBase {
                         + "minter from anyone who was sent the link");
         assertFalse(invite.getUrl().contains("AQIDBAUGBwgJCgsMDQ4PEA"),
                 "the url carries a proof");
+    }
+
+    @FormTest
+    void anInviteCannotCarryUnboundedFieldsIntoTheOutbox() {
+        // The registration json is persisted in the outbox BEFORE anything is
+        // sent and before any server sees it. The outbox caps its entry COUNT,
+        // which bounds nothing if one entry can be any size -- so an
+        // unbounded image address, or a parameter map built in a loop, went
+        // straight to storage. Payload, title and description were already
+        // refused at build(); these two were the way past all of them.
+        StringBuilder huge = new StringBuilder("https://example.com/");
+        for (int i = 0; i < InviteRequest.MAX_IMAGE_URL_LENGTH; i++) {
+            huge.append('x');
+        }
+        try {
+            InviteRequest.create().imageUrl(huge.toString()).build();
+            fail("an image address longer than the limit was accepted and would be "
+                    + "written to storage");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("imageUrl"), expected.getMessage());
+        }
+
+        InviteRequest.Builder many = InviteRequest.create();
+        for (int i = 0; i <= InviteRequest.MAX_PARAMETERS; i++) {
+            many.param("k" + i, "v");
+        }
+        try {
+            many.build();
+            fail("an unbounded parameter map was accepted");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("parameters"), expected.getMessage());
+        }
+
+        StringBuilder bigValue = new StringBuilder();
+        for (int i = 0; i <= InviteRequest.MAX_PARAM_VALUE_LENGTH; i++) {
+            bigValue.append('y');
+        }
+        try {
+            InviteRequest.create().param("note", bigValue.toString()).build();
+            fail("an unbounded parameter value was accepted");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("note"), expected.getMessage());
+        }
+    }
+
+    @FormTest
+    void anInviteWithinTheLimitsIsStillAccepted() {
+        // The bound must not refuse the ordinary case it exists to cap.
+        InviteRequest r = InviteRequest.create()
+                .imageUrl("https://example.com/preview.png")
+                .param("tier", "gold")
+                .build();
+        assertNotNull(r, "an ordinary invite was refused by the new bounds");
     }
 }
