@@ -228,7 +228,7 @@ When attribution resolves it's also written as persistent analytics dimensions (
 | An iOS App Clip received the invite link and handed the code to the app the person then installed. Exact. This is the iOS path.
 |===
 
-Every match type is exact. The App Store carries no referrer parameter of its own, so on iOS the code travels a different road than it does on Android: tapping an invite link offers an App Clip, the clip is launched by the link itself and so receives the code exactly, and it leaves that code where the full app can read it after installation. Nothing is matched, estimated or guessed, and a referral bounty can be paid on any of these.
+Every match type is exact. The App Store carries no referrer parameter of its own, so on iOS the code travels a different road than it does on Android: tapping the invite link offers an App Clip, the clip is launched by the link itself and so receives the code exactly, and it leaves that code where the full app can read it after installation. Nothing is matched, estimated or guessed, and a referral bounty can be paid on any of these.
 
 `Invites.setAttributionWindow(0)` stops a deferred lookup being started at all -- neither the Play install referrer nor the App Clip handoff is read. An exact code the device is already holding, one that arrived on a link, is still claimed: there is nothing to defer about it.
 
@@ -243,6 +243,17 @@ Nothing at all is collected about someone who only taps a link. An earlier desig
 ==== What the build does for you
 
 Referencing this package makes the build wire the platform side: an `autoVerify` App Links intent filter on Android, an associated domain on iOS, and the Play Install Referrer dependency. An app that only reports analytics gets none of it.
+
+On iOS it also generates the App Clip, because there is no attribution without one. The clip is a separate binary embedded in your app: a few hundred lines of UIKit that show your app's name, offer to install it, and record the invite code the link handed them. It is not a Codename One application and does not run your code. You do not write it, open it or maintain it.
+
+Three things the generated clip needs from you, and each fails in its own way:
+
+* The App Store identifier of your app, in `ios.invite.appStoreId`. Without it the clip still records the code, it simply shows no install sheet -- which is the right behaviour before your first release, when the app does not exist in the store yet.
+* An App Group registered on your developer account. The build derives one from your package name and adds it to `ios.app_groups`; override it with `ios.invite.appGroup` if you already have one. A group that is not registered signs cleanly and the clip and the app can then never reach each other, which is the failure with no symptom.
+* An App Clip enabled on your App ID, alongside Associated Domains.
+* An Advanced App Clip Experience registered in App Store Connect for your invite link prefix. Codename One authorises your clip for the domain; what maps a particular link to a particular clip is that experience, and until it exists tapping an invite link shows no clip card at all. The console shows the prefix to register once invites are switched on.
+
+Set `ios.invite.appClip` to `false` only if you ship an App Clip of your own. The app then reports every install as organic unless your clip writes the handoff itself.
 
 WARNING: On Android, App Links verification checks the certificate the installed APK is signed with. Under Play App Signing that's Google's key, not your upload key, so add the app-signing SHA-256 from the Play Console to `android.invite.signingFingerprint`. Without it verification fails on every Play install, the link opens the browser instead of your app, and nothing reports an error.
 

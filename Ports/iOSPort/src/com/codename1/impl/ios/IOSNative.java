@@ -2539,4 +2539,24 @@ public final class IOSNative {
 
     /** Stops advertising and browsing and drops every session. */
     native void nearbyStopAllTransport();
+
+    /**
+     * Whether the app group holding the App Clip invite handoff can be opened
+     * at all. False when the application carries no such entitlement, which is
+     * every build that generated no clip.
+     *
+     * @param appGroup the group identifier
+     * @return true when the shared container is reachable
+     */
+    native boolean isAppClipHandoffSupported(String appGroup);
+
+    /**
+     * Reads the invite handoff an App Clip left behind and clears it in the
+     * same step, so two launches cannot claim one code.
+     *
+     * @param appGroup the group identifier
+     * @return "code\nclickedSeconds", or null when no clip ran
+     */
+    native String consumeAppClipInviteHandoff(String appGroup);
+
 }

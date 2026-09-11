@@ -221,6 +221,84 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
+    void asurvivingCodeIsNotClaimedUnderTheNewIdentity() {
+        // The retry gate lived only in drainOutbox(), and the lookup path had
+        // none. A PENDING record that outlived its erasure still carried the
+        // code a direct link left on the device, and the next checkForInvite()
+        // reloaded it and claimed it under the NEW client id -- which is the
+        // transmission the erasure existed to prevent, made by the erasure's
+        // own aftermath.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleUrl("https://cloud.codenameone.com/i/ABC123");
+        implementation.clearQueuedRequests();
+
+        InviteStore.failNextDeleteForTest(InviteStore.PENDING);
+        assertFalse(Invites.eraseInternal(), "the fixture's erasure did not fail");
+        // The record really did survive, or this test proves nothing about the
+        // gate: a deleted record cannot be claimed either way.
+        assertFalse(InviteStore.read(InviteStore.PENDING) == null
+                        || InviteStore.read(InviteStore.PENDING).isEmpty(),
+                "the fixture did not leave a surviving record to claim");
+
+        // Storage is still refusing, so the retry inside the gate fails too and
+        // nothing may proceed.
+        InviteStore.failNextDeleteForTest(InviteStore.PENDING);
+        Invites.checkForInvite();
+
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "a code that survived an erasure was claimed under the new identity");
+    }
+
+    @FormTest
+    void afreshInviteIsNotAppendedToAQueueTheErasureWillDelete() {
+        // create() appended to whatever outbox was on the disk. An outbox that
+        // survived an erasure is deleted WHOLE by the retry inside the next
+        // drain -- which create() itself triggers through flush() -- so the
+        // invite just minted went with it. Having reported success, nothing
+        // held its code, and isRegistered() answered true about a registration
+        // the server was guaranteed never to have seen.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.create(InviteRequest.create().campaign("old").build());
+        assertFalse(InviteStore.readOutbox().isEmpty(), "the fixture queued nothing");
+
+        InviteStore.failNextDeleteForTest(InviteStore.OUTBOX);
+        assertFalse(Invites.eraseInternal(), "the fixture's erasure did not fail");
+
+        // Storage recovers, which is the case the finding is about: the retry
+        // inside create() now succeeds, so the stale queue goes and the new
+        // invite is appended to a clean one rather than to a doomed one.
+        Invite fresh = Invites.create(InviteRequest.create().campaign("new").build());
+        Invites.flush();
+
+        assertFalse(Invites.isRegistered(fresh),
+                "an invite that was never acknowledged reported itself registered");
+    }
+
+    @FormTest
+    void emptyingTheQueueIsVerifiedLikeEveryOtherDelete() {
+        // The last acknowledged registration empties the outbox, and that path
+        // called deleteStorageFile() and returned success without looking.
+        // On a port where the delete silently fails the entry stays durable,
+        // so every later flush resends an already acknowledged registration
+        // while isRegistered() goes on answering false about it.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.create(InviteRequest.create().campaign("launch").build());
+        assertFalse(InviteStore.readOutbox().isEmpty(), "the fixture queued nothing");
+
+        InviteStore.failNextDeleteForTest(InviteStore.OUTBOX);
+        assertFalse(InviteStore.writeOutbox(new java.util.ArrayList<String>()),
+                "emptying the queue reported success without verifying the delete");
+
+        // And the ordinary case still empties it and says so.
+        assertTrue(InviteStore.writeOutbox(new java.util.ArrayList<String>()),
+                "emptying the queue failed when the store was willing");
+        assertTrue(InviteStore.readOutbox().isEmpty(), "the queue survived");
+    }
+
+    @FormTest
     void registeringTheProviderIsNotMistakenForAnErasure() {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);

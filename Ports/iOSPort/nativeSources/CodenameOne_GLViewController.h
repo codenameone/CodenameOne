@@ -290,6 +290,12 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // entitlement.
 //#define CN1_INCLUDE_APPLESIGNIN
 
+// CN1_INCLUDE_INVITE_APPCLIP gates the App Clip invite handoff reader in
+// CN1InviteAppClip.m. IPhoneBuilder uncomments this only when it generated
+// an App Clip target, which is the only thing that ever writes the shared
+// app group container the reader consumes.
+//#define CN1_INCLUDE_INVITE_APPCLIP
+
 // CN1_INCLUDE_WEBAUTHN gates the com.codename1.io.webauthn native bridge
 // (ASAuthorizationPlatformPublicKeyCredentialProvider code in CN1WebAuthn.m,
 // iOS 16+). IPhoneBuilder uncomments this only when the scanner saw

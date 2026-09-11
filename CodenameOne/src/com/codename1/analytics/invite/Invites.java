@@ -586,6 +586,14 @@ public final class Invites {
             return false;
         }
         ensureProvider();
+        // A tapped link is a fresh answer and would ordinarily reopen
+        // attribution, but not while an erasure is still owed: claiming writes
+        // a record the failing store cannot erase either, and the claim itself
+        // carries the surviving old state. The retry usually succeeds, because
+        // what stopped it was transient.
+        if (!settleErasure()) {
+            return false;
+        }
         // The same guard beginDeferred() has. checkForInvite() treats a
         // consumed URL as handled and skips beginDeferred entirely, so without
         // this a refused user who opened an invite link still had a profile
@@ -1125,6 +1133,32 @@ public final class Invites {
         stateLoaded = true;
         erasurePending = false;
         return true;
+    }
+
+    /// Retries an erasure that could not finish, and says whether anything
+    /// else may proceed.
+    ///
+    /// `eraseInternal()` sets `erasurePending` when a delete or the tombstone
+    /// write failed, and what survives on the disk is exactly what the erasure
+    /// was asked to remove: a code, which names an inviter, and a queued
+    /// registration carrying the OLD client id.
+    ///
+    /// This gate lived only in `drainOutbox()`, which left two ways past it.
+    /// A lookup read the surviving code and claimed it under the NEW identity,
+    /// which is the transmission the erasure existed to prevent. And `create()`
+    /// appended to the surviving queue, after which the retry inside the very
+    /// next drain deleted the whole queue -- the freshly minted invite with
+    /// it, reported as enqueued and therefore not held in `unacknowledged`.
+    ///
+    /// A retry that fails again means storage is unusable, and the honest
+    /// answer there is to do nothing rather than write more records that
+    /// cannot be erased either.
+    ///
+    /// #### Returns
+    ///
+    /// true when no erasure is outstanding
+    private static boolean settleErasure() {
+        return !erasurePending || eraseInternal();
     }
 
     // Package private: called from the provider when consent changes.
@@ -1695,6 +1729,13 @@ public final class Invites {
 
     private static void beginDeferred() {
         if (deferredStarted) {
+            return;
+        }
+        // Before anything is read off the disk. A failed erasure leaves the
+        // PENDING record there with the code it carried, and the lookup below
+        // would reload that code and claim it under the new client id -- the
+        // one thing the erasure was asked to make impossible.
+        if (!settleErasure()) {
             return;
         }
         int s = getState();
@@ -2699,6 +2740,23 @@ public final class Invites {
             body.put("parameters", new LinkedHashMap<String, String>(request.getParameters()));
         }
         pendingRegistration = JSONParser.mapToJson(body);
+        // Settled before the queue is touched, and reported as a failed
+        // enqueue when it cannot be.
+        //
+        // An outbox that survived an erasure is deleted WHOLE by the retry
+        // inside the next drain -- which create() itself triggers through
+        // flush() -- so an entry appended to it goes with it. It had reported
+        // success, so nothing held its code in `unacknowledged` and
+        // isRegistered() answered true about a registration the server was
+        // guaranteed never to have seen; its campaign, channel and preview
+        // were gone for good.
+        //
+        // The caller's existing failure path is the right answer here: it
+        // sends this one registration now if consent permits, and otherwise
+        // remembers the code as unacknowledged. Neither touches the queue.
+        if (!settleErasure()) {
+            return false;
+        }
         List<String> outbox = InviteStore.readOutbox();
         outbox.add(pendingRegistration);
         return InviteStore.writeOutbox(outbox);
@@ -2708,15 +2766,13 @@ public final class Invites {
         if (!allowed()) {
             return;
         }
-        if (erasurePending) {
-            // An erasure could not delete the queue, and these entries carry
-            // the OLD client id along with the campaign, payload and preview.
-            // Sending them once storage recovers is exactly the transmission
-            // the erasure was asked to prevent, so the erasure is retried and
-            // nothing is drained until it succeeds.
-            if (!eraseInternal()) {
-                return;
-            }
+        // An erasure could not delete the queue, and these entries carry the
+        // OLD client id along with the campaign, payload and preview. Sending
+        // them once storage recovers is exactly the transmission the erasure
+        // was asked to prevent, so the erasure is retried and nothing is
+        // drained until it succeeds.
+        if (!settleErasure()) {
+            return;
         }
         List<String> outbox = InviteStore.readOutbox();
         if (outbox.isEmpty()) {

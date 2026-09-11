@@ -155,6 +155,23 @@ final class InviteStore {
     ///
     /// true when nothing readable is left
     static boolean delete(String record) {
+        return deleteVerified(record, new LinkedHashMap<String, String>());
+    }
+
+    /// The delete above, with the shape of the empty replacement left to the
+    /// caller.
+    ///
+    /// Shared with the outbox, which is a `List` and not a `Map`. Writing the
+    /// wrong one would not be caught by anything -- `readOutbox()` answers an
+    /// empty queue either way -- but it is what the next writer appends to.
+    ///
+    /// - `record`: the record name
+    /// - `empty`: what to leave behind when the delete cannot happen
+    ///
+    /// #### Returns
+    ///
+    /// true when nothing readable is left
+    private static boolean deleteVerified(String record, Object empty) {
         if (record != null && record.equals(failNextDeleteNamed)) {
             failNextDeleteNamed = null;
             return false;
@@ -171,11 +188,19 @@ final class InviteStore {
             if (!s.exists(record)) {
                 return true;
             }
-            if (!s.writeObject(record, new LinkedHashMap<String, String>())) {
+            if (!s.writeObject(record, empty)) {
                 return false;
             }
-            Map<String, String> left = read(record);
-            return left == null || left.isEmpty();
+            Object left = s.readObject(record);
+            if (left instanceof Map) {
+                return ((Map) left).isEmpty();
+            }
+            if (left instanceof List) {
+                return ((List) left).isEmpty();
+            }
+            // Neither shape came back, so nothing readable is left -- which is
+            // the question, and is why this is not an error.
+            return true;
         } catch (Throwable t) {
             Log.e(t);
             return false;
@@ -252,10 +277,15 @@ final class InviteStore {
                 return false;
             }
             if (copy.isEmpty()) {
-                if (s.exists(OUTBOX)) {
-                    s.deleteStorageFile(OUTBOX);
-                }
-                return true;
+                // Verified, exactly as delete() is, and for the same reason:
+                // deleteStorageFile() reports nothing useful on either port
+                // that matters, so a failed delete looked identical to a
+                // successful one. This is the path that empties the queue when
+                // the LAST registration is acknowledged, and reporting success
+                // over a surviving file meant every later flush resent an
+                // acknowledged registration while isRegistered() went on
+                // answering false about it.
+                return deleteVerified(OUTBOX, new ArrayList<String>());
             }
             return s.writeObject(OUTBOX, copy);
         } catch (Throwable t) {

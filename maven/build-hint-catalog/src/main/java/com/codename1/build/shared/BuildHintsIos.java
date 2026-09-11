@@ -221,6 +221,39 @@ final class BuildHintsIos {
                         + "Associated Domains capability either way, or invite links open Safari "
                         + "instead of the app with no error reported."));
 
+        h.add(new Hint("ios.invite.appClip")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("ios")
+                .doc("Whether the build generates and embeds the App Clip that makes invite "
+                        + "attribution exact on iOS. The App Store carries no referrer of its "
+                        + "own, so without the clip an iOS install cannot be attributed at all. "
+                        + "Set it to `false` only if you ship an App Clip of your own; the build "
+                        + "then writes no clip, and the app reports every install as organic "
+                        + "unless your clip writes the handoff itself. Ignored when "
+                        + "`ios.invite.universalLinks` is `false`, because iOS can only offer a "
+                        + "clip for a link the app has an associated domain for."));
+
+        h.add(new Hint("ios.invite.appGroup")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("The app group the invite App Clip hands the invite code to the installed "
+                        + "app through. Defaults to `group.<package name>.cn1invite`, and is "
+                        + "added to `ios.app_groups` automatically. It must start with `group.` "
+                        + "and must be registered on your developer account, or the clip and the "
+                        + "app both sign and neither can read what the other wrote."));
+
+        h.add(new Hint("ios.invite.appStoreId")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("The numeric App Store identifier of this app, which the invite App Clip "
+                        + "uses to offer the full app through `SKOverlay`. Leave it unset before "
+                        + "your first release: the clip still records the invite code, it simply "
+                        + "shows no install sheet until the app exists in the store."));
+
         h.add(new Hint("ios.associatedDomains")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
