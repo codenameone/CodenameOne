@@ -128,22 +128,25 @@ class AnalyticsFacadeTest extends UITestBase {
     }
 
     @FormTest
-    void anUnstampedFileIsNotTrustedWithFrameworkDimensions() {
-        // The case a read-back check cannot reach and the stamp only covers if
-        // it is treated strictly: a file whose stamp was never written --
-        // because it predates the stamp, or because the same storage failure
-        // that broke the erasure also stopped the stamp landing. Treating an
-        // absent stamp as current is exactly the state being defended against.
+    void anUnstampedFileIsAdoptedRatherThanDropped() {
+        // A file written before the stamp existed, which is what every app
+        // upgrading from an earlier release has. This was briefly treated as
+        // foreign -- absent provenance resolving to "drop it" -- and that read
+        // deleted live data: the framework cannot have written a reserved
+        // dimension into an unstamped file (persistDimensions() stamps in the
+        // same call, into the same preferences record), and before this
+        // feature setDimension() accepted every key and reserved no prefix. So
+        // a `cn1_` key here is the APPLICATION's, and dropping it silently
+        // destroys segmentation for an app that never asked for an erasure.
         Analytics.clearProviders();
         Analytics.clearDimensions();
         Analytics.simulateSurvivingDimensionsForTest(
                 "cn1_campaign\tspring\nplan\tpro", null);
 
         Map<String, String> loaded = Analytics.getDimensions();
-        assertNull(loaded.get("cn1_campaign"),
-                "an unstamped referral was trusted and reloaded");
-        assertEquals("pro", loaded.get("plan"),
-                "the application's own dimension was destroyed with it");
+        assertEquals("spring", loaded.get("cn1_campaign"),
+                "an upgrading app lost a dimension it set under the old contract");
+        assertEquals("pro", loaded.get("plan"));
     }
 
     @FormTest

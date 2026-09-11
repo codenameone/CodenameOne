@@ -1613,8 +1613,32 @@ public final class Invites {
         if (getAttribution() == null) {
             return false;
         }
-        InviteStore.delete(InviteStore.PENDING);
-        forgetPendingFallback();
+        // The removal is VERIFIED, for the same reason the resolved path
+        // verifies it. Ignoring the result here left the replacement's PENDING
+        // record on the disk while memory moved on to RESOLVED, and
+        // loadState() prefers a surviving pending record over the durable
+        // attribution -- so the next launch resubmitted a claim that had
+        // already ended definitively, every launch, for ever, with the public
+        // state reading pending the whole time.
+        //
+        // Overwritten with the terminal state when the store will not remove
+        // it: that says what the deletion would have said, in a record the
+        // store has just proved it will not delete, and it carries no code and
+        // no inviter. If that write fails too the held copy is kept and
+        // retried, rather than being discarded onto a disk that still says
+        // PENDING.
+        if (!InviteStore.delete(InviteStore.PENDING)) {
+            Map<String, String> settled = new LinkedHashMap<String, String>();
+            settled.put("state", String.valueOf(STATE_RESOLVED));
+            if (writePending(settled)) {
+                forgetPendingFallback();
+            } else {
+                Log.p("invite: an abandoned replacement could not be cleared or marked "
+                        + "settled; the correction is held and retried", Log.WARNING);
+            }
+        } else {
+            forgetPendingFallback();
+        }
         state = STATE_RESOLVED;
         stateLoaded = true;
         deferredStarted = false;
@@ -2005,7 +2029,7 @@ public final class Invites {
             requestReferrer(source);
             return;
         }
-        requestAppClipHandoff(pending);
+        requestAppClipHandoff();
     }
 
     private static boolean safeSupported(InstallReferrerSource source) {
@@ -2161,7 +2185,7 @@ public final class Invites {
         if (pending == null) {
             return;
         }
-        requestAppClipHandoff(pending);
+        requestAppClipHandoff();
     }
 
     private static void onEdt(Runnable r) {
@@ -2192,8 +2216,10 @@ public final class Invites {
     /// fingerprint now, and the code this reads is one the person produced
     /// themselves by tapping an invite.
     ///
-    /// - `pending`: the pending record, for the attempt budget
-    private static void requestAppClipHandoff(final Map<String, String> pending) {
+    /// Takes no pending record: the callback is asynchronous, and a record
+    /// captured before the call can be stale by the time the answer lands, so
+    /// it reads `pendingRecord()` at that point instead.
+    private static void requestAppClipHandoff() {
         final AppClipHandoffSource source = appClipSource;
         if (source == null || !source.isSupported()) {
             // No clip on this platform or this build, which is the ordinary
@@ -2633,12 +2659,10 @@ public final class Invites {
                     // still with the durable attribution sitting beside it. The
                     // replacement attempt is dropped and the install goes back
                     // to what it was.
-                    InviteStore.delete(InviteStore.PENDING);
-                    forgetPendingFallback();
-                    state = STATE_RESOLVED;
-                    stateLoaded = true;
-                    deferredStarted = false;
-                    lookupIssuedAt = 0;
+                    // Through abandonReplacement() rather than open-coded: this
+                    // was a second copy of it, and when the deletion there grew
+                    // a verification this copy silently kept the old behaviour.
+                    abandonReplacement();
                     return;
                 }
                 // Terminal, and it has to be durable. Deleting the record is

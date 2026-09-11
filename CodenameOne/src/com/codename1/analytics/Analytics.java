@@ -371,6 +371,12 @@ public final class Analytics {
     /// with every first-party batch. Passing a null value removes the key.
     /// Null or empty keys are ignored.
     ///
+    /// The `cn1_` prefix is RESERVED for dimensions the framework writes on
+    /// your behalf, and those are cleared by [#resetClientId] because they
+    /// identify the user across installs. A key of your own under that prefix
+    /// is accepted -- it always was -- but it will be erased along with them,
+    /// so pick another one.
+    ///
     /// #### Parameters
     ///
     /// - `key`: the dimension key
@@ -595,24 +601,34 @@ public final class Analytics {
         // to their new client id, one launch later and with nothing in memory
         // left to notice.
         //
-        // An ABSENT stamp counts as foreign, not as current. That is the
-        // difference between a mechanism that works and one that works only
-        // when the write it depends on succeeded: on a device whose file
-        // predates the stamp -- or where the storage failure that broke the
-        // erasure also stopped the stamp being written -- there is nothing to
-        // compare, and treating that as current is exactly the case being
-        // defended against. Unknown provenance for a dimension the FRAMEWORK
-        // owns resolves to dropping it.
+        // An ABSENT stamp is ADOPTED, not treated as foreign, and the reason
+        // is specific enough to be worth writing down -- the strict reading
+        // was tried first and destroyed live data.
         //
-        // The cost of being wrong that way is one re-resolution: a reserved
-        // dimension dropped here is rewritten by the next attribution. The
-        // cost of being wrong the other way is an erased identity coming back.
+        // Dropping a reserved dimension is only ever right when the FRAMEWORK
+        // wrote it, and the framework cannot have written one into an
+        // unstamped file. Every write of this record goes through
+        // persistDimensions(), which stamps in the same call, and Preferences
+        // keeps both keys in one record, so a file written by a version that
+        // owns reserved dimensions always carries a stamp. An absent one means
+        // the file predates the feature -- and back then `setDimension`
+        // accepted every key, documented no reserved prefix, and never wrote a
+        // `cn1_` dimension itself. So anything with that prefix in an
+        // unstamped file is the APPLICATION's, and dropping it silently
+        // deletes analytics segmentation from an app that did nothing wrong
+        // and never asked for an erasure.
+        //
+        // The erasure case the stamp defends against still works, because it
+        // cannot produce this state: the identity reset happens on a version
+        // that stamps, so the surviving file carries the PREVIOUS id and
+        // compares unequal below.
         //
         // clientId() rather than the field, because loading can happen before
         // the id has been materialised and a null would make every file look
-        // current. It does not read dimensions, so there is no recursion.
+        // foreign. It does not read dimensions, so there is no recursion.
         String owner = Preferences.get(PREF_DIMENSIONS_OWNER, null);
-        boolean foreign = !clientId().equals(owner);
+        boolean unstamped = owner == null;
+        boolean foreign = !unstamped && !clientId().equals(owner);
         String[] rows = split(stored, '\n');
         for (String row : rows) {
             if (row.length() == 0) {
@@ -641,10 +657,11 @@ public final class Analytics {
             }
             DIMENSIONS.put(key, value);
         }
-        if (foreign) {
-            // Rewritten under the current identity so the drop happens once.
-            // If this write fails too the next launch simply repeats it, which
-            // is the correct outcome either way.
+        if (foreign || unstamped) {
+            // Rewritten under the current identity so the drop -- or, for an
+            // unstamped file, the one-time adoption -- happens once. If this
+            // write fails the next launch simply repeats it, which is the
+            // correct outcome either way.
             persistDimensions();
         }
     }
@@ -677,7 +694,11 @@ public final class Analytics {
         // makes a surviving file distinguishable from a current one after a
         // restart, when nothing in memory remembers that an erasure was asked
         // for.
-        Preferences.set(PREF_DIMENSIONS_OWNER, clientId == null ? "" : clientId);
+        // clientId() rather than the field: the field is null until something
+        // materialises the id, and stamping a placeholder would make the file
+        // read as foreign on the next launch and drop the dimensions this call
+        // was in the middle of saving.
+        Preferences.set(PREF_DIMENSIONS_OWNER, clientId());
     }
 
     // Replaces the delimiter characters so the persisted form parses back

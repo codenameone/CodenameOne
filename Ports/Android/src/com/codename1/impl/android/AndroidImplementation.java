@@ -1697,27 +1697,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // rather than whatever the previous intent left cached.
             instance.setAppArg(null);
             clearIntentProperties();
-            // The data is consumed on a COPY, never on the caller's intent.
+            // The intent is stored UNMODIFIED, and the url is marked as delivered by
+            // remembering the intent's identity instead of by erasing its data.
             //
-            // getAppArg() rebuilds the url from the activity's stored intent, and
-            // CodenameOneActivity.onStop() clears the app arg -- so leaving the data
-            // in place meant the next read after a resume rebuilt the same url and
-            // an application that handles AppArg in start() saw the deep link a
-            // second time, opening the same invite twice for one tap.
+            // Two earlier shapes were both wrong. Clearing the data on the intent
+            // passed in broke the ordinary way to extend onNewIntent() --
+            // super.onNewIntent(intent) followed by the subclass reading
+            // intent.getData(), which had just been nulled underneath it. Storing a
+            // data-less COPY fixed that one and broke two more readers: the
+            // documented `android.intent.data` property is published from whatever
+            // the activity has stored, and native integrations read
+            // getActivity().getIntent().getData() after onNewIntent(). Both saw a
+            // warm deep link as no deep link at all while cold links still carried
+            // it -- an asymmetry an application has no way to work around.
             //
-            // Clearing it on the intent passed in was worse. This runs from
-            // CodenameOneActivity.onNewIntent(), and the ordinary way to extend that
-            // is super.onNewIntent(intent) followed by the subclass reading
-            // intent.getData() -- which had just been set to null underneath it, so
-            // custom deep-link routing that worked before lost the url entirely. The
-            // copy is what the activity stores; the object the override holds is
-            // left exactly as the OS handed it over.
-            android.content.Intent consumed = new android.content.Intent(intent);
-            consumed.setData(null);
-            getActivity().setIntent(consumed);
+            // What actually has to be suppressed is narrower than the data: only
+            // getAppArg()'s rebuilding of the url from the stored intent, because
+            // CodenameOneActivity.onStop() clears the app arg and the next read
+            // after a resume would otherwise report the same deep link a second
+            // time and open one tapped invite twice.
+            getActivity().setIntent(intent);
+            markAppArgDelivered(intent);
+            // Published here rather than left to getAppArg(), since the properties
+            // for the previous intent were just cleared and the reader that used to
+            // repopulate them lazily is exactly the one now suppressed.
+            publishIntentProperties(getActivity(), intent);
             Display.getInstance().setProperty("AppArg", data.toString());
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
+        }
+    }
+
+    /// Identity of the intent whose url [#dispatchNewIntentUrl] already delivered as
+    /// the app arg. Weak because it needs to outlive nothing: the activity holds the
+    /// intent, and once it stores a different one this reference is free to go.
+    private static java.lang.ref.WeakReference<Intent> deliveredAppArgIntent;
+
+    private static void markAppArgDelivered(Intent intent) {
+        synchronized (intentPropertyLock) {
+            deliveredAppArgIntent = new java.lang.ref.WeakReference<Intent>(intent);
+        }
+    }
+
+    private static boolean isAppArgDelivered(Intent intent) {
+        synchronized (intentPropertyLock) {
+            return deliveredAppArgIntent != null && deliveredAppArgIntent.get() == intent;
         }
     }
 
@@ -3790,6 +3814,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
             String scheme = intent.getScheme();
+            if (u != null && isAppArgDelivered(intent)) {
+                // dispatchNewIntentUrl() already handed this url over as the app arg
+                // on the warm path. The data stays on the intent for the readers that
+                // want it -- `android.intent.data` above, and native code asking the
+                // activity for its intent -- and only the second delivery is dropped.
+                u = null;
+            }
             if (u == null && intent.getExtras() != null) {
                 if (intent.getExtras().keySet().contains("android.intent.extra.STREAM")) {
                     try {

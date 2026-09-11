@@ -1182,6 +1182,31 @@ class InviteResilienceTest extends UITestBase {
 
     @Test
     @EdtTest
+    void aFailedReplacementWhosePendingRecordSurvivesIsNotAskedAgain() {
+        // The same abandonment, with a store that refuses to delete the record
+        // AND refuses the empty overwrite delete() falls back to. Memory moved
+        // on to RESOLVED and the disk still said PENDING -- which loadState()
+        // prefers under re-attribution -- so a claim that had already ended
+        // definitively was resubmitted on every launch, for ever, with the
+        // public state reading pending throughout.
+        Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST4", "c1", "sms"),
+                Invites.MATCH_DIRECT, false);
+        Invites.setReattribution(true);
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND4");
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+
+        InviteStore.failNextDeleteForTest(InviteStore.PENDING);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_DIRECT, false);
+
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState(),
+                "an abandoned replacement survived on disk and reopened the lookup");
+        assertNotNull(Invites.getAttribution(),
+                "the install lost the attribution it already had");
+    }
+
+    @Test
+    @EdtTest
     void aResumedLookupDoesNotAnnounceItselfToAListenerAlreadyTold() {
         // The refusal was delivered, so the listener has had its one callback
         // for this install. Reopening deleted the marker that recorded that,
