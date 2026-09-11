@@ -122,7 +122,7 @@ The drag-timing correction was checked directly against `AndroidNativeDragAndDro
 - All article-local Markdown links and media paths resolve. Each article has one discussion section; no en/em dashes, placeholder markers, or obsolete story links remain.
 - All seven pages pass Chromium checks at 1440 px and 390 px widths, including 15 rendered Mermaid diagrams and 13 loaded image uses. No document-level horizontal overflow was found. The revised parent title, opening, and hero were visually inspected on desktop and mobile.
 - Seven JPEG headers were generated at 1024×512 and inspected. Two benchmark SVGs and two live documentation screenshots remain in the package.
-- All 26 Java excerpts compile against the local core artifact under Java 8, with imports and enclosing application context supplied where needed. This validates names and signatures, not platform runtime behavior.
+- The 25 remaining Java excerpts were compiled against the local core artifact under Java 8, with imports and enclosing application context supplied where needed. This validates names and signatures, not platform runtime behavior.
 - The unchanged standalone Temperature/doclet example retains the prior verification: real doclet output and search index generated with JDK 26 compiling the doclet with `--release 25`.
 - Whitespace checks pass. No native implementation changed; benchmark and device results remain attributed to the feature PRs. No fresh native benchmark or full Maven suite was needed for this content revision.
 

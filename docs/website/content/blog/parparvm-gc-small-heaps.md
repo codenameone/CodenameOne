@@ -78,23 +78,11 @@ We also added mutator assistance. When an allocating thread reaches the limit on
 
 An old arm64 corruption report had kept us on the serial default. Since then, we have fixed barriers, object validation, and root handling. A dedicated workflow now exercises one and four markers on arm64 and four on x64. Parallel marking and assistance remain on that experimental path as we work through those runs.
 
-## A Java long became a C int
-
-The same investigation found that `1L << n` could become a 32-bit C shift. The shift count was masked for a Java long, but the translator emitted the constant as a bare C integer literal. A long variable worked, which helped the defect survive.
-
-```java
-long first = 1L << 31;  // 2147483648
-long second = 1L << 32; // 4294967296
-long third = 1L << 33;  // 8589934592
-```
-
-The fix casts the left operand appropriately. `LongShift` checks the shift variants against a reference built by repeated doubling. The arithmetic had to be right before its timing meant anything.
-
 ## The image you will need again in a second
 
-Imagine scrolling through a gallery and then back up to the image you just passed. If the cache kept it, the next frame can reuse it. If a memory warning emptied the cache, that same gesture sends the application back through decoding.
+A decoded image costs memory to keep and CPU time to recreate. That makes it a different problem from the short-lived garbage in the allocation loop.
 
-Collecting sooner is only half the job. We also need to keep useful work around without keeping every image forever.
+Imagine scrolling through a gallery and then back up to the image you just passed. If the cache kept it, the next frame can reuse it. If a memory warning emptied the cache, that same gesture sends the application back through decoding.
 
 [PR #5732](https://github.com/codenameone/CodenameOne/pull/5732) gives the collector real weak and soft references, including a policy that favors recently accessed data. The collector can now make that choice instead of treating the entire cache as permanent storage.
 
