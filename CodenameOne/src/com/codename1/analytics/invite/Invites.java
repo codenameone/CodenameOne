@@ -702,6 +702,28 @@ public final class Invites {
     /// the attribution
     public static InviteAttribution getAttribution() {
         ensureProvider();
+        // Gated like every other read of the durable records, and BELT AND
+        // BRACES rather than a leak being closed -- worth saying, because the
+        // obvious reading of this line overstates what it does.
+        //
+        // A review round argued that an erasure whose delete failed leaves the
+        // record on the disk, so this would reload it and conversion() would
+        // emit the erased code under the new client id. Measured rather than
+        // assumed: it does not, today. ensureProvider() above runs
+        // resumeOwedErasure() on every call, and the retry it makes clears the
+        // in-memory copy and marks it loaded before anything here reads the
+        // disk -- so the facade already answers null in that state, with the
+        // record demonstrably still on the disk. That is how the test written
+        // for it passed against the UNFIXED code, which is why there is no
+        // test beside this comment.
+        //
+        // The gate stays because it makes the rule true by construction rather
+        // than by the order two other methods happen to run in: a record whose
+        // deletion is still owed is not readable through this accessor. It
+        // costs one flag test on the uninvited path.
+        if (!settleErasure()) {
+            return null;
+        }
         loadAttribution();
         return resolved;
     }
@@ -1104,6 +1126,27 @@ public final class Invites {
     /// true when nothing readable is left behind
     static boolean resetVerified() {
         lookupEpoch++;
+        // The queue first, because the disk is not the only place a
+        // pre-erasure registration lives. create() hands the json to
+        // NetworkManager and returns; deleting the outbox afterwards does not
+        // touch a request already queued, and the epoch bumped above guards
+        // only attribution RESPONSES -- a registration never reads it. So a
+        // mint from a moment ago went on to transmit the old client id, the
+        // campaign and the payload after the erasure had reported success.
+        //
+        // kill() is enough for the case that matters: NetworkManager skips a
+        // killed request when it reaches the front of the queue, and kills the
+        // connection outright if it is already being sent.
+        while (!outstandingRegistrations.isEmpty()) {
+            InviteConnection req = outstandingRegistrations.elementAt(0);
+            outstandingRegistrations.removeElementAt(0);
+            try {
+                req.kill();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+        inFlight.clear();
         boolean cleared = InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
         // ATTRIBUTION names the inviter, and the OUTBOX is the queued
@@ -2476,6 +2519,9 @@ public final class Invites {
             req.setContentType("application/json");
             req.setRequestBody(json);
             req.setFailSilently(true);
+            if (registration) {
+                outstandingRegistrations.addElement(req);
+            }
             NetworkManager.getInstance().addToQueue(req);
         } catch (Throwable t) {
             Log.e(t);
@@ -2516,6 +2562,14 @@ public final class Invites {
             failed = true;
         }
 
+        // Package private for the same reason isFailed() is: ConnectionRequest
+        // keeps isKilled() protected, so only a subclass can answer it, and
+        // whether an erasure really stopped a queued registration is exactly
+        // the kind of thing that must be asserted rather than assumed.
+        boolean killedForTest() {
+            return isKilled();
+        }
+
         // Package private so a test can drive the outcome this class exists to
         // get right without standing up a server.
         boolean isFailed() {
@@ -2539,8 +2593,11 @@ public final class Invites {
         }
 
         private void releaseInFlight() {
-            if (registration && outboxEntry != null) {
-                inFlight.remove(outboxEntry);
+            if (registration) {
+                outstandingRegistrations.removeElement(this);
+                if (outboxEntry != null) {
+                    inFlight.remove(outboxEntry);
+                }
             }
         }
 
@@ -3148,6 +3205,23 @@ public final class Invites {
     // Not persisted: a process that dies with requests outstanding should
     // retry them, and an empty set on the next launch is what makes it.
     private static final Map<String, Long> inFlight = new LinkedHashMap<String, Long>();
+
+    // Registration requests handed to NetworkManager and not yet answered.
+    //
+    // An erasure has to reach these. reset() deletes the outbox and bumps the
+    // epoch, but a request already queued carries its OWN copy of the json --
+    // the old client id, the campaign, the payload -- and the epoch guards only
+    // attribution responses, which a registration is not. So a queued mint
+    // transmitted a pre-erasure registration after the erasure reported
+    // success, which is precisely the identity the user asked to be rid of.
+    //
+    // A Vector because these are touched from two threads: added on the EDT
+    // when the request is queued, removed from the network thread when it
+    // fails. That is the same boundary the map above already straddles, and it
+    // is a real one -- not the single-threaded EDT the rest of this class runs
+    // on.
+    private static final java.util.Vector<InviteConnection> outstandingRegistrations =
+            new java.util.Vector<InviteConnection>();
 
     /// How long an entry stays skippable after its request goes out.
     ///

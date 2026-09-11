@@ -149,6 +149,41 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void anErasureKillsARegistrationItCannotCatchOnTheDisk() {
+        // create() hands the registration json to NetworkManager and returns,
+        // so an erasure a moment later has two copies to deal with and used to
+        // find only one: deleting the outbox does not touch a request already
+        // queued, and the epoch reset() bumps guards attribution RESPONSES,
+        // which a registration is not. The queued mint went on to transmit the
+        // old client id, the campaign and the payload after the erasure had
+        // reported success.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+        implementation.clearQueuedRequests();
+
+        assertNotNull(Invites.create(InviteRequest.create().campaign("spring").build()),
+                "minting is offline and must still work");
+        java.util.List<com.codename1.io.ConnectionRequest> queued =
+                implementation.getQueuedRequests();
+        assertTrue(queued.size() > 0, "the fixture queued no registration at all");
+
+        Invites.reset();
+
+        int checked = 0;
+        for (com.codename1.io.ConnectionRequest r : queued) {
+            if (r instanceof Invites.InviteConnection) {
+                assertTrue(((Invites.InviteConnection) r).killedForTest(),
+                        "a registration queued before the erasure was still on its way "
+                                + "out with the erased identity in it");
+                checked++;
+            }
+        }
+        assertTrue(checked > 0, "no invite request was queued, so nothing was asserted");
+    }
+
+    @FormTest
     void dimensionsAreRestoredFromTheDurableAttribution() {
         // Preferences.set swallows its write failure, so a resolve can commit
         // the attribution and fail to persist the four dimensions: right in
