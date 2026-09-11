@@ -1368,6 +1368,15 @@ class InviteResilienceTest extends UITestBase {
 
         assertNull(Invites.getAttribution(),
                 "a statistical answer landed after the attribution window closed");
+        // And the lookup is SETTLED, not left hanging. The ordinary flow makes
+        // one asynchronous request and has no timer behind it, so refusing the
+        // answer without terminalising left the install pending for ever and
+        // the listener owed an answer it would never get.
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
+                "refusing a late answer left the lookup pending for ever");
+        assertEquals(Invites.REASON_EXPIRED,
+                InviteStore.get(InviteStore.read(InviteStore.PENDING), "reason", null),
+                "the settled lookup does not say why");
     }
 
     @Test

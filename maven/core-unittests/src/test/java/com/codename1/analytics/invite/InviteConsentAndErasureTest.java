@@ -179,6 +179,24 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
+    void anerasureIsNotReportedDoneWhileTheOutboxSurvives() {
+        // The outbox holds the queued registration JSON, and that carries the
+        // OLD client id along with the campaign, payload and preview. Ignoring
+        // its delete result was a hole the size of the whole erasure: the
+        // erasure reported success, the provider advanced its baseline, and the
+        // next drainOutbox() transmitted a pre-erasure registration under the
+        // new identity as soon as storage recovered.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.create(InviteRequest.create().campaign("launch").build());
+        assertFalse(InviteStore.readOutbox().isEmpty(), "the fixture queued nothing");
+
+        InviteStore.failNextDeleteForTest(InviteStore.OUTBOX);
+        assertFalse(Invites.eraseInternal(),
+                "an erasure reported success while the queued registration survived");
+    }
+
+    @FormTest
     void registeringTheProviderIsNotMistakenForAnErasure() {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);

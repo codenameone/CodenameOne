@@ -982,13 +982,23 @@ public final class Invites {
     /// true when nothing readable is left behind
     static boolean resetVerified() {
         lookupEpoch++;
-        boolean cleared = InviteStore.delete(InviteStore.PENDING);
+        InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
-        // ATTRIBUTION is the one that matters: it names the inviter. The other
-        // two are a lookup in progress and a queue of registrations, neither of
-        // which identifies anybody after this.
+        boolean cleared = true;
+        // ATTRIBUTION names the inviter, and the OUTBOX is the queued
+        // registration JSON -- which carries the OLD client id along with the
+        // campaign, payload and preview. Both have to actually go.
+        //
+        // Ignoring the outbox result was a hole the size of the whole erasure:
+        // if the store rejected deleting and overwriting it, the erasure still
+        // reported success and the provider advanced its baseline, and the next
+        // drainOutbox() transmitted a pre-erasure registration under the new
+        // identity once storage recovered.
+        //
+        // The pending record is a lookup in progress and identifies nobody
+        // after this, so it is deleted without gating on it.
         cleared &= InviteStore.delete(InviteStore.ATTRIBUTION);
-        InviteStore.delete(InviteStore.OUTBOX);
+        cleared &= InviteStore.delete(InviteStore.OUTBOX);
         Preferences.delete(PREF_CONSUMED_ARG);
         clearDimensions();
         resolved = null;
@@ -2253,6 +2263,23 @@ public final class Invites {
             Map<String, String> deadline = readPending();
             long expiresAt = InviteStore.getLong(deadline, "expiresAt", 0);
             if (expiresAt > 0 && System.currentTimeMillis() > expiresAt) {
+                // SETTLED, not just refused.
+                //
+                // The ordinary flow makes this one asynchronous request and has
+                // no timer behind it, so returning here left the install
+                // STATE_PENDING for ever: the window had closed, the answer had
+                // been thrown away, and nothing would ask again unless the
+                // application happened to call flush() or checkForInvite()
+                // itself. The listener was owed an answer and never got one.
+                //
+                // A replacement is abandoned rather than settled, for the
+                // reason abandonReplacement() gives: the earlier attribution
+                // still stands, and telling a listener "no invite" about an
+                // install it has already been told about is a contradiction
+                // rather than an answer.
+                if (!abandonReplacement() && markTerminal(REASON_EXPIRED)) {
+                    notifyUnavailable(REASON_EXPIRED);
+                }
                 return;
             }
         }
