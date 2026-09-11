@@ -117,3 +117,12 @@ Valgrind
 Sonatype
 [Ll]oopback
 [Rr]unbook
+
+Hashtable
+immediates
+mutex
+doclet
+recents
+worklist
+premultiplication
+Goldmark
