@@ -149,6 +149,39 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void dimensionsAreRestoredFromTheDurableAttribution() {
+        // Preferences.set swallows its write failure, so a resolve can commit
+        // the attribution and fail to persist the four dimensions: right in
+        // memory for the rest of that process, and gone on the next launch.
+        // Reconciliation only looked one way -- it dropped dimensions with no
+        // record behind them -- so an attribution whose dimensions were missing
+        // or, under re-attribution, still the PREVIOUS invite's was accepted
+        // for ever, and every later batch credited a campaign the install no
+        // longer belonged to.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("DIMS1", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
+
+        // The state a failed dimension write leaves behind: the durable record
+        // says one thing and the dimensions say another.
+        Analytics.setDimension("cn1_campaign", "the-previous-campaign");
+        Analytics.clearDimension("cn1_invite_code");
+
+        // The next process.
+        Invites.forgetDimensionReconciliationForTest();
+        Invites.forgetCachedAttributionForTest();
+        Invites.checkForInvite();
+
+        assertEquals("spring", Analytics.getDimensions().get("cn1_campaign"),
+                "a stale campaign outlived the attribution that disagreed with it");
+        assertEquals("DIMS1", Analytics.getDimensions().get("cn1_invite_code"),
+                "the code was never restored from the durable record");
+    }
+
+    @FormTest
     void aNotYetAnswerIsAskedAgainInTheSameProcess() {
         // beginDeferred() runs at most once per process, so after a "not yet"
         // the documented call-me-from-start() contract did nothing for the rest

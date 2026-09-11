@@ -2931,7 +2931,28 @@ public final class Invites {
         }
         dimensionsReconciled = true;
         try {
-            if (readAttribution() != null) {
+            InviteAttribution durable = readAttribution();
+            if (durable != null) {
+                // The record stands, so the dimensions are rewritten FROM it
+                // rather than merely accepted. Reconciliation is two-sided:
+                // dimensions with no record behind them are stale and go, and a
+                // record whose dimensions disagree is the authority, because it
+                // is the half that can report whether it was written.
+                //
+                // Preferences cannot. A resolve that committed the attribution
+                // and then failed to persist the dimensions looked complete --
+                // the values were right in memory for the rest of that process
+                // -- and the next launch loaded whatever the disk still held:
+                // nothing, so the campaign went missing from every batch, or
+                // under re-attribution the PREVIOUS invite's values, so revenue
+                // was credited to a campaign the install no longer belonged to.
+                // Nothing ever looked again.
+                //
+                // Written only when they actually differ, so an ordinary launch
+                // does not pay for a storage write it has no use for.
+                if (dimensionsDisagree(durable)) {
+                    writeDimensions(durable);
+                }
                 return;
             }
             // getDimensions() returns a fresh copy and never null, so there
@@ -2950,6 +2971,25 @@ public final class Invites {
         } catch (Throwable t) {
             Log.e(t);
         }
+    }
+
+    // Whether the persisted dimensions say something other than the record.
+    // A null on the record means the dimension should be absent, which is what
+    // writeDimensions() does with it, so the comparison treats absent and null
+    // as the same answer.
+    private static boolean dimensionsDisagree(InviteAttribution a) {
+        Map<String, String> set = Analytics.getDimensions();
+        return differs(set.get(DIMENSION_CODE), a.getCode())
+                || differs(set.get(DIMENSION_CAMPAIGN), a.getCampaign())
+                || differs(set.get(DIMENSION_CHANNEL), a.getChannel())
+                || differs(set.get(DIMENSION_MATCH), a.getMatchType());
+    }
+
+    private static boolean differs(String persisted, String durable) {
+        if (durable == null || durable.length() == 0) {
+            return persisted != null && persisted.length() > 0;
+        }
+        return !durable.equals(persisted);
     }
 
     private static void clearDimensions() {
