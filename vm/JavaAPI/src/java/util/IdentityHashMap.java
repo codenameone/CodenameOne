@@ -125,52 +125,25 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
 
         final MapEntry.Type<E, KT, VT> type;
 
-        /**
-         * Which of the three views this iterator serves.
-         *
-         * Keys and values come straight out of the table; only entrySet has to
-         * materialise an Entry, and only there can the caller observe one. The
-         * generic {@code type} callback cannot express that, because it takes a
-         * MapEntry -- so serving a key iterator through it allocated an Entry per
-         * next() purely to read one field back out and drop it. Measured on a
-         * self-hosting translation of the ParparVM translator: 1,366,140 such
-         * entries, 43.7MB, all garbage. java.util.HashMap already had separate
-         * key/value/entry iterators for exactly this reason; this one was missed.
-         */
-        static final int KIND_ENTRY = 0;
-        static final int KIND_KEY = 1;
-        static final int KIND_VALUE = 2;
-
-        final int kind;
-
         boolean canRemove = false;
 
         IdentityHashMapIterator(MapEntry.Type<E, KT, VT> value,
                 IdentityHashMap<KT, VT> hm) {
             associatedMap = hm;
             type = value;
-            kind = KIND_ENTRY;
-            expectedModCount = hm.modCount;
-        }
-
-        IdentityHashMapIterator(int iteratorKind, IdentityHashMap<KT, VT> hm) {
-            associatedMap = hm;
-            type = null;
-            kind = iteratorKind;
             expectedModCount = hm.modCount;
         }
 
         public boolean hasNext() {
-            // elementData hoisted into a local: it was re-loaded from the outer map
-            // on every comparison AND on every array access, twice per probe step.
-            Object[] data = associatedMap.elementData;
-            int p = position;
-            int len = data.length;
-            while (p < len && data[p] == null) {
-                p += 2;
+            while (position < associatedMap.elementData.length) {
+                // if this is an empty spot, go to the next one
+                if (associatedMap.elementData[position] == null) {
+                    position += 2;
+                } else {
+                    return true;
+                }
             }
-            position = p;
-            return p < len;
+            return false;
         }
 
         void checkConcurrentMod() throws ConcurrentModificationException {
@@ -179,50 +152,19 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             }
         }
 
-        @SuppressWarnings("unchecked")
         public E next() {
-            // The concurrent-modification test and the null-skipping scan are
-            // INLINED here rather than reached through checkConcurrentMod() and
-            // hasNext().
-            //
-            // An enhanced-for already pays two interface dispatches per element
-            // (hasNext then next); routing next() through two more non-inlined
-            // calls made it four, and ParparVM has no JIT to fold them away.
-            // MEASURED on the 5782-class hellocodenameone translation:
-            // IdentityHashMapIterator.next 6.43% of mutator self-time with
-            // checkConcurrentMod a further 1.84%, second only to the ArrayList
-            // iterator.
-            //
-            // Behaviour is unchanged: same ConcurrentModificationException on a
-            // structural change, same NoSuchElementException past the end, and
-            // position still advances past empty slots exactly as hasNext() did.
-            if (expectedModCount != associatedMap.modCount) {
-                throw new ConcurrentModificationException();
-            }
-            Object[] data = associatedMap.elementData;
-            int p = position;
-            int len = data.length;
-            while (p < len && data[p] == null) {
-                p += 2;
-            }
-            if (p >= len) {
-                position = p;
+            checkConcurrentMod();
+            if (!hasNext()) {
                 throw new NoSuchElementException();
             }
 
-            lastPosition = p;
-            position = p + 2;
-            canRemove = true;
+            IdentityHashMapEntry<KT, VT> result = associatedMap
+                    .getEntry(position);
+            lastPosition = position;
+            position += 2;
 
-            if (kind == KIND_KEY) {
-                Object key = associatedMap.elementData[lastPosition];
-                return (E) (key == NULL_OBJECT ? null : key);
-            }
-            if (kind == KIND_VALUE) {
-                Object value = associatedMap.elementData[lastPosition + 1];
-                return (E) (value == NULL_OBJECT ? null : value);
-            }
-            return type.get(associatedMap.getEntry(lastPosition));
+            canRemove = true;
+            return type.get(result);
         }
 
         public void remove() {
@@ -745,7 +687,11 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
                 @Override
                 public Iterator<K> iterator() {
                     return new IdentityHashMapIterator<K, K, V>(
-                            IdentityHashMapIterator.KIND_KEY, IdentityHashMap.this);
+                            new MapEntry.Type<K, K, V>() {
+                                public K get(MapEntry<K, V> entry) {
+                                    return entry.key;
+                                }
+                            }, IdentityHashMap.this);
                 }
             };
         }
@@ -793,7 +739,11 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
                 @Override
                 public Iterator<V> iterator() {
                     return new IdentityHashMapIterator<V, K, V>(
-                            IdentityHashMapIterator.KIND_VALUE, IdentityHashMap.this);
+                            new MapEntry.Type<V, K, V>() {
+                                public V get(MapEntry<K, V> entry) {
+                                    return entry.value;
+                                }
+                            }, IdentityHashMap.this);
                 }
 
                 @Override

@@ -423,26 +423,6 @@ JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_T
     // Fast path: both backing arrays are char[] -- byte-equality of UTF-16 code
     // units == string equality; libc memcmp is the SIMD-optimized comparison on
     // every target.
-    // BOTH LATIN-1 -- the overwhelmingly common case, and until now the SLOW one.
-    //
-    // The char[] path below already had a memcmp; the compact byte[] path did
-    // not, so two ASCII strings (every class name, method name and descriptor
-    // this translator compares) fell into the per-character loop at the bottom,
-    // which calls cn1StrCharAtRaw TWICE per character. That helper reloads
-    // `value` and `offset` and branches on the backing array's class pointer
-    // EVERY time, so the common case paid a branch and two field loads per char
-    // where a single memcmp would do.
-    //
-    // Latin-1 stores each char as its raw 0..255 byte, so memcmp's unsigned byte
-    // ordering is exactly char ordering; equality is bit-identical.
-    //
-    // MEASURED before the fix: java_lang_String_equals was 6.78% of mutator
-    // self-time on the 5782-class hellocodenameone translation.
-    if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        JAVA_ARRAY_BYTE* ta = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
-        JAVA_ARRAY_BYTE* oa = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
-        return memcmp(ta, oa, (size_t)t->java_lang_String_count) == 0 ? JAVA_TRUE : JAVA_FALSE;
-    }
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
         JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
         JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
@@ -491,25 +471,8 @@ JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD
         }
         return tc - oc;
     }
-    // BOTH Latin-1: hoist the coder test and the field reloads OUT of the loop.
-    // cn1StrCharAtRaw re-derives the base pointer and re-tests the backing array's
-    // class on every character, twice per iteration; with both coders known the
-    // loop is two raw byte pointers. Ordering is unchanged -- Latin-1 bytes are
-    // the char values 0..255.
-    if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        struct obj__java_lang_String* ts = (struct obj__java_lang_String*)__cn1ThisObject;
-        struct obj__java_lang_String* os = (struct obj__java_lang_String*)__cn1Arg1;
-        const JAVA_ARRAY_BYTE* tb = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)ts->java_lang_String_value)->data) + ts->java_lang_String_offset;
-        const JAVA_ARRAY_BYTE* ob = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)os->java_lang_String_value)->data) + os->java_lang_String_offset;
-        for(JAVA_INT k = 0; k < minL; k++) {
-            int d = (int)(tb[k] & 0xff) - (int)(ob[k] & 0xff);
-            if(d) {
-                return d;
-            }
-        }
-        return tc - oc;
-    }
-    // Mixed coders: one Latin-1, one UTF-16. Rare; keep the general helper.
+    // Coder-aware path: at least one string is Latin-1 (byte[]); compare logical
+    // chars. Same UTF-16 code-unit ordering, bit-identical to the char[] path.
     for(JAVA_INT k = 0; k < minL; k++) {
         int d = (int)cn1StrCharAtRaw(__cn1ThisObject, k) - (int)cn1StrCharAtRaw(__cn1Arg1, k);
         if(d) {
@@ -1500,6 +1463,16 @@ JAVA_LONG java_lang_Double_doubleToLongBits___double_R_long(CODENAME_ONE_THREAD_
     return u.l;
 }
 
+JAVA_LONG java_lang_Double_doubleToRawLongBits___double_R_long(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE n1) {
+    union {
+        JAVA_DOUBLE d;
+        JAVA_LONG   l;
+    } u;
+    
+    u.d = n1;
+    return u.l;
+}
+
 JAVA_FLOAT java_lang_Float_intBitsToFloat___int_R_float(CODENAME_ONE_THREAD_STATE, JAVA_INT n1)
 {
     union {
@@ -2000,81 +1973,6 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
     return newStringFromCString(threadStateData, clz->clsName);
 }
 
-/**
- * Backs Integer.TYPE and the eight other wrapper TYPE fields. The JDK needs a
- * native here for the same reason we do: `TYPE = int.class` cannot initialize the
- * field, because javac lowers a primitive class literal to a read of that very
- * field (getstatic TYPE; putstatic TYPE), leaving it null.
- *
- * Takes an int code rather than the JDK's String name deliberately. This runs
- * inside the wrapper class initializers, which are among the earliest code in the
- * process, and decoding a Java String here would drag in String.getBytes and the
- * charset machinery during Integer's own clinit. An int argument allocates
- * nothing and initializes nothing.
- *
- * The codes are an implementation detail shared only with java/lang/Class.java;
- * they are matched by CN1_PRIM_* there.
- */
-JAVA_OBJECT java_lang_Class_getPrimitiveClass___int_R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_INT typeCode) {
-    switch(typeCode) {
-        case 0: return (JAVA_OBJECT)&cn1_primitive_class_int;
-        case 1: return (JAVA_OBJECT)&cn1_primitive_class_long;
-        case 2: return (JAVA_OBJECT)&cn1_primitive_class_short;
-        case 3: return (JAVA_OBJECT)&cn1_primitive_class_byte;
-        case 4: return (JAVA_OBJECT)&cn1_primitive_class_char;
-        case 5: return (JAVA_OBJECT)&cn1_primitive_class_float;
-        case 6: return (JAVA_OBJECT)&cn1_primitive_class_double;
-        case 7: return (JAVA_OBJECT)&cn1_primitive_class_boolean;
-        case 8: return (JAVA_OBJECT)&cn1_primitive_class_void;
-    }
-    // Only java/lang/Class.java calls this, always with one of its own constants,
-    // so this is unreachable short of the two files disagreeing. Returning null
-    // would restore exactly the silent null TYPE this code exists to remove.
-    fprintf(stderr, "getPrimitiveClass: unknown primitive type code %d\n", (int)typeCode);
-    exit(1);
-    return JAVA_NULL;
-}
-
-/**
- * Resources linked into the executable, backing Class.getResourceAsStream.
- *
- * cn1FindResource has a weak definition here that finds nothing. A target that
- * embeds resources emits a strong one (the generated cn1_resources_table.c) and
- * overrides it; everywhere else this one stands and getResourceAsStream falls
- * through to the filesystem. That keeps every existing target unchanged --
- * getResourceAsStream returned a hard-coded null before this existed, so nothing
- * can regress, only start working.
- *
- * A weak DEFINITION rather than a weak declaration: Mach-O will not link an
- * undefined weak symbol without weak_import, while a weak definition is overridable
- * on both Mach-O and ELF.
- */
-__attribute__((weak)) const unsigned char* cn1FindResource(const char* name, int* lenOut) {
-    (void)name;
-    if(lenOut) {
-        *lenOut = 0;
-    }
-    return 0;
-}
-
-JAVA_OBJECT java_lang_Class_cn1EmbeddedResource___java_lang_String_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
-    if(name == JAVA_NULL) {
-        return JAVA_NULL;
-    }
-    const char* n = stringToUTF8(threadStateData, name);
-    if(n == 0) {
-        return JAVA_NULL;
-    }
-    int len = 0;
-    const unsigned char* data = cn1FindResource(n, &len);
-    if(data == 0 || len <= 0) {
-        return JAVA_NULL;
-    }
-    JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(threadStateData, len);
-    memcpy(((JAVA_ARRAY)arr)->data, data, len);
-    return arr;
-}
-
 JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
     struct clazz* clz = (struct clazz*)cls;
     return clz->isArray;
@@ -2090,12 +1988,6 @@ JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA
 JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT cls2) {
     struct clazz* clz1 = (struct clazz*)cls;
     struct clazz* clz2 = (struct clazz*)cls2;
-    // A primitive class carries CN1_PRIMITIVE_CLASS_ID, which indexes no row of
-    // the instanceof tables, so it must never reach instanceofFunction. The JDK
-    // rule is also simply identity: int is assignable only from int.
-    if(clz1->primitiveType || clz2->primitiveType) {
-        return clz1 == clz2 ? JAVA_TRUE : JAVA_FALSE;
-    }
     // A.isAssignableFrom(B): target is A, the class under test is B.
     return instanceofFunction(clz1->classId, clz2->classId);
 }
@@ -2103,9 +1995,6 @@ JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENA
 JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT obj) {
     if(obj == JAVA_NULL) { return JAVA_FALSE; }
     struct clazz* clz1 = (struct clazz*)cls;
-    // No object is ever an instance of a primitive class, and its sentinel
-    // classId indexes no instanceof table row -- see isAssignableFrom above.
-    if(((struct clazz*)cls)->primitiveType) { return JAVA_FALSE; }
     struct clazz* clz2 = (struct clazz*)CN1_CLASS_OF(obj); // tag-aware: a tagged Integer has no header
     // A.isInstance(o): target is A, the class under test is o's class. These were
     // reversed, so isInstance searched the TARGET's supertype table for the
