@@ -230,6 +230,10 @@ public final class Invites {
     // Set when a clip handoff has been read and not yet made durable. The clip
     // container is the only copy until then, so it must not be cleared early.
     private static boolean handoffAwaitingAck;
+    // True when the last discard left the handoff where it was. The container
+    // is not one of our records, so this is the only way a reset can tell that
+    // something survived it.
+    private static boolean handoffSurvived;
 
     // Set when an erasure could not remove the durable records, and cleared
     // when a later attempt does. Nothing that transmits may run while it is
@@ -1180,6 +1184,19 @@ public final class Invites {
     ///
     /// true when a record, an attribution or a queued registration remains
     private static boolean anythingSurvives() {
+        // The App Clip container counts, and it is not one of the records
+        // below.
+        //
+        // resetVerified() reports false when the handoff could not be
+        // discarded, but the latch that makes a failed erasure retry was
+        // decided by reading the three InviteStore records -- all three of
+        // which had gone. So the one failure whose only survivor is OUTSIDE
+        // our storage returned false and latched nothing: no durable marker,
+        // nothing blocked, nothing retrying, and the surviving code read by
+        // the next launch.
+        if (handoffSurvived) {
+            return true;
+        }
         Map<String, String> record = InviteStore.read(InviteStore.PENDING);
         if (record != null && !record.isEmpty()) {
             return true;
@@ -2092,6 +2109,8 @@ public final class Invites {
         if (gone) {
             handoffAwaitingAck = false;
         }
+        // Remembered for anythingSurvives(), which cannot see the container.
+        handoffSurvived = !gone;
         return gone;
     }
 
@@ -2566,7 +2585,16 @@ public final class Invites {
             // is the reopenable marker the kill switch writes, so reporting it
             // here would have every launch reopen a lookup that can never have
             // anything to find.
-            lookupIssuedAt = 0;
+            // Stamped, not cleared, for the reason handleResolution() gives.
+            // settleNoHandoff() does NOT always settle: when the pending
+            // record carries referrerRetry -- a transient Play failure, which
+            // is the ordinary way this is reached on Android -- it leaves the
+            // state pending on purpose. Clearing the stamp then made
+            // lookupInFlight() false immediately, so every later
+            // checkForInvite() bound the Play service again. These local
+            // attempts do not bump the persisted claim counter, so nothing
+            // bounded them but the attribution window.
+            lookupIssuedAt = System.currentTimeMillis();
             settleNoHandoff(REASON_NO_MATCH);
             return;
         }

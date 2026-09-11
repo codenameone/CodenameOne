@@ -494,6 +494,27 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void aHandoffOnlyFailureStillLatchesTheErasure() {
+        // resetVerified() reports the failure, and reset() decides whether to
+        // LATCH by asking what survived -- which was answered by reading the
+        // three InviteStore records, all of which had gone. So the one failure
+        // whose only survivor sits outside our storage latched nothing: no
+        // durable marker, nothing blocked, nothing retrying, and the surviving
+        // code read by the next launch. The whole point of the gate.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        InviteTestSupport.PendingHandoffSource source = InviteTestSupport.pendingHandoff;
+        source.discardFails = true;
+
+        Invites.reset();
+
+        assertNotNull(InviteStore.read(InviteStore.ERASURE),
+                "a reset whose only survivor was the App Clip container reported "
+                        + "success and left nothing retrying, so the next launch "
+                        + "restores the attribution it promised to forget");
+    }
+
+    @FormTest
     void aHandoffThatWillNotGoFailsTheReset() {
         // Every store deletion in resetVerified() is gated; the clip container
         // was not, so a container that refused to empty -- or a flush that did
@@ -1098,6 +1119,14 @@ class InviteResilienceTest extends UITestBase {
                 callback.onReferrer("utm_source=cn1_invite&cn1_invite=LATER1", 0L, 0L);
             }
         });
+        // After the retry interval, which now applies to this path too: a
+        // transient referrer failure leaves the lookup PENDING, and an
+        // unthrottled pending lookup re-bound the Play service on every
+        // lifecycle call without bound, because these local attempts do not
+        // bump the persisted claim counter. What the case is about is that the
+        // answer is not settled as organic and still lands when the store
+        // recovers -- not how soon the retry is allowed.
+        Invites.lookupRetryDelay = 0;
         Invites.flush();
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         assertEquals("LATER1", InviteStore.get(pending, "code", null),
