@@ -1583,8 +1583,7 @@ public final class HttpServer {
         // answer at the end of its own turn; until then such a response can still
         // be cut short by a stop(), and that is a smaller fault than a native data
         // race during shutdown.
-        while(System.currentTimeMillis() < deadline
-                && (inFlightRequests.get() > 0 || http2Turns.get() > 0)) {
+        while(System.currentTimeMillis() < deadline && workOutstanding()) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -1610,8 +1609,7 @@ public final class HttpServer {
         // while one is still inside it is the thing being avoided, so the sweep below
         // waits for the count to reach zero rather than assuming it has.
         long freeBy = System.currentTimeMillis() + SESSION_RELEASE_GRACE_MILLIS;
-        while(System.currentTimeMillis() < freeBy
-                && (inFlightRequests.get() > 0 || http2Turns.get() > 0)) {
+        while(System.currentTimeMillis() < freeBy && workOutstanding()) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -1627,7 +1625,7 @@ public final class HttpServer {
         // sessions are left alone. That leaks one per live connection, which a
         // process about to exit does not care about and a use-after-free is not
         // a trade for.
-        if(inFlightRequests.get() > 0 || http2Turns.get() > 0) {
+        if(workOutstanding()) {
             releaseVirtualThreadSlot();
             synchronized(stopped) {
                 fullyStopped = true;
@@ -1678,11 +1676,93 @@ public final class HttpServer {
         if(tls != null) {
             tls.close();
         }
+        // THE POLLERS, which nothing closed. Each Reactor owns an epoll or kqueue
+        // descriptor -- a Selector on Java SE -- so a process that stops and starts
+        // a server, which releaseVirtualThreadSlot() exists precisely to allow,
+        // leaked one per cycle until it ran out of descriptors.
+        //
+        // Only on THIS path, and only once the loops have left them. The early
+        // return above leaves workers running and they reach the reactor; closing
+        // it under one is the same use-after-free the session sweeps go out of
+        // their way to avoid, and the same trade is taken there -- a process about
+        // to exit can afford a descriptor, and cannot afford a crash.
+        if(pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
+            closePollers();
+        }
         releaseVirtualThreadSlot();
         synchronized(stopped) {
             fullyStopped = true;
             stopped.notifyAll();
         }
+    }
+
+    /**
+     * Whether any worker is queued, running, or inside a request or an h2 turn.
+     *
+     * <p>ALL FOUR counters, which is the point of having one predicate. The drain
+     * loops waited on inFlightRequests and http2Turns alone, and both of those are
+     * still zero while a task sits in the pool's queue or a worker is handshaking
+     * or parsing a request line -- so a stop() could decide nothing was running,
+     * free the TLS and HTTP/2 sessions, and let a task ExecutorService.shutdown()
+     * still permits run straight into them. pendingWork covers the queued window
+     * and activeRequests the worker's whole stay on a connection; both already
+     * existed and neither was consulted here.
+     *
+     * <p>The comment on the first drain loop records http2Turns being added to one
+     * loop and not the others, which is this same drift once already. One method
+     * is what stops it happening a third time.
+     */
+    private boolean workOutstanding() {
+        return inFlightRequests.get() > 0 || http2Turns.get() > 0
+                || pendingWork.get() > 0 || activeRequests.get() > 0;
+    }
+
+    /** How long stop() waits for the poll loops before giving up on closing them. */
+    private static final int POLL_LOOP_JOIN_MILLIS = 2000;
+
+    /** Waits for every poll loop to end, and answers whether they all did. */
+    private boolean pollLoopsEnded(long millis) {
+        long deadline = System.currentTimeMillis() + millis;
+        boolean all = true;
+        Thread[] threads = pollers;
+        if(threads != null) {
+            for(int iter = 0 ; iter < threads.length ; iter++) {
+                // Every one of them, not just until the first that outstays its
+                // welcome: a poller still inside its reactor is exactly the one
+                // whose reactor must be left alone.
+                all = endedBy(threads[iter], deadline) && all;
+            }
+        }
+        return endedBy(loop, deadline) && all;
+    }
+
+    private boolean endedBy(Thread thread, long deadline) {
+        if(thread == null) {
+            return true;
+        }
+        long left = deadline - System.currentTimeMillis();
+        try {
+            thread.join(left > 0 ? left : 1);
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+        }
+        return !thread.isAlive();
+    }
+
+    /** Closes every reactor exactly once. */
+    private void closePollers() {
+        VtHost[] hosts = vtHosts;
+        if(hosts != null) {
+            for(int iter = 0 ; iter < hosts.length ; iter++) {
+                // Host 0 SHARES the main reactor (see start()), so closing every
+                // host's poller and then the reactor would close that one twice --
+                // a double free of one descriptor, not the release of two.
+                if(hosts[iter] != null && hosts[iter].poller != reactor) {
+                    hosts[iter].poller.close();
+                }
+            }
+        }
+        reactor.close();
     }
 
     /**
