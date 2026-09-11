@@ -2679,7 +2679,28 @@ public final class Invites {
                     + "pending and will be retried", Log.WARNING);
             return;
         }
-        InviteStore.delete(InviteStore.PENDING);
+        if (!InviteStore.delete(InviteStore.PENDING)) {
+            // The claim is settled and its record could not be removed, nor
+            // overwritten with the empty one delete() falls back to. Under
+            // re-attribution loadState() prefers a surviving pending record
+            // over the durable attribution -- deliberately, so a claim
+            // interrupted by process death is retried -- so leaving this one
+            // there resubmits a claim that already succeeded, and a second
+            // invite_install or invite_opened is emitted for one install.
+            //
+            // Overwritten with the terminal state instead of deleted. That
+            // says the same thing the deletion would have, in a record the
+            // store has just proved it will not remove, and it carries no
+            // code and no inviter -- so if this write fails too, what is left
+            // is the record that was already there and nothing new is
+            // disclosed.
+            Map<String, String> settled = new LinkedHashMap<String, String>();
+            settled.put("state", String.valueOf(STATE_RESOLVED));
+            if (!writePending(settled)) {
+                Log.p("invite: the pending record survived a resolved claim and could not be "
+                        + "marked settled; this install may be attributed again", Log.WARNING);
+            }
+        }
         forgetPendingFallback();
         resolved = a;
         attributionLoaded = true;

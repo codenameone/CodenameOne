@@ -603,6 +603,30 @@ class InviteResilienceTest extends UITestBase {
                 "an empty deletion tombstone reopened a settled attribution");
     }
 
+    @FormTest
+    void asettledClaimWhosePendingRecordSurvivesIsNotAskedAgain() {
+        // The store refuses to delete the record AND refuses the empty
+        // overwrite delete() falls back to, so the real pending state lives on
+        // beside the new attribution. Under re-attribution loadState() prefers
+        // that record -- deliberately, so a claim interrupted by process death
+        // is retried -- and the already-successful claim was resubmitted,
+        // emitting a second invite_install for one install.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.setReattribution(true);
+        Invites.handleUrl("https://cloud.codenameone.com/i/PENDSURV");
+
+        InviteStore.failNextDeleteForTest(InviteStore.PENDING);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("PENDSURV", "spring", "sms"),
+                Invites.MATCH_DIRECT, false);
+        assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
+
+        Invites.forgetLoadedState();
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState(),
+                "a settled claim was left pending and would be submitted again");
+    }
+
     @Test
     @EdtTest
     void theReferrerCodeIsPersistedBeforeTheClaimGoesOut() {
