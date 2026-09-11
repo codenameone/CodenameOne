@@ -115,3 +115,9 @@ clang: warning: argument unused during compilation: '-stdlib=libc++' [-Wunused-c
 # 20. A message containing the field delimiter. Unescaped it produces a six-field
 # baseline row that the reader truncates and the format check then rejects.
 /tmp/proj/HelloApp-src/cn1_globals.c:88:5: warning: suggest parentheses around arithmetic in operand of '|' [-Wparentheses]
+
+# 21. Swift, which is announced unlike anything else: the architecture comes
+# second, and the line carries a "Compiling\ A.swift,\ B.swift" summary followed
+# by the paths. Both .swift files below must register as compiled, or adding
+# .swift to the completeness set would fail every build that contains one.
+SwiftCompile normal x86_64 Compiling\ SwiftKotlinNativeImpl.swift,\ CN1WatchApp.swift /tmp/proj/HelloApp-src/SwiftKotlinNativeImpl.swift /tmp/proj/HelloApp-src/CN1WatchApp.swift (in target 'HelloApp' from project 'HelloApp')

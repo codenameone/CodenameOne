@@ -84,7 +84,16 @@ COMPILE_CMAKE_RE = re.compile(
     r'^\s*(?:\[\s*(?:\d+/\d+|\d+%)\s*\]\s*)?'
     r'(?:Building|Compiling)\s+\S+\s+object\s+(?P<obj>\S+)')
 
-SOURCE_EXTS = (".m", ".mm", ".c", ".cc", ".cpp", ".cxx", ".metal", ".S", ".s")
+SOURCE_EXTS = (".m", ".mm", ".c", ".cc", ".cpp", ".cxx", ".metal", ".S", ".s", ".swift")
+
+# Swift is announced differently from everything else: the architecture comes second,
+# and the line then carries either a "Compiling\ A.swift,\ B.swift" summary followed by
+# the paths, or the paths alone. So take every .swift path on the line rather than a
+# fixed position. Without this, adding .swift to SOURCE_EXTS would make the completeness
+# check demand a unit it could not see being compiled and fail every build -- a
+# generated iOS project does put .swift files in Compile Sources, and the sample has one.
+SWIFT_COMPILE_RE = re.compile(r'^\s*SwiftCompile\s')
+SWIFT_PATH_RE = re.compile(r'(/[^\s\\]+\.swift)')
 HEADER_EXTS = (".h", ".hh", ".hpp")
 
 # Provenance rules for files the manifest does not name. These are rules about
@@ -278,6 +287,9 @@ def parse_log(text):
         m = COMPILE_XCODE_RE.match(line)
         if m:
             compiled.add(os.path.basename(m.group("src").strip('"')))
+        elif SWIFT_COMPILE_RE.match(line):
+            for sp in SWIFT_PATH_RE.findall(line):
+                compiled.add(os.path.basename(sp))
         else:
             m = COMPILE_CMAKE_RE.match(line)
             if m:
@@ -490,6 +502,21 @@ def check_completeness(manifest, compiled):
     return sorted(expected - set(compiled)), sorted(expected)
 
 
+# KNOWN LIMITATION, stated rather than left to be discovered: completeness is measured
+# against the PHONE manifest only. An embedded watch or tv app is a second, independent
+# translation with a manifest of its own that nothing stages, so a build that compiled
+# the phone target fully and the companion not at all passes this check.
+#
+# Diagnostics from the companion are still attributed -- watch-src/tv-src files resolve
+# through the manifest by name, and the companion's own translated classes fall to the
+# COMPANION_SRC_MARKERS rule -- so nothing is misreported. What is not verified is that
+# the companion compiled everything it has.
+#
+# Closing it means staging the companion's cn1-source-manifest.txt alongside the phone's
+# and checking both; that is a change to build-ios-app.sh and the builders, not to this
+# tool, which is why it is recorded here instead of being half-done.
+
+
 def baseline_path(leg):
     return os.path.join(BASELINE_DIR, "baseline-%s.txt" % leg)
 
@@ -676,7 +703,9 @@ def self_test():
     if len(header) != 1:
         problems.append("header warning deduped to %d entries, expected 1" % len(header))
     if not {"IOSNative.m", "cn1_globals.c", "cn1_virtual_thread.c",
-            "CN1MetalShaders.metal"} <= compiled:
+            "CN1MetalShaders.metal",
+            # Both paths off one SwiftCompile line, not just the first.
+            "SwiftKotlinNativeImpl.swift", "CN1WatchApp.swift"} <= compiled:
         problems.append("did not recognise the compile lines: %s" % sorted(compiled))
     if problems:
         for p in problems:
