@@ -186,7 +186,6 @@ public final class Invites {
     private static final String DEFAULT_BASE_URL = "https://cloud.codenameone.com";
     private static final String PATH_MINT = "/api/v2/analytics/invites";
     private static final String PATH_CLAIM = "/api/v2/analytics/invites/claim";
-    private static final String PATH_MATCH = "/api/v2/analytics/invites/match";
 
     // Package private so the unit tests can clear them between cases.
     /// Display property carrying the invite host the build registered, stamped
@@ -999,7 +998,58 @@ public final class Invites {
     /// that left the referral dimensions behind would re-link the fresh
     /// identity to the same inviter.
     public static void reset() {
-        resetVerified();
+        if (!resetVerified()) {
+            // The records did not go, and this method promised they would.
+            //
+            // Dropping the answer here left nothing blocked and nothing
+            // retrying: a surviving PENDING record still carried its code, so
+            // the next checkForInvite() claimed it, and a surviving outbox
+            // entry still carried the old client id for the next flush. The
+            // detection added inside resetVerified() was real and then thrown
+            // away at the one call site an application reaches.
+            //
+            // Setting the flag is what settleErasure() gates every lookup,
+            // claim and enqueue on, so nothing proceeds until a retry
+            // succeeds. That retry runs eraseInternal(), which also writes the
+            // tombstone -- so a reset that had to be retried ends terminal
+            // rather than looking like a fresh install. That divergence is
+            // deliberate: it only happens when the store refused, and there
+            // the safe answer is to attribute nothing rather than to start a
+            // fresh lookup over records that are still on the disk.
+            //
+            // Latched only when something really did survive, because the
+            // consequence is severe and permanent-looking: nothing else
+            // proceeds until an erasure succeeds, and only eraseInternal()
+            // clears the flag. resetVerified() also answers false for a
+            // reason that leaves nothing behind -- no Storage at all, which
+            // is a device state rather than a refusal -- and latching on that
+            // would block a device that has no invite data to block over.
+            if (anythingSurvives()) {
+                erasurePending = true;
+            }
+        }
+    }
+
+    /// Whether any durable invite record is still readable.
+    ///
+    /// The question a failed reset actually has to answer. A delete that could
+    /// not run because there was no storage at all leaves nothing behind and
+    /// is not the failure the erasure gate exists for; a record still on the
+    /// disk is.
+    ///
+    /// #### Returns
+    ///
+    /// true when a record, an attribution or a queued registration remains
+    private static boolean anythingSurvives() {
+        Map<String, String> record = InviteStore.read(InviteStore.PENDING);
+        if (record != null && !record.isEmpty()) {
+            return true;
+        }
+        Map<String, String> attribution = InviteStore.read(InviteStore.ATTRIBUTION);
+        if (attribution != null && !attribution.isEmpty()) {
+            return true;
+        }
+        return !InviteStore.readOutbox().isEmpty();
     }
 
     /// The same work, reporting whether the durable records really went.
@@ -1047,6 +1097,15 @@ public final class Invites {
         lookupIssuedAt = 0;
         undelivered = null;
         unacknowledged.clear();
+        if (cleared) {
+            // The flag means "records survived an erasure", and they
+            // demonstrably did not survive this one. Only eraseInternal()
+            // cleared it before, so a plain reset() that succeeded left the
+            // stale latch standing -- and the next gated call then ran a full
+            // erasure, tombstone included, turning an application's ordinary
+            // reset() into a terminal state it never asked for.
+            erasurePending = false;
+        }
         return cleared;
     }
 
@@ -1868,7 +1927,8 @@ public final class Invites {
             String matchType = InviteStore.get(pending, "codeMatch", MATCH_DIRECT);
             boolean deferred = InviteStore.getBoolean(pending, "codeDeferred", false);
             claim(code, source, InviteStore.get(pending, "codeReferrer", ""),
-                    matchType, deferred);
+                    matchType, deferred,
+                    InviteStore.getLong(pending, "codeClicked", 0));
             return;
         }
         InstallReferrerSource source = referrerSource;
@@ -1938,11 +1998,25 @@ public final class Invites {
                             pending.put("codeDeferred", "true");
                             InviteStore.put(pending, "codeReferrer",
                                     rawReferrer == null ? "" : rawReferrer);
+                            // Play reports the tap time too, and it was being
+                            // dropped for the same reason the clip's was: read
+                            // from the callback and never written down. The
+                            // redirect DID see this tap, so the server usually
+                            // has its own record -- but not for a link opened
+                            // from a place the redirect never ran, and not
+                            // after retention has swept the click. Carrying it
+                            // costs nothing and makes the two platforms report
+                            // the same field the same way.
+                            if (clickSeconds > 0) {
+                                pending.put("codeClicked",
+                                        String.valueOf(clickSeconds * 1000L));
+                            }
                             pending.remove("referrerRetry");
                             writePending(pending);
                             claim(code, "install_referrer",
                                     rawReferrer == null ? "" : rawReferrer,
-                                    MATCH_REFERRER, true);
+                                    MATCH_REFERRER, true,
+                                    clickSeconds > 0 ? clickSeconds * 1000L : 0);
                         }
                     });
                 }
@@ -2079,8 +2153,10 @@ public final class Invites {
         // this answer belongs to.
         final int issued = lookupEpoch;
         source.requestHandoff(new AppClipHandoffCallback() {
+            @Override
             public void onHandoff(final String code, final long clickedSeconds) {
                 onEdt(new Runnable() {
+                    @Override
                     public void run() {
                         if (issued != lookupEpoch) {
                             return;
@@ -2106,17 +2182,36 @@ public final class Invites {
                         record.put("codeMatch", MATCH_APP_CLIP);
                         record.put("codeDeferred", "true");
                         record.put("codeReferrer", "");
+                        // The tap time, and this is the only place it exists.
+                        //
+                        // An App Clip invocation is resolved by iOS from the
+                        // association file, so it never reaches our redirect
+                        // and the server has no click of its own to date the
+                        // funnel from. The clip observed the tap and the
+                        // native side cleared the handoff as it read it, so a
+                        // value dropped here is gone -- and every App Clip
+                        // attribution reported a click time of zero.
+                        //
+                        // Persisted in the record rather than only passed on,
+                        // because the claim can fail and be resent from here.
+                        if (clickedSeconds > 0) {
+                            record.put("codeClicked",
+                                    String.valueOf(clickedSeconds * 1000L));
+                        }
                         writePending(record);
                         // Claimed exactly as a referrer code is: the trip
                         // through the store is what makes both of them exact,
                         // and the server treats them the same way.
-                        claim(code, "app_clip", "", MATCH_APP_CLIP, true);
+                        claim(code, "app_clip", "", MATCH_APP_CLIP, true,
+                                clickedSeconds > 0 ? clickedSeconds * 1000L : 0);
                     }
                 });
             }
 
+            @Override
             public void onUnavailable(final String reason) {
                 onEdt(new Runnable() {
+                    @Override
                     public void run() {
                         if (issued != lookupEpoch) {
                             return;
@@ -2162,6 +2257,17 @@ public final class Invites {
 
     private static void claim(String code, String source, String rawReferrer,
             final String matchType, final boolean deferred) {
+        claim(code, source, rawReferrer, matchType, deferred, 0);
+    }
+
+    /// clickedMillis: when the link was tapped, as the device observed it, or
+    /// 0 when nothing on the device saw it. Only an App Clip has this: iOS
+    /// resolves a clip invocation from the association file, so that tap never
+    /// reaches the redirect and the server has no click to date the funnel
+    /// from. It is a hint, never an override -- the server prefers its own
+    /// observation, because this one is a number an app could put anything in.
+    private static void claim(String code, String source, String rawReferrer,
+            final String matchType, final boolean deferred, long clickedMillis) {
         if (!allowed()) {
             return;
         }
@@ -2173,6 +2279,9 @@ public final class Invites {
         body.put("code", code);
         body.put("source", source);
         body.put("rawReferrer", rawReferrer == null ? "" : rawReferrer);
+        if (clickedMillis > 0) {
+            body.put("clickedMillis", Long.valueOf(clickedMillis));
+        }
         lookupIssuedAt = System.currentTimeMillis();
         post(getLinkBase() + PATH_CLAIM, body, matchType, deferred);
     }

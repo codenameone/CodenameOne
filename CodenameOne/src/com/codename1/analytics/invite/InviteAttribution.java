@@ -146,12 +146,19 @@ public final class InviteAttribution {
         return deferred;
     }
 
-    /// When the link was clicked, in milliseconds since the epoch, or 0 when
-    /// unknown.
+    /// When the link was tapped, in milliseconds since the epoch, or 0 when
+    /// nothing observed it.
+    ///
+    /// Zero is a real answer and not rare. The tap is observed by whichever
+    /// side of the exchange saw it: the invite redirect for a link that
+    /// reached it, or the App Clip for an iOS invocation, which iOS resolves
+    /// from the association file without ever reaching the redirect. An
+    /// install whose tap neither side recorded has no time to report, so
+    /// compare against 0 before subtracting it from anything.
     ///
     /// #### Returns
     ///
-    /// the click time
+    /// the click time, or 0
     public long getClickTimestamp() {
         return clickTimestamp;
     }

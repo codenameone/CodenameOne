@@ -62,10 +62,15 @@ final class InviteTestSupport {
 
         /** Delivers a code, as a clip that saw the link would. */
         void answer(String code) {
+            answer(code, 0L);
+        }
+
+        /** Delivers a code with the tap time the clip observed. */
+        void answer(String code, long clickedSeconds) {
             AppClipHandoffCallback cb = callback;
             callback = null;
             if (cb != null) {
-                cb.onHandoff(code, 0L);
+                cb.onHandoff(code, clickedSeconds);
             }
         }
 

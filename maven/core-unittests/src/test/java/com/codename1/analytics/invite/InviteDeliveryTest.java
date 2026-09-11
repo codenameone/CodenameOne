@@ -33,6 +33,7 @@ import org.junit.jupiter.api.AfterEach;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InviteDeliveryTest extends UITestBase {
@@ -269,6 +270,41 @@ class InviteDeliveryTest extends UITestBase {
                 "the clip's code was never written down, so a failed claim loses it");
         assertEquals(Invites.MATCH_APP_CLIP, InviteStore.get(record, "codeMatch", null),
                 "the saved code lost its provenance");
+    }
+
+    @FormTest
+    void theclipsTapTimeSurvivesIntoTheClaim() {
+        // The clip is the only witness to the tap: iOS resolves a clip
+        // invocation from the association file, so it never reaches the
+        // redirect, and the native side clears the handoff as it reads it.
+        // Dropped here the value is gone, and every App Clip attribution
+        // reports a click time of zero.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        implementation.clearQueuedRequests();
+
+        long tappedSeconds = System.currentTimeMillis() / 1000L - 600L;
+        Invites.checkForInvite();
+        InviteTestSupport.pendingHandoff.answer("CLIPTIME", tappedSeconds);
+
+        // Written down, because the claim can fail and be resent from the
+        // record rather than from the callback.
+        Map<String, String> record = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(record);
+        assertEquals(tappedSeconds * 1000L,
+                InviteStore.getLong(record, "codeClicked", 0),
+                "the tap time was not persisted, so a resent claim loses it");
+
+        // And it is on the wire, in milliseconds.
+        List sent = implementation.getQueuedRequests();
+        assertFalse(sent.isEmpty(), "no claim was sent at all");
+        String body = ((com.codename1.io.ConnectionRequest)
+                sent.get(sent.size() - 1)).getRequestBody();
+        // A bare number, not a quoted one. Asserted because the server binds
+        // it to a long: a string would still coerce today and would stop
+        // doing so the moment anything there gets stricter.
+        assertTrue(body.contains("\"clickedMillis\": " + (tappedSeconds * 1000L)),
+                "the claim did not carry the tap time as a number: " + body);
     }
 
     @FormTest
