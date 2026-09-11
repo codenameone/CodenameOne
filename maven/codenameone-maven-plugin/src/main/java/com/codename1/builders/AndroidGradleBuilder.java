@@ -3013,10 +3013,10 @@ public class AndroidGradleBuilder extends Executor {
         // <activity>, and rendered again into the wear companion manifest, so
         // one append reaches both and cannot drift.
         if (usesInvites && "true".equals(request.getArg("android.invite.appLinks", "true"))) {
-            String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
+            String inviteHost = InviteBuildHints.domain(request);
             String existingFilter = request.getArg("android.xintent_filter", "");
             String withAppLinks = InviteManifestFragments.injectAppLinks(existingFilter,
-                    inviteHost, request.getArg("invite.slug", ""));
+                    inviteHost, InviteBuildHints.slug(request));
             if (!withAppLinks.equals(existingFilter)) {
                 debug("Invite attribution: adding the App Links filter for " + inviteHost);
                 request.putArgument("android.xintent_filter", withAppLinks);
@@ -6044,13 +6044,13 @@ public class AndroidGradleBuilder extends Executor {
         String inviteDomainProperty = "";
         if (usesInvites) {
             inviteDomainProperty = "        Display.getInstance().setProperty(\"invite.domain\", \""
-                    + request.getArg("invite.domain", "cloud.codenameone.com") + "\");\n";
+                    + InviteBuildHints.domain(request) + "\");\n";
             // The slug goes with it, and for the same reason. This build claims
             // /i/<slug>/ and nothing else, so a client that mints a bare
             // /i/<code> link produces a url its own build cannot open -- and it
             // would, because the client only learns the slug from the link
             // service, which the first invite is minted before ever reaching.
-            String inviteSlug = request.getArg("invite.slug", "");
+            String inviteSlug = InviteBuildHints.slug(request);
             if (inviteSlug != null && inviteSlug.trim().length() > 0) {
                 inviteDomainProperty += "        Display.getInstance().setProperty(\"invite.slug\", \""
                         + inviteSlug.trim() + "\");\n";

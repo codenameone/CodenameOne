@@ -55,6 +55,18 @@ final class InviteTestSupport {
             callback = cb;
         }
 
+        /** Counts the acknowledgements, which is what the iOS source clears on. */
+        private int persisted;
+
+        public void handoffPersisted() {
+            persisted++;
+        }
+
+        /** How many handoffs the framework reported as durably stored. */
+        int persistedCount() {
+            return persisted;
+        }
+
         /** True once Invites has asked. */
         boolean wasAsked() {
             return callback != null;

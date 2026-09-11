@@ -71,7 +71,7 @@ public class IOSAppClipHandoff implements AppClipHandoffSource {
         String handoff;
         try {
             handoff = IOSImplementation.nativeInstance
-                    .consumeAppClipInviteHandoff(appGroup);
+                    .readAppClipInviteHandoff(appGroup);
         } catch (Throwable t) {
             // An unreachable container reads as "no clip ran", never as a
             // crash: the application works, it simply has no invite behind it.
@@ -84,8 +84,8 @@ public class IOSAppClipHandoff implements AppClipHandoffSource {
             return;
         }
         // "<code>\n<clickedSeconds>". Two values in one string because the
-        // native side clears the container as it reads, so a second call to
-        // fetch the timestamp would answer nothing.
+        // container is read once and emptied once: splitting the call would
+        // mean deciding which half clears it.
         String code = handoff;
         long clicked = 0;
         int nl = handoff.indexOf('\n');
@@ -99,6 +99,31 @@ public class IOSAppClipHandoff implements AppClipHandoffSource {
             return;
         }
         callback.onHandoff(code, clicked);
+    }
+
+    /// Empties the shared container, once the framework has the code stored
+    /// somewhere that survives this process.
+    ///
+    /// The read deliberately leaves it alone. This container is the only
+    /// durable copy of an exact App Clip code until the framework writes its
+    /// own record, so clearing on read destroyed it whenever that write failed
+    /// or the process exited in between -- and the next launch, finding no
+    /// handoff, settled an invited install as no_match for ever. Nothing
+    /// reports that: the clip ran, the store carried the person across, and
+    /// the install simply looks organic.
+    public void handoffPersisted() {
+        if (appGroup == null || appGroup.length() == 0) {
+            return;
+        }
+        try {
+            IOSImplementation.nativeInstance.clearAppClipInviteHandoff(appGroup);
+        } catch (Throwable t) {
+            // Worth nothing more than a log: the code is stored, so the only
+            // cost of a container that could not be emptied is the next launch
+            // reading the same handoff again -- and the framework already
+            // refuses a second attribution for one install.
+            Log.e(t);
+        }
     }
 
     /// A timestamp that will not parse is not worth losing an attribution

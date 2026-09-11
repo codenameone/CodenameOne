@@ -2433,7 +2433,23 @@ public final class Invites {
                             record.put("codeClicked",
                                     String.valueOf(clickedSeconds * 1000L));
                         }
-                        writePending(record);
+                        if (writePending(record)) {
+                            // And only now may the source let go of its own
+                            // copy. The container the clip wrote is the ONLY
+                            // durable copy until this write lands, so a source
+                            // that emptied it as it read destroyed the exact
+                            // code whenever this failed or the process exited
+                            // first -- and the next launch, finding no
+                            // handoff, settled an invited install as no_match
+                            // for ever. A write that failed leaves the
+                            // container alone, so the next launch reads it
+                            // again.
+                            try {
+                                source.handoffPersisted();
+                            } catch (Throwable t) {
+                                Log.e(t);
+                            }
+                        }
                         // Claimed exactly as a referrer code is: the trip
                         // through the store is what makes both of them exact,
                         // and the server treats them the same way.
@@ -2771,6 +2787,21 @@ public final class Invites {
                     // attributed, and this is the opposite of terminal. The
                     // existing attempt cap and attribution window bound how
                     // long this can go on.
+                    //
+                    // The attempt is STAMPED rather than cleared. Every
+                    // response clears lookupIssuedAt above, which is right for
+                    // an answer that settles something -- nothing will ask
+                    // again -- and wrong for this one: the state stays pending,
+                    // so resumeDeferred() re-issues on the next
+                    // checkForInvite(), and with no timestamp to throttle it an
+                    // application that calls that from two places would spend
+                    // all five attempts in seconds and settle an
+                    // offline-minted invite as no_match before its
+                    // registration ever arrived. This is the field the retry
+                    // interval is measured from, so recording the completed
+                    // attempt is what makes the interval apply to "not yet"
+                    // as well as to silence.
+                    lookupIssuedAt = System.currentTimeMillis();
                     setState(STATE_PENDING);
                     return;
                 }

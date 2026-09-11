@@ -62,4 +62,22 @@ public interface AppClipHandoffSource {
     ///
     /// - `callback`: receives the answer, never null
     void requestHandoff(AppClipHandoffCallback callback);
+
+    /// Told that the code from the last handoff is now stored somewhere that
+    /// survives the process, so a source holding the only other copy may
+    /// discard it.
+    ///
+    /// The iOS source hands over a value it reads out of the container it
+    /// shares with the App Clip, and that container is the ONLY durable copy
+    /// until the framework writes its own. Emptying it as it read meant a
+    /// failed write, or a process that exited in between, destroyed the exact
+    /// code -- and the next launch, finding no handoff, settled an invited
+    /// install as no_match for ever. So the read leaves the container alone
+    /// and this is what empties it.
+    ///
+    /// Called at most once per handoff, and never when the write failed: the
+    /// code stays where it is and the next launch reads it again, which is the
+    /// outcome a retry can still fix. A source with nothing to discard --
+    /// anything that did not hand over its only copy -- does nothing here.
+    void handoffPersisted();
 }

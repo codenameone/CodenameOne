@@ -450,6 +450,78 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void aDurableClipHandoffIsAcknowledged() {
+        // The shared container is the only durable copy of an exact App Clip
+        // code until this record is written, so the source is told when the
+        // framework has it and may let go. Without the acknowledgement the
+        // container is read again on every launch.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        InviteTestSupport.PendingHandoffSource source = InviteTestSupport.pendingHandoff;
+        Invites.checkForInvite();
+        assertTrue(source.wasAsked(), "the fixture never reached the clip handoff");
+
+        source.answer("CLIPACK1", 1700000000L);
+
+        assertEquals(1, source.persistedCount(),
+                "a durable handoff was never acknowledged");
+    }
+
+    @FormTest
+    void aClipHandoffWhoseRecordFailedIsNotAcknowledged() {
+        // And the half that matters: a source that empties the container on
+        // being told would destroy the exact code, because the write that was
+        // supposed to keep it did not land. The next launch then finds no
+        // handoff and settles an invited install as no_match for ever.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        InviteTestSupport.PendingHandoffSource source = InviteTestSupport.pendingHandoff;
+        Invites.checkForInvite();
+        assertTrue(source.wasAsked(), "the fixture never reached the clip handoff");
+
+        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+        source.answer("CLIPACK2", 1700000000L);
+
+        assertEquals(0, source.persistedCount(),
+                "the source was told to discard the only copy of the code after the "
+                        + "write that was supposed to keep it had failed");
+    }
+
+    @FormTest
+    void aNotYetAnswerIsNotAskedAgainImmediately() {
+        // The retry above must be throttled, or the fix for it becomes its own
+        // bug: every response clears the issued-at stamp, so with the state
+        // left pending an application that calls checkForInvite() from two
+        // places would re-issue on each one, spend all five attempts in
+        // seconds, and settle an offline-minted invite as no_match before its
+        // registration ever arrived.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=THROTTLE", 0L, 0L);
+            }
+        });
+        Invites.checkForInvite();
+        Invites.handleResolution("{\"resolved\":false,\"retry\":true}",
+                Invites.MATCH_REFERRER, true);
+        assertEquals(Invites.STATE_PENDING, Invites.getState());
+        implementation.clearQueuedRequests();
+
+        // The retry interval has NOT elapsed, so these must do nothing.
+        Invites.checkForInvite();
+        Invites.checkForInvite();
+
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "a not-yet answer was re-asked inside the retry interval, which is how "
+                        + "the attempt budget is spent in seconds");
+    }
+
+    @FormTest
     void aNotYetAnswerIsAskedAgainInTheSameProcess() {
         // beginDeferred() runs at most once per process, so after a "not yet"
         // the documented call-me-from-start() contract did nothing for the rest

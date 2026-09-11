@@ -3706,13 +3706,13 @@ public class IPhoneBuilder extends Executor {
         String inviteDomainProperty = "";
         if (usesInvites) {
             inviteDomainProperty = "        Display.getInstance().setProperty(\"invite.domain\", \""
-                    + request.getArg("invite.domain", "cloud.codenameone.com") + "\");\n";
+                    + InviteBuildHints.domain(request) + "\");\n";
             // The slug goes with it, and for the same reason. This build claims
             // /i/<slug>/ and nothing else, so a client that mints a bare
             // /i/<code> link produces a url its own build cannot open -- and it
             // would, because the client only learns the slug from the link
             // service, which the first invite is minted before ever reaching.
-            String inviteSlug = request.getArg("invite.slug", "");
+            String inviteSlug = InviteBuildHints.slug(request);
             if (inviteSlug != null && inviteSlug.trim().length() > 0) {
                 inviteDomainProperty += "        Display.getInstance().setProperty(\"invite.slug\", \""
                         + inviteSlug.trim() + "\");\n";
@@ -4448,7 +4448,7 @@ public class IPhoneBuilder extends Executor {
             // duplicate key, which fails codesigning.
             if (usesInvites
                     && "true".equals(request.getArg("ios.invite.universalLinks", "true"))) {
-                String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
+                String inviteHost = InviteBuildHints.domain(request);
                 String existingDomains = request.getArg("ios.associatedDomains", "");
                 // TWO prefixes on the same host, and they do different jobs.
                 //
@@ -4485,7 +4485,7 @@ public class IPhoneBuilder extends Executor {
             // domain has no way for iOS to offer a clip and would ship one
             // that can never launch.
             if (inviteAppClipGroup.length() > 0) {
-                String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
+                String inviteHost = InviteBuildHints.domain(request);
                 // Already resolved and validated before the stub was written,
                 // which needed it to decide whether to register a reader at
                 // all. Re-deriving it here would let the two disagree.
@@ -12359,7 +12359,7 @@ public class IPhoneBuilder extends Executor {
     private void appendInviteAppClipTarget(StringBuilder sb, BuildRequest request,
             File distDir) throws IOException, BuildException {
         String name = InviteAppClipBuilder.CLIP_NAME;
-        String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
+        String inviteHost = InviteBuildHints.domain(request);
         String displayName = request.getDisplayName() == null
                 ? request.getMainClass() : request.getDisplayName();
         IOSWalletExtensionBuilder.writeFileMap(

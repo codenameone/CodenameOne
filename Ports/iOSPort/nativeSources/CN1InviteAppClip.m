@@ -79,7 +79,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppClipHandoffSupported___java_l
             ? JAVA_TRUE : JAVA_FALSE;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_consumeAppClipInviteHandoff___java_lang_String_R_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_readAppClipInviteHandoff___java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
     NSUserDefaults *suite = cn1InviteSuite(toNSString(CN1_THREAD_STATE_PASS_ARG groupObj));
     if (suite == nil) {
@@ -103,10 +103,17 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_consumeAppClipInviteHandoff___java_
     long long clicked = [clickedValue isKindOfClass:[NSNumber class]]
             ? [(NSNumber *)clickedValue longLongValue] : 0;
 
-    // Cleared whatever was found, including a malformed record. Read once is
-    // the contract AppClipHandoffSource states, and it is what stops a second
-    // launch claiming a code the first already claimed.
-    [suite removeObjectForKey:kCN1InviteHandoffKey];
+    // NOT cleared here. This container is the only durable copy of the code
+    // until the framework writes its own record, so emptying it as it was read
+    // destroyed the exact code whenever that write failed or the process
+    // exited in between -- and the next launch, finding no handoff, settled an
+    // invited install as no_match for ever. Read once is still the contract;
+    // clearAppClipInviteHandoff below is what enforces it, at the point where
+    // losing the value costs nothing.
+    //
+    // The malformed case above is different and still clears: a record that
+    // cannot be parsed will never become valid, and leaving it means reading
+    // the same garbage on every launch.
 
     if (code == nil || code.length == 0) {
         return JAVA_NULL;
@@ -119,6 +126,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_consumeAppClipInviteHandoff___java_
     }
     NSString *joined = [NSString stringWithFormat:@"%@\n%lld", code, clicked];
     return fromNSString(CN1_THREAD_STATE_PASS_ARG joined);
+}
+
+void com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
+    NSUserDefaults *suite = cn1InviteSuite(toNSString(CN1_THREAD_STATE_PASS_ARG groupObj));
+    if (suite == nil) {
+        return;
+    }
+    [suite removeObjectForKey:kCN1InviteHandoffKey];
 }
 
 #else
@@ -138,9 +154,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppClipHandoffSupported___java_l
     return JAVA_FALSE;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_consumeAppClipInviteHandoff___java_lang_String_R_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_readAppClipInviteHandoff___java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
     return JAVA_NULL;
+}
+
+void com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
 }
 
 #endif // CN1_INCLUDE_INVITE_APPCLIP
