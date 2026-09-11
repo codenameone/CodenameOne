@@ -222,4 +222,18 @@ class InviteManifestFragmentsTest {
                 + "android:pathPrefix=\"/i/\" /></intent-filter>";
         assertFalse(InviteManifestFragments.declaresInviteLinks(existing, HOST, "acme"));
     }
+    @Test
+    void aSlugWithStraySpaceStillMatchesTheLinksTheAppMints() {
+        // The generated startup code stores invite.slug trimmed, so a hint
+        // written with a space around it made the app mint /i/<trimmed>/<code>
+        // while the manifest's pathPrefix kept the space. A link that does not
+        // match the filter opens the browser instead of the app, and nothing
+        // reports it: the build succeeds and the filter is right there.
+        String out = InviteManifestFragments.injectAppLinks("", HOST, "  acme  ");
+        assertTrue(out.contains("android:pathPrefix=\"/i/acme/\""),
+                "the filter kept the whitespace the app trims: " + out);
+        assertFalse(out.contains("/i/  acme"),
+                "the untrimmed slug reached the manifest: " + out);
+    }
+
 }

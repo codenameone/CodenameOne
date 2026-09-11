@@ -71,10 +71,22 @@ final class InviteManifestFragments {
         if (host == null || host.length() == 0) {
             return current;
         }
-        if (declaresInviteLinks(current, host, slug)) {
+        // Trimmed HERE, because the other reader of this hint trims too.
+        //
+        // The generated startup code stores invite.slug trimmed, so a hint
+        // written with a stray space around it made the app mint
+        // /i/<trimmed>/<code> while the pathPrefix in the manifest kept the
+        // space -- and a link that does not match the filter opens the browser
+        // instead of the app. Nothing reports it: the build succeeds, the
+        // filter is there, and every invite silently misses it.
+        //
+        // One normalization for both outputs, in the place both go through,
+        // rather than a second trim at a call site that has to remember.
+        String path = slug == null ? "" : slug.trim();
+        if (declaresInviteLinks(current, host, path)) {
             return current;
         }
-        return current + filter(host, slug);
+        return current + filter(host, path);
     }
 
     /**
