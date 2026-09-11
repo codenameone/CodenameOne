@@ -30,8 +30,11 @@ import com.codename1.util.StringUtil;
 /// The platform crypto bridge only accepts X.509/SubjectPublicKeyInfo and
 /// PKCS#8 DER, but the files people actually have on disk are PEM: base64
 /// wrapped in `-----BEGIN ...-----` armor, and often in the older PKCS#1 or
-/// SEC1 container rather than the one the bridge wants. This class absorbs
-/// both differences so callers do not have to run `openssl` first.
+/// SEC1 container rather than the one the bridge wants. A public key is as
+/// likely again to arrive inside the X.509 certificate that carries it --
+/// a server's TLS certificate, a payment gateway's signing certificate, the
+/// `x5c` entry of a JWK -- which is not a key container at all. This class
+/// absorbs all of those so callers do not have to run `openssl` first.
 ///
 /// Validation stops at structure. This class checks what it walks, classifies
 /// on, or rebuilds -- container shape, mandatory fields, element bounds -- so a
@@ -51,9 +54,15 @@ final class Pem {
     private static final int SHAPE_PKCS1_PUBLIC = 2;
     private static final int SHAPE_PKCS1_PRIVATE = 3;
     private static final int SHAPE_SEC1 = 4;
-    private static final int SHAPE_UNKNOWN = 5;
+    private static final int SHAPE_CERTIFICATE = 5;
+    private static final int SHAPE_UNKNOWN = 6;
 
-    private static final String[] PUBLIC_LABELS = {"PUBLIC KEY", "RSA PUBLIC KEY"};
+    /// `X509 CERTIFICATE` is the same DER under the label OpenSSL wrote before
+    /// RFC 7468 settled on the shorter one, and files carrying it are still in
+    /// circulation.
+    private static final String[] PUBLIC_LABELS = {
+        "PUBLIC KEY", "RSA PUBLIC KEY", "CERTIFICATE", "X509 CERTIFICATE"
+    };
     private static final String[] PRIVATE_LABELS = {"PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY"};
 
     private static final String BEGIN = "-----BEGIN ";
@@ -108,6 +117,7 @@ final class Pem {
     /// Decodes `pem` to X.509/SubjectPublicKeyInfo DER.
     ///
     /// Accepts a `PUBLIC KEY` block, a PKCS#1 `RSA PUBLIC KEY` block (rewrapped
+    /// here), a `CERTIFICATE` block (whose subject public key is lifted out
     /// here), or bare base64 with no armor at all.
     static byte[] toSpki(String pem) {
         byte[] der = select(pem, PUBLIC_LABELS, false);
@@ -123,6 +133,9 @@ final class Pem {
             byte[] bitString = new byte[der.length + 1];
             System.arraycopy(der, 0, bitString, 1, der.length);
             return tlv(0x30, concat(rsaAlgorithmIdentifier(), tlv(0x03, bitString)));
+        }
+        if (shape == SHAPE_CERTIFICATE) {
+            return certificateToSpki(der);
         }
         if (shape == SHAPE_UNKNOWN) {
             throw new CryptoException("unrecognized public key container");
@@ -146,6 +159,11 @@ final class Pem {
         }
         if (shape == SHAPE_SEC1) {
             return sec1ToPkcs8(der);
+        }
+        if (shape == SHAPE_CERTIFICATE) {
+            // Reachable through bare base64 only: an armored certificate never
+            // matches PRIVATE_LABELS and is refused by select() by name.
+            throw new CryptoException("this is a certificate, not a private key");
         }
         if (shape == SHAPE_UNKNOWN) {
             throw new CryptoException("unrecognized private key container");
@@ -257,12 +275,28 @@ final class Pem {
             // bounds-checks its length) and nothing may follow it. Peeking at
             // the tag alone accepted a lone 0x03 byte and an empty 03 00.
             c.skip();
+            if (c.hasMore() && c.peek() == 0x03) {
+                // A BIT STRING's first content octet counts unused bits, so a
+                // length of one is metadata and no key material at all.
+                return isBitString(c.read(0x03)) && !c.hasMore() ? SHAPE_SPKI : SHAPE_UNKNOWN;
+            }
+            // Certificate ::= SEQUENCE { tbsCertificate SEQUENCE,
+            // signatureAlgorithm AlgorithmIdentifier, signatureValue BIT STRING }
+            // -- three fields where an SPKI has two, and no other container
+            // here opens with a SEQUENCE at all, so the outer shape separates
+            // the two with nothing left over to collide. Only the outer shape
+            // is read: classifying on the tbsCertificate as well would mean
+            // walking it twice and reporting a certificate this class cannot
+            // read as "unrecognized container" rather than saying what is
+            // wrong with it, so that walk belongs to certificateToSpki.
+            if (!c.hasMore() || c.peek() != 0x30) {
+                return SHAPE_UNKNOWN;
+            }
+            c.skip();
             if (!c.hasMore() || c.peek() != 0x03) {
                 return SHAPE_UNKNOWN;
             }
-            // A BIT STRING's first content octet counts unused bits, so a
-            // length of one is metadata and no key material at all.
-            return isBitString(c.read(0x03)) && !c.hasMore() ? SHAPE_SPKI : SHAPE_UNKNOWN;
+            return isBitString(c.read(0x03)) && !c.hasMore() ? SHAPE_CERTIFICATE : SHAPE_UNKNOWN;
         }
         if (c.peek() != 0x02) {
             return SHAPE_UNKNOWN;
@@ -438,9 +472,15 @@ final class Pem {
             throw new CryptoException("this private key is passphrase-encrypted; decrypt it first with: "
                     + "openssl pkcs8 -topk8 -nocrypt -in key.pem -out key_pkcs8.pem");
         }
-        if (!privateKey && labels.indexOf("CERTIFICATE") >= 0) {
-            throw new CryptoException("this is a certificate, not a public key; "
-                    + "extract the key with: openssl x509 -in cert.pem -pubkey -noout");
+        if (!privateKey && labels.indexOf("TRUSTED CERTIFICATE") >= 0) {
+            // A plain CERTIFICATE is a public key source and matched above. This
+            // one is not the same file: OpenSSL's trusted form appends its trust
+            // settings after the certificate, so the body holds two DER elements
+            // and would be refused for its trailing bytes -- which says nothing
+            // about what the file is or how to get a usable one out of it.
+            throw new CryptoException("this is an OpenSSL trusted certificate, which carries "
+                    + "trust settings after the certificate itself; re-export it with: "
+                    + "openssl x509 -in trusted.pem -out cert.pem");
         }
         throw new CryptoException("no " + (privateKey ? "private" : "public")
                 + " key block in this PEM; it holds: " + labels);
@@ -539,6 +579,145 @@ final class Pem {
         if (c.hasMore()) {
             throw new CryptoException("malformed key: " + (der.length - c.position())
                     + " trailing bytes after the key");
+        }
+    }
+
+    /// Lifts the `subjectPublicKeyInfo` out of an X.509 certificate.
+    ///
+    /// A certificate is the commonest way a public key is handed to a client,
+    /// and it is not a key container: the key sits seven fields deep inside
+    /// `tbsCertificate`, so it has to be walked to. Everything walked past is
+    /// checked, in the order the structure declares it, because this method
+    /// returns a slice of its input and a container it cannot read is one
+    /// whose seventh field is not the key it looks like.
+    ///
+    /// ```text
+    /// Certificate     ::= SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }
+    /// TBSCertificate  ::= SEQUENCE {
+    ///     version          [0] EXPLICIT INTEGER DEFAULT v1,
+    ///     serialNumber         INTEGER,
+    ///     signature            AlgorithmIdentifier,
+    ///     issuer               Name,
+    ///     validity             Validity,
+    ///     subject              Name,
+    ///     subjectPublicKeyInfo SubjectPublicKeyInfo,   -- what is wanted
+    ///     issuerUniqueID   [1] IMPLICIT BIT STRING OPTIONAL,
+    ///     subjectUniqueID  [2] IMPLICIT BIT STRING OPTIONAL,
+    ///     extensions       [3] EXPLICIT Extensions OPTIONAL }
+    /// ```
+    ///
+    /// The signature is not checked and cannot be: verifying it needs the
+    /// issuer's key, which is not in the file, and a self-signed certificate
+    /// verifying against itself would say nothing anyway. Neither is the
+    /// validity period -- an expired certificate still names the right key,
+    /// and refusing one here would break an app on a date this class chose.
+    /// Both belong to a trust decision the caller makes elsewhere; all this
+    /// method claims is that the key it returns is the key the file carries.
+    private static byte[] certificateToSpki(byte[] der) {
+        Cursor certificate = new Cursor(der);
+        certificate.enter(0x30);
+        Cursor c = new Cursor(certificate.element());
+        c.enter(0x30);
+        if (c.hasMore() && c.peek() == 0xA0) {
+            requireCertificateVersion(c.element());
+        }
+        // A DER INTEGER always carries at least one content octet, so a serial
+        // number of no bytes is malformed however plausible the rest looks.
+        if (!c.hasMore() || c.peek() != 0x02 || c.consume(0x02) == 0) {
+            throw new CryptoException("malformed certificate: no serial number");
+        }
+        requireTbsSequence(c, "signature algorithm");
+        requireTbsSequence(c, "issuer");
+        requireTbsSequence(c, "validity");
+        requireTbsSequence(c, "subject");
+        if (!c.hasMore() || c.peek() != 0x30) {
+            throw new CryptoException("malformed certificate: no subjectPublicKeyInfo");
+        }
+        byte[] spki = c.element();
+        // The three optional trailers are IMPLICIT [1] and [2] BIT STRINGs and
+        // an EXPLICIT [3], in that order and no other. Stopping at the key
+        // would accept a spliced tbsCertificate on the strength of its first
+        // seven fields.
+        if (c.hasMore() && c.peek() == 0x81 && !isBitString(c.read(0x81))) {
+            throw new CryptoException("malformed certificate: issuerUniqueID is not a BIT STRING");
+        }
+        if (c.hasMore() && c.peek() == 0x82 && !isBitString(c.read(0x82))) {
+            throw new CryptoException("malformed certificate: subjectUniqueID is not a BIT STRING");
+        }
+        if (c.hasMore() && c.peek() == 0xA3) {
+            requireExtensions(c.element());
+        }
+        if (c.hasMore()) {
+            throw new CryptoException("malformed certificate: unexpected field 0x"
+                    + Integer.toHexString(c.peek()) + " after the subject public key");
+        }
+        // The seventh field of a certificate is a SubjectPublicKeyInfo by
+        // position, which is not the same as being one: the tag says SEQUENCE
+        // and nothing else has been read. Classifying it puts what comes out
+        // of a certificate through exactly the checks a PUBLIC KEY block goes
+        // through, rather than trusting where it was found.
+        if (shapeOf(spki) != SHAPE_SPKI) {
+            throw new CryptoException("malformed certificate: the subject public key is not a "
+                    + "well-formed SubjectPublicKeyInfo");
+        }
+        return spki;
+    }
+
+    /// Consumes one of the mandatory `tbsCertificate` SEQUENCEs, naming it if
+    /// it is absent.
+    private static void requireTbsSequence(Cursor c, String field) {
+        if (!c.hasMore() || c.peek() != 0x30) {
+            throw new CryptoException("malformed certificate: no " + field);
+        }
+        c.skip();
+    }
+
+    /// `version [0] EXPLICIT Version` -- an INTEGER of v1 (0), v2 (1) or v3 (2)
+    /// and nothing else in the tag.
+    ///
+    /// The version has no bearing on the key that comes out, so this checks it
+    /// rather than reading it: a `[0]` holding something other than a version
+    /// means the field the walk counts on being the serial number is not, and
+    /// the walk would go on regardless and return whatever sat in the seventh
+    /// position.
+    private static void requireCertificateVersion(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0xA0);
+        byte[] version = c.read(0x02);
+        if (c.hasMore()) {
+            throw new CryptoException("malformed certificate: [0] holds more than the version");
+        }
+        if (version.length != 1 || version[0] < 0 || version[0] > 2) {
+            throw new CryptoException("unsupported certificate version; X.509 defines only "
+                    + "v1, v2 and v3");
+        }
+    }
+
+    /// `extensions [3] EXPLICIT Extensions`, where `Extensions ::= SEQUENCE
+    /// SIZE (1..MAX) OF Extension`.
+    ///
+    /// Walked to its members rather than skipped whole, because "[3] is
+    /// present" is not the same as "[3] holds a populated SEQUENCE": an empty
+    /// one breaks the size constraint, and a `30 01 06` inside it is a tag with
+    /// no length behind it.
+    private static void requireExtensions(byte[] element) {
+        Cursor c = new Cursor(element);
+        c.enter(0xA3);
+        if (!c.hasMore() || c.peek() != 0x30) {
+            throw new CryptoException("malformed certificate: [3] does not hold an extensions "
+                    + "SEQUENCE");
+        }
+        Cursor extensions = new Cursor(c.element());
+        extensions.enter(0x30);
+        if (!extensions.hasMore()) {
+            throw new CryptoException("malformed certificate: the extensions SEQUENCE is empty");
+        }
+        while (extensions.hasMore()) {
+            extensions.skip();
+        }
+        if (c.hasMore()) {
+            throw new CryptoException("malformed certificate: [3] holds more than the extensions "
+                    + "SEQUENCE");
         }
     }
 
