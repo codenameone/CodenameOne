@@ -1048,6 +1048,15 @@ public final class Invites {
             // would block a device that has no invite data to block over.
             if (anythingSurvives()) {
                 erasurePending = true;
+                // And durably, because the flag above is a static. A reset
+                // whose deletes failed and whose process then exited left
+                // nothing to retry from, and a plain reset keeps the client
+                // id -- so the provider sees no identity change on the next
+                // launch and does not erase either. The surviving records came
+                // back and were transmitted.
+                Map<String, String> owed = new LinkedHashMap<String, String>();
+                owed.put("at", String.valueOf(System.currentTimeMillis()));
+                InviteStore.write(InviteStore.ERASURE, owed);
             }
         }
     }
@@ -1135,6 +1144,13 @@ public final class Invites {
     // under, so a test can simulate a response that raced an erasure.
     static int currentLookupEpochForTest() {
         return lookupEpoch;
+    }
+
+    // Package private test seam: models the next process, where nothing in
+    // memory remembers that an erasure was owed.
+    static void forgetErasurePendingForTest() {
+        erasurePending = false;
+        dimensionsReconciled = false;
     }
 
     // Package private test seam: lets a test model the next launch, where the
@@ -1233,6 +1249,9 @@ public final class Invites {
         state = STATE_NONE_FOUND;
         stateLoaded = true;
         erasurePending = false;
+        // The durable marker goes with the flag, or every later launch would
+        // erase again and settle a fresh install as terminal.
+        InviteStore.delete(InviteStore.ERASURE);
         return true;
     }
 
@@ -1358,6 +1377,7 @@ public final class Invites {
     // catalog's prefix and put a Play dependency and an API floor on every
     // application that logs a single event.
     private static void ensureProvider() {
+        resumeOwedErasure();
         reconcileDimensions();
         try {
             List providers = Analytics.getProviders();
@@ -2829,6 +2849,23 @@ public final class Invites {
     /// gone and the dimensions are not, the dimensions are the stale copy, and
     /// the erasure finishes here instead -- on the next launch rather than the
     /// failing one, which is the best any unverifiable store allows.
+    /// Picks up an erasure that a previous process could not finish.
+    ///
+    /// Called on the same once-per-process path as the dimension
+    /// reconciliation, and before anything can read or transmit a record: the
+    /// marker means the records on the disk are ones the user asked to be rid
+    /// of.
+    private static void resumeOwedErasure() {
+        Map<String, String> owed = InviteStore.read(InviteStore.ERASURE);
+        if (owed == null || owed.isEmpty()) {
+            return;
+        }
+        erasurePending = true;
+        if (eraseInternal()) {
+            InviteStore.delete(InviteStore.ERASURE);
+        }
+    }
+
     private static void reconcileDimensions() {
         if (dimensionsReconciled) {
             return;
@@ -3011,7 +3048,23 @@ public final class Invites {
     //
     // Not persisted: a process that dies with requests outstanding should
     // retry them, and an empty set on the next launch is what makes it.
-    private static final List<String> inFlight = new ArrayList<String>();
+    private static final Map<String, Long> inFlight = new LinkedHashMap<String, Long>();
+
+    /// How long an entry stays skippable after its request goes out.
+    ///
+    /// The mark exists to stop one burst of invites reposting the whole queue,
+    /// and a burst happens inside milliseconds -- so a short bound serves that
+    /// completely while guaranteeing the queue heals.
+    ///
+    /// It is a TIME bound rather than a callback because the callback cannot
+    /// be relied on. These requests are fail-silent, and NetworkManager's
+    /// fail-silent branch only logs: it never calls handleIOException or
+    /// handleRuntimeException, so nothing reaches the request's own exception
+    /// hooks. A transport failure therefore left the entry marked for the life
+    /// of the process and every automatic drain skipped it -- trading an
+    /// amplification bug for a registration that only an explicit flush() or a
+    /// restart would ever resend.
+    static final long IN_FLIGHT_WINDOW_MS = 60000L;
 
     /// Records that a queued registration was evicted to keep the outbox
     /// under its cap.
@@ -3090,6 +3143,22 @@ public final class Invites {
     ///   answer. true everywhere else, including the flush create() issues
     ///   itself -- that one is what turned a burst of N invites into N(N+1)/2
     ///   requests, and no invite in a burst needs its predecessors resent.
+    /// Whether this entry's request went out recently enough to skip.
+    ///
+    /// An expired mark is dropped as it is read, so a queue that outlives its
+    /// requests cleans itself rather than growing for the life of the process.
+    private static boolean issuedRecently(String json) {
+        Long at = inFlight.get(json);
+        if (at == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() - at.longValue() < IN_FLIGHT_WINDOW_MS) {
+            return true;
+        }
+        inFlight.remove(json);
+        return false;
+    }
+
     private static void drainOutbox(boolean skipInFlight) {
         if (!allowed()) {
             return;
@@ -3117,13 +3186,13 @@ public final class Invites {
         // Re-posting an entry that did land is harmless: the server keys on
         // the code and treats a repeat from the same inviter as idempotent.
         for (String json : outbox) {
-            if (skipInFlight && inFlight.contains(json)) {
+            if (skipInFlight && issuedRecently(json)) {
                 // Already on the wire. Its response will remove it or leave it
                 // for the next drain; sending it again buys nothing and is how
                 // one burst of invites became thousands of requests.
                 continue;
             }
-            inFlight.add(json);
+            inFlight.put(json, Long.valueOf(System.currentTimeMillis()));
             // The body is rewritten, the KEY is not. The outbox still holds the
             // original string, and that is what has to be removed when the
             // server accepts it.

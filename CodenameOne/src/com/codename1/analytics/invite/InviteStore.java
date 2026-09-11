@@ -51,6 +51,22 @@ final class InviteStore {
     // Mint registrations that have not reached the link service yet.
     static final String OUTBOX = "CN1$InviteOutbox";
 
+    /// Records that an erasure was asked for and could not finish.
+    ///
+    /// Its own record because it has to outlive the process: `erasurePending`
+    /// is a static, so a reset() whose deletes failed and whose application
+    /// then exited left nothing behind to retry from -- and a plain reset
+    /// keeps the client id, so the provider sees no identity change on the
+    /// next launch and never erases either. The surviving attribution came
+    /// back and was transmitted, which is what reset() promises will not
+    /// happen.
+    ///
+    /// Tiny and written rather than deleted, because the failure being
+    /// recorded is a failure to DELETE: a store that refuses removals may
+    /// still accept a small write, and if it refuses that too this is no worse
+    /// than what came before.
+    static final String ERASURE = "CN1$InviteErasureOwed";
+
     // Entries leave this queue when the server acknowledges them, so the cap is
     // a safety ceiling rather than a working limit -- and it was far too low
     // for that. A dropped registration is not recoverable: the code carries no

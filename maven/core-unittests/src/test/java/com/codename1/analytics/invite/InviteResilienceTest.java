@@ -627,6 +627,38 @@ class InviteResilienceTest extends UITestBase {
                 "a settled claim was left pending and would be submitted again");
     }
 
+    @FormTest
+    void anerasureOwedSurvivesTheProcessThatCouldNotFinishIt() {
+        // erasurePending is a static. A reset whose deletes failed and whose
+        // process then exited left nothing to retry from -- and a plain reset
+        // keeps the client id, so the provider sees no identity change on the
+        // next launch and does not erase either. The surviving attribution
+        // came back and was transmitted, which is the one thing reset()
+        // promises will not happen.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("OWED1", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
+
+        InviteStore.failNextDeleteForTest(InviteStore.ATTRIBUTION);
+        Invites.reset();
+        assertNotNull(InviteStore.read(InviteStore.ERASURE),
+                "a failed reset left no durable trace of the erasure it owed");
+
+        // The next process: nothing in memory remembers, and the store has
+        // recovered.
+        Invites.forgetErasurePendingForTest();
+        Invites.forgetCachedAttributionForTest();
+        Invites.checkForInvite();
+
+        assertNull(Invites.getAttribution(),
+                "the erasure was never finished and the attribution came back");
+        assertNull(InviteStore.read(InviteStore.ERASURE),
+                "the marker outlived the erasure it asked for");
+    }
+
     @Test
     @EdtTest
     void theReferrerCodeIsPersistedBeforeTheClaimGoesOut() {

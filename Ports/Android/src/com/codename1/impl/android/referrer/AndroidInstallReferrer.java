@@ -236,12 +236,29 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
             unavailable(issued, callback, Invites.REASON_NO_MATCH);
             return;
         }
-        Preferences.set(PREF_ATTEMPTED, true);
         if (referrer == null || referrer.length() == 0) {
+            // Read successfully and there is no invite behind this install.
+            // Definitive, so the flag is burnt: asking again cannot change it.
+            Preferences.set(PREF_ATTEMPTED, true);
             unavailable(issued, callback, Invites.REASON_NO_MATCH);
             return;
         }
+        // The handoff FIRST, the flag after.
+        //
+        // Burning the flag before handing the referrer over meant a process
+        // killed in between lost the exact code for ever: the next launch saw
+        // isSupported() false and settled the invited install as no-match.
+        // Invites persists the code inside this call when it runs on the EDT,
+        // which is the common case.
+        //
+        // It is not a guarantee, and saying so is the point: the framework
+        // marshals onto the EDT, so when this callback arrives on a binder
+        // thread the persist is queued rather than done, and a process killed
+        // inside that window still loses it. The window goes from "always" to
+        // "the callSerially latency", which is the most the SPI shape allows
+        // without the port knowing what the framework did with the value.
         referrer(issued, callback, referrer, clickSeconds, beginSeconds);
+        Preferences.set(PREF_ATTEMPTED, true);
     }
 
     private void finish(int issued, InstallReferrerCallback callback, String reason) {
