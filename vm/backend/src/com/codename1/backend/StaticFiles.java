@@ -388,6 +388,20 @@ public final class StaticFiles implements HttpServer.Handler {
         return since >= 0 && modified / 1000 <= since / 1000;
     }
 
+    /**
+     * Whether {@code text} is empty, or a run of ASCII digits and nothing else.
+     * Empty means the bound was absent, which both range forms allow.
+     */
+    private static boolean isUnsignedDigits(String text) {
+        for(int iter = 0 ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            if(c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Returns {offset, length}, or null when the range cannot be satisfied. */
     /**
      * Returned when the Range field cannot be honoured but nothing about it is
@@ -422,8 +436,25 @@ public final class StaticFiles implements HttpServer.Handler {
             // this cannot make about a field it did not understand.
             return IGNORE_RANGE;
         }
-        String fromText = value.substring(0, dash).trim();
-        String toText = value.substring(dash + 1).trim();
+        String fromText = value.substring(0, dash);
+        String toText = value.substring(dash + 1);
+        // EACH BOUND IS AN UNSIGNED RUN OF ASCII DIGITS, or it is absent.
+        // Long.parseLong accepts a sign and Character.digit's whole repertoire, so
+        // "bytes=+0-1" parsed as 0-1 and answered 206 to a field that is not a
+        // byte-range-spec at all -- as would Arabic-Indic digits. The .trim() that
+        // used to be here was the same leniency once more: RFC 9112 allows no
+        // whitespace inside the spec, and accepting it invents a range the client
+        // did not write.
+        //
+        // Ignored rather than 416, which is what makes being strict here safe: the
+        // client gets the WHOLE representation, which every client understands.
+        // RFC 9110 14.2 says to ignore a Range that cannot be parsed; 416 asserts
+        // that what was asked for does not exist, and that is a claim this cannot
+        // make about a field it did not understand.
+        if(!isUnsignedDigits(fromText) || !isUnsignedDigits(toText)
+                || (fromText.length() == 0 && toText.length() == 0)) {
+            return IGNORE_RANGE;
+        }
         if(size == 0) {
             // No range over a zero-length representation can be satisfied, and the
             // suffix form quietly produced one: "bytes=-1" clamped to a length of 0

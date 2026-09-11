@@ -577,6 +577,39 @@ class BackendHttpIntegrationTest {
         // And a Range that cannot be parsed at all is ignored for the same reason.
         assertEquals(200, status(request("GET", "/static/big.bin", null,
                 new String[]{"Range: bytes=abc"})));
+
+        // A BOUND IS AN UNSIGNED RUN OF ASCII DIGITS. Long.parseLong accepts a
+        // sign and the whole of Character.digit's repertoire, so these were read
+        // as ordinary ranges and answered 206 -- a partial response to a field
+        // that is not a byte-range-spec. Ignored rather than refused, so the
+        // client still gets the whole representation.
+        String[] notRanges = {
+            "bytes=+0-1",        // a sign is not part of first-byte-pos
+            "bytes=0-+1",        // nor of last-byte-pos
+            "bytes=-+1",         // nor of a suffix length
+            "bytes=\u0660-\u0661",   // Arabic-Indic digits are digits to parseLong
+            "bytes= 0-1",        // no whitespace is allowed inside the spec
+            "bytes=0 -1",
+            "bytes=0- 1",
+            "bytes=-",           // both bounds absent is not a range
+        };
+        for(int iter = 0 ; iter < notRanges.length ; iter++) {
+            byte[] answer = request("GET", "/static/big.bin", null,
+                    new String[]{"Range: " + notRanges[iter]});
+            assertEquals(200, statusOf(answer),
+                    "\"" + notRanges[iter] + "\" is not a byte-range-spec and must be "
+                            + "ignored, not answered as a range");
+            assertEquals(null, header(answer, "Content-Range"),
+                    "an ignored Range must leave no Content-Range: " + notRanges[iter]);
+        }
+
+        // The real forms still work, which is what being strict here must not cost.
+        assertEquals(206, status(request("GET", "/static/big.bin", null,
+                new String[]{"Range: bytes=0-99"})));
+        assertEquals(206, status(request("GET", "/static/big.bin", null,
+                new String[]{"Range: bytes=100-"})));
+        assertEquals(206, status(request("GET", "/static/big.bin", null,
+                new String[]{"Range: bytes=-100"})));
     }
 
     @Test

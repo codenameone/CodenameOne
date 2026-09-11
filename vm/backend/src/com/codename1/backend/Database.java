@@ -22,6 +22,7 @@
  */
 package com.codename1.backend;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -437,26 +438,51 @@ public final class Database {
             if(value.indexOf('%') < 0) {
                 return value;
             }
-            byte[] out = new byte[value.length()];
-            int length = 0;
-            for(int iter = 0 ; iter < value.length() ; iter++) {
-                char c = value.charAt(iter);
-                if(c == '%' && iter + 2 < value.length()) {
-                    int high = digit(value.charAt(iter + 1));
-                    int low = digit(value.charAt(iter + 2));
-                    if(high >= 0 && low >= 0) {
-                        out[length++] = (byte)((high << 4) | low);
-                        iter += 2;
-                        continue;
-                    }
-                }
-                out[length++] = (byte)c;
-            }
+            // A LITERAL CHARACTER IS ENCODED, not narrowed. Writing (byte)c put
+            // the low eight bits of a UTF-16 char into a buffer that is then read
+            // back as UTF-8, so a password of "p\u00e4ss%40word" became byte 0xE4
+            // -- a lone continuation-less lead byte -- and decoded to U+FFFD. The
+            // credential, database name or CA path silently became a DIFFERENT
+            // string, and only when something else in it needed escaping: with no
+            // escape anywhere this method is never reached.
+            //
+            // Literals are gathered and handed to the platform encoder rather than
+            // encoded by hand, which is what makes a surrogate pair come out as
+            // the one four-byte sequence it is instead of two malformed halves.
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            StringBuilder literal = new StringBuilder();
             try {
-                return new String(out, 0, length, "UTF-8");
+                for(int iter = 0 ; iter < value.length() ; iter++) {
+                    char c = value.charAt(iter);
+                    if(c == '%' && iter + 2 < value.length()) {
+                        int high = digit(value.charAt(iter + 1));
+                        int low = digit(value.charAt(iter + 2));
+                        if(high >= 0 && low >= 0) {
+                            flushLiteral(literal, out);
+                            out.write((high << 4) | low);
+                            iter += 2;
+                            continue;
+                        }
+                    }
+                    literal.append(c);
+                }
+                flushLiteral(literal, out);
+                byte[] bytes = out.toByteArray();
+                return new String(bytes, 0, bytes.length, "UTF-8");
             } catch (UnsupportedEncodingException err) {
                 return value;
             }
+        }
+
+        /** Writes the pending literal run as UTF-8 and empties it. */
+        private static void flushLiteral(StringBuilder literal, ByteArrayOutputStream out)
+                throws UnsupportedEncodingException {
+            if(literal.length() == 0) {
+                return;
+            }
+            byte[] encoded = literal.toString().getBytes("UTF-8");
+            out.write(encoded, 0, encoded.length);
+            literal.setLength(0);
         }
 
         private static int digit(char c) {

@@ -625,6 +625,56 @@ public class SelfTest {
     }
 
     /**
+     * A URL component keeps its non-ASCII characters when something ELSE in it
+     * needed escaping.
+     *
+     * <p>The decoder wrote a literal char straight into a byte buffer that it then
+     * read back as UTF-8, so "p\u00e4ss%40word" put byte 0xE4 -- a lead byte with
+     * no continuation -- where two bytes belonged, and the password decoded to
+     * U+FFFD in place of the a-umlaut. The credential, database name or CA path
+     * silently became a DIFFERENT string, and the connection then failed, or
+     * succeeded against something other than what was written down.
+     *
+     * <p>Only reachable when one component carries an escape AND a literal
+     * non-ASCII character: with no escape anywhere the decoder is never entered,
+     * which is why an accented password on its own always worked and this stayed
+     * invisible until some other character needed encoding.
+     *
+     * <p>Read back through sslmode, which is the one decoded value this API
+     * repeats verbatim -- its refusal quotes what it was given, so the decoder's
+     * output is observable without a live server and without printing a password.
+     */
+    private static void urlComponentsKeepTheirUnicode() throws Exception {
+        // "caf<a-umlaut>%2Dx" is a literal non-ASCII character and an escaped '-'
+        // in one value. Correctly decoded it is "caf<a-umlaut>-x".
+        String outcome;
+        try {
+            Database.open("postgres://u:p@127.0.0.1:1/db?sslmode=caf\u00e4%2Dx");
+            outcome = "accepted";
+        } catch (Exception refused) {
+            outcome = String.valueOf(refused.getMessage());
+        }
+        check("the escape decoded", "true", String.valueOf(outcome.indexOf("-x") >= 0));
+        check("and the literal character survived it", "true",
+                String.valueOf(outcome.indexOf("caf\u00e4-x") >= 0));
+        check("with no replacement character", "true",
+                String.valueOf(outcome.indexOf("\uFFFD") < 0));
+
+        // A character OUTSIDE the basic plane arrives as a surrogate PAIR, which a
+        // hand-rolled encoder turns into two malformed halves. U+1F600 beside an
+        // escape is the case that proves the pair is encoded as one sequence.
+        String astral;
+        try {
+            Database.open("postgres://u:p@127.0.0.1:1/db?sslmode=\ud83d\ude00%2Dx");
+            astral = "accepted";
+        } catch (Exception refused) {
+            astral = String.valueOf(refused.getMessage());
+        }
+        check("a surrogate pair survives the round trip", "true",
+                String.valueOf(astral.indexOf("\ud83d\ude00-x") >= 0));
+    }
+
+    /**
      * An explicitly spelled port that is not a real port is refused by the
      * PARSER, rather than reaching an engine that reads it as "unset".
      *
@@ -769,6 +819,7 @@ public class SelfTest {
         repeatedOutboundHeadersSurvive();
         negativeConnectTimeoutsAreRefused();
         malformedPortsAreRefused();
+        urlComponentsKeepTheirUnicode();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");
