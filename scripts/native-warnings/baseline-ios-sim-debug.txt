@@ -31,7 +31,6 @@ port|Ports/iOSPort/nativeSources/CN1Crypto.m|-Wunused-variable|unused variable ?
 port|Ports/iOSPort/nativeSources/CN1DragAndDrop.m|-Wunused-variable|unused variable ?|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wdeprecated-declarations|? is deprecated: first deprecated in iOS ? - OpenGLES API deprecated. (Define GLES_SILENCE_DEPRECATION to silence these warnings)|77 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wincompatible-pointer-types-discards-qualifiers|assigning to ? (aka ?) from ? (aka ?) discards qualifiers|3 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wint-conversion|incompatible pointer to integer conversion initializing ? (aka ?) with an expression of type ?|18 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wnonportable-include-path|non-portable path to file ?; specified path differs in case from file name on disk|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wpointer-sign|passing ? (aka ?) to parameter of type ? (aka ?) converts between pointers to integer types with different sign|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? (aka ?) to ?|4 instance(s) when the baseline was written; not yet triaged
