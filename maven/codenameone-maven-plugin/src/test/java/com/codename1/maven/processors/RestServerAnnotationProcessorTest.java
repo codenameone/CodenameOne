@@ -1327,7 +1327,10 @@ public class RestServerAnnotationProcessorTest {
                         java.util.List tags = (java.util.List) pet.getClass()
                                 .getField("tags").get(pet);
                         double total = 0;
-                        for (int i = 0; i < tags.size(); i++) {
+                        // A null collection is a legal thing for the client to
+                        // send, so this fixture has to survive it -- it is the
+                        // value the "stays null" case below asserts arrives.
+                        for (int i = 0; tags != null && i < tags.size(); i++) {
                             Object tag = tags.get(i);
                             if (tag == null) {
                                 continue; // an element of the wrong shape decodes to null
@@ -1383,6 +1386,26 @@ public class RestServerAnnotationProcessorTest {
             assertTrue(String.valueOf(expected.getCause()),
                     expected.getCause() instanceof IllegalArgumentException);
         }
+        // THE CONTAINER, by the same rule as the element above. A scalar or an
+        // object where an array was declared answered null, so the handler was
+        // invoked with a null field and the client's mistake was indistinguishable
+        // from an explicit JSON null -- the very distinction the element check
+        // beside it exists to preserve, missing one level up.
+        Object[] notArrays = {"a string", Long.valueOf(7),
+                              new java.util.LinkedHashMap(), Boolean.TRUE};
+        for (int i = 0; i < notArrays.length; i++) {
+            java.util.Map petShape = new java.util.LinkedHashMap();
+            petShape.put("tags", notArrays[i]);
+            try {
+                dispatch.invoke(dispatcher, "POST", "/pet", null, petShape);
+                fail("a " + notArrays[i].getClass().getName()
+                        + " where an array was declared must be refused, not nulled");
+            } catch (java.lang.reflect.InvocationTargetException expected) {
+                assertTrue(String.valueOf(expected.getCause()),
+                        expected.getCause() instanceof IllegalArgumentException);
+            }
+        }
+
         // A genuine JSON null element still passes through as null.
         java.util.List withNull = new java.util.ArrayList();
         withNull.add(null);
@@ -1391,6 +1414,16 @@ public class RestServerAnnotationProcessorTest {
         java.util.Map nullOut = (java.util.Map) dispatch.invoke(dispatcher, "POST", "/pet",
                 null, petNull);
         assertNull(((java.util.List) nullOut.get("tags")).get(0));
+
+        // And a null COLLECTION is still a null collection. That is the half the
+        // fix must not have taken away: null is a legal value for the field, and
+        // only a non-null value of the wrong shape is the client being wrong.
+        java.util.Map petAbsent = new java.util.LinkedHashMap();
+        petAbsent.put("name", "Rex");
+        petAbsent.put("tags", null);
+        java.util.Map absentOut = (java.util.Map) dispatch.invoke(dispatcher, "POST", "/pet",
+                null, petAbsent);
+        assertNull("an explicit null array must stay null", absentOut.get("tags"));
         loader.close();
     }
 

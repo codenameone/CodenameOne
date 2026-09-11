@@ -3432,10 +3432,36 @@ public final class HttpServer {
             Http2.Stream stream;
             while((stream = h2.nextRequest()) != null) {
                 // :authority is what Host is in HTTP/1.1, so the handler sees a
-                // request shaped exactly like an HTTP/1.1 one.
+                // request shaped exactly like an HTTP/1.1 one. Which means it has
+                // to be held to the same rules: a handler reading getHeader("host")
+                // cannot tell which protocol carried the request, so an authority
+                // refused on one side and served on the other is one server giving
+                // two answers. RFC 9113 8.3.1 also requires :authority and a Host
+                // field to agree when both are sent.
                 Map headers = new LinkedHashMap(stream.getHeaders());
-                if(stream.getAuthority() != null) {
-                    headers.put("host", stream.getAuthority());
+                Object carriedHost = headers.get("host");
+                String authority = stream.getAuthority();
+                if(authority != null) {
+                    if(carriedHost != null
+                            && !String.valueOf(carriedHost).equalsIgnoreCase(authority)) {
+                        if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                                asciiBytes("the authority and the Host header disagree"))) {
+                            h2.respond(stream.getId(), 400, "text/plain",
+                                       new ArrayList(), null);
+                        }
+                        requestsServed.incrementAndGet();
+                        continue;
+                    }
+                    headers.put("host", authority);
+                }
+                Object effectiveHost = headers.get("host");
+                if(effectiveHost != null && !isAuthority(String.valueOf(effectiveHost))) {
+                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                            asciiBytes("the authority is not a valid authority"))) {
+                        h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
+                    }
+                    requestsServed.incrementAndGet();
+                    continue;
                 }
                 byte[] h2RequestBody = stream.getBody();
                 if(h2RequestBody != null && h2RequestBody.length > 0

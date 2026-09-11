@@ -1876,6 +1876,42 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("h2 holds :authority to the same rules as Host")
+    void h2AuthoritiesAreValidated() throws Exception {
+        // :authority IS Host over h2 -- this server copies it into the
+        // handler-visible "host" field. A handler reading getHeader("host") cannot
+        // tell which protocol carried the request, so an authority refused on one
+        // side and served on the other is one server giving two answers, and
+        // host-based routing or authorization is what acts on the difference.
+        //
+        // WHAT IS ASSERTED HERE IS WHAT MEASUREMENT SHOWED, not the whole set of
+        // malformed authorities. nghttp2 applies its own HTTP messaging validation
+        // first and refuses some of them at the stream level, with a stream error
+        // and no response at all -- measured: ":authority: user@internal" and one
+        // containing a space both time out rather than answering, so they never
+        // reach this server's code and cannot be asserted as a 400. The review
+        // that asked for this named user@internal specifically; the cases below
+        // are the ones that DO arrive, and they did reach the handler before.
+        assertEquals(400, h2StatusFor(port, "/healthz", "GET", "example.com:notaport", null),
+                "a port that is not a number must be refused");
+        assertEquals(400, h2StatusFor(port, "/healthz", "GET", "bad%zz.example", null),
+                "an incomplete percent triplet must be refused");
+
+        // The legal forms still serve, which is the direction this breaks.
+        assertEquals(200, h2StatusFor(port, "/healthz", "GET", "example.com", null));
+        assertEquals(200, h2StatusFor(port, "/healthz", "GET", "example.com:8080", null));
+
+        // RFC 9113 8.3.1: when both are sent they have to agree. The HTTP/1 parser
+        // already refuses a target authority that disagrees with Host for the same
+        // reason -- a request carrying two answers to "which host did you mean" has
+        // no honest reading.
+        assertEquals(400, h2StatusFor(port, "/healthz", "GET", "example.com", "other.example"),
+                ":authority and a Host field that disagree must be refused");
+        assertEquals(200, h2StatusFor(port, "/healthz", "GET", "example.com", "example.com"),
+                "and agreeing ones must be served");
+    }
+
+    @Test
     @DisplayName("h2 refuses an unsupported method the same way HTTP/1 does")
     void unsupportedMethodsAreRefusedOverHttp2() throws Exception {
         // The HTTP/1 request line answers 501 for anything outside KNOWN_METHODS,
@@ -1908,6 +1944,16 @@ class BackendHttpIntegrationTest {
     }
 
     private int h2StatusFor(int onPort, String path, String method) throws Exception {
+        return h2StatusFor(onPort, path, method, "127.0.0.1", null);
+    }
+
+    /**
+     * @param authority  the :authority pseudo-header
+     * @param hostHeader an additional literal "host" field, or null to send none.
+     *                   RFC 9113 8.3.1 requires the two to agree when both are sent.
+     */
+    private int h2StatusFor(int onPort, String path, String method, String authority,
+                            String hostHeader) throws Exception {
         Socket socket = new Socket();
         socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
         socket.setSoTimeout(20000);
@@ -1926,7 +1972,10 @@ class BackendHttpIntegrationTest {
             hpackLiteral(block, ":method", method);
             hpackLiteral(block, ":path", path);
             hpackLiteral(block, ":scheme", "http");
-            hpackLiteral(block, ":authority", "127.0.0.1");
+            hpackLiteral(block, ":authority", authority);
+            if (hostHeader != null) {
+                hpackLiteral(block, "host", hostHeader);
+            }
             out.write(frame(1, 0x05, 1, block.toByteArray()));
             out.flush();
             out.write(frame(8, 0, 1, windowUpdate));

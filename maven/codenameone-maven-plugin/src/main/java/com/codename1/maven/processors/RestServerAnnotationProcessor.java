@@ -1770,7 +1770,6 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        }\n");
         sb.append("        return (java.util.Map)v;\n");
         sb.append("    }\n");
-        sb.append("    private static java.util.List asList(Object v) { return v instanceof java.util.List ? (java.util.List)v : null; }\n");
         sb.append("    /** A decoded array as a Set, preserving the order it arrived in. */\n");
         sb.append("    private static java.util.Set setFromList(java.util.List v) {\n");
         sb.append("        return v == null ? null : new java.util.LinkedHashSet(v);\n");
@@ -1814,7 +1813,18 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        return out;\n");
         sb.append("    }\n");
         sb.append("    private static java.util.List fromMapList(Object raw, FromMapFn f) {\n");
-        sb.append("        if(!(raw instanceof java.util.List)) return null;\n");
+        // NULL ONLY FOR AN ACTUAL NULL. Answering null for a scalar or an object
+        // made a malformed shape indistinguishable from an explicit JSON null, so
+        // the handler was invoked with a null field instead of the request being
+        // refused -- and the IllegalArgumentException the transport turns into a
+        // 400 was exactly what the element check three lines below already throws
+        // for the same mistake one level down. A container of the wrong type is no
+        // more the client's prerogative than an element of the wrong type.
+        sb.append("        if(raw == null) return null;\n");
+        sb.append("        if(!(raw instanceof java.util.List)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"expected an array, got \""
+                + " + raw.getClass().getName());\n");
+        sb.append("        }\n");
         sb.append("        java.util.List src = (java.util.List)raw;\n");
         sb.append("        java.util.List out = new java.util.ArrayList();\n");
         sb.append("        for(int i = 0 ; i < src.size() ; i++) {\n");
