@@ -131,11 +131,12 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_readAppClipInviteHandoff___java_lan
     return fromNSString(CN1_THREAD_STATE_PASS_ARG joined);
 }
 
-void com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_String(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_String_R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
     NSUserDefaults *suite = cn1InviteSuite(toNSString(CN1_THREAD_STATE_PASS_ARG groupObj));
     if (suite == nil) {
-        return;
+        // No container, so there is nothing left holding a code.
+        return JAVA_TRUE;
     }
     [suite removeObjectForKey:kCN1InviteHandoffKey];
     // Flushed before returning, exactly as the generated clip flushes the
@@ -155,6 +156,14 @@ void com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_Stri
     // asymmetry has no justification, and the cost here is one flush on a path
     // that runs once per install.
     [suite synchronize];
+    // READ BACK, rather than trusting the flush.
+    //
+    // The caller gates an erasure on this, and synchronize's own BOOL says
+    // whether a write-out happened, not whether the key is gone. What the
+    // erasure needs to know is exactly that, so it is asked directly: if the
+    // entry survives, the code is still on the device and the reset that
+    // promised to forget it has not.
+    return [suite objectForKey:kCN1InviteHandoffKey] == nil ? JAVA_TRUE : JAVA_FALSE;
 }
 
 #else
@@ -179,8 +188,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_readAppClipInviteHandoff___java_lan
     return JAVA_NULL;
 }
 
-void com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_String(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_String_R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT groupObj) {
+    return JAVA_TRUE;
 }
 
 #endif // CN1_INCLUDE_INVITE_APPCLIP

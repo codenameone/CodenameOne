@@ -1229,9 +1229,16 @@ public final class Invites {
         //
         // Unconditional, because "was it consumed?" is not knowable from here
         // and the answer does not change what to do: forgetting means the copy
-        // goes either way. A source with nothing to discard does nothing.
-        discardAnyHandoff();
-        boolean cleared = InviteStore.delete(InviteStore.PENDING);
+        // goes either way. A source with nothing to discard answers true.
+        //
+        // GATED like every store deletion beside it. The result used to be
+        // dropped, so a container that refused to empty -- or a flush that did
+        // not reach the disk -- let the erasure report success with an exact
+        // code still on the device, which the next launch reads and
+        // re-attributes from. That is the one failure this method exists to
+        // refuse to hide.
+        boolean cleared = discardAnyHandoff();
+        cleared &= InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
         // ATTRIBUTION names the inviter, and the OUTBOX is the queued
         // registration JSON -- which carries the OLD client id along with the
@@ -2066,20 +2073,26 @@ public final class Invites {
     /// Separate from `ackHandoff` because the obligation flag does not apply:
     /// forgetting has to reach a handoff this process never read, and there is
     /// no record to check a codeSource against.
-    private static void discardAnyHandoff() {
+    private static boolean discardAnyHandoff() {
         AppClipHandoffSource source = appClipSource;
-        // Nothing is owed any more either way, so the flag goes with it -- or a
-        // later write of an unrelated record would ask the source to discard a
-        // handoff that is already gone.
-        handoffAwaitingAck = false;
         if (source == null) {
-            return;
+            handoffAwaitingAck = false;
+            return true;
         }
+        boolean gone;
         try {
-            source.discardHandoff();
+            gone = source.discardHandoff();
         } catch (Throwable t) {
             Log.e(t);
+            gone = false;
         }
+        // The obligation is cleared only when the copy really went. A handoff
+        // still sitting in the container is still owed to somebody, and a
+        // later durable write should ask again rather than assume.
+        if (gone) {
+            handoffAwaitingAck = false;
+        }
+        return gone;
     }
 
     private static void ackHandoff(Map<String, String> record) {

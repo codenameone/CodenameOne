@@ -494,6 +494,32 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void aHandoffThatWillNotGoFailsTheReset() {
+        // Every store deletion in resetVerified() is gated; the clip container
+        // was not, so a container that refused to empty -- or a flush that did
+        // not reach the disk -- let reset() report success with an exact code
+        // still on the device. The next launch reads it and re-attributes,
+        // which is precisely what the erasure promised would not happen.
+        //
+        // Failing is the right answer rather than the tidy one: reset()
+        // latches and retries, so the code is tried again, and nothing tells
+        // the user their attribution is gone while it is not.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        InviteTestSupport.PendingHandoffSource source = InviteTestSupport.pendingHandoff;
+        source.discardFails = true;
+
+        assertFalse(Invites.resetVerified(),
+                "an erasure reported success while the App Clip container still held "
+                        + "the code, so the next launch restores the attribution it "
+                        + "promised to forget");
+
+        source.discardFails = false;
+        assertTrue(Invites.resetVerified(),
+                "the erasure kept failing once the container could be emptied");
+    }
+
+    @FormTest
     void forgettingDiscardsAHandoffNothingHasReadYet() {
         // The acknowledgement paths all cover a code THIS process read. A code
         // the clip left that nothing has consumed is still in the shared

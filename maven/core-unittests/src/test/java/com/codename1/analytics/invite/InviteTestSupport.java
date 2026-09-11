@@ -58,8 +58,13 @@ final class InviteTestSupport {
         /** Counts the discards, which is what the iOS source clears on. */
         private int discarded;
 
-        public void discardHandoff() {
+        /// Set by a test that wants the container to refuse to empty, which
+        /// is what an erasure has to notice.
+        boolean discardFails;
+
+        public boolean discardHandoff() {
             discarded++;
+            return !discardFails;
         }
 
         /** How many times the framework said it was done with the handoff. */

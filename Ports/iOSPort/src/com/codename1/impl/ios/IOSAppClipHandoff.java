@@ -111,18 +111,21 @@ public class IOSAppClipHandoff implements AppClipHandoffSource {
     /// handoff, settled an invited install as no_match for ever. Nothing
     /// reports that: the clip ran, the store carried the person across, and
     /// the install simply looks organic.
-    public void discardHandoff() {
+    public boolean discardHandoff() {
         if (appGroup == null || appGroup.length() == 0) {
-            return;
+            // No group, so no container, so nothing is holding a code.
+            return true;
         }
         try {
-            IOSImplementation.nativeInstance.clearAppClipInviteHandoff(appGroup);
+            return IOSImplementation.nativeInstance.clearAppClipInviteHandoff(appGroup);
         } catch (Throwable t) {
-            // Worth nothing more than a log: the code is stored, so the only
-            // cost of a container that could not be emptied is the next launch
-            // reading the same handoff again -- and the framework already
-            // refuses a second attribution for one install.
+            // Reported as NOT discarded, because the caller may be an erasure.
+            // A container that could not be emptied still holds an exact code
+            // naming an inviter, and it is read on the next launch -- so the
+            // honest answer is that the handoff is still there, whatever the
+            // reason.
             Log.e(t);
+            return false;
         }
     }
 

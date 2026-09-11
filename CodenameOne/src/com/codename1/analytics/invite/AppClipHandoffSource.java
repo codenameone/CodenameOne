@@ -88,6 +88,14 @@ public interface AppClipHandoffSource {
     ///   the device afterwards and undoes exactly what was erased.
     ///
     /// A source with nothing to discard -- anything that did not hand over its
-    /// only copy -- does nothing here.
-    void discardHandoff();
+    /// only copy -- answers true here without doing anything.
+    ///
+    /// #### Returns
+    ///
+    /// true when no handoff is left on the device. An erasure is REFUSED on
+    /// false: the container is read on launch, so a copy that survives is an
+    /// exact code naming an inviter that the next launch re-attributes from,
+    /// and reporting an erasure that did not happen is worse than failing one
+    /// that can be retried.
+    boolean discardHandoff();
 }

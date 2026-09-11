@@ -2575,6 +2575,6 @@ public final class IOSNative {
      *
      * @param appGroup the group identifier
      */
-    native void clearAppClipInviteHandoff(String appGroup);
+    native boolean clearAppClipInviteHandoff(String appGroup);
 
 }
