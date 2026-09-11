@@ -4841,6 +4841,33 @@ void codenameOneGCSweep() {
         cn1GcReleaseBlockedThreads();
         return;
     }
+    // AN UNDRAINED SATB LOG BLOCKS THE RECLAIM, for the same reason the stale
+    // index above does and with the same self-correcting cost.
+    //
+    // cn1SatbTake refuses to stage a batch it cannot hold, so the entries stay in
+    // the log -- but the termination loop is bounded by CN1_SATB_MAX_REOPENS, and
+    // an allocation that keeps failing for all of them leaves the loop reaching
+    // its cap with the log still occupied. cn1GcRetainAllReferences covers the
+    // Reference objects at that point and nothing else: an ordinary
+    // DELETION-barrier entry names an object that may be reachable through no
+    // other edge, and sweeping on that mark frees it while it is live.
+    //
+    // Reading it here is exact rather than approximate: every append is gated on
+    // gcSatbActive, which the loop lowered, and cn1SatbBulkQuiesce waited out the
+    // writers already past that check -- so anything still in the log now is
+    // something the MARK failed to see, never a store that merely arrived late.
+    {
+        long undrained;
+        pthread_mutex_lock(&gcSatbMutex);
+        undrained = gcSatbTop;
+        pthread_mutex_unlock(&gcSatbMutex);
+        if(undrained > 0) {
+            fprintf(stderr, "[GC] %ld SATB entries could not be drained, so this "
+                    "sweep is skipped; the next cycle retries\n", undrained);
+            cn1GcReleaseBlockedThreads();
+            return;
+        }
+    }
 #ifndef CN1_DISABLE_BIBOP
     // Reclaim dead slots on retired BiBOP pages (rebuild per-page free-lists from
     // the header epoch marks). Runs first, on the GC thread, with no marking in

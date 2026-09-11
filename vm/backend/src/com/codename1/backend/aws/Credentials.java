@@ -216,7 +216,25 @@ public final class Credentials {
         if(token == null) {
             token = string(parsed, "SessionToken");
         }
-        return new Credentials(id, secret, token, expiryMillis(string(parsed, "Expiration")));
+        // AN EXPIRY IS REQUIRED HERE. Both callers of this are the metadata
+        // providers -- ECS/EKS and IMDS -- and everything they hand out is
+        // TEMPORARY. expiryMillis answers 0 for an Expiration that is missing or
+        // that it cannot read, and 0 is the sentinel isExpiring reads as "never
+        // expires": the credential would then be refreshed exactly never, and
+        // every request after the provider's real expiry would sign with a dead
+        // key until the process restarted. A field this code could not understand
+        // is a reason to fail here, where the message can say so, rather than in
+        // an hour's time as an authorization error with no visible cause.
+        String expiration = string(parsed, "Expiration");
+        long expiresAt = expiryMillis(expiration);
+        if(expiresAt <= 0) {
+            throw new IOException("The credential endpoint returned "
+                    + (expiration == null ? "no Expiration" : "an Expiration this "
+                            + "runtime cannot read: " + expiration)
+                    + ". Temporary credentials that never expire would be refreshed "
+                    + "never and used after the provider retired them");
+        }
+        return new Credentials(id, secret, token, expiresAt);
     }
 
     /**
