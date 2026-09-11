@@ -897,17 +897,30 @@ public class ByteCodeTranslator {
         //includeFrameworks.add("StoreKit.framework");
         // CoreMotion has no macOS implementation -- a Mac has no accelerometer to
         // report -- MessageUI and MediaPlayer are UIKit composers, and
-        // MobileCoreServices is the iOS spelling of what macOS calls
-        // UniformTypeIdentifiers. Each of these is a link failure rather than
-        // dead weight if it stays.
+        // MobileCoreServices is the iOS spelling of the C-level type identifier
+        // API that macOS keeps in CoreServices. Each of these is a link failure
+        // rather than dead weight if it stays.
         if (platform.hasIosDeviceIdioms()) {
             includeFrameworks.add("CoreMotion.framework");
             includeFrameworks.add("MessageUI.framework");
             includeFrameworks.add("MediaPlayer.framework");
             includeFrameworks.add("MobileCoreServices.framework");
-        } else {
-            includeFrameworks.add("UniformTypeIdentifiers.framework");
         }
+        // UniformTypeIdentifiers is NOT the macOS spelling of MobileCoreServices, which is what
+        // the split above used to assume: MobileCoreServices carries only the deprecated C
+        // functions (UTTypeCreatePreferredIdentifierForTag and friends), while the UTType CLASS
+        // lives here on every platform from iOS 14 / macOS 11 / watchOS 7 / tvOS 14.
+        // CN1DragAndDrop.m compiles that class into every slice -- the MIME-to-identifier
+        // mapping sits outside its
+        // UIKit guard because the clipboard natives need it too -- so leaving the framework off the
+        // iOS branch linked an application that referenced _OBJC_CLASS_$_UTType and nothing that
+        // defined it, and every device archive failed at the link.
+        //
+        // Weak, because ios.deployment_target reaches back to releases that predate the framework
+        // and a hard link against one the device does not have kills the process at launch. The
+        // uses are @available fenced, so an older device simply takes the legacy path.
+        includeFrameworks.add("UniformTypeIdentifiers.framework");
+        optionalFrameworks.add("UniformTypeIdentifiers.framework");
         includeFrameworks.add("CoreLocation.framework");
         includeFrameworks.add("AVFoundation.framework");
         includeFrameworks.add("CoreText.framework");
