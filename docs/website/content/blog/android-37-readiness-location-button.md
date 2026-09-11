@@ -1,15 +1,15 @@
 ---
-title: "Android 17 Preparation and Less Security Glue"
+title: "Android 17 Without the Last-Minute Scramble"
 slug: android-37-readiness-location-button
 url: /blog/android-37-readiness-location-button/
 date: '2026-09-17'
 author: Shai Almog
 description: "API 37 checks and a system location button prepare Android migration. PEM parsing and task-clearing exit put more security-sensitive platform and format handling into Codename One."
-feed_html: '<img src="https://www.codenameone.com/blog/android-37-readiness-location-button.jpg" alt="Less Glue Clearer Boundaries" /> API 37 checks and a system location button prepare Android migration. PEM parsing and task-clearing exit put more security-sensitive platform and format handling into Codename One.'
+feed_html: '<img src="https://www.codenameone.com/blog/android-37-readiness-location-button.jpg" alt="Android 17 Before The Rush" /> API 37 checks and a system location button prepare Android migration. PEM parsing and task-clearing exit put more security-sensitive platform and format handling into Codename One.'
 series: ["release-2026-09-11"]
 ---
 
-![Less Glue Clearer Boundaries](/blog/android-37-readiness-location-button.jpg)
+![Android 17 Before The Rush](/blog/android-37-readiness-location-button.jpg)
 
 An Android port can compile successfully against an old `android.jar` while referencing a class the next platform has removed. Until this week, our regular port compilation could give exactly that false reassurance.
 

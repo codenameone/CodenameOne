@@ -9,14 +9,14 @@ Baseline: last week's `voip-vpn-builders` parent, dated follow-ups, matching `se
 | Date | Article | Narrative |
 | --- | --- | --- |
 | 2026-09-11 | [Lies, Damn Lies and Benchmarks](../content/blog/performance-work-between-benchmarks.md) | Benchmark blind spots and the weekly overview |
-| 2026-09-12 | [The Collector and the Cache Have to Agree](../content/blog/parparvm-gc-small-heaps.md) | GC pacing, weak references, and useful caches |
-| 2026-09-13 | [Fixing the Map, Then the Objects Inside It](../content/blog/hashmap-misses-probe-sequence.md) | Map probing and the boxed values inside collections |
-| 2026-09-14 | [Unnecessary Waiting, From AppKit to JavaScript](../content/blog/startup-cost-before-first-paint.md) | Unnecessary native waiting and JavaScript suspension |
-| 2026-09-15 | [Pick Up the Work on Another Screen](../content/blog/continuity-restoring-work.md) | State restoration, cross-device continuity, and native drag/drop |
-| 2026-09-16 | [We Stopped Embedding a Second Website Inside Our API Docs](../content/blog/javadoc-hugo-markdown-doclet.md) | Reusable Javadoc-to-Hugo generation and searchable API docs |
-| 2026-09-17 | [Android 17 Preparation and Less Security Glue](../content/blog/android-37-readiness-location-button.md) | API 37 preparation, location consent, PEM keys, and task removal |
+| 2026-09-12 | [Less Garbage, More Room for Your App](../content/blog/parparvm-gc-small-heaps.md) | GC pacing, weak references, and useful caches |
+| 2026-09-13 | [Faster Maps: Chasing Swiss Speed](../content/blog/hashmap-misses-probe-sequence.md) | Map probing and the boxed values inside collections |
+| 2026-09-14 | [Faster Starts, Less JavaScript Overhead](../content/blog/startup-cost-before-first-paint.md) | Unnecessary native waiting and JavaScript suspension |
+| 2026-09-15 | [Native Drag and Drop Meets Cross-Device Continuity](../content/blog/continuity-restoring-work.md) | State restoration, cross-device continuity, and native drag/drop |
+| 2026-09-16 | [Javadoc That Feels Like Your Website](../content/blog/javadoc-hugo-markdown-doclet.md) | Reusable Javadoc-to-Hugo generation and searchable API docs |
+| 2026-09-17 | [Android 17 Without the Last-Minute Scramble](../content/blog/android-37-readiness-location-button.md) | API 37 preparation, location consent, PEM keys, and task removal |
 
-Each follow-up has one opening, connected technical sections, and one conclusion. Five superseded articles and their headers were removed. Their technical material, examples, and relevant diagrams live in the retained narratives, and links now point to those articles. Each of the six narratives has a substantial section in the parent.
+Each follow-up has one opening, connected technical sections, and one conclusion. Five superseded articles and their headers were removed. Their technical material, examples, and relevant diagrams live in the retained narratives, and links now point to those articles. Each narrative has substantial coverage in the parent. Native drag and drop and cross-device continuity each have a major section and direct introductory links; neither is hidden under the other feature. The opening schedule table is replaced by reader-focused previews of the six follow-ups.
 
 ## Parent red team
 
@@ -37,37 +37,37 @@ Boldness ruling: keep the author's humor and personal confidence. The evidence e
 
 ## Six narrative reviews
 
-### The collector and the cache
+### Less garbage, more room for your app
 
 The reader's problem is an image-heavy application choosing between retained memory and repeated decoding. The collector floor and reference policy now share that problem statement. The deep dive preserves the failed live-set experiment, worst-pause comparison, concurrent-read barrier, and simulated-budget cache results.
 
-Skeptical checks: the 38 MB result is a backend measurement; the stock floor did not change; the framework image-cache migration remains separate; recency was not compared with matched-rate random eviction. None is hidden by the combined narrative. The conclusion connects lower garbage, useful cache retention, and the runtime's responsibility to prevent dangling references.
+Skeptical checks: the 38 MB result is a controlled runtime measurement; the stock floor did not change; the framework image-cache migration remains separate; recency was not compared with matched-rate random eviction. None is hidden by the combined narrative. The conclusion connects lower garbage, useful cache retention, and the runtime's responsibility to prevent dangling references.
 
-### Maps and the values they contain
+### Chasing Swiss speed
 
-The missing-key workload is the hook. Wider tagged values then answer the next allocation question: what does each key/value slot point to? The probe helper, map regressions, tag diagram, coverage table, and allocation census remain in one article.
+The Swiss-map comparison is the hook, with the missing-key workload showing why the improvement matters. “Faster Maps: Chasing Swiss Speed” describes the investigation, not measured parity with Go. Wider tagged values then answer the next allocation question: what does each key/value slot point to? The probe helper, map regressions, tag diagram, coverage table, and allocation census remain in one article.
 
 Skeptical checks: no Swiss-style SIMD group-probing claim, no equivalent-workload Go parity claim, no universal Long/Double encoding, and no general stack-allocation promise. The “poor man's Valhalla” callback keeps its precise limits. The two optimizations do not become a multiplied speedup.
 
-### Unnecessary native and JavaScript waiting
+### Faster starts, less JavaScript overhead
 
 The margin calculation waiting on AppKit leads into publication of screen state, monitor entry, style construction, and artwork generation. Receiver-aware JavaScript analysis follows as a second example of treating too many operations as potentially waiting.
 
 Skeptical checks: native Mac timings are not universal startup numbers; Node results are compiler/runtime measurements; the 13.7% iterator regression remains unexplained and visible. The conclusion preserves conservative resolution and collector coordination while removing unnecessary work.
 
-### Work that moves beyond the process
+### Native drag and drop meets cross-device continuity
 
 Continuity preserves a description of a task; native drag/drop transfers a representation to another application. That payload contract ties the APIs together without pretending they use the same transport. Code covers restoration, logout, and incoming files.
 
 Skeptical checks: no automatic universal relay service, no assumption that a checkpoint authorizes access, no unsupported native desktop ports, and no claim of a physical two-device or native-drag test. The linked review's provider timing issue is corrected in prose, table, diagram, and parent. The conclusion treats incoming files as external input and restores routes only after account checks.
 
-### Javadoc owned by the website
+### Javadoc that feels like your website
 
 The useful result is a reusable doclet that emits content, letting Hugo own layout and search. Actual reference/search screenshots, the minimal example, source paths, and anchor parity give other Java developers something they can use.
 
 Skeptical checks: Markdown comments arrived in JDK 23; Java 25 is the tooling requirement. The guide remains outside the site search index. The doclet example was verified with a local JDK 26 tool compiling with `--release 25`, not represented as a fresh JDK 25 run.
 
-### Android preparation and security glue
+### Android 17 without the last-minute scramble
 
 API 37 compilation and packaging preparation leads into a system-owned location permission flow, then key-format validation and explicit task removal. These are places where the framework can replace security-sensitive platform and format code in individual applications.
 
@@ -78,7 +78,7 @@ Skeptical checks: compile readiness is not runtime certification; the location-p
 | Severity | Draft claim at risk | Evidence and final treatment |
 | --- | --- | --- |
 | Blocking | A live-set-proportional GC floor shipped as the default | PR #5717's opening description is stale relative to its merged source. `cn1_globals.m` explains why incomplete sweep counters made that policy unsound. The articles state that the floor is deployment-selected and the stock floor remains 24 MB. |
-| Blocking | GC now matches Go and keeps memory flat through everything | The recorded median and p99 matched in one loop; the worst pause did not. Four-marker ParparVM pauses were 0.3–0.9 seconds versus Go's 20 ms. The lower-memory backend configuration is distinguished from a stock mobile build. No invented time-series curve is shown. |
+| Blocking | GC now matches Go and keeps memory flat through everything | The recorded median and p99 matched in one loop; the worst pause did not. Four-marker ParparVM pauses were 0.3–0.9 seconds versus Go's 20 ms. The lower-memory test configuration is distinguished from a stock mobile build. No invented time-series curve is shown. |
 | Blocking | PR #5722 adds Swiss-style SIMD group probing and proves Go map parity | The merged table loop uses scalar perturbed probing. Compact metadata and the native string comparison path are explained separately. No comparable Go timing table was found in the supplied PR, so no equality/superiority claim is published. |
 | Blocking | Every image cache now uses ranked soft references | PR #5732 explicitly leaves the iOS strong-reference table and framework call sites for separate integration. The article distinguishes VM semantics, benchmark evidence, and prospective cache migration. |
 | Blocking | All boxed primitives are stack allocated | Tagged words are not general stack allocation. Long and Double have explicit encoding limits and heap fallback. Byte and Boolean already have bounded caches. |
@@ -116,3 +116,5 @@ The drag-timing correction was checked directly against `AndroidNativeDragAndDro
 - All 26 Java excerpts compile against the local core artifact under Java 8, with imports and enclosing application context supplied where needed. This validates names and signatures, not platform runtime behavior.
 - The unchanged standalone Temperature/doclet example retains the prior verification: real doclet output and search index generated with JDK 26 compiling the doclet with `--release 25`.
 - Whitespace checks pass. No native implementation changed; benchmark and device results remain attributed to the feature PRs. No fresh native benchmark or full Maven suite was needed for this content revision.
+
+The public GC copy and chart label describe a controlled runtime experiment. Unannounced product details, endpoint names, and connection counts are omitted; the PR attribution, measured RSS, and distinction from a mobile-device benchmark remain.

@@ -1,15 +1,15 @@
 ---
-title: "We Stopped Embedding a Second Website Inside Our API Docs"
+title: "Javadoc That Feels Like Your Website"
 slug: javadoc-hugo-markdown-doclet
 url: /blog/javadoc-hugo-markdown-doclet/
 date: '2026-09-16'
 author: Shai Almog
 description: "A Java 25 doclet turns the Codename One API model and Markdown comments into Hugo content. The site gains integrated search and theming while preserving member links and the offline Javadoc archive."
-feed_html: '<img src="https://www.codenameone.com/blog/javadoc-hugo-markdown-doclet.jpg" alt="Api Docs Belong Here" /> A Java 25 doclet turns the Codename One API model and Markdown comments into Hugo content. The site gains integrated search and theming while preserving member links and the offline Javadoc archive.'
+feed_html: '<img src="https://www.codenameone.com/blog/javadoc-hugo-markdown-doclet.jpg" alt="Your Javadoc Your Website" /> A Java 25 doclet turns the Codename One API model and Markdown comments into Hugo content. The site gains integrated search and theming while preserving member links and the offline Javadoc archive.'
 series: ["release-2026-09-11"]
 ---
 
-![Api Docs Belong Here](/blog/javadoc-hugo-markdown-doclet.jpg)
+![Your Javadoc Your Website](/blog/javadoc-hugo-markdown-doclet.jpg)
 
 Our API reference used to bring its own website along with it. We copied standard Javadoc output into the site, scoped its stylesheet under a wrapper, and used JavaScript to fetch pages into that wrapper. Dark mode made the mismatch particularly obvious.
 

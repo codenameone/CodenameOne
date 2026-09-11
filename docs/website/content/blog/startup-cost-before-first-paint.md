@@ -1,15 +1,15 @@
 ---
-title: "Unnecessary Waiting, From AppKit to JavaScript"
+title: "Faster Starts, Less JavaScript Overhead"
 slug: startup-cost-before-first-paint
 url: /blog/startup-cost-before-first-paint/
 date: '2026-09-14'
 author: Shai Almog
 description: "Codename One removes native startup waits, repeated style scans, and unnecessary JavaScript suspension. Profiles and compiler benchmarks expose costs that bundle size and frame rates miss."
-feed_html: '<img src="https://www.codenameone.com/blog/startup-cost-before-first-paint.jpg" alt="Why Are We Waiting?" /> Codename One removes native startup waits, repeated style scans, and unnecessary JavaScript suspension. Profiles and compiler benchmarks expose costs that bundle size and frame rates miss.'
+feed_html: '<img src="https://www.codenameone.com/blog/startup-cost-before-first-paint.jpg" alt="Start Sooner Wait Less" /> Codename One removes native startup waits, repeated style scans, and unnecessary JavaScript suspension. Profiles and compiler benchmarks expose costs that bundle size and frame rates miss.'
 series: ["release-2026-09-11"]
 ---
 
-![Why Are We Waiting?](/blog/startup-cost-before-first-paint.jpg)
+![Start Sooner Wait Less](/blog/startup-cost-before-first-paint.jpg)
 
 A margin calculation should not need a synchronous trip to the operating system's main thread. Ours did. Every component that converted padding or margins to pixels could wait for AppKit to tell it which screen contained the window.
 

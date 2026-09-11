@@ -4,12 +4,12 @@ slug: performance-work-between-benchmarks
 url: /blog/performance-work-between-benchmarks/
 date: '2026-09-11'
 author: Shai Almog
-description: "Codename One tackles misleading benchmarks, GC and cache pressure, boxed allocations, and unnecessary waits. Six deep dives cover the performance work, native integration, docs, and security."
-feed_html: '<img src="https://www.codenameone.com/blog/performance-work-between-benchmarks.jpg" alt="Lies, Damn Lies and Benchmarks" /> Codename One tackles misleading benchmarks, GC and cache pressure, boxed allocations, and unnecessary waits. Six deep dives cover the performance work, native integration, docs, and security.'
+description: "Codename One tackles GC, maps, startup, and JavaScript overhead, and adds native drag and drop plus cross-device continuity. Javadoc joins website search as we prepare for Android API 37."
+feed_html: '<img src="https://www.codenameone.com/blog/performance-work-between-benchmarks.jpg" alt="Lies, Damn Lies And Benchmarks" /> Codename One tackles GC, maps, startup, and JavaScript overhead, and adds native drag and drop plus cross-device continuity. Javadoc joins website search as we prepare for Android API 37.'
 series: ["release-2026-09-11"]
 ---
 
-![Lies, Damn Lies and Benchmarks](/blog/performance-work-between-benchmarks.jpg)
+![Lies, Damn Lies And Benchmarks](/blog/performance-work-between-benchmarks.jpg)
 
 There's an old joke about three kinds of lies: [lies, damn lies, and benchmarks](https://www.spec.org/osg/news/articles/news9412/lies.html). Codename One did very well in our benchmarks. But were they accurate? Were they representative?
 
@@ -17,34 +17,31 @@ Performance is the fitted sheet of programming. Just when you get the damn corne
 
 This week we made a concentrated effort to get a few more corners into place, and got a lot done. There's still work ahead that we'll discuss next week, but it's getting to a point where I feel confident saying Codename One is pretty fast. Not the best (yet), but fast.
 
-The trouble with a good benchmark score is how little it can tell you about the next operation. Our map was fast at finding keys that existed. Asking for missing keys exposed a lookup that could walk hundreds of thousands of slots. A collector setting that looked reasonable for a larger process let a small backend retain garbage without buying measurable throughput. A rendering benchmark had no reason to notice that a switch generated blurred artwork before anyone asked to paint it.
+The trouble with a good benchmark score is how little it can tell you about the next operation. Our map was fast at finding keys that existed. Asking for missing keys exposed a lookup that could walk hundreds of thousands of slots. A collector setting that looked reasonable for a larger process let a small process retain garbage without buying measurable throughput. A rendering benchmark had no reason to notice that a switch generated blurred artwork before anyone asked to paint it.
 
 Those costs meet in an application. Opening a screen constructs styles and lays out components. Loading its data fills maps and boxes numbers. Displaying images creates results worth caching, until memory gets tight. We worked through those layers together because making one loop faster does not tell us whether the screen starts sooner or leaves less memory behind.
 
 [Last week](/blog/voip-vpn-builders/), builders let us take responsibility for native integration that used to belong in each application's platform project. This week we are using the same reach inside the runtime: changing collection, object representation, UI internals, and generated JavaScript while keeping the application code in Java.
 
-## This week
+Two major additions let users take their work further. **[Native drag and drop](#native-drag-and-drop-take-it-outside-your-app)** lets them move files and content between your application and other apps. **[Cross-device continuity](#cross-device-continuity-pick-up-where-you-left-off)** lets them continue a task on another device, as well as recover it after the OS closes the process. Both now have Java APIs in Codename One.
 
-The parent covers the mechanisms below. Six follow-ups take them further, with one article per day through September 17. Links become available on their publication dates.
+## Coming up: less waiting, more room, and work that travels
 
-| Date | Follow-up | What we investigate |
-| --- | --- | --- |
-| September 12 | {{< post-link path="/blog/parparvm-gc-small-heaps" text="The collector and the cache" >}} | Collection pacing, weak references, and keeping useful images |
-| September 13 | {{< post-link path="/blog/hashmap-misses-probe-sequence" text="Maps and the objects inside them" >}} | Missing keys, probe sequences, and wider tagged values |
-| September 14 | {{< post-link path="/blog/startup-cost-before-first-paint" text="Unnecessary waiting, from AppKit to JavaScript" >}} | Startup profiles, style construction, and suspension analysis |
-| September 15 | {{< post-link path="/blog/continuity-restoring-work" text="Work that moves to another screen" >}} | State restoration, cross-device continuity, and native drag and drop |
-| September 16 | {{< post-link path="/blog/javadoc-hugo-markdown-doclet" text="Javadoc inside the website" >}} | A reusable doclet, integrated search, and preserving member links |
-| September 17 | {{< post-link path="/blog/android-37-readiness-location-button" text="Android 17 and less security glue" >}} | API 37, location consent, PEM keys, and clearing recents |
+Tomorrow's {{< post-link path="/blog/parparvm-gc-small-heaps" text="Less Garbage, More Room for Your App" >}} asks why a collector should keep memory that buys no speed, and how to stop a cache flush from making you decode every image again. On Sunday, {{< post-link path="/blog/hashmap-misses-probe-sequence" text="Faster Maps: Chasing Swiss Speed" >}} follows our comparison with Go's map design into faster lookups and numbers that no longer need their own heap objects.
 
-## Why keep garbage if it isn't buying speed?
+Monday brings {{< post-link path="/blog/startup-cost-before-first-paint" text="Faster Starts, Less JavaScript Overhead" >}}. A margin calculation was waiting on AppKit, and a blocking method was making unrelated JavaScript calls suspend. Tuesday's {{< post-link path="/blog/continuity-restoring-work" text="Native Drag and Drop Meets Cross-Device Continuity" >}} puts the new integration APIs to work: offer a document to another app, resume a draft on another device, and keep account changes from restoring the wrong user's screen.
 
-ParparVM translates Java bytecode to C for Codename One's native ports. Its collector therefore has to serve both a mobile application and the small backend processes we have been using to investigate the runtime. Those processes make a large garbage allowance easy to spot: there may be very little live application data underneath it.
+On Wednesday, {{< post-link path="/blog/javadoc-hugo-markdown-doclet" text="Javadoc That Feels Like Your Website" >}} shows how to give your own Java API reference the site's layout and search. We finish on September 17 with {{< post-link path="/blog/android-37-readiness-location-button" text="Android 17 Without the Last-Minute Scramble" >}}: catching SDK changes early, letting the OS handle location consent, and removing more security-sensitive glue from application code.
+
+## Less garbage, more room for your app
+
+ParparVM translates Java bytecode to C for Codename One's native ports. On a memory-constrained device, the collector's allowance for garbage competes with the images, screens, and data the application actually needs. A controlled runtime test with very little live data made that allowance easy to examine.
 
 I have enormous respect for HotSpot's collectors. G1 is explicitly designed for multiprocessor machines with large memories. HotSpot offers other collectors too, including Serial for small data sets, so “copy HotSpot” is not a collection policy. We needed to examine the assumptions against our own workloads. [Oracle's G1 guidance](https://docs.oracle.com/en/java/javase/25/gctuning/garbage-first-g1-garbage-collector1.html) describes that design target.
 
 Go was a useful reference because its [GC guide](https://go.dev/doc/gc-guide) makes the tradeoff explicit. Let more garbage accumulate and you can do collection work less often. Collect sooner and you spend less memory, but may spend more CPU tracing the same live objects. That extra memory should earn its keep.
 
-In our `/plaintext` backend workload with 64 connections, it wasn't. The stock 24 MB allocation floor was associated with 98 MB of loaded resident memory. Sweeping through lower trigger settings left throughput and p99 within run-to-run noise. A subsequent lower-floor configuration brought loaded RSS down to **38 MB**. [PR #5717](https://github.com/codenameone/CodenameOne/pull/5717) records the experiment.
+In the GC trigger experiment, it wasn't. The stock 24 MB allocation floor was associated with 98 MB of loaded resident memory. Sweeping through lower trigger settings left throughput and p99 within run-to-run noise. A subsequent lower-floor configuration brought loaded RSS down to **38 MB**. [PR #5717](https://github.com/codenameone/CodenameOne/pull/5717) records the experiment.
 
 ![Reported resident memory at five GC trigger settings](/blog/gc-trigger-rss.svg)
 
@@ -64,7 +61,7 @@ The merged code lets a deployment choose its minimum instead:
 #endif
 ```
 
-That is runtime configuration, not an application build hint. The backend can select a smaller floor; the stock default stays unchanged. A policy based on the live set needs a count we can trust first.
+That is runtime configuration, not an application build hint. A controlled build can select a smaller floor; the stock default stays unchanged. A policy based on the live set needs a count we can trust first.
 
 Parallel marking is the other part of the investigation. In the recorded allocation loop, ParparVM's median and p99 matched Go. The worst pause still favored Go: about 20 ms, against 0.3 to 0.9 seconds with four ParparVM markers and 2.2 to 3.3 seconds with one. Parallel marking remains experimental. Allocation threads can help drain marking work instead of merely waiting at the run-ahead cap, but that assistance belongs to the parallel path, not the unchanged serial default.
 
@@ -115,7 +112,7 @@ In the simulated 160 MB budget test, ranked retention produced a **97.44% hit ra
 
 The {{< post-link path="/blog/parparvm-gc-small-heaps" text="collector and cache article" >}} follows both experiments in detail. Lowering garbage headroom and retaining useful cached results address different sides of the same memory budget.
 
-## The map was fast because we kept asking the easy question
+## Chasing Swiss speed without changing your Java maps
 
 Our open-addressed HashMap stores entries in arrays. A key's hash selects its first slot. If that slot is occupied by another key, the map probes elsewhere until it finds the key or an empty slot.
 
@@ -179,7 +176,7 @@ The JSON-like allocation census fell from **24.02 boxed allocations per map to 5
 
 The {{< post-link path="/blog/hashmap-misses-probe-sequence" text="maps and boxing article" >}} covers the coverage measurements and dispatch hazards. A type tag must select the right `hashCode` and `equals` implementation. Reusing the Integer fast path for every tag would produce a fast, incorrect map.
 
-## A margin calculation should not wait for AppKit
+## Faster starts begin with work your app never needed
 
 Before the first frame, a screen asks a lot of components how big they are. Padding and margin conversion needs the screen scale. Our native Mac path synchronously asked AppKit which screen contained the window, even though the answer usually had not changed since the previous component asked.
 
@@ -242,9 +239,11 @@ Yield sites fell **25.3%** while bundle size fell only **1.2%**. Counting bytes 
 
 The {{< post-link path="/blog/startup-cost-before-first-paint" text="native and JavaScript performance article" >}} follows these paths and their tests. The common question is whether an operation needs to wait at all, before trying to make its waiting machinery faster.
 
-## Let the work survive the process, then move it somewhere useful
+## Cross-device continuity: pick up where you left off
 
-Lower memory use helps a process survive. It does not guarantee that a mobile operating system will keep it alive. A `Form` saved in a field disappears with that process, and the user returns to the first screen.
+Start writing on your phone and continue on your tablet. Reopen an app after the OS reclaimed its process and return to the draft you were editing. Cross-device continuity lets an application preserve the task the user cares about, instead of making the current process its only home.
+
+A `Form` saved in a field cannot do that. The field disappears with the process, and another device cannot reconstruct a screen from an object in the first device's memory. It needs a description of the work.
 
 [PR #5663](https://github.com/codenameone/CodenameOne/pull/5663) adds `com.codename1.continuity`. It saves application state and the router stack as a checkpoint that a new process can reconstruct. A route identifies the screen; a `StateProvider` supplies the data needed to resume the work. For a draft editor, that can be as small as the text:
 
@@ -276,9 +275,11 @@ if (!Continuity.restore()) {
 
 Apple Handoff can offer the activity to another signed-in device. An application-owned `StateRelay` can carry state through your existing accounts and server, including across Android, Apple devices, and a browser. Codename One does not operate that relay or choose its account-isolation policy. iCloud key-value sync is a separate package with its own entitlement requirement.
 
-### A drag carries a representation instead of a checkpoint
+## Native drag and drop: take it outside your app
 
-[PR #5662](https://github.com/codenameone/CodenameOne/pull/5662) adds native drag and drop beside the lightweight in-form API. A file dragged into another app uses `ClipboardContent`, the same payload model as copy and paste. It can offer files, plain text, or HTML and let the receiving app choose a supported representation.
+Drag a report into another application. Drop a file into your own import screen. Offer a selection as formatted HTML to an editor or as plain text to an application that only wants the words. These are operating-system drag sessions, with a destination outside your form.
+
+[PR #5662](https://github.com/codenameone/CodenameOne/pull/5662) adds that native drag and drop beside our existing lightweight API. In-form dragging still works as before. The new API connects components to the OS drag session using `ClipboardContent`, so the same representations that work for copy and paste can be offered to a drag receiver.
 
 ```java
 Label file = new Label("report.pdf");
@@ -300,9 +301,9 @@ Provider timing depends on the port. JavaSE can request the representation lazil
 
 The initial implementation covers JavaSE, Android, and UIKit ports, with cross-application behavior on Android, iPadOS, and Mac Catalyst. iPhone has a narrower interaction model. Native AppKit, Windows, Linux, and JavaScript do not implement this native-drag path yet. Check `NativeDragAndDrop.isSupported()` before relying on it.
 
-The {{< post-link path="/blog/continuity-restoring-work" text="continuity and drag-and-drop article" >}} includes the platform matrix, callback threading, and logout sequence. A received checkpoint must still pass the current account's authorization checks; a completed move must be confirmed before deleting the source. Moving work should not mean losing ownership of it.
+The {{< post-link path="/blog/continuity-restoring-work" text="native drag and drop and continuity article" >}} includes the platform matrix, callback threading, and logout sequence. A received checkpoint must still pass the current account's authorization checks; a completed move must be confirmed before deleting the source. Moving work should not mean losing ownership of it.
 
-## The API reference should not bring a second website with it
+## Give your Javadoc the website it deserves
 
 We kept improving the developer guide, but the API reference still carried standard Javadoc's layout and stylesheet into a wrapper inside our site. Search and dark mode made that separation particularly obvious.
 
@@ -328,7 +329,7 @@ This is reusable source for Java developers who want their own site generator to
 
 The migration also checked **2,272 pages and 29,583 fragments** against the old output. A prettier member page is not much use if years of links to that member stop working. The {{< post-link path="/blog/javadoc-hugo-markdown-doclet" text="doclet article" >}} includes a complete sample, build commands, and the anchor defects that parity testing caught.
 
-## Prepare Android 17 without handing customers another migration project
+## Android 17 without the last-minute scramble
 
 [PR #5731](https://github.com/codenameone/CodenameOne/pull/5731) adds API 37 compilation checks and generated-application assembly. This matters before changing the default target SDK: compiling against the old platform cannot tell us which referenced classes the new one has removed.
 

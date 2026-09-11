@@ -1,21 +1,23 @@
 ---
-title: "Pick Up the Work on Another Screen"
+title: "Native Drag and Drop Meets Cross-Device Continuity"
 slug: continuity-restoring-work
 url: /blog/continuity-restoring-work/
 date: '2026-09-15'
 author: Shai Almog
-description: "Codename One adds state restoration, cross-device continuity, and native drag and drop. Shared payloads carry work across process and app boundaries with explicit account and platform rules."
-feed_html: '<img src="https://www.codenameone.com/blog/continuity-restoring-work.jpg" alt="Take The Work With You" /> Codename One adds state restoration, cross-device continuity, and native drag and drop. Shared payloads carry work across process and app boundaries with explicit account and platform rules.'
+description: "Drag files into another application and pick up a task on another device. Codename One adds native drag and drop and cross-device continuity through shared Java APIs."
+feed_html: '<img src="https://www.codenameone.com/blog/continuity-restoring-work.jpg" alt="Drag, Drop, And Continue" /> Drag files into another application and pick up a task on another device. Codename One adds native drag and drop and cross-device continuity through shared Java APIs.'
 series: ["release-2026-09-11"]
 ---
 
-![Take The Work With You](/blog/continuity-restoring-work.jpg)
+![Drag, Drop, And Continue](/blog/continuity-restoring-work.jpg)
 
-Keeping the current `Form` in a field works until the operating system kills the process. When the application starts again, the field is gone. The user returns to the first screen even though they were halfway through a task.
+Drag a document from your app into another application. Pick up an unfinished task on another device. These are ordinary things users want to do, but until now Codename One's shared APIs did not provide the native drag session or the cross-device checkpoint to carry them through.
 
-[PR #5663](https://github.com/codenameone/CodenameOne/pull/5663) adds `com.codename1.continuity` to preserve that work. It restores a local checkpoint and the router's screen stack, and can offer the same activity to another device.
+This week adds both. [Native drag and drop](#native-drag-and-drop-bring-other-apps-into-the-workflow) connects your components to the OS through the same payload model as copy and paste. [Cross-device continuity](#cross-device-continuity-save-the-work-not-the-screen) preserves application state and the router stack so another process or device can reconstruct the task. The application decides what may travel and which account may open it.
 
-## Save a description of the work
+## Cross-device continuity: save the work, not the screen
+
+[PR #5663](https://github.com/codenameone/CodenameOne/pull/5663) adds `com.codename1.continuity` for local restoration, Apple Handoff, and application-owned relays.
 
 The router already represents navigation as a stack of paths. Those paths can be serialized and reconstructed without animating through every intermediate screen. A `StateProvider` adds the application data needed to resume the task.
 
@@ -114,7 +116,7 @@ Android task removal handles a different part of ending a session, covered in {{
 The continuity PR verified core state tests and generated Apple builds, including a single `NSUserActivityTypes` array shared correctly with App Intents. It did not report a physical two-device Handoff session. The paired cloud-builder integration also needs to be present in the builder serving your application.
 
 
-## Sometimes the next stop is another application
+## Native drag and drop: bring other apps into the workflow
 
 A checkpoint carries a task to a new process or device. A drag carries a document, image, or selection into another application. Both need a payload the receiver can understand without access to the source's live UI objects.
 

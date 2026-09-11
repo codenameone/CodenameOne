@@ -1,17 +1,17 @@
 ---
-title: "The Collector and the Cache Have to Agree"
+title: "Less Garbage, More Room for Your App"
 slug: parparvm-gc-small-heaps
 url: /blog/parparvm-gc-small-heaps/
 date: '2026-09-12'
 author: Shai Almog
-description: "ParparVM lowers memory in a small-backend GC experiment and adds real weak and soft references. Go-inspired pacing and ranked retention address garbage and useful cached data together."
-feed_html: '<img src="https://www.codenameone.com/blog/parparvm-gc-small-heaps.jpg" alt="Keep The Cache Lose The Garbage" /> ParparVM lowers memory in a small-backend GC experiment and adds real weak and soft references. Go-inspired pacing and ranked retention address garbage and useful cached data together.'
+description: "ParparVM experiments with lower GC thresholds and adds real weak and soft references. The results show how to reduce garbage without discarding useful cached images."
+feed_html: '<img src="https://www.codenameone.com/blog/parparvm-gc-small-heaps.jpg" alt="Less Garbage More Room" /> ParparVM experiments with lower GC thresholds and adds real weak and soft references. The results show how to reduce garbage without discarding useful cached images.'
 series: ["release-2026-09-11"]
 ---
 
-![Keep The Cache Lose The Garbage](/blog/parparvm-gc-small-heaps.jpg)
+![Less Garbage More Room](/blog/parparvm-gc-small-heaps.jpg)
 
-A backend holding very little live data still reached 98 MB of resident memory. Its collector waited against a 24 MB allocation floor, and lowering that floor did not measurably hurt throughput in the trigger sweep. We were spending memory without buying speed.
+A controlled runtime test holding very little live data still reached 98 MB of resident memory. Its collector waited against a 24 MB allocation floor, and lowering that floor did not measurably hurt throughput in the trigger sweep. We were spending memory without buying speed.
 
 [PR #5717](https://github.com/codenameone/CodenameOne/pull/5717) investigates that behavior in ParparVM, the Java-to-C runtime used by Codename One's native ports. It also fixes long-shift code generation and reopens a parallel-marking experiment. This is the collector part of our {{< post-link path="/blog/performance-work-between-benchmarks" text="weekly performance work" >}}.
 
@@ -23,7 +23,7 @@ Go offers a useful comparison because its documentation makes the CPU-versus-mem
 
 ## The experiment, and the version that actually merged
 
-The `/plaintext` backend test used 64 connections. Reported loaded RSS across the trigger sweep was:
+We varied the GC trigger while keeping the workload fixed. Reported resident memory under load across the sweep was:
 
 | Trigger | Loaded RSS |
 | --- | --- |
@@ -35,7 +35,7 @@ The `/plaintext` backend test used 64 connections. Reported loaded RSS across th
 
 Throughput and p99 stayed within run-to-run noise. A subsequent lower-floor configuration reported 38 MB loaded RSS, down from 98 MB. RSS includes resident process memory; it is not a live-object count or a heap-only measurement.
 
-![Reported backend RSS by configured trigger](/blog/gc-trigger-rss.svg)
+![Reported process RSS by configured trigger](/blog/gc-trigger-rss.svg)
 
 *Separate trigger configurations from PR #5717. This chart does not show a time series or compare against Go.*
 
@@ -51,7 +51,7 @@ Three proportional-floor attempts failed in different ways. One kept a departed 
 #endif
 ```
 
-That is an excerpt from the runtime, not an application build hint. The backend can select a lower floor because its workload is known. Shipping this change does not automatically switch every mobile application to a 4 MB floor.
+That is an excerpt from the runtime, not an application build hint. The test build can select a lower floor because its workload is controlled. Shipping this change does not automatically switch every mobile application to a 4 MB floor.
 
 {{< mermaid >}}
 flowchart LR

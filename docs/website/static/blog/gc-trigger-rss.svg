@@ -247,7 +247,7 @@ L 722.5344 294.912
    </g>
   </g>
   <g id="text_21">
-   <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #555555" x="729.9072" y="363.1104" transform="rotate(-0 729.9072 363.1104)">PR #5717 • /plaintext backend, 64 connections • Separate configurations</text>
+   <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #555555" x="729.9072" y="363.1104" transform="rotate(-0 729.9072 363.1104)">PR #5717 • Controlled GC trigger sweep • Separate configurations</text>
   </g>
  </g>
  <defs>

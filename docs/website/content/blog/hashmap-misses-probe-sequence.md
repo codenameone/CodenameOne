@@ -1,15 +1,17 @@
 ---
-title: "Fixing the Map, Then the Objects Inside It"
+title: "Faster Maps: Chasing Swiss Speed"
 slug: hashmap-misses-probe-sequence
 url: /blog/hashmap-misses-probe-sequence/
 date: '2026-09-13'
 author: Shai Almog
 description: "ParparVM fixes pathological map misses and extends tagged boxed values. Probe counts, allocation coverage, and regressions show where ordinary Java collections became cheaper."
-feed_html: '<img src="https://www.codenameone.com/blog/hashmap-misses-probe-sequence.jpg" alt="Faster Maps Fewer Boxes" /> ParparVM fixes pathological map misses and extends tagged boxed values. Probe counts, allocation coverage, and regressions show where ordinary Java collections became cheaper.'
+feed_html: '<img src="https://www.codenameone.com/blog/hashmap-misses-probe-sequence.jpg" alt="Faster Maps: Chasing Swiss Speed" /> ParparVM fixes pathological map misses and extends tagged boxed values. Probe counts, allocation coverage, and regressions show where ordinary Java collections became cheaper.'
 series: ["release-2026-09-11"]
 ---
 
-![Faster Maps Fewer Boxes](/blog/hashmap-misses-probe-sequence.jpg)
+![Faster Maps: Chasing Swiss Speed](/blog/hashmap-misses-probe-sequence.jpg)
+
+Go's Swiss maps gave us a useful target: compact storage and fast lookups without an object allocation for every entry. ParparVM already had compact arrays and separate metadata. The surprise was how much time a missing key could spend in that compact table.
 
 Three million `containsKey` calls took 32.7 seconds. The map benchmark we had been watching still looked healthy. It mostly asked for keys that existed.
 
