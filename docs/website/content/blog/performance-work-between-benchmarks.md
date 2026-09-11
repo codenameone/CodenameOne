@@ -27,7 +27,7 @@ Two major additions let users take their work further. **[Native drag and drop](
 
 ## Coming up: less waiting, more room, and work that travels
 
-Tomorrow's {{< post-link path="/blog/parparvm-gc-small-heaps" text="Less Garbage, More Room for Your App" >}} asks why a collector should keep memory that buys no speed, and how to stop a cache flush from making you decode every image again. On Sunday, {{< post-link path="/blog/hashmap-misses-probe-sequence" text="Faster Maps: Chasing Swiss Speed" >}} follows our comparison with Go's map design into faster lookups and numbers that no longer need their own heap objects.
+Tomorrow's {{< post-link path="/blog/parparvm-gc-small-heaps" text="What Go Taught Us About Java Garbage Collection" >}} asks why a collector should keep memory that buys no speed, and how to stop a cache flush from making you decode every image again. On Sunday, {{< post-link path="/blog/hashmap-misses-probe-sequence" text="Faster Maps: Chasing Swiss Speed" >}} follows our comparison with Go's map design into faster lookups and numbers that no longer need their own heap objects.
 
 Monday brings {{< post-link path="/blog/startup-cost-before-first-paint" text="Faster Starts, Less JavaScript Overhead" >}}. A margin calculation was waiting on AppKit, and a blocking method was making unrelated JavaScript calls suspend. Tuesday's {{< post-link path="/blog/continuity-restoring-work" text="Native Drag and Drop Meets Cross-Device Continuity" >}} puts the new integration APIs to work: offer a document to another app, resume a draft on another device, and keep account changes from restoring the wrong user's screen.
 
@@ -35,17 +35,17 @@ On Wednesday, {{< post-link path="/blog/javadoc-hugo-markdown-doclet" text="Java
 
 ## Less garbage, more room for your app
 
-ParparVM translates Java bytecode to C for Codename One's native ports. On a memory-constrained device, the collector's allowance for garbage competes with the images, screens, and data the application actually needs. A controlled runtime test with very little live data made that allowance easy to examine.
+As Java developers, HotSpot is the standard we tend to reach for. Comparing ParparVM with Go made me look beyond that familiar reference. My first suspicion was stack allocation: perhaps Go was simply creating fewer heap objects, the same sort of overhead that makes [Valhalla's value objects](https://github.com/openjdk/valhalla-docs/blob/main/site/design-notes/state-of-valhalla/02-object-model.md) interesting.
 
-I have enormous respect for HotSpot's collectors. G1 is explicitly designed for multiprocessor machines with large memories. HotSpot offers other collectors too, including Serial for small data sets, so “copy HotSpot” is not a collection policy. We needed to examine the assumptions against our own workloads. [Oracle's G1 guidance](https://docs.oracle.com/en/java/javase/25/gctuning/garbage-first-g1-garbage-collector1.html) describes that design target.
+But Go's collection policy mattered too. ParparVM is an AOT runtime with a closed-world build, so we can experiment with allocation and collection together. We translate the application to C, own its object representation, and know what has to cooperate with the collector.
 
-Go was a useful reference because its [GC guide](https://go.dev/doc/gc-guide) makes the tradeoff explicit. Let more garbage accumulate and you can do collection work less often. Collect sooner and you spend less memory, but may spend more CPU tracing the same live objects. That extra memory should earn its keep.
+We started with the allowance for new garbage. Letting more accumulate can save collection work, but that extra memory should buy something.
 
-In the GC trigger experiment, it wasn't. The stock 24 MB allocation floor was associated with 98 MB of loaded resident memory. Sweeping through lower trigger settings left throughput and p99 within run-to-run noise. A subsequent lower-floor configuration brought loaded RSS down to **38 MB**. [PR #5717](https://github.com/codenameone/CodenameOne/pull/5717) records the experiment.
+In our trigger experiment, it bought very little. The stock 24 MB allocation floor was associated with 98 MB of loaded resident memory. Sweeping through lower trigger settings left throughput and p99 within run-to-run noise. A subsequent lower-floor configuration brought loaded RSS down to **38 MB**. [PR #5717](https://github.com/codenameone/CodenameOne/pull/5717) records the experiment.
 
 ![Reported resident memory at five GC trigger settings](/blog/gc-trigger-rss.svg)
 
-*Separate trigger configurations, not a time series. The sweep's 4 MB point reported 30 MB RSS; the subsequent configuration reported 38 MB. RSS includes resident process memory beyond the Java heap.*
+*Resident memory at each trigger setting. The final tuned configuration reached 38 MB; RSS includes memory outside the Java heap.*
 
 ### The live-set estimate was missing live objects
 
@@ -61,7 +61,7 @@ The merged code lets a deployment choose its minimum instead:
 #endif
 ```
 
-That is runtime configuration, not an application build hint. A controlled build can select a smaller floor; the stock default stays unchanged. A policy based on the live set needs a count we can trust first.
+A runtime build can select the smaller floor. We kept the stock default while working through more workloads and the incomplete live-set counters.
 
 Parallel marking is the other part of the investigation. In the recorded allocation loop, ParparVM's median and p99 matched Go. The worst pause still favored Go: about 20 ms, against 0.3 to 0.9 seconds with four ParparVM markers and 2.2 to 3.3 seconds with one. Parallel marking remains experimental. Allocation threads can help drain marking work instead of merely waiting at the run-ahead cap, but that assistance belongs to the parallel path, not the unchanged serial default.
 
@@ -108,7 +108,7 @@ sequenceDiagram
     GC->>GC: Sweep
 {{< /mermaid >}}
 
-In the simulated 160 MB budget test, ranked retention produced a **97.44% hit rate at 82.1 MB**, compared with **87.99% at 91.0 MB** for clearing on pressure. That is the policy benchmark, not a device scrolling result. The VM machinery is ready; moving the iOS cache table and framework call sites onto it remains separate work.
+In the simulated 160 MB budget test, ranked retention produced a **97.44% hit rate at 82.1 MB**, compared with **87.99% at 91.0 MB** for clearing on pressure. The next step is moving the iOS cache table and framework call sites onto the new reference machinery, then measuring the effect on real screens.
 
 The {{< post-link path="/blog/parparvm-gc-small-heaps" text="collector and cache article" >}} follows both experiments in detail. Lowering garbage headroom and retaining useful cached results address different sides of the same memory budget.
 
@@ -143,7 +143,7 @@ The caller shifts the unsigned perturbation right by five bits between probes. A
 
 The last row got worse. That tradeoff belongs beside the spectacular miss result, because the change did not make every map operation hundreds of times faster.
 
-Go's [Swiss maps](https://go.dev/blog/swisstable) were another useful comparison. ParparVM already keeps compact metadata separate from its key and value arrays, so we were closer in structure than a map built around an allocation per entry. The merged lookup remains scalar perturbed probing. The SIMD-related improvement is on the string-key path: unequal cached hashes reject a match early, and compatible UTF-16 storage goes through native `memcmp`, where the platform can use optimized vector comparisons. This is distinct from Swiss-table group probing. These PR results do not establish equal-workload timing parity with Go.
+Go's [Swiss maps](https://go.dev/blog/swisstable) were another useful comparison. ParparVM already keeps compact metadata separate from its key and value arrays, so we were closer in structure than a map built around an allocation per entry. The merged lookup remains scalar perturbed probing. The SIMD-related improvement is on the string-key path: unequal cached hashes reject a match early, and compatible UTF-16 storage goes through native `memcmp`, where the platform can use optimized vector comparisons. Our probe sequence and string comparisons address different stages of the lookup. The timings here compare the old and new ParparVM implementations.
 
 Hashtable also moves away from an `Entry` allocation per mapping. IdentityHashMap needed a different fix: ParparVM's identity hash comes from an aligned address, so copying an indexing expression suited to HotSpot's already-scrambled identity hashes left too many zero low bits. Folding high bits down improved its measured distribution.
 
@@ -172,7 +172,7 @@ flowchart LR
     D --> J[Java wrapper behavior]
 {{< /mermaid >}}
 
-The JSON-like allocation census fell from **24.02 boxed allocations per map to 5.24**. That is work the collector never has to do. It is also why the “poor man's Valhalla” callback is useful, provided we keep the mechanism straight: these are tagged values, not general value classes or stack-allocated objects. A tagged value can live inside a heap collection.
+The JSON-like allocation census fell from **24.02 boxed allocations per map to 5.24**. That is work the collector never has to do. This extends our “poor man's Valhalla” work: put a known wrapper value directly into its reference word. The tag travels with it, including when that word lives in a heap collection. Long and Double keep a heap fallback for values that do not fit.
 
 The {{< post-link path="/blog/hashmap-misses-probe-sequence" text="maps and boxing article" >}} covers the coverage measurements and dispatch hazards. A type tag must select the right `hashCode` and `equals` implementation. Reusing the Integer fast path for every tag would produce a fast, incorrect map.
 
@@ -182,7 +182,7 @@ Before the first frame, a screen asks a lot of components how big they are. Padd
 
 [PR #5686](https://github.com/codenameone/CodenameOne/pull/5686) publishes screen identity and scale together when the window is created or moves. Layout reads that state atomically. Publishing the pair together also prevents a reader from combining one screen with another screen's scale.
 
-The old query accounted for 35 ms of blocked event-dispatch-thread time in the recorded startup profile. Installing a window observer added another synchronous wait even though the caller needed no return value. That path accounted for 37 ms. These are individual native Mac costs, not numbers to add into a universal startup score.
+The old query accounted for 35 ms of blocked event-dispatch-thread time in the recorded startup profile. Installing a window observer added another synchronous wait even though the caller needed no return value. That path accounted for 37 ms. The Mac profile gave us two specific waits to remove from startup.
 
 The same profile found an uncontended lock announcing that it was about to park before trying to acquire its mutex. That announcement could wait on a GC handshake. The runtime now tries the lock first and enters the park protocol when it actually has to wait.
 
@@ -356,7 +356,7 @@ form.add(location);
 
 The OS draws the supported control into a hosted surface and ties the request to a visible user action and a session-scoped location grant. The implementation uses the platform session API through reflection, avoiding an AndroidX dependency that would force a newer Android Gradle Plugin on every application using the button. The builder adds `USE_LOCATION_BUTTON` when it finds the component; the separate cloud-builder mirror still needs to be present in the builder serving the app.
 
-The PR exercised the system button, a human tap, consent, and a returned location on an Android 17 emulator, with fallback on API 36. That is useful runtime evidence for this flow. It is not a claim that every API 37 behavior has been tested, or that a location-policy deadline is the general target-SDK deadline. The {{< post-link path="/blog/android-37-readiness-location-button" text="Android and security article" >}} separates those checks and links the current platform guidance.
+The PR exercised the system button, a human tap, consent, and a returned location on an Android 17 emulator, with fallback on API 36. The regular screenshot suite still runs on API 36; broader API 37 coverage is part of the remaining migration work. The {{< post-link path="/blog/android-37-readiness-location-button" text="Android and security article" >}} separates those checks and links the current platform guidance.
 
 ### Stop making each application parse its own key armor
 

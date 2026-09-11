@@ -11,9 +11,11 @@ series: ["release-2026-09-11"]
 
 ![Drag, Drop, And Continue](/blog/continuity-restoring-work.jpg)
 
-Drag a document from your app into another application. Pick up an unfinished task on another device. These are ordinary things users want to do, but until now Codename One's shared APIs did not provide the native drag session or the cross-device checkpoint to carry them through.
+You are halfway through a draft on your phone when you sit down at your computer. The words are already written. The document is already open. Starting again should not be the price of changing screens.
 
-This week adds both. [Native drag and drop](#native-drag-and-drop-bring-other-apps-into-the-workflow) connects your components to the OS through the same payload model as copy and paste. [Cross-device continuity](#cross-device-continuity-save-the-work-not-the-screen) preserves application state and the router stack so another process or device can reconstruct the task. The application decides what may travel and which account may open it.
+Finishing the draft raises another familiar task: getting its output into another application. Copy and paste can help, but dragging the document onto its destination is often the action you reach for first.
+
+This week we added [cross-device continuity](#cross-device-continuity-save-the-work-not-the-screen) and [native drag and drop](#native-drag-and-drop-bring-other-apps-into-the-workflow) to Codename One. The first carries a description of the task to another process or device. The second offers its content to another application through the operating system. Both start by separating useful data from the screen that happens to show it.
 
 ## Cross-device continuity: save the work, not the screen
 
@@ -77,7 +79,7 @@ flowchart LR
     A --> V[Validate state and restore]
 {{< /mermaid >}}
 
-The handoff and relay paths are separate options. They do not turn a local checkpoint into an automatically trusted cloud document.
+Handoff and an application relay are separate ways to transport the checkpoint. In both cases, the receiving application checks the state against the signed-in account.
 
 ## The platform boundaries are visible
 
@@ -88,9 +90,9 @@ The handoff and relay paths are separate options. They do not turn a local check
 | Platform key-value synchronization | Apple iCloud; simulator support for testing |
 | Application-defined cross-device relay | `StateRelay`, backed by your endpoint |
 
-`Continuity.isContinuationSupported()` lets the application check the platform facility. Android does not claim to provide Apple-style Handoff. An application relay can instead use the product's existing accounts to carry state between Android, Apple devices, or a browser.
+`Continuity.isContinuationSupported()` lets the application check the platform facility. Apple devices use Handoff. An application relay can use your existing accounts to carry state between Android, Apple devices, or a browser.
 
-`RestStateRelay` is the provided HTTP starting point. Codename One does not run a relay service or decide which saved states belong to the same person. Your server owns authentication, account isolation, retention, and conflict policy.
+`RestStateRelay` supplies the HTTP starting point for your server. You provide the endpoint and decide how accounts, retention, and conflicting checkpoints work.
 
 The iCloud key-value store lives in `com.codename1.continuity.sync`. That package requires the appropriate entitlement on the Apple App ID. Basic restoration and Handoff do not acquire that requirement just because the app wants to resume a screen.
 
@@ -113,8 +115,7 @@ Both calls matter. Clearing stored state alone leaves continuity enabled, so a l
 
 Android task removal handles a different part of ending a session, covered in {{< post-link path="/blog/android-37-readiness-location-button" text="the security follow-up" >}}. Neither operation replaces server-side credential revocation.
 
-The continuity PR verified core state tests and generated Apple builds, including a single `NSUserActivityTypes` array shared correctly with App Intents. It did not report a physical two-device Handoff session. The paired cloud-builder integration also needs to be present in the builder serving your application.
-
+The Apple builder also combines the continuity and App Intents declarations into a single `NSUserActivityTypes` array. Use a builder with the paired continuity integration when testing the device-to-device flow.
 
 ## Native drag and drop: bring other apps into the workflow
 
@@ -190,16 +191,15 @@ Static MIME filters therefore affect the cursor immediately. A decision made lat
 | iPhone | Supported | Not offered by this implementation's interaction model |
 | JavaScript, native AppKit, native Windows/Linux | Not implemented here | Not implemented here |
 
-Check `NativeDragAndDrop.isSupported()` before offering a native-only workflow. Unsupported calls are no-ops, and the lightweight drag/drop API continues to work as before. Mac Catalyst and native AppKit are distinct ports; supporting UIKit drag interactions does not automatically implement AppKit dragging.
+Check `NativeDragAndDrop.isSupported()` before offering the native workflow. The lightweight drag/drop API remains available on the other ports. Mac Catalyst uses this UIKit implementation; the native AppKit port still needs its own bridge.
 
 On Android, the conversion reuses the clipboard's `ClipData` machinery and file-provider URIs. On iOS, UIKit owns recognition of the gesture. Recognition and data preparation are separate steps; once a session begins, the provider timing above applies.
 
-## The test boundary
+## Try the whole handoff
 
-The PR reports passing core and JavaSE tests, including lazy file transfer and MIME conversion, plus native Apple compilation and translation checks. It explicitly does not report a physically driven operating-system drag. Synthetic mouse input did not reach the window server in that environment. Android and iOS paths had compilation and analysis evidence rather than device-driven drag evidence.
+Use the simulator to exercise restoration, then try the task on the devices your users will move between. For dragging, test the receiving application too: a text editor and a file manager can request different representations of the same content.
 
-That distinction belongs beside the platform matrix. A compiled bridge and a real user moving a document into another application answer different questions.
-
+The bridge has core, JavaSE, and native compilation checks behind it. A useful integration test goes further: finish the move, cancel it, reject the payload, and sign out before an old checkpoint arrives. Those are the moments when a feature either preserves the user's work or surprises them.
 
 ## Move the work, keep the account boundary
 

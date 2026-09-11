@@ -11,11 +11,11 @@ series: ["release-2026-09-11"]
 
 ![Faster Maps: Chasing Swiss Speed](/blog/hashmap-misses-probe-sequence.jpg)
 
-Go's Swiss maps gave us a useful target: compact storage and fast lookups without an object allocation for every entry. ParparVM already had compact arrays and separate metadata. The surprise was how much time a missing key could spend in that compact table.
+After looking at Go's collector, we turned to its maps. Swiss tables have an appealing premise: keep entries compact, use a small amount of metadata to narrow the search, and avoid chasing a separate object for every mapping. ParparVM already had compact arrays and separate metadata. We were starting closer than I expected.
 
-Three million `containsKey` calls took 32.7 seconds. The map benchmark we had been watching still looked healthy. It mostly asked for keys that existed.
+Then a missing key spoiled the picture. Three million `containsKey` calls took 32.7 seconds, while the benchmark we usually watched still looked healthy. It mostly asked for keys that existed.
 
-[PR #5722](https://github.com/codenameone/CodenameOne/pull/5722) fixes that blind spot and improves Hashtable and IdentityHashMap along the way. The lesson applies to anyone benchmarking a hash table: successful lookup and unsuccessful lookup are different workloads.
+The investigation took us through the probe sequence, string comparisons, and the boxed numbers stored inside the table. [The map changes](https://github.com/codenameone/CodenameOne/pull/5722) and [wider tagged values](https://github.com/codenameone/CodenameOne/pull/5735) ended up attacking different costs in the same Java collection.
 
 ## One probe for a hit, thousands for a miss
 
@@ -32,7 +32,7 @@ for (int i = 0; i < 100000; i++) {
 boolean present = values.containsKey(-1);
 ```
 
-This illustrates the two operations, not the complete measured workload. The committed [MapBench](https://github.com/codenameone/CodenameOne/blob/963764b5e7/vm/benchmarks/src/com/bench/MapBench.java) controls the key distribution and includes misses, tombstones, growth, string keys, and identity keys.
+To exercise different collision patterns, we expanded [MapBench](https://github.com/codenameone/CodenameOne/blob/963764b5e7/vm/benchmarks/src/com/bench/MapBench.java) with misses, tombstones, growth, string keys, and identity keys, controlling the key distribution for each run.
 
 | Map entries | Mean probes per miss before | After |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ This illustrates the two operations, not the complete measured workload. The com
 | 100,000 | 16,742 | 1.53 |
 | 1,000,000 | 222,721 | 1.98 |
 
-Hits stayed at one probe in this experiment. A checksum verifies the answer; it does not tell you that getting the answer took a linear walk.
+Hits stayed at one probe. That explained why the old benchmark looked so good: it kept landing straight on the key while the missing-key search walked past thousands of entries.
 
 ## Keep the first slot, change the collision path
 
@@ -67,17 +67,17 @@ flowchart TD
     P --> Q
 {{< /mermaid >}}
 
-## What the Swiss-table comparison does and does not say
+## Where the Swiss idea helped
 
-Go's [Swiss-table explanation](https://go.dev/blog/swisstable) describes compact groups with control metadata used to filter candidate entries. It is a useful reference when a table spends time chasing pointers or comparing keys unnecessarily.
+Go's [Swiss maps](https://go.dev/blog/swisstable) compare compact control metadata before loading full keys. That puts more of the search into a small amount of contiguous memory. Our existing layout already separated metadata from keys and values, so the most urgent fix was the route through that layout after a collision.
 
-ParparVM already has compact arrays and metadata separated from key/value storage. That structural overlap makes the comparison interesting. It does not make the implementations identical, and this PR does not publish an equivalent-workload ParparVM-versus-Go result.
+We kept scalar perturbed probing for that route. String equality got a separate improvement: cached unequal hashes now reject a match immediately, and compatible UTF-16 arrays go through native `memcmp`. That gives the platform's optimized vector comparison a chance to do the expensive byte work. The implementation lives in [the native equality path](https://github.com/codenameone/CodenameOne/blob/963764b5e7/vm/ByteCodeTranslator/src/nativeMethods.m).
 
-The merged lookup loop uses scalar perturbed probes. There is SIMD-related work on the string-key path: cached unequal hashes can reject equality immediately, and compatible UTF-16 backing arrays use native `memcmp`, which can use the platform's optimized vector comparison. That comparison path is visible in [nativeMethods.m](https://github.com/codenameone/CodenameOne/blob/963764b5e7/vm/ByteCodeTranslator/src/nativeMethods.m). It is distinct from checking a group of table control bytes at once. A claim that we shipped Swiss-style SIMD probing here would describe code we did not merge.
+Swiss group probing and our string comparisons use metadata and contiguous storage at different stages of lookup. Looking at Go helped identify where we were already compact and where we were still wasting work.
 
 ## Gains, and the cost we accepted
 
-These are the PR's interleaved best-of-N measurements on the development Mac, with matching checksums. They compare before and after this change, not whole applications or Go maps.
+We alternated old and new builds on the development Mac, checked that their answers matched, and compared the best runs:
 
 | Workload | Before | After |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ These are the PR's interleaved best-of-N measurements on the development Mac, wi
 | Hashtable build | 167.8 ms | 96.6 ms |
 | IdentityHashMap lookup | 13.4 ms | 5.0 ms |
 
-The large-table result regressed. The broad benchmark geometric mean barely moved. The large gains remove a pathological case that the old suite did not price; they are not a 728-fold improvement to every map operation.
+The miss-heavy workload fell from 32.7 seconds to 44.9 ms. Random hits in the large table got slower, and the broad suite's geometric mean barely moved. We accepted that tradeoff to remove the pathological misses and tombstone walks.
 
 Hashtable now avoids an `Entry` allocation per mapping and uses the compact layout. Its lookup remains more expensive than HashMap with the same probe code because synchronization goes through ParparVM's address-keyed monitor table. The next useful optimization belongs there.
 
@@ -104,7 +104,7 @@ ParparVM already avoided a separate allocation for `Integer.valueOf`. [PR #5735]
 
 On this 64-bit representation, aligned object addresses leave three low bits available. ParparVM's conservative root scan already rejects words with those alignment bits set. The encoding uses them as a type tag, with the remaining 61 bits carrying the payload.
 
-That alignment assumption is verified by `TagProbe` across more than 380,000 allocations in the implementation work. It is a property of this runtime and its allocator, not a portable trick Java application code should perform on references.
+We checked the allocator alignment with `TagProbe` across more than 380,000 allocations. Those spare bits were already part of the runtime's reference-scanning contract; the new encoding puts them to work.
 
 {{< mermaid >}}
 flowchart LR
@@ -116,7 +116,7 @@ flowchart LR
     D --> J[Java wrapper behavior]
 {{< /mermaid >}}
 
-A tagged value may reside in a local variable, register, array, or map slot. There is no separate wrapper allocation. A value stored inside a heap collection is not a stack-allocated object.
+A tagged value fits wherever the reference word fits: a local variable, a register, an array element, or a map slot. The separate wrapper object disappears.
 
 ## Which values fit?
 
@@ -138,7 +138,7 @@ Double exact = Double.valueOf(12.5);        // Tagged
 Double fraction = Double.valueOf(0.1);      // Heap fallback
 ```
 
-These comments describe the ParparVM representation, not a Java language guarantee. Use `equals()` for wrapper value equality. Code should not infer object identity or lifetime from whether an allocation happened.
+Application code still uses `equals()` for wrapper value equality. The runtime chooses the representation behind those ordinary Java calls.
 
 ## The useful benchmark reports coverage
 
@@ -154,9 +154,9 @@ The PR records best-of-six interleaved comparisons against the Integer-only buil
 | Mixed boxed churn | 1.28x |
 | JSON-like parsing | 1.14x |
 
-The whole `Bench` suite remained at 1.00. These are targeted workload results, not an application-wide speed multiplier.
+The whole `Bench` suite remained at 1.00. The gains were concentrated where boxed values had been creating work.
 
-An allocation census checks the mechanism independently of elapsed time. The JSON-like workload fell from **24.02 boxed allocations per map to 5.24**. Its expected remaining Double allocations were about 5.28 per map at the measured coverage. The agreement matters more than a convenient headline: allocations fell by roughly the amount the encoding predicts.
+An allocation census checks the mechanism independently of elapsed time. The JSON-like workload fell from **24.02 boxed allocations per map to 5.24**. Its expected remaining Double allocations were about 5.28 per map at the measured coverage. The allocation count lined up with the encoding: the remaining Double values explained almost all of the surviving boxes.
 
 ## A type tag is also a dispatch obligation
 
@@ -166,20 +166,21 @@ The other wrapper types therefore reach their own implementations through the di
 
 The nursery write barrier needed a tag guard too. Every place that handles a value as an object must distinguish an immediate from the address of a heap object. Saving an allocation is useful only if reference scanning and dispatch agree about what occupies the slot.
 
-## The useful part of the Valhalla analogy
+## Our poor man's Valhalla gets a little richer
 
-Our [earlier runtime article](/blog/beating-hotspot-performance/) and [SIMD and allocation discussion](/blog/ios-density-scroll-and-accessibility/) explored ways to remove object overhead without changing application algorithms. "Poor man's Valhalla" captures that motivation.
+[Project Valhalla](https://github.com/openjdk/valhalla-docs/blob/main/site/design-notes/state-of-valhalla/02-object-model.md) tackles the cost of giving values an object identity they do not need. That opens the door to storing values together and passing their contents directly, instead of requiring another object and pointer for each one.
 
-The boundary is substantial. This is not a general implementation of value classes. Mutable objects such as `Dimension` and `Rectangle` do not become immediate values, and arbitrary objects do not gain automatic stack allocation. The optimization covers specific wrapper representations with a defined fallback.
+Our [earlier tagged-Integer work](/blog/beating-hotspot-performance/) took a smaller route through the same problem. We already knew the wrapper types and controlled their representation, so we could put an Integer where its pointer would have been. Now more numeric wrappers get that treatment.
 
+The 61-bit payload is the limit of this particular trick. Long and Double retain a heap fallback; mutable objects such as `Dimension` and `Rectangle` keep their existing representation. The payoff is immediate for maps and JSON data full of numbers: ordinary Java APIs, fewer separate objects.
 
 ## Measure the contents as well as the container
 
 A cache asks whether an item is missing. A decoder builds a map and boxes its numbers. A registry deletes and replaces entries. Measuring one successful lookup tells us very little about those other jobs.
 
-The map fixes and wider tagged values address separate costs in the same Java data structures. The probe sequence changes where we search; the encoding changes what occupies a key or value slot. Their benchmark ratios cannot be multiplied into a single speedup, but the allocation census gives the collector a concrete benefit: fewer objects to trace and reclaim.
+The map fixes and wider tagged values address separate costs in the same Java data structures. The probe sequence changes where we search; the encoding changes what occupies a key or value slot. The allocation census shows what carries through to the collector: fewer objects to trace and reclaim.
 
-That is a useful result for the {{< post-link path="/blog/performance-work-between-benchmarks" text="week's performance work" >}}. App developers keep ordinary maps and wrapper APIs. Codename One handles probing, dispatch, and reference scanning together, including the edge cases that must remain correct when a reference no longer points to an object. A faster map is worth shipping only when a missing key, an unusual Double, and a collector scan still get the right answer.
+That is a useful result for the {{< post-link path="/blog/performance-work-between-benchmarks" text="week's performance work" >}}. App developers keep ordinary maps and wrapper APIs. Codename One handles probing, dispatch, and reference scanning together, including the edge cases that must remain correct when a reference no longer points to an object. That lets the application keep its data model while we improve the search and allocation work underneath it.
 
 ---
 

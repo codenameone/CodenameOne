@@ -9,7 +9,7 @@ Baseline: last week's `voip-vpn-builders` parent, dated follow-ups, matching `se
 | Date | Article | Narrative |
 | --- | --- | --- |
 | 2026-09-11 | [Lies, Damn Lies and Benchmarks](../content/blog/performance-work-between-benchmarks.md) | Benchmark blind spots and the weekly overview |
-| 2026-09-12 | [Less Garbage, More Room for Your App](../content/blog/parparvm-gc-small-heaps.md) | GC pacing, weak references, and useful caches |
+| 2026-09-12 | [What Go Taught Us About Java Garbage Collection](../content/blog/parparvm-gc-small-heaps.md) | GC pacing, weak references, and useful caches |
 | 2026-09-13 | [Faster Maps: Chasing Swiss Speed](../content/blog/hashmap-misses-probe-sequence.md) | Map probing and the boxed values inside collections |
 | 2026-09-14 | [Faster Starts, Less JavaScript Overhead](../content/blog/startup-cost-before-first-paint.md) | Unnecessary native waiting and JavaScript suspension |
 | 2026-09-15 | [Native Drag and Drop Meets Cross-Device Continuity](../content/blog/continuity-restoring-work.md) | State restoration, cross-device continuity, and native drag/drop |
@@ -35,11 +35,21 @@ Likely skeptical responses:
 
 Boldness ruling: keep the author's humor and personal confidence. The evidence earns detailed claims about these workloads, not a “best runtime” headline. Traction comes from recognizable engineering mistakes and reusable fixes; no traffic result is assumed.
 
+## Narrative and voice review
+
+The series uses the author's investigation and concrete workflows to carry the technical material. The GC opening follows the author-supplied account of comparing HotSpot and Go, suspecting stack allocation, and exploring the choices available to ParparVM's AOT runtime. The map story continues into compact tables and the wider tagged-value implementation; Valhalla supplies the Java ecosystem connection without being described as stack allocation.
+
+The other openings follow a startup stall inside a margin calculation, a draft moving between devices and applications, Javadoc bringing a second website into the site, and an Android SDK version parsed as `372`. Code and diagrams remain central. Measurements sit beside the change they explain. Regressions and incomplete integration work remain in the narrative as engineering decisions and next steps.
+
+Aggressive copy polish removed detached source-label sentences, repeated certification disclaimers, and defenses against claims the article never made. Links now belong to the sentence explaining the code or idea. Chart captions describe the plotted quantities. The supplied feature PRs remain the source of the benchmark numbers; this content task did not rerun them.
+
+The Go runtime terminology and allocation discussion were checked against the official Go FAQ. Valhalla's identity and representation discussion was checked against OpenJDK's value-object design notes. The prose makes no release-date promise for Valhalla and keeps the concrete limits of tagged Long and Double values.
+
 ## Six narrative reviews
 
-### Less garbage, more room for your app
+### What Go taught us about Java garbage collection
 
-The reader's problem is an image-heavy application choosing between retained memory and repeated decoding. The collector floor and reference policy now share that problem statement. The deep dive preserves the failed live-set experiment, worst-pause comparison, concurrent-read barrier, and simulated-budget cache results.
+The author starts with HotSpot as the familiar reference, suspects stack allocation after comparing with Go, and then investigates collection policy. AOT and the closed-world runtime explain why ParparVM can run the experiment. The allocation question connects to Valhalla and returns in the map/boxing follow-up. The deep dive preserves the failed live-set experiment, worst-pause comparison, concurrent-read barrier, and simulated-budget cache results.
 
 Skeptical checks: the 38 MB result is a controlled runtime measurement; the stock floor did not change; the framework image-cache migration remains separate; recency was not compared with matched-rate random eviction. None is hidden by the combined narrative. The conclusion connects lower garbage, useful cache retention, and the runtime's responsibility to prevent dangling references.
 
@@ -86,9 +96,8 @@ Skeptical checks: compile readiness is not runtime certification; the location-p
 | Blocking | Site search includes the full developer guide | The live search page explicitly excludes that document. Copy now says that API types/members are indexed and the guide retains its own navigation/browser search. |
 | High | Security superiority is established by the release | No comparative security assessment exists here. The close names validated boundaries: key container checks, explicit restoration shutdown, permission injection, and OS-owned consent. It does not certify an app or imply task removal revokes credentials. |
 | High | Java 25 introduced Markdown documentation comments | Tooling uses Java 25; Markdown comments arrived in JDK 23. The article links Oracle's documentation and explains the distinction. |
-| High | Native drag support covers every desktop port and was exercised by hand | The matrix distinguishes JavaSE and Catalyst from native AppKit/Windows/Linux. The supplied PR explicitly lacks a physically driven drag test; that limit is included. |
+| High | Native drag support covers every desktop port and was exercised by hand | The matrix distinguishes JavaSE and Catalyst from native AppKit/Windows/Linux. The supplied PR lacks a physically driven drag test. This report records that evidence limit; the article gives practical integration tests without claiming they were run. |
 | High | The JavaScript optimization improved every workload | The 13.7% iterator regression is included beside the wins, with its unresolved cause. The source-size reduction is not used as a proxy for throughput. |
-
 | High | Every drag data provider waits for a receiver | Review comment [3982187867](https://github.com/codenameone/CodenameOne/pull/5767#discussion_r3982187867) correctly identifies eager paths. Android resolves every provider before starting the drag; iOS resolves file lists to count items. The parent and merged continuity article state these exceptions, and the new diagram shows their timing. Providers must be cheap enough for drag start; expensive exports need preparation or caching. |
 
 ## Evidence and media provenance

@@ -11,9 +11,11 @@ series: ["release-2026-09-11"]
 
 ![Start Sooner Wait Less](/blog/startup-cost-before-first-paint.jpg)
 
-A margin calculation should not need a synchronous trip to the operating system's main thread. Ours did. Every component that converted padding or margins to pixels could wait for AppKit to tell it which screen contained the window.
+A margin calculation is an odd place to find a startup stall. It sounds like arithmetic. In our native Mac profile, it could wait for the operating system's main thread.
 
-That was one of the startup costs found in [PR #5686](https://github.com/codenameone/CodenameOne/pull/5686). The measurements came from a native Mac build, so they identify concrete paths to fix without pretending to be universal iOS or Android startup numbers.
+Following that call led to screen-scale queries repeated across components, a theme scan repeated across styles, and a switch generating blurred artwork just to say how big it was. None of those costs required a complicated screen. They happened while constructing an ordinary one.
+
+[The native profiling work](https://github.com/codenameone/CodenameOne/pull/5686) started by asking what each call actually needed from the platform. Later, we found the same kind of overreach in the JavaScript compiler: preparing calls to suspend even when they could finish synchronously.
 
 ## Publish screen state when it changes
 
@@ -29,17 +31,17 @@ flowchart LR
     D --> E[Padding and margin layout]
 {{< /mermaid >}}
 
-The PR records 35 ms of blocked event-dispatch-thread time per launch on the old path. Installing an AppKit window observer also used a synchronous dispatch, despite no caller needing a result. Removing that wait addressed another reported 37 ms.
+The old path accounted for 35 ms of blocked event-dispatch-thread time per launch in the Mac profile. Installing a window observer had another synchronous dispatch, even though the caller needed no result. That accounted for 37 ms.
 
-Those are measurements of individual costs. Adding them together and advertising that sum as a measured end-to-end startup improvement would ignore overlap, scheduling, and other work on the path.
+The profile gave us two calls to remove from the waiting path. Their overlap and scheduling still matter to the total launch time.
 
 ## Try the lock before announcing a park
 
 ParparVM's monitor entry announced a GC park before it knew whether acquiring the lock would block. An uncontended lock could therefore wait for the collector's handshake despite having no competing owner.
 
-The implementation now tries the mutex first. Only the path that actually needs to wait enters the park protocol. The measured startup cost was 8.7 ms in the PR's run. Instrumentation also had to change: the stall report previously missed that handshake loop and reported zero.
+The implementation now tries the mutex first. Only the path that actually needs to wait enters the park protocol. That handshake had cost 8.7 ms in the startup profile. Instrumentation also had to change: the stall report previously missed that handshake loop and reported zero.
 
-A profiler cannot explain time it does not observe. Correcting the instrumentation was part of the fix, not an optional reporting improvement.
+The old stall report said zero because it missed the handshake loop. Fixing that blind spot let us see the wait we were trying to remove.
 
 ## Style construction repeated a global query
 
@@ -51,7 +53,7 @@ The fix indexes dark keys once per theme generation. A new UIID then performs a 
 | --- | --- | --- |
 | First-use dark-variant lookup | 111,955 ns | 17,378 ns |
 
-The change concerns this lookup in style construction, not the entire cost of constructing a component. It becomes valuable because a first screen often introduces many distinct UIIDs.
+A first screen often introduces many distinct UIIDs. Each new style had been paying for that global search.
 
 For an application-side diagnostic, measure construction separately from the first paint and use a fresh process for cold samples:
 
@@ -70,7 +72,7 @@ System.out.println("Form construction: " + constructionMs + " ms");
 form.show();
 ```
 
-This short example measures Java construction only. It is too coarse to reproduce the nanosecond lookup result and does not measure completion of the first visible frame.
+This separates construction from `show()`. Use a profiler for the individual lookup and first-frame timings.
 
 ## Preferred size should not generate artwork
 
@@ -90,18 +92,17 @@ This work complements {{< post-link path="/blog/parparvm-gc-small-heaps" text="c
 
 A null socket handle was being unboxed into a long. An image creation path needed its one-pass premultiplication restored. A mismatched native symbol name had left rounded drawing inactive without a linker error. Forked Maven runs also failed to inherit `maven.repo.local`, which could make a developer run stale artifacts while believing a fix was under test.
 
-The PR records 6,145 passing core tests and clean builds of the affected modules. Those checks support the changes, while the timings remain specific to the native Mac measurements recorded in the PR.
-
+The affected modules built cleanly, and 6,145 core tests passed with the changes.
 
 ## JavaScript was waiting for the wrong reason too
 
-On the native Mac path, a margin calculation waited for screen information that could already have been published. The JavaScript backend had a different unnecessary wait: an unrelated blocking method could make a synchronous call into a suspension point.
+On the native Mac path, a margin calculation waited for screen information that could already have been published. The JavaScript compiler had a different unnecessary wait: an unrelated blocking method could make a synchronous call into a suspension point.
 
 One blocking `run()` was enough to affect other `run()` methods, then their callers. [PR #5755](https://github.com/codenameone/CodenameOne/pull/5755) gives suspension analysis the receiver-type information it needs to stop that propagation.
 
 ## A signature does not identify an implementation
 
-The backend translates a Java method that can block into a JavaScript generator. Calls that can suspend need `yield*` so the runtime can resume them later. That is necessary for blocking behavior, but unnecessary generator dispatch adds work to synchronous paths.
+The compiler translates a Java method that can block into a JavaScript generator. Calls that can suspend need `yield*` so the runtime can resume them later. That is necessary for blocking behavior, but unnecessary generator dispatch adds work to synchronous paths.
 
 The old analysis grouped methods by name and descriptor without the owner class. This small Java example shows the distinction it lost:
 
@@ -143,7 +144,7 @@ An unresolved receiver cannot simply be skipped. The runtime can search interfac
 
 ## Why counting bytes was the wrong measure
 
-In `hellocodenameone`, the PR reports:
+Translating `hellocodenameone` showed how far the old assumption had spread:
 
 | Generated artifact metric | Before | After |
 | --- | --- | --- |
@@ -165,7 +166,7 @@ Use the script's options to build comparable arms and retain its checksums. Each
 
 ## The timing results include a regression
 
-The PR reports interleaved best-of-three measurements against the previous revision. A master-versus-master comparison measured the noise floor at 0.3% to 4.9% across workloads.
+We compared the previous and updated revisions with interleaved best-of-three runs. A master-versus-master comparison measured the noise floor at 0.3% to 4.9% across workloads.
 
 | Workload | Elapsed-time change |
 | --- | --- |
@@ -175,20 +176,19 @@ The PR reports interleaved best-of-three measurements against the previous revis
 | `mapChurn` | 6.6% lower |
 | `iteratorWalk` | 13.7% higher |
 
-The iterator regression was reproducible and above its own noise floor. Its emitted body and the inspected iterator functions were byte-identical between arms. The PR did not establish a cause. It remains an open result, not something a smaller bundle or matching screenshot can explain away.
+The iterator regression was reproducible and above its own noise floor. Its emitted body and the inspected iterator functions were byte-identical between arms. We have not found the cause yet. That leaves a specific workload to investigate next, even after the generator count has fallen.
 
-Node measurements also do not predict every browser's rendering or scheduling behavior. They isolate compiler/runtime throughput. A browser application still needs measurement in the browser and on the devices it targets.
+Running under Node isolates compiler/runtime throughput. Browser profiling will tell us how those changes interact with rendering and scheduling on the target device.
 
 ## A narrower answer must remain correct
 
-The local VM tests reported 305 tests, zero failures, and one pre-existing skip. The PR's JavaScript screenshot check subsequently reported 181 matching screenshots. That adds rendering evidence for the changed bridge handling, although a screenshot suite is not exhaustive proof of every dynamic dispatch path.
-
+The VM tests finished with zero failures across 305 tests and one pre-existing skip. The JavaScript screenshot check matched 181 screenshots after the bridge changes.
 
 ## Spend the time on the screen the user asked for
 
 A screen-scale lookup should read the current scale. A size query should calculate dimensions. A call that cannot block should not need generator dispatch. Each fix removes work that grew out of a broader assumption than the operation required.
 
-The native timings describe startup paths; the Node measurements describe compiler and runtime throughput. They do not combine into one application score. They do give us better questions for the next profile, including the iterator regression we have not explained yet.
+The native and JavaScript investigations both started with work that had spread further than it needed to. Publishing screen state stopped repeated queries; using receiver types stopped unrelated methods from becoming generators. The iterator regression is the next loose end.
 
 Across [this week's release](/blog/performance-work-between-benchmarks/), Codename One is reducing those costs inside the shared implementation. App teams can keep their Java screens and benefit as the ports improve. The compiler still takes the conservative path when it cannot resolve a receiver, and the runtime still coordinates with the collector when a lock must wait. Removing unnecessary work should preserve those safeguards.
 

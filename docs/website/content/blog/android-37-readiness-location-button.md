@@ -11,11 +11,13 @@ series: ["release-2026-09-11"]
 
 ![Android 17 Before The Rush](/blog/android-37-readiness-location-button.jpg)
 
-An Android port can compile successfully against an old `android.jar` while referencing a class the next platform has removed. Until this week, our regular port compilation could give exactly that false reassurance.
+One of the bugs in our Android 17 preparation was a version number. The platform was `37.2`. One builder path removed the punctuation and read it as `372`.
 
-[PR #5731](https://github.com/codenameone/CodenameOne/pull/5731) adds checks against API 37 and fixes builder assumptions about minor-versioned platforms. [PR #5738](https://github.com/codenameone/CodenameOne/pull/5738) adds the Android 17 location button. Both let us prepare the migration before changing every customer's target SDK.
+That number sailed through minimum-version checks. A different path tried to parse the suffix as an integer and failed outright. Neither had anything to do with the application a customer was trying to build.
 
-## Three different meanings of ready
+This is the work we want to do before a target-SDK deadline arrives. [The API 37 changes](https://github.com/codenameone/CodenameOne/pull/5731) check the new platform and fix its path through the builder. [The location button](https://github.com/codenameone/CodenameOne/pull/5738) then exercises a new permission flow in a generated application. Along the way, PEM parsing and task removal take two more recurring pieces of security code out of individual apps.
+
+## Make the new platform break our build first
 
 | Check | What it establishes |
 | --- | --- |
@@ -23,7 +25,7 @@ An Android port can compile successfully against an old `android.jar` while refe
 | Assemble the generated application against the new SDK | Exercise resources, manifest merging, dependency metadata, and packaging |
 | Run and interact with the app on the new OS | Exercise changed runtime behavior and permissions |
 
-A successful compile does not answer the third question. The API 37 PR deliberately leaves the normal SDK floor at 36 rather than silently changing all generated applications' target SDK and required downloads.
+We kept the normal SDK floor at 36 while adding these API 37 checks. That lets us work through migration failures before changing the default for customer builds.
 
 The source check compiles identical sources against two platform jars and compares errors. Optional packages with unresolved dependencies can fail identically in both runs; the useful signal is an error introduced only by the newer platform.
 
@@ -39,7 +41,7 @@ This continues the [platform-watch work from last week](/blog/platform-deprecati
 
 ## One-time location belongs behind a deliberate action
 
-Android 17 introduces a system-rendered location button for transactional precise-location access. Google's policy page, checked September 10, lists January 27, 2027, for compliance and describes the Android 17+ enforcement timing as subject to further updates. That is a location-policy timeline, not a blanket API 37 target-SDK deadline. [Google Play location policy](https://support.google.com/googleplay/android-developer/answer/17033915?hl=en).
+Android 17 introduces a system-rendered location button for transactional precise-location access. Google's policy page, checked September 10, lists January 27, 2027, for compliance and describes the Android 17+ enforcement timing as subject to further updates. The dates come from [Google Play's location policy](https://support.google.com/googleplay/android-developer/answer/17033915?hl=en); the general target-SDK schedule is a separate requirement.
 
 The Codename One component presents the platform control where supported and an ordinary button elsewhere:
 
@@ -58,7 +60,7 @@ form.add(location);
 
 `searchNearby` is application code. A `null` result is a normal outcome when permission is declined or no location is delivered. The component exposes `isSystemRendered()` so the application can inspect which path is active.
 
-Google's design ties the request to a visible user action and a session-scoped precise-location grant. The application should still choose coarse location if that is enough for the task. [Android's location-button introduction](https://developer.android.com/blog/posts/redefining-location-privacy-new-tools-and-improvements-for-android-17?hl=en).
+[Android's location button](https://developer.android.com/blog/posts/redefining-location-privacy-new-tools-and-improvements-for-android-17?hl=en) ties the precise-location request to a visible user action and a session-scoped grant. For a task that works with coarse location, keep the request coarse.
 
 ## Use the platform protocol without forcing an AndroidX upgrade
 
@@ -78,28 +80,27 @@ flowchart TD
     O --> L
 {{< /mermaid >}}
 
-This is a specific native control integration. It does not change Codename One's general custom-rendered UI model.
+The rest of the Codename One screen keeps its custom rendering; the OS owns this consent surface.
 
 ## Permission injection and fallback still need attention
 
-The generated manifest must include `USE_LOCATION_BUTTON`. The repository builder adds it when the application references `LocationButton`. The PR explicitly says the separate BuildDaemon mirror was still pending at that point; this article does not certify deployment to the cloud builder serving a particular account.
+The generated manifest must include `USE_LOCATION_BUTTON`. The repository builder adds it when the application references `LocationButton`. The separate BuildDaemon mirror was still pending with this change, so the cloud builder needs that update too.
 
 The implementation also avoids automatically restricting all precise-location permission to button-only access. An application may have a legitimate continuous-location feature as well. That decision requires reviewing the application's actual location use and current platform guidance, rather than inferring policy from the presence of one class.
 
-If a platform session fails, the component falls back to the ordinary button. That preserves a usable control, but an app targeting the new transactional-location requirements should test that the system path really remains active. A visible button alone is insufficient evidence of the new permission flow.
+If a platform session fails, the component falls back to the ordinary button. That preserves a usable control, but an app targeting the new transactional-location requirements should test that the system path really remains active. Check `isSystemRendered()` while testing that flow.
 
-## What was exercised
+## The button on Android 17
 
-The location-button PR reports a real Android 17 emulator image running a generated app at compile SDK 37.2 and target SDK 37. The system button rendered, a human tap opened the platform consent sheet, and approval produced a location with the session-scoped permission flags. The same APK on API 36 used the ordinary button and permission flow.
+We ran the generated app on an Android 17 emulator with compile SDK 37.2 and target SDK 37. The system button rendered, a human tap opened the platform consent sheet, and approval produced a location with the session-scoped permission flags. The same APK on API 36 used the ordinary button and permission flow.
 
-The regular Android screenshot CI leg remains at API 36 in this work. Broader API 37 runtime behavior and policy compliance are not established by the compile gate or this single location flow. We will keep those checks separate so a passing build cannot conceal an untested migration assumption.
+The regular screenshot CI leg is still on API 36. Expanding that coverage to API 37 is part of the remaining migration work.
 
+## The key file is right there. Why are we converting it by hand?
 
-## A key file is another input boundary
+Loading a key often started with a small conversion task: remove the PEM armor, decode Base64, and work out which DER container was inside. That is a poor place for every application to maintain its own slightly different parser.
 
-Permissions govern what an app may request from the OS. Key parsing governs what it accepts from a file. [PR #5707](https://github.com/codenameone/CodenameOne/pull/5707) removes another piece of security-sensitive glue code that applications previously had to supply.
-
-PEM is more than Base64 with a heading.
+[PEM parsing](https://github.com/codenameone/CodenameOne/pull/5707) puts that work into the security API.
 
 `PublicKey.rsa()` and `PrivateKey.rsa()` take DER bytes in the expected key container. PEM adds textual armor and Base64 encoding. Passing the whole armored file to a Base64 decoder does not reliably strip the labels for you, and stripping them still leaves the question of which container is inside.
 
@@ -116,7 +117,7 @@ PrivateKey privateKey = PrivateKey.fromPem(
         Util.readInputStream(privateStream));
 ```
 
-The streams in this excerpt come from the application's existing key-loading flow. The parser does not decide where a private key should be stored or whether a supplied public key is trusted.
+The streams in this excerpt come from the application's existing key-loading flow. The application chooses the key source and its trust policy; the parser handles the file format.
 
 | Input | Parser behavior |
 | --- | --- |
@@ -144,9 +145,9 @@ flowchart LR
     C --> R[Reject unsupported or mismatched input]
 {{< /mermaid >}}
 
-The tests cross-check generated keys against the JCE and OpenSSL conversions. The PR reports a 294-case truncation check that ensures failures do not escape as `ArrayIndexOutOfBoundsException`. It also records a provider limitation in its Java 8 test environment: the SunEC provider was absent, so platform acceptance of EC keys was not exercised there even though the byte-rewrapping assertions ran.
+We cross-checked the generated keys against JCE and OpenSSL conversions. A 294-case truncation test checked that damaged input fails with a useful error instead of `ArrayIndexOutOfBoundsException`. EC byte conversion was checked separately because that Java 8 environment lacked SunEC.
 
-Parsing a valid key is not certificate validation, signature verification, or proof of ownership. Those are separate operations. A reusable parser removes application-level format code while keeping that trust boundary visible.
+The result is a key object ready for the application's verification flow. Certificate validation and trust decisions stay with that flow.
 
 ## End the task when the session is finished
 
@@ -180,19 +181,19 @@ Continuity.disable();
 CN.exitAndClearTask();
 ```
 
-This fragment shows the framework calls, not a complete sign-out implementation. Application cleanup belongs between restoring-state shutdown and process termination, including any credentials or cached account data the product stores.
+Complete credential and account-data cleanup before process termination, including any asynchronous sign-out requests.
 
-The PR tested the exact Android removal-plus-immediate-kill sequence in a small API 36 emulator app. It reports removal in 29 of 29 executed trials, while the process-kill-only control left the task present. One additional driving broadcast did not reach the handler and therefore did not test the sequence.
+On an API 36 emulator, removing the task before killing the process removed it in all 29 executed trials. Killing the process alone left the task in recents.
 
 ## Make the common security operations harder to get wrong
 
-The location button, PEM parser, and task-clearing exit each replace a piece of platform or format code that app teams should not have to reconstruct. They also have specific limits: a parser cannot decide whom to trust, and removing a task cannot revoke a credential. Clear APIs help developers put those responsibilities in the right place.
+The location button, PEM parser, and task-clearing exit each replace a piece of platform or format code that app teams should not have to reconstruct. Application code can concentrate on whom to trust, which location it needs, and when the account has finished signing out.
 
 That work closes a week in which we also reduced garbage, made caches reclaimable, improved maps and boxed values, and removed unnecessary native waits and JavaScript suspension. Continuity and native drag and drop give users more ways to move their work; integrated Javadoc makes the contracts easier to find. The {{< post-link path="/blog/performance-work-between-benchmarks" text="release overview" >}} links the full series.
 
 We are strengthening Codename One's advantage by maintaining the Java API, runtime, and platform integration together. That lets a reference-safety fix, a stricter key parser, or an OS-owned consent control reach applications through the framework. Customers should spend less time repairing platform glue and more time on the authorization and data rules specific to their product.
 
-API 37 preparation continues before we require a migration, and more performance work is already underway. We will keep reporting the measurements that improve and the cases that still need attention. A passing compile and a flattering benchmark are useful starting points; neither finishes the job.
+API 37 preparation continues before we require a migration, and more performance work is already underway. We will keep reporting the measurements that improve and the cases that still need attention. The version-number bug was a small reminder of how much work can hide behind a platform upgrade. Finding it now keeps it out of a customer's release scramble.
 
 ---
 
