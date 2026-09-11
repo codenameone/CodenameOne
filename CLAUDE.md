@@ -482,6 +482,60 @@ calls -- is a warning: it is dead code, not a broken build. Note the offline gat
 reads `target/classes`, so **a stale port build reports natives that no longer
 exist**; rebuild the module before believing a finding.
 
+#### A framework an app gets by accident is a framework it can lose
+
+The iOS port referenced the `UTType` class while `ByteCodeTranslator` linked
+`UniformTypeIdentifiers.framework` only on the macOS branch -- and *every* iOS CI
+job stayed green for five days while *every* customer archive failed with
+`Undefined symbols: "_OBJC_CLASS_$_UTType"`.
+
+Nothing declared the framework in either case. The sample application CI builds
+simply supplies it by accident, three different ways, none of which a plain
+application has:
+
+- **A Swift autolink hint.** `import SwiftUI` makes swiftc stamp
+  `-framework UniformTypeIdentifiers` into the object as an `LC_LINKER_OPTION`,
+  and the linker honours it. The sample has Swift in its app target (App Intents,
+  Live Activity surfaces); an ordinary Codename One app has none.
+- **`CLANG_ENABLE_MODULES`.** `IPhoneBuilder` turns it on for the Metal build,
+  for pods, the watch and the VPN extension. With modules on, a plain
+  `#import <Framework/Header.h>` autolinks too -- so the *same source* links on
+  the Metal build and fails on the GL one.
+- **CocoaPods.** A pod's own dependencies are on the link line either way.
+
+So the rule is: **a framework the port's natives reference must be declared in
+`ByteCodeTranslator.includeFrameworks`**, never left to an autolink hint. Weakly
+(`optionalFrameworks`, which emits `ATTRIBUTES = (Weak, )`) when the API is newer
+than the lowest `ios.deployment_target`, so a device without the framework still
+launches -- the uses are `@available` fenced. Classify it in `WatchNativeBuilder`
+in the same change, the way the watch partition test asks.
+
+`scripts/check-ios-framework-links.py` gates this. It runs over the project
+`build-ios-app.sh` already generated, so it costs seconds, and it answers one
+question: *every symbol our natives reference that an SDK framework defines -- is
+it defined by a framework this project declares?* It compiles the port's natives
+with the project's own settings (prefix header, defines, per-file `-fobjc-arc`,
+modules where the project asks) and then resolves the undefined symbols against
+the declared set alone. **Autolink cannot hide anything from it**: a hint is a
+load command, not a definition, so `nm` still reports the symbol undefined, and
+the probe it links to confirm a finding carries no hints at all.
+
+Two properties worth keeping if you touch it. A native that fails to compile is
+**fatal**, not skipped -- a partial set reporting success is the exact failure
+this replaces. And the SDK symbol index self-tests (a symbol floor, plus two
+known symbols that must resolve to `Foundation` and `UIKit`), because a text
+index that silently parses to nothing reports every project clean.
+
+```bash
+scripts/check-ios-framework-links.py <generated-ios-source-dir>
+scripts/check-ios-framework-links.py <dir> --sdk iphonesimulator --verbose
+```
+
+Scope is the **iOS application target and our own port natives**. Translated C
+only calls into natives, and a cn1lib's natives are its author's to declare. The
+watch, tv and macOS slices are not covered yet.
+
+
 ### Integration Tests
 
 Located in `maven/integration-tests/`:
