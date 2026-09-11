@@ -111,6 +111,9 @@ class BibopPageFloorIntegrationTest {
      * of the page, which the address-to-page mask in cn1ConservativeResolve and
      * the nextAll registry both depend on; that is a redesign, not a tweak.</p>
      */
+    // Kept in step with BibopPageFloorApp.settleForRelease, which waits for this
+    // same fraction: a settle that stops at a looser figure than the assertion
+    // needs reports success and then fails here.
     private static final double FLOOR_MAX_RETAINED_FRACTION = 0.55;
 
     /**

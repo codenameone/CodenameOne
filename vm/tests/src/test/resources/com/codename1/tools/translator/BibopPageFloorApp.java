@@ -228,11 +228,47 @@ public class BibopPageFloorApp {
         System.out.println("BIBOP_PAGE_FLOOR_DONE");
     }
 
-    /** Allocates and holds a large live set of BiBOP-resident objects, then drops it. */
+    /**
+     * Allocates and holds a large live set of BiBOP-resident objects, then drops
+     * it and waits for the pages to come back.
+     *
+     * <p>THE ALLOCATION LIVES IN ITS OWN METHOD, and that is load-bearing rather
+     * than tidy. CN1_CONSERVATIVE_GC_ROOTS is on in every shipping build, so the
+     * collector scans the NATIVE stack a word at a time and cannot tell a live
+     * reference from a dead frame's leftover one. Setting the Java local to null
+     * says nothing about the copies the C compiler spilled into the frame while
+     * the loop ran, and ONE surviving word pins the whole ring: the elements are
+     * reachable through the array, so 192MB stands or falls on a single slot.
+     *
+     * <p>scrubStack cannot reach those words while the frame that owns them is
+     * still on the stack -- it recurses DEEPER, so it overwrites the region below
+     * the allocating frame and never the frame itself. Building the set in a
+     * method that has RETURNED before the scrub is what puts those words below
+     * the stack pointer, where the scrub's own frames then land on top of them.
+     *
+     * <p>This is the arm64 CI failure, and the shape of it is the tell: the
+     * warm-up gave back NOTHING across its whole settle and the memory then came
+     * back during the NEXT phase, whose frames overwrote the words. It is bimodal
+     * rather than slow because whether a copy survives in the frame is a register
+     * allocation decision -- the same source, one arch keeping it and another not.
+     */
     private static void smallPhase(String name, long liveBytes) {
-        int count = (int) (liveBytes / SMALL_BYTES);
         beginPhase(name);
+        long heldKb = buildAndDropSmallSet(name, liveBytes);
+        releasePhase(name, heldKb, true);
+        // Everything from here on is after the warm-up's live set died, so every
+        // reading contributes to the minimum the release assertion reads.
+        trackMinFootprint = true;
+    }
 
+    /**
+     * Builds the live set, holds it long enough to be sampled, and returns the
+     * footprint while it was held. Every reference to the ring -- the Java local,
+     * and whatever the compiler spilled beside it -- is confined to this frame,
+     * which is gone by the time the caller settles. See smallPhase.
+     */
+    private static long buildAndDropSmallSet(String name, long liveBytes) {
+        int count = (int) (liveBytes / SMALL_BYTES);
         byte[][] live = new byte[count][];
         for (int i = 0; i < count; i++) {
             byte[] o = new byte[SMALL_BYTES];
@@ -247,19 +283,25 @@ public class BibopPageFloorApp {
         phaseChecksum += hold(live, SMALL_BYTES);
         long heldKb = footprintKb();
         endPhase(name, "objects=" + count + " liveBytes=" + liveBytes);
-
-        live = null;
-        releasePhase(name, heldKb, true);
-        // Everything from here on is after the warm-up's live set died, so every
-        // reading contributes to the minimum the release assertion reads.
-        trackMinFootprint = true;
         checksum = checksum * 131 + phaseChecksum;
+        live = null;
+        return heldKb;
     }
 
-    /** Allocates and holds a large live set of legacy-path buffers, then drops it. */
+    /**
+     * Allocates and holds a large live set of legacy-path buffers, then drops it.
+     * Split the same way as smallPhase and for the same reason: this phase's
+     * BASELINE is read after the previous one's memory was supposed to be gone,
+     * so a leftover word here moves a reading the test does compare.
+     */
     private static void texturePhase(String name) {
         beginPhase(name);
+        long heldKb = buildAndDropTextures(name);
+        releasePhase(name, heldKb, false);
+    }
 
+    /** See buildAndDropSmallSet -- the ring stays inside this frame. */
+    private static long buildAndDropTextures(String name) {
         byte[][] textures = new byte[TEXTURE_COUNT][];
         for (int i = 0; i < TEXTURE_COUNT; i++) {
             byte[] t = new byte[TEXTURE_BYTES];
@@ -278,10 +320,9 @@ public class BibopPageFloorApp {
         long heldKb = footprintKb();
         endPhase(name, "textures=" + TEXTURE_COUNT
                 + " liveBytes=" + ((long) TEXTURE_COUNT * TEXTURE_BYTES));
-
-        textures = null;
-        releasePhase(name, heldKb, false);
         checksum = checksum * 131 + phaseChecksum;
+        textures = null;
+        return heldKb;
     }
 
     private static void beginPhase(String name) {
@@ -382,7 +423,13 @@ public class BibopPageFloorApp {
      * whichever machine ran it.
      */
     private static int settleForRelease(long heldKb) {
-        long target = (heldKb * 3) / 5;
+        // The SAME fraction the harness asserts on
+        // (BibopPageFloorIntegrationTest.FLOOR_MAX_RETAINED_FRACTION). They were
+        // 60% here and 55% there, so a settle could stop satisfied at 58% and the
+        // assertion then fail on a release that was still arriving -- the wait
+        // reporting success for a figure it had not actually reached. Keep the
+        // two in step; this one must never be the looser of the pair.
+        long target = (heldKb * 55) / 100;
         for (int i = 0; i < SETTLE_MAX_ROUNDS; i++) {
             System.gc();
             sleep(SETTLE_PAUSE_MS);

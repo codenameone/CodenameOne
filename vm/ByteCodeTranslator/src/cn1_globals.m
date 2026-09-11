@@ -1629,6 +1629,42 @@ void collectThreadResources(struct ThreadLocalData *current)
     current->gcQueuedForDrain = JAVA_TRUE;
     current->gcDeadNext = cn1DeadPendingThreads;
     cn1DeadPendingThreads = current;
+    // RAISING THE LATCH IS ALL THIS CAN DO, and that is a constraint rather than
+    // an omission. Review asked for the threshold transition to WAKE a collector
+    // already inside LOCK.wait(idle), since gcIdleWaitMillis() is read only
+    // before that wait. There is no thread here that may do the waking:
+    //
+    //  - An OS thread reaches this from markDeadThread() on the DYING thread,
+    //    after java_lang_Thread_runImpl returned. Its slot in allThreads is
+    //    already cleared and its TLD is already queued for drain, so the GC can
+    //    migrate or free its allocations at any moment and no longer walks it.
+    //    Entering a Java monitor from there is not a thing this thread may do.
+    //  - A virtual thread reaches it from cn1RetireVirtualThread() on the
+    //    CARRIER, which is live -- but a monitor enter there blocks the carrier,
+    //    and every other virtual thread it carries, on a lock the collector holds
+    //    for the length of its decision. Trading a queued TLD for a stalled
+    //    carrier is the worse of the two, and putting a Java monitor inside the
+    //    scheduler's teardown is a change to the mechanism that has already
+    //    deadlocked this collector twice.
+    //
+    // What bounds the exposure instead is in gcIdleWaitMillis: demand standing
+    // when the collector decides refuses the 30s idle and takes 200ms. The hole
+    // that leaves is demand arriving entirely INSIDE an idle that already began,
+    // and its cost is latency, not growth -- the queue drains at the next mark
+    // start and the count zeroes there.
+    //
+    // Note also that the scenario the finding names cannot reach the long idle.
+    // It requires !isHighFrequencyGC(), i.e. less than a full GC trigger's worth
+    // of allocation since the last cycle, while a server churning enough
+    // connections to retire CN1_GC_DEAD_THREAD_DEMAND virtual threads is
+    // allocating for every one of them. The two are the same traffic.
+    //
+    // If this is revisited, the cheap safe move is in the collector rather than
+    // here: take the short idle whenever cn1DeadPendingCount is NON-ZERO, not
+    // only at the threshold. That costs one extra 200ms cycle per burst of
+    // deaths (the drain zeroes the count, so it does not repeat) and nothing at
+    // all on an app where no thread is dying. It wants its own A/B against the
+    // GC benchmarks, which is why it is not folded in here.
     if(atomic_fetch_add_explicit(&cn1DeadPendingCount, 1, memory_order_relaxed) + 1
             >= CN1_GC_DEAD_THREAD_DEMAND) {
         extern _Atomic int cn1GcNativeGcRequest;
