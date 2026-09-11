@@ -148,6 +148,53 @@ class InviteResilienceTest extends UITestBase {
         assertNotNull(Invites.getAttribution(), "the late answer was refused");
     }
 
+    @FormTest
+    void aNotYetAnswerIsAskedAgainInTheSameProcess() {
+        // beginDeferred() runs at most once per process, so after a "not yet"
+        // the documented call-me-from-start() contract did nothing for the rest
+        // of the run: the request had already completed, no delayed retry
+        // exists, and deferredStarted stayed set. An invite that became
+        // claimable seconds later -- the whole point of the offline-mint
+        // window -- waited for the next cold start, withholding its payload,
+        // its callback and its dimensions through the entire onboarding.
+        //
+        // Driven through the referrer source, because that is the path that
+        // sets deferredStarted: handleUrl() issues its claim directly and
+        // leaves the flag alone, so a fixture built on it re-enters
+        // beginDeferred() either way and cannot tell the two behaviours apart.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.lookupRetryDelay = 0L;
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=RETRY1", 0L, 0L);
+            }
+        });
+        try {
+            Invites.checkForInvite();
+            assertTrue(implementation.getQueuedRequests().size() > 0,
+                    "the fixture never issued a first claim, so it proves nothing");
+            Invites.handleResolution("{\"resolved\":false,\"retry\":true}",
+                    Invites.MATCH_REFERRER, true);
+            assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                    "a not-yet answer was treated as a final no");
+            implementation.clearQueuedRequests();
+
+            // The next start, or the next form: the same call the application
+            // already makes, and the only one it is told to make.
+            Invites.checkForInvite();
+
+            assertTrue(implementation.getQueuedRequests().size() > 0,
+                    "a not-yet answer was never asked again in this process");
+        } finally {
+            Invites.lookupRetryDelay = 30000L;
+        }
+    }
+
     @Test
     @EdtTest
     void aPlainNoIsStillFinalEvenBesideTheRetryAnswer() {

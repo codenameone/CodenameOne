@@ -520,6 +520,14 @@ public final class Invites {
     /// Safe and cheap to call on every start; it will not attribute twice and
     /// will not report twice.
     ///
+    /// Call it on every start rather than only the first. A lookup that ended
+    /// with "not yet" -- the invite exists but the inviter minted it offline
+    /// and their registration has not reached the service -- is retried here,
+    /// at most once per retry interval, so an invite that becomes claimable
+    /// during the session is picked up in the session rather than on the next
+    /// cold start. [#flush] does the same for an application that knows it has
+    /// just regained connectivity.
+    ///
     /// #### Returns
     ///
     /// true when the launch argument carried an invite link
@@ -567,7 +575,7 @@ public final class Invites {
             }
         }
         if (!consumed) {
-            beginDeferred();
+            resumeDeferred();
         }
         return consumed;
     }
@@ -1876,6 +1884,33 @@ public final class Invites {
         pending.put("state", String.valueOf(STATE_PENDING));
         writePending(pending);
         return pending;
+    }
+
+    // beginDeferred() runs at most once per process, which is right for the
+    // FIRST attempt and wrong for every later one: the lookup is fail-silent,
+    // so a request that never answered leaves deferredStarted set with nothing
+    // to clear it, and a claim answered with "retry" -- the ordinary state of
+    // an invite minted offline, whose registration has not landed yet -- is
+    // pending with no attempt outstanding. Either way the documented
+    // call-me-from-start() contract did nothing at all for the rest of the
+    // process: the invite resolved on the next cold start, after an onboarding
+    // that could have had its payload.
+    //
+    // Bounded by lookupInFlight(), so an application that calls
+    // checkForInvite() from every form cannot spend the attempt budget faster
+    // than one attempt per lookupRetryDelay, and by the persisted attempt cap
+    // and the attribution window beyond that.
+    //
+    // The epoch is bumped for the reason flush() bumps it: the retry
+    // supersedes whatever the last attempt left outstanding, and without it an
+    // answer still on the wire can land after the retry resolved and overwrite
+    // an exact attribution with a statistical one.
+    private static void resumeDeferred() {
+        if (deferredStarted && getState() == STATE_PENDING && !lookupInFlight()) {
+            lookupEpoch++;
+            deferredStarted = false;
+        }
+        beginDeferred();
     }
 
     private static void beginDeferred() {

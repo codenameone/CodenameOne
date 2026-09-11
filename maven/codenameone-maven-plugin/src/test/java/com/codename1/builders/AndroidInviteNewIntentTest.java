@@ -97,24 +97,43 @@ public class AndroidInviteNewIntentTest {
     }
 
     @Test
-    void theConsumedUrlIsClearedOnAcopyNotOnTheCallersIntent() throws IOException {
+    void theDeliveredUrlIsMarkedRatherThanErased() throws IOException {
         // dispatchNewIntentUrl runs from CodenameOneActivity.onNewIntent, and
-        // the ordinary way to extend that is super.onNewIntent(intent) followed
-        // by the subclass reading intent.getData(). Clearing the data on THAT
-        // object set it to null underneath the override, so custom deep-link
-        // routing that worked before lost the url entirely.
+        // every reader of that intent has to survive it.
+        //
+        // Clearing the data on the caller's intent broke the ordinary way to
+        // extend onNewIntent -- super.onNewIntent(intent) followed by the
+        // subclass reading intent.getData(), which had just been nulled
+        // underneath it. Storing a data-less COPY fixed that one and broke two
+        // more: the documented `android.intent.data` property is published from
+        // whatever the activity has stored, and native integrations read
+        // getActivity().getIntent().getData(). Both saw a warm deep link as no
+        // deep link at all while cold links still carried it.
+        //
+        // So the intent is stored as it arrived and the url is marked
+        // delivered by identity, which suppresses the one thing that actually
+        // had to be suppressed: getAppArg() rebuilding the url from the stored
+        // intent after onStop() cleared the app arg, and opening one tapped
+        // invite twice.
         File port = new File(ANDROID_PORT);
         assertTrue(port.isFile(), "the port must be readable: " + port.getAbsolutePath());
         String source = new String(Files.readAllBytes(port.toPath()), StandardCharsets.UTF_8);
         int at = source.indexOf("static void dispatchNewIntentUrl(");
         assertTrue(at > 0, "dispatchNewIntentUrl is gone");
         String block = source.substring(at, source.indexOf("\n    }", at));
-        assertTrue(!block.contains("intent.setData(null)"),
-                "the caller's intent is mutated, so a subclass reading it after "
-                        + "super.onNewIntent() finds no data");
-        assertTrue(block.contains("new android.content.Intent(intent)")
-                        && block.contains("consumed.setData(null)"),
-                "the url is no longer consumed on a copy");
+        assertTrue(!block.contains("setData(null)"),
+                "the url is erased from an intent again, so a reader of the stored "
+                        + "intent sees a warm deep link as no deep link");
+        assertTrue(block.contains("getActivity().setIntent(intent);"),
+                "the activity no longer stores the intent it was handed");
+        assertTrue(block.contains("markAppArgDelivered(intent);"),
+                "nothing marks the url delivered, so getAppArg() reports it a "
+                        + "second time after a resume");
+        assertTrue(block.contains("publishIntentProperties(getActivity(), intent);"),
+                "the intent properties are not published, and the reader that "
+                        + "used to publish them lazily is the one now suppressed");
+        assertTrue(source.contains("isAppArgDelivered(intent)"),
+                "getAppArg() does not honour the delivered mark");
     }
 
     @Test
