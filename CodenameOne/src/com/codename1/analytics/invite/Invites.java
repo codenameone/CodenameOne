@@ -1137,7 +1137,7 @@ public final class Invites {
         // kill() is enough for the case that matters: NetworkManager skips a
         // killed request when it reaches the front of the queue, and kills the
         // connection outright if it is already being sent.
-        killQueuedRegistrations();
+        killQueuedRequests();
         boolean cleared = InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
         // ATTRIBUTION names the inviter, and the OUTBOX is the queued
@@ -1396,7 +1396,7 @@ public final class Invites {
         // The durable outbox is deliberately left alone: the entries are what a
         // later grant sends, and withdrawing consent is not a request to forget
         // the invites this person minted.
-        killQueuedRegistrations();
+        killQueuedRequests();
         // Nothing is outstanding once the epoch has moved: any response still
         // on the wire fails the guard. Saying so here is what lets a later
         // grant resume immediately rather than waiting out a retry delay for a
@@ -2538,11 +2538,16 @@ public final class Invites {
             req.setContentType("application/json");
             req.setRequestBody(json);
             req.setFailSilently(true);
-            if (registration) {
-                req.queuedAt = System.currentTimeMillis();
-                pruneOutstanding();
-                outstandingRegistrations.addElement(req);
-            }
+            // EVERY invite request, not only the registrations.
+            //
+            // A claim carries the client id and the invite code, which is the
+            // same identity an erasure is asked to be rid of -- and tracking
+            // only registrations left a queued claim free to transmit it after
+            // reset() had reported success. The epoch discards the response;
+            // nothing was stopping the request.
+            req.queuedAt = System.currentTimeMillis();
+            pruneOutstanding();
+            outstanding.addElement(req);
             NetworkManager.getInstance().addToQueue(req);
         } catch (Throwable t) {
             Log.e(t);
@@ -2617,11 +2622,9 @@ public final class Invites {
         }
 
         private void releaseInFlight() {
-            if (registration) {
-                outstandingRegistrations.removeElement(this);
-                if (outboxEntry != null) {
-                    inFlight.remove(outboxEntry);
-                }
+            outstanding.removeElement(this);
+            if (registration && outboxEntry != null) {
+                inFlight.remove(outboxEntry);
             }
         }
 
@@ -3230,24 +3233,27 @@ public final class Invites {
     // retry them, and an empty set on the next launch is what makes it.
     private static final Map<String, Long> inFlight = new LinkedHashMap<String, Long>();
 
-    // Registration requests handed to NetworkManager and not yet answered.
+    // Invite requests handed to NetworkManager and not yet answered. Claims as
+    // well as registrations -- every one of them carries the client id.
     //
     // An erasure has to reach these. reset() deletes the outbox and bumps the
     // epoch, but a request already queued carries its OWN copy of the json --
-    // the old client id, the campaign, the payload -- and the epoch guards only
-    // attribution responses, which a registration is not. So a queued mint
-    // transmitted a pre-erasure registration after the erasure reported
-    // success, which is precisely the identity the user asked to be rid of.
+    // the old client id, the code, the campaign, the payload -- and the epoch
+    // decides only whether an ANSWER is acted on. So a queued mint transmitted
+    // a pre-erasure registration after the erasure reported success, and when
+    // only registrations were tracked a queued CLAIM did the same with the
+    // client id and the code it was claiming. Both are precisely the identity
+    // the user asked to be rid of.
     //
     // A Vector because these are touched from two threads: added on the EDT
     // when the request is queued, removed from the network thread when it
     // fails. That is the same boundary the map above already straddles, and it
     // is a real one -- not the single-threaded EDT the rest of this class runs
     // on.
-    private static final java.util.Vector<InviteConnection> outstandingRegistrations =
+    private static final java.util.Vector<InviteConnection> outstanding =
             new java.util.Vector<InviteConnection>();
 
-    // How long a queued registration is remembered for the erasure's sake.
+    // How long a queued request is remembered for the erasure's sake.
     //
     // Generous on purpose. The point of remembering one is to kill it if an
     // erasure arrives, so pruning early is what would break -- but nothing
@@ -3263,7 +3269,7 @@ public final class Invites {
     // does not depend on a clock being sane.
     private static final int MAX_OUTSTANDING = 32;
 
-    /// Kills every registration handed to NetworkManager and not yet answered.
+    /// Kills every invite request handed to NetworkManager and not yet answered.
     ///
     /// Shared by the erasure and by a consent withdrawal, which need the same
     /// thing for different reasons: one must not transmit an identity the user
@@ -3274,10 +3280,10 @@ public final class Invites {
     ///
     /// The durable outbox is untouched. What is queued is a copy; the outbox is
     /// the record, and it is what a later grant sends.
-    private static void killQueuedRegistrations() {
-        while (!outstandingRegistrations.isEmpty()) {
-            InviteConnection req = outstandingRegistrations.elementAt(0);
-            outstandingRegistrations.removeElementAt(0);
+    private static void killQueuedRequests() {
+        while (!outstanding.isEmpty()) {
+            InviteConnection req = outstanding.elementAt(0);
+            outstanding.removeElementAt(0);
             try {
                 req.kill();
             } catch (Throwable t) {
@@ -3287,7 +3293,7 @@ public final class Invites {
         inFlight.clear();
     }
 
-    /// Drops a remembered registration, and KILLS it on the way out.
+    /// Drops a remembered request, and KILLS it on the way out.
     ///
     /// Forgetting one without killing it was a hole in the erasure this set
     /// exists for: the reference is the only handle reset() has, so a request
@@ -3302,8 +3308,8 @@ public final class Invites {
     /// the thing that gets it sent in the end. The registration is not lost by
     /// killing it; the next drain re-queues it.
     private static void forget(int index) {
-        InviteConnection req = outstandingRegistrations.elementAt(index);
-        outstandingRegistrations.removeElementAt(index);
+        InviteConnection req = outstanding.elementAt(index);
+        outstanding.removeElementAt(index);
         try {
             req.kill();
         } catch (Throwable t) {
@@ -3312,8 +3318,8 @@ public final class Invites {
     }
 
     // Package private so a test can assert the bound rather than trust it.
-    static int outstandingRegistrationCountForTest() {
-        return outstandingRegistrations.size();
+    static int outstandingRequestCountForTest() {
+        return outstanding.size();
     }
 
     /// Forgets registrations old enough that nothing is coming back for them.
@@ -3324,13 +3330,13 @@ public final class Invites {
     /// the process.
     private static void pruneOutstanding() {
         long now = System.currentTimeMillis();
-        for (int i = outstandingRegistrations.size() - 1; i >= 0; i--) {
-            InviteConnection req = outstandingRegistrations.elementAt(i);
+        for (int i = outstanding.size() - 1; i >= 0; i--) {
+            InviteConnection req = outstanding.elementAt(i);
             if (now - req.queuedAt >= OUTSTANDING_MAX_AGE_MS) {
                 forget(i);
             }
         }
-        while (outstandingRegistrations.size() >= MAX_OUTSTANDING) {
+        while (outstanding.size() >= MAX_OUTSTANDING) {
             forget(0);
         }
         for (String json : new ArrayList<String>(inFlight.keySet())) {
@@ -3553,12 +3559,22 @@ public final class Invites {
         unacknowledged.add(code);
     }
 
+    // Package private test seam: the acknowledgement normally arrives with a
+    // server response, and what has to be asserted is which entry it clears.
+    static void registrationAcknowledgedForTest(String json) {
+        registrationAcknowledged(json);
+    }
+
     private static void registrationAcknowledged(String json) {
-        for (int i = unacknowledged.size() - 1; i >= 0; i--) {
-            String code = unacknowledged.get(i);
-            if (json != null && json.indexOf(code) >= 0) {
-                unacknowledged.remove(i);
-            }
+        // The acknowledged entry's own code, for the reason isRegistered()
+        // parses rather than searches: a substring test cleared an UNRELATED
+        // invite from the unacknowledged set whenever this registration's
+        // payload or title mentioned its code, and that one is worse than the
+        // false negative -- an invite the server has never seen then reports
+        // as registered.
+        String acknowledged = codeOf(json);
+        if (acknowledged != null) {
+            unacknowledged.remove(acknowledged);
         }
         List<String> outbox = InviteStore.readOutbox();
         if (outbox.remove(json)) {
@@ -3592,12 +3608,40 @@ public final class Invites {
         if (unacknowledged.contains(code)) {
             return false;
         }
+        // The queued entry's own code, parsed, not looked for anywhere in its
+        // text. A registration carries the campaign, the payload, the title and
+        // whatever parameters the application set, so another invite whose
+        // payload happens to contain this code -- a referral message quoting
+        // it, most obviously -- made a registration that WAS acknowledged
+        // report as still queued, and an application that waits for
+        // isRegistered() before sharing waits for ever.
         for (String pending : InviteStore.readOutbox()) {
-            if (pending != null && pending.indexOf(code) >= 0) {
+            if (code.equals(codeOf(pending))) {
                 return false;
             }
         }
         return true;
+    }
+
+    /// The top-level `code` of a queued registration, or null when the entry
+    /// cannot be parsed.
+    ///
+    /// Parsing rather than searching is the whole point: every other field in
+    /// the entry is application text, and an invite's code appearing inside one
+    /// of them says nothing about which registration this is.
+    private static String codeOf(String json) {
+        if (json == null || json.length() == 0) {
+            return null;
+        }
+        try {
+            Map<String, Object> parsed = JSONParser.parseJSON(json);
+            return parsed == null ? null : str(parsed.get("code"));
+        } catch (Throwable t) {
+            // An unparseable entry matches nothing, which leaves the invite
+            // reported as unregistered -- the conservative answer, and the one
+            // a retry can still correct.
+            return null;
+        }
     }
 
     private static boolean truthy(Object o) {

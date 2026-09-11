@@ -198,9 +198,9 @@ class InviteResilienceTest extends UITestBase {
                     "minting is offline and must still work");
         }
 
-        assertTrue(Invites.outstandingRegistrationCountForTest() <= 32,
+        assertTrue(Invites.outstandingRequestCountForTest() <= 32,
                 "queued registrations accumulated without bound: "
-                        + Invites.outstandingRegistrationCountForTest());
+                        + Invites.outstandingRequestCountForTest());
     }
 
     @FormTest
@@ -271,6 +271,72 @@ class InviteResilienceTest extends UITestBase {
         assertTrue(checked > 0, "no invite request was queued, so nothing was asserted");
         assertFalse(InviteStore.readOutbox().isEmpty(),
                 "the durable outbox was discarded, so a later grant has nothing to send");
+    }
+
+    @FormTest
+    void anErasureKillsAqueuedClaimToo() {
+        // The kill sweep tracked registrations only, and a claim carries the
+        // same client id plus the code it is claiming -- so one queued behind
+        // other network work still transmitted the erased identity after
+        // reset() reported success. The epoch discards the response; nothing
+        // was stopping the request.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        implementation.clearQueuedRequests();
+
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/CLAIMKILL");
+        java.util.List<com.codename1.io.ConnectionRequest> queued =
+                implementation.getQueuedRequests();
+        assertTrue(queued.size() > 0, "the fixture queued no claim at all");
+
+        Invites.reset();
+
+        int checked = 0;
+        for (com.codename1.io.ConnectionRequest r : queued) {
+            if (r instanceof Invites.InviteConnection) {
+                assertTrue(((Invites.InviteConnection) r).killedForTest(),
+                        "a claim queued before the erasure was still on its way out with "
+                                + "the client id and the code it was claiming");
+                checked++;
+            }
+        }
+        assertTrue(checked > 0, "no invite request was queued, so nothing was asserted");
+    }
+
+    @FormTest
+    void anInviteIsNotReportedRegisteredBecauseAnotherEntryMentionsItsCode() {
+        // The outbox scan matched the code anywhere in a queued entry's text,
+        // and an entry carries the campaign, the payload, the title and
+        // whatever parameters the app set. A referral message quoting another
+        // invite's code therefore made a registration that HAD been
+        // acknowledged report as still queued -- and an application that waits
+        // for isRegistered() before sharing waits for ever.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+
+        Invite first = Invites.create(InviteRequest.create().campaign("spring").build());
+        assertNotNull(first, "minting is offline and must still work");
+        // A second invite whose payload quotes the first one's code, which is
+        // exactly what a referral message does.
+        Invite second = Invites.create(InviteRequest.create()
+                .campaign("spring")
+                .payload("join me with " + first.getCode())
+                .build());
+        assertNotNull(second, "the fixture could not mint the second invite");
+
+        // The first one is acknowledged; the second stays queued.
+        for (String entry : InviteStore.readOutbox()) {
+            if (entry != null && entry.indexOf("\"" + first.getCode() + "\"") >= 0
+                    && entry.indexOf("join me with") < 0) {
+                Invites.registrationAcknowledgedForTest(entry);
+            }
+        }
+
+        assertTrue(Invites.isRegistered(first),
+                "an acknowledged invite read as unregistered because another queued "
+                        + "entry quoted its code");
     }
 
     @FormTest
