@@ -4421,14 +4421,26 @@ public class IPhoneBuilder extends Executor {
             if (usesInvites
                     && "true".equals(request.getArg("ios.invite.universalLinks", "true"))) {
                 String inviteHost = request.getArg("invite.domain", "cloud.codenameone.com");
-                String want = "applinks:" + inviteHost;
                 String existingDomains = request.getArg("ios.associatedDomains", "");
-                if (!declaresAssociatedDomain(existingDomains, want)) {
-                    String merged = existingDomains.trim().length() == 0
+                // TWO prefixes on the same host, and they do different jobs.
+                //
+                // applinks: is what opens an INSTALLED app from the link.
+                // appclips: is what lets iOS offer the App Clip to somebody who
+                // does not have the app -- which is the whole iOS attribution
+                // path now, since the clip receives the invite url exactly and
+                // hands the code to the app the person then installs. Declaring
+                // only applinks: leaves that person with a Safari page and no
+                // way to attribute the install that follows.
+                String[] wanted = {"applinks:" + inviteHost, "appclips:" + inviteHost};
+                for (String want : wanted) {
+                    if (declaresAssociatedDomain(existingDomains, want)) {
+                        continue;
+                    }
+                    existingDomains = existingDomains.trim().length() == 0
                             ? want : existingDomains + "," + want;
                     debug("Invite attribution: adding the associated domain " + want);
-                    request.putArgument("ios.associatedDomains", merged);
                 }
+                request.putArgument("ios.associatedDomains", existingDomains);
             }
 
             if (request.getArg("ios.associatedDomains", null) != null) {

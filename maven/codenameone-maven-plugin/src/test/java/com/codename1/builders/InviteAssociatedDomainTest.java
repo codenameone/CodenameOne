@@ -82,4 +82,32 @@ class InviteAssociatedDomainTest {
         assertFalse(IPhoneBuilder.declaresAssociatedDomain(null, WANT));
         assertFalse(IPhoneBuilder.declaresAssociatedDomain(WANT, null));
     }
+
+    @Test
+    void bothPrefixesAreDeclaredForTheInviteHost() {
+        // applinks: opens an INSTALLED app from the link. appclips: is what
+        // lets iOS offer the App Clip to somebody who does not have the app --
+        // and since the clip receives the invite url exactly and hands the code
+        // to the app the person then installs, that IS the iOS attribution
+        // path. Declaring only applinks: leaves that person on a Safari page
+        // with nothing to attribute the install that follows.
+        String source = builderSource();
+        int at = source.indexOf("String[] wanted = {\"applinks:\" + inviteHost");
+        assertTrue(at > 0, "the invite host no longer declares both prefixes");
+        assertTrue(source.indexOf("\"appclips:\" + inviteHost", at) > at,
+                "appclips: is not declared, so iOS cannot offer the App Clip");
+    }
+
+    /** The builder source, read the way the other codegen tests read it. */
+    private static String builderSource() {
+        try {
+            java.io.File f = new java.io.File(
+                    "src/main/java/com/codename1/builders/IPhoneBuilder.java");
+            assertTrue(f.isFile(), "the builder must be readable: " + f.getAbsolutePath());
+            return new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
 }

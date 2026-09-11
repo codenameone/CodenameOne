@@ -224,19 +224,19 @@ When attribution resolves it's also written as persistent analytics dimensions (
 | `MATCH_REFERRER`
 | The invite code travelled through the app store and came back verbatim. Exact. This is the Android path.
 
-| `MATCH_FINGERPRINT`
-| The server matched this install to an earlier click statistically. Not exact.
+| `MATCH_APP_CLIP`
+| An iOS App Clip received the invite link and handed the code to the app the person then installed. Exact. This is the iOS path.
 |===
 
-The App Store carries no referrer parameter of its own, so on iOS a deferred install -- one where the friend didn't already have the app -- can only be matched statistically, on a coarse device profile within a short window. That match is occasionally wrong, and `getConfidence()` reports how much to trust it. Report it as an estimate, and don't pay a referral bounty on it without saying so.
+Every match type is exact. The App Store carries no referrer parameter of its own, so on iOS the code travels a different road than it does on Android: tapping an invite link offers an App Clip, the clip is launched by the link itself and so receives the code exactly, and it leaves that code where the full app can read it after installation. Nothing is matched, estimated or guessed, and a referral bounty can be paid on any of these.
 
-`Invites.setAttributionWindow(0)` switches the statistical match off if you would rather not use it. It doesn't turn deferred attribution off altogether: an exact code the device is already holding -- one that came back through the Play install referrer, or arrived on a link -- is still claimed and still reported, because there's nothing to guess about it. What the window governs is the match that needs a window to mean anything.
+`Invites.setAttributionWindow(0)` stops a deferred lookup being started at all -- neither the Play install referrer nor the App Clip handoff is read. An exact code the device is already holding, one that arrived on a link, is still claimed: there is nothing to defer about it.
 
 ==== Consent
 
-Everything reported here is gated on the analytics consent category, and nothing is transmitted until consent is granted. The statistical match additionally requires an explicit grant: opt-out mode alone isn't enough, because it reports permission with no user choice on record.
+Everything reported here is gated on the analytics consent category, and nothing is transmitted until consent is granted.
 
-One thing does happen before consent. On first launch a coarse device profile -- OS version, hardware model, language, screen size -- is written to local storage so a deferred match is still possible if consent arrives in time. It's never transmitted while consent is withheld, and it's deleted outright if consent is refused. There's no alternative that also works: the window in which a deferred match can be made closes long before a typical consent prompt is answered.
+Nothing at all is collected about someone who only taps a link. An earlier design wrote a coarse device profile to local storage on first launch -- OS version, hardware model, language, screen size -- so an iOS install could be matched to a click, and the server kept a hashed fingerprint of the visitor's address for seven days to match it against. App Clips made all that unnecessary: the clip is handed the code by the link, so there is nothing to match and nothing to keep.
 
 `Analytics.resetClientId()` erases the invite attribution along with the identity, so an erasure request can't leave a fresh pseudonymous id linked to the same inviter.
 

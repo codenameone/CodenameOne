@@ -145,7 +145,16 @@ class InviteDeliveryTest extends UITestBase {
     }
 
     @FormTest
-    void noStoreReferrerFallsBackToTheStatisticalMatch() {
+    void noStoreReferrerFallsBackToTheAppClipHandoff() {
+        // The Android store answered "no referral", so the deferred lookup asks
+        // the other exact source: the code an iOS App Clip left in the
+        // container it shares with this application.
+        //
+        // It used to fall back to a statistical match -- a coarse device
+        // profile posted to the server, matched against a hashed click within
+        // an hour. Nothing is posted now and nothing about the device is read,
+        // which is why this asserts on the SOURCE rather than on a request
+        // body: there is no request.
         InviteTestSupport.freshInstall();
         implementation.clearQueuedRequests();
         implementation.setAutoProcessConnections(false);
@@ -161,19 +170,81 @@ class InviteDeliveryTest extends UITestBase {
 
         Invites.checkForInvite();
 
-        boolean sawMatch = false;
+        assertTrue(InviteTestSupport.pendingHandoff.wasAsked(),
+                "the referrer came back empty and nothing asked the App Clip");
         for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
-            if (implementation.getQueuedRequests().get(i).getUrl().endsWith("/invites/match")) {
-                sawMatch = true;
+            assertTrue(!implementation.getQueuedRequests().get(i).getUrl().endsWith("/match"),
+                    "a statistical match was still posted to the server");
+        }
+
+        // And the code the clip hands over is claimed exactly, like a referrer.
+        InviteTestSupport.pendingHandoff.answer("CLIP123");
+        boolean sawClaim = false;
+        for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
+            if (implementation.getQueuedRequests().get(i).getUrl().endsWith("/invites/claim")) {
                 String body = implementation.getQueuedRequests().get(i).getRequestBody();
-                // The server reads the address off the socket; the client must
-                // never try to enumerate it.
-                assertTrue(!body.contains("\"ip\""), body);
-                assertTrue(body.contains("osVersion"), body);
-                assertTrue(body.contains("deviceModel"), body);
+                if (body != null && body.contains("CLIP123")) {
+                    sawClaim = true;
+                    assertTrue(body.contains("app_clip"), body);
+                    // Nothing about the device goes with it.
+                    assertTrue(!body.contains("osVersion"), body);
+                    assertTrue(!body.contains("deviceModel"), body);
+                }
             }
         }
-        assertTrue(sawMatch, "expected the statistical match as the fallback");
+        assertTrue(sawClaim, "the App Clip's code was never claimed");
+    }
+
+    @FormTest
+    void anInstallWithNoClipHandoffIsNotInvited() {
+        // The overwhelmingly common case: somebody installed the application
+        // without ever tapping an invite. The clip answers that it has nothing,
+        // and that is a real and permanent answer about this install -- not
+        // "unsupported", which is the reopenable marker the kill switch writes
+        // and would have every launch ask again for something that can never be
+        // there.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        final String[] told = new String[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0] = reason;
+            }
+        });
+
+        Invites.checkForInvite();
+        InviteTestSupport.pendingHandoff.answerNothing(Invites.REASON_NO_MATCH);
+
+        assertEquals(Invites.REASON_NO_MATCH, told[0]);
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
+    }
+
+    @FormTest
+    void aplatformWithNoAppClipSettlesRatherThanWaiting() {
+        // No clip source at all -- the desktop, the simulator, an iOS build
+        // without a clip, or Android once the referrer has already answered.
+        // Settling immediately is what keeps the listener's contract: exactly
+        // one answer per install, and this install's answer is "no invite".
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.registerAppClipHandoffSource(null);
+        final int[] told = new int[1];
+        Invites.setInviteListener(new InviteListener() {
+            public void inviteReceived(InviteAttribution a) {
+            }
+
+            public void attributionUnavailable(String reason) {
+                told[0]++;
+            }
+        });
+
+        Invites.checkForInvite();
+
+        assertEquals(1, told[0], "a platform with no App Clip left the listener waiting");
+        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
     }
 
     @FormTest

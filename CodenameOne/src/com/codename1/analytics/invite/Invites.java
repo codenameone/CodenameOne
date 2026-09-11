@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /// Invite a friend, and follow the invitation through to what it caused.
@@ -103,12 +102,18 @@ import java.util.Map;
 ///
 /// ### How exact the answer is
 ///
-/// [InviteAttribution#getMatchType] says how the attribution was made.
-/// [#MATCH_DIRECT] and [#MATCH_REFERRER] are exact. [#MATCH_FINGERPRINT] is a
-/// statistical match made on the server, used where the platform's store
-/// carries no referrer, and it is occasionally wrong -- check
-/// [InviteAttribution#getConfidence] and do not pay a referral bounty on it
-/// without saying so.
+/// [InviteAttribution#getMatchType] says how the attribution was made, and
+/// every one of them is exact. [#MATCH_DIRECT] is a link opening an
+/// application that was already installed; [#MATCH_REFERRER] is a code that
+/// made the whole trip through the Play store; [#MATCH_APP_CLIP] is a code an
+/// iOS App Clip received from the link itself and handed to the application it
+/// installed.
+///
+/// There used to be a statistical match here as well, because the App Store
+/// carries no referrer of its own and an iOS install could only be guessed at.
+/// It was occasionally wrong, it could not say which times, and it required
+/// collecting a hashed profile of people who installed nothing. App Clips made
+/// it unnecessary and it is gone.
 public final class Invites {
     /// Nothing has been attributed and nothing is outstanding.
     public static final int STATE_NONE = 0;
@@ -132,9 +137,9 @@ public final class Invites {
     /// came back verbatim. Exact.
     public static final String MATCH_REFERRER = "referrer";
 
-    /// The server matched this install to a click statistically, because the
-    /// platform's store carries no referrer. Not exact.
-    public static final String MATCH_FINGERPRINT = "fingerprint";
+    /// An iOS App Clip received the invite link, kept the code, and handed it
+    /// to the application the person then installed. Exact.
+    public static final String MATCH_APP_CLIP = "app_clip";
 
     /// No invite matched. The ordinary outcome for an uninvited install.
     public static final String REASON_NO_MATCH = "no_match";
@@ -215,6 +220,11 @@ public final class Invites {
     private static boolean reattribution;
     private static InviteListener listener;
     private static InstallReferrerSource referrerSource;
+
+    // The iOS counterpart: the code an App Clip left in the container it shares
+    // with this application. Registered by the build the same way, and absent
+    // on every platform that has no clip.
+    private static AppClipHandoffSource appClipSource;
     private static InviteAttribution resolved;
     private static boolean attributionLoaded;
     private static int state = STATE_NONE;
@@ -288,6 +298,17 @@ public final class Invites {
     /// - `source`: the platform source, or null to remove it
     public static void registerInstallReferrerSource(InstallReferrerSource source) {
         referrerSource = source;
+    }
+
+    /// Registers the platform hook that reads the invite code an iOS App Clip
+    /// left for this application. The Codename One build calls this before the
+    /// application starts on platforms that have one; an application does not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the platform source, or null to remove it
+    public static void registerAppClipHandoffSource(AppClipHandoffSource source) {
+        appClipSource = source;
     }
 
     // ---- sending ---------------------------------------------------------
@@ -1226,11 +1247,6 @@ public final class Invites {
         return c != null && !c.isAnalytics();
     }
 
-    private static boolean explicitlyAllowed() {
-        AnalyticsConsent c = Analytics.getConsent();
-        return c != null && c.isAnalytics();
-    }
-
     private static String newCode() {
         byte[] raw = new byte[16];
         try {
@@ -1663,35 +1679,8 @@ public final class Invites {
         pending.put("expiresAt", String.valueOf(now + attributionWindow));
         pending.put("attempts", "0");
         pending.put("state", String.valueOf(STATE_PENDING));
-        captureProfile(pending);
         writePending(pending);
         return pending;
-    }
-
-    /// Writes the coarse device profile the deferred lookup is matched on.
-    ///
-    /// Separate from `pendingRecord()` because it is needed twice. A terminal
-    /// marker deliberately carries none of it -- a refused profile is deleted,
-    /// which is the promise the consent path makes -- so a marker that is
-    /// later reopened has to capture it again rather than restore it. Sending
-    /// the empty strings and zero dimensions the terminal marker really does
-    /// hold left the server with the network and the country and nothing else,
-    /// which scores below the threshold: a consent grant inside the original
-    /// window could not recover the invite it was granted for.
-    ///
-    /// - `record`: the pending record to fill in
-    private static void captureProfile(Map<String, String> record) {
-        Display d = Display.getInstance();
-        if (d != null) {
-            InviteStore.put(record, "platform", d.getPlatformName());
-            InviteStore.put(record, "osVersion", d.getProperty("OSVer", ""));
-            InviteStore.put(record, "deviceModel",
-                    d.getProperty("DeviceHardwareModel", d.getProperty("DeviceName", "")));
-            record.put("screenWidth", String.valueOf(d.getDisplayWidth()));
-            record.put("screenHeight", String.valueOf(d.getDisplayHeight()));
-        }
-        Locale loc = Locale.getDefault();
-        InviteStore.put(record, "locale", loc == null ? "" : loc.toString());
     }
 
     private static void beginDeferred() {
@@ -1743,19 +1732,6 @@ public final class Invites {
                     marker.put("expiresAt", String.valueOf(began + attributionWindow));
                 }
                 marker.remove("reason");
-                // And the device profile is CAPTURED AGAIN, not restored.
-                //
-                // markTerminal() carries the timing, the delivery flag and the
-                // direct-link code and nothing that describes the device --
-                // deliberately, because a refusal deletes the fingerprint. So
-                // the marker being converted here holds none of it, and the
-                // resumed requestMatch() sent empty strings and zero screen
-                // dimensions: the server had the network and the country to
-                // score on, which is not enough to match, so granting consent
-                // inside the original window recovered nothing. Recapturing
-                // costs five property reads and is the same profile the first
-                // launch would have taken.
-                captureProfile(marker);
                 writePending(marker);
                 state = STATE_PENDING;
                 stateLoaded = true;
@@ -1850,7 +1826,7 @@ public final class Invites {
             requestReferrer(source);
             return;
         }
-        requestMatch(pending);
+        requestAppClipHandoff(pending);
     }
 
     private static boolean safeSupported(InstallReferrerSource source) {
@@ -1992,7 +1968,7 @@ public final class Invites {
         if (pending == null) {
             return;
         }
-        requestMatch(pending);
+        requestAppClipHandoff(pending);
     }
 
     private static void onEdt(Runnable r) {
@@ -2008,32 +1984,76 @@ public final class Invites {
         }
     }
 
-    private static void requestMatch(Map<String, String> pending) {
-        if (!explicitlyAllowed()) {
-            // Nothing is outstanding after this, and saying so is what lets a
-            // later grant act immediately.
+    /// Asks the platform whether an App Clip left a code behind.
+    ///
+    /// This replaced a statistical match against a hashed device profile. That
+    /// existed only because the App Store carries no referrer of its own, so an
+    /// install deferred through it could only be guessed at -- from a coarse
+    /// profile, a network prefix and an hour-long window, sometimes wrong and
+    /// never able to say so. A clip is launched BY the invite link and receives
+    /// it exactly, so the answer is a fact and the guess is gone, along with
+    /// everything that was collected to make it.
+    ///
+    /// No consent gate beyond the ordinary one. The strict grant the match
+    /// needed was for transmitting a device fingerprint; there is no
+    /// fingerprint now, and the code this reads is one the person produced
+    /// themselves by tapping an invite.
+    ///
+    /// - `pending`: the pending record, for the attempt budget
+    private static void requestAppClipHandoff(final Map<String, String> pending) {
+        final AppClipHandoffSource source = appClipSource;
+        if (source == null || !source.isSupported()) {
+            // No clip on this platform or this build, which is the ordinary
+            // case: Android answered through the install referrer before
+            // reaching here, and the desktop and the simulator have neither.
             //
-            // Under OPT_OUT with no choice on record the referrer read IS
-            // permitted, so a Play install that comes back empty falls through
-            // to here -- where the statistical match needs an explicit grant
-            // and declines. The referrer's own lookupIssuedAt was still set, so
-            // onConsentChanged() saw a lookup in flight, did not start the
-            // match the grant had just permitted, and nothing retried it: the
-            // attribution stayed pending until some unrelated flush, check or
-            // relaunch happened along.
+            // NO_MATCH rather than UNSUPPORTED. This install was not invited --
+            // that is a real answer about it, and a permanent one. UNSUPPORTED
+            // is the reopenable marker the kill switch writes, so reporting it
+            // here would have every launch reopen a lookup that can never have
+            // anything to find.
             lookupIssuedAt = 0;
+            settleNoHandoff(REASON_NO_MATCH);
             return;
         }
         bumpAttempts(pending);
-        Map<String, Object> body = identity();
-        body.put("platform", InviteStore.get(pending, "platform", ""));
-        body.put("osVersion", InviteStore.get(pending, "osVersion", ""));
-        body.put("deviceModel", InviteStore.get(pending, "deviceModel", ""));
-        body.put("locale", InviteStore.get(pending, "locale", ""));
-        body.put("screenWidth", Integer.valueOf(InviteStore.getInt(pending, "screenWidth", 0)));
-        body.put("screenHeight", Integer.valueOf(InviteStore.getInt(pending, "screenHeight", 0)));
         lookupIssuedAt = System.currentTimeMillis();
-        post(getLinkBase() + PATH_MATCH, body, MATCH_FINGERPRINT, true);
+        source.requestHandoff(new AppClipHandoffCallback() {
+            public void onHandoff(final String code, final long clickedSeconds) {
+                onEdt(new Runnable() {
+                    public void run() {
+                        lookupIssuedAt = 0;
+                        if (code == null || code.length() == 0) {
+                            settleNoHandoff(REASON_NO_MATCH);
+                            return;
+                        }
+                        // Claimed exactly as a referrer code is: the trip
+                        // through the store is what makes both of them exact,
+                        // and the server treats them the same way.
+                        claim(code, "app_clip", "", MATCH_APP_CLIP, true);
+                    }
+                });
+            }
+
+            public void onUnavailable(final String reason) {
+                onEdt(new Runnable() {
+                    public void run() {
+                        lookupIssuedAt = 0;
+                        settleNoHandoff(reason == null ? REASON_NO_MATCH : reason);
+                    }
+                });
+            }
+        });
+    }
+
+    /// Settles an install no clip left anything for, which is most of them.
+    private static void settleNoHandoff(String reason) {
+        if (abandonReplacement()) {
+            return;
+        }
+        if (markTerminal(reason)) {
+            notifyUnavailable(reason);
+        }
     }
 
     private static void claim(String code, String source, String rawReferrer,
@@ -2221,68 +2241,21 @@ public final class Invites {
         if (epoch != lookupEpoch || !allowed()) {
             return;
         }
-        // And the kill switch is read HERE, not only where the lookup starts.
+        // There is no kill-switch guard on the answer any more, because every
+        // answer is exact.
         //
-        // setAttributionWindow(0) turns off deferred attribution, but a
-        // statistical request queued a moment earlier is already on the wire
-        // and carries the epoch it was issued with -- so its answer used to
-        // land, persist and report an attribution the application had just
-        // switched off. The window is checked against the answer rather than
-        // against the request.
+        // It refused a statistical match that setAttributionWindow(0) had
+        // switched off, and a statistical match that arrived after the window
+        // closed. Both were about a guess: a coarse profile matched on the
+        // server, which could be wrong and could be stale. A referrer code and
+        // an App Clip code are facts that made the trip through the store, and
+        // a fact arriving late is still the right answer -- which is why the
+        // guard had to be keyed on the match type rather than on `deferred` in
+        // the first place, and why it has nothing left to key on now.
         //
-        // Only the STATISTICAL answer. The switch turns off the fingerprint
-        // lookup, not an exact code the device is holding: hasSavedCode()
-        // exempts one where the lookup begins, and cancelling an exact claim
-        // here would break the same exemption from the other end. That is also
-        // why this is not an epoch bump -- the epoch is global and would
-        // discard the exact claim with it.
-        //
-        // Keyed on the match type rather than on `deferred`, which was the
-        // first spelling and was wrong: an install-referrer claim is exact AND
-        // deferred -- the code came back through the store, which is the whole
-        // reason the Android path is the deterministic one -- so the kill
-        // switch dropped the best answer the device will ever have.
-        if (MATCH_FINGERPRINT.equals(matchType)) {
-            if (attributionWindow == 0) {
-                return;
-            }
-            // And the window has to still be open when the ANSWER arrives.
-            //
-            // A request issued just before expiresAt can sit in the queue or on
-            // the wire past it, and only the current window was checked -- so a
-            // late statistical answer resolved and reported invite_install
-            // outside the window the application configured. The request does
-            // not carry the expiry to the server either, so the server cannot
-            // refuse it on our behalf; the record on this device is the only
-            // place the deadline exists.
-            //
-            // Read from the pending record rather than recomputed, because it
-            // is the deadline this lookup was started under -- and a marker
-            // with no expiry at all is left alone, since that is a record from
-            // before the window was written rather than one that has run out.
-            Map<String, String> deadline = readPending();
-            long expiresAt = InviteStore.getLong(deadline, "expiresAt", 0);
-            if (expiresAt > 0 && System.currentTimeMillis() > expiresAt) {
-                // SETTLED, not just refused.
-                //
-                // The ordinary flow makes this one asynchronous request and has
-                // no timer behind it, so returning here left the install
-                // STATE_PENDING for ever: the window had closed, the answer had
-                // been thrown away, and nothing would ask again unless the
-                // application happened to call flush() or checkForInvite()
-                // itself. The listener was owed an answer and never got one.
-                //
-                // A replacement is abandoned rather than settled, for the
-                // reason abandonReplacement() gives: the earlier attribution
-                // still stands, and telling a listener "no invite" about an
-                // install it has already been told about is a contradiction
-                // rather than an answer.
-                if (!abandonReplacement() && markTerminal(REASON_EXPIRED)) {
-                    notifyUnavailable(REASON_EXPIRED);
-                }
-                return;
-            }
-        }
+        // The window still governs where the lookup STARTS: beginDeferred()
+        // refuses to begin one past the deadline, and hasSavedCode() exempts a
+        // code already in hand.
         try {
             if (payload == null || payload.length() == 0) {
                 return;
@@ -2359,10 +2332,12 @@ public final class Invites {
             if (rawScore instanceof Number) {
                 double s = ((Number) rawScore).doubleValue();
                 score = s > 1d ? s / 100d : s;
-            } else if (MATCH_FINGERPRINT.equals(matchType)) {
-                score = 0d;
             }
-            if (MATCH_DIRECT.equals(matchType) || MATCH_REFERRER.equals(matchType)) {
+            // Every match type is exact now, so the score is one whatever the
+            // server said. It survives because InviteAttribution advertises it
+            // and an application may read it; it no longer varies.
+            if (MATCH_DIRECT.equals(matchType) || MATCH_REFERRER.equals(matchType)
+                    || MATCH_APP_CLIP.equals(matchType)) {
                 score = 1d;
             }
             Map<String, String> params = new LinkedHashMap<String, String>();

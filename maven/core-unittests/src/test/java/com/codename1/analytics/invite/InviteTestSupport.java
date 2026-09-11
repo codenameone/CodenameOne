@@ -37,6 +37,48 @@ final class InviteTestSupport {
     private InviteTestSupport() {
     }
 
+    /** The source freshInstall() leaves registered; holds its callback. */
+    static PendingHandoffSource pendingHandoff;
+
+    /**
+     * An App Clip source that is supported and never answers on its own, so a
+     * test can decide when -- and whether -- the handoff arrives.
+     */
+    static final class PendingHandoffSource implements AppClipHandoffSource {
+        private AppClipHandoffCallback callback;
+
+        public boolean isSupported() {
+            return true;
+        }
+
+        public void requestHandoff(AppClipHandoffCallback cb) {
+            callback = cb;
+        }
+
+        /** True once Invites has asked. */
+        boolean wasAsked() {
+            return callback != null;
+        }
+
+        /** Delivers a code, as a clip that saw the link would. */
+        void answer(String code) {
+            AppClipHandoffCallback cb = callback;
+            callback = null;
+            if (cb != null) {
+                cb.onHandoff(code, 0L);
+            }
+        }
+
+        /** Answers that no clip left anything, which is the common case. */
+        void answerNothing(String reason) {
+            AppClipHandoffCallback cb = callback;
+            callback = null;
+            if (cb != null) {
+                cb.onUnavailable(reason);
+            }
+        }
+    }
+
     static RecordingProvider freshInstall() {
         clearAppArg();
         Analytics.clearProviders();
@@ -48,6 +90,14 @@ final class InviteTestSupport {
         Invites.setReattribution(false);
         Invites.setAttributionWindow(Invites.DEFAULT_ATTRIBUTION_WINDOW);
         Invites.registerInstallReferrerSource(null);
+        // A clip source that is present and never answers, which is the state
+        // the old statistical match left behind: a lookup outstanding with its
+        // response still to come. Without one, every deferred lookup settles
+        // the instant it starts -- correct on a device with no App Clip, and
+        // useless for testing anything that happens while one is in flight.
+        // A case that wants an answer installs its own.
+        pendingHandoff = new PendingHandoffSource();
+        Invites.registerAppClipHandoffSource(pendingHandoff);
         Invites.lookupRetryDelay = 30000L;
         Invites.reset();
         Preferences.delete(Invites.PREF_SLUG);

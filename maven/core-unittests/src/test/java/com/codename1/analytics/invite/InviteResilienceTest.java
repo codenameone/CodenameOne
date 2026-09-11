@@ -118,7 +118,7 @@ class InviteResilienceTest extends UITestBase {
         // queried again, and an ordinary uninvited install kept contacting the
         // server for ever.
         Invites.checkForInvite();
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
 
         Invites.forgetLoadedState();
@@ -132,7 +132,7 @@ class InviteResilienceTest extends UITestBase {
         // It is durable and it is empty: the profile existed to be matched,
         // and there is nothing left to match it against.
         Invites.checkForInvite();
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
         Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
         assertNotNull(marker, "the answer has to be durable");
         assertTrue(marker.containsKey("state"));
@@ -256,7 +256,7 @@ class InviteResilienceTest extends UITestBase {
         pending.put("referrerRetry", "true");
         InviteStore.write(InviteStore.PENDING, pending);
 
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
 
         Invites.forgetLoadedState();
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
@@ -296,7 +296,7 @@ class InviteResilienceTest extends UITestBase {
 
         // The deferred answer arrives late, under the epoch it was issued in.
         Invites.handleResolution(InviteTestSupport.resolvedJson("GUESS", "c2", "unknown"),
-                Invites.MATCH_FINGERPRINT, true, deferredEpoch);
+                Invites.MATCH_APP_CLIP, true, deferredEpoch);
 
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a);
@@ -328,7 +328,7 @@ class InviteResilienceTest extends UITestBase {
                 told[0]++;
             }
         });
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
         assertEquals(0, told[0], "a pending outcome used the terminal callback");
 
         // And the exact answer that arrives afterwards is still deliverable.
@@ -359,7 +359,7 @@ class InviteResilienceTest extends UITestBase {
         });
         Invites.reset();
         Invites.checkForInvite();
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
 
         Invites.forgetLoadedState();
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
@@ -405,7 +405,7 @@ class InviteResilienceTest extends UITestBase {
                 Invites.MATCH_REFERRER, true);
 
         Invites.handleResolution(InviteTestSupport.resolvedJson("GUESS", "c2", "unknown"),
-                Invites.MATCH_FINGERPRINT, true, stale);
+                Invites.MATCH_APP_CLIP, true, stale);
 
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a);
@@ -758,7 +758,7 @@ class InviteResilienceTest extends UITestBase {
         Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
         Analytics.setConsent(AnalyticsConsent.granted());
         Invites.handleResolution(InviteTestSupport.resolvedJson("RESOLVED1", "c1", "sms"),
-                Invites.MATCH_FINGERPRINT, true);
+                Invites.MATCH_APP_CLIP, true);
 
         final String[] unavailable = new String[1];
         final InviteAttribution[] received = new InviteAttribution[1];
@@ -1021,7 +1021,7 @@ class InviteResilienceTest extends UITestBase {
 
         Analytics.setConsent(AnalyticsConsent.granted());
         Invites.handleResolution(InviteTestSupport.resolvedJson("LATER3", "c1", "sms"),
-                Invites.MATCH_FINGERPRINT, true);
+                Invites.MATCH_APP_CLIP, true);
 
         Invites.forgetLoadedState();
         Invites.setInviteListener(null);
@@ -1159,7 +1159,7 @@ class InviteResilienceTest extends UITestBase {
             }
         });
         Invites.checkForInvite();
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
 
         Invites.forgetLoadedState();
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
@@ -1220,41 +1220,6 @@ class InviteResilienceTest extends UITestBase {
 
     @Test
     @EdtTest
-    void reopeningAfterConsentCapturesTheDeviceProfileAgain() {
-        // The other half of the same reopen. markTerminal() carries the timing,
-        // the delivery flag and the direct-link code and nothing that describes
-        // the device -- deliberately, because a refusal deletes the
-        // fingerprint. So the marker converted back to pending held empty
-        // strings and zero screen dimensions, and the resumed match sent the
-        // server the network and the country to score on and nothing else,
-        // which is below the threshold. Granting consent inside the original
-        // window could not recover the invite it was granted for.
-        Invites.checkForInvite();
-        Map<String, String> first = InviteStore.read(InviteStore.PENDING);
-        assertNotNull(first);
-        String platform = InviteStore.get(first, "platform", "");
-        assertTrue(platform.length() > 0, "the first launch captured no platform");
-
-        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
-        Map<String, String> denied = InviteStore.read(InviteStore.PENDING);
-        assertNotNull(denied);
-        assertEquals("", InviteStore.get(denied, "platform", ""),
-                "the refused marker kept a device profile it promised to delete");
-
-        Analytics.setConsent(AnalyticsConsent.granted());
-
-        Map<String, String> resumed = InviteStore.read(InviteStore.PENDING);
-        assertNotNull(resumed);
-        assertEquals(platform, InviteStore.get(resumed, "platform", ""),
-                "the reopened lookup carries no platform, so it cannot match");
-        assertTrue(InviteStore.getLong(resumed, "screenWidth", 0) > 0,
-                "the reopened lookup carries no screen dimensions");
-        assertTrue(InviteStore.get(resumed, "locale", "").length() > 0,
-                "the reopened lookup carries no locale");
-    }
-
-    @Test
-    @EdtTest
     void theZeroWindowDoesNotDiscardAnExactCodeWeAreHolding() {
         // setAttributionWindow(0) turns off the DEFERRED lookup, which is the
         // one that needs a window to mean anything. A code already in hand is
@@ -1279,26 +1244,6 @@ class InviteResilienceTest extends UITestBase {
 
         assertNull(told[0], "the kill switch discarded an exact code we were holding");
         assertEquals(Invites.STATE_PENDING, Invites.getState());
-    }
-
-    @Test
-    @EdtTest
-    void thekillSwitchAlsoRefusesAmatchAlreadyOnTheWire() {
-        // setAttributionWindow(0) changed only the value future calls read. A
-        // statistical request queued a moment earlier carries the epoch it was
-        // issued with, so its answer still landed, persisted and reported an
-        // attribution the application had just switched off.
-        Invites.checkForInvite();
-        assertEquals(Invites.STATE_PENDING, Invites.getState());
-        int inFlight = Invites.currentLookupEpochForTest();
-
-        Invites.setAttributionWindow(0);
-
-        Invites.handleResolution(InviteTestSupport.resolvedJson("LATE1", "c1", "sms"),
-                Invites.MATCH_FINGERPRINT, true, inFlight);
-
-        assertNull(Invites.getAttribution(),
-                "a statistical answer landed after the kill switch was thrown");
     }
 
     @Test
@@ -1342,41 +1287,6 @@ class InviteResilienceTest extends UITestBase {
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a, "the kill switch discarded an exact install-referrer claim");
         assertEquals("REF9", a.getCode());
-    }
-
-    @Test
-    @EdtTest
-    void afingerprintAnswerThatArrivesAfterTheWindowIsRefused() {
-        // A request issued just before expiresAt can sit in the queue or on the
-        // wire past it, and only the CURRENT window was checked -- so a late
-        // statistical answer resolved and reported invite_install outside the
-        // window the application configured. The request carries no expiry to
-        // the server either, so the record on this device is the only place
-        // that deadline exists.
-        Invites.checkForInvite();
-        int inFlight = Invites.currentLookupEpochForTest();
-
-        // The window closes while the answer is on the wire.
-        Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
-        assertNotNull(pending);
-        pending.put("expiresAt", String.valueOf(System.currentTimeMillis() - 1000L));
-        assertTrue(InviteStore.write(InviteStore.PENDING, pending));
-        Invites.forgetLoadedState();
-
-        Invites.handleResolution(InviteTestSupport.resolvedJson("LATE2", "c1", "sms"),
-                Invites.MATCH_FINGERPRINT, true, inFlight);
-
-        assertNull(Invites.getAttribution(),
-                "a statistical answer landed after the attribution window closed");
-        // And the lookup is SETTLED, not left hanging. The ordinary flow makes
-        // one asynchronous request and has no timer behind it, so refusing the
-        // answer without terminalising left the install pending for ever and
-        // the listener owed an answer it would never get.
-        assertEquals(Invites.STATE_NONE_FOUND, Invites.getState(),
-                "refusing a late answer left the lookup pending for ever");
-        assertEquals(Invites.REASON_EXPIRED,
-                InviteStore.get(InviteStore.read(InviteStore.PENDING), "reason", null),
-                "the settled lookup does not say why");
     }
 
     @Test
@@ -1451,7 +1361,7 @@ class InviteResilienceTest extends UITestBase {
         assertEquals(1, told[0], "the refusal was not delivered, so this proves nothing");
 
         Analytics.setConsent(AnalyticsConsent.granted());
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
 
         Invites.forgetLoadedState();
         Invites.setInviteListener(null);
@@ -1467,7 +1377,7 @@ class InviteResilienceTest extends UITestBase {
         // resolved the stale unavailable result -- with deliveredThisRun then
         // suppressing the correct one.
         Invites.checkForInvite();
-        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_FINGERPRINT, true);
+        Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
 
         Invites.handleUrl("https://cloud.codenameone.com/i/acme/LATER6");
