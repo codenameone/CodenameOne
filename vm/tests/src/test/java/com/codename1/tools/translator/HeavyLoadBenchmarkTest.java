@@ -121,11 +121,9 @@ public class HeavyLoadBenchmarkTest {
                 compileArgs.add(classesDir.toString());
                 compileArgs.addAll(helloSources);
                 int helloResult = compiler.run(null, null, null, compileArgs.toArray(new String[0]));
-                if (helloResult == 0) {
-                    System.out.println("Compiled HelloCodenameOne successfully.");
-                } else {
-                    System.out.println("WARNING: Failed to compile HelloCodenameOne.");
-                }
+                Assertions.assertEquals(0, helloResult,
+                        "Compilation of HelloCodenameOne failed; refusing to benchmark an incomplete workload");
+                System.out.println("Compiled HelloCodenameOne successfully.");
             }
         }
 
