@@ -637,11 +637,38 @@ class CleanTargetLinuxIntegrationTest {
         cmd.add("set pagination off");
         cmd.add("-ex");
         cmd.add("thread apply all bt");
-        Process gdb = new ProcessBuilder(cmd)
-                .redirectErrorStream(true)
-                .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
-                .start();
-        return gdb.waitFor();
+        try {
+            Process gdb = new ProcessBuilder(cmd)
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
+                    .start();
+            int rc = gdb.waitFor();
+            if (rc != 0) {
+                note(out, "gdb " + (viaSudo ? "(sudo) " : "") + "exited " + rc
+                        + " -- no stacks from this sample");
+            }
+            return rc;
+        } catch (java.io.IOException notInstalled) {
+            // An absent gdb used to throw here and be swallowed by the caller's
+            // catch-all, leaving hang-stacks.txt holding nothing but its sample
+            // headers. That reads as "we looked and the process was fine", which is
+            // the opposite of what happened, and it cost a full CI round to notice
+            // the file was empty rather than uninformative. Say so in the file.
+            note(out, "gdb " + (viaSudo ? "(sudo) " : "") + "could not be started: "
+                    + notInstalled + " -- install gdb on this runner to get stacks");
+            return -1;
+        }
+    }
+
+    /// Appends one diagnostic line to the dump file, so a failure to collect
+    /// evidence is itself recorded as evidence.
+    private static void note(java.io.File out, String msg) {
+        try (java.io.PrintWriter w = new java.io.PrintWriter(
+                new java.io.FileWriter(out, true), true)) {
+            w.println("  !! " + msg);
+        } catch (java.io.IOException ignore) {
+            // nothing further we can do from a diagnostic path
+        }
     }
 
     /// Dumps every thread's native stack from the still-running suite process.
@@ -682,8 +709,11 @@ class CleanTargetLinuxIntegrationTest {
             }
             System.out.println("CN1SS:HARNESS: wrote live thread stacks for pid " + pid.trim()
                     + " to " + out);
-        } catch (Exception ignore) {
-            // A missing gdb or a denied ptrace must not mask the real failure.
+        } catch (Exception e) {
+            // A missing gdb or a denied ptrace must not mask the real failure -- but
+            // it must not be invisible either, or an empty dump file gets read as a
+            // clean sample. Print it; the harness output is captured in the job log.
+            System.out.println("CN1SS:HARNESS: live stack dump failed: " + e);
         }
     }
 

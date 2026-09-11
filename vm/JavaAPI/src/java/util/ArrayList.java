@@ -38,47 +38,29 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     /**
      * Constructs a new instance of {@code ArrayList} with ten capacity.
      */
-    /**
-     * A shared zero-length array for a list created at the default capacity.
-     *
-     * A list that is never added to keeps this and allocates nothing: the eager
-     * {@code new Object[10]} that used to happen in this constructor cost a
-     * 128-byte slot for every empty list, and the translator alone builds hundreds
-     * of thousands of them. Sharing one instance is safe because the array is only
-     * ever REPLACED (by the grow methods), never written through.
-     *
-     * Its identity is what marks the "still at default capacity" state, so it must
-     * not be merged with any other empty array -- see allocateDefaultCapacity.
-     */
-    private static final Object[] DEFAULT_EMPTY_ARRAY = new Object[0];
-
-    /**
-     * Capacity the first growth allocates when the list was created at the default.
-     *
-     * Ten, not the twelve the general growth path would pick, because ten keeps a
-     * small list inside the same allocation size class it occupied when the array
-     * was allocated eagerly. Growing straight to twelve would have made every list
-     * of one to ten elements LARGER than before, trading a win on empty lists for a
-     * loss on the common case.
-     */
-    private static final int DEFAULT_CAPACITY = 10;
-
+    // ISOLATION (PR #5766): the lazy default-capacity allocation that used to sit
+    // here is withdrawn. It replaced the eager new Object[10] with a SHARED static
+    // zero-length array, which also gave java.util.ArrayList a <clinit> it had
+    // never had -- master's only static is a compile-time serialVersionUID, so the
+    // class previously emitted no static initializer at all.
+    //
+    // The suite then began stopping after exactly 145 of 166 screenshots on every
+    // target except glibc-x64, with ArrayList state corrupt at the point of
+    // failure: AIOOBE 89 inside pendingIdleSerialCalls.add, then AIOOBE -1, then a
+    // NullPointerException inside ArrayList.get, which only happens when the
+    // backing array reference itself is null.
+    //
+    // The list logic is NOT at fault: a differential fuzz of this exact source
+    // against java.util.ArrayList ran 3000 seeds x 200 random operations with no
+    // divergence, and every access to the corrupted list in Display is inside
+    // synchronized(lock). The corruption is therefore below Java, which makes the
+    // new <clinit> and the process-wide shared array the part worth removing
+    // before anything subtler is blamed.
+    //
+    // The iterator below is the change that carried the measured win (iteration
+    // 25.5% -> 12.4% of mutator self-time) and is kept.
     public ArrayList() {
-        firstIndex = size = 0;
-        array = (E[]) DEFAULT_EMPTY_ARRAY;
-    }
-
-    /**
-     * Replaces the shared empty array with a real one on the first growth.
-     *
-     * Called at the top of each grow method, which then proceeds exactly as it
-     * always did against a normally-sized array.
-     */
-    private void allocateDefaultCapacity(int required) {
-        if (array == DEFAULT_EMPTY_ARRAY) {
-            array = newElementArray(required > DEFAULT_CAPACITY ? required : DEFAULT_CAPACITY);
-            firstIndex = 0;
-        }
+        this(10);
     }
 
     public ArrayList(E... arr) {
@@ -444,7 +426,6 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     }
 
     private void growAtEnd(int required) {
-        allocateDefaultCapacity(required);
         if (array.length - size >= required) {
             // REVIEW: as growAtEnd, why not move size == 0 out as
             //         special case
@@ -476,7 +457,6 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     }
 
     private void growAtFront(int required) {
-        allocateDefaultCapacity(required);
         if (array.length - size >= required) {
             int newFirst = array.length - size;
             // REVIEW: as growAtEnd, why not move size == 0 out as
@@ -506,7 +486,6 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     }
 
     private void growForInsert(int location, int required) {
-        allocateDefaultCapacity(required);
         // REVIEW: we grow too quickly because we are called with the
         //         size of the new collection to add without taking in
         //         to account the free space we already have

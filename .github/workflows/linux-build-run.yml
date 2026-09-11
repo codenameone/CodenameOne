@@ -271,7 +271,16 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -e
+          # Installed up front and VERIFIED. This used to be silenced entirely, so
+          # a runner image without gdb produced a hang-stacks.txt holding nothing
+          # but sample headers -- which reads as "we sampled and all was well".
+          # A diagnostic that cannot run has to say so.
           bash scripts/ci/apt-get-install.sh gdb >/dev/null 2>&1 || true
+          if command -v gdb >/dev/null 2>&1; then
+            echo "gdb: $(gdb --version | head -1)"
+          else
+            echo "WARNING: gdb is NOT available on this runner; hang and crash stacks will be empty"
+          fi
           Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb-run.log 2>&1 &
           export DISPLAY=:99
           sleep 2
@@ -321,6 +330,15 @@ jobs:
           # frames (e.g. a stack overflow's recursion / the caller that ran CN1 on a small
           # native stack). The suite binary is not stripped, so addr2line resolves them.
           elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+          # Ship the unstripped binary with the artifact: a core or a raw backtrace
+          # is addresses and nothing else once the runner is gone.
+          if [ -n "$elf" ]; then
+            cp "$elf" "$(dirname "$CN1_APP_LOG_TEE")/LinuxHelloMain" 2>/dev/null || true
+          fi
+          for core in /tmp/cn1-cores/core.*; do
+            [ -f "$core" ] || continue
+            cp "$core" "$(dirname "$CN1_APP_LOG_TEE")/" 2>/dev/null || true
+          done
           if [ -n "$elf" ] && [ -f "$CN1_APP_LOG_TEE" ]; then
             {
               echo "=== addr2line of CN1 backtrace addresses (from app log) ==="
@@ -371,9 +389,21 @@ jobs:
           name: linux-suite-classes
       - name: Unpack suite classes
         run: tar xzf suite-classes.tgz
+      # The musl leg had no crash wiring at all: when the suite died mid-run the
+      # only artifact was a short screenshot directory, which is indistinguishable
+      # from a hang. core_pattern is global to the host kernel rather than per
+      # namespace, but the kernel writes the file in the CRASHING process's mount
+      # namespace -- so an absolute path under /cn1 lands inside the container, and
+      # /cn1 is the bind-mounted workspace, which means the core is uploaded with
+      # everything else.
+      - name: Enable core dumps for the container
+        run: |
+          mkdir -p artifacts/linux-port/raw-musl
+          sudo sysctl -w kernel.core_pattern='/cn1/artifacts/linux-port/raw-musl/core.%e.%p' || true
+
       - name: Translate + build + run the suite in Alpine (musl, end-to-end)
         run: |
-          docker run --rm \
+          docker run --rm --ulimit core=-1 \
             -v "$GITHUB_WORKSPACE":/cn1 -w /cn1 \
             -e CN1_SHOT_OUTPUT_DIR=/cn1/artifacts/linux-port/raw-musl \
             -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
@@ -381,7 +411,7 @@ jobs:
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories
-              apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 openjdk17 maven \
+              apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 openjdk17 maven gdb \
                 gtk+3.0-dev cairo-dev pango-dev gdk-pixbuf-dev glib-dev fontconfig-dev freetype-dev \
                 curl-dev openssl-dev libepoxy-dev mesa-dev mesa-gles mesa-egl mesa-gbm mesa-dri-gallium \
                 webkit2gtk-4.1-dev gstreamer-dev gst-plugins-base-dev \
@@ -400,9 +430,31 @@ jobs:
               # core + Linux port (musl JDK8); the default cc on Alpine already links musl.
               cd /cn1/maven && mvn -B -pl linux -am -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
               cd /cn1/vm && mvn -B clean package -pl JavaAPI -am -DskipTests
+              ulimit -c unlimited || true
+              rc=0
               mvn -B test -pl tests -am \
                 -Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux \
-                -Dsurefire.failIfNoSpecifiedTests=false
+                -Dsurefire.failIfNoSpecifiedTests=false || rc=$?
+              # Keep the UNSTRIPPED binary next to any core: without it a core names
+              # addresses and nothing else, and the container is gone by the time the
+              # artifact is looked at.
+              out=/cn1/artifacts/linux-port/raw-musl
+              mkdir -p "$out"
+              elf="$(find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+              if [ -n "$elf" ]; then cp "$elf" "$out/LinuxHelloMain" || true; fi
+              for core in "$out"/core.*; do
+                [ -f "$core" ] || continue
+                {
+                  echo "=== post-mortem of $core (elf=$elf) ==="
+                  gdb "$elf" "$core" -batch -ex "set pagination off" \
+                    -ex "thread apply all bt" -ex "thread 1" -ex "bt full" 2>&1
+                } >> "$out/crash-stacks.txt" || true
+              done
+              if [ ! -f "$out/crash-stacks.txt" ]; then
+                echo "no core file was written -- the suite stopped without a fatal signal" \
+                  > "$out/crash-stacks.txt"
+              fi
+              exit $rc
             '
       - name: Upload musl screenshots
         if: always()
