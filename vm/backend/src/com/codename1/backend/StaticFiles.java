@@ -105,6 +105,21 @@ public final class StaticFiles implements HttpServer.Handler {
         if(!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)) {
             return HttpServer.Response.text(405, "method not allowed");
         }
+        if(target.length() == 0) {
+            // The request named the mount EXACTLY, with no trailing slash. Left
+            // alone it becomes "/" and then "/" + indexFile, which resolves to a
+            // FILE -- so the directory branch further down, which exists to issue
+            // this very redirect, never runs and the index is served as 200 at
+            // /assets. A browser then resolves "style.css" in it against /, not
+            // /assets/, and every relative reference in the site points outside
+            // the mount. Redirect to the directory form the way that branch does,
+            // carrying the query because it was addressed to this resource.
+            String raw = request.getTarget() == null ? "" : request.getTarget();
+            int at = raw.indexOf('?');
+            Map here = new LinkedHashMap();
+            here.put("Location", prefix + "/" + (at < 0 ? "" : raw.substring(at)));
+            return HttpServer.Response.empty(301, "text/plain", here);
+        }
         String decoded = decode(target);
         if(decoded == null) {
             return HttpServer.Response.text(400, "bad path");

@@ -1073,7 +1073,8 @@ public final class HttpServer {
      * worker forever, and the pool is bounded on purpose -- open as many silent
      * connections as there are workers and the server stops answering anyone.
      */
-    private static final int SOCKET_TIMEOUT_MILLIS = envInt("CN1_HTTP_TIMEOUT_MS", 15000);
+    private static final int SOCKET_TIMEOUT_MILLIS =
+            envIntAtLeast("CN1_HTTP_TIMEOUT_MS", 15000, 1);
 
     /**
      * The slowest upload this server will wait for, in bytes per second.
@@ -2293,6 +2294,19 @@ public final class HttpServer {
             try {
                 ServerSocket.setBlocking(fd, false);
                 ServerSocket.setTimeout(fd, SOCKET_TIMEOUT_MILLIS);
+            } catch (IOException err) {
+                // CLOSED HERE, not through drop(). Nothing has been registered for
+                // this descriptor yet, and drop() declines to close what it does not
+                // own -- so routing this failure there returned without closing and
+                // leaked a descriptor per accept, which is one per connection for as
+                // long as the option keeps failing. That is exactly the shape a bad
+                // CN1_HTTP_TIMEOUT_MS used to produce before the clamp above, and it
+                // stays reachable for any other setsockopt failure.
+                trace("fd=" + fd + " rejected at accept: " + err);
+                ServerSocket.closeFd(fd);
+                continue;
+            }
+            try {
                 // Registered BEFORE the poller can report it. Arming first would let
                 // another host thread reach drop() for a descriptor this map has not
                 // heard of yet, and drop declines to close what it does not own.

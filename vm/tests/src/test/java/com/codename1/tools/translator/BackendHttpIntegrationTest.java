@@ -183,6 +183,14 @@ class BackendHttpIntegrationTest {
         // on its own fixture so every upload test on this port carries the
         // proof, and named in a test below so it cannot be deleted as noise.
         run.environment().put("CN1_HTTP_MIN_BODY_RATE", "0");
+        // Invalid for the same reason and refused the same way. A non-positive
+        // socket timeout means "no deadline" to the Java SE arm and disables
+        // SO_RCVTIMEO on the packaged one, so a connection that opens and says
+        // nothing holds a worker forever -- and a NEGATIVE one made setsockopt
+        // fail inside acceptAll before the descriptor was registered, where the
+        // old error path could not close it. Carried on this fixture so every
+        // test on this port runs against the fallback, and named below.
+        run.environment().put("CN1_HTTP_TIMEOUT_MS", "-1");
         run.redirectErrorStream(true);
         smallUploadLog = work.resolve("upload-server.log");
         run.redirectOutput(smallUploadLog.toFile());
@@ -417,6 +425,43 @@ class BackendHttpIntegrationTest {
     // ------------------------------------------------------------------
     // Static files
     // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("the mount prefix itself redirects to its directory form")
+    void theMountPrefixRedirectsToItsDirectoryForm() throws Exception {
+        // GET /static -- the mount named EXACTLY, with no trailing slash. Stripping
+        // the prefix leaves an empty target, which became "/" and then "/index.html"
+        // and resolved to a FILE, so the directory branch that exists to issue this
+        // redirect never ran: the index came back 200 at /static, and a browser then
+        // resolved "style.css" in it against / rather than /static/. Every relative
+        // reference in an otherwise valid site pointed one level too high.
+        byte[] bare = request("GET", "/static", null, null);
+        assertEquals(301, statusOf(bare),
+                "GET /static did not redirect:\n" + new String(bare, StandardCharsets.UTF_8));
+        assertTrue(new String(bare, StandardCharsets.UTF_8).indexOf("Location: /static/") >= 0,
+                "GET /static did not point at the directory form:\n"
+                        + new String(bare, StandardCharsets.UTF_8));
+
+        // The query was addressed to this resource, so it rides across -- the same
+        // rule the directory redirect below the prefix already follows.
+        byte[] withQuery = request("GET", "/static?v=2", null, null);
+        assertEquals(301, statusOf(withQuery));
+        assertTrue(new String(withQuery, StandardCharsets.UTF_8)
+                        .indexOf("Location: /static/?v=2") >= 0,
+                "the query was dropped from the redirect:\n"
+                        + new String(withQuery, StandardCharsets.UTF_8));
+
+        // And the directory form itself still serves the index, which is the
+        // behaviour this must not have traded away.
+        assertTrue(body(request("GET", "/static/", null, null)).contains("<h1>index</h1>"),
+                "/static/ stopped serving the index");
+
+        // A sibling that merely SHARES the prefix is still not ours. The boundary
+        // check above the redirect is what keeps /static2 out, and inserting a new
+        // early return is exactly the kind of edit that could have bypassed it.
+        assertEquals(404, statusOf(request("GET", "/static2", null, null)),
+                "/static2 was treated as the mount");
+    }
 
     @Test
     @DisplayName("static files serve, 404, and refuse to leave the document root")
@@ -763,6 +808,15 @@ class BackendHttpIntegrationTest {
         // JUnit 5 here: condition first, message second.
         assertTrue(log.indexOf("CN1_HTTP_MIN_BODY_RATE=0 is below the minimum") >= 0,
                 "the server did not report refusing CN1_HTTP_MIN_BODY_RATE=0:\n" + log);
+        // The same fixture carries a negative socket timeout. Unclamped it is
+        // worse than a useless deadline: setsockopt fails in acceptAll BEFORE the
+        // descriptor reaches liveConnections, and the old handler routed that to
+        // drop(), which returns without closing a descriptor it does not own --
+        // one leaked fd per connection until the process runs out. That the
+        // server answered every other test on this port at all is the behavioural
+        // half; the refusal message is the half that cannot be explained away.
+        assertTrue(log.indexOf("CN1_HTTP_TIMEOUT_MS=-1 is below the minimum") >= 0,
+                "the server did not report refusing CN1_HTTP_TIMEOUT_MS=-1:\n" + log);
 
         // And it still serves. The body has to arrive in a SECOND packet: sent in
         // one write it is already buffered when fillTo() looks, so the method
