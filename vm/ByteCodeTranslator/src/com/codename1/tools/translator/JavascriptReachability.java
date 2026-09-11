@@ -140,7 +140,317 @@ final class JavascriptReachability {
         rta.propagate();
         int eliminated = rta.eliminate(candidates);
         rta.mergeInstantiatedClasses(classes, candidates);
+        // Publish the instantiated set. The suspension analysis runs straight
+        // after us over the SURVIVING classes and needs exactly this fact to
+        // decide which overrides a given call site can really reach; without
+        // it, it has to assume every same-named method in the program.
+        exportedInstantiated = Collections.unmodifiableSet(new HashSet<String>(rta.instantiated));
         return eliminated;
+    }
+
+    /**
+     * Classes RTA proved are actually instantiated, published by
+     * {@link #run}. Empty when RTA did not run (``-Dparparvm.js.rta.off``),
+     * which every consumer must read as "no information" rather than "nothing
+     * is instantiated" -- see {@link Model#resolveImpls}.
+     */
+    static volatile Set<String> exportedInstantiated = Collections.<String>emptySet();
+
+    /**
+     * Forgets the previous translation's instantiated set.
+     *
+     * This CANNOT live inside {@link #run}, which is the obvious place and the
+     * wrong one: {@code Parser} skips {@code run} entirely under
+     * ``-Dparparvm.js.rta.off``, so a JVM that translated one application with
+     * RTA on and a second with it off would hand the second application's call
+     * sites the FIRST application's type graph -- and that under-approximates,
+     * which is the direction that picks the synchronous dispatcher for a
+     * suspending override. A reused JVM flipping the property mid-run is
+     * exactly what the translator's own tests do with the minifier properties.
+     * So the caller clears this unconditionally, before deciding whether to
+     * run RTA at all.
+     */
+    static void resetExportedFacts() {
+        exportedInstantiated = Collections.<String>emptySet();
+    }
+
+    /**
+     * The subtype relation plus RTA's instantiated set, indexed over one class
+     * list, answering "which method bodies can this call site actually reach".
+     *
+     * This exists because keying a virtual call by ``name + descriptor`` alone
+     * -- which is what the JS backend did everywhere -- collapses every
+     * same-named method in the program into one bucket. One blocking
+     * ``run()V`` then makes every ``run()V`` call site in the program a
+     * suspension point.
+     */
+    static final class Model {
+        private final Map<String, ByteCodeClass> byName;
+        private final Map<String, Set<String>> subclassesOf;
+        private final Set<String> instantiated;
+        // resolveImpls is called once per virtual call site and the subtype
+        // walk is recursive, so memoise on ``owner#name+desc``. Class names
+        // are sanitized to identifier characters, so '#' cannot collide.
+        private final Map<String, List<BytecodeMethod>> memo = new HashMap<String, List<BytecodeMethod>>();
+        private final Map<String, Set<String>> coneMemo = new HashMap<String, Set<String>>();
+
+        private Model(Map<String, ByteCodeClass> byName, Map<String, Set<String>> subclassesOf,
+                Set<String> instantiated) {
+            this.byName = byName;
+            this.subclassesOf = subclassesOf;
+            this.instantiated = instantiated;
+        }
+
+        /**
+         * The concrete bodies an {@code INVOKEVIRTUAL} / {@code
+         * INVOKEINTERFACE} on {@code owner} can dispatch to, given what RTA
+         * proved instantiated.
+         *
+         * Returns {@code null} for "no information", and the caller MUST fall
+         * back to the signature-wide answer when it does. That happens when
+         * the owner is not a class we indexed (an array type, a class the
+         * conservative pass removed), or when nothing in the owner's subtype
+         * cone is instantiated. The second case is the important one: an empty
+         * result would otherwise read as "reaches nothing, so it cannot
+         * suspend", which is exactly the wrong conclusion if the instantiated
+         * set is missing an edge.
+         */
+        List<BytecodeMethod> resolveImpls(String owner, String name, String desc) {
+            if (owner == null || name == null || desc == null) {
+                return null;
+            }
+            String cls = JavascriptNameUtil.sanitizeClassName(owner);
+            String key = cls + "#" + name + desc;
+            if (memo.containsKey(key)) {
+                return memo.get(key);
+            }
+            List<BytecodeMethod> result = null;
+            if (byName.containsKey(cls)) {
+                Set<BytecodeMethod> found = Collections.newSetFromMap(
+                        new IdentityHashMap<BytecodeMethod, Boolean>());
+                if (collectFrom(cls, name, desc, found, new HashSet<String>()) && !found.isEmpty()) {
+                    result = new ArrayList<BytecodeMethod>(found);
+                }
+            }
+            memo.put(key, result);
+            return result;
+        }
+
+        /**
+         * Every type a dispatch on {@code owner} could have as its runtime
+         * receiver: {@code owner} plus its transitive subtypes, DECLARED
+         * rather than filtered by {@link #instantiated}.
+         *
+         * The instantiated filter is deliberately not applied here. This is
+         * used to ask whether a bridge type is reachable through a call site,
+         * and a JSO bridge type is never created by a Java {@code new} -- it
+         * arrives from the host -- so RTA has no reason to consider it
+         * instantiated and filtering would answer "no bridge type here" for
+         * every call site.
+         *
+         * Returns {@code null} when the owner is not an indexed class, which
+         * the caller must read as "no information".
+         */
+        Set<String> coneTypes(String owner) {
+            if (owner == null) {
+                return null;
+            }
+            String cls = JavascriptNameUtil.sanitizeClassName(owner);
+            if (coneMemo.containsKey(cls)) {
+                return coneMemo.get(cls);
+            }
+            Set<String> result = null;
+            if (byName.containsKey(cls)) {
+                result = new HashSet<String>();
+                collectCone(cls, result);
+            }
+            coneMemo.put(cls, result);
+            return result;
+        }
+
+        private void collectCone(String type, Set<String> out) {
+            if (!out.add(type)) {
+                return;
+            }
+            Set<String> subs = subclassesOf.get(type);
+            if (subs != null) {
+                for (String sub : subs) {
+                    collectCone(sub, out);
+                }
+            }
+        }
+
+        /**
+         * Mirrors {@link JavascriptReachability#dispatchVirtualFromInstantiated}
+         * plus {@link JavascriptReachability#enqueueResolved}: every
+         * instantiated type in the cone contributes the concrete body it
+         * inherits, found by walking its superclass chain.
+         */
+        private boolean collectFrom(String type, String name, String desc,
+                Set<BytecodeMethod> out, Set<String> seen) {
+            if (!seen.add(type)) {
+                return true;
+            }
+            if (instantiated.contains(type) && isConcreteReceiver(type)) {
+                BytecodeMethod impl = walkUp(type, name, desc);
+                if (impl == null) {
+                    // An instantiated receiver whose body we cannot name is
+                    // NOT "contributes nothing" -- the runtime's resolveVirtual
+                    // also walks interfaces and then falls back to the global
+                    // native table, and both of those can land on a generator
+                    // this walk never saw. Silently skipping the type would
+                    // under-approximate, which is the one direction that
+                    // breaks. Give up on the whole query instead.
+                    return false;
+                }
+                out.add(impl);
+            }
+            Set<String> subs = subclassesOf.get(type);
+            if (subs != null) {
+                for (String sub : subs) {
+                    if (!collectFrom(sub, name, desc, out, seen)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        /**
+         * Whether {@code type} can actually BE a receiver at runtime.
+         *
+         * The exported set is not a set of concrete instantiations:
+         * {@link JavascriptReachability#markClassInstantiated} adds a name
+         * before it looks at what kind of type it is, and then walks the
+         * supertype chain, so constructing one concrete class routinely puts
+         * its abstract bases and its interfaces in there too. Treating those
+         * as receivers made {@link #walkUp} return null for a type that can
+         * never be a receiver, which abandoned the whole query and dropped the
+         * call site back to the signature-wide answer -- defeating the
+         * optimization for the ordinary "abstract base declares it abstractly"
+         * shape.
+         */
+        private boolean isConcreteReceiver(String type) {
+            ByteCodeClass cls = byName.get(type);
+            return cls != null && !cls.isIsInterface() && !cls.isIsAbstract();
+        }
+
+        private BytecodeMethod walkUp(String startClass, String name, String desc) {
+            String normalized;
+            if ("<init>".equals(name)) {
+                normalized = "__INIT__";
+            } else if ("<clinit>".equals(name)) {
+                normalized = "__CLINIT__";
+            } else {
+                normalized = name;
+            }
+            String current = startClass;
+            Set<String> visited = new HashSet<String>();
+            while (current != null && visited.add(current)) {
+                ByteCodeClass cls = byName.get(current);
+                if (cls == null) {
+                    return null;
+                }
+                for (BytecodeMethod m : cls.getMethods()) {
+                    if (!normalized.equals(m.getMethodName()) || !desc.equals(m.getSignature())) {
+                        continue;
+                    }
+                    if (m.isAbstract()) {
+                        break;
+                    }
+                    // An eliminated body is not reachable, so it contributes
+                    // nothing to what this call site can suspend on.
+                    if (m.isEliminated()) {
+                        break;
+                    }
+                    return m;
+                }
+                String base = cls.getBaseClass();
+                current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+            }
+            // Nothing on the extends chain: a Java 8 interface DEFAULT method
+            // may still supply the body, exactly as
+            // JavascriptReachability.enqueueInterfaceDefault resolves it for
+            // liveness and as the runtime's resolveVirtual resolves it for
+            // dispatch. Without this a concrete receiver that inherits a
+            // default without overriding it resolved to nothing, and the call
+            // site fell back to the signature-wide answer.
+            return walkInterfaces(startClass, normalized, desc, new HashSet<String>());
+        }
+
+        /**
+         * BREADTH-first, because that is what {@code jvm.resolveVirtual} does:
+         * it collects every interface of the class chain, then walks that queue
+         * FIFO and pushes each interface's own super-interfaces on the TAIL.
+         *
+         * A depth-first walk picks a different method, and picks it wrongly.
+         * For {@code C implements Left, Right} where {@code Left} only inherits
+         * {@code Root.f()} and {@code Right} overrides it, depth-first descends
+         * Left -> Root and answers {@code Root.f()} before it has looked at
+         * Right; the runtime answers {@code Right.f()}. If the root default is
+         * synchronous and the override suspends, the analysis picks the sync
+         * dispatcher for a call the runtime resolves to a generator -- the
+         * ``cn1_ivs ... (CHA unsound)`` failure.
+         */
+        private BytecodeMethod walkInterfaces(String clsName, String name, String desc, Set<String> visited) {
+            java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>();
+            String current = clsName;
+            Set<String> chain = new HashSet<String>();
+            while (current != null && chain.add(current)) {
+                ByteCodeClass cls = byName.get(current);
+                if (cls == null) {
+                    break;
+                }
+                if (cls.getBaseInterfaces() != null) {
+                    for (String iface : cls.getBaseInterfaces()) {
+                        pending.add(JavascriptNameUtil.sanitizeClassName(iface));
+                    }
+                }
+                String base = cls.getBaseClass();
+                current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+            }
+            while (!pending.isEmpty()) {
+                String ifaceName = pending.poll();
+                if (ifaceName == null || !visited.add(ifaceName)) {
+                    continue;
+                }
+                ByteCodeClass iface = byName.get(ifaceName);
+                if (iface == null) {
+                    continue;
+                }
+                for (BytecodeMethod m : iface.getMethods()) {
+                    if (!m.isEliminated() && !m.isAbstract()
+                            && name.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                        return m;
+                    }
+                }
+                if (iface.getBaseInterfaces() != null) {
+                    for (String up : iface.getBaseInterfaces()) {
+                        pending.add(JavascriptNameUtil.sanitizeClassName(up));
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Builds a {@link Model} over {@code classes} -- which must be the list
+     * the CALLER is going to classify, not the wider pool RTA indexed, or the
+     * model can hand back method objects that list does not contain.
+     *
+     * Returns {@code null} when RTA published no instantiated set, so callers
+     * keep their existing conservative behaviour under
+     * ``-Dparparvm.js.rta.off``.
+     */
+    static Model modelFor(List<ByteCodeClass> classes) {
+        Set<String> instantiated = exportedInstantiated;
+        if (instantiated.isEmpty()) {
+            return null;
+        }
+        JavascriptReachability indexer = new JavascriptReachability();
+        indexer.index(classes);
+        return new Model(indexer.byName, indexer.subclassesOf, instantiated);
     }
 
     private void index(List<ByteCodeClass> classes) {

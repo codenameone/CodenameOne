@@ -820,6 +820,12 @@ public class Parser extends ClassVisitor {
             // on OUTPUT_TYPE_JAVASCRIPT because the iOS runtime relies on
             // different dispatch mechanics and may break under stricter
             // reachability.
+            // Unconditionally, and BEFORE the RTA decision: the suspension
+            // analysis below reads what RTA published, and skipping RTA must
+            // mean "no information", not "the previous application's answer".
+            if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                JavascriptReachability.resetExportedFacts();
+            }
             if (BytecodeMethod.optimizerOn
                     && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
                     && System.getProperty("parparvm.js.rta.off") == null) {
@@ -842,7 +848,7 @@ public class Parser extends ClassVisitor {
             // methods don't pollute the analysis.
             if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                 Date suspStart = new Date();
-                int syncCount = JavascriptSuspensionAnalysis.run(classes);
+                int syncCount = JavascriptSuspensionAnalysis.run(classes, outputDirectory);
                 Date suspEnd = new Date();
                 if (ByteCodeTranslator.verbose) {
                     System.out.println("JS suspension analysis: " + syncCount

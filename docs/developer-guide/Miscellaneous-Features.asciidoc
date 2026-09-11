@@ -488,6 +488,44 @@ back, uses `.explanation_title`, `.explanation_body` and `.ok`:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava056Snippet.java[tag=miscellaneous-features-java-056,indent=0]
 ----
 
+==== One-time location - the location button
+
+Google Play draws a line between two ways an application uses precise location. Tracking, navigation and geofencing are ongoing, and an application that does them holds `ACCESS_FINE_LOCATION` and declares why. A transactional use is different: finding restaurants nearby, filling in an address, tagging a photo. For those, applications that target Android 17 (API level 37) must let the user share their location through a button that the *system* draws, and the deadline is January 27, 2027.
+
+`LocationButton` is that control:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava057Snippet.java[tag=miscellaneous-features-java-057,indent=0]
+----
+
+The listener is called once the user has answered, with a `Location` or with `null`. `null` means the user declined, or that no fix arrived before the button's timeout. A platform control that fails to open isn't reported this way: the component replaces it with the ordinary button, so the user is asked again there rather than told no. `isSystemRendered()` is how to see that happened.
+
+===== Where the system draws it, and where it doesn't
+
+On Android 17 and later this component *is* the system's control. Another process renders it, and the application can neither change its wording nor intercept its taps. That's the point: a tap on a button the system drew is what earns the session-scoped grant, so the application never has to hold precise location permanently.
+
+Everywhere else -- on Android below API level 37, on iOS, on the desktop and in the simulator -- the component is an ordinary Codename One button that asks for the location permission the usual way, styled through the `LocationButton` UIID like any other component. Your code is the same either way. `isSystemRendered()` on the button tells you which of the two it ended up with, for an application that wants to word something differently around it. It answers for that button rather than for the platform, so it's also false on an Android 17 device where the system control failed to open and the component fell back. To ask the platform question before you build anything, use `Display.getInstance().isLocationButtonSupported()`.
+
+The label comes from the text type you pass to the constructor, one of `TEXT_NONE`, `TEXT_PRECISE_LOCATION`, `TEXT_USE_PRECISE_LOCATION`, `TEXT_SHARE_PRECISE_LOCATION`, `TEXT_NEAR_MY_PRECISE_LOCATION` or `TEXT_NEAR_YOUR_PRECISE_LOCATION`. `setButtonBackgroundColor()` and `setButtonTextColor()` reach the system control; the fallback button follows the theme.
+
+===== Permissions
+
+Nothing to configure. Referencing `LocationButton` makes the Android build add `USE_LOCATION_BUTTON` to the manifest, which the platform requires before it will render the control.
+
+The build also decides how to declare `ACCESS_FINE_LOCATION`. An application that uses the button and nothing else from the location or maps packages gets it declared `onlyForLocationButton`, which means the system grants precise location through the button and never any other way: no "allow precise location" question, nothing held between taps, and nothing to justify to Google Play. An application that also tracks, navigates or geofences needs the ordinary grant and gets the ordinary declaration. The class scan the build already runs answers this, so neither case needs a build hint.
+
+The one thing it can't see is native Android code reaching the platform's location APIs directly, because Gradle compiles that after the decision is made. An application like that declares itself:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/miscellaneous-features.properties[tag=miscellaneous-features-properties-002,indent=0]
+----
+
+`true` forces the restriction on and `false` forces it off; the default, `auto`, infers it. Force it off when native code needs the ordinary grant -- the failure is otherwise silent, with location requests coming back approximate rather than refusing.
+
+One consequence is worth knowing. The restriction is what it says: precise location comes through the button and no other way. On an application that carries it, the fallback described above can't recover precise location -- if the system control fails to open, the ordinary button that replaces it asks a question the system won't answer with precise access, and the listener receives an approximate location or none. That's the bargain the restriction makes, and it's the right one for an application whose only use of precise location is the button; it's another reason not to force it on for an application that reaches precise location some other way.
+
 === Background music playback
 
 Codename One supports playing music in the background (for example: when the app is minimized) which is useful for developers building a music player style application.

@@ -64,6 +64,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 import java.io.Closeable;
 
 import java.io.ByteArrayInputStream;
@@ -1140,6 +1141,81 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setBrowserComponent(PeerComponent browserComponent) {
         this.browserComponent = browserComponent;
+    }
+
+    private boolean locationButtonSupported;
+    private boolean locationButtonReady = true;
+    private SuccessCallback<Boolean> locationButtonCallback;
+    private final java.util.List<SuccessCallback<Boolean>> locationButtonCallbacks =
+            new java.util.ArrayList<SuccessCallback<Boolean>>();
+    private int locationButtonTextType = -1;
+    private int locationButtonBackgroundColor;
+    private int locationButtonTextColor;
+
+    @Override
+    public boolean isLocationButtonSupported() {
+        return locationButtonSupported;
+    }
+
+    @Override
+    public PeerComponent createLocationButton(int textType, int backgroundColor,
+            int textColor, SuccessCallback<Boolean> onPermissionResult) {
+        if (!locationButtonSupported) {
+            return null;
+        }
+        locationButtonTextType = textType;
+        locationButtonBackgroundColor = backgroundColor;
+        locationButtonTextColor = textColor;
+        locationButtonCallback = onPermissionResult;
+        locationButtonCallbacks.add(onPermissionResult);
+        return new PeerComponent(new Object()) {
+        };
+    }
+
+    @Override
+    public boolean isLocationButtonReady(PeerComponent button) {
+        return button != null && locationButtonReady;
+    }
+
+    /// Plays a platform whose control was created but whose session never
+    /// opened -- present, blank, and reporting no failure.
+    public void setLocationButtonReady(boolean locationButtonReady) {
+        this.locationButtonReady = locationButtonReady;
+    }
+
+    /// Makes the fake implementation claim, or stop claiming, a system-rendered
+    /// location button.
+    public void setLocationButtonSupported(boolean locationButtonSupported) {
+        this.locationButtonSupported = locationButtonSupported;
+        if (!locationButtonSupported) {
+            locationButtonCallback = null;
+            locationButtonCallbacks.clear();
+            locationButtonTextType = -1;
+        }
+    }
+
+    /// The callback the component handed the "platform", so a test can play the
+    /// part of a user tapping the system button.
+    public SuccessCallback<Boolean> getLocationButtonCallback() {
+        return locationButtonCallback;
+    }
+
+    /// Every callback handed over, in creation order, so a test can play two
+    /// buttons on one form independently.
+    public java.util.List<SuccessCallback<Boolean>> getLocationButtonCallbacks() {
+        return locationButtonCallbacks;
+    }
+
+    public int getLocationButtonTextType() {
+        return locationButtonTextType;
+    }
+
+    public int getLocationButtonBackgroundColor() {
+        return locationButtonBackgroundColor;
+    }
+
+    public int getLocationButtonTextColor() {
+        return locationButtonTextColor;
     }
 
     @Override

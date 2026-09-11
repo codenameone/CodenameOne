@@ -20,8 +20,9 @@ on:
       - 'maven/cn1-admob/**'
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
-      - 'vm/ByteCodeTranslator/src/cn1_globals.h'
-      - 'vm/ByteCodeTranslator/src/cn1_virtual_thread.h'
+      - 'scripts/check-admob-ios-link.sh'
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/pom.xml'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
   push:
     branches: [master]
@@ -29,8 +30,9 @@ on:
       - 'maven/cn1-admob/**'
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
-      - 'vm/ByteCodeTranslator/src/cn1_globals.h'
-      - 'vm/ByteCodeTranslator/src/cn1_virtual_thread.h'
+      - 'scripts/check-admob-ios-link.sh'
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/pom.xml'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
 
 concurrency:
@@ -200,3 +202,20 @@ jobs:
                      -destination 'generic/platform=iOS Simulator' \
                      CODE_SIGNING_ALLOWED=NO \
                      build
+
+  link-admob-app:
+    name: Link AdMob app (${{ matrix.sdk }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [iphoneos, iphonesimulator]
+    steps:
+      - uses: actions/checkout@v6
+      # Temurin 8 is unavailable on macOS ARM64; Zulu supplies native Java 8.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '8'
+      - name: Link the native bridge and SDK into an app
+        run: scripts/check-admob-ios-link.sh "$RUNNER_TEMP/admob-link" "${{ matrix.sdk }}"

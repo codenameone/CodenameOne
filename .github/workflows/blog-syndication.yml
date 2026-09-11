@@ -42,6 +42,8 @@ jobs:
       - name: Run syndication regression tests
         run: |
           python3 scripts/website/test_syndicate_blog_posts.py
+          python3 scripts/website/test_syndicate_foojay_posts.py
+          python3 scripts/website/test_syndicate_browser_posts.py
           python3 scripts/website/test_queue_browser_syndication.py
           python3 scripts/website/test_queue_social_posts.py
           python3 scripts/website/test_syndication_health.py
@@ -59,46 +61,10 @@ jobs:
             python3 scripts/website/syndicate_blog_posts.py
           fi
 
-      - name: Detect browser-syndication credentials
-        id: browser_creds
-        env:
-          FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
-        run: |
-          if [ -n "${FOOJAY_USER}" ]; then
-            echo "any_configured=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "any_configured=false" >> "${GITHUB_OUTPUT}"
-          fi
-
       - name: Install markdown package (for browser-extension queue HTML)
         run: |
           set -euo pipefail
           pip install markdown
-
-      - name: Install Playwright dependencies
-        if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
-        run: |
-          set -euo pipefail
-          # Playwright shells out to apt for the OS-level deps, so the runner
-          # image's third-party sources have to be pruned FIRST -- a broken
-          # vendor mirror makes its apt-get fail as a whole and it reports
-          # only "Failed to install browser dependencies".
-          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
-          pip install playwright
-          playwright install --with-deps chromium
-
-      - name: Run browser syndication script
-        if: ${{ steps.browser_creds.outputs.any_configured == 'true' }}
-        env:
-          FOOJAY_USER: ${{ secrets.FOOJAY_USER }}
-          FOOJAY_PASSWORD: ${{ secrets.FOOJAY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            python3 scripts/website/syndicate_browser_posts.py --dry-run
-          else
-            python3 scripts/website/syndicate_browser_posts.py
-          fi
 
       - name: Queue browser-extension syndication tasks (Medium)
         run: |
@@ -113,6 +79,20 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/website/queue_social_posts.py --validate-only
+
+      # Run after queue creation so missing cross-repository credentials cannot
+      # prevent the existing local publisher from receiving its Medium work.
+      - name: Submit Foojay article for editorial review
+        env:
+          FOOJAY_GITHUB_TOKEN: ${{ secrets.FOOJAY_GITHUB_TOKEN }}
+          FOOJAY_HEAD_REPO: ${{ vars.FOOJAY_HEAD_REPO }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 scripts/website/syndicate_foojay_posts.py --dry-run
+          else
+            python3 scripts/website/syndicate_foojay_posts.py --submit
+          fi
 
       - name: Upload syndication screenshots on failure
         if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}

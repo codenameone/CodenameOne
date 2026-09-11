@@ -1685,6 +1685,58 @@ final class JavascriptBundleWriter {
      * body would never run.
      */
     static Set<String> collectBridgeReferencedCn1Tokens() {
+        return collectBridgeCn1Tokens(false);
+    }
+
+    /**
+     * The subset of {@link #collectBridgeReferencedCn1Tokens()} whose bodies
+     * the bridge can REPLACE at runtime, which is the only reason a name needs
+     * to be suspending.
+     *
+     * These two questions look like one and are not, and conflating them broke
+     * nine theme screenshots:
+     *
+     * - "the bridge NAMES this method" decides whether the emitted identifier
+     *   may be renamed, whether its {@code m:} entry may be pruned, and
+     *   whether the call may be devirtualized. A name the bridge merely LOOKS
+     *   UP still needs every one of those protections, or
+     *   {@code jvm.resolveVirtual(cls, "cn1_s_...")} stops finding it.
+     * - "the bridge REPLACES this method" decides whether callers must
+     *   {@code yield*}. Only a replacement can turn out to be a generator.
+     *
+     * So the narrowing lives HERE and nowhere else. Do not push it back into
+     * the shared collector: five other call sites depend on the wide set, four
+     * of them on by default -- {@code minifyGeneratedIdentifiers},
+     * {@code mangleDispatchIds}, {@code mangleInstanceFieldProps} and the
+     * devirtualization exclusions in this file and in
+     * {@link JavascriptMethodGenerator}.
+     */
+    static Set<String> collectBridgeReplacedCn1Tokens() {
+        return collectBridgeCn1Tokens(true);
+    }
+
+    /**
+     * Scrapes {@code cn1_*} string literals out of the hand-written bridge JS
+     * (parparvm_runtime.js, browser_bridge.js, port.js).
+     *
+     * With {@code replacedOnly}, a token is dropped when EVERY occurrence of
+     * it is a {@code resolveVirtual} argument. Such a name is looked up and
+     * called, and the result is driven through {@code cn1_ivAdapt} /
+     * {@code adaptVirtualResult}, both of which tolerate a plain function; a
+     * REPLACEMENT instead assigns to {@code classDef.methods[...]}, and every
+     * such site in the bridge is scoped to one class.
+     *
+     * The test is deliberately all-or-nothing. One assignment, one
+     * {@code bindNative} array entry, one mention anywhere else, and the token
+     * stays. That keeps a name reached through a variable
+     * ({@code const id = "cn1_s_..."; cls.methods[id] = fn}) protected,
+     * because the literal feeding the variable is not itself a lookup.
+     *
+     * It is worth 10 tokens out of 705, but they are the expensive ones:
+     * {@code toString}, {@code equals}, {@code hashCode} and {@code run}
+     * between them seeded most of the bridge-referenced suspending set.
+     */
+    private static Set<String> collectBridgeCn1Tokens(boolean replacedOnly) {
         Set<String> tokens = new HashSet<String>();
         List<String> sources = new ArrayList<String>();
         for (String res : new String[]{ "parparvm_runtime.js", "browser_bridge.js" }) {
@@ -1707,13 +1759,117 @@ final class JavascriptBundleWriter {
             // to the in-bundle string scan only)
         }
         java.util.regex.Pattern literal = java.util.regex.Pattern.compile("[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        java.util.regex.Pattern lookup = java.util.regex.Pattern.compile(
+                "resolveVirtual\\s*\\([^,()]*,\\s*[\"'](cn1_[A-Za-z0-9_]+)[\"']");
+        Map<String, int[]> counts = new HashMap<String, int[]>();
         for (String src : sources) {
             java.util.regex.Matcher m = literal.matcher(src);
             while (m.find()) {
-                tokens.add(m.group(1));
+                bump(counts, m.group(1), 0);
+            }
+            if (replacedOnly) {
+                java.util.regex.Matcher l = lookup.matcher(src);
+                while (l.find()) {
+                    bump(counts, l.group(1), 1);
+                }
+            }
+        }
+        for (Map.Entry<String, int[]> entry : counts.entrySet()) {
+            int[] seen = entry.getValue();
+            if (seen[0] > seen[1]) {
+                tokens.add(entry.getKey());
             }
         }
         return tokens;
+    }
+
+    /**
+     * Classifies the wrapper argument of a {@code bindNative([...], WRAPPER)}
+     * call whose name array ends at {@code close}.
+     *
+     * {@link WrapperKind#UNKNOWN} means it cannot tell, which the caller must
+     * treat as "leave suspending".
+     *
+     * One level of indirection is resolved, because the crypto bindings pass a
+     * factory result ({@code cn1CryptoAesBinding("aesEncrypt")}) rather than a
+     * literal: the named function is located and its first {@code return
+     * function} decides. Deeper indirection is deliberately not chased.
+     */
+    private static WrapperKind classifyBindNativeWrapper(String src, int close) {
+        int i = skipSpaceAndComments(src, close + 1);
+        if (i >= src.length() || src.charAt(i) != ',') {
+            return WrapperKind.UNKNOWN;
+        }
+        i = skipSpaceAndComments(src, i + 1);
+        if (src.startsWith("function", i)) {
+            return kindAt(src, i);
+        }
+        // ``ident(`` -- a factory. Resolve its declaration once.
+        int j = i;
+        while (j < src.length() && (Character.isLetterOrDigit(src.charAt(j)) || src.charAt(j) == '_'
+                || src.charAt(j) == '$')) {
+            j++;
+        }
+        if (j == i || j >= src.length() || src.charAt(j) != '(') {
+            return WrapperKind.UNKNOWN;
+        }
+        int decl = src.indexOf("function " + src.substring(i, j) + "(");
+        if (decl < 0) {
+            return WrapperKind.UNKNOWN;
+        }
+        int ret = src.indexOf("return function", decl);
+        if (ret < 0) {
+            return WrapperKind.UNKNOWN;
+        }
+        return kindAt(src, ret + "return ".length());
+    }
+
+    /** What kind of wrapper the {@code function} keyword at {@code i} opens. */
+    private static WrapperKind kindAt(String src, int i) {
+        return isGeneratorAt(src, i) ? WrapperKind.GENERATOR : WrapperKind.PLAIN;
+    }
+
+    /**
+     * Three states, not a nullable Boolean: "cannot tell" is a real answer
+     * here and must not be confused with either of the other two.
+     */
+    private enum WrapperKind { GENERATOR, PLAIN, UNKNOWN }
+
+    /** True when the {@code function} keyword at {@code i} is a generator. */
+    private static boolean isGeneratorAt(String src, int i) {
+        int k = i + "function".length();
+        while (k < src.length() && Character.isWhitespace(src.charAt(k))) {
+            k++;
+        }
+        return k < src.length() && src.charAt(k) == '*';
+    }
+
+    /** Advances past JS whitespace, {@code //} and block comments. */
+    private static int skipSpaceAndComments(String src, int i) {
+        while (i < src.length()) {
+            char c = src.charAt(i);
+            if (Character.isWhitespace(c)) {
+                i++;
+            } else if (src.startsWith("//", i)) {
+                int nl = src.indexOf('\n', i);
+                i = nl < 0 ? src.length() : nl + 1;
+            } else if (src.startsWith("/*", i)) {
+                int endC = src.indexOf("*/", i);
+                i = endC < 0 ? src.length() : endC + 2;
+            } else {
+                return i;
+            }
+        }
+        return i;
+    }
+
+    private static void bump(Map<String, int[]> counts, String token, int slot) {
+        int[] seen = counts.get(token);
+        if (seen == null) {
+            seen = new int[2];
+            counts.put(token, seen);
+        }
+        seen[slot]++;
     }
 
     /**
@@ -1762,17 +1918,23 @@ final class JavascriptBundleWriter {
                 if (close < 0) {
                     continue;
                 }
-                int fn = src.indexOf("function", close);    // the wrapper keyword
-                if (fn < 0) {
-                    continue;
-                }
-                int k = fn + "function".length();
-                while (k < src.length() && Character.isWhitespace(src.charAt(k))) {
-                    k++;
-                }
-                boolean generator = k < src.length() && src.charAt(k) == '*';
-                if (generator) {
-                    continue;                               // function* -> suspending, leave seeded
+                // Classify the wrapper that is the ARGUMENT of this call. The
+                // original scan took the next ``function`` anywhere after the
+                // ``]``, which walks past the end of the bindNative call and
+                // reads an unrelated declaration -- it classified aesEncrypt
+                // (wrapper ``cn1CryptoAesBinding("aesEncrypt")``, a generator)
+                // as a synchronous native by matching ``function
+                // cn1CryptoRsaBinding(op)`` several lines below.
+                //
+                // Getting this wrong is unsound in BOTH directions, so it has
+                // to be accurate rather than conservative: call a generator
+                // synchronously and the runtime raises ``cn1_ivs ... (CHA
+                // unsound)``; ``yield*`` a plain function and it raises "is
+                // not iterable". Skipping comments matters for the same
+                // reason -- SQLiteNative.isCipherAvailable documents itself
+                // between the ``],`` and its plain ``function``.
+                if (classifyBindNativeWrapper(src, close) != WrapperKind.PLAIN) {
+                    continue;   // unknown, or a generator -> leave it suspending
                 }
                 java.util.regex.Matcher lit = literal.matcher(src.substring(bracket + 1, close));
                 while (lit.find()) {

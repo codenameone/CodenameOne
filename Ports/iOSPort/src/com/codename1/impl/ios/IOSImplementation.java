@@ -15708,9 +15708,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// AccessibilityManager.getSnapshot on an idle Mac Catalyst app with no
     /// assistive technology running at all, plus the CPU to build it.
     ///
-    /// Turning VoiceOver on mid-session is picked up on the next invalidation --
-    /// the flag is read per call, and any mutation after that point projects
-    /// normally.
+    /// The native gate caches the initial UIKit status on the main queue.
+    /// Turning VoiceOver on mid-session latches eager projection and schedules
+    /// an invalidation through the status callback below.
     /// Invoked from native when an assistive-technology status notification fires.
     ///
     /// The status flip itself is not a component mutation, so without this nothing

@@ -8,8 +8,8 @@ inside a signed-in browser session.
 
 Daily flow:
 
-  1. CI runs the API syndicator (dev.to) and the Playwright syndicator
-     (foojay) directly.
+  1. CI runs the API syndicator (dev.to) and the GitHub PR syndicator
+     (Foojay) directly.
   2. CI runs *this* script for `medium` (or whatever browser
      platforms are configured) — it appends a task entry to
      syndication-queue.json for every eligible post that does not
@@ -58,8 +58,8 @@ DEFAULT_PLATFORMS = "medium"
 PAUSED_PLATFORMS = {"dzone"}
 
 # Platforms that only receive the weekly Friday digest post, rather than every
-# eligible post. This mirrors FoojayAdapter.accepts in
-# syndicate_browser_posts.py (post.date.weekday() == 4 -> Friday); deep-dive
+# eligible post. This mirrors accepts in
+# syndicate_foojay_posts.py (post.date.weekday() == 4 -> Friday); deep-dive
 # posts published on other weekdays are not syndicated to these platforms.
 WEEKLY_FRIDAY_PLATFORMS = {"dzone"}
 

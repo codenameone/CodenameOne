@@ -8121,6 +8121,72 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Whether this platform draws a location button of its own.
+    ///
+    /// A system-rendered button is what earns a session-scoped precise-location
+    /// grant on a tap, which Google Play requires from Android 17 for
+    /// transactional location use. Ports without one answer false and
+    /// [com.codename1.location.LocationButton] uses an ordinary Codename One
+    /// button that asks for the permission instead.
+    ///
+    /// #### Returns
+    ///
+    /// whether [#createLocationButton] can produce a control
+    public boolean isLocationButtonSupported() {
+        return false;
+    }
+
+    /// Builds the platform's own location button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textType`: one of the `TEXT_` constants on
+    ///   [com.codename1.location.LocationButton]
+    ///
+    /// - `backgroundColor`: an RRGGBB colour for the control, or -1 to let the
+    ///   platform choose
+    ///
+    /// - `textColor`: an RRGGBB colour for its label, or -1 to let the platform
+    ///   choose
+    ///
+    /// - `onPermissionResult`: invoked with TRUE when the user shared their
+    ///   location, FALSE when they declined, and null when the platform's own
+    ///   session failed -- the last of which can arrive without a tap, because
+    ///   the session opens when the control is attached
+    ///
+    /// #### Returns
+    ///
+    /// the control, or null when this platform has none
+    public PeerComponent createLocationButton(int textType, int backgroundColor,
+            int textColor, SuccessCallback<Boolean> onPermissionResult) {
+        return null;
+    }
+
+    /// Whether a control from [#createLocationButton] is actually live.
+    ///
+    /// Creating the control and having the platform draw into it are two
+    /// different moments on a port whose control is rendered by another
+    /// process: the peer exists as soon as it is asked for, and the session
+    /// behind it opens later. Between the two there is a component that looks
+    /// present and shows nothing, and a session that never opens leaves it that
+    /// way -- which is the one outcome this whole feature must not ship
+    /// silently.
+    ///
+    /// The default is true because on a port whose control is live the moment
+    /// it is built -- which is every port that has no remote surface -- there
+    /// is no in-between to report. Override where there is one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: a control this implementation returned
+    ///
+    /// #### Returns
+    ///
+    /// whether the platform is drawing into it
+    public boolean isLocationButtonReady(PeerComponent button) {
+        return button != null;
+    }
+
     /// Returns the port-specific motion sensor entry point. Default
     /// implementation returns {@code null}; ports that expose the device motion
     /// hardware override this to return a cached manager. Application code

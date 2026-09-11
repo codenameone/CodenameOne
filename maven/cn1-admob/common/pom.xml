@@ -73,6 +73,8 @@
                                 <mkdir dir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}" />
                                 <copy file="${basedir}/codenameone_library_required.properties"
                                       todir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}/" />
+                                <copy file="${basedir}/codenameone_library_appended.properties"
+                                      todir="${project.build.outputDirectory}/META-INF/codenameone/${project.groupId}/${project.artifactId}/" />
                             </target>
                         </configuration>
                         <goals>

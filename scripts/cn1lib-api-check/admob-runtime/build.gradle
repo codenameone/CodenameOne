@@ -1,0 +1,33 @@
+plugins { id 'com.android.application' version '8.13.2' }
+
+def root = file('../../..')
+def props = new Properties()
+file("$root/maven/cn1-admob/common/codenameone_library_required.properties").withInputStream { props.load(it) }
+
+android {
+    namespace 'com.codename1.ads.admob.probe'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.codename1.ads.admob.probe'
+        minSdk 23
+        targetSdk 36
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+        testInstrumentationRunnerArguments class: 'com.codename1.ads.admob.BannerMeasurementTest'
+    }
+    useLibrary 'android.test.runner'
+    useLibrary 'android.test.base'
+    sourceSets.main.java.srcDirs += ["$root/maven/cn1-admob/android/src/main/java"]
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}
+dependencies {
+    // Compile and run against precisely the dependencies shipped to apps.
+    (props.getProperty('codename1.arg.android.gradleDep') =~ /'([^']+)'/).each { implementation it[1] }
+}
+
+tasks.register('stageErrorCodes', Copy) {
+    from "$root/maven/cn1-admob/common/src/main/java"
+    include '**/AdMobErrorCodes.java'
+    into layout.buildDirectory.dir('generated/common')
+}
+android.sourceSets.main.java.srcDir layout.buildDirectory.dir('generated/common')
+tasks.named('preBuild').configure { dependsOn 'stageErrorCodes' }
