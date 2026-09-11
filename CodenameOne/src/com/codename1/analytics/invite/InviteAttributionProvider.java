@@ -68,9 +68,28 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
         }
         String last = Preferences.get(PREF_LAST_CLIENT_ID, "");
         if (last == null || last.length() == 0) {
-            // First registration on this device. Record the baseline; this is
-            // a provider being added, not an identity being erased.
-            Preferences.set(PREF_LAST_CLIENT_ID, seen);
+            // No baseline. Which of two things that means is decided by
+            // whether this device has invite records, because Preferences
+            // cannot be asked whether a write landed: set() updates a static
+            // table and swallows the store's answer.
+            //
+            // A genuinely first registration has no records, and recording the
+            // baseline is all there is to do. But a baseline write that failed
+            // earlier leaves the same empty value beside records that DO
+            // exist -- and the next resetClientId() in that process then read
+            // the new id as its first baseline, skipped eraseInternal(), and
+            // left the old attribution and the queued registrations attached
+            // to the identity the user had just reset.
+            //
+            // Records with no baseline are therefore treated as the erasure
+            // that never completed, and the baseline advances only once it has.
+            if (!Invites.hasDurableRecords()) {
+                Preferences.set(PREF_LAST_CLIENT_ID, seen);
+                return;
+            }
+            if (Invites.eraseInternal()) {
+                Preferences.set(PREF_LAST_CLIENT_ID, seen);
+            }
             return;
         }
         if (!last.equals(seen)) {

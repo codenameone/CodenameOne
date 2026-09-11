@@ -1137,12 +1137,33 @@ public final class Invites {
         return lookupEpoch;
     }
 
+    // Package private test seam: lets a test model the next launch, where the
+    // reconciliation runs again.
+    static void forgetDimensionReconciliationForTest() {
+        dimensionsReconciled = false;
+    }
+
     // Package private test seam: drops the in-memory copy so the next read
     // comes off the disk, which is what the next process would do.
     static void forgetCachedAttributionForTest() {
         resolved = null;
         attributionLoaded = false;
         stateLoaded = false;
+    }
+
+    /// Whether this device carries any durable invite record.
+    ///
+    /// Asked by the provider when it finds no identity baseline: with records
+    /// present that is a baseline write that failed rather than a first
+    /// registration, and the difference decides whether the next identity
+    /// change erases or is quietly accepted as the first one seen.
+    ///
+    /// #### Returns
+    ///
+    /// true when an attribution, a pending record or a queued registration
+    /// exists
+    static boolean hasDurableRecords() {
+        return anythingSurvives();
     }
 
     // Package private: the analytics provider hook calls this when the client
@@ -1337,6 +1358,7 @@ public final class Invites {
     // catalog's prefix and put a Play dependency and an API floor on every
     // application that logs a single event.
     private static void ensureProvider() {
+        reconcileDimensions();
         try {
             List providers = Analytics.getProviders();
             for (Object provider : providers) {
@@ -2710,6 +2732,7 @@ public final class Invites {
                     + "pending and will be retried", Log.WARNING);
             return;
         }
+        boolean pendingCleared = true;
         if (!InviteStore.delete(InviteStore.PENDING)) {
             // The claim is settled and its record could not be removed, nor
             // overwritten with the empty one delete() falls back to. Under
@@ -2728,11 +2751,19 @@ public final class Invites {
             Map<String, String> settled = new LinkedHashMap<String, String>();
             settled.put("state", String.valueOf(STATE_RESOLVED));
             if (!writePending(settled)) {
+                // Both the delete and the replacement failed, so the held copy
+                // is the only record of what the store should say. Discarding
+                // it committed the resolution with a durable STATE_PENDING
+                // still on the disk -- which re-attribution prefers -- and the
+                // next launch resubmitted a claim that had already succeeded.
+                pendingCleared = false;
                 Log.p("invite: the pending record survived a resolved claim and could not be "
-                        + "marked settled; this install may be attributed again", Log.WARNING);
+                        + "marked settled; the correction is held and retried", Log.WARNING);
             }
         }
-        forgetPendingFallback();
+        if (pendingCleared) {
+            forgetPendingFallback();
+        }
         resolved = a;
         attributionLoaded = true;
         state = STATE_RESOLVED;
@@ -2763,6 +2794,53 @@ public final class Invites {
         Analytics.setDimension(DIMENSION_CAMPAIGN, a.getCampaign());
         Analytics.setDimension(DIMENSION_CHANNEL, a.getChannel());
         Analytics.setDimension(DIMENSION_MATCH, a.getMatchType());
+    }
+
+    // Whether this process has already reconciled the dimensions with the
+    // durable record. Once is enough: nothing between here and the next launch
+    // can put the two back out of step without going through writeDimensions
+    // or clearDimensions.
+    private static boolean dimensionsReconciled;
+
+    /// Drops referral dimensions that no durable attribution stands behind.
+    ///
+    /// The dimensions live in Preferences, whose writes cannot be verified --
+    /// `Preferences.set` updates a static table and swallows the store's
+    /// answer -- so `reset()` could clear them in memory, fail to persist, and
+    /// report success: `resetVerified()` only tracks the three InviteStore
+    /// records, which DO report. A plain reset keeps the same client id, so
+    /// the owner stamp still matched and the next launch loaded the old
+    /// `cn1_invite*` values straight back and transmitted them.
+    ///
+    /// The attribution record is the authority and it is verifiable. If it is
+    /// gone and the dimensions are not, the dimensions are the stale copy, and
+    /// the erasure finishes here instead -- on the next launch rather than the
+    /// failing one, which is the best any unverifiable store allows.
+    private static void reconcileDimensions() {
+        if (dimensionsReconciled) {
+            return;
+        }
+        dimensionsReconciled = true;
+        try {
+            if (readAttribution() != null) {
+                return;
+            }
+            Map<String, String> set = Analytics.getDimensions();
+            if (set == null) {
+                return;
+            }
+            for (String dimension : DIMENSIONS) {
+                if (set.get(dimension) != null) {
+                    // One of them surviving means all of them are suspect;
+                    // clearDimensions() drops the whole set the framework owns
+                    // and leaves the application's own alone.
+                    clearDimensions();
+                    return;
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
     }
 
     private static void clearDimensions() {

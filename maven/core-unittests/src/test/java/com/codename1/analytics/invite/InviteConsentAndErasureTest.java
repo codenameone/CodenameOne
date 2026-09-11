@@ -299,6 +299,34 @@ class InviteConsentAndErasureTest extends UITestBase {
     }
 
     @FormTest
+    void referralDimensionsWithNoRecordBehindThemAreDropped() {
+        // reset() clears the dimensions in memory and asks Preferences to
+        // persist that -- and Preferences cannot say whether it did: set()
+        // updates a static table and swallows the store's answer, so
+        // resetVerified() reported success on the three InviteStore records it
+        // CAN verify while the old values stayed on the disk. A plain reset
+        // keeps the same client id, so the owner stamp still matched and the
+        // next launch loaded the referral straight back and transmitted it.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("GHOST1", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertEquals("spring", Analytics.getDimensions().get(Invites.DIMENSION_CAMPAIGN));
+
+        // The durable record goes; the dimensions are left behind, which is
+        // what an unpersisted clear looks like on the next launch.
+        assertTrue(InviteStore.delete(InviteStore.ATTRIBUTION));
+        Invites.forgetCachedAttributionForTest();
+        Invites.forgetDimensionReconciliationForTest();
+
+        Invites.checkForInvite();
+
+        assertNull(Analytics.getDimensions().get(Invites.DIMENSION_CAMPAIGN),
+                "a referral with no record behind it was kept and would be transmitted");
+    }
+
+    @FormTest
     void registeringTheProviderIsNotMistakenForAnErasure() {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
