@@ -164,7 +164,9 @@ JAVA_INT com_codename1_backend_Db_closeImpl___long_R_int(CODENAME_ONE_THREAD_STA
 JAVA_OBJECT com_codename1_backend_Db_errorImpl___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     sqlite3* db = (sqlite3*)(intptr_t)handle;
     const char* msg = db == NULL ? "database is not open" : sqlite3_errmsg(db);
-    return msg == NULL ? JAVA_NULL : newStringFromCString(threadStateData, msg);
+    /* sqlite3_errmsg quotes the offending SQL, so this carries the app's text. */
+    return msg == NULL ? JAVA_NULL
+            : newStringFromUtf8Len(threadStateData, msg, (int)strlen(msg));
 }
 
 JAVA_LONG com_codename1_backend_Db_prepareImpl___long_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT sql) {
@@ -258,7 +260,9 @@ JAVA_INT com_codename1_backend_Db_columnCountImpl___long_R_int(CODENAME_ONE_THRE
 JAVA_OBJECT com_codename1_backend_Db_columnNameImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
     const char* name = stmt == NULL ? NULL : sqlite3_column_name(stmt, index);
-    return name == NULL ? JAVA_NULL : newStringFromCString(threadStateData, name);
+    /* UTF-8, as SQLite returns it: a column alias may be any text the app wrote. */
+    return name == NULL ? JAVA_NULL
+            : newStringFromUtf8Len(threadStateData, name, (int)strlen(name));
 }
 
 /* Mirrors SQLITE_INTEGER/FLOAT/TEXT/BLOB/NULL as 1..5. */
@@ -270,7 +274,15 @@ JAVA_INT com_codename1_backend_Db_columnTypeImpl___long_int_R_int(CODENAME_ONE_T
 JAVA_OBJECT com_codename1_backend_Db_columnStringImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
     const unsigned char* text = stmt == NULL ? NULL : sqlite3_column_text(stmt, index);
-    return text == NULL ? JAVA_NULL : newStringFromCString(threadStateData, (const char*)text);
+    /* DECODED as UTF-8, which is what SQLite stores, and with the column's own
+       length rather than strlen -- a TEXT value may contain a NUL byte and strlen
+       would hand back the prefix. newStringFromCString, which this used to call,
+       is the GENERATED-LITERAL reader: it widens each byte, so "cafe" with an
+       e-acute came back as two characters, and it expands ~~uXXXX, so a stored
+       value could inject UTF-16 code units of its own choosing. */
+    return text == NULL ? JAVA_NULL
+            : newStringFromUtf8Len(threadStateData, (const char*)text,
+                                   sqlite3_column_bytes(stmt, index));
 }
 
 JAVA_LONG com_codename1_backend_Db_columnLongImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {

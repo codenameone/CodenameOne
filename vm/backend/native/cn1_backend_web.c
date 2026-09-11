@@ -77,6 +77,21 @@ typedef struct {
  */
 #define CN1_WEB_MAX_HEADER_BYTES ((size_t)(1024 * 1024))
 
+/* Whether CN1_WEB_VERBOSE names a true value. "1" or "true" in any case; every
+   other spelling, including "0", "false" and empty, leaves the trace off. Compared
+   by hand rather than through tolower, which is locale sensitive. */
+static int cn1WebVerboseEnabled(void) {
+    const char* v = getenv("CN1_WEB_VERBOSE");
+    if(v == NULL) {
+        return 0;
+    }
+    if(strcmp(v, "1") == 0) {
+        return 1;
+    }
+    return (v[0] == 't' || v[0] == 'T') && (v[1] == 'r' || v[1] == 'R')
+        && (v[2] == 'u' || v[2] == 'U') && (v[3] == 'e' || v[3] == 'E') && v[4] == 0;
+}
+
 static size_t cn1WebHeader(void* contents, size_t size, size_t count, void* userp) {
     CN1WebResponse* r = (CN1WebResponse*)userp;
     size_t total = size * count;
@@ -338,8 +353,15 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
     /* CN1_WEB_VERBOSE=1 makes libcurl narrate the exchange on stderr. Off by
      * default and read per request rather than cached, so it can be turned on for
      * a running process through its environment without a rebuild. Request headers
-     * carry credentials, so this is a debugging switch, not a logging one. */
-    if(getenv("CN1_WEB_VERBOSE") != NULL) {
+     * carry credentials, so this is a debugging switch, not a logging one.
+     *
+     * AN EXPLICIT TRUE VALUE, which is what the line above always claimed and the
+     * test below did not do: presence alone turned it on, so a deployment that
+     * spells a disabled flag "CN1_WEB_VERBOSE=0" -- or "false", or empty -- got
+     * the trace anyway, and with it every bearer token, API key and AWS session
+     * credential the process sent, in its application log. The operator had
+     * written the word for off. */
+    if(cn1WebVerboseEnabled()) {
         curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
     }
     if(headers != NULL) {
@@ -393,7 +415,7 @@ JAVA_OBJECT com_codename1_backend_Web_errorImpl___long_R_java_lang_String(CODENA
     if(r == NULL || r->error[0] == 0) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, r->error);
+    return newStringFromUtf8Len(threadStateData, r->error, (int)strlen(r->error));
 }
 
 JAVA_OBJECT com_codename1_backend_Web_bodyImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -420,7 +442,7 @@ JAVA_OBJECT com_codename1_backend_Web_headersImpl___long_R_java_lang_String(CODE
     if(r == NULL || r->headers == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, r->headers);
+    return newStringFromUtf8Len(threadStateData, r->headers, (int)r->headerLength);
 }
 
 JAVA_VOID com_codename1_backend_Web_freeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {

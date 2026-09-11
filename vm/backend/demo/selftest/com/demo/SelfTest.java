@@ -885,6 +885,72 @@ public class SelfTest {
     }
 
     /**
+     * Text stored in the database comes back as the same text.
+     *
+     * <p>The packaged arm read SQLite values with newStringFromCString, which is
+     * the GENERATED-LITERAL reader rather than a decoder: it widens each byte, so
+     * a stored e-acute (UTF-8 C3 A9) came back as the two characters 0xC3 and
+     * 0xA9, and it expands "~~uXXXX", so a value that merely CONTAINS that text
+     * came back as whatever code unit it names. The Java SE arm goes through JDBC
+     * and preserved both, so this was a divergence as well as a corruption -- the
+     * value written by the packaged server could not be read back by it.
+     *
+     * <p>The escape case is the one that cannot be explained away as an encoding
+     * detail: it is the database's own data choosing what character to become.
+     */
+    private static void storedTextComesBackUnchanged() throws Exception {
+        String path = "/tmp/cn1-selftest-text-" + System.currentTimeMillis() + ".db";
+        Database db = Database.open(path);
+        try {
+            db.execute("DROP TABLE IF EXISTS texts", null);
+            db.execute("CREATE TABLE texts (id INTEGER, body TEXT)", null);
+
+            // An accented letter, a character outside the basic plane, and the
+            // literal escape the generated-literal reader would have expanded.
+            // THE ESCAPE IS BUILT FROM CHARS, not written as a literal. A Java
+            // string literal containing that sequence is expanded by the
+            // TRANSLATOR on its way into the packaged binary, so the constant
+            // there is already "A" and the value under test never reaches the
+            // database -- the check would pass by testing nothing. Assembling it
+            // at runtime is the only way the seven characters exist to be stored.
+            String escapeText = new String(new char[]{'~', '~', 'u', '0', '0', '4', '1'});
+            String[] values = new String[] {
+                "caf\u00e9",
+                "\ud83d\ude00 smile",
+                escapeText,
+                "plain ascii",
+            };
+            for(int iter = 0 ; iter < values.length ; iter++) {
+                db.execute("INSERT INTO texts (id, body) VALUES (?, ?)",
+                        new Object[]{Integer.valueOf(iter), values[iter]});
+            }
+            for(int iter = 0 ; iter < values.length ; iter++) {
+                List rows = db.query("SELECT body FROM texts WHERE id = ?",
+                        new Object[]{Integer.valueOf(iter)});
+                String got = rows.isEmpty() ? "<missing>"
+                        : String.valueOf(((Map)rows.get(0)).get("body"));
+                check("stored text round trips: " + describeChars(values[iter]),
+                        describeChars(values[iter]), describeChars(got));
+            }
+        } finally {
+            db.close();
+            new java.io.File(path).delete();
+        }
+    }
+
+    /** A string as its code units, so a mismatch names the characters. */
+    private static String describeChars(String value) {
+        StringBuilder out = new StringBuilder();
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            if(iter > 0) {
+                out.append(' ');
+            }
+            out.append(Integer.toHexString(value.charAt(iter)));
+        }
+        return out.toString();
+    }
+
+    /**
      * A statement runs with exactly as many parameters as it has placeholders.
      *
      * <p>SQLite leaves an UNBOUND parameter as NULL and says nothing, so passing
@@ -1150,6 +1216,7 @@ public class SelfTest {
         malformedPortsAreRefused();
         urlComponentsKeepTheirUnicode();
         boundParametersMustMatchThePlaceholders();
+        storedTextComesBackUnchanged();
         expiryMarginIsDistinctFromExpiry();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();

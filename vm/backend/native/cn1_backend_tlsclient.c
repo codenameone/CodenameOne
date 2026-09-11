@@ -387,8 +387,10 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
 }
 
 JAVA_OBJECT com_codename1_backend_Tcp_tlsErrorImpl___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
-    return newStringFromCString(threadStateData,
-            cn1ClientTlsError[0] ? cn1ClientTlsError : "unknown TLS failure");
+    {
+        const char* text = cn1ClientTlsError[0] ? cn1ClientTlsError : "unknown TLS failure";
+        return newStringFromUtf8Len(threadStateData, text, (int)strlen(text));
+    }
 }
 
 JAVA_INT com_codename1_backend_Tcp_tlsReadImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG session, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {

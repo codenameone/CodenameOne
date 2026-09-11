@@ -12916,6 +12916,30 @@ JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str) {
     }
     return JAVA_NULL;
 #endif
+    if(str == 0) {
+        return JAVA_NULL;
+    }
+    return newStringFromUtf8Len(threadStateData, str, (int)strlen(str));
+}
+
+/*
+ * UTF-8 to String, always, for a run of KNOWN LENGTH.
+ *
+ * newStringFromNative decodes what the PLATFORM uses -- UTF-8 on POSIX and the
+ * ANSI code page on Windows -- which is right for argv and the environment and
+ * wrong for anything that is UTF-8 by specification wherever it runs. SQLite text
+ * and HTTP/2 header octets are both that, so they need this rather than that.
+ *
+ * And newStringFromCString is not a decoder at all: it is the generated-literal
+ * reader, widening each byte and expanding ~~uXXXX escapes. Handing it external
+ * data corrupts every non-ASCII value and lets the data inject UTF-16 code units
+ * -- the header beside its declaration says so, and two backend natives were
+ * calling it on bytes from a database and from the network anyway.
+ *
+ * Length-aware because the callers know the length and a NUL is a legal byte in
+ * both sources; strlen would silently truncate at one.
+ */
+JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* str, int length) {
     int in = 0;
     int out = 0;
     /* JAVA_ARRAY_CHAR, not JAVA_CHAR: these are UTF-16 code UNITS destined for a
@@ -12923,11 +12947,12 @@ JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str) {
     JAVA_ARRAY_CHAR stackBuf[256];
     JAVA_ARRAY_CHAR* buf;
     JAVA_OBJECT result;
-    int length;
     if(str == 0) {
         return JAVA_NULL;
     }
-    length = (int)strlen(str);
+    if(length < 0) {
+        length = 0;
+    }
     /* One UTF-16 unit per input BYTE is always enough: a 1-byte sequence yields 1,
        and the only multi-unit case (a 4-byte sequence yielding a surrogate pair)
        yields 2 units from 4 bytes. An invalid byte yields exactly one U+FFFD. */

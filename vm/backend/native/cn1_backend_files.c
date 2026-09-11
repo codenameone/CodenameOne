@@ -361,7 +361,7 @@ JAVA_OBJECT com_codename1_backend_FileIo_realPathImpl___java_lang_String_R_java_
     if(realpath(p, resolved) == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, resolved);
+    return newStringFromUtf8Len(threadStateData, resolved, (int)strlen(resolved));
 #endif
 }
 

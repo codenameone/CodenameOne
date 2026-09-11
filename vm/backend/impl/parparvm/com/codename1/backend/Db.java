@@ -191,11 +191,32 @@ public final class Db {
         return lastInsertRowIdImpl(handle);
     }
 
-    public void close() {
+    /**
+     * SYNCHRONIZED, like execute, query and transaction, and it keeps the handle
+     * when the close does not take.
+     *
+     * <p>sqlite3_close answers SQLITE_BUSY when a prepared statement is still
+     * alive on the connection, and does NOT destroy it. Zeroing the handle
+     * regardless threw away the only reference to a connection that was still
+     * open, so nothing could ever close it again -- the native connection and
+     * everything it owns leaked, once per shutdown that raced a borrower.
+     *
+     * <p>The lock is what makes that rare rather than merely recoverable: a
+     * DbPool.close() arriving while a borrowed connection is mid-query now waits
+     * for the query instead of closing underneath it.
+     */
+    public synchronized void close() {
         if(handle != 0) {
-            long h = handle;
-            handle = 0;
-            closeImpl(h);
+            if(closeImpl(handle) == 0) {
+                handle = 0;
+            } else {
+                // Not silent. The handle is deliberately kept so a later close can
+                // retry, but a connection that will not close is worth a line:
+                // without one, "the pool closed" and "the pool leaked a connection
+                // per shutdown" look identical from outside.
+                System.err.println("the database did not close (" + errorImpl(handle)
+                        + "); it stays open and can be closed again");
+            }
         }
     }
 

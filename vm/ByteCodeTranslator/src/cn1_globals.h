@@ -2839,6 +2839,13 @@ extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR da
  * for exactly that reason.
  */
 extern JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str);
+/**
+ * UTF-8 to String, always, for a run of KNOWN LENGTH. Use it for data that is
+ * UTF-8 by specification wherever it runs -- SQLite text, HTTP/2 header octets --
+ * where newStringFromNative's platform encoding would be the ANSI code page on
+ * Windows, and where newStringFromCString is not a decoder at all.
+ */
+extern JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* str, int length);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str);
 extern JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len);
 // Single-allocation fused compact-String builder (see cn1_globals.m). Returns a valid empty

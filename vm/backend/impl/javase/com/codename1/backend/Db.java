@@ -214,7 +214,17 @@ public final class Db {
         return lastInsertId;
     }
 
-    public void close() {
+    /**
+     * SYNCHRONIZED, like execute, query and transaction on this class, so a
+     * DbPool.close() arriving while a borrowed connection is mid-query waits for
+     * it rather than closing underneath it.
+     *
+     * <p>The packaged arm keeps its handle when the close does not take, because
+     * sqlite3_close answers SQLITE_BUSY and leaves the connection open. There is
+     * no equivalent here: JDBC's close releases the connection's resources
+     * whatever the driver reports, so nulling the field cannot strand one.
+     */
+    public synchronized void close() {
         Connection c = connection;
         connection = null;
         if(c != null) {

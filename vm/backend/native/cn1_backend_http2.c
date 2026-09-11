@@ -794,7 +794,8 @@ JAVA_OBJECT com_codename1_backend_Http2_methodImpl___long_R_java_lang_String(COD
     if(s == NULL || s->current == NULL || s->current->method == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, s->current->method);
+    return newStringFromUtf8Len(threadStateData, s->current->method,
+                                (int)strlen(s->current->method));
 }
 
 JAVA_OBJECT com_codename1_backend_Http2_pathImpl___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -802,7 +803,8 @@ JAVA_OBJECT com_codename1_backend_Http2_pathImpl___long_R_java_lang_String(CODEN
     if(s == NULL || s->current == NULL || s->current->path == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, s->current->path);
+    return newStringFromUtf8Len(threadStateData, s->current->path,
+                                (int)strlen(s->current->path));
 }
 
 JAVA_OBJECT com_codename1_backend_Http2_authorityImpl___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -810,7 +812,8 @@ JAVA_OBJECT com_codename1_backend_Http2_authorityImpl___long_R_java_lang_String(
     if(s == NULL || s->current == NULL || s->current->authority == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, s->current->authority);
+    return newStringFromUtf8Len(threadStateData, s->current->authority,
+                                (int)strlen(s->current->authority));
 }
 
 JAVA_INT com_codename1_backend_Http2_headerCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -823,7 +826,8 @@ JAVA_OBJECT com_codename1_backend_Http2_headerNameImpl___long_int_R_java_lang_St
     if(s == NULL || s->current == NULL || index < 0 || index >= s->current->headerCount) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, s->current->headers[index].name);
+    return newStringFromUtf8Len(threadStateData, s->current->headers[index].name,
+            (int)strlen(s->current->headers[index].name));
 }
 
 JAVA_OBJECT com_codename1_backend_Http2_headerValueImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT index) {
@@ -831,7 +835,8 @@ JAVA_OBJECT com_codename1_backend_Http2_headerValueImpl___long_int_R_java_lang_S
     if(s == NULL || s->current == NULL || index < 0 || index >= s->current->headerCount) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, s->current->headers[index].value);
+    return newStringFromUtf8Len(threadStateData, s->current->headers[index].value,
+            (int)strlen(s->current->headers[index].value));
 }
 
 JAVA_OBJECT com_codename1_backend_Http2_bodyImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {

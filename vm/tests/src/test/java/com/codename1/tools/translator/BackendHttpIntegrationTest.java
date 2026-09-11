@@ -1950,6 +1950,29 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("an h2 path is not run through the generated-literal decoder")
+    void h2PathsKeepTheirLiteralBytes() throws Exception {
+        // The h2 natives handed :path to newStringFromCString, which is the
+        // GENERATED-LITERAL reader rather than a decoder: it expands "~~uXXXX"
+        // into the code unit named. So the path chose its own characters after the
+        // frontend had seen the originals -- a proxy authorizing one path while
+        // this server dispatched another.
+        //
+        // "/~~u0068ealthz" separates the two readings by STATUS alone: ~~u0068 is
+        // 'h', so expanded it becomes "/healthz" and answers 200, while read
+        // literally it matches no route and is a 404. It keeps the leading slash
+        // that h2 requires -- a path without one is refused by nghttp2 before this
+        // server sees it, measured, so the shorter "~~u002fhealthz" spelling
+        // cannot be used to show this.
+        assertEquals(404, h2StatusFor(port, "/~~u0068ealthz", "GET", "127.0.0.1", null),
+                "an escape sequence in :path must not be expanded into a route");
+        // And the real path still routes, so the check is not passing because h2
+        // stopped working.
+        assertEquals(200, h2StatusFor(port, "/healthz", "GET", "127.0.0.1", null),
+                "the real path must still route");
+    }
+
+    @Test
     @DisplayName("h2 holds :authority to the same rules as Host")
     void h2AuthoritiesAreValidated() throws Exception {
         // :authority IS Host over h2 -- this server copies it into the

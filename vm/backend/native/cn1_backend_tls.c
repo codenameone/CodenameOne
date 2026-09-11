@@ -228,7 +228,7 @@ JAVA_OBJECT com_codename1_backend_Tls_negotiatedProtocolImpl___long_R_java_lang_
     }
     memcpy(name, proto, len);
     name[len] = 0;
-    return newStringFromCString(threadStateData, name);
+    return newStringFromUtf8Len(threadStateData, name, (int)strlen(name));
 }
 
 JAVA_VOID com_codename1_backend_Tls_closeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
