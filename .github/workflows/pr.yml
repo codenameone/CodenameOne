@@ -248,14 +248,9 @@ jobs:
         # tests to load the library. Also baked into the pr-ci-container image
         # (.ci/container/Dockerfile); this step covers running against the
         # previously published container before the rebuild propagates.
-        # Through the wrapper, because a bare "timeout 300 apt-get update" turns a
-        # stalled mirror into a FAILED job rather than a hung one -- which is all it
-        # ever bought, and it happened here. apt-get-install.sh prunes the broken
-        # vendor sources before it updates, forces IPv4, retries once, and skips the
-        # round trip entirely when the packages are already present. Since this one
-        # is baked into the container image above, that last case is the usual one
-        # and the step normally touches no mirror at all.
-        run: scripts/ci/apt-get-install.sh libdbus-1-3
+        # Skip the network when installed; otherwise use the shared bounded
+        # installer so a stalled mirror can recover without hiding install failures.
+        run: bash scripts/ci/apt-get-install.sh libdbus-1-3
       - name: Run JavaSE port unit tests
         if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher
@@ -284,8 +279,7 @@ jobs:
         # touch, which no single-platform test would catch, so check ours against the stock
         # sqlcipher client in both directions.
         run: |
-          # Through the wrapper for the same reason as the libdbus install above.
-          scripts/ci/apt-get-install.sh sqlcipher
+          bash scripts/ci/apt-get-install.sh sqlcipher
           scripts/ci/db-cipher-interop.sh
       - name: Determine AI/ad cn1libs to build
         id: cn1libs
@@ -530,9 +524,9 @@ jobs:
         # C it parses the #else branch and reports success. Both are baked into
         # the pr-ci-container image (.ci/container/Dockerfile); this step
         # covers running against the previously published container before the
-        # rebuild propagates. Through the wrapper for the same reason as the
-        # libdbus step above.
-        run: scripts/ci/apt-get-install.sh gcc gcc-mingw-w64-x86-64
+        # rebuild propagates. Reuse the installed-package check and bounded
+        # mirror recovery used by the other runtime dependencies above.
+        run: bash scripts/ci/apt-get-install.sh gcc gcc-mingw-w64-x86-64
       # The two platforms whose cn1lib sources need no SDK to check: the C
       # glue the native win32/Linux ports compile into the app, and the
       # JavaScript port implementations, which have no build step at all.

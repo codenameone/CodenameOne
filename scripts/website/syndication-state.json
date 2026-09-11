@@ -2031,6 +2031,19 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-11T00:01:15+00:00"
+      },
+      "devto": {
+        "id": 4634079,
+        "url": "https://dev.to/codenameone/voip-vpn-and-the-build-system-behind-them-58j3",
+        "syndicated_at": "2026-09-11T17:01:39+00:00"
+      },
+      "foojay": {
+        "id": 60,
+        "url": "https://github.com/foojayio/website/pull/60",
+        "pull_request_url": "https://github.com/foojayio/website/pull/60",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-09-11T17:01:55+00:00"
       }
     }
   }
