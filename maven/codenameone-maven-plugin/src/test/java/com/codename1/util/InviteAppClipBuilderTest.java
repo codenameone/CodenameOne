@@ -175,4 +175,21 @@ class InviteAppClipBuilderTest {
                 InviteAppClipBuilder.escapeObjC("Bob\"s \\ App"));
         assertEquals("one two", InviteAppClipBuilder.escapeObjC("one\ntwo"));
     }
+    /// The build hint documentation is part of the contract here, because the
+    /// two halves it governs are easy to conflate: the value of
+    /// ios.invite.appClip decides whether a clip is GENERATED, and never
+    /// whether a handoff is read. A developer shipping their own clip turns
+    /// generation off and still needs the app group, the native reader and the
+    /// registration -- without them their clip writes the documented handoff
+    /// into the documented container and nothing ever looks.
+    @Test
+    void theClipNameAndSuffixAreTheOnesTheServerAuthorises() {
+        // BuildCloud names each clip <team>.<bundle>.Clip in the association
+        // document, from its own copy of this suffix. The two repositories
+        // share no code, so a rename here is not a compile error there -- it
+        // is a clip iOS is never offered, with nothing reporting why.
+        assertEquals(".Clip", InviteAppClipBuilder.bundleId("x").substring(1));
+        assertEquals("CN1InviteClip", InviteAppClipBuilder.CLIP_NAME);
+    }
+
 }

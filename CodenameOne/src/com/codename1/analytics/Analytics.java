@@ -559,7 +559,7 @@ public final class Analytics {
     public static final String RESERVED_DIMENSION_PREFIX = "cn1_";
 
     // Must be called while holding LOCK.
-    private static boolean clearReservedDimensions() {
+    private static void clearReservedDimensions() {
         loadDimensions();
         boolean changed = false;
         Iterator<Map.Entry<String, String>> it = DIMENSIONS.entrySet().iterator();
@@ -571,20 +571,9 @@ public final class Analytics {
                 changed = true;
             }
         }
-        if (!changed) {
-            return true;
+        if (changed) {
+            persistDimensions();
         }
-        if (persistDimensions()) {
-            return true;
-        }
-        // One retry, because the common cause is transient. If it still will
-        // not land, the entries are gone from memory and still in the file --
-        // and the stamp written beside them now names the NEW client id's
-        // predecessor, so loadDimensions() drops them on the next launch
-        // rather than attaching them to the fresh identity.
-        Log.p("analytics: the reserved dimensions could not be erased from storage; "
-                + "they will be dropped on the next launch instead", Log.WARNING);
-        return persistDimensions();
     }
 
     // Must be called while holding LOCK. Lazily loads the persisted dimensions
@@ -602,12 +591,28 @@ public final class Analytics {
         }
         // Whose dimensions these are. An erasure that could not reach the disk
         // leaves the reserved entries in the file under the PREVIOUS identity;
-        // loading them would attach the referral identity the user asked to be
-        // rid of to their new client id, one launch later and with nothing in
-        // memory left to notice. An absent stamp is treated as current, so a
-        // file written before this existed is not discarded.
+        // loading them would attach the referral the user asked to be rid of
+        // to their new client id, one launch later and with nothing in memory
+        // left to notice.
+        //
+        // An ABSENT stamp counts as foreign, not as current. That is the
+        // difference between a mechanism that works and one that works only
+        // when the write it depends on succeeded: on a device whose file
+        // predates the stamp -- or where the storage failure that broke the
+        // erasure also stopped the stamp being written -- there is nothing to
+        // compare, and treating that as current is exactly the case being
+        // defended against. Unknown provenance for a dimension the FRAMEWORK
+        // owns resolves to dropping it.
+        //
+        // The cost of being wrong that way is one re-resolution: a reserved
+        // dimension dropped here is rewritten by the next attribution. The
+        // cost of being wrong the other way is an erased identity coming back.
+        //
+        // clientId() rather than the field, because loading can happen before
+        // the id has been materialised and a null would make every file look
+        // current. It does not read dimensions, so there is no recursion.
         String owner = Preferences.get(PREF_DIMENSIONS_OWNER, null);
-        boolean foreign = owner != null && clientId != null && !owner.equals(clientId);
+        boolean foreign = !clientId().equals(owner);
         String[] rows = split(stored, '\n');
         for (String row : rows) {
             if (row.length() == 0) {
@@ -645,18 +650,19 @@ public final class Analytics {
     }
 
     // Must be called while holding LOCK.
-    /// Writes the dimensions and says whether the write really landed.
+    /// Writes the dimensions and the identity they belong to.
     ///
-    /// `Preferences.set` returns nothing and swallows its own failure, so a
-    /// full or read-only store looked exactly like a successful write. The
-    /// value is read back instead of trusted, because for an erasure the
-    /// difference is the whole operation: entries removed only from the
-    /// in-memory map come back on the next launch.
+    /// There is deliberately NO read-back check here, and one was tried and
+    /// removed: `Preferences.set` updates a static table and `Preferences.get`
+    /// reads that same table, so reading a value back after writing it
+    /// compares memory with memory and reports success for a write that never
+    /// reached the disk. It looked like verification and verified nothing.
     ///
-    /// #### Returns
-    ///
-    /// true when the stored value matches what was written
-    private static boolean persistDimensions() {
+    /// The erasure is made safe by the stamp instead, which needs no write to
+    /// succeed -- see [#loadDimensions]. Both keys live in the SAME
+    /// preferences record, so they land together or not at all; there is no
+    /// state where the dimensions survive under a stamp that disowns them.
+    private static void persistDimensions() {
         StringBuilder b = new StringBuilder();
         boolean first = true;
         for (Map.Entry<String, String> e : DIMENSIONS.entrySet()) {
@@ -666,13 +672,12 @@ public final class Analytics {
             b.append(sanitize(e.getKey())).append('\t').append(sanitize(e.getValue()));
             first = false;
         }
-        String value = b.toString();
-        Preferences.set(PREF_DIMENSIONS, value);
-        // Stamped with the identity these dimensions belong to, so a restart
-        // can tell a surviving file from a current one even when the write
-        // above failed and nothing in memory remembers.
+        Preferences.set(PREF_DIMENSIONS, b.toString());
+        // Stamped with the identity these dimensions belong to. This is what
+        // makes a surviving file distinguishable from a current one after a
+        // restart, when nothing in memory remembers that an erasure was asked
+        // for.
         Preferences.set(PREF_DIMENSIONS_OWNER, clientId == null ? "" : clientId);
-        return value.equals(Preferences.get(PREF_DIMENSIONS, null));
     }
 
     // Replaces the delimiter characters so the persisted form parses back

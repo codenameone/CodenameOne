@@ -128,6 +128,25 @@ class AnalyticsFacadeTest extends UITestBase {
     }
 
     @FormTest
+    void anUnstampedFileIsNotTrustedWithFrameworkDimensions() {
+        // The case a read-back check cannot reach and the stamp only covers if
+        // it is treated strictly: a file whose stamp was never written --
+        // because it predates the stamp, or because the same storage failure
+        // that broke the erasure also stopped the stamp landing. Treating an
+        // absent stamp as current is exactly the state being defended against.
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        Analytics.simulateSurvivingDimensionsForTest(
+                "cn1_campaign\tspring\nplan\tpro", null);
+
+        Map<String, String> loaded = Analytics.getDimensions();
+        assertNull(loaded.get("cn1_campaign"),
+                "an unstamped referral was trusted and reloaded");
+        assertEquals("pro", loaded.get("plan"),
+                "the application's own dimension was destroyed with it");
+    }
+
+    @FormTest
     void setUserIdRequiresPersonalizationConsent() {
         Analytics.clearProviders();
         Analytics.setConsentMode(ConsentMode.OPT_IN);

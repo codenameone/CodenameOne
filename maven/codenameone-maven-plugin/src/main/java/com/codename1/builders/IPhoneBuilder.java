@@ -1437,6 +1437,11 @@ public class IPhoneBuilder extends Executor {
     /// generated stub tests before registering a reader.
     private String inviteAppClipGroup = "";
 
+    /// Whether to GENERATE the clip, which is a narrower question than whether
+    /// to read a handoff. A developer shipping their own clip turns this off
+    /// and still needs the app group, the native reader and the registration.
+    private boolean inviteAppClipTargetWanted;
+
     /// The App Group the Call Directory extension and the app share.
     private String callDirectoryAppGroup;
 
@@ -4517,9 +4522,12 @@ public class IPhoneBuilder extends Executor {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_INVITE_APPCLIP", ex);
                 }
-                debug("Invite attribution: generating the App Clip "
-                        + InviteAppClipBuilder.CLIP_NAME + " for " + inviteHost
-                        + " (app group " + group + ")");
+                debug("Invite attribution: " + (inviteAppClipTargetWanted
+                                ? "generating the App Clip "
+                                        + InviteAppClipBuilder.CLIP_NAME
+                                : "reading a handoff from an App Clip this build "
+                                        + "does not generate")
+                        + " for " + inviteHost + " (app group " + group + ")");
             }
 
             if (request.getArg("ios.associatedDomains", null) != null) {
@@ -7385,7 +7393,7 @@ public class IPhoneBuilder extends Executor {
                         appendWidgetExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
                     }
 
-                    if (inviteAppClipGroup.length() > 0) {
+                    if (inviteAppClipTargetWanted) {
                         // Same ordering note: appended after the global deployment-target
                         // pass, so the clip keeps its own iOS 14 floor -- which is not a
                         // preference. App Clips do not exist below it, and one built against
@@ -12276,9 +12284,18 @@ public class IPhoneBuilder extends Executor {
     ///                here; the enablement block adds the group
     private void resolveInviteAppClipGroup(BuildRequest request) throws BuildException {
         inviteAppClipGroup = "";
+        inviteAppClipTargetWanted = false;
+        // NOT gated on ios.invite.appClip, and that separation is the point.
+        //
+        // That hint says "do not GENERATE a clip", which a developer sets when
+        // they ship one of their own. It used to suppress the receiving side
+        // too -- the app group, the native define and the registration of
+        // IOSAppClipHandoff -- so a custom clip could write the documented
+        // handoff into the documented container and nothing in the
+        // application ever read it. Every install settled as no_match, for a
+        // clip that did its job.
         if (!usesInvites
-                || !"true".equals(request.getArg("ios.invite.universalLinks", "true"))
-                || !"true".equals(request.getArg("ios.invite.appClip", "true"))) {
+                || !"true".equals(request.getArg("ios.invite.universalLinks", "true"))) {
             return;
         }
         String group = request.getArg("ios.invite.appGroup",
@@ -12290,6 +12307,8 @@ public class IPhoneBuilder extends Executor {
                     + "\"group.\", got \"" + group + "\".");
         }
         inviteAppClipGroup = group;
+        inviteAppClipTargetWanted =
+                "true".equals(request.getArg("ios.invite.appClip", "true"));
     }
 
     /// Emits the App Clip target into the schemes ruby.
@@ -12333,9 +12352,13 @@ public class IPhoneBuilder extends Executor {
         buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");
         buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
                 InviteAppClipBuilder.DEPLOYMENT_TARGET);
-        // iPhone only. App Clips do not run on iPad-only or Mac destinations,
-        // and a clip claiming a family the host does not ship fails validation.
-        buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1");
+        // The HOST's families, through the same helper every other embedded
+        // target here uses. Hard-coding iPhone was wrong twice over: App Clips
+        // do run on iPad, and an ios.project_type=ipad build has an iPad-only
+        // app target -- so an iPhone-only clip inside it shares no family with
+        // its container and App Store validation rejects the archive.
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
         buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
                 "$(inherited) @executable_path/Frameworks");
         buildSettingsMap.put("SKIP_INSTALL", "YES");

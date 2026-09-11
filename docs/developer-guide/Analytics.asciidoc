@@ -253,7 +253,7 @@ Three things the generated clip needs from you, and each fails in its own way:
 * An App Clip enabled on your App ID, alongside Associated Domains.
 * An Advanced App Clip Experience registered in App Store Connect for your invite link prefix. Codename One authorizes your clip for the domain; what maps a particular link to a particular clip is that experience, and until it exists tapping the invite link shows no clip card at all. The console shows the prefix to register once invites are switched on.
 
-Set `ios.invite.appClip` to `false` only if you ship an App Clip of your own. The app then reports every install as organic unless your clip writes the handoff itself.
+Set `ios.invite.appClip` to `false` only if you ship an App Clip of your own. The build then generates no clip, but your app still gets the shared App Group and the reader, so a clip of yours that writes the handoff is still picked up.
 
 WARNING: On Android, App Links verification checks the certificate the installed APK is signed with. Under Play App Signing that's Google's key, not your upload key, so add the app-signing SHA-256 from the Play Console to `android.invite.signingFingerprint`. Without it verification fails on every Play install, the link opens the browser instead of your app, and nothing reports an error.
 
