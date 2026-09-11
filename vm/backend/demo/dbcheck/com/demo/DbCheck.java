@@ -235,6 +235,8 @@ public class DbCheck {
         // "relation already exists" -- against a SHARED server, which is what CI
         // uses, that turns one interrupted run into a failure for every run after
         // it. Cost me exactly that here.
+        parameterCountsMustMatch(db, postgres);
+
         db.execute("DROP TABLE IF EXISTS cn1_lock", null);
         db.execute("CREATE TABLE cn1_lock (tag TEXT)", null);
         try {
@@ -310,6 +312,65 @@ public class DbCheck {
     /** PostgreSQL numbers its placeholders; the other two use a question mark. */
     private static String placeholder(boolean postgres, int index) {
         return postgres ? "$" + index : "?";
+    }
+
+    /**
+     * A statement runs with exactly as many values as it has placeholders, on
+     * every engine, and a mismatch is refused before anything is written.
+     *
+     * <p>Here rather than in SelfTest because the three engines get this wrong in
+     * three different ways and only a shared body of checks holds them to one
+     * answer. SQLite leaves an unbound parameter NULL and commits a row the caller
+     * never wrote. MySQL's COM_STMT_EXECUTE carries a null bitmap and a type table
+     * sized by the CLIENT while the server decodes using the statement's own
+     * count, so extra descriptors shift the bytes read as the first value -- the
+     * wrong rows updated rather than an error. PostgreSQL's Bind is checked by the
+     * server, which is the only one of the three that was already safe.
+     */
+    private static void parameterCountsMustMatch(Database db, boolean postgres)
+            throws Exception {
+        db.execute("DROP TABLE IF EXISTS cn1_params", null);
+        db.execute("CREATE TABLE cn1_params (a VARCHAR(32), b VARCHAR(32))", null);
+        try {
+            String two = placeholders(postgres, 2);
+            // The matched call first, so nothing below can pass because the table
+            // or the statement was broken all along.
+            db.execute("INSERT INTO cn1_params (a, b) VALUES (" + two + ")",
+                    new Object[]{"one", "two"});
+            check("a matched statement inserts", "1",
+                    String.valueOf(db.query("SELECT a FROM cn1_params", null).size()));
+
+            check("too few values are refused", "refused",
+                    refusal(db, "INSERT INTO cn1_params (a, b) VALUES (" + two + ")",
+                            new Object[]{"only"}));
+            check("no values at all are refused", "refused",
+                    refusal(db, "INSERT INTO cn1_params (a, b) VALUES (" + two + ")", null));
+            check("too many values are refused", "refused",
+                    refusal(db, "INSERT INTO cn1_params (a, b) VALUES (" + two + ")",
+                            new Object[]{"a", "b", "c"}));
+            // A statement with NO placeholders and values supplied is the MySQL
+            // case the wire format punishes hardest: the server decodes nothing
+            // and the extra descriptors are read as something else entirely.
+            check("values for a statement with no placeholders are refused", "refused",
+                    refusal(db, "INSERT INTO cn1_params (a, b) VALUES ('x', 'y')",
+                            new Object[]{"surplus"}));
+
+            // And every refusal refused: only the one matched insert is there.
+            check("the refused statements wrote nothing", "1",
+                    String.valueOf(db.query("SELECT a FROM cn1_params", null).size()));
+        } finally {
+            db.execute("DROP TABLE IF EXISTS cn1_params", null);
+        }
+    }
+
+    /** "refused" if the statement threw, "accepted" if it ran. */
+    private static String refusal(Database db, String sql, Object[] params) {
+        try {
+            db.execute(sql, params);
+            return "accepted";
+        } catch (Exception refused) {
+            return "refused";
+        }
     }
 
     private static String placeholders(boolean postgres, int count) {

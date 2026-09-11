@@ -403,6 +403,23 @@ public final class MySql {
         }
 
         try {
+            // THE COUNT HAS TO MATCH, and it is checked HERE rather than left to the
+            // server. COM_STMT_EXECUTE carries a null bitmap and a type table sized
+            // by this client, while the server decodes them using the statement's
+            // own parameter count -- so a mismatch does not reliably produce an
+            // error, it produces a different reading of the same bytes.
+            //
+            // Measured against a real server: with one or more placeholders MySQL
+            // does catch a wrong count, but a statement with NO placeholders and a
+            // value supplied simply EXECUTED -- an insert the caller half wrote,
+            // committed, with nothing said. Inside the try so the COM_STMT_CLOSE
+            // below still runs; a refused statement must not also leak one.
+            int supplied = params == null ? 0 : params.length;
+            if(supplied != parameterCount) {
+                throw new IOException("the statement has " + parameterCount + " parameter"
+                        + (parameterCount == 1 ? "" : "s") + " and " + supplied
+                        + " were supplied [" + sql + "]");
+            }
             return executePrepared(statementId, params, columns, rows, sql);
         } finally {
             sequence = 0;
