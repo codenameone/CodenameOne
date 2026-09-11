@@ -6932,11 +6932,21 @@ public class IPhoneBuilder extends Executor {
             }
             // Wallet/widget extensions and .ios.appext archives mutate the Xcode project through
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
+            //
+            // The App Clip belongs in this list, and leaving it out was worth a
+            // whole broken feature: the target is created inside this block, so
+            // an invite-enabled app that uses no pods and no other extension --
+            // which is the DEFAULT shape of an app that just switched invites
+            // on -- built and shipped with no clip at all. Nothing reports it.
+            // The app signs, the association file lists it, and every iOS
+            // install settles as no_match for ever, because the clip that was
+            // supposed to hand the code over does not exist.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
                     || callDirectoryExtensionEnabled
                     || vpnTunnelBuilder.isEnabled()
                     || documentProviderEnabled
+                    || inviteAppClipTargetWanted
                     || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
                 try {
@@ -6981,6 +6991,18 @@ public class IPhoneBuilder extends Executor {
                             + "    # pass stomps them down to the app's deployment target (seen as WidgetKit\n"
                             + "    # sources compiling at iOS 14 instead of the extension's 16.1).\n"
                             + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
+                            // And the App Clip, which is not an app-extension: its product
+                            // type is a full application bundle, so the skip above never
+                            // matched it. Appending the clip's own settings after this pass
+                            // covers the FIRST run only -- the script re-runs after pods
+                            // integration, and on the second pass the target already exists,
+                            // so the guard that stops it being created twice also skips the
+                            // block that would restore its floor. This pass then left the
+                            // clip at the app's deployment target, commonly below 14, and
+                            // an App Clip built below 14 does not launch.
+                            + "    next if target.respond_to?(:product_type) && target.product_type == '"
+                            + InviteAppClipBuilder.PRODUCT_TYPE + "'\n"
+                            + ""
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
                             + simulatorArchitectureSettings

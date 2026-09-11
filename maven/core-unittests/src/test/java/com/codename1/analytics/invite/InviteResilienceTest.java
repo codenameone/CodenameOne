@@ -149,6 +149,37 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void aPrunedRegistrationIsKilledRatherThanJustForgotten() {
+        // The set of queued registrations is the only handle reset() has for
+        // killing one, so forgetting an entry to bound memory made it
+        // invisible to the erasure -- and NetworkManager would then transmit
+        // its pre-erasure client id, campaign and payload after reset() had
+        // reported success. Bounding the set must not create a request nothing
+        // can cancel.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+        implementation.clearQueuedRequests();
+
+        for (int i = 0; i < 80; i++) {
+            assertNotNull(Invites.create(InviteRequest.create().campaign("c" + i).build()),
+                    "minting is offline and must still work");
+        }
+
+        int pruned = 0;
+        for (com.codename1.io.ConnectionRequest r : implementation.getQueuedRequests()) {
+            if (r instanceof Invites.InviteConnection
+                    && ((Invites.InviteConnection) r).killedForTest()) {
+                pruned++;
+            }
+        }
+        assertTrue(pruned > 0,
+                "entries were dropped from the set without being killed, so a queued "
+                        + "registration outlived the only thing that could cancel it");
+    }
+
+    @FormTest
     void queuedRegistrationsDoNotAccumulateWithoutBound() {
         // Every invite request is fail-silent, and NetworkManager's fail-silent
         // branch only LOGS a transport failure -- it calls neither
@@ -170,6 +201,40 @@ class InviteResilienceTest extends UITestBase {
         assertTrue(Invites.outstandingRegistrationCountForTest() <= 32,
                 "queued registrations accumulated without bound: "
                         + Invites.outstandingRegistrationCountForTest());
+    }
+
+    @FormTest
+    void anErasureWhoseMarkerSurvivesIsNotReportedDone() {
+        // The records went and the durable marker did not. Reported as done,
+        // the marker is read by the next ensureProvider() as an erasure still
+        // owed -- and eraseInternal() runs again, against whatever the person
+        // has accepted or minted since, on every launch until the write
+        // succeeds. Reporting it incomplete keeps the flag and the marker
+        // saying the same thing, so the gate stays shut and there is nothing
+        // new to destroy.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("MARKER1", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
+
+        // The marker exists only once an erasure has been OWED, so the first
+        // one has to fail: the attribution delete is refused, which is what
+        // writes it.
+        InviteStore.failNextDeleteForTest(InviteStore.ATTRIBUTION);
+        Invites.reset();
+        assertNotNull(InviteStore.read(InviteStore.ERASURE),
+                "the fixture did not leave an erasure owed, so there is no marker");
+
+        // The store recovers for the records and still refuses the marker.
+        // eraseInternal() is the level that owns it: resetVerified() below it
+        // only deletes the records.
+        InviteStore.failNextDeleteForTest(InviteStore.ERASURE);
+        assertFalse(Invites.eraseInternal(),
+                "an erasure whose marker survived was reported complete");
+        assertNotNull(InviteStore.read(InviteStore.ERASURE),
+                "the fixture cleared the marker, so there is nothing to report about");
     }
 
     @FormTest

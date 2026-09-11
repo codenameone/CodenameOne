@@ -1299,10 +1299,27 @@ public final class Invites {
         }
         state = STATE_NONE_FOUND;
         stateLoaded = true;
-        erasurePending = false;
         // The durable marker goes with the flag, or every later launch would
-        // erase again and settle a fresh install as terminal.
-        InviteStore.delete(InviteStore.ERASURE);
+        // erase again and settle a fresh install as terminal -- and the result
+        // is CHECKED, because ignoring it made the two disagree in the one
+        // direction that destroys data.
+        //
+        // A marker that outlives a successful erasure is read by the next
+        // ensureProvider() as an erasure still owed, and eraseInternal() runs
+        // again -- against whatever the person has done since. An invite they
+        // accepted after the reset, a registration they minted, both gone, on
+        // every launch until the marker can be written. Reporting the erasure
+        // incomplete instead keeps the flag and the marker saying the same
+        // thing: the gate stays closed, so there is nothing new to destroy,
+        // and the retry costs an erasure that has nothing left to erase.
+        if (!InviteStore.delete(InviteStore.ERASURE)) {
+            Log.p("invite: the erasure is done but its marker could not be cleared, so it "
+                    + "is reported incomplete and retried rather than repeated against "
+                    + "whatever comes next", Log.WARNING);
+            erasurePending = true;
+            return false;
+        }
+        erasurePending = false;
         return true;
     }
 
@@ -3244,6 +3261,30 @@ public final class Invites {
     // does not depend on a clock being sane.
     private static final int MAX_OUTSTANDING = 32;
 
+    /// Drops a remembered registration, and KILLS it on the way out.
+    ///
+    /// Forgetting one without killing it was a hole in the erasure this set
+    /// exists for: the reference is the only handle reset() has, so a request
+    /// pruned while still queued became invisible to the kill sweep and
+    /// NetworkManager could transmit its pre-erasure client id, campaign and
+    /// payload after reset() had reported success.
+    ///
+    /// Killing what is dropped costs nothing that matters. A request old
+    /// enough to be pruned has almost certainly gone already -- kill() on a
+    /// finished request does nothing -- and one that really is still queued is
+    /// wedged behind a stalled network, where its own durable outbox entry is
+    /// the thing that gets it sent in the end. The registration is not lost by
+    /// killing it; the next drain re-queues it.
+    private static void forget(int index) {
+        InviteConnection req = outstandingRegistrations.elementAt(index);
+        outstandingRegistrations.removeElementAt(index);
+        try {
+            req.kill();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     // Package private so a test can assert the bound rather than trust it.
     static int outstandingRegistrationCountForTest() {
         return outstandingRegistrations.size();
@@ -3260,11 +3301,11 @@ public final class Invites {
         for (int i = outstandingRegistrations.size() - 1; i >= 0; i--) {
             InviteConnection req = outstandingRegistrations.elementAt(i);
             if (now - req.queuedAt >= OUTSTANDING_MAX_AGE_MS) {
-                outstandingRegistrations.removeElementAt(i);
+                forget(i);
             }
         }
         while (outstandingRegistrations.size() >= MAX_OUTSTANDING) {
-            outstandingRegistrations.removeElementAt(0);
+            forget(0);
         }
         for (String json : new ArrayList<String>(inFlight.keySet())) {
             Long at = inFlight.get(json);

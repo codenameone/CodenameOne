@@ -239,8 +239,11 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
         if (referrer == null || referrer.length() == 0) {
             // Read successfully and there is no invite behind this install.
             // Definitive, so the flag is burnt: asking again cannot change it.
-            Preferences.set(PREF_ATTEMPTED, true);
-            unavailable(issued, callback, Invites.REASON_NO_MATCH);
+            //
+            // Only when THIS exchange still owns the answer -- see burn().
+            if (unavailable(issued, callback, Invites.REASON_NO_MATCH)) {
+                Preferences.set(PREF_ATTEMPTED, true);
+            }
             return;
         }
         // The handoff FIRST, the flag after.
@@ -257,13 +260,26 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
         // inside that window still loses it. The window goes from "always" to
         // "the callSerially latency", which is the most the SPI shape allows
         // without the port knowing what the framework did with the value.
-        referrer(issued, callback, referrer, clickSeconds, beginSeconds);
-        Preferences.set(PREF_ATTEMPTED, true);
+        if (referrer(issued, callback, referrer, clickSeconds, beginSeconds)) {
+            Preferences.set(PREF_ATTEMPTED, true);
+        }
     }
 
+    /// The one-shot flag is burnt by the exchange that ANSWERED, and only by
+    /// it.
+    ///
+    /// A bind that outlives the retry interval leaves its callback pending
+    /// while a later checkForInvite() starts a fresh exchange. When the first
+    /// one finally lands it is superseded -- `issued != attemptSeq` -- and both
+    /// delivery methods below drop it on purpose, because the newer exchange
+    /// owns the outcome. Burning the flag anyway performed the one side effect
+    /// that cannot be undone: if the newer exchange then failed transiently,
+    /// every later launch saw isSupported() as false and the exact Play
+    /// referrer was gone, for an install that really did have one.
     private void finish(int issued, InstallReferrerCallback callback, String reason) {
-        Preferences.set(PREF_ATTEMPTED, true);
-        unavailable(issued, callback, reason);
+        if (unavailable(issued, callback, reason)) {
+            Preferences.set(PREF_ATTEMPTED, true);
+        }
     }
 
     /// Reports "no referral", at most once.
@@ -271,21 +287,23 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
     /// Every terminal path goes through here so the disconnect handler can
     /// close an exchange nobody else closed without risking a second answer
     /// for one that somebody did.
-    private void unavailable(int issued, InstallReferrerCallback callback, String reason) {
+    private boolean unavailable(int issued, InstallReferrerCallback callback, String reason) {
         if (answered || issued != attemptSeq) {
-            return;
+            return false;
         }
         answered = true;
         callback.onUnavailable(reason);
+        return true;
     }
 
-    private void referrer(int issued, InstallReferrerCallback callback, String value,
+    private boolean referrer(int issued, InstallReferrerCallback callback, String value,
             long clickSeconds, long beginSeconds) {
         if (answered || issued != attemptSeq) {
-            return;
+            return false;
         }
         answered = true;
         callback.onReferrer(value, clickSeconds, beginSeconds);
+        return true;
     }
 
     private void close(InstallReferrerClient client) {
