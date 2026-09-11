@@ -23,6 +23,8 @@
 package com.codename1.analytics.invite;
 
 import com.codename1.analytics.Analytics;
+import com.codename1.analytics.ConsentMode;
+import com.codename1.analytics.AnalyticsConsent;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import com.codename1.junit.FormTest;
@@ -305,6 +307,59 @@ class InviteDeliveryTest extends UITestBase {
         // doing so the moment anything there gets stricter.
         assertTrue(body.contains("\"clickedMillis\": " + (tappedSeconds * 1000L)),
                 "the claim did not carry the tap time as a number: " + body);
+    }
+
+    @FormTest
+    void theclipsTapTimeSurvivesAConsentRefusal() {
+        // A refusal is reopenable, so the code survives it -- and the tap time
+        // has to travel with the code. An App Clip invocation never reaches
+        // the redirect, so the clip is the only witness, and it cleared its
+        // own copy as it was read. Dropped from the marker, a
+        // withdraw-then-grant cycle resends the claim with a zero time that
+        // nothing can recover.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+
+        // The clip answers while consent stands, so the code and its tap time
+        // are persisted and the claim goes out.
+        long tappedSeconds = System.currentTimeMillis() / 1000L - 900L;
+        Invites.checkForInvite();
+        InviteTestSupport.pendingHandoff.answer("CLIPDENY", tappedSeconds);
+        assertEquals(tappedSeconds * 1000L,
+                InviteStore.getLong(InviteStore.read(InviteStore.PENDING), "codeClicked", 0),
+                "the fixture never persisted a tap time");
+
+        // Consent is withdrawn before the claim resolves, which writes the
+        // reopenable DECLINED marker.
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
+
+        Map<String, String> marker = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(marker, "the refusal left no marker");
+        assertEquals("CLIPDENY", InviteStore.get(marker, "code", null),
+                "the fixture did not reach the reopenable marker");
+        assertEquals(tappedSeconds * 1000L,
+                InviteStore.getLong(marker, "codeClicked", 0),
+                "the tap time did not survive the consent refusal");
+    }
+
+    @FormTest
+    void theclipHandoffReadIsNotChargedAsANetworkAttempt() {
+        // The claim bumps the counter itself. Charging the local handoff read
+        // too started the first network claim at 2, so the install settled
+        // terminal after four requests instead of the five MAX_ATTEMPTS
+        // promises -- and the referrer path, which never bumped here, got its
+        // full budget.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.checkForInvite();
+        InviteTestSupport.pendingHandoff.answer("CLIPBUDGET");
+
+        Map<String, String> record = InviteStore.read(InviteStore.PENDING);
+        assertNotNull(record);
+        assertEquals(1, InviteStore.getInt(record, "attempts", 0),
+                "the handoff read and its claim were both charged");
     }
 
     @FormTest

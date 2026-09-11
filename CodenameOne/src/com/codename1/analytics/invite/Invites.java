@@ -1666,11 +1666,16 @@ public final class Invites {
         //
         // A refusal is reopenable, so the code has to survive it: discarding it
         // meant a user who denied consent when the link arrived and granted it
-        // afterwards had the exact claim replaced by a referrer read or a
-        // statistical match, which can miss or credit a different click. Four
-        // short fields, and none of them describes the device.
+        // afterwards had the exact claim replaced by a referrer read, which can
+        // miss or credit a different click. None of these describes the device.
+        //
+        // codeClicked belongs in this list for the same reason and was missed
+        // when it was added. An App Clip invocation never reaches the redirect,
+        // so the clip is the only witness to the tap -- and it cleared its own
+        // copy as it was read. Dropped here, a withdraw-then-grant cycle
+        // resent the claim with a zero time that nothing could ever recover.
         for (String key : new String[] {"code", "codeSource", "codeMatch", "codeDeferred",
-                "codeReferrer"}) {
+                "codeReferrer", "codeClicked"}) {
             InviteStore.put(done, key, InviteStore.get(before, key, null));
         }
         if (!writePending(done)) {
@@ -2184,7 +2189,15 @@ public final class Invites {
             settleNoHandoff(REASON_NO_MATCH);
             return;
         }
-        bumpAttempts(pending);
+        // NOT counted as an attempt. The claim this leads to bumps the
+        // counter itself, and charging the local handoff read as well started
+        // the first network claim at 2 -- so the install settled terminal
+        // after four requests instead of the five MAX_ATTEMPTS promises.
+        //
+        // The install-referrer path has never bumped here and is the shape
+        // this now matches. A source that answers nothing at all is bounded by
+        // the attribution window rather than by this counter, which is true of
+        // both paths equally.
         lookupIssuedAt = System.currentTimeMillis();
         // The epoch this read was issued under, checked when it answers.
         //
@@ -2825,10 +2838,10 @@ public final class Invites {
             if (readAttribution() != null) {
                 return;
             }
+            // getDimensions() returns a fresh copy and never null, so there
+            // is nothing to guard here -- and SpotBugs, which is a
+            // zero-findings gate, says so.
             Map<String, String> set = Analytics.getDimensions();
-            if (set == null) {
-                return;
-            }
             for (String dimension : DIMENSIONS) {
                 if (set.get(dimension) != null) {
                     // One of them surviving means all of them are suspect;
