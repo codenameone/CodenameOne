@@ -59,6 +59,7 @@ public class DbCheck {
             db.close();
         }
         rejectsAnUntrustedCertificate(url);
+        refusesCleartextPasswordWithoutTls();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -68,6 +69,67 @@ public class DbCheck {
         if(!failures.isEmpty()) {
             System.exit(1);
         }
+    }
+
+    /**
+     * A cleartext password is not handed to an unencrypted connection.
+     *
+     * <p>PostgreSQL's AuthenticationCleartextPassword sends the password AS
+     * ITSELF. With the default sslmode=prefer the socket is clear whenever the
+     * PEER answers 'N' to the SSLRequest -- and an attacker in the path can answer
+     * for it, then ask for method 3 and read the credential. Verified by hand
+     * against a server that asks for it: refused with sslmode absent, and still
+     * connecting with sslmode=disable, which is the caller choosing a clear
+     * channel rather than an attacker choosing it for them.
+     *
+     * <p>NEEDS A SERVER THAT ASKS FOR CLEARTEXT, which an ordinary PostgreSQL does
+     * not -- they default to scram-sha-256. Point CN1_DBCHECK_CLEARTEXT_URL at one
+     * to run this; it skips loudly otherwise, and does not run in CI today:
+     *
+     * <pre>
+     * podman run -d --rm --name pg-cleartext -e POSTGRES_PASSWORD=secret \
+     *     -e POSTGRES_USER=cn1 -e POSTGRES_DB=cn1 \
+     *     -e POSTGRES_HOST_AUTH_METHOD=password -p 55433:5432 postgres:16
+     * CN1_DBCHECK_CLEARTEXT_URL=postgres://cn1:secret@127.0.0.1:55433/cn1
+     * </pre>
+     */
+    private static void refusesCleartextPasswordWithoutTls() throws Exception {
+        String url = System.getenv("CN1_DBCHECK_CLEARTEXT_URL");
+        if(url == null || url.length() == 0) {
+            note("cleartext-auth check skipped: set CN1_DBCHECK_CLEARTEXT_URL to a "
+                    + "server with POSTGRES_HOST_AUTH_METHOD=password");
+            return;
+        }
+        String refused;
+        try {
+            Database.open(url).close();
+            refused = "connected";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            // The wording, not merely that it threw: the server being down would
+            // also throw, and would pass a bare "it failed" check.
+            refused = message.indexOf("cleartext password") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("a cleartext password is refused on an unencrypted connection",
+                "refused", refused);
+
+        // And sslmode=disable still connects, because that is the caller saying the
+        // password may cross in the clear. Losing that would make the fix a
+        // regression for anyone who meant it.
+        String opted;
+        try {
+            Database db = Database.open(url + (url.indexOf('?') < 0 ? "?" : "&")
+                    + "sslmode=disable");
+            try {
+                opted = String.valueOf(db.query("SELECT 1 AS one", null).size());
+            } finally {
+                db.close();
+            }
+        } catch (Exception err) {
+            opted = "threw: " + err.getMessage();
+        }
+        check("sslmode=disable still connects to it", "1", opted);
     }
 
     private static void run(Database db, String url) throws Exception {

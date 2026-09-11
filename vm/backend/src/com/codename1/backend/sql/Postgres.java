@@ -71,11 +71,21 @@ public final class Postgres {
     private final String password;
     private boolean closed;
 
-    private Postgres(Wire wire, String user, String password) {
+    /**
+     * @param passwordMayCrossInTheClear whether this connection is entitled to
+     *        hand over the password itself. True only when TLS is up, or when the
+     *        caller wrote sslmode=disable and therefore chose a clear channel
+     *        knowingly.
+     */
+    private Postgres(Wire wire, String user, String password,
+            boolean passwordMayCrossInTheClear) {
         this.wire = wire;
         this.user = user;
         this.password = password;
+        this.passwordMayCrossInTheClear = passwordMayCrossInTheClear;
     }
+
+    private final boolean passwordMayCrossInTheClear;
 
     /**
      * Connects, negotiates TLS when asked, authenticates, and returns a session
@@ -91,7 +101,9 @@ public final class Postgres {
         Tcp connection = Tcp.connect(host, port <= 0 ? 5432 : port, timeoutMillis);
         try {
             Wire wire = new Wire(connection);
-            if(!"disable".equals(sslMode)) {
+            boolean plaintextByChoice = "disable".equals(sslMode);
+            boolean secured = false;
+            if(!plaintextByChoice) {
                 boolean offered = requestTls(wire);
                 boolean required = "require".equals(sslMode);
                 if(!offered && required) {
@@ -101,6 +113,7 @@ public final class Postgres {
                 if(offered) {
                     try {
                         connection.startTls(host, caFile);
+                        secured = true;
                     } catch (IOException err) {
                         if(required) {
                             throw err;
@@ -117,7 +130,10 @@ public final class Postgres {
                     }
                 }
             }
-            Postgres session = new Postgres(wire, user, password);
+            // Whether the password may be sent AS ITSELF later. TLS up, or the
+            // caller having written sslmode=disable, are the two ways that is the
+            // caller's decision rather than the peer's.
+            Postgres session = new Postgres(wire, user, password, secured || plaintextByChoice);
             session.startup(database, user);
             return session;
         } catch (IOException err) {
@@ -184,10 +200,41 @@ public final class Postgres {
                 return; // authentication complete
             }
             if(method == 3) {
+                // AuthenticationCleartextPassword sends the password AS ITSELF. On
+                // a clear socket that is the credential, readable by anyone on the
+                // path -- and with the default sslmode=prefer the socket is clear
+                // whenever the PEER answers 'N' to the SSLRequest, which an on-path
+                // attacker can do for it. Impersonate the server for one more
+                // message, ask for method 3, and the password arrives.
+                //
+                // Refused unless TLS is up or the caller wrote sslmode=disable, which
+                // is them choosing a clear channel rather than an attacker choosing
+                // it for them. The other methods are not this: 5 is a salted digest
+                // and 10 is SCRAM, so neither hands over the password outright.
+                if(!passwordMayCrossInTheClear) {
+                    throw new IOException("the server asked for a cleartext password "
+                            + "on a connection that is not encrypted. TLS was not "
+                            + "established -- with sslmode=prefer the server can "
+                            + "decline it, and an attacker in the path can decline it "
+                            + "for the server. Use sslmode=require, or sslmode=disable "
+                            + "if the password is meant to cross in the clear");
+                }
                 sendPasswordMessage(Wire.utf8(password == null ? "" : password));
                 continue;
             }
             if(method == 5) {
+                // MD5 is a salted digest, so a clear socket leaks something
+                // crackable rather than the password -- weaker than SCRAM and not
+                // the outright disclosure method 3 is. Said out loud rather than
+                // refused: many servers still ask for it, and refusing would turn a
+                // working deployment into a broken one over a weakness the operator
+                // may already have accepted.
+                if(!passwordMayCrossInTheClear) {
+                    System.err.println("warning: md5 authentication over an "
+                            + "unencrypted connection; the digest is offline "
+                            + "crackable. Prefer sslmode=require, or a server "
+                            + "configured for scram-sha-256");
+                }
                 byte[] salt = new byte[4];
                 System.arraycopy(message.body, 4, salt, 0, 4);
                 sendPasswordMessage(Wire.utf8(md5Password(user, password, salt)));
