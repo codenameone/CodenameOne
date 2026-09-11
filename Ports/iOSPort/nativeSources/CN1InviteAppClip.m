@@ -93,6 +93,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_readAppClipInviteHandoff___java_lan
     if (![stored isKindOfClass:[NSDictionary class]]) {
         if (stored != nil) {
             [suite removeObjectForKey:kCN1InviteHandoffKey];
+            // Flushed, for the same reason the clip flushes its write: see
+            // clearAppClipInviteHandoff below.
+            [suite synchronize];
         }
         return JAVA_NULL;
     }
@@ -135,6 +138,23 @@ void com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_lang_Stri
         return;
     }
     [suite removeObjectForKey:kCN1InviteHandoffKey];
+    // Flushed before returning, exactly as the generated clip flushes the
+    // write this undoes.
+    //
+    // NSUserDefaults writes back on its own schedule, so an app terminated
+    // between this call and that flush left the code in the shared container.
+    // The container is read on launch, so the value outlives the record it was
+    // copied into: the next launch finds the handoff again and re-attributes
+    // from it -- including after an erasure, which is the one case where the
+    // framework has deliberately forgotten and cannot notice that the clip has
+    // not.
+    //
+    // The write side is the one that proves this matters. A clip is a
+    // short-lived process that can be killed the moment it hands over, and it
+    // calls synchronize for that reason; the full app is longer-lived but the
+    // asymmetry has no justification, and the cost here is one flush on a path
+    // that runs once per install.
+    [suite synchronize];
 }
 
 #else

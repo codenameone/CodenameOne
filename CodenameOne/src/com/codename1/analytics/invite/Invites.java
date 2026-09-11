@@ -1376,6 +1376,26 @@ public final class Invites {
     /// stays, and a later grant sends it.
     static void suspendTransmission() {
         killQueuedRequests();
+        // And the lookup is no longer outstanding, which has to be SAID.
+        //
+        // lookupIssuedAt is what lookupInFlight() answers from, and killing the
+        // requests left it stamped: for the rest of the retry interval the
+        // lookup was dead and the state said it was on its way. Granting
+        // consent inside that interval reaches onConsentChanged(true), which
+        // declines to restart a lookup it believes is already outstanding --
+        // so the invite stayed unresolved until an explicit checkForInvite()
+        // after the delay, or the next launch, by which time the attribution
+        // window may have closed.
+        //
+        // The epoch goes up for the reason it goes up on an erasure or a
+        // withdrawal: the permission behind the outstanding lookup has just
+        // changed, and a response already on the wire must not be allowed to
+        // land against the state this leaves behind.
+        lookupEpoch++;
+        lookupIssuedAt = 0;
+        // Cleared too, or beginDeferred() would decline to start the lookup it
+        // is being restarted to run.
+        deferredStarted = false;
     }
 
     // Package private: called from the provider when consent changes.

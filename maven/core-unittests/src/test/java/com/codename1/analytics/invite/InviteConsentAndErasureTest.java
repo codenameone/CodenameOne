@@ -591,4 +591,49 @@ class InviteConsentAndErasureTest extends UITestBase {
         assertNull(InviteStore.read(InviteStore.ATTRIBUTION),
                 "the durable attribution record was left on the device");
     }
+
+    @FormTest
+    void grantingConsentRestartsALookupThatSuspensionKilled() {
+        // Switching from OPT_OUT to OPT_IN with nothing on record withdraws the
+        // mode's implicit allow, so queued requests are killed: they passed the
+        // permission gate a moment ago and would transmit after transmission
+        // stopped being permitted. Nothing is refused -- the prompt is simply
+        // unanswered -- so the lookup stays pending.
+        //
+        // The kill used to leave lookupIssuedAt stamped, so for the rest of the
+        // retry interval the lookup was dead and the state said it was in
+        // flight. Granting consent inside that interval then did nothing,
+        // because onConsentChanged() will not restart a lookup it believes is
+        // already outstanding, and the invite stayed unresolved until an
+        // explicit check after the delay or the next launch -- by which time
+        // the attribution window may have closed.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+        Analytics.setConsent(null);
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=SUSPEND1", 0L, 0L);
+            }
+        });
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "the fixture never got a lookup under way");
+
+        // The withdrawal. The retry interval has NOT elapsed, which is the
+        // whole point: this is the window the stale stamp covered.
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        implementation.clearQueuedRequests();
+
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+
+        assertFalse(implementation.getQueuedRequests().isEmpty(),
+                "consent was granted while the killed lookup still looked outstanding, "
+                        + "so nothing restarted it and the invite stays unresolved until "
+                        + "the retry interval elapses or the app is launched again");
+    }
 }
