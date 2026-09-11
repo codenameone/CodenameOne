@@ -151,7 +151,18 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
         // stayed stopped and an attribution's dimensions stayed cleared.
         if (Analytics.getConsentMode() == ConsentMode.OPT_OUT) {
             Invites.onConsentChanged(true);
+            return;
         }
+        // OPT_IN with nothing on record, which is a transition in the other
+        // direction: the mode's implicit allow has just been withdrawn, so
+        // allowed() answers no from here on. Requests queued a moment ago have
+        // already passed that gate and would transmit the client id and the
+        // invite metadata after transmission stopped being permitted.
+        //
+        // Killing them is all that happens. onConsentChanged(false) is the
+        // refusal path -- it settles the lookup and clears the dimensions --
+        // and nothing has been refused here: the prompt has not been answered.
+        Invites.suspendTransmission();
     }
 
     @Override

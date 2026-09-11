@@ -1086,7 +1086,25 @@ public final class Invites {
                 // back and were transmitted.
                 Map<String, String> owed = new LinkedHashMap<String, String>();
                 owed.put("at", String.valueOf(System.currentTimeMillis()));
-                InviteStore.write(InviteStore.ERASURE, owed);
+                if (!InviteStore.write(InviteStore.ERASURE, owed)) {
+                    // Said out loud, because this is the one state nothing
+                    // here can recover from. The intent is still live in
+                    // memory, every gated call retries this whole path while
+                    // the flag is set, and resetVerified() answers false so
+                    // the caller does not report the erasure as done -- but if
+                    // the process exits before any write succeeds there is
+                    // nothing on the disk to resume from, and a plain reset
+                    // keeps the client id, so the next launch sees no identity
+                    // change and the surviving records come back.
+                    //
+                    // There is no second place to write it that a store
+                    // refusing this write would accept, so the honest handling
+                    // is a loud log and a retry on the next call rather than
+                    // an invented redundancy.
+                    Log.p("invite: the erasure is owed and its marker could not be written, "
+                            + "so it survives only in memory -- the records will come back "
+                            + "if this process exits before a retry succeeds", Log.ERROR);
+                }
             }
         }
     }
@@ -1338,6 +1356,23 @@ public final class Invites {
     /// true when no erasure is outstanding
     private static boolean settleErasure() {
         return !erasurePending || eraseInternal();
+    }
+
+    /// Stops what is already on its way out, without settling anything.
+    ///
+    /// The case is a consent MODE change: OPT_OUT to OPT_IN with no choice on
+    /// record flips `allowed()` from an implicit yes to an unanswered no. A
+    /// request queued a moment earlier has already passed that gate, so it
+    /// would transmit the client id and the invite metadata after transmission
+    /// stopped being permitted -- and `onConsentChanged(false)`, which is what
+    /// otherwise kills them, must not be called here: nothing has been
+    /// refused, and reporting a refusal would settle a lookup and clear
+    /// dimensions for a user who has answered no prompt at all.
+    ///
+    /// So this kills the queue and touches nothing else. The durable outbox
+    /// stays, and a later grant sends it.
+    static void suspendTransmission() {
+        killQueuedRequests();
     }
 
     // Package private: called from the provider when consent changes.

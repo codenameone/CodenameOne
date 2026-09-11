@@ -238,6 +238,48 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void switchingToOptInKillsWhatTheImplicitAllowHadQueued() {
+        // OPT_OUT to OPT_IN with nothing on record withdraws the mode's
+        // implicit allow: allowed() answers no from that moment. A request
+        // queued a moment earlier has already passed that gate, so it would
+        // transmit the client id and the invite metadata after transmission
+        // stopped being permitted. Nothing has been REFUSED, though -- the
+        // prompt has not been answered -- so the lookup must not settle and
+        // the dimensions must not clear.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        // No choice on record is the whole point: with one, the provider reads
+        // it and never reaches the mode transition. freshInstall() grants, so
+        // it has to be cleared first.
+        Analytics.setConsent(null);
+        Analytics.setConsentMode(ConsentMode.OPT_OUT);
+        implementation.clearQueuedRequests();
+
+        assertNotNull(Invites.create(InviteRequest.create().campaign("spring").build()),
+                "minting is offline and must still work");
+        java.util.List<com.codename1.io.ConnectionRequest> queued =
+                implementation.getQueuedRequests();
+        assertTrue(queued.size() > 0, "the implicit allow queued nothing, so nothing is tested");
+
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+
+        int checked = 0;
+        for (com.codename1.io.ConnectionRequest r : queued) {
+            if (r instanceof Invites.InviteConnection) {
+                assertTrue(((Invites.InviteConnection) r).killedForTest(),
+                        "a request queued under the implicit allow was still on its way "
+                                + "out after the mode withdrew it");
+                checked++;
+            }
+        }
+        assertTrue(checked > 0, "no invite request was queued, so nothing was asserted");
+        assertFalse(InviteStore.readOutbox().isEmpty(),
+                "the durable outbox was discarded for a prompt nobody has answered");
+        assertTrue(Invites.getState() != Invites.STATE_DECLINED,
+                "an unanswered prompt was recorded as a refusal");
+    }
+
+    @FormTest
     void withdrawingConsentKillsARegistrationAlreadyOnItsWay() {
         // The epoch decides whether an ANSWER is acted on, and a registration
         // is never answered -- so a request queued behind other network work
