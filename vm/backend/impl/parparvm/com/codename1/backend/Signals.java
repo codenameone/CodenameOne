@@ -62,6 +62,16 @@ public final class Signals {
                 int signo = awaitShutdownSignal();
                 if(signo > 0) {
                     System.out.println("signal " + signo + " received, shutting down");
+                } else {
+                    // NOT a signal: the wait failed, which means the handler was
+                    // never installed. Saying so matters because everything below
+                    // still runs -- the server is stopped and the process exits --
+                    // and without this line that is indistinguishable from an
+                    // ordinary shutdown, seconds after start, with no reason given.
+                    // The generated bootstrap now refuses to start when the install
+                    // fails, so this covers a hand-written main that does not.
+                    System.err.println("the shutdown wait failed (" + signo + "), so no "
+                            + "signal was ever waited for; stopping anyway");
                 }
                 body.run();
                 // Here rather than in body: stopping the server only unblocks the

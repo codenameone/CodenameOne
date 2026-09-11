@@ -2149,7 +2149,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * silently the moment main returned. Generating it means the controller is the
      * only thing anyone writes, and the lifecycle is the same in every project.
      */
-    private String generateBootstrap(String packageName) {
+    /**
+     * Package-visible so a test can read what this emits. The generated source is
+     * compiled straight to classes and never written anywhere a test could open,
+     * and the alternative -- running main() -- starts a server.
+     */
+    String generateBootstrap(String packageName) {
         StringBuilder sb = new StringBuilder();
         if (packageName.length() > 0) {
             sb.append("package ").append(packageName).append(";\n\n");
@@ -2159,7 +2164,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("public final class BackendApplication {\n\n");
         sb.append("    private BackendApplication() {\n    }\n\n");
         sb.append("    public static void main(String[] args) throws Exception {\n");
-        sb.append("        com.codename1.backend.Signals.installShutdownHandler();\n");
+        // CHECKED, because the failure is otherwise a server that exits saying it
+        // succeeded. installShutdownHandler answers false when the self-pipe or the
+        // sigaction cannot be set up -- under descriptor exhaustion, say -- and the
+        // onShutdown watcher below then gets -1 from awaitShutdownSignal
+        // immediately, stops the server it just started, and calls System.exit(0).
+        // A container that never served a request, reporting success.
+        sb.append("        if (!com.codename1.backend.Signals.installShutdownHandler()) {\n");
+        sb.append("            throw new IllegalStateException(\"could not install the \"\n");
+        sb.append("                    + \"shutdown handler, so a stop signal could not be \"\n");
+        sb.append("                    + \"waited for; refusing to start rather than exiting \"\n");
+        sb.append("                    + \"silently once it is registered\");\n");
+        sb.append("        }\n");
         sb.append("        int port = 8080;\n");
         sb.append("        String configured = System.getenv(\"PORT\");\n");
         sb.append("        if (configured != null && configured.length() > 0) {\n");

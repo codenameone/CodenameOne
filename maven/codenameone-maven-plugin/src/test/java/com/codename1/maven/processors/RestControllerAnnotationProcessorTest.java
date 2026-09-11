@@ -156,6 +156,38 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void theBootstrapRefusesToStartWithoutAShutdownHandler() throws Exception {
+        // installShutdownHandler answers false when the self-pipe or the sigaction
+        // cannot be set up -- under descriptor exhaustion, say. The bootstrap
+        // ignored that, and Signals.onShutdown then got -1 from
+        // awaitShutdownSignal immediately, stopped the server it had just started,
+        // and called System.exit(0): a container that never served a request,
+        // reporting success.
+        //
+        // ASSERTED ON THE EMITTED SOURCE, which is what there is. The generated
+        // file is compiled straight to classes and never written anywhere a test
+        // can open, and the only behavioural alternative -- calling main() -- starts
+        // a server and cannot make the install fail anyway.
+        String bootstrap = new RestControllerAnnotationProcessor()
+                .generateBootstrap("com.example");
+        int install = bootstrap.indexOf("installShutdownHandler()");
+        assertTrue("the bootstrap no longer installs a shutdown handler", install >= 0);
+        assertTrue("the bootstrap ignores whether the shutdown handler installed:\n"
+                        + bootstrap,
+                bootstrap.indexOf("if (!com.codename1.backend.Signals."
+                        + "installShutdownHandler())") >= 0);
+        // And it refuses rather than carrying on, which is the point.
+        int throwAt = bootstrap.indexOf("IllegalStateException", install);
+        assertTrue("the bootstrap does not fail when the install fails:\n" + bootstrap,
+                throwAt > install);
+        // Before the server is started, not after: a refusal that has already
+        // bound the port is the failure mode this replaces.
+        int start = bootstrap.indexOf("HttpServer.start");
+        assertTrue("the check must come before the server starts:\n" + bootstrap,
+                start < 0 || throwAt < start);
+    }
+
+    @Test
     public void namesTheBootstrapForThePackagingGoal() throws Exception {
         ProcessorContext ctx = run(compile(CONTROLLER_SOURCE));
         byte[] name = ctx.getEmittedResources()

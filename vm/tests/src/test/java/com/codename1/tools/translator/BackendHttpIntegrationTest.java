@@ -1845,6 +1845,26 @@ class BackendHttpIntegrationTest {
         assertEquals(200, h2StatusFor(port, "/healthz?name=%C3%A9"),
                 "and a valid accented value must still be served over h2");
 
+        // RAW BYTES, with no escape anywhere -- sent as BYTES, because
+        // raw(String) encodes UTF-8 and would turn the very byte under test into
+        // a well formed two-byte sequence. The fast path used to return early for
+        // any target with no '%' in it, so a truncated sequence sent literally
+        // reached the handler as U+FFFD and aliased the same legitimate spelling
+        // the escaped form does.
+        assertEquals(400, statusOf(rawBytes(targetBytes(
+                new byte[]{(byte) 0xC3, (byte) '('}))),
+                "raw malformed UTF-8 in the target must be refused");
+        // Raw UTF-8 that is WELL formed is text and must still be served: C3 A9
+        // is e-acute, the same two bytes %C3%A9 spells.
+        assertEquals(200, statusOf(rawBytes(targetBytes(
+                new byte[]{(byte) 0xC3, (byte) 0xA9}))),
+                "a raw well-formed sequence must still be served");
+        // And a raw control byte is not a request target at all.
+        assertEquals(400, statusOf(rawBytes(targetBytes(new byte[]{1}))),
+                "a raw control byte in the target must be refused");
+        assertEquals(400, statusOf(rawBytes(targetBytes(new byte[]{(byte) 0x7f}))),
+                "nor is DEL");
+
         // A malformed ESCAPE is deliberately NOT what this rejects: percentDecode
         // passes it through as literal bytes and browsers do send a bare '%'.
         assertEquals(200, statusOf(raw("GET /healthz?pct=100%25andmore HTTP/1.1\r\nHost: x\r\n"
@@ -1869,6 +1889,19 @@ class BackendHttpIntegrationTest {
             "example.com:99999",    // past the port space
             "exam ple.com",         // a space inside the authority
             "[::1",                 // an unterminated IPv6 literal
+            // The brackets used to admit any run of hex, colons and dots, which
+            // is not what an IPv6 literal is.
+            "[.]",                  // not an address by any reading
+            "[1:]",                 // a trailing single colon
+            "[:1]",                 // and a leading one
+            "[::1::2]",             // two runs of "::" leave the length ambiguous
+            "[12345::1]",           // five hex digits is not a group
+            "[1:2:3:4:5:6:7]",      // seven groups without "::"
+            "[1:2:3:4:5:6:7:8:9]",  // and nine with none
+            "[]",                   // empty
+            "[::ffff:999.1.1.1]",   // a dotted tail out of range
+            "[::ffff:01.2.3.4]",    // and one with a padded octet
+            "[v1.fe80--1]",         // IPvFuture, which this deliberately refuses
             ":8080",                // no host at all
             // A '%' opens a pct-encoded triplet or it is not a '%'. Accepting it
             // as an ordinary character let an authority through that a conforming
@@ -1877,6 +1910,8 @@ class BackendHttpIntegrationTest {
             "bad%zz.example",       // two characters, neither of them hex
             "bad%4.example",        // one hex digit is not two
             "bad%",                 // and a triplet that runs off the end
+            "a,a",                  // what a repeated field combines to
+            "example.com,example.com",
             "[fe80::1%]",           // the same rule inside the bracketed form
         };
         for(int iter = 0 ; iter < bad.length ; iter++) {
@@ -1895,6 +1930,12 @@ class BackendHttpIntegrationTest {
             "example.com:8080",
             "127.0.0.1:" + port,
             "[::1]:8080",
+            "[::]",                 // the any address
+            "[::1]",                // loopback, unbracketed port
+            "[2001:db8::1]:443",
+            "[fe80:0:0:0:0:0:0:1]", // fully written out, eight groups
+            "[::ffff:127.0.0.1]",   // an IPv4-mapped address
+            "[1:2:3:4:5:6:7:8]",
             "xn--80ak6aa92e.com",   // punycode, which is how a client sends an IDN
             "example.com.",         // a fully qualified name keeps its root dot
             "ok%41.example",        // a COMPLETE triplet is legal and must pass
@@ -1940,6 +1981,14 @@ class BackendHttpIntegrationTest {
         // no honest reading.
         assertEquals(400, h2StatusFor(port, "/healthz", "GET", "example.com", "other.example"),
                 ":authority and a Host field that disagree must be refused");
+        // A DUPLICATE Host over h2. Http2 combines repeated fields on "," as RFC
+        // 9110 says a repeated field line means, so two "host: a" lines arrive as
+        // the one value "a,a" and HttpServer sees a single map entry -- there is
+        // no count left for it to reject. The comma is what gives it away, and
+        // the HTTP/1 parser answers 400 for a duplicate Host, so this is the two
+        // protocols disagreeing about one request again.
+        assertEquals(400, h2StatusFor(port, "/healthz", "GET", "dup.example,dup.example", null),
+                "a combined duplicate Host must be refused");
         assertEquals(200, h2StatusFor(port, "/healthz", "GET", "example.com", "example.com"),
                 "and agreeing ones must be served");
     }
@@ -2680,6 +2729,21 @@ class BackendHttpIntegrationTest {
     }
 
     /** Writes exactly these bytes, for a request whose body is not text. */
+    /**
+     * A complete GET whose query value is exactly {@code value}, byte for byte.
+     *
+     * raw(String) encodes with UTF-8, which re-encodes any non-ASCII char into a
+     * WELL formed sequence -- the opposite of what a malformed-byte test needs.
+     */
+    private byte[] targetBytes(byte[] value) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write("GET /healthz?name=".getBytes(StandardCharsets.US_ASCII));
+        out.write(value, 0, value.length);
+        out.write((" HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+                .getBytes(StandardCharsets.US_ASCII));
+        return out.toByteArray();
+    }
+
     private byte[] rawBytes(byte[] all) throws IOException {
         Socket socket = new Socket();
         socket.connect(new InetSocketAddress("127.0.0.1", port), 5000);

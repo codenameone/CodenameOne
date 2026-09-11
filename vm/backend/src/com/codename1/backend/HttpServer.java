@@ -4115,14 +4115,29 @@ public final class HttpServer {
      * nothing is allocated for them.
      */
     private static boolean targetDecodesToUtf8(byte[] raw, int from, int to) {
-        boolean encoded = false;
+        boolean inspect = false;
         for(int iter = from ; iter < to ; iter++) {
-            if(raw[iter] == '%') {
-                encoded = true;
-                break;
+            int c = raw[iter] & 0xff;
+            // A RAW CONTROL BYTE IS NOT A TARGET. RFC 9110 excludes CTL from a
+            // URI, so anything below 0x20 or DEL arrives only from a client that
+            // means something by it -- and this runs after the request line was
+            // split on spaces, so CR and LF cannot reach here anyway.
+            if(c < 0x20 || c == 0x7f) {
+                return false;
+            }
+            // The fast path is PURE ASCII, not merely unescaped. The version this
+            // replaces returned true for any target with no '%' in it, reasoning
+            // that nothing without an escape can decode to anything but itself --
+            // true, and beside the point, because "itself" is not necessarily
+            // valid UTF-8. A raw 0xC3 followed by '(' is a truncated sequence
+            // sitting on the wire with no escape anywhere, and it decoded to
+            // U+FFFD exactly as "%C3%28" did, aliasing the same legitimate
+            // spelling this check exists to keep distinct.
+            if(c == '%' || c >= 0x80) {
+                inspect = true;
             }
         }
-        if(!encoded) {
+        if(!inspect) {
             return true;
         }
         byte[] out = new byte[to - from];
@@ -4143,6 +4158,113 @@ public final class HttpServer {
             pos++;
         }
         return Utf8.isValid(out, 0, length);
+    }
+
+    /**
+     * Whether {@code [from, to)} is an RFC 3986 IPv6address.
+     *
+     * <p>Eight groups of one to four hex digits, at most one "::" standing for a
+     * run of zero groups, and an optional dotted-quad tail that counts as the
+     * last two. IPvFuture ("v1.xyz") is refused: nothing sends it, and accepting
+     * a form this server cannot route is how the whitelist got here.
+     *
+     * <p>An RFC 6874 zone id is refused too, for the same reason -- "%25eth0"
+     * after the address is not something a Host field carries to an origin
+     * server, and the escape-shaped syntax made it the one place a percent could
+     * appear inside brackets.
+     */
+    private static boolean isIpv6Literal(String value, int from, int to) {
+        if(to <= from) {
+            return false;
+        }
+        int pos = from;
+        int groups = 0;
+        boolean compressed = false;
+        if(value.charAt(pos) == ':') {
+            // A leading colon is only legal as the first half of "::".
+            if(pos + 1 >= to || value.charAt(pos + 1) != ':') {
+                return false;
+            }
+            compressed = true;
+            pos += 2;
+            if(pos == to) {
+                return true;                       // "::" alone is the any address
+            }
+        }
+        while(pos < to) {
+            int start = pos;
+            int digits = 0;
+            while(pos < to && digits < 4 && Hex.digit(value.charAt(pos)) >= 0) {
+                pos++;
+                digits++;
+            }
+            if(pos < to && value.charAt(pos) == '.') {
+                // A dotted-quad tail ends the address and fills two groups.
+                if(!isIpv4Literal(value, start, to)) {
+                    return false;
+                }
+                groups += 2;
+                pos = to;
+                break;
+            }
+            if(digits == 0) {
+                return false;
+            }
+            groups++;
+            if(pos == to) {
+                break;
+            }
+            if(value.charAt(pos) != ':') {
+                return false;                      // a fifth hex digit, or junk
+            }
+            pos++;
+            if(pos < to && value.charAt(pos) == ':') {
+                if(compressed) {
+                    return false;                  // only one "::" may appear
+                }
+                compressed = true;
+                pos++;
+                if(pos == to) {
+                    break;                         // a trailing "::" is legal
+                }
+            } else if(pos == to) {
+                return false;                      // a trailing single colon is not
+            }
+        }
+        return compressed ? groups < 8 : groups == 8;
+    }
+
+    /** Whether {@code [from, to)} is a dotted quad, each part 0-255 and unpadded. */
+    private static boolean isIpv4Literal(String value, int from, int to) {
+        int parts = 0;
+        int pos = from;
+        while(pos < to) {
+            int start = pos;
+            int n = 0;
+            while(pos < to && value.charAt(pos) >= '0' && value.charAt(pos) <= '9') {
+                n = n * 10 + (value.charAt(pos) - '0');
+                pos++;
+            }
+            int digits = pos - start;
+            // "01" is not a dec-octet: RFC 3986 spells the leading-zero forms out
+            // and none of them has one, which is also what stops an octal reading.
+            if(digits < 1 || digits > 3 || n > 255
+                    || (digits > 1 && value.charAt(start) == '0')) {
+                return false;
+            }
+            parts++;
+            if(pos == to) {
+                break;
+            }
+            if(value.charAt(pos) != '.') {
+                return false;
+            }
+            pos++;
+            if(pos == to) {
+                return false;                      // a trailing dot
+            }
+        }
+        return parts == 4;
     }
 
     /** Whether {@code at} is a '%' followed by two hex digits. */
@@ -4171,24 +4293,12 @@ public final class HttpServer {
             if(close < 2) {
                 return false;
             }
-            for(int iter = 1 ; iter < close ; iter++) {
-                char c = value.charAt(iter);
-                if(c == '%') {
-                    // Same rule as the reg-name below: a '%' opens a triplet or it
-                    // is not a '%'. The only percent this form has any use for is
-                    // the "%25" that introduces an RFC 6874 zone id, and that is
-                    // two hex digits like any other.
-                    if(!isPercentTriplet(value, iter)) {
-                        return false;
-                    }
-                    iter += 2;
-                    continue;
-                }
-                boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
-                        || (c >= 'A' && c <= 'F') || c == ':' || c == '.';
-                if(!ok) {
-                    return false;
-                }
+            // PARSED, not character-whitelisted. Accepting any run of hex digits,
+            // colons and dots took "[.]" and "[1:]" for IPv6 literals -- neither
+            // is one, and a frontend that parses them rejects the request this
+            // server then routed on.
+            if(!isIpv6Literal(value, 1, close)) {
+                return false;
             }
             hostEnd = close + 1;
         } else {
@@ -4217,12 +4327,20 @@ public final class HttpServer {
                 // '@', not a space, not a control character -- and the point of
                 // spelling the set out is that everything absent from it is
                 // refused rather than tolerated.
+                // RFC 3986 reg-name minus the comma. The comma is a sub-delim and
+                // so legal in a generic reg-name, but no host has one -- and it is
+                // exactly what a REPEATED field turns into over HTTP/2, where
+                // Http2 combines repeats on "," as RFC 9110 says a repeated field
+                // line means. A client sending "host: a" twice therefore arrived
+                // as the single value "a,a", which this accepted and dispatched,
+                // while the HTTP/1 parser answers 400 for a duplicate Host. One
+                // character, and the two protocols agree again.
                 boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                         || (c >= '0' && c <= '9')
                         || c == '-' || c == '.' || c == '_' || c == '~'
                         || c == '!' || c == '$' || c == '&' || c == '\''
                         || c == '(' || c == ')' || c == '*' || c == '+'
-                        || c == ',' || c == ';' || c == '=';
+                        || c == ';' || c == '=';
                 if(!ok) {
                     return false;
                 }
