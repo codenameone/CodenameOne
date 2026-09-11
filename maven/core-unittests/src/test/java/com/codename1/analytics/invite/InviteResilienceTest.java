@@ -578,6 +578,31 @@ class InviteResilienceTest extends UITestBase {
                 "an exact 'no invite' answer was left pending");
     }
 
+    @FormTest
+    void thedeleteTombstoneIsNotMistakenForAPendingLookup() {
+        // InviteStore.delete() overwrites a record it could not remove with an
+        // empty one, on purpose: an empty record carries no code, no inviter
+        // and no campaign, so a delete that cannot happen leaves nothing
+        // behind. But an absent "state" key defaulted to STATE_PENDING, and
+        // under re-attribution a pending state outranks the durable
+        // attribution -- so the settled claim was resubmitted and the install
+        // funnel counted one install twice.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.setReattribution(true);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("SETTLED1", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
+
+        // The tombstone a failed delete leaves.
+        InviteStore.write(InviteStore.PENDING, new java.util.LinkedHashMap<String, String>());
+        Invites.forgetLoadedState();
+
+        assertEquals(Invites.STATE_RESOLVED, Invites.getState(),
+                "an empty deletion tombstone reopened a settled attribution");
+    }
+
     @Test
     @EdtTest
     void theReferrerCodeIsPersistedBeforeTheClaimGoesOut() {

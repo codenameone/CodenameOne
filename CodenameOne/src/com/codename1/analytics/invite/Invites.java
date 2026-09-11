@@ -90,15 +90,17 @@ import java.util.Map;
 /// Everything reported here is gated on the analytics consent category of
 /// [Analytics], and nothing is transmitted until consent is granted.
 ///
-/// One thing does happen before consent: on first launch a coarse device
-/// profile -- operating system version, hardware model, language, screen size
-/// -- is written to local storage so that a deferred match is still possible
-/// once consent arrives. It is never transmitted while consent is withheld,
-/// and it is deleted outright if consent is refused. There is no alternative
-/// that also works, because the window in which a deferred match can be made
-/// closes within the hour, long before a typical consent prompt is answered.
-/// [#setAttributionWindow] with `0` switches deferred attribution off
-/// entirely.
+/// Nothing about the device is collected, before consent or after it. An
+/// earlier design wrote a coarse profile -- operating system version,
+/// hardware model, language, screen size -- to local storage on first launch,
+/// because an iOS install could then be matched to a click statistically.
+/// App Clips removed the need: the clip is launched by the invite link and is
+/// handed the code itself, so there is nothing to match and nothing to keep.
+///
+/// What is stored locally is the invite code and the bookkeeping around it --
+/// a state, a deadline, an attempt count -- and the code is only ever one the
+/// person produced by tapping an invite. [#setAttributionWindow] with `0`
+/// switches deferred attribution off entirely.
 ///
 /// ### How exact the answer is
 ///
@@ -775,7 +777,17 @@ public final class Invites {
         // the shape PMD reads as an unsynchronized lazy singleton, and the
         // answer to that is not a lock: this facade runs on the EDT and adding
         // one would be the real mistake.
-        int recorded = pending == null ? STATE_NONE
+        // An EMPTY record reads as absent, not as pending.
+        //
+        // InviteStore.delete() overwrites a record it could not remove with an
+        // empty one, deliberately -- an empty record carries no code, no
+        // inviter and no campaign, so a delete that cannot happen at least
+        // leaves nothing behind. But the default below turned that tombstone
+        // into STATE_PENDING on the next launch, and under re-attribution a
+        // pending state outranks the durable attribution: the settled claim
+        // was resubmitted and invite_install or invite_opened emitted a second
+        // time for one install.
+        int recorded = pending == null || pending.isEmpty() ? STATE_NONE
                 : InviteStore.getInt(pending, "state", STATE_PENDING);
         // The pending record is consulted first only under re-attribution.
         // There a later invite writes a new claim while the earlier attribution
