@@ -41,9 +41,19 @@ BASELINE_DIR = os.path.join(ROOT, "scripts", "native-warnings")
 # carries a ": warning: " at column zero. The clang-cl grammar is separate only
 # because MSVC puts the location in parentheses; it still carries [-Wflag],
 # because clang-cl is clang.
+# The column is OPTIONAL. "path:line: warning: ..." is a valid diagnostic that gcc and
+# several tools emit, and requiring :line:col: dropped every one of them silently --
+# the worst failure mode for a census, because the gate then reports clean.
 GNU_RE = re.compile(
-    r'^(?P<path>[^\s][^:]*(?::[^:\s][^:]*)*?):(?P<line>\d+):(?P<col>\d+):\s+'
+    r'^(?P<path>[^\s][^:]*(?::[^:\s][^:]*)*?):(?P<line>\d+):(?:(?P<col>\d+):)?\s+'
     r'(?P<sev>warning|error|note):\s+(?P<msg>.*)$')
+
+# A diagnostic about a FILE with no line at all -- "/tmp/App.xcodeproj: warning: The iOS
+# Simulator deployment target ...". Xcode emits these per project and they are as
+# reproducible as any other; neither grammar above accepts them, and BARE_RE will not
+# either, because the line starts with neither "warning:" nor a tool name.
+PATH_ONLY_RE = re.compile(
+    r'^(?P<path>/[^\s:][^:]*):\s+(?P<sev>warning|error|note):\s+(?P<msg>.*)$')
 MSVC_RE = re.compile(
     r'^(?P<path>[A-Za-z]?[^\s(][^(]*)\((?P<line>\d+)(?:,(?P<col>\d+))?\):\s+'
     r'(?P<sev>warning|error|note):\s+(?P<msg>.*)$')
@@ -135,10 +145,20 @@ def signature(msg):
     every commit that renumbered a local.
     """
     msg = FLAG_RE.sub("", msg).strip()
+    # Quoted identifiers collapse whatever quotes the tool chose. gcc and Apple's
+    # asset-catalog compiler use the Unicode pair -- "Accent color \u2018AccentColor\u2019 is
+    # not present" -- and matching only the ASCII apostrophe left those identifiers in
+    # the key, so every distinct name became its own baseline row and the file churned.
+    msg = re.sub(r"[\u2018\u201c`]([^\u2019\u201d'`\"]*)[\u2019\u201d'`]", "?", msg)
     msg = re.sub(r"'[^']*'", "?", msg)
     msg = re.sub(r'"[^"]*"', "?", msg)
     msg = re.sub(r'\b\d+(?:\.\d+)*\b', "?", msg)
-    return re.sub(r"\s+", " ", msg).strip()
+    msg = re.sub(r"\s+", " ", msg).strip()
+    # "|" separates the baseline's fields, and a diagnostic can legitimately contain one
+    # -- gcc's "suggest parentheses around arithmetic in operand of '|'" does. Left raw,
+    # write_baseline() emits a six-field row, the reader's split truncates the key after
+    # the fourth, and check_baselines() then rejects the file the tool itself wrote.
+    return msg.replace("|", "\\u007c")
 
 
 class Diagnostic(object):
@@ -272,31 +292,40 @@ def parse_log(text):
                         break
                 compiled.add(obj)
 
-        m = GNU_RE.match(line) or MSVC_RE.match(line)
+        m = GNU_RE.match(line) or MSVC_RE.match(line) or PATH_ONLY_RE.match(line)
         if m:
             if m.group("sev") != "warning":
                 continue
             msg = m.group("msg")
             flag_m = FLAG_RE.search(msg)
-            d = Diagnostic(m.group("path"), int(m.group("line")),
-                           int(m.group("col") or 0),
+            gd = m.groupdict()
+            d = Diagnostic(gd["path"], int(gd.get("line") or 0),
+                           int(gd.get("col") or 0),
                            flag_m.group(1) if flag_m else "<no-flag>", msg)
         else:
             m = BARE_RE.match(line)
             if not m or m.group("sev") != "warning":
                 continue
-            # A fileless diagnostic that nonetheless carries a [-Wflag] is not a
-            # build-system warning -- clang flags belong to file-scoped diagnostics.
-            # It is a compiler warning whose path the log transport dropped outright
-            # (bytes lost, not merely split, so nothing can put it back). Counting
-            # these keeps them visible; attributing them to the toolchain would be a
-            # lie, and baselining them would freeze a row that can never recur.
-            if FLAG_RE.search(m.group("msg")):
+            # A fileless diagnostic carrying a [-Wflag] is one of two things, and the
+            # TOOL PREFIX separates them. With a prefix -- "clang: warning: argument
+            # unused during compilation: ... [-Wunused-command-line-argument]" -- it is
+            # a real driver diagnostic that clang emits exactly this way, reproducible
+            # and worth gating on. Without one it is a file-scoped diagnostic whose path
+            # the log transport dropped outright (bytes lost, not merely split, so
+            # nothing can put it back); attributing that to the toolchain would be a lie
+            # and baselining it would freeze a row that can never recur.
+            if FLAG_RE.search(m.group("msg")) and not m.group("tool"):
                 lost += 1
                 continue
-            # No file and no flag: a linker or driver diagnostic. It still matters --
-            # ThinLTO puts real findings here -- but it belongs to no source.
-            d = Diagnostic("<none>", 0, 0, "<no-flag>", m.group("msg"))
+            # A linker or driver diagnostic. It still matters -- ThinLTO puts real
+            # findings here -- but it belongs to no source. Keep its flag when it has
+            # one: a tool-prefixed diagnostic like clang's
+            # -Wunused-command-line-argument is gated on like any other, and reporting
+            # it as <no-flag> would merge every driver warning into one baseline row.
+            bare_msg = m.group("msg")
+            bare_flag = FLAG_RE.search(bare_msg)
+            d = Diagnostic("<none>", 0, 0,
+                           bare_flag.group(1) if bare_flag else "<no-flag>", bare_msg)
 
         if d.dedup_key not in seen:
             seen[d.dedup_key] = d
@@ -383,6 +412,35 @@ def classify(diags, manifest, leg):
             continue
         name = os.path.basename(d.path)
         norm = d.path
+        if d.line == 0:
+            # A path with no line is not a diagnostic about source: it is the build
+            # system talking about a file or a target ("WatchImages.xcassets: warning:
+            # Accent color 'AccentColor' is not present in any asset catalogs"). It has
+            # no owner among the compiled sources, and it belongs with the other
+            # build-system diagnostics rather than being blamed on whoever happens to
+            # share its basename. It still gates -- it is a real, reproducible warning
+            # that was simply invisible until the grammar accepted it.
+            d.group, d.identity = "toolchain", name
+            continue
+        # Order matters three ways, and getting it wrong misattributes silently.
+        #
+        # VENDORED and SDK go FIRST, ahead of the manifest: the manifest is keyed on a
+        # bare file name and names collide across trees, so a pod shipping Renderer.h
+        # would otherwise match the iOS port's Renderer.h and be reported as our code.
+        # A path under an SDK or a dependency checkout is definitive and needs no lookup.
+        if any(marker in norm for marker in VENDORED_MARKERS):
+            d.group, d.identity = "vendored", name
+            continue
+        if any(marker in norm for marker in SDK_MARKERS):
+            d.group, d.identity = "sdk", name
+            continue
+        # The companion marker goes LAST, after the manifest. A watch or tv target is a
+        # second translation, and the port natives, the ParparVM runtime and the bundled
+        # SQLite are all copied into it as well -- watch-src/IOSNative.m is still the
+        # port and watch-src/cn1_sqlite3_amalgamation.h is still vendored. Testing the
+        # directory first reclassified 435 diagnostics in one real build as generated
+        # code, which would have hidden port warnings behind an emitter key. Only a file
+        # the phone manifest does not name is the companion's own translated output.
         entry = manifest.get(name)
         if entry:
             origin, _source = entry
@@ -405,18 +463,9 @@ def classify(diags, manifest, leg):
         if any(marker in norm for marker in COMPANION_SRC_MARKERS):
             d.group, d.identity = "generated", "*"
             continue
-        # Vendored is tested first because its markers are the more specific ones.
-        # "/Library/Developer/" matches a developer's own
-        # ~/Library/Developer/Xcode/DerivedData, so checking SDK first labelled a
-        # Swift package checkout as an Apple SDK header. Neither group gates, so
-        # this only ever affected what the report claimed -- but a census nobody
-        # believes is no better than no census.
-        if any(marker in norm for marker in VENDORED_MARKERS):
-            d.group, d.identity = "vendored", name
-        elif any(marker in norm for marker in SDK_MARKERS):
-            d.group, d.identity = "sdk", name
-        else:
-            unattributed.append(d)
+        # Everything else ran above, so this is a file the manifest does not name and no
+        # provenance rule recognises.
+        unattributed.append(d)
     return unattributed
 
 
@@ -600,6 +649,19 @@ def self_test():
         ("com_codename1_ui_Button.m", 77, 9, "-Wunused-variable", "unused variable ?"),
         # Genuinely unflagged, and its snippet/caret must NOT have been glued on.
         ("cn1_globals.m", 42, 3, "<no-flag>", "implicit declaration of function ?"),
+        # No column: "path:line: warning:". Dropped entirely before.
+        ("cn1_globals.c", 77, 0, "-Wimplicit-function-declaration",
+         "implicit declaration of function ?"),
+        # A file with no line at all, as Xcode emits per project.
+        ("HelloApp.xcodeproj", 0, 0, "<no-flag>",
+         "The iOS Simulator deployment target is set to ?"),
+        # A real driver warning: flagged AND tool-prefixed, so it is kept rather than
+        # counted as a path the transport lost.
+        ("<none>", 0, 0, "-Wunused-command-line-argument",
+         "argument unused during compilation: ?"),
+        # The delimiter in a message is escaped so the baseline row stays five fields.
+        ("cn1_globals.c", 88, 5, "-Wparentheses",
+         "suggest parentheses around arithmetic in operand of ?"),
     }
     problems = []
     for extra in sorted(got - expected):

@@ -632,6 +632,7 @@ public class ByteCodeTranslator {
                 table.append("    {\"").append(escapeCString(e.getKey())).append("\", ").append(id).append("},\n");
                 id++;
             }
+            sourceManifest.recordGenerated("cn1_resources.rc");
             Files.write(new File(srcRoot, "cn1_resources.rc").toPath(),
                     rc.toString().getBytes(StandardCharsets.UTF_8));
         }
@@ -645,6 +646,7 @@ public class ByteCodeTranslator {
         table.append("    }\n");
         table.append("    return 0;\n");
         table.append("}\n");
+        sourceManifest.recordGenerated("cn1_resources_table.c");
         Files.write(new File(srcRoot, "cn1_resources_table.c").toPath(),
                 table.toString().getBytes(StandardCharsets.UTF_8));
     }
@@ -708,6 +710,7 @@ public class ByteCodeTranslator {
                         .append("[]; extern const unsigned char cn1res_").append(id).append("_end[];\n");
                 id++;
             }
+            sourceManifest.recordGenerated("cn1_resources_data.S");
             Files.write(new File(srcRoot, "cn1_resources_data.S").toPath(),
                     asm.toString().getBytes(StandardCharsets.UTF_8));
         }
@@ -733,6 +736,7 @@ public class ByteCodeTranslator {
         table.append("    if (lenOut) { *lenOut = 0; }\n");
         table.append("    return 0;\n");
         table.append("}\n");
+        sourceManifest.recordGenerated("cn1_resources_table.c");
         Files.write(new File(srcRoot, "cn1_resources_table.c").toPath(),
                 table.toString().getBytes(StandardCharsets.UTF_8));
     }

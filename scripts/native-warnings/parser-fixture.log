@@ -95,3 +95,23 @@ warning: Skipping duplicate build file in Compile Sources build phase
 /tmp/proj/HelloApp-src/cn1_globals.m:42:3: warning: implicit declaration of function 'cn1_absent'
    42 |   cn1_absent();
       |   ^
+
+# ---------------------------------------------------------------------------
+# Shapes a code review found missing. Each one was being dropped silently, which
+# for a census is the worst failure: the gate reports clean.
+
+# 17. No COLUMN. gcc and several tools emit "path:line: warning: ..." and the
+# grammar used to require :line:col:, so every one of these vanished.
+/tmp/proj/HelloApp-src/cn1_globals.c:77: warning: implicit declaration of function 'cn1_no_column' [-Wimplicit-function-declaration]
+
+# 18. A diagnostic about a FILE with no line at all. Xcode emits these per project.
+/tmp/proj/HelloApp.xcodeproj: warning: The iOS Simulator deployment target is set to 8.0
+
+# 19. A genuine fileless DRIVER warning. It carries a flag AND a tool prefix; the
+# prefix is what separates it from a file-scoped diagnostic whose path the log
+# transport lost, which must not be attributed to anyone.
+clang: warning: argument unused during compilation: '-stdlib=libc++' [-Wunused-command-line-argument]
+
+# 20. A message containing the field delimiter. Unescaped it produces a six-field
+# baseline row that the reader truncates and the format check then rejects.
+/tmp/proj/HelloApp-src/cn1_globals.c:88:5: warning: suggest parentheses around arithmetic in operand of '|' [-Wparentheses]

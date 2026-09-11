@@ -220,6 +220,19 @@ public class SourceManifest {
         entries.put(toName, new Entry(toName, existing.origin, existing.source));
     }
 
+    /**
+     * Forgets everything recorded so far.
+     *
+     * <p>Provenance describes one translation. This object is reached through a static,
+     * so a second translation in the same JVM would otherwise inherit the previous
+     * application's files -- and the tests translate repeatedly in one JVM. Called from
+     * {@code Parser.cleanup()}, which is where the rest of a translation's state is
+     * reset.</p>
+     */
+    public void reset() {
+        entries.clear();
+    }
+
     /** Every entry, in the order it was recorded. */
     public List<Entry> getEntries() {
         return Collections.unmodifiableList(new ArrayList<Entry>(entries.values()));
