@@ -2455,6 +2455,203 @@ public class BytecodeMethod implements SignatureSet {
         return desc;
     }
 
+    /**
+     * The type this method allocates and hands straight back -- NEW T, DUP, the
+     * constructor arguments, T.&lt;init&gt;, ARETURN -- or null for any other shape.
+     * The point of being this strict is that the caller uses the answer as a
+     * certainty about the returned object's concrete class, so a body that could
+     * return something it did not just allocate has to be rejected rather than
+     * guessed at.
+     */
+    public String allocatedReturnType() {
+        List<Instruction> real = new ArrayList<Instruction>();
+        for (Instruction i : instructions) {
+            if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof TryCatch) {
+                continue;
+            }
+            real.add(i);
+        }
+        if (real.size() < 4) {
+            return null;
+        }
+        Instruction first = real.get(0);
+        if (!(first instanceof TypeInstruction) || first.getOpcode() != Opcodes.NEW) {
+            return null;
+        }
+        String type = ((TypeInstruction) first).getTypeName();
+        if (type == null || real.get(1).getOpcode() != Opcodes.DUP) {
+            return null;
+        }
+        if (real.get(real.size() - 1).getOpcode() != Opcodes.ARETURN) {
+            return null;
+        }
+        Instruction ctor = real.get(real.size() - 2);
+        if (!(ctor instanceof Invoke) || ctor.getOpcode() != Opcodes.INVOKESPECIAL) {
+            return null;
+        }
+        Invoke ci = (Invoke) ctor;
+        if (!"<init>".equals(ci.getName()) || !type.equals(ci.getOwner())) {
+            return null;
+        }
+        // Everything between the DUP and the constructor has to be a plain local
+        // read. Anything with a side effect could leave a different object under
+        // the ARETURN, and then the type above would be a lie.
+        for (int i = 2; i < real.size() - 2; i++) {
+            Instruction a = real.get(i);
+            if (!(a instanceof VarOp) || !isLoadOpcode(a.getOpcode())) {
+                return null;
+            }
+        }
+        return type;
+    }
+
+    private static boolean isLoadOpcode(int op) {
+        return op == Opcodes.ALOAD || op == Opcodes.ILOAD || op == Opcodes.LLOAD
+                || op == Opcodes.FLOAD || op == Opcodes.DLOAD;
+    }
+
+    private int nextExecutable(int from) {
+        for (int i = from; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction || ins instanceof LineNumber || ins instanceof TryCatch) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private int prevExecutable(int from) {
+        for (int i = from; i >= 0; i--) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction || ins instanceof LineNumber || ins instanceof TryCatch) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private int countStoresTo(int slot) {
+        int n = 0;
+        for (Instruction ins : instructions) {
+            if (ins instanceof VarOp && ins.getOpcode() == Opcodes.ASTORE
+                    && ((VarOp) ins).getIndex() == slot) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * ITERATOR LOWERING: give a for-each loop the concrete Iterator type its
+     * collection really returns, so the calls stop going through the interface.
+     *
+     * A for-each compiles to Iterator.hasNext()/next() through INVOKEINTERFACE,
+     * which is the most expensive dispatch the VM has -- a lookup in the owning
+     * class's interface map before the vtable read -- and it runs twice per
+     * element. Neither the emitter's closed-world devirtualization nor ThinLTO
+     * can touch it, because both start from a concrete owner and an interface
+     * call does not have one: java.util.Iterator has 27 implementors here.
+     *
+     * The concrete type is recoverable locally even though the translator has no
+     * general stack-type inference. If the collection's iterator() has exactly
+     * one reachable implementation, and that implementation's whole body is
+     * `return new T(...)`, then the object stored by the ASTORE that follows the
+     * call is a T -- no inference needed. Retyping the calls to INVOKEVIRTUAL on
+     * T is then enough on its own: the existing devirtualization in
+     * Invoke.appendInstruction takes any virtual call with no reachable override
+     * the rest of the way to a direct one, which ThinLTO can inline.
+     *
+     * The single-assignment requirement on the local is what makes this sound
+     * without dataflow. If a slot were written twice, a second iterator of some
+     * other class could reach the same ALOAD, and a virtual call on the wrong
+     * class reads its fields out of an object that does not have them -- silent
+     * on this VM, since ParparVM's CHECKCAST is unchecked.
+     *
+     * Like the concat fusion this must run BEFORE the unused-method cull, so the
+     * newly created edges exist while reachability is computed.
+     */
+    public void lowerIteratorCalls() {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke)) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            int op = inv.getOpcode();
+            if (op != Opcodes.INVOKEINTERFACE && op != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            if (!"iterator".equals(inv.getName()) || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
+                continue;
+            }
+            ByteCodeClass coll = Parser.getClassObject(Util.mangle(inv.getOwner()));
+            String itType = Parser.resolveConcreteIteratorType(coll);
+            if (itType == null) {
+                continue;
+            }
+            int st = nextExecutable(i + 1);
+            if (st < 0) {
+                continue;
+            }
+            Instruction store = instructions.get(st);
+            if (!(store instanceof VarOp) || store.getOpcode() != Opcodes.ASTORE) {
+                continue;
+            }
+            int slot = ((VarOp) store).getIndex();
+            if (countStoresTo(slot) != 1) {
+                continue;
+            }
+            retypeIteratorUses(slot, itType);
+        }
+    }
+
+    private void retypeIteratorUses(int slot, String itType) {
+        ByteCodeClass itClass = Parser.getClassObject(Util.mangle(itType));
+        if (itClass == null) {
+            return;
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke) || ins.getOpcode() != Opcodes.INVOKEINTERFACE) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            if (!"java/util/Iterator".equals(inv.getOwner())) {
+                continue;
+            }
+            int r = prevExecutable(i - 1);
+            if (r < 0) {
+                continue;
+            }
+            Instruction recv = instructions.get(r);
+            if (!(recv instanceof VarOp) || recv.getOpcode() != Opcodes.ALOAD
+                    || ((VarOp) recv).getIndex() != slot) {
+                continue;
+            }
+            // The concrete class has to actually resolve the method, and resolve it
+            // monomorphically -- otherwise the retyped call has nothing to bind to.
+            if (Parser.resolveDevirtualizedOwner(itClass, inv.getName(), inv.getDesc()) == null) {
+                continue;
+            }
+            Invoke direct = new Invoke(Opcodes.INVOKEVIRTUAL, itType, inv.getName(), inv.getDesc(), false);
+            instructions.set(i, direct);
+            // Register it exactly as addInstruction() would: the list entry alone
+            // leaves the call with no owning method, no class dependency and no
+            // edge in the dependency graph, so the cull would not see the concrete
+            // iterator's methods being called.
+            direct.setMethod(this);
+            direct.addDependencies(dependentClasses);
+            if (dependencyGraph != null) {
+                String uses = direct.getMethodUsed();
+                if (uses != null) {
+                    dependencyGraph.recordMethodCall(this, uses);
+                }
+            }
+        }
+    }
+
     public Set<LocalVariable> getLocalVariables() {
         return localVariables;
     }

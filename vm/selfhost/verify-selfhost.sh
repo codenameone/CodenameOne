@@ -34,6 +34,24 @@ JAPI="$REPO/vm/selfhost/target/javaapi-classes"
 TR="$REPO/vm/ByteCodeTranslator/target/classes"
 ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"
 
+# The JVM side of gate A runs target/classes, which nothing in this script builds
+# -- build-selfhost.sh compiles the translator only for the NATIVE side. A source
+# edit that has not been through `mvn package` therefore makes gate A compare the
+# new translator against the old one, and it reports the intended change as a VM
+# divergence. That has happened; the diff pointed at java_util_ArrayDeque.c and
+# looked exactly like a real one. Maven's own incremental check does not save us
+# here either -- it answered "Nothing to compile - all classes are up to date"
+# for a source three hours newer than its class, so this compares the trees
+# directly rather than trusting it.
+newest_src="$(find "$REPO/vm/ByteCodeTranslator/src" -name '*.java' -newer "$TR" -print -quit 2>/dev/null || true)"
+if [ -n "$newest_src" ]; then
+    echo "STALE: $TR is older than $newest_src" >&2
+    echo "gate A would compare the new translator against the old one. Run:" >&2
+    echo "  (cd $REPO/vm && mvn -q -B -pl ByteCodeTranslator clean package -DskipTests)" >&2
+    echo "and restore target/selfhost-asm-classpath.txt, which clean removes." >&2
+    exit 1
+fi
+
 W="$REPO/vm/selfhost/target/verify"
 rm -rf "$W"; mkdir -p "$W"
 OUT="$W/out"

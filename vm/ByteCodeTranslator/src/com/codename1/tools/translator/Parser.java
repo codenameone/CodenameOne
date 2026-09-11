@@ -138,6 +138,33 @@ public class Parser extends ClassVisitor {
         }
         return null;
     }
+    /**
+     * The concrete Iterator class a for-each over this collection type will
+     * really get, or null when that cannot be established with certainty.
+     *
+     * Two things have to hold. The collection's iterator() must have exactly one
+     * reachable implementation -- resolveDevirtualizedOwner answers that -- and
+     * that implementation must do nothing but allocate and return, so the class
+     * it allocates is the class the caller receives. Anything else answers null
+     * and the call site is left as the interface call it was.
+     */
+    public static synchronized String resolveConcreteIteratorType(ByteCodeClass owner) {
+        String decl = resolveDevirtualizedOwner(owner, "iterator", "()Ljava/util/Iterator;");
+        if (decl == null) {
+            return null;
+        }
+        ByteCodeClass dc = getClassObject(Util.mangle(decl));
+        if (dc == null) {
+            return null;
+        }
+        for (BytecodeMethod m : dc.getMethods()) {
+            if ("iterator".equals(m.getMethodName()) && "()Ljava/util/Iterator;".equals(m.getDesc())) {
+                return m.allocatedReturnType();
+            }
+        }
+        return null;
+    }
+
     private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     private int stringConcatCounter;
@@ -820,6 +847,7 @@ public class Parser extends ClassVisitor {
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
                         fuseMtd.fuseStringBuilderConcat();
+                        fuseMtd.lowerIteratorCalls();
                     }
                 }
             }
