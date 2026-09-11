@@ -378,6 +378,13 @@ class CleanTargetIntegrationTest {
         assertTrue(origins.contains("port"), "no hand-written native was recorded: " + origins);
         assertEquals("port", originByName.get("native_hello.c"),
                 "the hand-written native must not be classified as generated code");
+
+        // NOT tested here, deliberately: that a second translation in the same JVM does
+        // not inherit this one's files. runTranslatorImpl gives every call a
+        // `new URLClassLoader(urls, null)`, so each translation gets its own copy of the
+        // statics and the leak is unobservable from this harness -- an assertion here
+        // passes whether the reset exists or not, which was verified by removing it.
+        // SourceManifestTest covers the reset contract where it can actually fail.
     }
 
     @org.junit.jupiter.api.Test

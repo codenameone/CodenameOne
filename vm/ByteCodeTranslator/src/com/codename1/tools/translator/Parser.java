@@ -143,14 +143,6 @@ public class Parser extends ClassVisitor {
     private int lambdaCounter;
     private int stringConcatCounter;
     public static void cleanup() {
-        // Provenance is per TRANSLATION, and this class is where a translation's
-        // state is reset. The manifest is a static, so without this a second
-        // translation in the same JVM -- which the integration tests do repeatedly,
-        // and an embedded caller can -- inherits every file the previous application
-        // recorded. The warning census would then attribute a diagnostic to a source
-        // belonging to a different app, or report files that are not in the project
-        // at all.
-        ByteCodeTranslator.sourceManifest.reset();
         nativeSources = null;
         classes.clear();
         // classes is cleared in place (same List reference), so the name index's

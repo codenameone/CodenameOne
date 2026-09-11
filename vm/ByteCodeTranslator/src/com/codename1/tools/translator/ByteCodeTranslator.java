@@ -385,7 +385,16 @@ public class ByteCodeTranslator {
         }
     }
 
-    public static void main(String[] args) throws Exception {        
+    public static void main(String[] args) throws Exception {
+        // Provenance describes ONE translation, and this is the start of one. It has to
+        // be cleared here rather than in Parser.cleanup(): that runs from the `finally`
+        // of Parser.writeOutput(), which is BEFORE the output handler writes the
+        // manifest, so resetting there threw away everything the translation had just
+        // recorded -- the generated files most of all. Clearing on the way IN is also
+        // the property actually wanted, since what must not leak is the PREVIOUS
+        // application's files, and the tests translate repeatedly in one JVM through
+        // this method.
+        sourceManifest.reset();
         if(args.length == 0) {
             new File("build/kitchen").mkdirs();
             args = new String[] {"ios", "/Users/shai/dev/CodenameOne/ByteCodeTranslator/tmp;/Users/shai/dev/cn1/vm/JavaAPI/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/nativeSources;/Users/shai/dev/cn1/CodenameOne/build/classes;/Users/shai/dev/codenameone-demos/KitchenSink/build/classes", 

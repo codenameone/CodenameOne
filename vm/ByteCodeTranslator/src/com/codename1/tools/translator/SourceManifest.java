@@ -225,9 +225,12 @@ public class SourceManifest {
      *
      * <p>Provenance describes one translation. This object is reached through a static,
      * so a second translation in the same JVM would otherwise inherit the previous
-     * application's files -- and the tests translate repeatedly in one JVM. Called from
-     * {@code Parser.cleanup()}, which is where the rest of a translation's state is
-     * reset.</p>
+     * application's files -- and the tests translate repeatedly in one JVM.</p>
+     *
+     * <p>Called on the way IN, from {@code ByteCodeTranslator.main}. Not from
+     * {@code Parser.cleanup()}: that runs from the {@code finally} of
+     * {@code Parser.writeOutput()}, which is before the output handler writes the
+     * manifest, so clearing there discarded the translation's own records.</p>
      */
     public void reset() {
         entries.clear();
