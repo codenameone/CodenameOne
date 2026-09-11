@@ -387,7 +387,12 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
      * Applies to every `for (x : list)` in every translated application whatever
      * the loop's static type, because dispatch lands on the concrete ArrayList.
      */
-    private class ArrayListIterator implements Iterator<E> {
+    // Package-private, not private: a private inner class whose constructor is
+    // reached from the outer class makes javac synthesise an access bridge and a
+    // ArrayList$1 marker type, so every iterator() paid an extra class and an
+    // aconst_null for the bridge argument. Nothing outside java.util can see it
+    // either way.
+    class ArrayListIterator implements Iterator<E> {
         private int cursor;
         private int lastReturned = -1;
         private int expectedModCount = modCount;
