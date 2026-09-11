@@ -1970,6 +1970,19 @@ class BackendHttpIntegrationTest {
         // stopped working.
         assertEquals(200, h2StatusFor(port, "/healthz", "GET", "127.0.0.1", null),
                 "the real path must still route");
+
+        // RAW UTF-8 IN THE QUERY, which must reach the handler as the same text
+        // HTTP/1 delivers. The natives build :path one char per octet, so
+        // Request.byteAt takes it apart to the bytes that arrived and percentDecode
+        // reads them as UTF-8 -- decoding in the native instead made byteAt narrow
+        // an already-decoded character and hand the handler U+FFFD.
+        assertEquals(200, h2StatusFor(port, "/accent?caf\u00c3\u00a9=x", "GET",
+                "127.0.0.1", null),
+                "a raw multi-byte query name must not be mangled into a bad request");
+        // Malformed raw bytes are still refused, over h2 as over HTTP/1.
+        assertEquals(400, h2StatusFor(port, "/healthz?name=\u00c3(", "GET",
+                "127.0.0.1", null),
+                "raw malformed UTF-8 must be refused over h2 too");
     }
 
     @Test
@@ -2685,8 +2698,13 @@ class BackendHttpIntegrationTest {
      * the one form every decoder must accept.
      */
     private static void hpackLiteral(ByteArrayOutputStream out, String name, String value) {
-        byte[] n = name.getBytes(StandardCharsets.UTF_8);
-        byte[] v = value.getBytes(StandardCharsets.UTF_8);
+        // ISO-8859-1, so one char is one OCTET. An HPACK literal carries bytes,
+        // not text, and encoding UTF-8 here meant a test could not express a raw
+        // byte at all: "\u00c3" went out as the well formed pair C3 83 and the
+        // server rightly answered 200, which read as the check failing. Every
+        // other call site passes ASCII, where the two encodings agree.
+        byte[] n = name.getBytes(StandardCharsets.ISO_8859_1);
+        byte[] v = value.getBytes(StandardCharsets.ISO_8859_1);
         out.write(0x00);
         out.write(n.length);   // H=0, length < 127 for every name used here
         out.write(n, 0, n.length);

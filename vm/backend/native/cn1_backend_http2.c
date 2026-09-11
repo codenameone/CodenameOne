@@ -475,9 +475,24 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
            answer and the closest thing HTTP/2 has to HTTP/1's 431. */
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
-    r->headers[r->headerCount].name = cn1H2Dup(name, nameLen);
-    r->headers[r->headerCount].value = cn1H2Dup(value, valueLen);
-    r->headerCount++;
+    {
+        /* BOTH COPIES OR NEITHER. Either malloc can fail under native memory
+           pressure, and incrementing headerCount over a half-copied entry
+           published a NULL that headerNameImpl/headerValueImpl then handed to
+           strlen -- taking the whole backend down instead of this one stream.
+           Failing the stream is the answer the row above already gives for too
+           many headers, and it leaves the connection up. */
+        char* dupName = cn1H2Dup(name, nameLen);
+        char* dupValue = dupName == NULL ? NULL : cn1H2Dup(value, valueLen);
+        if(dupName == NULL || dupValue == NULL) {
+            free(dupName);
+            free(dupValue);
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        }
+        r->headers[r->headerCount].name = dupName;
+        r->headers[r->headerCount].value = dupValue;
+        r->headerCount++;
+    }
     return 0;
 }
 
@@ -794,8 +809,12 @@ JAVA_OBJECT com_codename1_backend_Http2_methodImpl___long_R_java_lang_String(COD
     if(s == NULL || s->current == NULL || s->current->method == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromUtf8Len(threadStateData, s->current->method,
-                                (int)strlen(s->current->method));
+    /* Byte for byte, as asciiString() in HttpServer does for HTTP/1. Not a
+       UTF-8 decode: an HTTP target is a sequence of OCTETS, and decoding
+       them here made Request.byteAt -- which narrows each char back to a
+       byte for percentDecode -- see different bytes than arrived. */
+    return newStringFromAsciiLen(threadStateData, s->current->method,
+                                 (int)strlen(s->current->method));
 }
 
 JAVA_OBJECT com_codename1_backend_Http2_pathImpl___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -803,8 +822,12 @@ JAVA_OBJECT com_codename1_backend_Http2_pathImpl___long_R_java_lang_String(CODEN
     if(s == NULL || s->current == NULL || s->current->path == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromUtf8Len(threadStateData, s->current->path,
-                                (int)strlen(s->current->path));
+    /* Byte for byte, as asciiString() in HttpServer does for HTTP/1. Not a
+       UTF-8 decode: an HTTP target is a sequence of OCTETS, and decoding
+       them here made Request.byteAt -- which narrows each char back to a
+       byte for percentDecode -- see different bytes than arrived. */
+    return newStringFromAsciiLen(threadStateData, s->current->path,
+                                 (int)strlen(s->current->path));
 }
 
 JAVA_OBJECT com_codename1_backend_Http2_authorityImpl___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -812,8 +835,12 @@ JAVA_OBJECT com_codename1_backend_Http2_authorityImpl___long_R_java_lang_String(
     if(s == NULL || s->current == NULL || s->current->authority == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromUtf8Len(threadStateData, s->current->authority,
-                                (int)strlen(s->current->authority));
+    /* Byte for byte, as asciiString() in HttpServer does for HTTP/1. Not a
+       UTF-8 decode: an HTTP target is a sequence of OCTETS, and decoding
+       them here made Request.byteAt -- which narrows each char back to a
+       byte for percentDecode -- see different bytes than arrived. */
+    return newStringFromAsciiLen(threadStateData, s->current->authority,
+                                 (int)strlen(s->current->authority));
 }
 
 JAVA_INT com_codename1_backend_Http2_headerCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -826,7 +853,12 @@ JAVA_OBJECT com_codename1_backend_Http2_headerNameImpl___long_int_R_java_lang_St
     if(s == NULL || s->current == NULL || index < 0 || index >= s->current->headerCount) {
         return JAVA_NULL;
     }
-    return newStringFromUtf8Len(threadStateData, s->current->headers[index].name,
+    /* A field value is OCTETS, not text: RFC 9110 allows obs-text, and the
+       HTTP/1 path widens each byte to a char. Decoding UTF-8 here turned a
+       lone 0xE9 into U+FFFD and collapsed a multi-byte run into one
+       character, so a handler or a @RequestHeader binding saw a different
+       value depending on which protocol carried it. */
+    return newStringFromAsciiLen(threadStateData, s->current->headers[index].name,
             (int)strlen(s->current->headers[index].name));
 }
 
@@ -835,7 +867,12 @@ JAVA_OBJECT com_codename1_backend_Http2_headerValueImpl___long_int_R_java_lang_S
     if(s == NULL || s->current == NULL || index < 0 || index >= s->current->headerCount) {
         return JAVA_NULL;
     }
-    return newStringFromUtf8Len(threadStateData, s->current->headers[index].value,
+    /* A field value is OCTETS, not text: RFC 9110 allows obs-text, and the
+       HTTP/1 path widens each byte to a char. Decoding UTF-8 here turned a
+       lone 0xE9 into U+FFFD and collapsed a multi-byte run into one
+       character, so a handler or a @RequestHeader binding saw a different
+       value depending on which protocol carried it. */
+    return newStringFromAsciiLen(threadStateData, s->current->headers[index].value,
             (int)strlen(s->current->headers[index].value));
 }
 

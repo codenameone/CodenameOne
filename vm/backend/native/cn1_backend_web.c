@@ -442,7 +442,10 @@ JAVA_OBJECT com_codename1_backend_Web_headersImpl___long_R_java_lang_String(CODE
     if(r == NULL || r->headers == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromUtf8Len(threadStateData, r->headers, (int)r->headerLength);
+    /* The upstream's header block, octet for octet. Field values are not
+       required to be UTF-8, and Web.parseHeaders splits and compares this the
+       way the HTTP/1 server does -- byte to char. */
+    return newStringFromAsciiLen(threadStateData, r->headers, (int)r->headerLength);
 }
 
 JAVA_VOID com_codename1_backend_Web_freeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {

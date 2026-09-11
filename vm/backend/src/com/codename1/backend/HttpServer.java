@@ -224,7 +224,16 @@ public final class HttpServer {
             return null;
         }
 
-        /** One byte of the request target, from whichever form this Request holds. */
+        /**
+         * One byte of the request target, from whichever form this Request holds.
+         *
+         * <p>The String form is one char per OCTET -- the h2 natives build it with
+         * newStringFromAsciiLen, as the HTTP/1 parser reads its bytes -- so
+         * narrowing here recovers exactly what arrived. It is not a UTF-16 string
+         * being truncated: decoding those octets into characters anywhere upstream
+         * would make this return bytes the client never sent, which is what a
+         * UTF-8 decode of :path did.
+         */
         private int byteAt(int index) {
             if(targetLength > 0 && raw != null) {
                 return raw[targetStart + index] & 0xff;
@@ -4090,17 +4099,31 @@ public final class HttpServer {
      * HTTP/1 side.
      */
     private static boolean targetDecodesToUtf8(String target) {
-        if(target == null || target.indexOf('%') < 0) {
+        if(target == null) {
             return true;
         }
-        try {
-            byte[] raw = target.getBytes("UTF-8");
-            return targetDecodesToUtf8(raw, 0, raw.length);
-        } catch (java.io.UnsupportedEncodingException err) {
-            // UTF-8 is required of every VM this runs on; the checked exception is
-            // the API's, not a case that can happen.
-            return true;
+        // NO "%" FAST PATH HERE. The byte version's was corrected to test for pure
+        // ASCII rather than for the absence of an escape, and this one was left
+        // behind -- so a raw malformed octet in an h2 :path was refused on the
+        // HTTP/1 side and served on this one, which is the divergence the whole
+        // check exists to close. The byte version below does the deciding; this
+        // only has to hand it the right bytes.
+
+        // NARROWED, not re-encoded. The h2 natives build this String one char per
+        // OCTET, exactly as the HTTP/1 parser reads its bytes, and byteAt() takes
+        // it back apart the same way -- so getBytes("UTF-8") would have re-encoded
+        // each of those chars and validated something the server never received.
+        byte[] raw = new byte[target.length()];
+        for(int iter = 0 ; iter < raw.length ; iter++) {
+            char c = target.charAt(iter);
+            if(c > 0xff) {
+                // Not a byte any wire could have delivered under that
+                // representation, so it cannot be a target this server parsed.
+                return false;
+            }
+            raw[iter] = (byte)c;
         }
+        return targetDecodesToUtf8(raw, 0, raw.length);
     }
 
     /**
