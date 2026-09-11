@@ -318,23 +318,32 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
             }
             return;
         }
-        // The handoff FIRST, the flag after.
+        // The handoff only. The flag is burnt by referrerPersisted(), which
+        // the framework calls once the code is in durable storage.
         //
-        // Burning the flag before handing the referrer over meant a process
-        // killed in between lost the exact code for ever: the next launch saw
-        // isSupported() false and settled the invited install as no-match.
-        // Invites persists the code inside this call when it runs on the EDT,
-        // which is the common case.
+        // Burning it here lost the exact code whenever the process died first:
+        // the framework marshals onto the EDT, so a callback arriving on a
+        // binder thread leaves the persist QUEUED, and the next launch then
+        // saw isSupported() false and settled an invited install as no-match --
+        // permanently, on the one platform whose answer is exact. The window
+        // was small and it was unbounded in consequence.
         //
-        // It is not a guarantee, and saying so is the point: the framework
-        // marshals onto the EDT, so when this callback arrives on a binder
-        // thread the persist is queued rather than done, and a process killed
-        // inside that window still loses it. The window goes from "always" to
-        // "the callSerially latency", which is the most the SPI shape allows
-        // without the port knowing what the framework did with the value.
-        if (referrer(issued, callback, referrer, clickSeconds, beginSeconds)) {
-            Preferences.set(PREF_ATTEMPTED, true);
-        }
+        // This exchange is still marked as having ANSWERED, so a superseded or
+        // duplicate callback cannot answer again; what waits for durability is
+        // only the one-shot flag that decides whether Play is ever asked again.
+        referrer(issued, callback, referrer, clickSeconds, beginSeconds);
+    }
+
+    /// Burns the one-shot flag, once the framework has the code durably.
+    ///
+    /// Play answers a given install once, so asking again would throw the
+    /// answer away -- which is what this flag prevents. It is set HERE rather
+    /// than at handover so that a process killed before the framework's write
+    /// lands leaves it unset, and the next launch asks Play again instead of
+    /// losing the referrer for good.
+    @Override
+    public void referrerPersisted() {
+        Preferences.set(PREF_ATTEMPTED, true);
     }
 
     /// The one-shot flag is burnt by the exchange that ANSWERED, and only by

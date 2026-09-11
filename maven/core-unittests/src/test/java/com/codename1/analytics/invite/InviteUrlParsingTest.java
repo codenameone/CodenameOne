@@ -135,4 +135,40 @@ class InviteUrlParsingTest extends UITestBase {
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         assertEquals("ABC125", InviteStore.get(pending, "code", null));
     }
+
+    @FormTest
+    void aForeignUrlCarryingTheKeyIsNotAnInvite() {
+        // The query form used to be read BEFORE the host was checked and
+        // returned the moment it found the key, so any deep link the
+        // application handles for any other domain -- a partner site, a
+        // campaign page -- was accepted and claimed. That hands a fresh
+        // install, or a last-touch re-attribution, to whoever wrote a url this
+        // app happens to open.
+        assertNull(Invites.extractCode(
+                        "https://partner.example.com/promo?cn1_invite=STOLEN1"),
+                "a url on somebody else's host was accepted as an invite");
+        // Our own host in the query form is still an invite.
+        assertEquals("MINE123", Invites.extractCode(
+                "https://cloud.codenameone.com/anything?cn1_invite=MINE123"));
+    }
+
+    @FormTest
+    void anotherAppsSlugOnTheSharedHostIsNotOurInvite() {
+        // One domain serves every enrolled app, which is why the path carries
+        // a slug. A build whose App Links filter claims /i/ broadly is handed
+        // /i/other-app/CODE as readily as its own, and this took the last
+        // component regardless -- claiming a stranger's invite, and
+        // remembering their slug as its own so later mints advertised their
+        // links.
+        Invites.reset();
+        Preferences.set(Invites.PREF_SLUG, "acme");
+
+        assertNull(Invites.extractCode("https://cloud.codenameone.com/i/other-app/THEIRS1"),
+                "an invite belonging to another app on the shared host was claimed");
+        assertEquals("acme", Preferences.get(Invites.PREF_SLUG, ""),
+                "the foreign slug was remembered, so later invites mint their links");
+        assertEquals("OURS123",
+                Invites.extractCode("https://cloud.codenameone.com/i/acme/OURS123"),
+                "our own slugged invite stopped being recognised");
+    }
 }

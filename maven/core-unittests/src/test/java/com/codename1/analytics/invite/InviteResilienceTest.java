@@ -613,6 +613,9 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 callback.onReferrer("utm_source=cn1_invite&cn1_invite=USELESS1", 0L, 0L);
             }
@@ -649,6 +652,9 @@ class InviteResilienceTest extends UITestBase {
         Invites.registerInstallReferrerSource(new InstallReferrerSource() {
             public boolean isSupported() {
                 return true;
+            }
+
+            public void referrerPersisted() {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -690,6 +696,9 @@ class InviteResilienceTest extends UITestBase {
         Invites.registerInstallReferrerSource(new InstallReferrerSource() {
             public boolean isSupported() {
                 return true;
+            }
+
+            public void referrerPersisted() {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -956,6 +965,9 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 callback.onReferrer("utm_source=organic", 0L, 0L);
             }
@@ -1099,6 +1111,9 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 callback.onUnavailable(Invites.REASON_NO_MATCH);
             }
@@ -1113,6 +1128,9 @@ class InviteResilienceTest extends UITestBase {
         Invites.registerInstallReferrerSource(new InstallReferrerSource() {
             public boolean isSupported() {
                 return true;
+            }
+
+            public void referrerPersisted() {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1143,6 +1161,9 @@ class InviteResilienceTest extends UITestBase {
         Invites.registerInstallReferrerSource(new InstallReferrerSource() {
             public boolean isSupported() {
                 return true;
+            }
+
+            public void referrerPersisted() {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1246,6 +1267,9 @@ class InviteResilienceTest extends UITestBase {
         Invites.registerInstallReferrerSource(new InstallReferrerSource() {
             public boolean isSupported() {
                 return true;
+            }
+
+            public void referrerPersisted() {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1482,6 +1506,9 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 held[0] = callback;
             }
@@ -1715,6 +1742,9 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 held[0] = callback;
             }
@@ -1827,6 +1857,9 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 callback.onReferrer("utm_source=cn1_invite&cn1_invite=PROV1", 0L, 0L);
             }
@@ -1937,6 +1970,9 @@ class InviteResilienceTest extends UITestBase {
 
             public boolean isSupported() {
                 return !spent;
+            }
+
+            public void referrerPersisted() {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {

@@ -51,4 +51,21 @@ public interface InstallReferrerSource {
     ///
     /// - `callback`: receives the answer, never null
     void requestReferrer(InstallReferrerCallback callback);
+
+    /// Told that the referrer handed over is now stored somewhere that
+    /// survives the process, so a source holding a one-shot flag may burn it.
+    ///
+    /// The Android source may only ask Play once: the API answers a given
+    /// install once, and the port records that it has asked so a later launch
+    /// does not throw the answer away by asking again. Burning that flag when
+    /// the value was merely HANDED OVER loses the exact code whenever the
+    /// process dies first -- the framework marshals onto the EDT, so the
+    /// persist is queued rather than done -- and the next launch then settles
+    /// an invited install as no-match, permanently, on the one platform whose
+    /// answer is exact.
+    ///
+    /// Called once per accepted referrer, and never when the write failed: the
+    /// source should keep its flag unburnt so the next launch can ask again.
+    /// A source with no such flag does nothing here.
+    void referrerPersisted();
 }

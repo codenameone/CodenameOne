@@ -616,6 +616,9 @@ class InviteConsentAndErasureTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 callback.onReferrer("utm_source=cn1_invite&cn1_invite=SUSPEND1", 0L, 0L);
             }

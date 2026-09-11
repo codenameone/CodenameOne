@@ -1720,13 +1720,19 @@ public final class Invites {
         if (frag >= 0) {
             url = url.substring(0, frag);
         }
+        // The HOST is settled before either form is read.
+        //
+        // The query branch used to run first and return the moment it found
+        // the key, so any deep link the application handles for any other
+        // domain -- a partner's site, a campaign page, anything carrying
+        // cn1_invite in its query -- was accepted and claimed. That hands a
+        // fresh install, or a last-touch re-attribution, to whoever wrote a
+        // url this app happens to open.
+        //
+        // This function is the URL path only. The install referrer is a bare
+        // query string with no host at all, and it calls codeFromQuery()
+        // directly, so nothing about that path changes.
         int q = url.indexOf('?');
-        if (q >= 0) {
-            String code = codeFromQuery(url.substring(q + 1));
-            if (code != null) {
-                return code;
-            }
-        }
         String host = hostOf(url);
         if (host == null) {
             return null;
@@ -1736,6 +1742,12 @@ public final class Invites {
         if (expected == null || !host.regionMatches(true, 0, expected, 0, expected.length())
                 || host.length() != expected.length()) {
             return null;
+        }
+        if (q >= 0) {
+            String code = codeFromQuery(url.substring(q + 1));
+            if (code != null) {
+                return code;
+            }
         }
         String path = url;
         int schemeEnd = path.indexOf("://");
@@ -1765,9 +1777,25 @@ public final class Invites {
         }
         int slash = rest.lastIndexOf('/');
         String code = slash < 0 ? rest : rest.substring(slash + 1);
-        if (slash > 0) {
-            // Remember the slug so later invites mint the precise form.
-            Preferences.set(PREF_SLUG, rest.substring(0, slash));
+        String pathSlug = slash > 0 ? rest.substring(0, slash) : null;
+        String mine = configuredSlug();
+        if (pathSlug != null && mine != null && mine.length() > 0 && !mine.equals(pathSlug)) {
+            // ANOTHER app's invite, on the host we share with it.
+            //
+            // One domain serves every enrolled app, which is why the path
+            // carries a slug at all. A build whose App Links filter claims
+            // /i/ broadly -- which is what a hand-written filter usually does
+            // -- is handed /i/other-app/CODE by Android as readily as its own,
+            // and this took the last component regardless. The app then
+            // claimed a stranger's invite, and remembered their slug as its
+            // own, so its later mints advertised their links.
+            return null;
+        }
+        if (pathSlug != null && (mine == null || mine.length() == 0)) {
+            // Learned only when this build has no slug of its own to
+            // contradict: the bare form is what a first offline mint produces,
+            // and the server hands the slugged one back on registration.
+            Preferences.set(PREF_SLUG, pathSlug);
         }
         return code.length() == 0 ? null : code;
     }
@@ -2459,7 +2487,20 @@ public final class Invites {
                                         String.valueOf(clickSeconds * 1000L));
                             }
                             pending.remove("referrerRetry");
-                            writePending(pending);
+                            // The source is told only when the record really
+                            // landed. It holds a one-shot flag -- Play answers
+                            // an install once -- and burning it on handover
+                            // lost the exact code whenever the process died
+                            // inside the marshalling window. A failed write
+                            // leaves the flag unburnt, so the next launch asks
+                            // again, which is the outcome a retry can fix.
+                            if (writePending(pending)) {
+                                try {
+                                    source.referrerPersisted();
+                                } catch (Throwable t) {
+                                    Log.e(t);
+                                }
+                            }
                             claim(code, "install_referrer",
                                     rawReferrer == null ? "" : rawReferrer,
                                     MATCH_REFERRER, true,

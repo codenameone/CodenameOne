@@ -125,6 +125,9 @@ class InviteDeliveryTest extends UITestBase {
                 return true;
             }
 
+            public void referrerPersisted() {
+            }
+
             public void requestReferrer(InstallReferrerCallback callback) {
                 callback.onReferrer(
                         "utm_source=cn1_invite&utm_medium=referral&cn1_invite=ABC123",
@@ -167,6 +170,9 @@ class InviteDeliveryTest extends UITestBase {
         Invites.registerInstallReferrerSource(new InstallReferrerSource() {
             public boolean isSupported() {
                 return true;
+            }
+
+            public void referrerPersisted() {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
