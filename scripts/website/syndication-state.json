@@ -2020,6 +2020,18 @@
         "url": "https://dev.to/codenameone/build-hints-that-fail-before-the-build-server-3c6o",
         "syndicated_at": "2026-09-10T17:03:01+00:00"
       }
+    },
+    "voip-vpn-builders": {
+      "hashnode": {
+        "url": "https://debugagent.com/voip-vpn-and-the-build-system-behind-them",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa344931394571c5ef29606",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-11T00:01:15+00:00"
+      }
     }
   }
 }
