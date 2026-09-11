@@ -498,6 +498,74 @@ public class SelfTest {
      * do it. The JDK's own "Invalid HTTP method: PATCH" says none of that, and
      * that opaque failure is what this asserts is gone.
      */
+    /**
+     * An outbound header value cannot smuggle a second header.
+     *
+     * <p>The packaged arm passes headers to its native as ONE string with '\n'
+     * between them, and the native splits on that byte and gives each line to
+     * libcurl. So a value derived from untrusted input -- the bearerToken
+     * getJson() and postJson() accept is exactly that -- could add a header the
+     * caller never wrote: "abc\nX-Admin: true" becomes a second header on a
+     * request the upstream trusts.
+     *
+     * <p>Asserted on BOTH arms with one expectation, which is the point. Leaving
+     * it to HttpURLConnection on one side and libcurl on the other is how the two
+     * end up disagreeing about the same call; both now refuse before either stack
+     * is reached. No request is made -- the refusal happens first, so the URL here
+     * is never contacted.
+     */
+    private static void outboundHeadersCannotCarryANewline() throws Exception {
+        String[] bad = new String[] {
+            "Authorization: Bearer abc\nX-Admin: true",  // the finding
+            "Authorization: Bearer abc\rX-Admin: true",  // CR alone, same trick
+            "Authorization: Bearer abc\u010a",           // narrows to 0x0A for the native
+            "X Bad: value",                              // a name that is not a token
+            "no-colon-at-all",                           // not a header line
+        };
+        for(int iter = 0 ; iter < bad.length ; iter++) {
+            List one = new ArrayList();
+            one.add(bad[iter]);
+            String outcome;
+            try {
+                Web.request("GET", "http://127.0.0.1:1/nothing", one, null);
+                outcome = "sent";
+            } catch (Exception refused) {
+                String message = String.valueOf(refused.getMessage());
+                // The validator's wording. A connection failure would also throw
+                // here -- nothing is listening on port 1 -- so matching on "it
+                // threw" would pass even with the check removed.
+                outcome = message.indexOf("request header") >= 0 ? "refused"
+                        : "other: " + message;
+            }
+            check("an outbound header is validated: " + sanitize(bad[iter]),
+                    "refused", outcome);
+        }
+        // A legal header is still sent. Nothing is listening, so the answer is a
+        // connection failure -- what matters is that the VALIDATOR did not stop it.
+        List good = new ArrayList();
+        good.add("Authorization: Bearer abc.def");
+        good.add("X-Trace: 1\tindented");
+        String sent;
+        try {
+            Web.request("GET", "http://127.0.0.1:1/nothing", good, null);
+            sent = "not refused";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            sent = message.indexOf("request header") >= 0 ? "refused" : "not refused";
+        }
+        check("a legal header is still sent", "not refused", sent);
+    }
+
+    /** A header spelling with its control characters made visible, for a message. */
+    private static String sanitize(String value) {
+        StringBuilder out = new StringBuilder();
+        for(int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            out.append(c < 0x20 || c > 0x7e ? '?' : c);
+        }
+        return out.toString();
+    }
+
     private static void patchIsASendableVerb() throws Exception {
         String outcome;
         try {
@@ -697,6 +765,7 @@ public class SelfTest {
     private static void json() throws Exception {
         bothJsonWritersAgree();
         patchIsASendableVerb();
+        outboundHeadersCannotCarryANewline();
         repeatedOutboundHeadersSurvive();
         negativeConnectTimeoutsAreRefused();
         malformedPortsAreRefused();

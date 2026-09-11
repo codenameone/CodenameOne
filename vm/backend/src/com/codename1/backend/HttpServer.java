@@ -3910,6 +3910,80 @@ public final class HttpServer {
     }
 
     /**
+     * Whether this is a legal HTTP authority: a host, bracketed if it is an IPv6
+     * literal, optionally followed by ":" and a port.
+     *
+     * <p>Userinfo is the part that matters. RFC 9110 excludes it from an HTTP
+     * authority, and "Host: user@internal" is how one request is made to mean one
+     * thing to a parser that takes the whole string and another to a parser that
+     * reads only what follows the '@'.
+     */
+    private static boolean isAuthority(String value) {
+        if(value.length() == 0) {
+            return false;
+        }
+        int hostEnd;
+        if(value.charAt(0) == '[') {
+            int close = value.indexOf(']');
+            if(close < 2) {
+                return false;
+            }
+            for(int iter = 1 ; iter < close ; iter++) {
+                char c = value.charAt(iter);
+                boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+                        || (c >= 'A' && c <= 'F') || c == ':' || c == '.' || c == '%';
+                if(!ok) {
+                    return false;
+                }
+            }
+            hostEnd = close + 1;
+        } else {
+            hostEnd = value.indexOf(':');
+            if(hostEnd < 0) {
+                hostEnd = value.length();
+            }
+            if(hostEnd == 0) {
+                return false;
+            }
+            for(int iter = 0 ; iter < hostEnd ; iter++) {
+                char c = value.charAt(iter);
+                // RFC 3986 reg-name: unreserved / pct-encoded / sub-delims. Not
+                // '@', not a space, not a control character -- and the point of
+                // spelling the set out is that everything absent from it is
+                // refused rather than tolerated.
+                boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                        || (c >= '0' && c <= '9')
+                        || c == '-' || c == '.' || c == '_' || c == '~' || c == '%'
+                        || c == '!' || c == '$' || c == '&' || c == '\''
+                        || c == '(' || c == ')' || c == '*' || c == '+'
+                        || c == ',' || c == ';' || c == '=';
+                if(!ok) {
+                    return false;
+                }
+            }
+        }
+        if(hostEnd == value.length()) {
+            return true;
+        }
+        if(value.charAt(hostEnd) != ':') {
+            return false;
+        }
+        int digits = value.length() - hostEnd - 1;
+        if(digits < 1 || digits > 5) {
+            return false;
+        }
+        int port = 0;
+        for(int iter = hostEnd + 1 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if(c < '0' || c > '9') {
+                return false;
+            }
+            port = port * 10 + (c - '0');
+        }
+        return port >= 1 && port <= 65535;
+    }
+
+    /**
      * Whether this is one of the methods this server routes. Anything else is
      * 501, not a 404 -- the path may well exist, the verb is what is unknown.
      *
@@ -4361,6 +4435,27 @@ public final class HttpServer {
         // authorities out of the same request.
         if(hostCount > 1) {
             throw new ProtocolException(400, "duplicate Host header");
+        }
+        // And the authority has to BE one. Everything above settles which answer
+        // to "which host did you mean" the request carries; none of it looks at
+        // whether the answer is well formed, so "Host: user@internal" and
+        // "Host: example.com:not-a-port" reached the handler intact. An
+        // application routing or authorizing on getHeader("host") then acts on a
+        // value a conforming parser in front of it would have rejected, and the
+        // proxy and the origin disagreeing about the authority is the same class
+        // of defect as the two framings below -- it is just spelled with a Host
+        // instead of a Content-Length.
+        //
+        // The absolute-form authority is checked as well rather than relying on
+        // the equality test above to carry the verdict across: that test runs only
+        // when BOTH are present, and an HTTP/1.0 absolute-form request has no Host
+        // to compare against.
+        if(hostValue != null && !isAuthority(hostValue)) {
+            throw new ProtocolException(400, "the Host header is not a valid authority");
+        }
+        if(absoluteAuthority != null && !isAuthority(absoluteAuthority)) {
+            throw new ProtocolException(400,
+                    "the request target's authority is not a valid authority");
         }
 
         String contentLength = contentLengthAt < 0 ? null : "set";

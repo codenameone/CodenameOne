@@ -148,6 +148,7 @@ public final class Web {
         if(url == null) {
             throw new IOException("No URL");
         }
+        HeaderLines.validate(headers);
         HttpURLConnection connection;
         try {
             connection = (HttpURLConnection)new URL(url).openConnection();

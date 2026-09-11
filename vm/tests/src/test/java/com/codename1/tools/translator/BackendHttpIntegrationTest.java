@@ -1746,6 +1746,53 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a Host that is not an authority is refused before the handler")
+    void malformedHostAuthoritiesAreRefused() throws Exception {
+        // Missing, duplicate and disagreeing Host headers were already 400. What
+        // none of those looked at is whether the value is an authority at all, so
+        // these reached the handler intact -- and an application that routes or
+        // authorizes on getHeader("host") then acts on a value a conforming proxy
+        // in front of it would have rejected. Proxy and origin disagreeing about
+        // the authority is the Content-Length/Transfer-Encoding problem wearing a
+        // different header.
+        String[] bad = new String[] {
+            "user@internal",        // userinfo: the finding, and the dangerous one
+            "example.com:notaport", // a port that is not a number
+            "example.com:0",        // and one that is not connectable
+            "example.com:99999",    // past the port space
+            "exam ple.com",         // a space inside the authority
+            "[::1",                 // an unterminated IPv6 literal
+            ":8080",                // no host at all
+        };
+        for(int iter = 0 ; iter < bad.length ; iter++) {
+            byte[] response = raw("GET /healthz HTTP/1.1\r\nHost: " + bad[iter]
+                    + "\r\nConnection: close\r\n\r\n");
+            assertEquals(400, statusOf(response),
+                    "Host: " + bad[iter] + " should be refused:\n"
+                            + new String(response, StandardCharsets.UTF_8));
+        }
+
+        // The forms that ARE authorities still serve, which is the half that keeps
+        // this from being a denial of service against ordinary clients.
+        String[] good = new String[] {
+            "x",
+            "example.com",
+            "example.com:8080",
+            "127.0.0.1:" + port,
+            "[::1]:8080",
+            "xn--80ak6aa92e.com",   // punycode, which is how a client sends an IDN
+            "example.com.",         // a fully qualified name keeps its root dot
+        };
+        for(int iter = 0 ; iter < good.length ; iter++) {
+            byte[] response = raw("GET /healthz HTTP/1.1\r\nHost: " + good[iter]
+                    + "\r\nConnection: close\r\n\r\n");
+            assertEquals(200, statusOf(response),
+                    "Host: " + good[iter] + " is a legal authority and must be served:\n"
+                            + new String(response, StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
     @DisplayName("h2 refuses an unsupported method the same way HTTP/1 does")
     void unsupportedMethodsAreRefusedOverHttp2() throws Exception {
         // The HTTP/1 request line answers 501 for anything outside KNOWN_METHODS,

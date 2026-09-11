@@ -167,6 +167,7 @@ public final class Web {
         if(url == null) {
             throw new IOException("No URL");
         }
+        HeaderLines.validate(headers);
         StringBuilder joined = new StringBuilder();
         if(headers != null) {
             for(int iter = 0 ; iter < headers.size() ; iter++) {
