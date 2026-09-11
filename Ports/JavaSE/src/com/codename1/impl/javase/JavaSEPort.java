@@ -7576,6 +7576,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         long now = System.currentTimeMillis() / 1000L;
                         callback.onReferrer(referrer, now - 60L, now);
                     }
+
+                    @Override
+                    public void referrerPersisted() {
+                        // The simulator has no one-shot flag to burn: the menu
+                        // item is the trigger, and it can be used again.
+                    }
                 });
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
