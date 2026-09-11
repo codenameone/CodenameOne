@@ -272,6 +272,8 @@ public class DbCheck {
         }
 
         db.execute("DROP TABLE cn1_check", null);
+        parameterCountsMustMatch(db, postgres);
+        oversizeMessagesAreRefused(url, postgres, mysql);
         concurrentTransactionsOwnTheSession(db, postgres);
     }
 
@@ -297,7 +299,6 @@ public class DbCheck {
         // "relation already exists" -- against a SHARED server, which is what CI
         // uses, that turns one interrupted run into a failure for every run after
         // it. Cost me exactly that here.
-        parameterCountsMustMatch(db, postgres);
 
         db.execute("DROP TABLE IF EXISTS cn1_lock", null);
         db.execute("CREATE TABLE cn1_lock (tag TEXT)", null);
@@ -374,6 +375,96 @@ public class DbCheck {
     /** PostgreSQL numbers its placeholders; the other two use a question mark. */
     private static String placeholder(boolean postgres, int index) {
         return postgres ? "$" + index : "?";
+    }
+
+    /**
+     * A server message larger than the configured bound is refused.
+     *
+     * <p>Both clients read a LENGTH the peer chose and allocate to match, before
+     * the connection is authenticated and, with sslmode=prefer or before MySQL's
+     * TLS, before it is encrypted. PostgreSQL's 32-bit length can name 2GB in one
+     * message; MySQL's logical packet is built from 16MB continuations with no
+     * limit on the count. An OutOfMemoryError from either is not an IOException --
+     * it unwinds past every catch here and takes the process down.
+     *
+     * <p>Driven from a REAL server rather than a fake one: asking for a value
+     * bigger than the bound makes the server send exactly the oversized message
+     * the guard exists to refuse. Needs CN1_DB_MAX_MESSAGE_MB set small, because
+     * proving the 64MB default would mean moving 64MB to prove it.
+     */
+    private static void oversizeMessagesAreRefused(String url,
+            boolean postgres, boolean mysql) throws Exception {
+        String configured = System.getenv("CN1_DB_MAX_MESSAGE_MB");
+        int limitMb = 0;
+        if(configured != null) {
+            try {
+                limitMb = Integer.parseInt(configured.trim());
+            } catch (NumberFormatException ignored) {
+                limitMb = 0;
+            }
+        }
+        if(limitMb < 1 || limitMb > 4) {
+            note("oversize-message check skipped: set CN1_DB_MAX_MESSAGE_MB to 1..4");
+            return;
+        }
+        if(!postgres && !mysql) {
+            note("oversize-message check skipped: it needs a network engine");
+            return;
+        }
+        // MySQL's continuation path only engages past ONE packet, which is 16MB by
+        // protocol, so the oversize must clear that before the accumulator can see
+        // it. PostgreSQL has no such floor and one message is enough.
+        int bytes = mysql ? 20 * 1024 * 1024 : (limitMb * 1024 * 1024) + (1024 * 1024);
+        String sql = postgres
+                ? "SELECT repeat('x', " + bytes + ") AS big"
+                : "SELECT REPEAT('x', " + bytes + ") AS big";
+        // ITS OWN CONNECTION, because refusing the oversized message CLOSES the
+        // one it arrives on -- that is the point of the last assertion here -- and
+        // a check that used the shared Database would leave every check after it
+        // talking to a dead session. Measured the hard way: it did.
+        Database db = Database.open(url);
+        try {
+        // THE ORDINARY MESSAGE FIRST. Refusing an oversized one leaves the rest of
+        // it unread on the wire, so the client closes the connection rather than
+        // hand a desynchronised one back to the pool -- which means nothing can be
+        // asked of it afterwards, and a check that tried would be testing the
+        // close instead of the bound.
+        List small = db.query(postgres ? "SELECT repeat('y', 1024) AS small"
+                                       : "SELECT REPEAT('y', 1024) AS small", null);
+        check("a message inside the bound still arrives", "1024",
+                small.isEmpty() ? "<none>"
+                        : String.valueOf(String.valueOf(
+                                ((Map)small.get(0)).get("small")).length()));
+
+        String outcome;
+        try {
+            List rows = db.query(sql, null);
+            Object value = rows.isEmpty() ? null : ((Map)rows.get(0)).get("big");
+            outcome = "returned " + (value == null ? "null"
+                    : String.valueOf(String.valueOf(value).length()));
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            // The bound's own wording. The server refusing to build the value, or
+            // the connection dropping, would also throw and would pass a bare
+            // "it failed" check while proving nothing.
+            outcome = message.indexOf("CN1_DB_MAX_MESSAGE_MB") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("a message past the bound is refused", "refused", outcome);
+
+        // And the connection is CLOSED by it, not left desynchronised for the next
+        // borrower to read this message's tail as its own answer.
+        String afterwards;
+        try {
+            db.query(postgres ? "SELECT 1 AS one" : "SELECT 1 AS one", null);
+            afterwards = "still usable";
+        } catch (Exception expected) {
+            afterwards = "closed";
+        }
+        check("and the connection is taken out of service", "closed", afterwards);
+        } finally {
+            db.close();
+        }
     }
 
     /**

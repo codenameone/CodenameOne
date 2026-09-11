@@ -755,6 +755,14 @@ public final class MySql {
             // read as data.
             ByteArrayOutputStream all = new ByteArrayOutputStream();
             all.write(packet.body, 0, packet.body.length);
+            // BOUNDED WHILE IT ACCUMULATES. A logical packet is assembled from
+            // 16MB continuations and the protocol puts no limit on how many, so a
+            // peer can send them without end and grow this until the process dies.
+            // The greeting is read through this same path BEFORE TLS is
+            // negotiated, so sslmode=require is no protection: whoever answers the
+            // connection can do it, authenticated or not.
+            long accumulated = all.size();
+            long allowed = SqlLimits.maxMessageBytes();
             while(length == MAX_PACKET_BODY) {
                 int next = wire.read();
                 if(next < 0) {
@@ -762,6 +770,16 @@ public final class MySql {
                 }
                 length = next | (wire.read() << 8) | (wire.read() << 16);
                 sequence = wire.read() + 1;
+                accumulated += length;
+                if(accumulated > allowed) {
+                    // Closed for the same reason the PostgreSQL bound closes: the
+                    // rest of this logical packet is still on the wire and there
+                    // is no resync, so a connection left open would hand its tail
+                    // to whoever borrows it next.
+                    close();
+                    throw new IOException("A MySQL packet grew past the " + allowed
+                            + " bytes CN1_DB_MAX_MESSAGE_MB allows");
+                }
                 byte[] more = wire.readFully(length);
                 all.write(more, 0, more.length);
             }

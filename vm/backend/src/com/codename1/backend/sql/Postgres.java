@@ -669,7 +669,29 @@ public final class Postgres {
         }
         int length = wire.readIntBE();
         if(length < 4) {
+            // CLOSED, not merely refused. A length this code will not honour leaves
+            // the message still on the wire, so the connection is desynchronised
+            // from here on -- and DbPool returns a released connection to the idle
+            // list without asking, so the next borrower would read the tail of
+            // this message as the head of its own answer. There is no resync in
+            // this protocol; the only honest thing left is to take the connection
+            // out of service.
+            close();
             throw new IOException("A PostgreSQL message claims length " + length);
+        }
+        // BEFORE THE ALLOCATION, and before anything about this peer is trusted.
+        // The header carries a 32-bit length the SERVER chose, so a peer that is
+        // merely on the path -- which the default sslmode=prefer permits, since it
+        // can decline TLS on the server's behalf -- can name a length near
+        // Integer.MAX_VALUE and have this ask for a 2GB array in one go. The
+        // OutOfMemoryError that follows is not an IOException: it unwinds past
+        // every catch here and takes the process with it, before a single
+        // authentication message has been exchanged.
+        if(length - 4 > SqlLimits.maxMessageBytes()) {
+            close();                    // desynchronised; see the branch above
+            throw new IOException("A PostgreSQL message claims " + (length - 4)
+                    + " bytes, past the " + SqlLimits.maxMessageBytes()
+                    + " CN1_DB_MAX_MESSAGE_MB allows");
         }
         Message message = new Message();
         message.type = type;
