@@ -2941,7 +2941,28 @@ public final class Invites {
 
     static void handleResolution(String payload, String matchType, boolean deferred, int epoch) {
         if (epoch == lookupEpoch) {
-            lookupIssuedAt = 0;
+            // RE-STAMPED, not cleared, because an answer arriving is not the
+            // same as a question being settled.
+            //
+            // Clearing it said "nothing is on the wire", which is true, and
+            // was read by lookupInFlight() as "ask again whenever you like".
+            // For every response that settles something that is harmless --
+            // the state is terminal and nothing asks again. For one that does
+            // NOT, and there are several that reach a plain return below
+            // without settling anything -- an empty body, JSON that will not
+            // parse, a resolved answer carrying no code -- it left the lookup
+            // pending with nothing to throttle it. Each later
+            // checkForInvite() then re-issued immediately and burned another
+            // of the five durable attempts, so a couple of lifecycle calls
+            // could settle an exact referrer or App Clip code as no_match in
+            // seconds.
+            //
+            // The retry interval is measured from this field, so recording the
+            // completed attempt is what makes it apply to a useless answer as
+            // well as to silence. The terminal paths do not care: they are
+            // gated on the state, not on this, and every reset and erasure
+            // clears it outright.
+            lookupIssuedAt = System.currentTimeMillis();
         }
         // A response that was already on the wire when consent was withdrawn or
         // the identity was erased must not be acted on. Both of those delete the
@@ -2991,19 +3012,16 @@ public final class Invites {
                     // existing attempt cap and attribution window bound how
                     // long this can go on.
                     //
-                    // The attempt is STAMPED rather than cleared. Every
-                    // response clears lookupIssuedAt above, which is right for
-                    // an answer that settles something -- nothing will ask
-                    // again -- and wrong for this one: the state stays pending,
-                    // so resumeDeferred() re-issues on the next
-                    // checkForInvite(), and with no timestamp to throttle it an
-                    // application that calls that from two places would spend
+                    // Stamped explicitly, although the entry to this method
+                    // now stamps every response for the same reason. Kept
+                    // because this is the path where it matters most and
+                    // where the reasoning is easiest to lose: the state stays
+                    // pending, so resumeDeferred() re-issues on the next
+                    // checkForInvite(), and with no timestamp to throttle it
+                    // an application calling that from two places would spend
                     // all five attempts in seconds and settle an
                     // offline-minted invite as no_match before its
-                    // registration ever arrived. This is the field the retry
-                    // interval is measured from, so recording the completed
-                    // attempt is what makes the interval apply to "not yet"
-                    // as well as to silence.
+                    // registration ever arrived.
                     lookupIssuedAt = System.currentTimeMillis();
                     setState(STATE_PENDING);
                     return;

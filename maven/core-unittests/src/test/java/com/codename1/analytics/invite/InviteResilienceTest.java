@@ -577,6 +577,45 @@ class InviteResilienceTest extends UITestBase {
     }
 
     @FormTest
+    void anAnswerThatSettlesNothingIsThrottledToo() {
+        // A 2xx whose body is empty, unparseable, or resolved with no code
+        // reaches a plain return without settling anything -- and the entry to
+        // handleResolution used to clear the in-flight stamp for EVERY
+        // response. The lookup was then pending with nothing to throttle it,
+        // so each later checkForInvite() re-issued at once and burned another
+        // of the five durable attempts: a couple of lifecycle calls could
+        // settle an exact code as no_match in seconds.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=USELESS1", 0L, 0L);
+            }
+        });
+        Invites.checkForInvite();
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "the fixture never got a lookup under way");
+
+        // The useless answer: a success that decides nothing.
+        Invites.handleResolution("", Invites.MATCH_REFERRER, true);
+        assertEquals(Invites.STATE_PENDING, Invites.getState(),
+                "an empty body settled the lookup, so this proves nothing");
+        implementation.clearQueuedRequests();
+
+        // The retry interval has NOT elapsed, so these must do nothing.
+        Invites.checkForInvite();
+        Invites.checkForInvite();
+
+        assertEquals(0, implementation.getQueuedRequests().size(),
+                "an answer that settled nothing left the lookup unthrottled, so every "
+                        + "later check re-asked at once and spent the attempt budget");
+    }
+
+    @FormTest
     void aNotYetAnswerIsNotAskedAgainImmediately() {
         // The retry above must be throttled, or the fix for it becomes its own
         // bug: every response clears the issued-at stamp, so with the state

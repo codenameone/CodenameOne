@@ -155,15 +155,22 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_clearAppClipInviteHandoff___java_l
     // calls synchronize for that reason; the full app is longer-lived but the
     // asymmetry has no justification, and the cost here is one flush on a path
     // that runs once per install.
-    [suite synchronize];
-    // READ BACK, rather than trusting the flush.
+    // BOTH the flush and the key, because neither alone is evidence.
     //
-    // The caller gates an erasure on this, and synchronize's own BOOL says
-    // whether a write-out happened, not whether the key is gone. What the
-    // erasure needs to know is exactly that, so it is asked directly: if the
-    // entry survives, the code is still on the device and the reset that
-    // promised to forget it has not.
-    return [suite objectForKey:kCN1InviteHandoffKey] == nil ? JAVA_TRUE : JAVA_FALSE;
+    // Reading the key back is not enough on its own, and an earlier version of
+    // this did exactly that: removeObjectForKey: has already changed this
+    // NSUserDefaults instance's in-memory view, so objectForKey: answers nil
+    // whether or not anything reached the disk. The check passed by
+    // construction and the erasure it gates was never actually verified.
+    //
+    // synchronize's BOOL is the half that knows about the disk, so it is what
+    // says the removal is durable; the key is still read afterwards because a
+    // successful flush of the wrong thing is not what is being claimed either.
+    // The caller refuses the erasure on false, and a container that still
+    // holds a code is exactly what it must refuse on.
+    BOOL flushed = [suite synchronize];
+    BOOL gone = [suite objectForKey:kCN1InviteHandoffKey] == nil;
+    return (flushed && gone) ? JAVA_TRUE : JAVA_FALSE;
 }
 
 #else
