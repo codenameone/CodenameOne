@@ -846,20 +846,8 @@ public class Parser extends ClassVisitor {
             if (BytecodeMethod.optimizerOn) {
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
-                        // BISECT PROBE (PR #5766, not a fix): both passes are off.
-                        // These are the only changes in this PR that REWRITE bytecode,
-                        // and the failure under investigation is heap corruption -- an
-                        // int[] header reading length 0, which then takes an unchecked
-                        // [-1] store in Display.edtLoopImpl. Wrong stack depth or a
-                        // wrong receiver type from a rewrite is the most plausible
-                        // source of that, so turning both off splits the suspect space
-                        // in half: green means the cause is an emitted-code rewrite,
-                        // red means it is in the JavaAPI or the C runtime instead.
-                        // Restore both once the answer is in.
-                        if (false) {
-                            fuseMtd.fuseStringBuilderConcat();
-                            fuseMtd.lowerIteratorCalls();
-                        }
+                        fuseMtd.fuseStringBuilderConcat();
+                        fuseMtd.lowerIteratorCalls();
                     }
                 }
             }

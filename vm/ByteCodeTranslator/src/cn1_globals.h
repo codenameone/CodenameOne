@@ -2185,7 +2185,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 // because bibopCurrent[] is shared across all classes of the same size class).
 #if !defined(CN1_DISABLE_INLINE_ALLOC) && !defined(CN1_DISABLE_BIBOP)
 #define CN1_FAST_NEW(X) ({ \
-    if(__builtin_expect(!class__##X.initialized, 0)) __STATIC_INITIALIZER_##X(threadStateData); \
+    if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
     if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
     __cn1fo; })
@@ -2193,7 +2193,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 // still fully zeroes (calloc) -- correct, just un-elided on the rare page-full
 // path.
 #define CN1_FAST_NEW_NOZERO(X) ({ \
-    if(__builtin_expect(!class__##X.initialized, 0)) __STATIC_INITIALIZER_##X(threadStateData); \
+    if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAllocNoZero(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
     if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
     __cn1fo; })
@@ -2826,6 +2826,34 @@ extern struct clazz class_array3__JAVA_FLOAT;
 extern struct clazz class_array1__JAVA_DOUBLE;
 extern struct clazz class_array2__JAVA_DOUBLE;
 extern struct clazz class_array3__JAVA_DOUBLE;
+
+/**
+ * The nine scalar primitive class objects -- int.class, Integer.TYPE and friends.
+ *
+ * javac lowers a primitive class literal to a read of the boxed type's own TYPE
+ * field, so `TYPE = int.class` inside Integer's initializer compiles to
+ * `getstatic TYPE; putstatic TYPE` -- it reads the field it is initializing and
+ * leaves it null. Every wrapper that declared TYPE that way had a null one, and
+ * a Map keyed on them collapsed to a single entry, so a lookup for int answered
+ * with whatever type was stored last. Nothing threw. The wrappers now go through
+ * java_lang_Class_getPrimitiveClass, which hands back one of these.
+ *
+ * classId is CN1_PRIMITIVE_CLASS_ID for all nine: these never take part in an
+ * instanceof, and instanceofFunction indexes tables by classId, so the callers
+ * that could reach one (isAssignableFrom, isInstance) test primitiveType first
+ * rather than indexing with a value no table has a row for.
+ */
+#define CN1_PRIMITIVE_CLASS_ID (-1)
+
+extern struct clazz cn1_primitive_class_int;
+extern struct clazz cn1_primitive_class_long;
+extern struct clazz cn1_primitive_class_short;
+extern struct clazz cn1_primitive_class_byte;
+extern struct clazz cn1_primitive_class_char;
+extern struct clazz cn1_primitive_class_float;
+extern struct clazz cn1_primitive_class_double;
+extern struct clazz cn1_primitive_class_boolean;
+extern struct clazz cn1_primitive_class_void;
 
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
 /**

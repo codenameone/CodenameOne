@@ -27,6 +27,12 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.0
  */
 public final class Boolean implements Comparable<Boolean> {
+
+    /**
+     * The class object for the primitive type this class wraps.
+     */
+    public static final Class<Boolean> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_BOOLEAN);
+
     /**
      * The Boolean object corresponding to the primitive value false.
      */

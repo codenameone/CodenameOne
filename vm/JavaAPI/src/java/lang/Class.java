@@ -50,6 +50,21 @@ public final class Class<T> implements java.lang.reflect.Type {
      * following code fragment returns the runtime Class descriptor for the
      * class named java.lang.Thread: Classt= Class.forName("java.lang.Thread")
      */
+    /**
+     * Returns the Class object for {@code className}.
+     *
+     * ParparVM links the whole program ahead of time, so there is no second class
+     * loader to consult and nothing to defer: both extra arguments are accepted and
+     * ignored, and the class is resolved exactly as the one-argument form resolves
+     * it. The overload exists because library bytecode calls it -- ASM's
+     * ClassWriter.getCommonSuperClass does -- and an absent overload is a link
+     * error in translated code, not a compile error here.
+     */
+    public static java.lang.Class forName(java.lang.String className, boolean initialize,
+            ClassLoader loader) throws java.lang.ClassNotFoundException {
+        return forName(className);
+    }
+
     public static java.lang.Class forName(java.lang.String className) throws java.lang.ClassNotFoundException {
         className = className.replace('$', '.');
         Class c = forNameImpl(className);
@@ -136,9 +151,102 @@ public final class Class<T> implements java.lang.reflect.Type {
      * class upon which the getResourceAsStream method was called.
      */
     public java.io.InputStream getResourceAsStream(java.lang.String name){
-         return null; 
+        if (name == null) {
+            return null;
+        }
+        String absolute = name;
+        if (!absolute.startsWith("/")) {
+            // Relative names resolve against this class's package, as the javadoc
+            // above describes.
+            String className = getName();
+            int lastDot = className.lastIndexOf('.');
+            absolute = lastDot < 0 ? "/" + name
+                    : "/" + className.substring(0, lastDot).replace('.', '/') + "/" + name;
+        }
+        byte[] embedded = cn1EmbeddedResource(absolute);
+        if (embedded != null) {
+            return new java.io.ByteArrayInputStream(embedded);
+        }
+        return cn1FileResource(absolute);
+    }
+
+    /**
+     * Resources linked into the executable, or null when there are none.
+     *
+     * The native side calls a weakly-linked {@code cn1FindResource}, which the
+     * generated resource table overrides on targets that embed resources. Where
+     * nothing provides it the weak symbol is null and this returns null, so a target
+     * that embeds nothing behaves exactly as it did before this existed.
+     */
+    private static native byte[] cn1EmbeddedResource(String name);
+
+    /**
+     * The filesystem half of {@link #getResourceAsStream}: looks the resource up
+     * under a search path, so a translated command-line program can read files that
+     * sit beside it rather than being linked into it.
+     *
+     * The path comes from CN1_RESOURCE_PATH, else a "cn1runtime" directory next to
+     * the executable. Entries are separated the way the platform separates path
+     * entries.
+     */
+    private static java.io.InputStream cn1FileResource(String absolute) {
+        String path = System.getenv("CN1_RESOURCE_PATH");
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        String relative = absolute.substring(1);
+        int from = 0;
+        while (from <= path.length()) {
+            int end = path.indexOf(java.io.File.pathSeparatorChar, from);
+            String root = end < 0 ? path.substring(from) : path.substring(from, end);
+            if (root.length() > 0) {
+                java.io.File candidate = new java.io.File(root, relative);
+                if (candidate.exists()) {
+                    try {
+                        return new java.io.FileInputStream(candidate);
+                    } catch (java.io.IOException err) {
+                        return null;
+                    }
+                }
+            }
+            if (end < 0) {
+                break;
+            }
+            from = end + 1;
+        }
+        return null;
     }
     
+    /**
+     * Type codes for {@link #getPrimitiveClass(int)}. Shared only with
+     * nativeMethods.m, which switches on the same values.
+     */
+    static final int CN1_PRIM_INT = 0;
+    static final int CN1_PRIM_LONG = 1;
+    static final int CN1_PRIM_SHORT = 2;
+    static final int CN1_PRIM_BYTE = 3;
+    static final int CN1_PRIM_CHAR = 4;
+    static final int CN1_PRIM_FLOAT = 5;
+    static final int CN1_PRIM_DOUBLE = 6;
+    static final int CN1_PRIM_BOOLEAN = 7;
+    static final int CN1_PRIM_VOID = 8;
+
+    /**
+     * Returns the class object for a primitive type, e.g. the one
+     * {@code int.class} and {@link Integer#TYPE} denote.
+     *
+     * The wrapper classes cannot initialize their {@code TYPE} fields with a
+     * primitive class literal: javac lowers {@code int.class} to a read of
+     * {@code Integer.TYPE} itself, so {@code TYPE = int.class} compiles to
+     * {@code getstatic TYPE; putstatic TYPE} and leaves the field null. The JDK
+     * declares an equivalent native for the same reason.
+     *
+     * Takes an int code rather than a name so that it allocates nothing and
+     * decodes nothing: it runs inside the wrapper class initializers, which are
+     * among the earliest code in the process.
+     */
+    static native Class getPrimitiveClass(int typeCode);
+
     /**
      * Determines if this Class object represents an array class.
      */

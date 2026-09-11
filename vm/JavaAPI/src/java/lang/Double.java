@@ -29,7 +29,7 @@ package java.lang;
  */
 public final class Double extends Number implements Comparable<Double> {
     
-    public static final Class<Double> TYPE = double.class;
+    public static final Class<Double> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_DOUBLE);
     /**
      * The largest positive finite value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7fefffffffffffffL)
      * See Also:Constant Field Values
@@ -88,6 +88,14 @@ public final class Double extends Number implements Comparable<Double> {
      * If the argument is NaN, the result is 0x7ff8000000000000L.
      * In all cases, the result is a long integer that, when given to the longBitsToDouble(long) method, will produce a floating-point value equal to the argument to doubleToLongBits.
      */
+    /**
+     * The raw IEEE 754 bits of {@code value}, without collapsing NaN to the
+     * canonical NaN. See {@link Float#floatToRawIntBits} for why this delegates.
+     */
+    public static long doubleToRawLongBits(double value) {
+        return doubleToLongBits(value);
+    }
+
     public native static long doubleToLongBits(double value);
 
     /**

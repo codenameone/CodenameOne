@@ -29,7 +29,7 @@ package java.lang;
  */
 public final class Integer extends Number implements Comparable<Integer> {
     
-    public static final Class<Integer> TYPE = int.class;
+    public static final Class<Integer> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_INT);
     
     private static final char[] DIGITS = {
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -357,6 +357,18 @@ public final class Integer extends Number implements Comparable<Integer> {
      */
     public static int signum(int i) {
         return (i >> 31) | (-i >>> 31); // Hacker's delight 2-7
+    }
+
+    /**
+     * Rotates the two's-complement binary representation of {@code i} left by
+     * {@code distance} bits.
+     *
+     * The shift distance is used modulo 32 by the JLS shift rules, which is what
+     * makes the negation on the right half correct for every distance, including
+     * zero and multiples of 32.
+     */
+    public static int rotateLeft(int i, int distance) {
+        return (i << distance) | (i >>> -distance);
     }
 
     public static int compare(int f1, int f2) {
