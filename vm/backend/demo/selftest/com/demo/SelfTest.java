@@ -451,6 +451,8 @@ public class SelfTest {
             "Sun, 06 Nov 9999 -1:-1:-1 GMT",   // negative fields fit the fixed width
             "Sun, 06 Nov 9999 +1:+1:+1 GMT",   // and so does a signed one
             "Sun,  6 Nov 1994 08:49:37 GMT",   // space-padded day, an asctime habit
+            "Xxx, 06 Nov 9999 08:49:37 GMT",   // not a weekday at all
+            "Mon, 06 Nov 1994 08:49:37 GMT",   // a weekday, but not THAT date's
             "Sunday, 06-Nov-94 08:49:37 GMT",  // RFC 850, deliberately unsupported
         };
         for(int iter = 0 ; iter < bad.length ; iter++) {

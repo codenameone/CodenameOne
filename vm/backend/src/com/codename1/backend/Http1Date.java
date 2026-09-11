@@ -131,6 +131,19 @@ public final class Http1Date {
                 return -1;
             }
             long days = daysFromCivil(year, month, day);
+            // The weekday, which the shape test above never looked at: the first
+            // three characters were accepted as-is, so "Xxx, 06 Nov 9999 ..." read
+            // as a year-9999 date and StaticFiles.isNotModified() answered 304 to
+            // it. This checks the name AGAINST THE DATE rather than only against
+            // the seven, which costs nothing -- daysFromCivil has already run --
+            // and is what RFC 9110 requires a sender to get right. Rejecting an
+            // inconsistent one is the safe direction: the answer is a full
+            // response rather than a 304, and every date this file emits is
+            // consistent by construction, so a client echoing our own
+            // Last-Modified back can never trip it.
+            if(!DAYS[(int)(((days % 7) + 7) % 7)].equals(v.substring(0, 3))) {
+                return -1;
+            }
             return ((days * 86400L) + hour * 3600L + minute * 60L + second) * 1000L;
         } catch (IndexOutOfBoundsException err) {
             // Unreachable while the shape test above pins the length at 29, and
