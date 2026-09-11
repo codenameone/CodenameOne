@@ -29,12 +29,22 @@ import java.util.Map;
 /// The invite that caused this install or open. Immutable; delivered to an
 /// [InviteListener].
 ///
-/// Read [#getMatchType] before acting on this. A deterministic match came
-/// through the store or from a code the user entered and is exact. A
-/// [Invites#MATCH_FINGERPRINT] match is a statistical guess made on the
-/// server, because the App Store carries no referrer of its own, and it is
-/// occasionally wrong. Do not pay a referral bounty on a probabilistic match
-/// without saying so.
+/// [#getMatchType] says how the invite was identified, and every answer is
+/// exact:
+///
+/// - [Invites#MATCH_DIRECT] -- the link opened an app that was already
+///   installed.
+/// - [Invites#MATCH_REFERRER] -- the code travelled through Google Play and
+///   came back verbatim.
+/// - [Invites#MATCH_APP_CLIP] -- an iOS App Clip was launched by the invite
+///   link, so it received the code exactly, and handed it to the app the
+///   person then installed.
+///
+/// Nothing here is matched, estimated or guessed, so a referral bounty can be
+/// paid on any of them. An earlier design added a statistical match for iOS,
+/// because the App Store carries no referrer of its own; App Clips made it
+/// unnecessary and it is gone, along with the profile of the visitor it
+/// needed.
 public final class InviteAttribution {
     private final String code;
     private final String campaign;
@@ -104,7 +114,7 @@ public final class InviteAttribution {
     }
 
     /// How this attribution was established: [Invites#MATCH_DIRECT],
-    /// [Invites#MATCH_REFERRER] or [Invites#MATCH_FINGERPRINT].
+    /// [Invites#MATCH_REFERRER] or [Invites#MATCH_APP_CLIP].
     ///
     /// #### Returns
     ///
@@ -113,8 +123,11 @@ public final class InviteAttribution {
         return matchType;
     }
 
-    /// How much to trust this attribution, from 0 to 1. Both deterministic
-    /// match types report 1; a fingerprint match reports the server's score.
+    /// How much to trust this attribution, from 0 to 1.
+    ///
+    /// Always 1. Every match type is exact now, so there is nothing left for
+    /// this to discount -- it survives because an application that branched on
+    /// it should keep compiling and keep taking the same branch.
     ///
     /// #### Returns
     ///

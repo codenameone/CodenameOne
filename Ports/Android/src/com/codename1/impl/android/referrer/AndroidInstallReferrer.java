@@ -51,11 +51,27 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
 
     private boolean retried;
 
-    // Whether the framework has been given its one answer. The SPI promises
-    // exactly one call, and the disconnect handler added below can arrive
-    // after a real answer as easily as instead of one -- ending a connection
-    // is itself what fires it.
+    // Whether the framework has been given its one answer FOR THIS EXCHANGE.
+    // The SPI promises exactly one call, and the disconnect handler below can
+    // arrive after a real answer as easily as instead of one -- ending a
+    // connection is itself what fires it.
+    //
+    // Reset by requestReferrer, and that reset is load bearing. Invites keeps
+    // one source instance and calls it again on a later flush; left set from a
+    // transient failure, this suppressed the retry's answer while deliver()
+    // had already recorded the read as attempted, so an exact code was read
+    // and thrown away and no relaunch could ask for it again.
     private boolean answered;
+
+    // Which attempt is current. Every bind captures this and answers only
+    // while it still matches.
+    //
+    // One counter rather than a flag per attempt, because two different things
+    // supersede a listener and both have to be caught: the retry below, whose
+    // close() fires the OLD listener's disconnect, and a later flush, which
+    // starts a whole new exchange that a lingering listener from the previous
+    // one would otherwise answer.
+    private int attemptSeq;
 
     @Override
     public boolean isSupported() {
@@ -65,9 +81,19 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
 
     @Override
     public void requestReferrer(InstallReferrerCallback callback) {
+        // A NEW exchange, so both guards start clean. The internal retry does
+        // not come through here -- it calls attempt() directly -- because
+        // resetting `retried` there would turn one allowance into a loop.
+        answered = false;
+        retried = false;
+        attempt(callback);
+    }
+
+    private void attempt(InstallReferrerCallback callback) {
+        attemptSeq++;
         Context context = AndroidNativeUtil.getContext();
         if (context == null) {
-            unavailable(callback, Invites.REASON_UNSUPPORTED);
+            unavailable(attemptSeq, callback, Invites.REASON_UNSUPPORTED);
             return;
         }
         try {
@@ -77,23 +103,25 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
             // never as a crash: the application still works, it simply has no
             // invite behind it.
             Log.e(t);
-            finish(callback, Invites.REASON_UNSUPPORTED);
+            finish(attemptSeq, callback, Invites.REASON_UNSUPPORTED);
         }
     }
 
     private void connect(final InstallReferrerClient client,
             final InstallReferrerCallback callback) {
-        // Per ATTEMPT, not per instance. The retry below ends this connection,
-        // which fires this listener's own disconnect -- and that must not be
-        // read as the retried connection failing.
-        final boolean[] superseded = new boolean[1];
+        // Captured, not read at callback time. The retry below ends this
+        // connection, which fires this listener's own disconnect, and a later
+        // flush starts a whole new exchange -- a listener that read the field
+        // when it fired would inherit whichever attempt is current and answer
+        // for it.
+        final int issued = attemptSeq;
         client.startConnection(new InstallReferrerStateListener() {
             @Override
             public void onInstallReferrerSetupFinished(int responseCode) {
                 try {
                     switch (responseCode) {
                         case InstallReferrerClient.InstallReferrerResponse.OK:
-                            deliver(client, callback);
+                            deliver(issued, client, callback);
                             break;
                         case InstallReferrerClient.InstallReferrerResponse.SERVICE_UNAVAILABLE:
                             // Transient. Exactly one retry: a loop here would
@@ -101,9 +129,18 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                             // never going to answer.
                             if (!retried) {
                                 retried = true;
-                                superseded[0] = true;
+                                // The sequence advances BEFORE the close, and
+                                // that order is the whole guard. Ending a
+                                // connection is what fires its own listener's
+                                // disconnect, so closing while this attempt is
+                                // still current lets that disconnect answer
+                                // the exchange the retry was about to make --
+                                // with "no referral", for a store that had not
+                                // been asked yet. attempt() advances it again,
+                                // which only skips a number.
+                                attemptSeq++;
                                 close(client);
-                                requestReferrer(callback);
+                                attempt(callback);
                                 return;
                             }
                             // Transient, so it is NOT recorded as attempted.
@@ -113,7 +150,7 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                             // skip the deterministic path and fall back to a
                             // statistical guess for a referrer we could have
                             // read exactly.
-                            unavailable(callback, Invites.REASON_NO_MATCH);
+                            unavailable(issued, callback, Invites.REASON_NO_MATCH);
                             break;
                         default:
                             // FEATURE_NOT_SUPPORTED is the ordinary answer on a
@@ -122,14 +159,14 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                             // store. Terminal: this device will never have a
                             // referrer, so the flag is recorded and the bind is
                             // not attempted again.
-                            finish(callback, Invites.REASON_UNSUPPORTED);
+                            finish(issued, callback, Invites.REASON_UNSUPPORTED);
                             break;
                     }
                 } catch (Throwable t) {
                     // Unknown failure: treated as transient, so a later flush
                     // can still read a referrer that is genuinely there.
                     Log.e(t);
-                    unavailable(callback, Invites.REASON_NO_MATCH);
+                    unavailable(issued, callback, Invites.REASON_NO_MATCH);
                 } finally {
                     close(client);
                 }
@@ -151,15 +188,13 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                 // Reported as transient, which is what it is -- the once-only
                 // flag stays unburnt, so a later flush can still read a
                 // referrer that was there the whole time.
-                if (superseded[0]) {
-                    return;
-                }
-                unavailable(callback, Invites.REASON_NO_MATCH);
+                unavailable(issued, callback, Invites.REASON_NO_MATCH);
             }
         });
     }
 
-    private void deliver(InstallReferrerClient client, InstallReferrerCallback callback) {
+    private void deliver(int issued, InstallReferrerClient client,
+            InstallReferrerCallback callback) {
         String referrer = "";
         long clickSeconds = 0;
         long beginSeconds = 0;
@@ -186,20 +221,20 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
             // statistical no-match settles the install as organic -- for a
             // referrer that was there all along and simply could not be read
             // this once.
-            unavailable(callback, Invites.REASON_NO_MATCH);
+            unavailable(issued, callback, Invites.REASON_NO_MATCH);
             return;
         }
         Preferences.set(PREF_ATTEMPTED, true);
         if (referrer == null || referrer.length() == 0) {
-            unavailable(callback, Invites.REASON_NO_MATCH);
+            unavailable(issued, callback, Invites.REASON_NO_MATCH);
             return;
         }
-        referrer(callback, referrer, clickSeconds, beginSeconds);
+        referrer(issued, callback, referrer, clickSeconds, beginSeconds);
     }
 
-    private void finish(InstallReferrerCallback callback, String reason) {
+    private void finish(int issued, InstallReferrerCallback callback, String reason) {
         Preferences.set(PREF_ATTEMPTED, true);
-        unavailable(callback, reason);
+        unavailable(issued, callback, reason);
     }
 
     /// Reports "no referral", at most once.
@@ -207,17 +242,17 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
     /// Every terminal path goes through here so the disconnect handler can
     /// close an exchange nobody else closed without risking a second answer
     /// for one that somebody did.
-    private void unavailable(InstallReferrerCallback callback, String reason) {
-        if (answered) {
+    private void unavailable(int issued, InstallReferrerCallback callback, String reason) {
+        if (answered || issued != attemptSeq) {
             return;
         }
         answered = true;
         callback.onUnavailable(reason);
     }
 
-    private void referrer(InstallReferrerCallback callback, String value,
+    private void referrer(int issued, InstallReferrerCallback callback, String value,
             long clickSeconds, long beginSeconds) {
-        if (answered) {
+        if (answered || issued != attemptSeq) {
             return;
         }
         answered = true;

@@ -4485,23 +4485,28 @@ public class IPhoneBuilder extends Executor {
                 // which needed it to decide whether to register a reader at
                 // all. Re-deriving it here would let the two disagree.
                 String group = inviteAppClipGroup;
-                // Entry by entry, never a substring test: group.com.acme.shared
-                // contains group.com.acme, and deciding the group is already
-                // present on that basis entitles the clip for one group and the
-                // application for another -- two processes that sign, install,
-                // and never meet.
+                // SPACE, not a comma, and read through declaresAppGroup.
+                //
+                // generateEntitlements splits ios.app_groups on " " alone, so
+                // a comma-joined pair reaches the device as a single <string>
+                // "group.a,group.b", which matches neither configured group.
+                // The app then signs and cannot open the container it shares
+                // with its own clip, which
+                // is this feature failing with no error anywhere. An app with
+                // no other app group never saw it, because there was nothing
+                // to join to.
+                //
+                // declaresAppGroup compares entry by entry and tolerates
+                // either separator when reading, which is both what makes this
+                // safe against a hand-written comma list and what hid the bug:
+                // group.com.acme.shared contains group.com.acme, and a
+                // substring test would decide the group was already present
+                // and entitle the clip for one group and the app for another.
                 String appGroups = request.getArg("ios.app_groups", "");
-                boolean present = false;
-                for (String candidate : appGroups.split(",")) {
-                    if (candidate.trim().equals(group)) {
-                        present = true;
-                        break;
-                    }
-                }
-                if (!present) {
+                if (!declaresAppGroup(appGroups, group)) {
                     request.putArgument("ios.app_groups",
                             appGroups.trim().length() == 0 ? group
-                                    : appGroups.trim() + "," + group);
+                                    : appGroups.trim() + " " + group);
                 }
                 try {
                     replaceInFile(new File(buildinRes,

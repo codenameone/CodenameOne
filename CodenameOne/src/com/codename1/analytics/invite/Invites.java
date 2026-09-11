@@ -250,9 +250,8 @@ public final class Invites {
     /// A direct link was the worst case: `handleUrl` committed STATE_PENDING
     /// and issued the claim, and if that request also failed, the exact code
     /// existed nowhere. The retry then read a record with no code in it and
-    /// fell back to the install referrer or the fingerprint -- answering a
-    /// question the device already had an exact answer to, with a guess or not
-    /// at all.
+    /// fell back to the install referrer or the App Clip handoff -- asking a
+    /// question the device already had an exact answer to.
     ///
     /// Held only while the durable copy is missing: a successful write clears
     /// it, so this can never disagree with what is on the disk. It does not
@@ -994,7 +993,7 @@ public final class Invites {
     }
 
     /// Forgets every trace of invite attribution on this device: the pending
-    /// fingerprint, the resolved attribution and the referral dimensions.
+    /// lookup, the resolved attribution and the referral dimensions.
     ///
     /// [Analytics#resetClientId] triggers this for you, because an erasure
     /// that left the referral dimensions behind would re-link the fresh
