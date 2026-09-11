@@ -226,6 +226,9 @@ public final class Invites {
     // with this application. Registered by the build the same way, and absent
     // on every platform that has no clip.
     private static AppClipHandoffSource appClipSource;
+    // Set when a clip handoff has been read and not yet made durable. The clip
+    // container is the only copy until then, so it must not be cleared early.
+    private static boolean handoffAwaitingAck;
 
     // Set when an erasure could not remove the durable records, and cleared
     // when a later attempt does. Nothing that transmits may run while it is
@@ -1908,7 +1911,44 @@ public final class Invites {
         // Cleared on success rather than left behind, so the fallback can never
         // shadow a newer durable record.
         pendingFallback = written ? null : record;
+        if (written) {
+            ackHandoff(record);
+        }
         return written;
+    }
+
+    /// Lets the App Clip drop its copy, once ours is durable.
+    ///
+    /// Here rather than beside the first write, because the first write is not
+    /// the only one that can make the record durable. A write that fails
+    /// leaves the record in `pendingFallback`, and `readPending()` retries it
+    /// the next time anything wants it -- so the code became durable with
+    /// nobody telling the clip, and its container kept the code for ever.
+    ///
+    /// That is not merely untidy. The container is read on launch, so a code
+    /// left in it outlives an erasure: the user erased their attribution, the
+    /// next launch found the handoff again and restored exactly what the
+    /// erasure promised to forget.
+    ///
+    /// Every path that persists goes through `writePending`, so acknowledging
+    /// here covers the retries without any of them having to remember to.
+    private static void ackHandoff(Map<String, String> record) {
+        if (!handoffAwaitingAck || !"app_clip".equals(record.get("codeSource"))) {
+            return;
+        }
+        AppClipHandoffSource source = appClipSource;
+        // Cleared whether or not there is still a source to tell: the flag
+        // tracks this process's obligation, and a source that has gone away
+        // cannot be handed anything.
+        handoffAwaitingAck = false;
+        if (source == null) {
+            return;
+        }
+        try {
+            source.handoffPersisted();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
     }
 
     /// Forgets the in-memory copy, for the paths that delete the record.
@@ -2433,23 +2473,23 @@ public final class Invites {
                             record.put("codeClicked",
                                     String.valueOf(clickedSeconds * 1000L));
                         }
-                        if (writePending(record)) {
-                            // And only now may the source let go of its own
-                            // copy. The container the clip wrote is the ONLY
-                            // durable copy until this write lands, so a source
-                            // that emptied it as it read destroyed the exact
-                            // code whenever this failed or the process exited
-                            // first -- and the next launch, finding no
-                            // handoff, settled an invited install as no_match
-                            // for ever. A write that failed leaves the
-                            // container alone, so the next launch reads it
-                            // again.
-                            try {
-                                source.handoffPersisted();
-                            } catch (Throwable t) {
-                                Log.e(t);
-                            }
-                        }
+                        // Owed from here until the record is durable, which
+                        // may be this write or a later retry of it.
+                        // And the source may let go of its own copy only
+                        // once ours is durable -- which writePending() reports
+                        // by calling handoffPersisted(), here or on whichever
+                        // later retry succeeds.
+                        //
+                        // The container the clip wrote is the ONLY durable
+                        // copy until then, so a source that emptied it as it
+                        // read destroyed the exact code whenever the write
+                        // failed or the process exited first -- and the next
+                        // launch, finding no handoff, settled an invited
+                        // install as no_match for ever. A write that failed
+                        // leaves the container alone, so the next launch reads
+                        // it again.
+                        handoffAwaitingAck = true;
+                        writePending(record);
                         // Claimed exactly as a referrer code is: the trip
                         // through the store is what makes both of them exact,
                         // and the server treats them the same way.

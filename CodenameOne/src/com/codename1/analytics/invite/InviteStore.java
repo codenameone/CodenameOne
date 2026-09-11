@@ -123,7 +123,18 @@ final class InviteStore {
     private static String failNextNamed;
 
     static void failNextWriteForTest(String name) {
+        failWritesForTest(name, 1);
+    }
+
+    // How many more writes of that record must fail. A single shot is not
+    // enough to hold a record undurable: readPending() retries the held copy
+    // the next time anything reads it, so a test that wants to observe "still
+    // not saved" has to outlast the retry as well as the first attempt.
+    private static int failNamedRemaining;
+
+    static void failWritesForTest(String name, int count) {
         failNextNamed = name;
+        failNamedRemaining = count;
     }
 
     // The same seam for a delete. Storage.deleteStorageFile cannot be made to
@@ -136,7 +147,10 @@ final class InviteStore {
 
     static boolean write(String record, Map<String, String> values) {
         if (record != null && record.equals(failNextNamed)) {
-            failNextNamed = null;
+            failNamedRemaining--;
+            if (failNamedRemaining <= 0) {
+                failNextNamed = null;
+            }
             return false;
         }
         try {

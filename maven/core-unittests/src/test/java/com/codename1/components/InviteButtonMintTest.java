@@ -29,9 +29,11 @@ import com.codename1.analytics.invite.Invite;
 import com.codename1.analytics.invite.Invites;
 import com.codename1.junit.FormTest;
 import com.codename1.share.ShareResult;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.share.ShareResultListener;
 import com.codename1.junit.UITestBase;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -113,5 +115,72 @@ public class InviteButtonMintTest extends UITestBase {
         assertNotSame(first, second,
                 "a press after the sheet had already answered re-shared the invite "
                         + "that was just sent, so its outcome is reported twice");
+    }
+
+    @FormTest
+    void aSecondPressWhileTheSheetIsOutstandingDoesNothing() {
+        // Reusing the code was only half of it. ShareButton defers to the next
+        // EDT cycle and then shares unconditionally, so two presses inside one
+        // cycle still enqueued two presentations: two native sheets attempted,
+        // the app's listener called twice, and -- because the first result
+        // takes the outstanding mark -- the SECOND share reported to nobody.
+        // A real share missing from the funnel is the part the reuse caused.
+        Invites.reset();
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+        final int[] presented = new int[1];
+        InviteButton button = new InviteButton("Invite a friend") {
+            @Override
+            void presentShare(ActionEvent evt) {
+                // NOT delegated: ShareButton would defer to the next EDT cycle
+                // and open a sheet. Counting here is what the press does, and
+                // it is the thing the guard changes.
+                presented[0]++;
+            }
+        };
+
+        button.actionPerformed(new ActionEvent(button));
+        button.actionPerformed(new ActionEvent(button));
+
+        assertNotNull(button.getInvite(), "the first press minted nothing");
+        assertEquals(1, presented[0],
+                "a second press while the sheet was still outstanding presented "
+                        + "another share, so two sheets are attempted, the app's "
+                        + "listener is called twice, and the second share -- whose "
+                        + "outstanding mark the first result already took -- is "
+                        + "reported to nobody");
+    }
+
+    @FormTest
+    void aPressAfterTheSheetAnsweredWorksAgain() {
+        // The guard must not be a latch: swallowing every later press would
+        // make the button dead after one share. Safe to swallow at all only
+        // because Display.share() always reports an outcome -- with a null
+        // package name where the platform cannot say -- so the outstanding
+        // mark is always cleared.
+        Invites.reset();
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+        final int[] presented = new int[1];
+        InviteButton button = new InviteButton("Invite a friend") {
+            @Override
+            void presentShare(ActionEvent evt) {
+                presented[0]++;
+            }
+        };
+
+        button.actionPerformed(new ActionEvent(button));
+        Invite first = button.getInvite();
+        button.chain.onResult(ShareResult.sharedTo("com.example.chat"));
+        button.actionPerformed(new ActionEvent(button));
+        Invite second = button.getInvite();
+
+        assertEquals(2, presented[0],
+                "the guard is a latch: the press after a completed share never "
+                        + "reached the share sheet");
+
+        assertNotNull(second, "the button was dead after one completed share");
+        assertNotSame(first, second,
+                "the press after a completed share did not mint a fresh invite");
     }
 }

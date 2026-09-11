@@ -116,6 +116,12 @@ final class InviteTestSupport {
         pendingHandoff = new PendingHandoffSource();
         Invites.registerAppClipHandoffSource(pendingHandoff);
         Invites.lookupRetryDelay = 30000L;
+        // Any unspent write failure a previous case armed is disarmed here.
+        // It used to disarm itself, because one failure consumed it; a case
+        // that asks for several can leave a count behind, and a store that
+        // refuses to save in a test that never asked for it is a confusing
+        // way to fail.
+        InviteStore.failWritesForTest(null, 0);
         Invites.reset();
         Preferences.delete(Invites.PREF_SLUG);
         Preferences.delete(Invites.PREF_CONSUMED_ARG);

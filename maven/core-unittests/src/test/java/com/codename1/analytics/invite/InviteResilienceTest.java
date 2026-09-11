@@ -479,12 +479,49 @@ class InviteResilienceTest extends UITestBase {
         Invites.checkForInvite();
         assertTrue(source.wasAsked(), "the fixture never reached the clip handoff");
 
-        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+        // Every write of the record fails, retries included. One failure is
+        // not enough to show this: claim() reads the record on its way out and
+        // readPending() persists the held copy, so a single shot leaves it
+        // durable -- which is the case the test below covers.
+        InviteStore.failWritesForTest(InviteStore.PENDING, 8);
         source.answer("CLIPACK2", 1700000000L);
 
+        assertTrue(Invites.pendingFallbackPresentForTest(),
+                "the record was saved after all, so this proves nothing");
         assertEquals(0, source.persistedCount(),
-                "the source was told to discard the only copy of the code after the "
-                        + "write that was supposed to keep it had failed");
+                "the source was told to discard the only copy of the code while the "
+                        + "write that was supposed to keep it kept failing");
+    }
+
+    @FormTest
+    void aClipHandoffAcknowledgedWhenTheRETRYPersistsIt() {
+        // The other end of the same obligation. A failed write leaves the
+        // record in memory and readPending() retries it the next time anything
+        // wants it -- so the code became durable through a path that never
+        // told the clip, and its container kept the code for ever.
+        //
+        // That outlives an erasure: the container is read on launch, so the
+        // next one found the handoff again and restored exactly the
+        // attribution the user asked to be forgotten.
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        InviteTestSupport.PendingHandoffSource source = InviteTestSupport.pendingHandoff;
+        Invites.checkForInvite();
+        assertTrue(source.wasAsked(), "the fixture never reached the clip handoff");
+
+        // Exactly ONE write fails. The held record is then persisted by the
+        // retry inside readPending(), which claim() reaches on its way out --
+        // the path that used to make the code durable with nobody telling the
+        // clip.
+        InviteStore.failNextWriteForTest(InviteStore.PENDING);
+        source.answer("CLIPRETRY", 1700000000L);
+
+        assertFalse(Invites.pendingFallbackPresentForTest(),
+                "the retry did not persist the held record, so this proves nothing");
+        assertEquals(1, source.persistedCount(),
+                "the record became durable through the retry and the clip was never "
+                        + "told, so its container keeps the code and a launch after an "
+                        + "erasure restores the attribution that was erased");
     }
 
     @FormTest

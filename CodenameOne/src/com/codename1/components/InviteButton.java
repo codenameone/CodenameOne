@@ -209,9 +209,43 @@ public class InviteButton extends ShareButton {
     /// {@inheritDoc}
     @Override
     public void actionPerformed(ActionEvent evt) {
+        // A press while a share is still outstanding does NOTHING, rather than
+        // reusing the code and presenting a second time.
+        //
+        // ShareButton defers to the next EDT cycle and then shares
+        // unconditionally, so two presses within one cycle enqueue two
+        // presentations. Reusing the invite made both carry the same code,
+        // which was the point, but it left the rest: two native sheets
+        // attempted, the application's result listener called twice, and --
+        // because the first result takes `outstanding` -- the second share
+        // reported to nobody. A real share missing from the funnel is the
+        // worst of those, and it is the one the reuse introduced.
+        //
+        // Safe to swallow the press because the outcome always arrives:
+        // Display.share() documents that the listener is invoked even where
+        // the platform cannot report a result, with a null package name, so
+        // `outstanding` cannot be left set by a share that never answers.
+        if (outstanding != null) {
+            return;
+        }
         mintForShare();
-        // ShareButton defers the share by one EDT cycle, so setting the text
-        // in mintForShare() is in time.
+        presentShare(evt);
+    }
+
+    /// Hands the press to [ShareButton], which presents the sheet.
+    ///
+    /// Package private so a test can count presentations. Whether a second
+    /// press presents a second time is not observable otherwise: ShareButton
+    /// defers to the next EDT cycle, and the sheet it opens there is the one
+    /// part of a press that cannot run headless.
+    ///
+    /// ShareButton defers by one EDT cycle, so the text set in
+    /// `mintForShare()` is in time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`: the press
+    void presentShare(ActionEvent evt) {
         super.actionPerformed(evt);
     }
 
