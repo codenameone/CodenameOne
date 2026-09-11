@@ -50,8 +50,22 @@ public class InviteButton extends ShareButton {
     private String channel;
     private String payload;
     private String message;
+    // Two fields, because they answer two different questions and clearing
+    // one on a result silently broke the other. `invite` is what getInvite()
+    // reports -- the invite minted for the most recent press, which an
+    // application reads from inside its own ShareResultListener to tell which
+    // invite the ShareResult belongs to, so it has to survive the result.
+    // `outstanding` is the one still awaiting a result, and exists only to
+    // stop a second press minting a second code; it is cleared as soon as the
+    // outcome is taken, so that outcome can be reported exactly once.
     private Invite invite;
+    private Invite outstanding;
     private ShareResultListener appListener;
+    // The chained listener super was given. Package private so a test can
+    // deliver a ShareResult without the share sheet -- getShareResultListener()
+    // is overridden to answer with the application's listener, so the chain is
+    // otherwise unreachable from outside a real press.
+    ShareResultListener chain;
 
     /// Default constructor.
     public InviteButton() {
@@ -77,13 +91,16 @@ public class InviteButton extends ShareButton {
     // listener would silently replace the chain and the funnel would lose
     // every share.
     private void installChain() {
-        super.setShareResultListener(new ShareResultListener() {
+        chain = new ShareResultListener() {
             @Override
             public void onResult(com.codename1.share.ShareResult result) {
                 // Taken and CLEARED, so the next press mints again and this
-                // outcome can only ever be reported once.
-                Invite current = invite;
-                invite = null;
+                // outcome can only ever be reported once. Only the outstanding
+                // mark is cleared -- getInvite() still answers, because the
+                // application's listener runs below and correlating the result
+                // with its invite is the whole reason that accessor exists.
+                Invite current = outstanding;
+                outstanding = null;
                 if (current != null) {
                     Invites.reportShareResult(current, result);
                 }
@@ -91,7 +108,8 @@ public class InviteButton extends ShareButton {
                     appListener.onResult(result);
                 }
             }
-        });
+        };
+        super.setShareResultListener(chain);
     }
 
     /// Groups the invites this button mints under a campaign.
@@ -229,13 +247,17 @@ public class InviteButton extends ShareButton {
         // construction. Sharing one code more than once is the ordinary shape
         // of a referral anyway -- a code is not per recipient, it is the
         // inviter's -- so nothing is lost by not minting a second.
-        if (invite == null) {
-            invite = Invites.create(b.build());
+        if (outstanding == null) {
+            outstanding = Invites.create(b.build());
+            invite = outstanding;
         }
+        // The outstanding one, not the accessor's: this is the invite whose
+        // url goes into the sheet, and the two only ever differ if a future
+        // change lets them.
         String text = message == null || message.length() == 0
-                ? invite.getUrl() : message + " " + invite.getUrl();
+                ? outstanding.getUrl() : message + " " + outstanding.getUrl();
         setTextToShare(text);
-        return invite;
+        return outstanding;
     }
 
     /// {@inheritDoc}
