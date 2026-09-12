@@ -21,7 +21,7 @@ Despite that you still need to keep in mind that the binary could still be rever
 
 Each section below discusses some attack vectors against applications and how they can be stopped. Pretty much all these attacks require a sophisticated attacker which will exist for high value targets (for example, bank apps, government etc.).
 
-The sections that follow work through the places a value can be kept, from the weakest to the strongest. They aren't interchangeable: each one answers a different attacker, and the first two barely answer any.
+The sections that follow work through the places a value can be kept. They aren't interchangeable and they aren't a single ranking: each one answers a different attacker, the first two barely answer any, and the last two compose rather than compete -- `Secrets` caches what it fetches in `SecureStorage`. A per-user token belongs in the keychain; an app-wide key you want to rotate without a release belongs in the vault.
 
 image::img/security-secret-storage.svg[Where a secret can live and what each place protects,scaledwidth=95%]
 
