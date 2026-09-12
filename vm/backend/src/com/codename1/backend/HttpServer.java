@@ -5188,6 +5188,40 @@ public final class HttpServer {
                         throw new ProtocolException(400, "chunk trailers too large");
                     }
                     boolean blank = trailerEnd == conn.pos;
+                    if(!blank) {
+                        // THE SAME CHECKS THE HEADER BLOCK GETS, and for the same
+                        // reason. This loop finds the end of a trailer by scanning
+                        // for CRLF, so a bare LF inside one was just a byte to it:
+                        // a zero chunk followed by "X: v\n\nGET /next ..." ended
+                        // the trailer section at an intermediary that treats LF as
+                        // a delimiter, while this consumed the whole thing --
+                        // including the next request -- as opaque trailer text. The
+                        // two then disagree about where the next request starts on
+                        // a reused connection, which is the whole of smuggling. The
+                        // header block above refuses exactly this shape; a trailer
+                        // is a header field and gets the same treatment.
+                        int colon = -1;
+                        for(int scan = conn.pos ; scan < trailerEnd ; scan++) {
+                            if(conn.buffer[scan] == ':') {
+                                colon = scan;
+                                break;
+                            }
+                        }
+                        // No colon covers obsolete folding too: a continuation line
+                        // begins with space and carries none.
+                        if(colon < 0 || !isRequestHeaderName(conn.buffer, conn.pos, colon)) {
+                            throw new ProtocolException(400, "malformed trailer name");
+                        }
+                        int valueStart = colon + 1;
+                        while(valueStart < trailerEnd && (conn.buffer[valueStart] == ' '
+                                || conn.buffer[valueStart] == '\t')) {
+                            valueStart++;
+                        }
+                        if(hasControlByte(conn.buffer, valueStart, trailerEnd)) {
+                            throw new ProtocolException(400,
+                                    "control character in a trailer value");
+                        }
+                    }
                     conn.pos = trailerEnd + 2;
                     if(blank) {
                         return body.toByteArray();

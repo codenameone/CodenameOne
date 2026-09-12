@@ -591,12 +591,44 @@ public class BackendPackageMojo extends AbstractMojo {
     private File resolveJdk8() throws MojoFailureException {
         if (jdk8Home != null && jdk8Home.length() > 0) {
             File home = new File(jdk8Home);
-            if (new File(home, "bin/javac").isFile()) {
+            if (hasJavac(home)) {
                 return home;
             }
         }
-        throw new MojoFailureException("A JDK 8 is required to translate; set "
-                + "JDK_8_HOME or -Dcn1.backend.jdk8");
+        // THE JDK RUNNING MAVEN, when that is already a JDK 8.
+        //
+        // The documented setup selects Java 8 through JAVA_HOME, which is the
+        // standard way to say it; JDK_8_HOME is an extra this plugin asked for. A
+        // developer who followed the instructions therefore has exactly the right
+        // compiler -- it is the one compiling everything else in the build -- and
+        // was told the packaging command needs a second variable naming the same
+        // directory. Falling back to it makes the documented setup sufficient.
+        //
+        // The version is CHECKED rather than assumed: translating with a newer
+        // javac would produce class files the translator cannot read, and the
+        // failure would arrive much later and say something else.
+        String version = System.getProperty("java.version");
+        if (version != null && version.startsWith("1.8")) {
+            File running = new File(System.getProperty("java.home"));
+            if (hasJavac(running)) {
+                return running;
+            }
+            // The old layout points java.home at the jre inside the JDK, where
+            // there is no compiler; it is one level up.
+            File parent = running.getParentFile();
+            if (parent != null && hasJavac(parent)) {
+                return parent;
+            }
+        }
+        throw new MojoFailureException("A JDK 8 is required to translate. Run "
+                + "Maven on a JDK 8, or set JDK_8_HOME or -Dcn1.backend.jdk8 to "
+                + "one.");
+    }
+
+    /** Windows names it javac.exe, and a JRE has neither. */
+    private static boolean hasJavac(File home) {
+        return new File(home, "bin/javac").isFile()
+                || new File(home, "bin/javac.exe").isFile();
     }
 
     private File resolve(String groupId, String artifactId, String version, String classifier)

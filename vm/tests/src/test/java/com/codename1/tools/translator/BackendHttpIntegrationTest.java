@@ -2302,6 +2302,50 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    void aChunkedTrailerIsValidatedLikeAHeader() throws Exception {
+        // A trailer IS a header field, and this parser finds the end of one by
+        // scanning for CRLF -- so a bare LF inside a trailer was just a byte to it.
+        // An intermediary that accepts LF as a delimiter ends the trailer section
+        // early and reads what follows as the next request, while this server
+        // swallowed the whole thing as opaque trailer text. The two then disagree
+        // about where the next request starts on a reused connection, which is the
+        // whole of request smuggling.
+        String smuggled = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                + "0\r\n"
+                + "X: v\nGET /healthz HTTP/1.1\r\n"
+                + "\r\n";
+        assertEquals(400, statusOf(rawBytes(smuggled.getBytes(StandardCharsets.ISO_8859_1))),
+                "a trailer carrying a bare LF is not a trailer");
+
+        // A trailer whose name is not a token is refused for the same reason the
+        // header block refuses one.
+        String badName = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                + "0\r\n"
+                + "not a name: v\r\n"
+                + "\r\n";
+        assertEquals(400, statusOf(rawBytes(badName.getBytes(StandardCharsets.ISO_8859_1))),
+                "a trailer name with spaces in it is not a token");
+
+        // And a well-formed trailer still works, so what was refused is the
+        // malformation rather than trailers.
+        String good = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                + "5\r\nhello\r\n"
+                + "0\r\n"
+                + "X-Checksum: v\r\n"
+                + "\r\n";
+        byte[] answered = rawBytes(good.getBytes(StandardCharsets.ISO_8859_1));
+        assertEquals(200, statusOf(answered), "a well-formed trailer is still accepted");
+        // /echo answers with the method and the body LENGTH, so five is the whole
+        // chunk arriving through the trailer path rather than being cut short by
+        // the new checks.
+        assertTrue(body(answered).contains("len=5"),
+                "and the body it followed still arrives whole: " + body(answered));
+    }
+
+    @Test
     void aMalformedPercentEscapeIsRefused() throws Exception {
         // RFC 3986 leaves one reading of '%': two hex digits follow it. The server
         // used to decline to DECODE a malformed escape and then copy it through as

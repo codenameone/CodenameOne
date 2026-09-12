@@ -22,7 +22,9 @@
  */
 package com.demo;
 
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.codename1.backend.Db;
@@ -66,16 +68,23 @@ public class Greeter {
                 if(method == null || path == null) {
                     return error(400, "expected httpMethod and path");
                 }
+                // THE QUERY IS A SEPARATE FIELD in a proxy event, and the dispatcher
+                // reads it out of the target like any other server would. Handing it
+                // the bare path made every @Query parameter arrive null here while
+                // the same dispatcher bound them correctly under PetServer -- the
+                // generated code was right and the glue in front of it was not,
+                // which is the one thing this demo exists to get right.
+                String target = withQuery(path, envelope);
                 Map headers = envelope.get("headers") instanceof Map
                         ? (Map)envelope.get("headers") : null;
                 Object body = decodeBody(envelope.get("body"));
 
-                if(!dispatcher.hasRoute(method, path)) {
+                if(!dispatcher.hasRoute(method, target)) {
                     return error(404, "no route for " + method + " " + path);
                 }
                 Object result;
                 try {
-                    result = dispatcher.dispatch(method, path, headers, body);
+                    result = dispatcher.dispatch(method, target, headers, body);
                 } catch (SecurityException err) {
                     // Authentication or authorisation failed; not a server fault.
                     return error(401, err.getMessage());
@@ -113,6 +122,78 @@ public class Greeter {
             return text;
         }
     }
+
+    /**
+     * The target the dispatcher expects: path, then the query the event carries
+     * beside it.
+     *
+     * <p>An API Gateway proxy event puts query values in queryStringParameters,
+     * and in multiValueQueryStringParameters when a name repeats. Both are decoded
+     * already, so they are percent-encoded back on the way in -- a value holding
+     * '&' or '=' would otherwise arrive as two parameters or as a different one.
+     */
+    private static String withQuery(String path, Map envelope) {
+        Object multi = envelope.get("multiValueQueryStringParameters");
+        Object single = envelope.get("queryStringParameters");
+        StringBuilder query = new StringBuilder();
+        if(multi instanceof Map) {
+            Iterator entries = ((Map)multi).entrySet().iterator();
+            while(entries.hasNext()) {
+                Map.Entry entry = (Map.Entry)entries.next();
+                Object values = entry.getValue();
+                if(values instanceof List) {
+                    List list = (List)values;
+                    for(int iter = 0 ; iter < list.size() ; iter++) {
+                        appendParam(query, String.valueOf(entry.getKey()),
+                                list.get(iter));
+                    }
+                } else {
+                    appendParam(query, String.valueOf(entry.getKey()), values);
+                }
+            }
+        } else if(single instanceof Map) {
+            Iterator entries = ((Map)single).entrySet().iterator();
+            while(entries.hasNext()) {
+                Map.Entry entry = (Map.Entry)entries.next();
+                appendParam(query, String.valueOf(entry.getKey()), entry.getValue());
+            }
+        }
+        return query.length() == 0 ? path : path + "?" + query;
+    }
+
+    private static void appendParam(StringBuilder query, String name, Object value) {
+        if(query.length() > 0) {
+            query.append('&');
+        }
+        escape(query, name);
+        query.append('=');
+        escape(query, value == null ? "" : String.valueOf(value));
+    }
+
+    /** Unreserved characters as themselves, everything else as its UTF-8 octets. */
+    private static void escape(StringBuilder out, String value) {
+        byte[] utf8;
+        try {
+            utf8 = value.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException err) {
+            utf8 = value.getBytes();
+        }
+        for(int iter = 0 ; iter < utf8.length ; iter++) {
+            int c = utf8[iter] & 0xff;
+            boolean unreserved = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_'
+                    || c == '~';
+            if(unreserved) {
+                out.append((char)c);
+            } else {
+                out.append('%');
+                out.append(HEX.charAt((c >> 4) & 0xf));
+                out.append(HEX.charAt(c & 0xf));
+            }
+        }
+    }
+
+    private static final String HEX = "0123456789ABCDEF";
 
     private static String string(Object v) {
         return v == null ? null : String.valueOf(v);
