@@ -301,6 +301,34 @@ def normalize(line, project_dir):
     return line.strip()
 
 
+def parse_diagnostics(out, project_dir):
+    """Clang output -> (normalized diagnostics, error count, fatal count).
+
+    One parser for the real sweeps AND the self-test. The self-test used to substring-match
+    clang's raw output, which proved only that CLANG behaves differently under the two SDKs.
+    Everything that turns that into a finding -- this parser, normalize(), the set
+    subtraction -- went untested, so a break in any of them would have left the probe happy
+    and the run reporting OK.
+    """
+    diags, errors, fatal = [], 0, 0
+    for line in out.splitlines():
+        m = DIAGNOSTIC_RE.search(line)
+        if not m:
+            continue
+        kind = m.group(1)
+        # "fatal error" is the dangerous one: clang stops the translation unit there, so
+        # every later diagnostic is missing rather than absent. Matching only ": error:"
+        # misses it outright -- the text is ": fatal error:" -- and the file then counts
+        # as clean while contributing nothing.
+        if kind == "fatal error":
+            fatal += 1
+            errors += 1
+        elif kind == "error":
+            errors += 1
+        diags.append(normalize(line, project_dir))
+    return diags, errors, fatal
+
+
 def compile_one(clang, sdk, project_dir, prefix_header, filename, defines, arc, target,
                 stub_dir=None):
     src = os.path.join(NATIVE_SOURCES, filename)
@@ -328,22 +356,7 @@ def compile_one(clang, sdk, project_dir, prefix_header, filename, defines, arc, 
     cmd.append(src)
     res = run(cmd)
     out = res.stdout + res.stderr
-    diags, errors, fatal = [], 0, 0
-    for line in out.splitlines():
-        m = DIAGNOSTIC_RE.search(line)
-        if not m:
-            continue
-        kind = m.group(1)
-        # "fatal error" is the dangerous one: clang stops the translation unit there, so
-        # every later diagnostic is missing rather than absent. Matching only ": error:"
-        # misses it outright -- the text is ": fatal error:" -- and the file then counts
-        # as clean while contributing nothing.
-        if kind == "fatal error":
-            fatal += 1
-            errors += 1
-        elif kind == "error":
-            errors += 1
-        diags.append(normalize(line, project_dir))
+    diags, errors, fatal = parse_diagnostics(out, project_dir)
     if res.returncode != 0 and errors == 0:
         # clang can exit nonzero with nothing this parser recognises: a frontend crash, a
         # signal, or a driver-level error such as an SDK it cannot open. Those carry no
@@ -436,7 +449,8 @@ def compile_probe(clang, sdk, target, threshold):
         res = run([clang, "-fsyntax-only", "-arch", "arm64",
                    "-target", "arm64-apple-ios" + target,
                    "-isysroot", sdk, "-fno-objc-arc", "-Wdeprecated-declarations", src])
-        return res.stdout + res.stderr
+        diags, _, _ = parse_diagnostics(res.stdout + res.stderr, tmp)
+        return set(diags)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -541,12 +555,17 @@ def main():
     threshold = sdk_version_macro(new_version)
     probe_old = compile_probe(clang, old_sdk, new_version, threshold)
     probe_new = compile_probe(clang, new_sdk, new_version, threshold)
-    if PROBE_MARKER not in probe_new or PROBE_MARKER in probe_old:
+    # Subtracted exactly the way a sweep's findings are, so the parser, normalize() and the
+    # set difference are all on the path being proved -- not just clang.
+    probe_delta = [line for line in sorted(probe_new - probe_old) if PROBE_MARKER in line]
+    if not probe_delta:
         fail("self-test did not fire: a probe keyed to __IPHONE_OS_VERSION_MAX_ALLOWED >= %d "
-             "should warn under %s and not under %s. The comparison is not working, so an "
-             "empty result would be a lie.\n  old: %s\n  new: %s"
-             % (threshold, os.path.basename(new_sdk), os.path.basename(old_sdk),
-                probe_old.strip()[:300] or "<silent>", probe_new.strip()[:300] or "<silent>"))
+             "should survive subtraction as a finding present only under %s. It did not, so "
+             "an empty result from the real sweeps would be a lie.\n"
+             "  under %s: %s\n  under %s: %s"
+             % (threshold, os.path.basename(new_sdk),
+                os.path.basename(old_sdk), sorted(probe_old) or "<no diagnostics>",
+                os.path.basename(new_sdk), sorted(probe_new) or "<no diagnostics>"))
     print("[ios-sdk-deltas] self-test: differ sees a delta only the newer SDK produces "
           "(__IPHONE_OS_VERSION_MAX_ALLOWED >= %d)" % threshold)
 
