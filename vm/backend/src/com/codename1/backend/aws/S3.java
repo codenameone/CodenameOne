@@ -134,13 +134,28 @@ public final class S3 {
      * unless the endpoint says http:// -- a default of "encrypted" is the one
      * that fails safely.
      */
+    /** Whether the endpoint opens with this scheme, ignoring case. See forEndpoint. */
+    private static boolean hasScheme(String value, String scheme) {
+        return value.length() >= scheme.length()
+                && value.regionMatches(true, 0, scheme, 0, scheme.length());
+    }
+
     public static S3 forEndpoint(Credentials credentials, String region, String endpoint) {
         String host = endpoint == null ? "" : endpoint;
         boolean useTls = true;
-        if(host.startsWith("http://")) {
+        // IGNORING CASE, because a scheme is case-insensitive and what happens
+        // otherwise is not a rejection. "HTTP://localhost:9000" kept its scheme
+        // inside `host` and left TLS on, so the request went to
+        // "https://HTTP://localhost:9000/..." -- which never reaches the endpoint
+        // that was configured and may resolve the host "HTTP" instead.
+        //
+        // regionMatches rather than toLowerCase: String.toLowerCase is locale
+        // sensitive and there is no Locale here to ask for the root one, so on a
+        // Turkish device the I of HTTP folds to a dotless i and stops matching.
+        if(hasScheme(host, "http://")) {
             useTls = false;
             host = host.substring("http://".length());
-        } else if(host.startsWith("https://")) {
+        } else if(hasScheme(host, "https://")) {
             host = host.substring("https://".length());
         }
         while(host.endsWith("/")) {

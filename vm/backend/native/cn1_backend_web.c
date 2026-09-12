@@ -141,11 +141,26 @@ static size_t cn1WebResponseLimit(void) {
     const char* text = getenv("CN1_WEB_MAX_RESPONSE_MB");
     long mb = CN1_WEB_DEFAULT_MAX_RESPONSE_MB;
     if(text != NULL && text[0] != 0) {
-        char* end = NULL;
-        long parsed = strtol(text, &end, 10);
-        /* All digits and in range, or the default. A misconfigured bound must not
-           silently become a smaller one than the caller believes. */
-        if(end != NULL && *end == 0 && parsed >= 1 && parsed <= 2047) {
+        /* PLAIN DIGITS, by hand, because this has to accept exactly what the Java
+           SE arm accepts. strtol takes a sign and leading whitespace, so "+1" set
+           a 1MB bound here while Web.maxResponseBytes ignored it and kept 64MB --
+           and a response between those two sizes then succeeded under cn1:backend
+           and aborted once packaged, which is the most expensive kind of
+           divergence to track down. Same grammar, same length cap, same range.
+           A misconfigured bound is ignored rather than clamped: it must not
+           silently become a different one than the caller believes it set. */
+        size_t length = strlen(text);
+        long parsed = 0;
+        int digits = length >= 1 && length <= 4;
+        size_t iter;
+        for(iter = 0 ; digits && iter < length ; iter++) {
+            if(text[iter] < '0' || text[iter] > '9') {
+                digits = 0;
+            } else {
+                parsed = parsed * 10 + (text[iter] - '0');
+            }
+        }
+        if(digits && parsed >= 1 && parsed <= 2047) {
             mb = parsed;
         }
     }
