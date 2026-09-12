@@ -256,6 +256,18 @@ public class ComponentGroup extends Container {
         }
     }
 
+    /// A member configured through setUIID(portrait, landscape) is only half handled
+    /// here, and deliberately so. getUIID resolves to whichever alias matches the
+    /// current orientation and the one-argument setUIID writes the portrait slot, so
+    /// in landscape the group's name never takes effect and a restore can put a
+    /// landscape alias into the portrait slot.
+    ///
+    /// It is not fixable from this class: Component.landscapeUiid is private with no
+    /// accessor, so there is nothing here to read or put back. Doing it properly means
+    /// giving Component a way to read and swap both aliases together, which is a change
+    /// to core styling rather than to this container. Nothing about it is new -- every
+    /// group that has ever been active has behaved this way -- so it is recorded here
+    /// rather than worked around.
     private void updateUIID(String newUIID, Component c) {
         Object o = c.getClientProperty("$origUIID");
         if (o == null) {
