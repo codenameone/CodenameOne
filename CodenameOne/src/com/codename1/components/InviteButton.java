@@ -26,6 +26,7 @@ import com.codename1.analytics.invite.Invite;
 import com.codename1.analytics.invite.InviteRequest;
 import com.codename1.analytics.invite.Invites;
 import com.codename1.share.ShareResultListener;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.events.ActionEvent;
@@ -242,7 +243,13 @@ public class InviteButton extends ShareButton {
             return;
         }
         presenting = true;
-        mintForShare();
+        if (mintForShare() == null) {
+            // Nothing was minted -- the device could not supply secure
+            // randomness -- so there is no link to share. Presenting anyway
+            // would open the sheet on whatever text was set last.
+            presenting = false;
+            return;
+        }
         presentShare(evt);
         Display d = Display.getInstance();
         if (d == null) {
@@ -308,7 +315,16 @@ public class InviteButton extends ShareButton {
         // of a referral anyway -- a code is not per recipient, it is the
         // inviter's -- so nothing is lost by not minting a second.
         if (outstanding == null) {
-            outstanding = Invites.create(b.build());
+            try {
+                outstanding = Invites.create(b.build());
+            } catch (IllegalStateException e) {
+                // The device could not supply secure randomness, so there is
+                // no invite to share. Nothing is presented rather than
+                // sharing a link somebody else could claim -- see
+                // Invites.create().
+                Log.e(e);
+                return null;
+            }
             invite = outstanding;
         }
         // The outstanding one, not the accessor's: this is the invite whose

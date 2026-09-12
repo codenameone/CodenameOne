@@ -295,10 +295,6 @@ public final class Invites {
     // the user has just erased or refused.
     private static int lookupEpoch;
 
-    // Only ever touched on the fallback path in newCode(), and held as a field
-    // so there is one generator for the process rather than one per call.
-    private static final java.util.Random FALLBACK_RANDOM = new java.util.Random();
-
     private Invites() {
     }
 
@@ -342,6 +338,15 @@ public final class Invites {
     /// #### Returns
     ///
     /// the invite, never null
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when the device cannot supply secure
+    ///   randomness. The code is the digest of a secret and that secret is
+    ///   what proves who minted it, so a guessable one is a forgeable proof --
+    ///   an invite anybody it is shared with could register as their own.
+    ///   Failing here is visible on the broken device; minting anyway is
+    ///   invisible on every device the link reaches.
     public static Invite create(InviteRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request is null");
@@ -1668,13 +1673,30 @@ public final class Invites {
         try {
             Util.secureRandomBytes(raw);
         } catch (Throwable t) {
-            // Weaker randomness now costs more than uniqueness -- a guessable
-            // secret is a forgeable proof -- but failing the mint outright
-            // would take the feature down on whatever platform is degraded,
-            // and the fallback is still a SecureRandom-seeded generator.
-            // Reported once rather than failing the invite.
+            // NO FALLBACK. A mint without secure randomness does not happen.
+            //
+            // There used to be one, on the reasoning that weak randomness
+            // degrades uniqueness and that the fallback was "still a
+            // SecureRandom-seeded generator". That was simply untrue:
+            // FALLBACK_RANDOM was a plain java.util.Random, and this runtime
+            // implements it as a 48-bit linear congruential generator seeded
+            // from System.currentTimeMillis() (vm/JavaAPI java.util.Random).
+            //
+            // The secret is no longer only about uniqueness -- the code is its
+            // digest, and the secret is what proves who minted it. A recipient
+            // who has the public code and knows roughly when it was made can
+            // search that seed window, recover the proof, and register the
+            // invite as their own: exactly the theft the proof was added to
+            // prevent, handed back on the one platform whose CSPRNG is
+            // degraded.
+            //
+            // So this throws. An invite that cannot be minted is a visible
+            // failure on a broken device; an invite minted with a guessable
+            // proof is a silent one on every device it is shared with.
             Log.e(t);
-            FALLBACK_RANDOM.nextBytes(raw);
+            throw new IllegalStateException(
+                    "invite codes need secure randomness, which this device did not "
+                            + "provide; minting would produce a forgeable invite", t);
         }
         String proof = trimPadding(Base64.encodeUrlSafe(raw));
         String code = trimPadding(Base64.encodeUrlSafe(Hash.sha256(raw)));

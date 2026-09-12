@@ -199,6 +199,20 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
                             // Transient. Exactly one retry: a loop here would
                             // bind the service repeatedly on a device that is
                             // never going to answer.
+                            // Only the exchange that is STILL CURRENT may
+                            // retry. `retried` is shared and the newer
+                            // exchange resets it, so a binding that outlived
+                            // lookupRetryDelay could come back with this
+                            // transient code, find the flag clear, advance the
+                            // sequence and start its own retry -- invalidating
+                            // the newer exchange, whose answer might have been
+                            // the exact referrer. Every other branch here
+                            // already passes `issued` to a method that checks
+                            // it; this one decided on its own.
+                            if (issued != attemptSeq) {
+                                close(client);
+                                return;
+                            }
                             if (!retried) {
                                 retried = true;
                                 // The sequence advances BEFORE the close, and
