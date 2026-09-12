@@ -31,6 +31,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -333,5 +334,38 @@ class InviteUrlParsingTest extends UITestBase {
                 "the parser stopped splitting on the first equals only");
         assertNull(Invites.validCodeFromQuery("cn1_invite=a=b"),
                 "a value with an equals in it was accepted as a code");
+    }
+
+    /**
+     * A url cannot wear our host as userinfo.
+     *
+     * <p>The host check is the whole basis for believing a link is ours, and
+     * it read the authority by scanning to the first delimiter -- including
+     * ':'. That stopped at the port separator, so
+     * {@code https://cloud.codenameone.com:x@evil.example/i/<code>} answered
+     * "cloud.codenameone.com" while the authority rules put the real host
+     * after the '@'. The foreign invite was consumed, persisted and claimed.</p>
+     *
+     * <p>Reached through {@code handleUrl}, which an application that routes
+     * its own deep links calls with whatever it was given.</p>
+     */
+    @FormTest
+    void aUrlWearingOurHostAsUserinfoIsNotOurs() {
+        InviteTestSupport.freshInstall();
+        String code = "ABC123xxxxxxxxxxxxxxxx";
+
+        assertNull(Invites.extractCode(
+                        "https://cloud.codenameone.com:x@evil.example/i/" + code),
+                "a foreign host wearing ours as userinfo was accepted");
+        assertNull(Invites.extractCode(
+                        "https://cloud.codenameone.com@evil.example/i/" + code),
+                "a foreign host with our name as bare userinfo was accepted");
+        assertFalse(Invites.handleUrl(
+                        "https://cloud.codenameone.com:x@evil.example/i/" + code),
+                "handleUrl claimed an invite from a foreign host");
+
+        // Our own host still works, with and without a port.
+        assertEquals(code, Invites.extractCode("https://cloud.codenameone.com/i/" + code),
+                "our own link stopped being recognised");
     }
 }

@@ -1401,6 +1401,11 @@ class InviteResilienceTest extends UITestBase {
         // arrived looking unconsented and could be refused, and the link it
         // describes would keep its code and lose its campaign, payload and
         // preview for good.
+        // Reset first: this asserts the outbox is EMPTY at the end, which is a
+        // statement about the whole queue rather than about its own entry, and
+        // the suite leaves entries behind now that a registration is only
+        // retired when the response actually acknowledges it.
+        InviteTestSupport.freshInstall();
         Analytics.setConsent(null);
         implementation.clearQueuedRequests();
         implementation.setAutoProcessConnections(false);
@@ -1464,8 +1469,15 @@ class InviteResilienceTest extends UITestBase {
         }
         assertNotNull(req, "the queued registration was never sent");
         try {
+            // The shape the mint endpoint really answers with: it echoes the
+            // code it registered. {"registered":true} was an invention of this
+            // fixture -- the service has no such field -- and retiring the
+            // durable entry on it meant retiring on any 200 at all, including
+            // a captive portal's.
             req.readResponse(new ByteArrayInputStream(
-                    "{\"registered\":true}".getBytes("UTF-8")));
+                    ("{\"code\":\"" + invite.getCode() + "\",\"url\":\"https://"
+                            + "cloud.codenameone.com/i/" + invite.getCode() + "\"}")
+                            .getBytes("UTF-8")));
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
@@ -2761,5 +2773,58 @@ class InviteResilienceTest extends UITestBase {
             }
         }
         return n;
+    }
+
+    /**
+     * A 200 that is not the service does not retire the registration.
+     *
+     * <p>The durable entry used to go on any non-failed response, so a captive
+     * portal or an interposing proxy answering the POST with its own page --
+     * indistinguishable from success at the status line, and exactly the
+     * network a queued offline mint is retried on -- dropped a registration
+     * the service never saw, permanently, while isRegistered() reported it as
+     * landed.</p>
+     */
+    @FormTest
+    void aTwoHundredThatIsNotOursDoesNotRetireTheRegistration() {
+        // freshInstall() at BOTH ends, because this one deliberately finishes
+        // with an entry still queued. Several tests in this class read the
+        // outbox without resetting first, so residue here is their failure.
+        InviteTestSupport.freshInstall();
+        Analytics.setConsent(AnalyticsConsent.granted());
+        implementation.clearQueuedRequests();
+        implementation.setAutoProcessConnections(false);
+
+        Invite invite = Invites.create(InviteRequest.create().campaign("portal").build());
+        assertNotNull(invite);
+        assertEquals(1, InviteStore.readOutbox().size(), "the registration was not queued");
+
+        Invites.InviteConnection req = null;
+        for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
+            ConnectionRequest r = implementation.getQueuedRequests().get(i);
+            if (r instanceof Invites.InviteConnection && r.getRequestBody() != null
+                    && r.getRequestBody().indexOf(invite.getCode()) >= 0) {
+                req = (Invites.InviteConnection) r;
+            }
+        }
+        assertNotNull(req, "the queued registration was never sent");
+        try {
+            // A portal's login page, returned with 200.
+            req.readResponse(new ByteArrayInputStream(
+                    "<html><body>Sign in to continue</body></html>".getBytes("UTF-8")));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        req.postResponse();
+
+        assertEquals(1, InviteStore.readOutbox().size(),
+                "a 200 that was not the mint endpoint retired the registration, so the "
+                        + "invite can never be registered and reports itself as landed");
+        assertFalse(Invites.isRegistered(invite),
+                "an invite the service never saw reported itself registered");
+
+        // The entry this test is about is left behind on purpose; clear it so
+        // the next test does not inherit it.
+        InviteTestSupport.freshInstall();
     }
 }

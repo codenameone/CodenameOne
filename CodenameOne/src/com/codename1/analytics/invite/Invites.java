@@ -2076,15 +2076,37 @@ public final class Invites {
             return null;
         }
         int start = schemeEnd + 3;
+        // The AUTHORITY first, and the port does not end it.
+        //
+        // Stopping at the first ':' read the port delimiter as the end of the
+        // host, which let a url wear our host as USERINFO:
+        // https://cloud.codenameone.com:x@evil.example/i/<code> stopped at the
+        // colon, answered cloud.codenameone.com, and passed a check whose
+        // whole purpose is to establish that the link is ours -- while the
+        // authority rules put the real host after the '@'. The foreign invite
+        // was then consumed, persisted and claimed.
         int end = url.length();
         for (int i = start; i < url.length(); i++) {
             char c = url.charAt(i);
-            if (c == '/' || c == '?' || c == '#' || c == ':') {
+            if (c == '/' || c == '?' || c == '#') {
                 end = i;
                 break;
             }
         }
-        return end > start ? url.substring(start, end) : null;
+        String authority = url.substring(start, end);
+        // Userinfo is REFUSED rather than parsed past. Nothing this framework
+        // mints carries any, so a url that has some is not one of ours no
+        // matter what follows the '@' -- and refusing is the answer that does
+        // not depend on getting the rest of the authority grammar right.
+        if (authority.indexOf('@') >= 0) {
+            return null;
+        }
+        // The port, which is part of the authority and not part of the host.
+        int colon = authority.indexOf(':');
+        if (colon >= 0) {
+            authority = authority.substring(0, colon);
+        }
+        return authority.length() > 0 ? authority : null;
     }
 
     // The build hint wins over the value the link service handed back: it is
@@ -3319,7 +3341,27 @@ public final class Invites {
             }
             if (registration) {
                 applySlug(payload);
-                if (outboxEntry != null) {
+                // The ANSWER has to be about this registration before the
+                // durable entry is retired, not merely a 2xx.
+                //
+                // The review that asked for this described a mint returning
+                // 200 with {"registered":false}; that is not a shape this
+                // service produces -- every refusal is a 403 and the response
+                // carries no such field -- so inventing a check for it would
+                // constrain nothing. What DOES happen is a 200 that is not
+                // ours at all: a captive portal or an interposing proxy
+                // answers the POST with its own page, which is indistinguishable
+                // from success at the status line and is exactly the network a
+                // queued offline mint is retried on. Retiring there drops a
+                // registration the service never saw, permanently, while
+                // isRegistered() goes on reporting it as landed.
+                //
+                // The mint response echoes the code it registered, so the
+                // cheapest sufficient question is whether the body names this
+                // entry's code. Anything else -- HTML, an empty body, another
+                // invite's answer -- leaves the entry queued for the next
+                // drain, which is what the outbox is for.
+                if (outboxEntry != null && acknowledges(payload, outboxEntry)) {
                     registrationAcknowledged(outboxEntry);
                 }
             } else {
@@ -4290,6 +4332,25 @@ public final class Invites {
     // server response, and what has to be asserted is which entry it clears.
     static void registrationAcknowledgedForTest(String json) {
         registrationAcknowledged(json);
+    }
+
+    /// Whether this response is the service acknowledging THIS registration.
+    ///
+    /// Compares the code the mint response echoes with the one the queued
+    /// entry carries. Both are read with the same parser the rest of this
+    /// class uses, so an unparseable body answers no rather than throwing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `payload`: the response body, may be null
+    /// - `outboxEntry`: the queued registration json
+    ///
+    /// #### Returns
+    ///
+    /// true when the body names this entry's code
+    private static boolean acknowledges(String payload, String outboxEntry) {
+        String mine = codeOf(outboxEntry);
+        return mine != null && mine.equals(codeOf(payload));
     }
 
     private static void registrationAcknowledged(String json) {
