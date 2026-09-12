@@ -261,10 +261,22 @@ public final class Web {
      * and calling it while another thread might still be in libcurl is the very
      * thing this avoids.
      */
-    private static synchronized void initialiseCurlOnce() {
-        if(!curlInitialised) {
-            curlInitialised = globalInitImpl() == 0;
+    private static synchronized void initialiseCurlOnce() throws IOException {
+        if(curlInitialised) {
+            return;
         }
+        int rc = globalInitImpl();
+        if(rc != 0) {
+            // THROWN, not left for the request to carry on past. Returning here
+            // set out to retry later and meanwhile let THIS worker walk into
+            // curl_easy_init, whose implicit initialisation is the very thing
+            // this monitor exists to keep one thread at a time -- so a failure
+            // put one worker inside the implicit path while the next was inside
+            // curl_global_init under the lock, which is the race, restored.
+            throw new IOException("libcurl could not be initialised (CURLcode "
+                    + rc + "), so no outbound request can be made");
+        }
+        curlInitialised = true;
     }
 
     /** curl_global_init's CURLcode -- 0 is CURLE_OK. */
