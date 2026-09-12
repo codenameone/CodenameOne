@@ -78,11 +78,15 @@ public final class StaticFiles implements HttpServer.Handler {
     }
 
     public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-        String target = request.getTarget();
-        int q = target.indexOf('?');
-        if(q >= 0) {
-            target = target.substring(0, q);
-        }
+        // THE CANONICAL PATH, not getTarget(). getTarget hands back the target
+        // exactly as it arrived, so the mount was matched on the spelling the
+        // client chose while every generated router matching the same URI compares
+        // it with percent-encoded unreserved octets already resolved. /assets was
+        // therefore ours and /%61ssets was not -- the same path, and in a chain of
+        // handlers, two different answers to whose it is. pathFrom stops at the
+        // query, which is what the split this replaces was for, and it leaves an
+        // encoded slash encoded, so %2F still cannot invent a segment boundary.
+        String target = request.pathFrom(0);
         if(prefix.length() > 0) {
             // The prefix has to end on a segment boundary. startsWith alone let
             // /assets2/logo.png match a prefix of /assets, strip to /2/logo.png and

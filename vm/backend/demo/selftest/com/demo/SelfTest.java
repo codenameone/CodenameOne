@@ -997,6 +997,17 @@ public class SelfTest {
                 + "\"Token\":\"t\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
         check("a whitespace secret is refused", "refused",
                 ExpiryProbe.rejects(blankSecret));
+        // A REGION BECOMES PART OF A HOST: "s3." + region + ".amazonaws.com". One
+        // with a separator in it moves the amazonaws.com suffix into the path and
+        // leaves the authority to whoever owns the region string.
+        check("a region with a path separator is refused", "refused",
+                regionRefused("evil.example/ignored"));
+        check("and one with a dot, which is the same trick a label shorter",
+                "refused", regionRefused("evil.example"));
+        check("and one with an at sign, which moves the host past userinfo",
+                "refused", regionRefused("x@evil.example"));
+        check("an ordinary region is accepted", "accepted",
+                regionRefused("us-east-1"));
         // An empty Token now falls through to SessionToken instead of being read
         // as a token that is present but unusable.
         String emptyThenSession = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"s\","
@@ -1490,6 +1501,72 @@ public class SelfTest {
             new java.io.File(dir).delete();
         }
         check("a static file comes back whole", String.valueOf(size), outcome);
+    }
+
+    /**
+     * The mount prefix is matched on the canonical path, so an equivalent
+     * spelling of it is the same mount.
+     *
+     * <p>%61 is 'a'. The handler used to test request.getTarget(), which is the
+     * target as it arrived, while a generated router matching the same URI
+     * compares it with the unreserved escapes already resolved -- so /assets was
+     * this handler's and /%61ssets was nobody's, and in a chain the second
+     * spelling fell through to whatever came next.
+     */
+    private static void anEncodedMountPrefixIsTheSameMount() throws Exception {
+        String dir = "/tmp/cn1-selftest-mount-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        java.io.FileOutputStream out = new java.io.FileOutputStream(dir + "/logo.txt");
+        try {
+            out.write("logo".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        final StaticFiles files = new StaticFiles(dir, "/assets", null, null);
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = files.handle(request);
+                // What a chain does with a path the file handler says is not its
+                // own -- and the answer that tells the two spellings apart.
+                return served == null ? HttpServer.Response.text(404, "not ours") : served;
+            }
+        });
+        String plain;
+        String encoded;
+        String encodedSlash;
+        try {
+            plain = httpGetBody("127.0.0.1", server.getPort(), "/assets/logo.txt");
+            encoded = httpGetBody("127.0.0.1", server.getPort(), "/%61ssets/logo.txt");
+            // AND NOT THIS ONE: %2F is not unreserved, so it stays encoded and
+            // cannot pass for the separator that ends the mount.
+            encodedSlash = httpGetBody("127.0.0.1", server.getPort(), "/assets%2Flogo.txt");
+        } finally {
+            server.stop(2000);
+            new java.io.File(dir + "/logo.txt").delete();
+            new java.io.File(dir).delete();
+        }
+        check("a static file is served from its mount", "logo", plain);
+        check("and from an encoded spelling of the same mount", "logo", encoded);
+        check("an encoded slash does not end the mount", "not ours", encodedSlash);
+    }
+
+    /**
+     * Whether S3 refuses `region` as a hostname label.
+     *
+     * forRegion resolves credentials before it returns, which needs a metadata
+     * service, so what is asked here is only whether the region got past the
+     * check: anything else that fails says "accepted" and the check below reads
+     * as a pass only when the refusal is the region's.
+     */
+    private static String regionRefused(String region) {
+        try {
+            S3.forRegion(region);
+            return "accepted";
+        } catch (Exception err) {
+            String message = err.getMessage();
+            return message != null && message.indexOf("Not an AWS region") >= 0
+                    ? "refused" : "accepted";
+        }
     }
 
     /** One GET, reading to the end of the body by Content-Length. */
@@ -2102,6 +2179,7 @@ public class SelfTest {
         aTruncatedMySqlBodyIsRefused();
         aStaticFileComesBackWhole();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
+        anEncodedMountPrefixIsTheSameMount();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
         anImpossibleExpiryIsRefused();
