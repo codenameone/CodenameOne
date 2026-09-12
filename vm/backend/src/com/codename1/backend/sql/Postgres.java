@@ -579,8 +579,21 @@ public final class Postgres {
                         int length = intAt(message.body, at);
                         at += 4;
                         Object value;
-                        if(length < 0) {
-                            value = null;
+                        if(length == -1) {
+                            value = null;           // the only negative there is
+                        } else if(length < 0) {
+                            // -1 IS THE WHOLE OF IT. The wire protocol gives one
+                            // negative length a meaning and leaves the rest
+                            // undefined, so reading any of them as NULL answered a
+                            // query with silently altered data -- a column the
+                            // caller sees as absent -- and kept the session for the
+                            // next one. A frame that names -2 is a frame this side
+                            // has misread or the peer has mangled; either way the
+                            // stream is no longer trustworthy.
+                            close();
+                            throw new IOException("A PostgreSQL DataRow names a "
+                                    + "column length of " + length + "; only -1 is "
+                                    + "NULL");
                         } else {
                             requireBytes(message.body, at, length);
                             value = decode(Wire.fromUtf8(message.body, at, length),

@@ -793,7 +793,24 @@ public final class MySql {
         if(b1 < 0 || b2 < 0 || b3 < 0) {
             throw new IOException("The MySQL connection closed mid-header");
         }
-        sequence = b3 + 1;
+        // CHECKED, not adopted. Trusting the peer's byte meant a stale packet --
+        // one left over from an exchange this side thinks is finished -- was
+        // parsed as the current response and the session stayed reusable, which
+        // is how desynchronisation becomes wrong data rather than an error. The
+        // counter is ours: the writer advances it packet by packet, and a read
+        // advances it the same way.
+        //
+        // Compared masked, because the counter is not: the writer emits
+        // `sequence++ & 0xff`, so after 256 packets of one exchange -- an
+        // ordinary large result set -- the value here is past a byte while the
+        // wire has wrapped.
+        if(b3 != (sequence & 0xff)) {
+            close();
+            throw new IOException("A MySQL packet arrived with sequence " + b3
+                    + " where " + (sequence & 0xff) + " was due, so this "
+                    + "connection is no longer in step with the server");
+        }
+        sequence++;
         return b0 | (b1 << 8) | (b2 << 16);
     }
 
