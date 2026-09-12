@@ -2234,6 +2234,57 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    void anEtagChangesWhenTheContentIsReplacedWithTheSameShape() throws Exception {
+        // Size and mtime alone identify a representation only as well as the
+        // timestamps do. A deployment that copies files with timestamps preserved
+        // -- cp -p, tar -p, rsync -t -- reproduces the same millisecond, so if the
+        // new content is the same LENGTH the validator does not change and every
+        // client holding the old one is told 304 for as long as it keeps asking.
+        // The ETag carries the file's identity as a third component for exactly
+        // this: the copy is a new file.
+        // A FIXED WHOLE SECOND on both versions, rather than capturing and putting
+        // back what the filesystem happened to record. Files.setLastModifiedTime
+        // loses the sub-second part on this platform -- measured: restoring a
+        // timestamp of ...219ms produced ...000ms -- so a capture-and-restore test
+        // passes whether or not the fix is present, the mtime having changed by
+        // itself. A value that is already whole seconds survives that truncation,
+        // which is what makes size and mtime genuinely identical across the swap
+        // and leaves the file's identity as the only thing that can differ.
+        java.nio.file.attribute.FileTime when =
+                java.nio.file.attribute.FileTime.fromMillis(1700000000000L);
+        Path target = work.resolve("www").resolve("swapped.txt");
+        Files.write(target, "AAAA".getBytes(StandardCharsets.UTF_8));
+        Files.setLastModifiedTime(target, when);
+        String first = etagOf(rawGet("/static/swapped.txt"));
+        assertTrue(first.length() > 0, "the response carries an ETag");
+
+        // Replaced by a new file of the SAME length carrying the SAME timestamp,
+        // which is what a timestamp-preserving deployment leaves behind.
+        Path replacement = work.resolve("replacement.txt");
+        Files.write(replacement, "BBBB".getBytes(StandardCharsets.UTF_8));
+        Files.move(replacement, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Files.setLastModifiedTime(target, when);
+        assertEquals(when, Files.getLastModifiedTime(target),
+                "the swap only means something if the timestamp really is the same");
+
+        byte[] second = rawGet("/static/swapped.txt");
+        assertEquals("BBBB", body(second), "the new bytes are what is served");
+        assertTrue(!first.equals(etagOf(second)),
+                "the validator must not survive the replacement: " + first
+                        + " then " + etagOf(second));
+    }
+
+    private static String etagOf(byte[] response) {
+        String text = new String(response, StandardCharsets.ISO_8859_1);
+        int at = text.toLowerCase().indexOf("etag:");
+        if (at < 0) {
+            return "";
+        }
+        int end = text.indexOf("\r\n", at);
+        return text.substring(at + 5, end < 0 ? text.length() : end).trim();
+    }
+
+    @Test
     void bothSpellingsOfANonAsciiPathFindTheSameFile() throws Exception {
         // A target arrives as bytes, and a client may spell a non-ASCII filename
         // percent-encoded or raw. Both are valid and both name the same file.

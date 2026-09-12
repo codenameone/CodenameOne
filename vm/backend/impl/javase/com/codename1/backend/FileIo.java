@@ -63,6 +63,13 @@ public final class FileIo {
         final boolean consistent;
         /** The file's identity as the path saw it, or null where unsupported. */
         final Object fileKey;
+        /**
+         * The same identity as a number, for the ETag's third component. See the
+         * inode in the native stat: it is what distinguishes a file replaced by a
+         * timestamp-preserving copy from the one it replaced. 0 where the platform
+         * will not say.
+         */
+        final long identity;
         long position;
 
         OpenFile(FileChannel channel, Path path) {
@@ -94,6 +101,19 @@ public final class FileIo {
             } catch (Exception ignored) {
                 // stat() reports the failure; there is nothing to do here.
             }
+            long capturedIdentity = 0;
+            try {
+                Object ino = Files.getAttribute(path, "unix:ino");
+                if(ino instanceof Number) {
+                    capturedIdentity = ((Number)ino).longValue();
+                }
+            } catch (Exception unsupported) {
+                // Not a Unix filesystem view; the file key's hash is the next best
+                // identity available and is derived from the same device and inode
+                // where there is one.
+                capturedIdentity = capturedKey == null ? 0 : capturedKey.hashCode();
+            }
+            this.identity = capturedIdentity;
             this.size = capturedSize;
             this.modified = capturedModified;
             this.directory = capturedDirectory;
@@ -180,6 +200,9 @@ public final class FileIo {
         out[0] = file.size;
         out[1] = file.modified;
         out[2] = file.directory ? 1 : 0;
+        if(out.length > 3) {
+            out[3] = file.identity;
+        }
         return 0;
     }
 

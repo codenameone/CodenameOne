@@ -193,6 +193,20 @@ JAVA_INT com_codename1_backend_FileIo_statImpl___int_long_1ARRAY_R_int(CODENAME_
     data[1] = (JAVA_LONG)st.st_mtime * 1000LL;
 #endif
     data[2] = S_ISDIR(st.st_mode) ? 1 : 0;
+    if(((JAVA_ARRAY)out)->length > 3) {
+        /* THE INODE, as a third component of the ETag. Size and mtime alone name
+           the representation only as well as the filesystem's timestamps allow:
+           a deployment that copies files with their timestamps preserved -- cp -p,
+           tar -p, rsync -t -- reproduces the same millisecond, and if the new
+           content happens to be the same length the validator does not change and
+           every client holding the old one is told 304 indefinitely. Such a copy
+           creates a NEW file, so the inode is exactly what differs in that case.
+           An in-place rewrite that restores the timestamp and keeps the length is
+           still invisible; closing that needs the content itself, which means
+           reading every byte of every response on a path built to avoid reading
+           any of them. */
+        data[3] = (JAVA_LONG)st.st_ino;
+    }
     return 0;
 #endif
 }

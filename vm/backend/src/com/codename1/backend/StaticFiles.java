@@ -152,7 +152,7 @@ public final class StaticFiles implements HttpServer.Handler {
         }
         boolean release = true;
         try {
-            long[] info = new long[3];
+            long[] info = new long[4];
             if(FileIo.stat(fd, info) != 0) {
                 return HttpServer.Response.text(404, "not found");
             }
@@ -206,10 +206,27 @@ public final class StaticFiles implements HttpServer.Handler {
 
             long size = info[0];
             long modified = info[1];
-            // JavaAPI's Long has neither toHexString nor a radix toString. An
-            // ETag only has to be stable and opaque, so size-mtime in decimal is
-            // exactly as good a validator.
-            String etag = "\"" + size + "-" + modified + "\"";
+            // JavaAPI's Long has neither toHexString nor a radix toString. An ETag
+            // only has to be stable and opaque, so decimal is exactly as good.
+            //
+            // THREE COMPONENTS, the third being the file's identity -- its inode
+            // where the platform has one. Size and mtime alone identify the
+            // representation only as well as the timestamps do: a deployment that
+            // copies files with timestamps preserved reproduces the same
+            // millisecond, and if the new content is the same length the validator
+            // does not change, so a client holding the old one is told 304 for as
+            // long as it keeps asking. That copy makes a new file, which is what
+            // the identity catches.
+            //
+            // What remains uncovered is an in-place rewrite that restores the
+            // timestamp AND keeps the byte length. Closing that means deriving the
+            // validator from the content, which means reading every byte of every
+            // response on a path whose whole purpose is to avoid reading any of
+            // them -- and a cache of those hashes could only be keyed on the
+            // metadata that just collided. Operators who rewrite files that way
+            // should touch them, or serve them with a Cache-Control that does not
+            // invite revalidation.
+            String etag = "\"" + size + "-" + modified + "-" + info[3] + "\"";
 
             Map headers = new LinkedHashMap();
             headers.put("ETag", etag);
