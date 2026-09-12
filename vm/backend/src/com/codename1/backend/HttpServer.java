@@ -5141,6 +5141,16 @@ public final class HttpServer {
                 }
                 lineEnd = indexOfCrLf(conn.buffer, conn.pos);
             }
+            // NO CONTROL BYTE ANYWHERE ON THE LINE, checked before any of it is
+            // discarded. The extension after ';' is thrown away unread, so a bare
+            // LF inside one was swallowed with it -- this parser scans on to the
+            // next CRLF, while an intermediary that ends a chunk line at LF stops
+            // there and reads the rest as chunk data or as the next request. That
+            // is the same disagreement the trailer loop below refuses, and the
+            // comment under this one already claims this line refuses it too.
+            if(hasControlByte(conn.buffer, conn.pos, lineEnd)) {
+                throw new ProtocolException(400, "control character in a chunk size line");
+            }
             String sizeLine = new String(conn.buffer, conn.pos, lineEnd - conn.pos, "UTF-8");
             // A chunk-size may carry extensions after a ';'; the size is before it.
             int semi = sizeLine.indexOf(';');

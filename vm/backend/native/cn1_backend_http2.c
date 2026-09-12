@@ -220,9 +220,15 @@ static _Atomic long cn1H2InboundBytes = 0;
         + CN1_H2_MAX_SESSION_HEADER_BYTES))
 
 static void cn1H2FreeBody(CN1H2Body* body) {
-    if(body->data != NULL && body->length > body->offset) {
+    /* The WHOLE length, matching what was reserved: the buffer is one allocation
+       and free() below returns all of it at once, however much of it had been
+       sent. Releasing only the unsent remainder here paired with a per-byte
+       decrement on the send path, which together tracked "bytes not yet written"
+       rather than "bytes still held" -- and the ceiling exists for the second. A
+       file body holds no buffer and was never charged. */
+    if(body->data != NULL) {
         atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes,
-                (long)(body->length - body->offset), memory_order_relaxed);
+                (long)body->length, memory_order_relaxed);
     }
     if(body->fd >= 0) {
         atomic_fetch_sub_explicit(&cn1H2OpenFileBodies, 1, memory_order_relaxed);
@@ -939,10 +945,13 @@ static ssize_t cn1H2ReadBody(nghttp2_session* session, int32_t streamId, uint8_t
             memcpy(buf, body->data + body->offset, remaining);
         }
         body->offset += remaining;
-        if(body->data != NULL) {
-            atomic_fetch_sub_explicit(&cn1H2PendingBodyBytes, (long)remaining,
-                                      memory_order_relaxed);
-        }
+        /* NOT DECREMENTED HERE. What the ceiling bounds is memory held, and
+           body->data stays allocated at its full length until the stream ends --
+           sending a byte frees nothing. Counting sent bytes instead let a client
+           grant credit for all but the last byte of one body after another and
+           leave each multi-megabyte allocation charged at one byte, so the budget
+           admitted the next one. The whole allocation is released in
+           cn1H2FreeBody, which is the moment the memory actually goes away. */
     }
     if(body->offset >= body->length) {
         *dataFlags |= NGHTTP2_DATA_FLAG_EOF;

@@ -2302,6 +2302,34 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    void aChunkExtensionCannotHideALineBreak() throws Exception {
+        // The extension after ';' on a chunk-size line is discarded unread, so a
+        // bare LF inside one went with it: this parser scans on to the next CRLF
+        // while an intermediary that ends a chunk line at LF stops there and reads
+        // the rest as chunk data or as the start of another request. Same
+        // disagreement as the trailer below, one line earlier in the same framing.
+        String hidden = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                + "5;x=\nGET /healthz HTTP/1.1\r\n"
+                + "hello\r\n"
+                + "0\r\n\r\n";
+        assertEquals(400, statusOf(rawBytes(hidden.getBytes(StandardCharsets.ISO_8859_1))),
+                "a chunk extension carrying a bare LF is not a chunk line");
+
+        // A well-formed extension is still ignored rather than refused: they are
+        // legal and this server has no use for them.
+        String extended = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                + "5;name=value\r\n"
+                + "hello\r\n"
+                + "0\r\n\r\n";
+        byte[] answered = rawBytes(extended.getBytes(StandardCharsets.ISO_8859_1));
+        assertEquals(200, statusOf(answered), "a well-formed extension is still accepted");
+        assertTrue(body(answered).contains("len=5"),
+                "and the chunk it labels still arrives: " + body(answered));
+    }
+
+    @Test
     void aChunkedTrailerIsValidatedLikeAHeader() throws Exception {
         // A trailer IS a header field, and this parser finds the end of one by
         // scanning for CRLF -- so a bare LF inside a trailer was just a byte to it.
