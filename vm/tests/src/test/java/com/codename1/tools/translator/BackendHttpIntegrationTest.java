@@ -2353,6 +2353,120 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("an expectation is resolved over h2 as well as HTTP/1.1")
+    void theExpectationIsResolvedOverHttp2Too() throws Exception {
+        // The other half of the test below. A request is queued for the handler
+        // when END_STREAM arrives, and a client using 100-continue has not sent
+        // it -- that is the whole mechanism -- so nothing could answer: the client
+        // waited out its own timeout before sending the body, and an expectation
+        // this server cannot satisfy was ignored here while HTTP/1.1 refused it
+        // with 417. The same request, answered two ways by the protocol that
+        // carried it.
+        List<Integer> continued = h2Expect(port, "/echo", "100-continue");
+        assertTrue(continued.contains(100),
+                "the client is entitled to be told before it sends: " + continued);
+        assertEquals(200, (int) continued.get(continued.size() - 1),
+                "and the body it then sends must be served: " + continued);
+
+        // AND THE UNSATISFIABLE ONE, with no body sent at all -- if the answer
+        // needed the body, this would hang rather than fail.
+        long started = System.currentTimeMillis();
+        List<Integer> refused = h2Expect(port, "/echo", "custom-extension");
+        long elapsed = System.currentTimeMillis() - started;
+        assertEquals(java.util.Collections.singletonList(417), refused,
+                "an expectation this server cannot meet is a 417 here too: " + refused);
+        assertTrue(elapsed < 5000,
+                "and promptly, without waiting for a body: " + elapsed + "ms");
+
+        // MIXED WITH ONE WE KNOW is still unsatisfiable, which is the case the
+        // HTTP/1.1 path had to be corrected for: asking only whether 100-continue
+        // is among the tokens answers a client that is still holding its body.
+        List<Integer> mixed = h2Expect(port, "/echo", "100-continue, custom-extension");
+        assertEquals(java.util.Collections.singletonList(417), mixed,
+                "a list this server cannot wholly satisfy is a 417: " + mixed);
+    }
+
+    /**
+     * Opens an h2 stream that declares an Expect and does NOT end the stream,
+     * which is what a client using 100-continue does.
+     *
+     * <p>Every status the server sends on it, in order. A 100 makes this send the
+     * body, as the client would; anything final ends the exchange. The body is
+     * never sent when no 100 arrives, so a server that ignores the field ends
+     * this at the read timeout with nothing in the list rather than passing.
+     */
+    private List<Integer> h2Expect(int onPort, String path, String expect) throws Exception {
+        List<Integer> statuses = new java.util.ArrayList<Integer>();
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
+        socket.setSoTimeout(4000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            byte[] windowUpdate = new byte[4];
+            int increment = 1024 * 1024;
+            windowUpdate[0] = (byte) ((increment >> 24) & 0x7f);
+            windowUpdate[1] = (byte) ((increment >> 16) & 0xff);
+            windowUpdate[2] = (byte) ((increment >> 8) & 0xff);
+            windowUpdate[3] = (byte) (increment & 0xff);
+            out.write(frame(8, 0, 0, windowUpdate));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "POST");
+            hpackLiteral(block, ":path", path);
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            hpackLiteral(block, "expect", expect);
+            // END_HEADERS and NOT END_STREAM: the body is being withheld.
+            out.write(frame(1, 0x04, 1, block.toByteArray()));
+            out.flush();
+            InputStream in = socket.getInputStream();
+            boolean bodySent = false;
+            long deadline = System.currentTimeMillis() + 8000;
+            while (System.currentTimeMillis() < deadline) {
+                byte[] header;
+                try {
+                    header = readExactly(in, 9);
+                } catch (java.io.InterruptedIOException timedOut) {
+                    break;      // the server said nothing; the list says so
+                }
+                if (header == null) {
+                    break;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8)
+                        | (header[2] & 0xff);
+                int type = header[3] & 0xff;
+                int flags = header[4] & 0xff;
+                byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                if (payload == null) {
+                    break;
+                }
+                if (type == 7) {
+                    fail("the server sent GOAWAY: "
+                            + new String(payload, StandardCharsets.UTF_8));
+                }
+                if (type != 1 || payload.length == 0) {
+                    continue;
+                }
+                int status = hpackStatus(payload);
+                statuses.add(status);
+                if (status == 100 && !bodySent) {
+                    out.write(frame(0, 0x01, 1, "hello".getBytes(StandardCharsets.UTF_8)));
+                    out.flush();
+                    bodySent = true;
+                    continue;
+                }
+                if (status >= 200) {
+                    break;
+                }
+            }
+            return statuses;
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
     void anUnsupportedExpectationIsAnsweredNotIgnored() throws Exception {
         // The expectation mechanism means the client waits to be TOLD before it
         // sends the body. An Expect this server does not know used to be ignored

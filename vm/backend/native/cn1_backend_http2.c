@@ -636,19 +636,153 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
     return 0;
 }
 
+/*
+ * Whether the `length` bytes at `at` are `lower`, ignoring ASCII case.
+ *
+ * A field VALUE is not required to be lower case -- only a field name is -- so
+ * an Expect token has to be compared this way. Folded by hand rather than with
+ * strncasecmp, which folds by the C locale: the token is ASCII by specification
+ * and must not depend on where the process is running, which is the same reason
+ * nothing in this project reaches for toLowerCase on a protocol token.
+ */
+static int cn1H2EqualsLower(const char* at, size_t length, const char* lower) {
+    size_t iter;
+    for(iter = 0 ; iter < length ; iter++) {
+        char c = at[iter];
+        if(c >= 'A' && c <= 'Z') {
+            c = (char)(c - 'A' + 'a');
+        }
+        if(c != lower[iter]) {
+            return 0;
+        }
+    }
+    return lower[length] == 0 ? 1 : 0;
+}
+
+/*
+ * Whether every token of an Expect field is 100-continue, which is the only
+ * expectation this server can make true.
+ *
+ * The twin of HttpServer.onlyExpects100Continue, token for token, including its
+ * two decisions: EVERY token is tested rather than just whether the one we know
+ * is among them -- "100-continue, custom-extension" carries something nobody can
+ * satisfy -- and an empty field expects nothing, so it is not an expectation
+ * this server has met.
+ */
+static int cn1H2OnlyExpects100Continue(const char* value) {
+    const char* at = value;
+    int any = 0;
+    for(;;) {
+        const char* comma = strchr(at, ',');
+        const char* end = comma == NULL ? at + strlen(at) : comma;
+        const char* start = at;
+        size_t length;
+        while(start < end && (*start == ' ' || *start == '\t')) {
+            start++;
+        }
+        while(end > start && (end[-1] == ' ' || end[-1] == '\t')) {
+            end--;
+        }
+        length = (size_t)(end - start);
+        if(length > 0) {
+            any = 1;
+            if(length != 12 || cn1H2EqualsLower(start, 12, "100-continue") == 0) {
+                return 0;
+            }
+        }
+        if(comma == NULL) {
+            return any;
+        }
+        at = comma + 1;
+    }
+}
+
+/*
+ * Answers the Expect field as soon as the request's headers are in, rather than
+ * after a body that is waiting to be invited.
+ *
+ * The point of 100-continue is that the client does not send the body until it is
+ * told to. Enqueuing a request only on END_STREAM meant serveHttp2 never saw one
+ * that was waiting, so it could not answer, and the client sat until its own
+ * timeout before sending anyway -- every upload from such a client paying that
+ * wait. And an expectation this server cannot satisfy was simply ignored here,
+ * while the HTTP/1.1 path refuses it with 417: the same request answered two
+ * ways depending on the protocol that carried it.
+ *
+ * Answered in C because this is where the headers are, and because the interim
+ * response has to go out before the stream is anything Java can see. The rule
+ * itself is the same rule, and the tests check both protocols against it.
+ *
+ * Returns 1 when the stream has been answered and freed, 0 when it continues.
+ */
+static int cn1H2ResolveExpect(CN1H2Session* s, CN1H2Request* r, int bodyToCome) {
+    const char* value = NULL;
+    int iter;
+    for(iter = 0 ; iter < r->headerCount ; iter++) {
+        /* Lower case by the protocol: RFC 9113 requires it of a field name and
+           nghttp2 has already refused anything else, which is how the
+           pseudo-headers above are matched too. */
+        if(r->headers[iter].name != NULL
+                && strcmp(r->headers[iter].name, "expect") == 0) {
+            value = r->headers[iter].value;
+            break;
+        }
+    }
+    if(value == NULL) {
+        return 0;
+    }
+    if(cn1H2OnlyExpects100Continue(value) == 0) {
+        /* 417, now. Per-stream rather than closing the connection, which is the
+           h2 answer to one bad request -- the status is what has to agree with
+           the HTTP/1.1 path, not the framing. */
+        nghttp2_nv nva[1];
+        nva[0].name = (uint8_t*)":status";
+        nva[0].namelen = 7;
+        nva[0].value = (uint8_t*)"417";
+        nva[0].valuelen = 3;
+        nva[0].flags = NGHTTP2_NV_FLAG_NONE;
+        nghttp2_submit_response(s->session, r->streamId, nva, 1, NULL);
+        cn1H2Unlink(&s->open, r);
+        cn1H2FreeRequest(r);
+        return 1;
+    }
+    if(bodyToCome) {
+        /* The interim response the client is waiting for. A failure to submit it
+           is not fatal to the stream: the client sends the body once its own wait
+           expires, which is exactly the behaviour this removes. */
+        nghttp2_nv nva[1];
+        nva[0].name = (uint8_t*)":status";
+        nva[0].namelen = 7;
+        nva[0].value = (uint8_t*)"100";
+        nva[0].valuelen = 3;
+        nva[0].flags = NGHTTP2_NV_FLAG_NONE;
+        nghttp2_submit_headers(s->session, NGHTTP2_FLAG_NONE, r->streamId,
+                               NULL, nva, 1, NULL);
+    }
+    return 0;
+}
+
 static int cn1H2OnFrameRecv(nghttp2_session* session, const nghttp2_frame* frame,
                             void* userData) {
     CN1H2Session* s = (CN1H2Session*)userData;
     CN1H2Request* r;
+    int endStream = (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) != 0;
     (void)session;
-    if((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) == 0) {
-        return 0;
-    }
     if(frame->hd.type != NGHTTP2_HEADERS && frame->hd.type != NGHTTP2_DATA) {
         return 0;
     }
     r = cn1H2FindOpen(s, frame->hd.stream_id);
     if(r == NULL) {
+        return 0;
+    }
+    /* BEFORE the END_STREAM test below, because a request that is waiting to be
+       told to send its body has not set it. */
+    if(frame->hd.type == NGHTTP2_HEADERS
+            && frame->headers.cat == NGHTTP2_HCAT_REQUEST
+            && cn1H2ResolveExpect(s, r, endStream == 0)) {
+        return 0;
+    }
+    if(endStream == 0) {
         return 0;
     }
     /* The request is complete only now: END_STREAM is what says the client has
