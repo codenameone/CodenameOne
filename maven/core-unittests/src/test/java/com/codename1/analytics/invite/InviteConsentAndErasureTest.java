@@ -715,4 +715,48 @@ class InviteConsentAndErasureTest extends UITestBase {
         assertNull(Invites.getAttribution(),
                 "the pre-reset referral resolved into an attribution after the reset");
     }
+
+    /**
+     * A baseline write that never landed does not cost the invite it was
+     * recorded beside.
+     *
+     * <p>The baseline used to live in Preferences, whose set() updates a static
+     * table and swallows the store's answer -- so a write that failed left
+     * exactly the same empty value as a write that never happened. Records
+     * beside an empty baseline were read as an erasure that never finished,
+     * and eraseInternal() ran. One storage hiccup on a first launch was
+     * therefore enough to delete a perfectly good attribution on the next one:
+     * the link resolves, the record is durable, the process exits, and the
+     * referral the user really did come from is gone.</p>
+     *
+     * <p>The baseline is a checked InviteStore write now, so its absence means
+     * the write never landed rather than that an identity changed, and the
+     * record is left where it is.</p>
+     */
+    @FormTest
+    void aBaselineThatNeverLandedDoesNotEraseTheAttributionBesideIt() {
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("KEEPMExxxxxxxxxxxxxxxx", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution(), "the fixture resolved no attribution");
+
+        // The state a failed first baseline write leaves: a durable record,
+        // and no baseline in either the durable store or the legacy key.
+        Analytics.clearProviders();
+        InviteStore.delete(InviteStore.BASELINE);
+        Preferences.delete(InviteAttributionProvider.PREF_LAST_CLIENT_ID);
+
+        // The next launch.
+        Invites.checkForInvite();
+
+        assertNotNull(Invites.getAttribution(),
+                "an absent baseline was read as an unfinished erasure and deleted a valid "
+                        + "attribution -- a storage hiccup, not an identity reset");
+        assertEquals(Analytics.clientId(),
+                InviteStore.get(InviteStore.read(InviteStore.BASELINE), "clientId", null),
+                "the baseline was not recorded durably, so the next launch faces the "
+                        + "same ambiguity again");
+    }
 }

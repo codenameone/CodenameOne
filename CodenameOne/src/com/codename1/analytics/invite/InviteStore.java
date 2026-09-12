@@ -67,6 +67,15 @@ final class InviteStore {
     /// than what came before.
     static final String ERASURE = "CN1$InviteErasureOwed";
 
+    /// The client id the attribution provider last saw.
+    ///
+    /// Here rather than in Preferences for the reason every other durable
+    /// record is: `Preferences.set` updates a static table and swallows the
+    /// store's answer, so a failed write is indistinguishable from one that
+    /// never happened -- and the provider reads exactly that absence to decide
+    /// whether an identity reset is owed. A write here can be verified.
+    static final String BASELINE = "CN1$InviteIdentityBaseline";
+
     // Entries leave this queue when the server acknowledges them, so the cap is
     // a safety ceiling rather than a working limit -- and it was far too low
     // for that. A dropped registration is not recoverable: the code carries no

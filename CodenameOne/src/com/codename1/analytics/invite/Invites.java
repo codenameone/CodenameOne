@@ -1458,21 +1458,6 @@ public final class Invites {
         stateLoaded = false;
     }
 
-    /// Whether this device carries any durable invite record.
-    ///
-    /// Asked by the provider when it finds no identity baseline: with records
-    /// present that is a baseline write that failed rather than a first
-    /// registration, and the difference decides whether the next identity
-    /// change erases or is quietly accepted as the first one seen.
-    ///
-    /// #### Returns
-    ///
-    /// true when an attribution, a pending record or a queued registration
-    /// exists
-    static boolean hasDurableRecords() {
-        return anythingSurvives();
-    }
-
     // Package private: the analytics provider hook calls this when the client
     // id changes underneath us, which is what an erasure request looks like.
     static boolean eraseInternal() {
@@ -3329,6 +3314,19 @@ public final class Invites {
             // burst of invites reposting the whole queue, not to retire an
             // entry.
             releaseInFlight();
+            // The body is read ONCE, into a local.
+            //
+            // readResponse() can run more than once against the same request --
+            // ConnectionRequest re-reads it on a redirect, and the simulator's
+            // mock transport re-delivers a queued request whenever the EDT
+            // yields underneath us -- so the field is not stable for the length
+            // of this method. It was read twice here, once to apply the slug
+            // and again to decide whether the answer acknowledged the queued
+            // registration, and a rewrite landing between the two left the
+            // second read looking at an empty body: the registration was never
+            // retired, went out on every later flush for ever, and
+            // isRegistered() never became true.
+            String body = payload;
             // Reading the body of an error response is on by default
             // (ConnectionRequest.readResponseForErrorsDefault), and the error
             // path falls through to postResponse() exactly as a 200 does. So
@@ -3340,7 +3338,7 @@ public final class Invites {
                 return;
             }
             if (registration) {
-                applySlug(payload);
+                applySlug(body);
                 // The ANSWER has to be about this registration before the
                 // durable entry is retired, not merely a 2xx.
                 //
@@ -3361,11 +3359,11 @@ public final class Invites {
                 // entry's code. Anything else -- HTML, an empty body, another
                 // invite's answer -- leaves the entry queued for the next
                 // drain, which is what the outbox is for.
-                if (outboxEntry != null && acknowledges(payload, outboxEntry)) {
+                if (outboxEntry != null && acknowledges(body, outboxEntry)) {
                     registrationAcknowledged(outboxEntry);
                 }
             } else {
-                handleResolution(payload, matchType, deferred, epoch);
+                handleResolution(body, matchType, deferred, epoch);
             }
         }
     }

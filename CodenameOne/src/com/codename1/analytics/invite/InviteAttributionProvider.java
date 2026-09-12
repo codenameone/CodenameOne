@@ -28,7 +28,10 @@ import com.codename1.analytics.AnalyticsCapability;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.AnalyticsContext;
 import com.codename1.analytics.ConsentMode;
+import com.codename1.io.Log;
 import com.codename1.io.Preferences;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 // The seam that lets invite attribution honour an erasure request and a
 // consent change without any edit to the Analytics facade.
@@ -69,30 +72,31 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
         if (seen == null) {
             return;
         }
-        String last = Preferences.get(PREF_LAST_CLIENT_ID, "");
+        String last = baseline();
         if (last == null || last.length() == 0) {
-            // No baseline. Which of two things that means is decided by
-            // whether this device has invite records, because Preferences
-            // cannot be asked whether a write landed: set() updates a static
-            // table and swallows the store's answer.
+            // No baseline, and with a VERIFIED store that now means one thing.
             //
-            // A genuinely first registration has no records, and recording the
-            // baseline is all there is to do. But a baseline write that failed
-            // earlier leaves the same empty value beside records that DO
-            // exist -- and the next resetClientId() in that process then read
-            // the new id as its first baseline, skipped eraseInternal(), and
-            // left the old attribution and the queued registrations attached
-            // to the identity the user had just reset.
+            // It used to mean two, because the baseline lived in Preferences:
+            // set() updates a static table and swallows the store's answer, so
+            // a write that failed left exactly the same empty value as a write
+            // that never happened. Records beside an empty baseline were read
+            // as an erasure that never finished, and eraseInternal() ran --
+            // which on a first launch whose baseline write had merely failed
+            // DELETED a perfectly good invite. One storage hiccup was enough:
+            // a direct link or an App Clip persists a pending invite, the
+            // process exits, and the next launch destroys it.
             //
-            // Records with no baseline are therefore treated as the erasure
-            // that never completed, and the baseline advances only once it has.
-            if (!Invites.hasDurableRecords()) {
-                Preferences.set(PREF_LAST_CLIENT_ID, seen);
-                return;
-            }
-            if (Invites.eraseInternal()) {
-                Preferences.set(PREF_LAST_CLIENT_ID, seen);
-            }
+            // The baseline is a checked InviteStore write now, so an absent one
+            // means the write never landed -- a storage failure, not a reset,
+            // and storage that cannot hold this could not have held the records
+            // either. So the baseline is simply (re)written, and nothing is
+            // erased on the strength of its absence.
+            //
+            // A real reset is not detected by absence anyway. It is detected by
+            // the baseline DIFFERING below, and by the durable erasure marker
+            // that reset() and eraseInternal() leave when they cannot finish,
+            // which resumeOwedErasure() retries on every entry point.
+            rememberBaseline(seen);
             return;
         }
         if (!last.equals(seen)) {
@@ -108,8 +112,46 @@ final class InviteAttributionProvider extends AbstractAnalyticsProvider {
             // repeated erasure and is the only thing here that survives the
             // process.
             if (Invites.eraseInternal()) {
-                Preferences.set(PREF_LAST_CLIENT_ID, seen);
+                rememberBaseline(seen);
             }
+        }
+    }
+
+    /// The client id this provider last saw, or the empty string.
+    ///
+    /// Reads the durable record, falling back to the Preferences key earlier
+    /// builds used so an upgrade does not look like a first launch -- which
+    /// would be harmless now, but would still cost a needless rewrite.
+    private static String baseline() {
+        Map<String, String> record = InviteStore.read(InviteStore.BASELINE);
+        String stored = InviteStore.get(record, "clientId", null);
+        if (stored != null && stored.length() > 0) {
+            return stored;
+        }
+        return Preferences.get(PREF_LAST_CLIENT_ID, "");
+    }
+
+    /// Records the baseline durably.
+    ///
+    /// The Preferences key is kept in step so a downgrade, or any code still
+    /// reading it, sees the same answer. It is the copy that cannot be
+    /// trusted, not the one that is wrong.
+    ///
+    /// A write that does not land is reported rather than returned, because
+    /// there is nothing a caller could do about it: the answer is to try again
+    /// on the next entry point, which is what happens anyway.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientId`: the id now in force
+    private static void rememberBaseline(String clientId) {
+        Map<String, String> record = new LinkedHashMap<String, String>();
+        record.put("clientId", clientId);
+        boolean stored = InviteStore.write(InviteStore.BASELINE, record);
+        Preferences.set(PREF_LAST_CLIENT_ID, clientId);
+        if (!stored) {
+            Log.p("invite: the identity baseline could not be stored, so an identity "
+                    + "change may go unnoticed until it can be", Log.WARNING);
         }
     }
 
