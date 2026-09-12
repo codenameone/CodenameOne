@@ -219,6 +219,45 @@ static _Atomic long cn1H2InboundBytes = 0;
 #define CN1_H2_MAX_PROCESS_INBOUND_BYTES (4 * (CN1_H2_MAX_SESSION_BODY_BYTES \
         + CN1_H2_MAX_SESSION_HEADER_BYTES))
 
+/* Reserves `bytes` of that total, atomically, exactly as cn1H2ReserveBodyBytes
+   does for the pending side. Returns 0 when the reservation would cross the
+   ceiling, in which case nothing is added.
+
+   A load, a comparison and an add is not a reservation: every worker processing
+   a session can read the same below-the-ceiling total and then add its own
+   share. That was written off as an overshoot of one DATA chunk per session,
+   which was wrong twice over. The charge is a CAPACITY DELTA, not a chunk -- the
+   buffer grows to twice what is needed, so the last doubling under an 8MB
+   per-body ceiling reserves about 4MB for a 16KB frame -- and it is bounded by
+   the worker count, so the default 16 can walk tens of megabytes past a ceiling
+   other sessions have already filled. A client choosing its upload sizes decides
+   when they all cross together.
+
+   The caller charges BEFORE allocating and gives the reservation back if the
+   allocation fails, which is what keeps the counter from drifting up: the
+   previous order -- test, allocate, charge -- was chosen for that same reason
+   and is what made the test and the charge two steps. */
+static int cn1H2ReserveInboundBytes(long bytes) {
+    long current = atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed);
+    for(;;) {
+        if(current + bytes > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
+            return 0;
+        }
+        if(atomic_compare_exchange_weak_explicit(&cn1H2InboundBytes, &current,
+                                                 current + bytes,
+                                                 memory_order_relaxed,
+                                                 memory_order_relaxed)) {
+            return 1;
+        }
+        /* current now holds what another worker left; try again against that. */
+    }
+}
+
+/* Gives back a reservation the allocation it was made for did not use. */
+static void cn1H2ReleaseInboundBytes(long bytes) {
+    atomic_fetch_sub_explicit(&cn1H2InboundBytes, bytes, memory_order_relaxed);
+}
+
 static void cn1H2FreeBody(CN1H2Body* body) {
     /* The WHOLE length, matching what was reserved: the buffer is one allocation
        and free() below returns all of it at once, however much of it had been
@@ -367,8 +406,7 @@ static int cn1H2OnBeginHeaders(nghttp2_session* session, const nghttp2_frame* fr
        zero while holding one of these per stream, per connection. Counted as
        what it is: a fixed cost per open request, charged here and released in
        cn1H2FreeRequest with everything else the request holds. */
-    if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed)
-            + (long)sizeof(CN1H2Request) > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
+    if(!cn1H2ReserveInboundBytes((long)sizeof(CN1H2Request))) {
         /* Refusing the stream rather than the connection: nghttp2 resets this
            one and the peer's other streams carry on, which is the proportionate
            answer to a process that is momentarily full. */
@@ -376,10 +414,9 @@ static int cn1H2OnBeginHeaders(nghttp2_session* session, const nghttp2_frame* fr
     }
     r = (CN1H2Request*)calloc(1, sizeof(CN1H2Request));
     if(r == NULL) {
+        cn1H2ReleaseInboundBytes((long)sizeof(CN1H2Request));
         return NGHTTP2_ERR_CALLBACK_FAILURE;
     }
-    atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)sizeof(CN1H2Request),
-                              memory_order_relaxed);
     r->streamId = frame->hd.stream_id;
     r->next = s->open;
     s->open = r;
@@ -549,12 +586,10 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
         }
     }
-    /* Tested before the append and charged after it, because cn1H2FreeRequest
-       gives back bodyLength: charging first would strand the bytes of an append
-       that then FAILS to grow the buffer, and the counter would drift up until
-       it refused everything. The load-then-add can overshoot when two sessions
-       cross together, by at most one chunk each, which is the right trade for a
-       coarse memory guard -- the alternative is a lock on the data path. */
+    /* Reserved before the buffer grows and given back if the growth fails, so
+       the counter neither drifts up nor admits two workers on the strength of
+       one reading. cn1H2FreeRequest gives back the capacity when the request
+       ends, which is the other half of the same arrangement. */
     if(r->bodyLength + length > r->bodyCapacity) {
         /* CAPACITY, NOT LENGTH, on both the test and the charge. This grows to
            twice what is needed, so charging the payload left roughly half of every
@@ -564,11 +599,13 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
            it says. The capacity is what free() gives back, so it is what the
            counter has to follow.
 
-           Tested before the realloc and charged after it, which is the order the
-           previous version had and for the same reason: a growth that FAILS must
-           leave the counter where it was. The load-then-add can still overshoot by
-           one chunk per session when two cross together, which remains the right
-           trade for a coarse guard against a lock on the data path. */
+           RESERVED, not tested and then charged. The delta below is a capacity
+           step, so the last doubling under the per-body ceiling reserves about
+           4MB for one 16KB frame: every worker reading the same total before any
+           of them adds to it is how a fleet of sessions crosses the process
+           ceiling together, by far more than the one chunk each this used to
+           claim. Given back below if the growth fails, which is the whole reason
+           the charge used to come after it. */
         size_t grown = (r->bodyLength + length) * 2 + 1024;
         size_t added;
         unsigned char* buf;
@@ -576,18 +613,16 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
             grown = CN1_H2_MAX_BODY_BYTES;
         }
         added = grown - r->bodyCapacity;
-        if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed) + (long)added
-                > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
+        if(!cn1H2ReserveInboundBytes((long)added)) {
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
         }
         buf = (unsigned char*)realloc(r->body, grown);
         if(buf == NULL) {
+            cn1H2ReleaseInboundBytes((long)added);
             return NGHTTP2_ERR_CALLBACK_FAILURE;
         }
         r->body = buf;
         r->bodyCapacity = grown;
-        atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)added,
-                                  memory_order_relaxed);
     }
     memcpy(r->body + r->bodyLength, data, length);
     r->bodyLength += length;
