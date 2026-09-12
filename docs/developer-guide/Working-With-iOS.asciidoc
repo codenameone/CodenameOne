@@ -13,7 +13,7 @@ If you've access to a Mac, connect the device, open Xcode, and use the device ex
 - Check that you own the package name. For example, if you earlier installed an app with the same package name but a different certificate, a new install will fail. This is true for Android too. If you installed the kitchen sink from the store and then built your own app with the same package name, the installation will collide.
 - This can be a problem if you use a generic package name that someone else already claimed, so use your own domain.
 
-- Make sure the device has a recent enough version of iOS for the dependencies. As of 2024, Codename One builds target iOS 12.0 or newer by default. You can raise the need with the `ios.deployment_target` build hint if a library needs a newer version.
+- Make sure the device has a recent enough version of iOS for the dependencies. Codename One builds target iOS 14 unless you say otherwise, and never drop below iOS 13 whatever is asked for. Raise the floor with the `ios.deployment_target` build hint when a library needs a newer version.
 
 - Verify that you're using Safari when installing on the device. If you used a cable, that isn't a problem. Some developers had issues with Firefox not launching the install process.
 
@@ -27,7 +27,7 @@ Launch screen storyboards are the default approach for Codename One iOS builds. 
 
 ==== Key files
 
-The build server provides a minimal launch storyboard automatically. Customize it by adding any of the following files under your project's `native/ios` directory:
+The build server provides a minimal launch storyboard automatically. Customize it by adding any of the following files under your project's `ios/src/main/resources` directory:
 
 . `Launch.Foreground.png` - Shown in the center of the screen instead of your app icon.
 . `Launch.Background.png` - Drawn behind the content to provide a color or illustration.
@@ -78,7 +78,7 @@ When iterating locally with a Mac, open the generated Xcode project and run it o
 
 Local notifications are like push notifications, except that they're initiated locally by the app, rather than remotely. They're useful for communicating information to the user while the app is running in the background, since they manifest themselves as pop-up notifications on supported devices.
 
-TIP: To set the notification icon on Android place a 24×24 icon named `ic_stat_notify.png` under the `native/android` folder of the app. The icon can be white with transparency areas
+TIP: To set the notification icon on Android place a 24×24 icon named `ic_stat_notify.png` under `android/src/main/resources`. The icon can be white with transparency areas
 
 ==== Sending notifications
 
@@ -205,7 +205,7 @@ For example, it seems that Apple will reject your app if you include that and do
 
 NOTE: CocoaPods remains fully supported, but it's no longer the only supported iOS dependency path. Swift Package Manager (SPM) is also supported. The current guidance is documented in this section.
 
-https://cocoapods.org/[CocoaPods] is a dependency manager for Swift and Objective-C Cocoa projects. It has over eighteen thousand libraries and can help you scale your projects. Cocoapods can be used in your Codename One project to include native iOS libraries without having to go through the hassle of bundling the actual library into your project. Rather than bundling `.h` and `.a` files in your ios/native directory, you can specify which "pods" your app uses through the `ios.pods` build hint. (Other build hints also exist if you need more advanced features.)
+https://cocoapods.org/[CocoaPods] is a dependency manager for Swift and Objective-C Cocoa projects. It has over eighteen thousand libraries and can help you scale your projects. Cocoapods can be used in your Codename One project to include native iOS libraries without having to go through the hassle of bundling the actual library into your project. Rather than bundling `.h` and `.a` files in your `ios/src/main/resources` directory, you can specify which "pods" your app uses through the `ios.pods` build hint. (Other build hints also exist if you need more advanced features.)
 
 **Examples**
 
@@ -291,8 +291,8 @@ the dependency hints only if suppression is intentional, or switch to
 
 === Including dynamic frameworks
 
-If you need to use a dynamic framework (for example: SomeThirdPartySDK.framework), and it isn't available through CocoaPods, then you can add it to your project by zipping up the framework and copying it to your native/ios directory.
+If you need to use a dynamic framework (for example: SomeThirdPartySDK.framework), and it isn't available through CocoaPods, then you can add it to your project by zipping up the framework and copying it to `ios/src/main/resources`.
 
-For example: native/ios/SomeThirdPartySDK.framework.zip
+For example: `ios/src/main/resources/SomeThirdPartySDK.framework.zip`
 
 No build hints necessary for this approach. The build server will automatically detect the framework and link it into your app.

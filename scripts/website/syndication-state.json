@@ -1993,6 +1993,11 @@
       "medium": {
         "url": "https://medium.com/p/7c2081802a30/edit",
         "syndicated_at": "2026-09-08T19:01:31+00:00"
+      },
+      "devto": {
+        "id": 4616804,
+        "url": "https://dev.to/codenameone/rootless-jailbreak-detection-updating-the-signals-not-the-claim-3b1e",
+        "syndicated_at": "2026-09-09T17:09:25+00:00"
       }
     },
     "compile-time-build-hints": {
@@ -2005,6 +2010,56 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-09T00:08:57+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/cf0f03201d2b/edit",
+        "syndicated_at": "2026-09-09T19:01:46+00:00"
+      },
+      "devto": {
+        "id": 4625689,
+        "url": "https://dev.to/codenameone/build-hints-that-fail-before-the-build-server-3c6o",
+        "syndicated_at": "2026-09-10T17:03:01+00:00"
+      }
+    },
+    "voip-vpn-builders": {
+      "hashnode": {
+        "url": "https://debugagent.com/voip-vpn-and-the-build-system-behind-them",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa344931394571c5ef29606",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-11T00:01:15+00:00"
+      },
+      "devto": {
+        "id": 4634079,
+        "url": "https://dev.to/codenameone/voip-vpn-and-the-build-system-behind-them-58j3",
+        "syndicated_at": "2026-09-11T17:01:39+00:00"
+      },
+      "foojay": {
+        "id": 60,
+        "url": "https://github.com/foojayio/website/pull/60",
+        "pull_request_url": "https://github.com/foojayio/website/pull/60",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-09-11T17:01:55+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/722f79a6115e/edit",
+        "syndicated_at": "2026-09-11T19:01:34+00:00"
+      }
+    },
+    "dialogs-in-native-windows": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-dialog-can-now-be-a-native-desktop-window",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa49612e6a7f480eca4e6b4",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-12T00:01:13+00:00"
       }
     }
   }

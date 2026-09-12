@@ -19,6 +19,12 @@ UIIDs can be customized in the GUI builder and support per-component styling.
 
 NOTE: The component class name often matches the UIID, but the two remain separate entities.
 
+Looking a UIID up isn't a single lookup. The state, the appearance and any
+`derive` chain each get a turn before the default style is reached:
+
+.The order UIManager searches when a component asks for its style
+image::img/theme-style-cascade.svg[The order UIManager searches to resolve a UIID into a Style,scaledwidth=85%]
+
 [[theme-layering-section]]
 === Theme layering
 

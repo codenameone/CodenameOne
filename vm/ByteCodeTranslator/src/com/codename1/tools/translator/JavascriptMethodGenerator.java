@@ -126,6 +126,17 @@ final class JavascriptMethodGenerator {
     // win. JSO-bridge types are excluded (they dispatch host-side via
     // the m: map). Kill switch: ``-Dparparvm.js.devirt.off``.
     private static volatile java.util.Map<String, String> monomorphicDispatch = null;
+    // Dispatch id -> whether the SINGLE implementation ``monomorphicDispatch``
+    // resolves it to is suspending.
+    //
+    // A devirtualized call site names its target directly, so its ``yield*``
+    // must follow that target and NOT the signature-wide answer. Those two
+    // used to be the same thing; once a call site is resolved against its
+    // receiver they are not, and a signature that is suspending SOMEWHERE can
+    // devirtualize here to a plain function -- which made ``_dv*`` do
+    // ``yield*`` on a non-generator and throw "is not iterable" out of
+    // BytecodeTranslatorRegressionTest.
+    private static volatile java.util.Map<String, Boolean> monomorphicSuspending = null;
     // The class whose method is currently being emitted. Used by
     // ``appendInterpreterEnsureClassInitialized`` to elide
     // ``_I("X")`` when ``X`` is the containing class or one of
@@ -187,6 +198,7 @@ final class JavascriptMethodGenerator {
         // Monomorphic-devirtualization map must be computed BEFORE the
         // dispatch-reference scan so that scan can skip ids that will be
         // devirtualized (and thus need no m: entry / dispatch-id string).
+        monomorphicSuspending = new java.util.HashMap<String, Boolean>();
         java.util.Map<String, String> monoDispatch = computeMonomorphicDispatch(allClasses, index);
         monomorphicDispatch = monoDispatch;
 
@@ -291,6 +303,7 @@ final class JavascriptMethodGenerator {
      */
     private static java.util.Map<String, String> computeMonomorphicDispatch(
             List<ByteCodeClass> allClasses, Map<String, ByteCodeClass> index) {
+        java.util.Map<String, Boolean> suspendingByDispatchId = monomorphicSuspending;
         java.util.Map<String, String> result = new java.util.HashMap<String, String>();
         if (System.getProperty("parparvm.js.devirt.off") != null) {
             return result;
@@ -341,6 +354,7 @@ final class JavascriptMethodGenerator {
                 Integer total = declCount.get(did);
                 if (total != null && total == 1) {
                     result.put(did, jsMethodIdentifier(c, m));
+                    suspendingByDispatchId.put(did, Boolean.valueOf(m.isJavascriptSuspending()));
                 }
             }
         }
@@ -582,6 +596,70 @@ final class JavascriptMethodGenerator {
             String base = cls.getBaseClass();
             current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
         }
+        // A ``super`` call can land on an INTERFACE DEFAULT METHOD: the
+        // superclass chain declares nothing, and the JVM (like the runtime's
+        // resolveVirtual) then searches the interfaces. Walking only the
+        // extends chain returned null here, and a null direct target is
+        // treated as suspending -- so the emitter wrote ``yield*`` in front of
+        // a default method that is emitted as a plain function, which is
+        // exactly "yield* ... is not iterable". Harmless while every default
+        // was suspending anyway; live the moment call sites resolve against
+        // their receiver.
+        BytecodeMethod viaInterface = resolveThroughInterfaces(idx,
+                JavascriptNameUtil.sanitizeClassName(invoke.getOwner()), normalizedName, desc);
+        if (viaInterface != null) {
+            return viaInterface;
+        }
+        return null;
+    }
+
+    /**
+     * Breadth-first search of the interface hierarchy above {@code owner} for
+     * a concrete (default) {@code name + desc}, mirroring the order
+     * {@code jvm.resolveVirtual} uses: superclasses first, then interfaces.
+     */
+    private static BytecodeMethod resolveThroughInterfaces(Map<String, ByteCodeClass> idx,
+            String owner, String name, String desc) {
+        java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>();
+        java.util.HashSet<String> seen = new java.util.HashSet<String>();
+        String current = owner;
+        while (current != null && seen.add(current)) {
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                break;
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    pending.add(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+            String base = cls.getBaseClass();
+            current = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+        }
+        java.util.HashSet<String> visitedIfaces = new java.util.HashSet<String>();
+        while (!pending.isEmpty()) {
+            String ifaceName = pending.poll();
+            if (ifaceName == null || !visitedIfaces.add(ifaceName)) {
+                continue;
+            }
+            ByteCodeClass iface = idx.get(ifaceName);
+            if (iface == null) {
+                continue;
+            }
+            for (BytecodeMethod m : iface.getMethods()) {
+                if (m.isEliminated() || m.isAbstract()) {
+                    continue;
+                }
+                if (name.equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                    return m;
+                }
+            }
+            if (iface.getBaseInterfaces() != null) {
+                for (String up : iface.getBaseInterfaces()) {
+                    pending.add(JavascriptNameUtil.sanitizeClassName(up));
+                }
+            }
+        }
         return null;
     }
 
@@ -611,20 +689,60 @@ final class JavascriptMethodGenerator {
      * {@link BytecodeMethod#isJavascriptSuspending} flag itself
      * defaults to {@code true} for the same reason.
      */
+    /**
+     * Whether a call site that has been DEVIRTUALIZED to {@code dispatchId}
+     * must be emitted suspending.
+     *
+     * Follows the single implementation rather than the signature: ``_dv*``
+     * calls that implementation directly, so a signature-wide "suspending"
+     * would put ``yield*`` in front of a plain function.
+     */
+    private static boolean isDevirtualizedInvokeSuspending(String dispatchId, boolean signatureAnswer) {
+        java.util.Map<String, Boolean> known = monomorphicSuspending;
+        if (known == null) {
+            return signatureAnswer;
+        }
+        Boolean target = known.get(dispatchId);
+        return target == null ? signatureAnswer : target.booleanValue();
+    }
+
     private static boolean isInvokeSuspending(Invoke invoke) {
         int op = invoke.getOpcode();
         if (op == Opcodes.INVOKEVIRTUAL || op == Opcodes.INVOKEINTERFACE) {
-            // CHA result: the signature is sync only if NO class's
-            // impl is suspending. Consult the set exported by the
-            // suspension analysis. Default (no set → all dispatches
-            // suspending) preserves the historical over-conservative
-            // behaviour when the analysis is disabled.
+            // Ask the analysis about THIS call site, receiver type included.
+            // Keying on the bare signature -- which is what this did, and what
+            // the whole JS backend still does for its runtime dispatch ids --
+            // means one blocking ``run()V`` anywhere makes every ``run()V``
+            // call site in the program a suspension point.
+            //
+            // The answer MUST match the one the analysis used when it decided
+            // whether the ENCLOSING method is a generator, so both sides go
+            // through the same DispatchModel rather than reimplementing the
+            // rule; a ``yield*`` emitted into a plain ``function`` is a JS
+            // SyntaxError, not a subtle mistake.
+            JavascriptSuspensionAnalysis.DispatchModel model =
+                    JavascriptSuspensionAnalysis.exportedDispatchModel;
+            if (model != null) {
+                return model.isDispatchSuspending(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+            }
+            // Analysis disabled (-Dparparvm.js.suspension.off): unchanged
+            // historical behaviour.
             java.util.Set<String> suspendingSigs = JavascriptSuspensionAnalysis.exportedSuspendingSigs;
             if (suspendingSigs == null) {
                 return true;
             }
             String sig = invoke.getName() + invoke.getDesc();
             return suspendingSigs.contains(sig);
+        }
+        // Direct calls go through the analysis's resolver too. Resolving them
+        // here independently is what let a ``super`` call to an interface
+        // default be "suspending" at the call site and synchronous in the
+        // method containing it -- a ``yield*`` inside a plain ``function``,
+        // i.e. ``ReferenceError: yield is not defined``.
+        JavascriptSuspensionAnalysis.DispatchModel direct =
+                JavascriptSuspensionAnalysis.exportedDispatchModel;
+        if (direct != null) {
+            return direct.isDirectSuspending(invoke.getOwner(), invoke.getName(), invoke.getDesc());
         }
         BytecodeMethod target = resolveDirectInvokeTarget(invoke);
         return target == null || target.isJavascriptSuspending();
@@ -5117,10 +5235,13 @@ final class JavascriptMethodGenerator {
                     // Monomorphic devirtualization (see appendCompactVirtualDispatch):
                     // direct ``_dv*`` / ``_dw*`` call to the single impl when known.
                     String monoImpl = monomorphicDispatch == null ? null : monomorphicDispatch.get(dispatchId);
-                    String devBase = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+                    // A devirtualized site follows its TARGET, not the signature.
+                    boolean devSuspending = monoImpl != null
+                            ? isDevirtualizedInvokeSuspending(dispatchId, suspending) : suspending;
+                    String devBase = monoImpl != null ? (devSuspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
                     String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
                     StringBuilder callExpr = new StringBuilder();
-                    callExpr.append(suspending ? "(yield* " : "(").append(devBase)
+                    callExpr.append(devSuspending ? "(yield* " : "(").append(devBase)
                             .append(argValues.length <= 4 ? String.valueOf(argValues.length) : "N")
                             .append("(").append(target).append(", ").append(devSecond);
                     if (argValues.length > 4) {
@@ -7024,6 +7145,15 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // would resolve to a now-missing m: entry ("Missing virtual
             // method ...").
             String monoImpl = monomorphicDispatch == null ? null : monomorphicDispatch.get(dispatchId);
+            // A devirtualized site follows its TARGET, exactly as the
+            // straight-line and compact paths do. This one was left reading
+            // the call site's signature-wide verdict, so a complex method --
+            // one emitted through the interpreter rather than structured --
+            // could still ``yield*`` a plain function or drive a generator
+            // synchronously at precisely the sites this map exists for.
+            if (monoImpl != null) {
+                susp = isDevirtualizedInvokeSuspending(dispatchId, susp);
+            }
             String iv = monoImpl != null ? (susp ? "_dv" : "_dw") : (susp ? "_v" : "_w");
             String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
             String yk = susp ? "yield* " : "";
@@ -7270,6 +7400,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         // (bareword) impl function id, not a quoted dispatch id.
         java.util.Map<String, String> mono = monomorphicDispatch;
         String monoImpl = mono == null ? null : mono.get(methodId);
+        // Devirtualized: follow the TARGET's suspending-ness, not the
+        // signature's -- see isDevirtualizedInvokeSuspending.
+        if (monoImpl != null) {
+            suspending = isDevirtualizedInvokeSuspending(methodId, suspending);
+        }
         String base = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
         // The second helper argument: bareword impl fn for devirt, else
         // the quoted dispatch-id string.

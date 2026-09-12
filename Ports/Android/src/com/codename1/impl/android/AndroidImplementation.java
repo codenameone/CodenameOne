@@ -9265,6 +9265,107 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Whether this device draws the system location button.
+    ///
+    /// See [AndroidLocationButton] for why the check is a runtime one: the same
+    /// build of this port runs on both sides of the API 37 line, and nothing in
+    /// it is compiled against API 37 at all.
+    ///
+    /// #### Returns
+    ///
+    /// whether a system-rendered location button can be built here
+    public boolean isLocationButtonSupported() {
+        return getActivity() != null && AndroidLocationButton.isSupported();
+    }
+
+    /// Builds the system location button as a Codename One peer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textType`: one of the `TEXT_` constants on
+    ///   `com.codename1.location.LocationButton`
+    ///
+    /// - `backgroundColor`: an RRGGBB colour, or -1 for the platform's own
+    ///
+    /// - `textColor`: an RRGGBB colour, or -1 for the platform's own
+    ///
+    /// - `onPermissionResult`: TRUE when the user shared their location, FALSE
+    ///   when they declined, null when the session failed
+    ///
+    /// #### Returns
+    ///
+    /// the peer, or null when this device has no such control
+    public PeerComponent createLocationButton(final int textType,
+            final int backgroundColor, final int textColor,
+            final SuccessCallback<Boolean> onPermissionResult) {
+        final CodenameOneActivity a = getActivity();
+        if (a == null || !AndroidLocationButton.isSupported()) {
+            return null;
+        }
+        // A View may only be constructed on the Android UI thread, and the
+        // caller is building a Container right now and needs the peer to put in
+        // it -- the same trade the GPU peer above makes.
+        //
+        // A NAMED class rather than an anonymous one on purpose:
+        // scripts/check-cast-semantics.sh keys its baseline on Outer$N, so an
+        // anonymous class added anywhere in this file renumbers every one after
+        // it and reports untouched entries as new findings.
+        LocationButtonBuilder builder = new LocationButtonBuilder(a, textType,
+                backgroundColor, textColor, onPermissionResult);
+        runOnUiThreadAndBlock(builder);
+        if (builder.created == null) {
+            return null;
+        }
+        return createNativePeer(builder.created);
+    }
+
+    /// Whether the system has opened a session for this control.
+    ///
+    /// See [AndroidLocationButton#hasSession()]: the view is built
+    /// synchronously and the surface the system draws into arrives afterwards,
+    /// so a control that exists is not yet a control that works.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: a peer from [#createLocationButton]
+    ///
+    /// #### Returns
+    ///
+    /// whether the platform is drawing into it
+    public boolean isLocationButtonReady(PeerComponent button) {
+        if (button == null) {
+            return false;
+        }
+        Object view = button.getNativePeer();
+        return view instanceof AndroidLocationButton
+                && ((AndroidLocationButton) view).hasSession();
+    }
+
+    /// Constructs an [AndroidLocationButton] on the Android UI thread.
+    private static final class LocationButtonBuilder implements Runnable {
+        private final Activity activity;
+        private final int textType;
+        private final int backgroundColor;
+        private final int textColor;
+        private final SuccessCallback<Boolean> onPermissionResult;
+
+        AndroidLocationButton created;
+
+        LocationButtonBuilder(Activity activity, int textType, int backgroundColor,
+                int textColor, SuccessCallback<Boolean> onPermissionResult) {
+            this.activity = activity;
+            this.textType = textType;
+            this.backgroundColor = backgroundColor;
+            this.textColor = textColor;
+            this.onPermissionResult = onPermissionResult;
+        }
+
+        public void run() {
+            created = new AndroidLocationButton(activity, textType, backgroundColor,
+                    textColor, onPermissionResult);
+        }
+    }
+
     private AndroidMotionSensorManager motionSensorManager;
 
     @Override

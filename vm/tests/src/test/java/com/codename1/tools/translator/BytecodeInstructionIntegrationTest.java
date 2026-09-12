@@ -1004,6 +1004,8 @@ class BytecodeInstructionIntegrationTest {
         m.setAccessible(true);
 
         assertEquals("wrapper.framework", m.invoke(null, "foo.framework"));
+        assertEquals("compiled.mach-o.dylib", m.invoke(null, "libz.dylib"));
+        assertEquals("sourcecode.text-based-dylib-definition", m.invoke(null, "libc++.tbd"));
         assertEquals("sourcecode.c.objc", m.invoke(null, "foo.m"));
         assertEquals("file", m.invoke(null, "foo.txt"));
         assertEquals("wrapper.plug-in", m.invoke(null, "foo.bundle"));
@@ -1049,7 +1051,7 @@ class BytecodeInstructionIntegrationTest {
                 "ios",
                 sourceDir.toAbsolutePath().toString(),
                 outputDir.toAbsolutePath().toString(),
-                "MyAppIOS", "com.example", "My App", "1.0", "ios", "none"
+                "MyAppIOS", "com.example", "My App", "1.0", "ios", "libc++.tbd"
         };
 
         ByteCodeTranslator.OutputType originalOutput = ByteCodeTranslator.output;
@@ -1068,6 +1070,17 @@ class BytecodeInstructionIntegrationTest {
                     dist.resolve("MyAppIOS.xcodeproj/project.pbxproj")), StandardCharsets.UTF_8);
             assertTrue(pbxproj.contains("CoreText.framework"),
                     "iOS projects must link CoreText for IOSNative bundled font registration");
+
+            String stubReference = fileReferenceLine(pbxproj, "libc++.tbd");
+            assertTrue(stubReference.contains("lastKnownFileType = sourcecode.text-based-dylib-definition"));
+            assertTrue(stubReference.contains("path = \"usr/lib/libc++.tbd\""));
+            assertTrue(stubReference.contains("sourceTree = SDKROOT"));
+            assertTrue(buildPhase(pbxproj, "PBXFrameworksBuildPhase").contains("libc++.tbd"),
+                    "SDK library stubs must be linked into the app");
+            assertFalse(buildPhase(pbxproj, "PBXResourcesBuildPhase").contains("libc++.tbd"),
+                    "SDK library stubs must not be copied as application resources");
+            assertTrue(buildPhase(pbxproj, "PBXFrameworksBuildPhase").contains("libz.dylib"),
+                    "legacy dylib hints must continue to link");
 
             // The assembly file must be typed AND filed as a source. An extension
             // Xcode does not recognise gets `lastKnownFileType = file` and lands in

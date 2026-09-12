@@ -334,7 +334,7 @@ Implementing a native layer effectively means:
 
 .	Creating an interface that extends https://www.codenameone.com/javadoc/com/codename1/system/NativeInterface.html[NativeInterface] and defines methods with the arguments/return values declared in the previous paragraph.
 
-.	Creating the proper native implementation hierarchy based on the call conventions for every platform within the native directory
+.	Creating the proper native implementation hierarchy based on the call conventions for every platform, in each platform module's own source directory
 
 For example: to create a simple hello world interface do something like:
 
@@ -372,7 +372,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedto
 
 Notice that for this to work you must implement the native code on all supported platforms.
 
-You will start with Android which should be familiar and intuitive to many developers. The helper `MyNativeImplStub` class below mirrors the stub that the tooling generates under the `native/android` directory:
+You will start with Android which should be familiar and intuitive to many developers. The helper `MyNativeImplStub` class below mirrors the stub that the tooling generates under `android/src/main/java`:
 
 [source,java]
 ----
@@ -558,7 +558,7 @@ The problem with the synchronous call is that it will block the caller thread, i
 
 Cocoapods are the iOS equivalent of Gradle dependencies.
 
-CocoaPods allow you to add a native library dependency to iOS far more than Gradle. By default you target iOS 7.0 or newer which is supported by Intercom for older versions of the library. Annoyingly CocoaPods might seem to work but some specific APIs won't work since it fell back to an older version... To solve this you've to explicitly define the build hint `ios.pods.platform=8.0` to force iOS 8 or newer. You might need to force it to even newer versions as some libraries force an iOS 9 least etc.
+CocoaPods allow you to add a native library dependency to iOS far more than Gradle. A pod that needs a newer iOS than the rest of your app says so through the `ios.pods.platform` build hint. The deployment target the build uses is the highest of everything that asks for one -- the builder's own floor, `ios.deployment_target`, and `ios.pods.platform` -- so that hint can raise the target and never lower it.
 
 Including intercom itself required a single build hint: `ios.pods=Intercom` which you can obviously extend by using commas to include many libraries. You can search the https://cocoapods.org/[CocoaPods website] for supported 3rd party libraries which includes everything you would expect. One important advantage when working with CocoaPods is the faster build time as the upload to the Codename One website is smaller and the bandwidth you've to CocoaPods is faster. Another advantage is the ability to keep up with the latest developments from the library providers.
 
@@ -714,7 +714,7 @@ include::../demos/javascript/src/main/snippets/developer-guide/advanced-topics-u
 ----
 
 
-Notice that if you want to use a native library (jar,.a file etc.) places it within the appropriate native directory and it will be packaged into the final executable. You would be able to reference it from the native code and not from the Codename One code, which means you will need to build native interfaces to access it.
+Notice that if you want to use a native library (jar,.a file etc.) place it in the resources of the matching platform module -- `android/src/main/resources`, `ios/src/main/resources` -- and it will be packaged into the final executable. You would be able to reference it from the native code and not from the Codename One code, which means you will need to build native interfaces to access it.
 
 This is discussed further below.
 
@@ -864,7 +864,7 @@ A common way to implement features in Android is the `BroadcastReceiver` API. Th
 
 A good example is intercepting incoming SMS which is specific to Android so you'd need a broadcast receiver to implement that. This is often confusing to developers who sometimes derive the impl class from broadcast receiver. That's a mistake...
 
-The solution is to place any native Android class into the `native/android` directory. It will get compiled with the rest of the native code and "works." You can therefore place this class under `native/android/com/codename1/sms/intercept`:
+The solution is to place any native Android class into `android/src/main/java`. It will get compiled with the rest of the native code and "works." You can therefore place this class under `android/src/main/java/com/codename1/sms/intercept`:
 
 [source,java]
 ----
@@ -1250,9 +1250,8 @@ process isn't as straightforward.
 
 If you need to integrate such a library into your native calls you have the following options:
 
-. The first option (and the easiest one) is to place a Jar file in the native/android directory. This will link
-your binary with the jar file. Just place the jar under the native/android and the build server will pick it up and will
-add it to the classpath. +
+. The first option (and the easiest one) is to place a Jar file in `android/src/main/resources`. This will link
+your binary with the jar file, and the build server picks it up and adds it to the classpath. +
 Notice that Android release apps are obfuscated by default which might cause issues with such libraries if they
 reference APIs that are unavailable on Android. You can work around this by adding a build hint to the proguard
 obfuscation code that blocs the obfuscation of the problematic classes using the build hint: +
@@ -1261,12 +1260,12 @@ obfuscation code that blocs the obfuscation of the problematic classes using the
 . Another option is the `aar` file is a binary format Google introduced to represent an Android Library project (similarly to the cn1lib format). One of the problem with the Android Library projects was the fact that it required the project sources which made it difficult for 3rd party vendors to publish libraries. +
 As a result so android introduced the `aar` file which is a binary format that represents a Library project. To learn more about arr you can read link:https://developer.android.com/studio/projects/android-library.html#aar-contents[this]. +
 +
-You can link an `aar` file by placing it under the native/android and the build server will link it to the project.
+You can link an `aar` file by placing it in `android/src/main/resources` and the build server will link it to the project.
 
-. Another *obsolete approach* exists that you're mentioning for legacy purposes (for example: if you need to port code written with this legacy option). This predated the `aar` option from Google... Not all 3rd party tools can be packaged as a simple jar, some 3rd party tools need to declare activities add permissions, resources, assets, and/or even add native code (`.so` files). +
-To link a Library project to your Codename One project open the Library project in Eclipse or Android Studio and make sure the project builds, after the project was built successfully remove the bin directory from the project and zip the whole project. +
-+
-Rename the extension from `.zip` to `.andlib` and place the andlib file under the `native/android` directory. The build server will pick it up and will link it to the project.
+WARNING: Older material describes a third option, a zipped Eclipse library project renamed to `.andlib`.
+That format is gone. The Android builder stops with `andlib format is not supported anymore, use aar
+instead` the moment it finds one, so a project carrying an `.andlib` doesn't build at all. Convert it to
+an `aar`.
 
 
 === Integrating iOS 3rd party libraries
@@ -1450,18 +1449,25 @@ own configuration there; leave the user interface alone.
 
 
 
-=== Android Lollipop ActionBar customization
+=== Coloring the native Android chrome
 
-When running on Android Lollipop (5.0 or newer) the native action bar will use the Lollipop design. This isn't applicable
-if you use the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar] or https://www.codenameone.com/javadoc/com/codename1/ui/SideMenuBar.html[SideMenuBar] this will be used in the task switcher.
+Codename One switches the native action bar off -- the generated theme sets `android:windowActionBar` to
+`false` -- so the title you see belongs to the
+https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar] or the
+https://www.codenameone.com/javadoc/com/codename1/ui/SideMenuBar.html[SideMenuBar] and Codename One draws
+it. What's left for the platform to color is the chrome around your app: the status bar, and the card the
+task switcher shows for it.
 
-To customize the colors of the native `ActionBar` on Lollipop define a `colors.xml` file in the `native/android` directory
-of your project. It should look like this:
+Define a `colors.xml` file under `android/src/main/resources` for that. Every `<color>` in it becomes an
+`android:` item in the generated theme, so each name has to be an Android theme attribute:
 
 [source,xml]
 ----
 include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.xml[tag=advanced-topics-under-the-hood-xml-006,indent=0]
 ----
+
+NOTE: The colors reach the Material variant of the generated theme, so a device old enough to fall back to
+the Holo variant ignores them.
 
 === Intercepting URLs on iOS & Android
 
@@ -1663,19 +1669,49 @@ Codename One does pretty much everything on the EDT (Event Dispatch Thread), thi
 for example: modal dialogs, invokeAndBlock etc.
 
 For example native widgets have to be drawn on the devices native UI thread. +
-This means that drawing looks something like this:
+The oldest answer to that was to paint in two passes: loop over the Codename One components and paint
+them, then loop over the native peers and let the platform paint those over the result. That's where
+the rule that a peer always covers whatever sits under it comes from, and it isn't how the current
+ports work.
 
-. Loop over all Codename One components and paint them.
+`Display` asks the implementation one question, `paintNativePeersBehind()`, and a `false` answer
+doesn't mean the peer can't be covered. It leaves the compositing to the port, and the ports differ:
 
-. Loop over all native peer components and paint them.
+* iOS and the JavaScript port answer `true`. The native layer sits underneath and Codename One paints
+above it, punching a hole through its own surface with `clearRect` wherever a peer belongs.
 
-This means that all peer components are drawn on top of the Codename One components.
+* Android hands the peer's native `View` to the same ordered stream of drawing operations as every
+other component, so a component painted after the peer covers it. The simulator does the same for a
+peer that renders into a buffer.
+
+* Where the peer owns a surface of its own, the system composites that surface and paint order never
+reaches it. The screenshot technique below can't reach it either, for the same reason.
+
+.Where a peer sits, and what follows from it
+image::img/peer-component-painting.svg[Where a native peer is composited relative to the Codename One layer, and how it differs by port,scaledwidth=85%]
 
 NOTE: This was also the case in AWT/Swing to one degree or another...
 
 ==== Showing dialogs on top of peer components
 
-Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
+Under the first two models this needs nothing from you: a `Dialog` paints after the peer and covers it.
+What follows is for the third, where the system composites the peer's own surface and no amount of
+painting reaches it.
+
+A form transition tells the peers about itself without any help from you: `initTransition` puts both
+forms into lightweight mode, which is how the framework says that a peer isn't truly visible for a
+while. How a peer responds is left to the peer, and it varies by port. Codename One grabs a screenshot of the peer, hide it and then you can show the screenshot. Since the screenshot is static it can be rendered through the standard UI. You can't do that always since grabbing a screenshot is an expensive process on all platforms and must be performed on the native device thread.
+
+`PeerComponent` declares that callback empty, so a port opts into the still by overriding it. The iOS
+and Android peers do, and on Android what the still contains varies again: the browser peer overrides
+the capture and draws its `WebView` into the bitmap, the default renders the `View` the ordinary way,
+and a peer that owns a surface has nothing there to render, so its still is blank. That doesn't hide the
+peer, though. In super peer mode `setLightweightMode` only generates the image, it never changes the
+view's visibility, and `AndroidGLSurface` asks for `setZOrderMediaOverlay(true)`, so the live surface goes
+on drawing above the Codename One canvas while a blank still is painted into the canvas underneath it.
+The transition animates around a peer that never moved. The OpenGL peer keeps a copy of each frame read back with `glReadPixels`,
+but that copy feeds the screenshot path rather than the peer's still image, so it doesn't cover this.
+The JavaScript peer overrides nothing, so it stays live throughout.
 
 ==== Why can't you combine peer component scrolling and Codename One scrolling
 

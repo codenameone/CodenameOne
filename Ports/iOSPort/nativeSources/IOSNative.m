@@ -18849,14 +18849,14 @@ void cn1RegisterAccessibilityStatusObservers(void);
 static BOOL cn1A11yLatched = NO;
 
 BOOL cn1AccessibilityEagerLatched(void) {
-    return cn1A11yLatched;
+    return __atomic_load_n(&cn1A11yLatched, __ATOMIC_ACQUIRE);
 }
 
 #if !TARGET_OS_OSX
 static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *observer,
                                           CFStringRef name, const void *object,
                                           CFDictionaryRef userInfo) {
-    cn1A11yLatched = YES;
+    __atomic_store_n(&cn1A11yLatched, YES, __ATOMIC_RELEASE);
     com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
@@ -18867,10 +18867,9 @@ static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *
 // the tree. This, not the running flags, is what makes the gate correct for the
 // technologies UIKit will not report -- see the comment on that getter.
 void cn1AccessibilityNoteClientQuery(void) {
-    if(cn1A11yLatched) {
+    if(__atomic_exchange_n(&cn1A11yLatched, YES, __ATOMIC_ACQ_REL)) {
         return;   // one transition only; this is on a UIKit query path
     }
-    cn1A11yLatched = YES;
     // Reached on the native macOS port too, now that its rendering view
     // publishes a tree and hangs this call off accessibilityChildren. It is the
     // ONLY trigger there: macOS gives no running flag for Switch Control or
@@ -18937,11 +18936,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
     // public running flag for Voice Control or Full Keyboard Access, so this
     // cannot detect them -- see cn1AccessibilityStatusChanged for how that gap
     // is covered rather than ignored.
+#if TARGET_OS_OSX
     cn1RegisterAccessibilityStatusObservers();
     if(cn1AccessibilityEagerLatched()) {
         return JAVA_TRUE;
     }
-#if TARGET_OS_OSX
     // VoiceOver's own preference domain, which is where macOS records it, and
     // the only assistive technology the platform lets an application ask about.
     // Switch Control and AssistiveTouch have no macOS query and no macOS
@@ -18957,16 +18956,33 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
     extern BOOL CN1MacHostIsVoiceOverRunning(void);
     return CN1MacHostIsVoiceOverRunning() ? JAVA_TRUE : JAVA_FALSE;
 #else
-    if(UIAccessibilityIsVoiceOverRunning() || UIAccessibilityIsSwitchControlRunning()) {
-        return JAVA_TRUE;
-    }
-    // iOS 10. Weakly linked, so on an older deployment target the symbol is
-    // null and calling it jumps through nothing -- test the pointer first.
-    if(UIAccessibilityIsAssistiveTouchRunning != NULL &&
-       UIAccessibilityIsAssistiveTouchRunning()) {
-        return JAVA_TRUE;
-    }
-    return JAVA_FALSE;
+    // Called from AccessibilityManager.invalidate while it holds its Java
+    // monitor, usually on the CN1 EDT. UIKit queries belong on Apple's main
+    // thread, but synchronously waiting for it here can deadlock with a native
+    // accessibility query waiting for that same monitor. Initialize once on
+    // the main queue and read only cached state on the Java caller's thread.
+    // Until initialization finishes, keep projecting so no startup tree is lost.
+    static BOOL initiallyActive = YES;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            @autoreleasepool {
+                // Register before sampling so a later activation is latched by
+                // the existing status callback. All subsequent transitions keep
+                // eager projection enabled for the rest of the process.
+                cn1RegisterAccessibilityStatusObservers();
+                BOOL active = UIAccessibilityIsVoiceOverRunning()
+                        || UIAccessibilityIsSwitchControlRunning();
+                // iOS 10: do not call an absent weakly-linked function.
+                if(!active && UIAccessibilityIsAssistiveTouchRunning != NULL) {
+                    active = UIAccessibilityIsAssistiveTouchRunning();
+                }
+                __atomic_store_n(&initiallyActive, active, __ATOMIC_RELEASE);
+            }
+        });
+    });
+    return (cn1AccessibilityEagerLatched()
+            || __atomic_load_n(&initiallyActive, __ATOMIC_ACQUIRE)) ? JAVA_TRUE : JAVA_FALSE;
 #endif // TARGET_OS_OSX
 #else
     return JAVA_FALSE;

@@ -1,0 +1,32 @@
+name: iOS accessibility thread contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'Ports/iOSPort/nativeSources/IOSNative.m'
+      - 'scripts/ios/accessibility-thread-tests/**'
+      - '.github/workflows/ios-accessibility-thread.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'Ports/iOSPort/nativeSources/IOSNative.m'
+      - 'scripts/ios/accessibility-thread-tests/**'
+      - '.github/workflows/ios-accessibility-thread.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-accessibility-thread-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-contract:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check accessibility queries and cached state across Apple platform guards
+        run: python3 scripts/ios/accessibility-thread-tests/check.py

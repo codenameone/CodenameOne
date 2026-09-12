@@ -465,6 +465,463 @@ public class AndroidGradleBuilder extends Executor {
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
+
+    /// Set when the application references `com.codename1.location.LocationButton`.
+    ///
+    /// The system-rendered location button will not render at all without
+    /// `USE_LOCATION_BUTTON` in the merged manifest, and there is no runtime way
+    /// to acquire it. Detected from actual usage, so an application that never
+    /// shows one does not carry the permission.
+    private boolean locationButtonPermission;
+
+    /// Set when the application uses a location API that needs precise location
+    /// the ordinary way, rather than through the location button.
+    ///
+    /// The two together decide whether `ACCESS_FINE_LOCATION` can be declared
+    /// `onlyForLocationButton`: the button alone means it can, anything else
+    /// means it cannot.
+    private boolean otherLocationUse;
+
+    /// Whether a feature of this builder's own -- Bluetooth scanning, Wi-Fi,
+    /// Nearby -- declared ACCESS_FINE_LOCATION for itself.
+    private boolean featureNeedsOrdinaryFineLocation;
+
+    /// What the platform requires before it will render the system location
+    /// button. Google Play requires that button for transactional precise
+    /// location from Android 17.
+    ///
+    /// Its optional companion -- `usesPermissionFlags="onlyForLocationButton"`
+    /// on `ACCESS_FINE_LOCATION`, which takes ordinary precise location away
+    /// from the application entirely -- is deliberately NOT inferred. Whether
+    /// that is safe depends on what else the application does with location,
+    /// which is the developer's answer to give through `android.xpermissions`.
+    static final String LOCATION_BUTTON_PERMISSION =
+            "    <uses-permission android:name=\"android.permission.USE_LOCATION_BUTTON\" />\n";
+
+    /// Whether a class the application references is the location button.
+    ///
+    /// Nested classes count -- an anonymous listener written inside the
+    /// component is still the component -- while every other class in the
+    /// location package does not: they are the ordinary location APIs, which
+    /// need `ACCESS_FINE_LOCATION` and not this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: an internal class name, e.g. `com/codename1/location/LocationButton`
+    ///
+    /// #### Returns
+    ///
+    /// whether the application shows a location button
+    /// The ACCESS_FINE_LOCATION declaration this application gets.
+    ///
+    /// An application whose only precise-location use is the location button
+    /// declares the permission `onlyForLocationButton`, which means the system
+    /// will never grant it any other way: no "allow precise location" question,
+    /// nothing held between taps, and nothing to justify to Play. An
+    /// application that also tracks, navigates or geofences needs the ordinary
+    /// grant and gets the ordinary declaration.
+    ///
+    /// Inferred rather than asked for, because the compiled scan already knows:
+    /// it reports the classes the APPLICATION reaches, and the framework's own
+    /// code is not in it -- LocationButton calls LocationManager internally and
+    /// that call is not attributed to the application. So "uses the button and
+    /// nothing else from the location or maps packages" is exactly the
+    /// question, and it is already answered.
+    ///
+    /// `android.locationButton.exclusive` overrides the inference either way,
+    /// for an application whose location use the scan cannot see -- native
+    /// Android code calling the platform's own location APIs is the case that
+    /// matters, since Gradle compiles it after this decision is made.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    ///
+    /// #### Returns
+    ///
+    /// the manifest line for ACCESS_FINE_LOCATION
+    private String fineLocationPermission(BuildRequest request, int compileSdk)
+            throws BuildException {
+        // A hand-written fragment reaches the manifest through xPermissions and
+        // is never routed through this method: permissionAdd() suppresses ours
+        // when xPermissions already names ACCESS_FINE_LOCATION, so the guard
+        // below would pass while the unsupported value sat in the manifest
+        // regardless. Checked as text because that is all a free-form hint is,
+        // and refused here so the developer gets this sentence instead of an
+        // AAPT resource-linking error further down.
+        if (!compileSdkSupportsExclusiveLocation(compileSdk)
+                && xPermissions != null
+                && xPermissions.indexOf("onlyForLocationButton") >= 0) {
+            throw new BuildException(requireExclusiveCompileSdkMessage(compileSdk)
+                    + " It was found in android.xpermissions; note that the build"
+                    + " infers this declaration on its own and the hint is not"
+                    + " the way to ask for it.");
+        }
+        // A capped ACCESS_FINE_LOCATION in xpermissions is NOT checked here,
+        // and a check that failed the build over one was reverted after it broke
+        // the health leg. The capped entries are ours: Bluetooth emits one at
+        // maxSdkVersion 30 for BLE scanning and the Wi-Fi block used to emit one
+        // at 32, so the message told developers to remove a fragment they had
+        // never written and could not reach.
+        //
+        // The real limitation is permissionAdd(), which suppresses this build's
+        // declaration for any permission already named in xpermissions by bare
+        // name, never looking at maxSdkVersion. That is one bug, in one place,
+        // shared by every feature that caps a permission -- not something for
+        // this method to police one caller at a time. The Wi-Fi instance is
+        // fixed once, after the injectors, by uncapFineLocation().
+        String hint = request.getArg("android.locationButton.exclusive", "auto");
+        boolean asked = "true".equals(hint);
+        if (asked && featureNeedsOrdinaryFineLocation) {
+            // Refused rather than warned. Emitting the restriction would be
+            // dropped by permissionAdd() in favour of the feature's own
+            // declaration, and the application would ship ordinary precise
+            // access having asked for restricted -- silently, which is the
+            // failure this flag exists to prevent. Honouring it is not an option
+            // either: onlyForLocationButton would stop the feature being granted
+            // location at all.
+            throw new BuildException("android.locationButton.exclusive=true"
+                    + " cannot be honoured: this application also uses a feature"
+                    + " that needs ordinary precise location -- Bluetooth"
+                    + " scanning, Wi-Fi or Nearby -- and declaring"
+                    + " ACCESS_FINE_LOCATION onlyForLocationButton would stop that"
+                    + " feature being granted location at all. Drop the hint, or"
+                    + " stop using the feature that needs location.");
+        }
+        if (!wantsExclusiveLocation(hint, locationButtonPermission, otherLocationUse)) {
+            // The mirror of the conflict below, and just as silent. Answering
+            // "ordinary" here decides nothing on its own: permissionAdd() drops
+            // this declaration whenever android.xpermissions already names
+            // ACCESS_FINE_LOCATION, so a hand-written fragment carrying
+            // onlyForLocationButton stays in the manifest and the application
+            // ships restricted precise location -- the opposite of the force-off
+            // that was asked for, and it is native code, invisible to this scan,
+            // that such a build usually turns off the restriction FOR. It would
+            // then be handed approximate location at runtime with nothing in the
+            // build saying why.
+            if (declaresRestrictedFineLocation(xPermissionsAsSupplied)) {
+                if ("false".equals(hint)) {
+                    throw new BuildException("android.locationButton.exclusive=false"
+                            + " conflicts with an ACCESS_FINE_LOCATION this"
+                            + " application declares itself carrying"
+                            + " onlyForLocationButton, which the build can neither"
+                            + " rewrite nor override. Precise location would stay"
+                            + " limited to the location button despite the hint."
+                            + " Remove onlyForLocationButton from that declaration,"
+                            + " or drop the hint if the manual restriction is what"
+                            + " you want.");
+                }
+                // `auto` did not ask for anything, and an explicit fragment beats
+                // an inference -- the same precedence as the forced case below.
+                warn("android.xpermissions declares ACCESS_FINE_LOCATION"
+                        + " onlyForLocationButton, so precise location is limited to"
+                        + " the location button even though the build did not infer"
+                        + " that restriction.");
+            }
+            return FINE_LOCATION_PERMISSION;
+        }
+        // onlyForLocationButton is an API 37 enum value, and AAPT resolves
+        // manifest enum values against the COMPILE SDK, not the target: below
+        // 37 it fails resource linking outright --
+        //   AAPT: error: 'onlyForLocationButton' is incompatible with attribute
+        //   usesPermissionFlags (attr) flags [neverForLocation=65536]
+        // -- which is a broken build rather than the graceful fallback the
+        // component is supposed to give on older platforms. Measured against
+        // compileSdk 36; the same hazard the comment on compileSdkVersion
+        // further down describes, reached from a different direction.
+        //
+        // The level is passed in rather than read off compileSdkVersion,
+        // which is assigned thousands of lines after this runs; the caller asks
+        // the same shared helper the rest of the manifest fragments use.
+        //
+        // This is the compile SDK the BUILD GENERATES. A tool that rewrites
+        // app/build.gradle afterwards can still lower it out from under the
+        // manifest -- scripts/build-android-app.sh does exactly that, pinning
+        // the project for reproducible screenshots -- and AAPT would then
+        // reject the value this decided was safe to emit. Nothing here can see
+        // that; a tool that lowers the compile SDK below 37 has to drop this
+        // flag too. No sample currently qualifies for it, because
+        // hellocodenameone uses com/codename1/maps and so takes the ordinary
+        // declaration anyway.
+        // A hand-written ACCESS_FINE_LOCATION wins over ours: permissionAdd()
+        // suppresses this method's answer the moment xPermissions names the
+        // permission. For `auto` that is the right precedence -- an explicit
+        // fragment beats an inference -- but a forced `true` would then succeed
+        // while shipping ordinary precise access, which is the opposite of what
+        // was asked for, and silently.
+        if (declaresOrdinaryFineLocation(xPermissionsAsSupplied)) {
+            if (asked) {
+                throw new BuildException("android.locationButton.exclusive=true"
+                        + " conflicts with an ACCESS_FINE_LOCATION this application"
+                        + " declares itself -- either a fragment in"
+                        + " android.xpermissions or"
+                        + " android.permission.ACCESS_FINE_LOCATION=true. The build"
+                        + " cannot rewrite either, and both take precedence over the"
+                        + " declaration it generates, so the restriction would not"
+                        + " reach the manifest. Drop whichever of the two you did not"
+                        + " mean.");
+            }
+            warn("This application declares ACCESS_FINE_LOCATION itself, through"
+                    + " android.xpermissions or"
+                    + " android.permission.ACCESS_FINE_LOCATION=true, so the build's"
+                    + " own declaration is suppressed and precise location is not"
+                    + " limited to the location button.");
+            return FINE_LOCATION_PERMISSION;
+        }
+        if (!compileSdkSupportsExclusiveLocation(compileSdk)) {
+            if (asked) {
+                // THROWN, not logged. Executor.error() only writes to the
+                // logger and returns, so reporting it that way would leave the
+                // build green while quietly shipping an application without the
+                // privacy restriction its developer asked for by hand -- the
+                // exact silent failure this flag exists to prevent, moved from
+                // the manifest into the build log.
+                throw new BuildException(requireExclusiveCompileSdkMessage(compileSdk));
+            } else {
+                warn("Not declaring ACCESS_FINE_LOCATION onlyForLocationButton:"
+                        + " the compile SDK is " + compileSdk + " and the value"
+                        + " needs 37. The location button still works; the"
+                        + " application keeps the ordinary precise-location"
+                        + " declaration.");
+            }
+            return FINE_LOCATION_PERMISSION;
+        }
+        debug("Declaring ACCESS_FINE_LOCATION onlyForLocationButton");
+        return FINE_LOCATION_PERMISSION_EXCLUSIVE;
+    }
+
+    /// The ordinary ACCESS_FINE_LOCATION declaration.
+    static final String FINE_LOCATION_PERMISSION =
+            "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:required=\"false\" />\n";
+
+    /// The declaration that limits precise location to the location button.
+    static final String FINE_LOCATION_PERMISSION_EXCLUSIVE =
+            "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\""
+            + " android:usesPermissionFlags=\"onlyForLocationButton\""
+            + " android:required=\"false\" />\n";
+
+    /// The API level that first understands `onlyForLocationButton`. AAPT
+    /// resolves manifest enum values against the compile SDK, so below this the
+    /// value is a resource-linking failure rather than a newer-platform hint.
+    static final int EXCLUSIVE_LOCATION_MIN_COMPILE_SDK = 37;
+
+    /// Whether precise location should be limited to the location button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: `android.locationButton.exclusive` -- `true`, `false`, or
+    ///   anything else for the inference
+    ///
+    /// - `buttonUsed`: whether the application references the location button
+    ///
+    /// - `otherLocationUse`: whether it also reaches location the ordinary way
+    ///
+    /// #### Returns
+    ///
+    /// whether to declare the restriction, before the compile SDK is consulted
+    /// Removes any `maxSdkVersion` from the ACCESS_FINE_LOCATION declarations
+    /// in `xPermissions`, leaving everything else exactly as it was.
+    ///
+    /// Only the attribute goes; the element, its other attributes and every
+    /// other permission are untouched, so a cap on a different permission --
+    /// USE_FINGERPRINT at 28, BLUETOOTH_SCAN, WRITE_EXTERNAL_STORAGE -- is not
+    /// disturbed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xPermissions`: the extra permissions accumulated so far, possibly null
+    ///
+    /// #### Returns
+    ///
+    /// the same value with precise location left effective on every version
+    static String uncapFineLocation(String xPermissions) {
+        if (xPermissions == null
+                || xPermissions.indexOf("ACCESS_FINE_LOCATION") < 0) {
+            return xPermissions;
+        }
+        StringBuilder out = new StringBuilder();
+        int from = 0;
+        while (true) {
+            int at = xPermissions.indexOf("ACCESS_FINE_LOCATION", from);
+            if (at < 0) {
+                out.append(xPermissions.substring(from));
+                return out.toString();
+            }
+            int open = xPermissions.lastIndexOf('<', at);
+            int close = xPermissions.indexOf('>', at);
+            if (open < from || close < 0) {
+                out.append(xPermissions, from, at + 1);
+                from = at + 1;
+                continue;
+            }
+            out.append(xPermissions, from, open);
+            out.append(stripMaxSdkVersion(
+                    xPermissions.substring(open, close + 1)));
+            from = close + 1;
+        }
+    }
+
+    /// Removes a `maxSdkVersion` attribute from one element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the whole element text, from its `<` to its `>`
+    private static String stripMaxSdkVersion(String element) {
+        int at = element.indexOf("android:maxSdkVersion");
+        if (at < 0) {
+            return element;
+        }
+        int quote = element.indexOf('"', at);
+        if (quote < 0) {
+            return element;
+        }
+        int end = element.indexOf('"', quote + 1);
+        if (end < 0) {
+            return element;
+        }
+        // Take the whitespace in front of the attribute with it, so the element
+        // does not end up with a double space where it used to be.
+        int start = at;
+        while (start > 0 && element.charAt(start - 1) == ' ') {
+            start--;
+        }
+        return element.substring(0, start) + element.substring(end + 1);
+    }
+
+    /// Whether one of this builder's own features declared ACCESS_FINE_LOCATION,
+    /// as opposed to the application declaring it.
+    ///
+    /// Bluetooth scanning, Wi-Fi and Nearby each declare it for themselves. That
+    /// makes precise location something other than the location button's alone,
+    /// and not only because permissionAdd() would drop the button's declaration:
+    /// onlyForLocationButton would BREAK those features, since a permission
+    /// restricted to the button is never granted for a scan.
+    ///
+    /// #### Parameters
+    ///
+    /// - `supplied`: xpermissions as the application supplied it
+    /// - `accumulated`: xpermissions after this builder added its own fragments
+    static boolean featureDeclaredFineLocation(String supplied,
+            String accumulated) {
+        if (accumulated == null
+                || accumulated.indexOf("ACCESS_FINE_LOCATION") < 0) {
+            return false;
+        }
+        return supplied == null
+                || supplied.indexOf("ACCESS_FINE_LOCATION") < 0;
+    }
+
+    /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION
+    /// WITHOUT the location-button restriction.
+    ///
+    /// Both of these matter because permissionAdd() drops this build's own
+    /// declaration as soon as the fragment names the permission, so whatever
+    /// the fragment says is what ships and neither hint value can change it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xPermissions`: the raw android.xpermissions value, possibly null
+    static boolean declaresOrdinaryFineLocation(String xPermissions) {
+        return xPermissions != null
+                && xPermissions.indexOf("ACCESS_FINE_LOCATION") >= 0
+                && xPermissions.indexOf("onlyForLocationButton") < 0;
+    }
+
+    /// Whether `android.xpermissions` hand-declares ACCESS_FINE_LOCATION WITH
+    /// the location-button restriction on it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xPermissions`: the raw android.xpermissions value, possibly null
+    static boolean declaresRestrictedFineLocation(String xPermissions) {
+        return xPermissions != null
+                && xPermissions.indexOf("ACCESS_FINE_LOCATION") >= 0
+                && xPermissions.indexOf("onlyForLocationButton") >= 0;
+    }
+
+    static boolean wantsExclusiveLocation(String hint, boolean buttonUsed,
+            boolean otherLocationUse) {
+        if ("true".equals(hint)) {
+            return true;
+        }
+        if ("false".equals(hint)) {
+            return false;
+        }
+        return buttonUsed && !otherLocationUse;
+    }
+
+    /// What to tell a developer whose explicit restriction the compile SDK
+    /// cannot express.
+    ///
+    /// #### Parameters
+    ///
+    /// - `compileSdk`: the level this build compiles against
+    ///
+    /// #### Returns
+    ///
+    /// the message for the BuildException that stops the build
+    static String requireExclusiveCompileSdkMessage(int compileSdk) {
+        return "android.locationButton.exclusive=true needs a compile SDK of "
+                + EXCLUSIVE_LOCATION_MIN_COMPILE_SDK + " or newer; this build"
+                + " compiles against " + compileSdk + ", where AAPT rejects the"
+                + " onlyForLocationButton value. Raise the compile SDK, or"
+                + " remove the hint to let the build infer the declaration.";
+    }
+
+    /// Whether a compile SDK can express `onlyForLocationButton` at all.
+    static boolean compileSdkSupportsExclusiveLocation(int compileSdk) {
+        return compileSdk >= EXCLUSIVE_LOCATION_MIN_COMPILE_SDK;
+    }
+
+    /// Whether a class the application references means it needs precise
+    /// location outside the location button.
+    ///
+    /// Three classes in the location package belong to the button's own path
+    /// and do not count: the button, its listener, and the [Location] value the
+    /// listener is handed. Everything else in the package is the ordinary
+    /// location API -- managers, listeners, requests, geofences -- and so is the
+    /// maps package, whose components locate the user.
+    ///
+    /// Anything unrecognised counts as ordinary use on purpose. A class added to
+    /// the package later is then read as "needs the ordinary grant", which costs
+    /// an application the flag it might have qualified for; the other default
+    /// would silently take precise location away from an application that needs
+    /// it, and the whole point of this is that the failure is silent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cls`: an internal class name
+    ///
+    /// #### Returns
+    ///
+    /// whether it rules out a button-only declaration
+    static boolean needsOrdinaryPreciseLocation(String cls) {
+        if (cls == null) {
+            return false;
+        }
+        if (cls.indexOf("com/codename1/maps") == 0) {
+            return true;
+        }
+        if (cls.indexOf("com/codename1/location/") != 0) {
+            return false;
+        }
+        return !isLocationButtonClass(cls)
+                && !isNamed(cls, "com/codename1/location/LocationSharedListener")
+                && !isNamed(cls, "com/codename1/location/Location");
+    }
+
+    /// Whether `cls` is `name` or one of its nested classes.
+    private static boolean isNamed(String cls, String name) {
+        return cls.equals(name) || cls.startsWith(name + "$");
+    }
+
+    static boolean isLocationButtonClass(String cls) {
+        if (cls == null) {
+            return false;
+        }
+        return cls.equals("com/codename1/location/LocationButton")
+                || cls.startsWith("com/codename1/location/LocationButton$");
+    }
     private boolean pushPermission;
     private int pushVersion;
     private boolean foregroundServicePermission;
@@ -935,6 +1392,10 @@ public class AndroidGradleBuilder extends Executor {
     private boolean playServicesWallet;
     private boolean playServicesWear;
     private String xPermissions, xQueries;
+
+    /// `android.xpermissions` exactly as the application supplied it, before
+    /// any of this builder's own fragments were added to it.
+    private String xPermissionsAsSupplied = "";
     /**
      * The names of the installed platforms, as sdkmanager reports them.
      *
@@ -1515,6 +1976,26 @@ public class AndroidGradleBuilder extends Executor {
             addString += "/>\n";
             xPermissions += permissionAdd(request, permissionName, addString);
         }
+
+        // What the DEVELOPER asked for, kept because everything below adds this
+        // builder's own fragments to the same string and nothing afterwards can
+        // tell the two apart. Whether a fine-location declaration is theirs or
+        // ours decides whether the build may rewrite it, whether it counts as a
+        // manual declaration that beats this build's inference, and whether a
+        // feature is what needs precise location.
+        //
+        // Below ALL of the loops above, which are three ways of saying the same
+        // thing and all of them the application's:
+        //
+        //   android.xpermissions             -- the fragment, written out by hand
+        //   android.permission.XXX=true      -- with its own .maxSdkVersion
+        //   android.uses_permission.XXX=maxSdkVersion:NN
+        //
+        // Each was found sitting below this line in turn, and each time the
+        // effect was the same: the application's own declaration read as the
+        // build's, its cap rewritten, and a forced exclusive restriction either
+        // refused for the wrong reason or dropped without a word.
+        xPermissionsAsSupplied = xPermissions;
 
         File tmpFile = getBuildDirectory();
         if (tmpFile == null) {
@@ -2107,6 +2588,64 @@ public class AndroidGradleBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/maps") == 0 || cls.indexOf("com/codename1/location") == 0) {
                         gpsPermission = true;
+                    }
+                    // This sees cn1lib code too, so there is nothing to fold in
+                    // from libsDir and a scan of it would be dead weight.
+                    // CN1BuildMojo merges the dependency jars -- which is what a
+                    // cn1lib is on the Maven classpath -- into
+                    // jar-with-dependencies.jar via mergeJars(), and that becomes
+                    // dist.jar, which the builder unzips into dummyClassesDir:
+                    // the very tree this scan walks. A library that tracks or
+                    // geofences therefore reaches usesClass() here like any other
+                    // caller and takes the exclusive declaration away by itself.
+                    //
+                    // Review has now raised "libsDir is scanned separately, so
+                    // library usage is invisible" twice on this code. It is not
+                    // true of cn1lib Java, and the libsDir scans that do exist
+                    // (database, call/VPN, Nearby) are there for the native and
+                    // aar half, which never references com/codename1/location at
+                    // all and so could not affect this decision either way.
+                    //
+                    // The mirror-image claim has been raised too: that the
+                    // FRAMEWORK is scanned, so LocationButton.acquire()'s own
+                    // call to LocationManager.getLocationManager() would set
+                    // otherLocationUse for every application that shows a button
+                    // and defeat the inference entirely. It would -- if the
+                    // framework were there. It is not:
+                    // CN1BuildMojo.BUNDLE_ARTIFACT_ID_BLACKLIST holds
+                    // codenameone-core and java-runtime out of the merged jar,
+                    // and the staged userClasses.jar of an application whose
+                    // form holds nothing but a LocationButton contains no
+                    // com/codename1/location/LocationButton, no LocationManager
+                    // and not even com/codename1/ui/Display -- checked with
+                    // unzip -l, and confirmed by the outcome: that application's
+                    // manifest gets onlyForLocationButton, which requires
+                    // otherLocationUse to be false.
+                    if (needsOrdinaryPreciseLocation(cls)) {
+                        debug("Precise location is not button-only because of class " + cls);
+                        otherLocationUse = true;
+                    }
+                    // Counting the nested classes here does NOT make this fire
+                    // for every application, which is the obvious reading of a
+                    // scan over a jar that also holds the framework:
+                    // LocationButton's own constructor references
+                    // LocationButton$1, so if every framework class were walked
+                    // this would be set unconditionally. It is not -- usesClass
+                    // reports what the application reaches, so an application
+                    // that never names LocationButton never scans it and never
+                    // reaches its nested classes either.
+                    //
+                    // Measured both ways rather than argued: a generated app
+                    // whose only code is a Form and a Label produces a manifest
+                    // with no USE_LOCATION_BUTTON and no ACCESS_FINE_LOCATION,
+                    // while the same app with a LocationButton on the form gets
+                    // both. The same reasoning is why the gpsPermission rule
+                    // just above can match the whole com/codename1/location
+                    // package without giving every Codename One application
+                    // location permissions.
+                    if (isLocationButtonClass(cls)) {
+                        debug("Adding location button permission because of class " + cls);
+                        locationButtonPermission = true;
                     }
                     if (cls.indexOf("com/codename1/push") > -1) {
                         pushPermission = true;
@@ -3360,6 +3899,45 @@ public class AndroidGradleBuilder extends Executor {
                             "1.1.0-alpha07") + "'\n";
             minSDK = maxInt("26", minSDK);
             log("Health Connect raises minSdkVersion to " + minSDK);
+        }
+
+        // After every injector, because they are the ones that cap it. Wi-Fi,
+        // Bluetooth BLE and Nearby each declare ACCESS_FINE_LOCATION with a
+        // maxSdkVersion so an application that uses only THEM stops asking for
+        // location on the versions that no longer require it. That is right for
+        // those applications and wrong for one that needs precise location in
+        // its own right: permissionAdd() suppresses this build's declaration for
+        // any permission already named in xpermissions -- a bare name match that
+        // never reads maxSdkVersion -- so the capped entry would be the only
+        // ACCESS_FINE_LOCATION in the manifest and there would be none in effect
+        // past the cap.
+        //
+        // For an ordinary location application that is a silent loss of precise
+        // location on recent Android. For the location button it is fatal on the
+        // one platform it exists for: the system grants through a permission the
+        // manifest no longer really declares.
+        //
+        // Done in one place rather than in each injector. A check that refused
+        // the build over a capped entry was tried instead and was wrong twice
+        // over -- it fired on fragments this builder had written itself, and it
+        // told developers to remove something they had never written.
+        if (featureDeclaredFineLocation(xPermissionsAsSupplied, xPermissions)) {
+            // Precise location is not the button's alone: a feature needs it the
+            // ordinary way. The class scan cannot see this -- Bluetooth, Wi-Fi
+            // and Nearby ask through their own manifest fragments, never through
+            // com/codename1/location -- so it is recorded here, where both
+            // strings are in hand.
+            featureNeedsOrdinaryFineLocation = true;
+            otherLocationUse = true;
+        }
+        if (gpsPermission
+                && xPermissionsAsSupplied.indexOf("ACCESS_FINE_LOCATION") < 0) {
+            // Only when every fine-location entry is one of ours. A developer
+            // who wrote their own -- capped or not -- gets it back untouched:
+            // rewriting a fragment somebody hand-wrote is not this build's to
+            // do, and permissionAdd() will suppress this build's declaration in
+            // favour of theirs anyway.
+            xPermissions = uncapFineLocation(xPermissions);
         }
 
         String messagingService = request.getArg("android.messagingService",
@@ -5356,13 +5934,46 @@ public class AndroidGradleBuilder extends Executor {
             permissions += "    <uses-feature android:name=\"android.hardware.location\" android:required=\"false\" />\n"
                     + "    <uses-feature android:name=\"android.hardware.location.gps\" android:required=\"false\" />\n"
                     + permissionAdd(request, "ACCESS_FINE_LOCATION",
-                    "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:required=\"false\" />\n")
+                    fineLocationPermission(request,
+                            compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                                    targetNumber, usesNearbyRanging,
+                                    usesNearbyRanging || usesNearbyTransport
+                                            || usesNearbyCompanion,
+                                    usesCallVoip, usesCustomTunnel)))
                     + permissionAdd(request, "ACCESS_COARSE_LOCATION",
                     "    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"  android:required=\"false\" />\n");
             if(request.getArg("android.mockLocation", "true").equals("true")) {
                 permissions += permissionAdd(request, "ACCESS_MOCK_LOCATION",
                         "    <uses-permission android:name=\"android.permission.ACCESS_MOCK_LOCATION\"  android:required=\"false\" />\n");
             }
+        }
+        // Review asked why a forced android.locationButton.exclusive=true does
+        // not reach fineLocationPermission() when gpsPermission is false, and
+        // called the outer gate a way to bypass the compile-SDK validation.
+        // It is not one. The restriction is a modifier on the declaration this
+        // method generates, so with no declaration there is nothing to modify:
+        // gpsPermission is false only when the scan saw no com/codename1/maps
+        // or com/codename1/location class at all, and LocationButton is
+        // com/codename1/location/LocationButton -- it sets gpsPermission by
+        // that very prefix, so the button's own use always enters the block
+        // above and always runs the validator. AndroidLocationButtonPermissionTest
+        // locks that coupling, which is the part a later refactor could break.
+        // The remaining case is the hint set on an application with no location
+        // usage, where emitting nothing is correct and refusing the build would
+        // fail it over a hint that cannot apply. It was silent, though, so it
+        // says so here.
+        if (!gpsPermission
+                && "true".equals(request.getArg("android.locationButton.exclusive", "auto"))) {
+            warn("android.locationButton.exclusive=true was set, but no location"
+                    + " usage was detected, so no ACCESS_FINE_LOCATION declaration"
+                    + " is generated and there is nothing to restrict. An application"
+                    + " that reaches location only from native Android code, which the"
+                    + " class scan cannot see, declares the permission itself through"
+                    + " android.xpermissions and puts the flag on that entry.");
+        }
+        if (locationButtonPermission) {
+            permissions += permissionAdd(request, "USE_LOCATION_BUTTON",
+                    LOCATION_BUTTON_PERMISSION);
         }
         if (pushPermission && !useFCM && !useHMS) {
             permissions += "<permission android:name=\"" + request.getPackageName() + ".permission.C2D_MESSAGE\" android:protectionLevel=\"signature\" />\n"
