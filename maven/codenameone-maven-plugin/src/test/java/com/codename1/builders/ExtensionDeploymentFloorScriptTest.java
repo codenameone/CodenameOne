@@ -329,6 +329,37 @@ class ExtensionDeploymentFloorScriptTest {
                 "which of the two one-condition helpers wins is not decidable here");
     }
 
+    /// A tie only matters if one of the answers would clear the floor. When every tied
+    /// candidate is below it, whichever Xcode picks is below it too -- so raising is safe,
+    /// and refusing would leave an extension Xcode 27 rejects, which is the opposite of
+    /// protecting it.
+    @Test
+    void clampsATieWhereEveryCandidateIsBelowTheFloor(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "AllLow|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "EXTENSION_MIN[arch=arm64]->13.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=15.0",
+                got.get(0),
+                "12.0 and 13.0 are both below 15.0, so the tie changes nothing");
+    }
+
+    /// The same shape at the BASE key: no condition is known, but if neither the base nor any
+    /// qualified sibling clears the floor there is nothing to protect.
+    @Test
+    void clampsAnUnqualifiedKeyWhenNoSiblingClearsTheFloor(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "AllLowBase|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->13.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0));
+    }
+
     /// A helper qualified on only SOME of the key's conditions still applies, and requiring an
     /// identical suffix found nothing -- leaving a 12.0 extension for Xcode 27 to reject.
     @Test
@@ -398,6 +429,26 @@ class ExtensionDeploymentFloorScriptTest {
                 "Junk|" + EXT + "|not-a-version");
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0));
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1));
+    }
+
+    /// Watch, tv and macOS extensions are app-extension targets too, and an iOS floor means
+    /// nothing on them. The generated CN1WatchWidgets is SDKROOT=watchos with its own
+    /// WATCHOS_DEPLOYMENT_TARGET; writing IPHONEOS_DEPLOYMENT_TARGET onto it is a stray
+    /// setting. Found by running the real pass against a real generated project -- the
+    /// earlier stub fixtures had no non-iOS extension in them to notice it.
+    @Test
+    void leavesNonIosExtensionsAlone(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "WatchWidgets|" + EXT + "|SDKROOT->watchos;"
+                        + "SUPPORTED_PLATFORMS->watchos watchsimulator;"
+                        + "WATCHOS_DEPLOYMENT_TARGET->10.0",
+                "MacProvider|" + EXT + "|SDKROOT->macosx;MACOSX_DEPLOYMENT_TARGET->13.0",
+                "PhoneWidgets|" + EXT + "|SDKROOT->iphoneos;IPHONEOS_DEPLOYMENT_TARGET->12.0");
+        assertEquals("nil", got.get(0), "a watchOS extension must not gain an iOS floor");
+        assertEquals("nil", got.get(1), "nor a macOS one");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(2),
+                "the iOS extension beside them is still raised");
     }
 
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before
