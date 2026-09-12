@@ -1176,25 +1176,6 @@ public abstract class CodenameOneImplementation {
         drawImage(graphics, img, x, y, w, h);
     }
 
-    /**
-     * Creates an image whose peer need not keep a decoded copy of the pixels for
-     * its own recovery, because the caller retains the encoded bytes and will
-     * recreate the image if the platform loses it.
-     *
-     * <p>Only worth overriding on a port that DOES hold such a copy -- one that
-     * uploads a GPU texture and keeps the CPU-side bitmap alive so it can
-     * re-upload after the OS discards the texture. That port pays for the
-     * picture twice for as long as it is on screen, and this call says it does
-     * not have to. Everywhere else the default is exactly right.</p>
-     *
-     * @param bytes the encoded image data
-     * @param offset offset within the array
-     * @param len number of bytes
-     * @return the platform image, or null on failure
-     */
-    public Object createImageNoBackingCopy(byte[] bytes, int offset, int len) {
-        return createImage(bytes, offset, len);
-    }
 
     /// Returns the width of a native image
     ///
