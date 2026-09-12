@@ -101,10 +101,30 @@ public class ComponentGroup extends Container {
         return c;
     }
 
-    private void reverseRadio(Component cmp) {
-        if (cmp instanceof ComboBox) {
-            ((ComboBox) cmp).setActAsSpinnerDialog(uiidsDirty);
+    /// A grouped ComboBox opens as a spinner rather than a popup. Leaving the group has
+    /// to put that back, and put back what the application chose rather than false:
+    /// this keyed off the group's own dirty flag, so restoring a combo the application
+    /// had deliberately set to spinner mode silently turned it into a popup.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the member whose popup mode should follow the group
+    /// - `grouped`: true while this group owns the member
+    private void reverseRadio(Component cmp, boolean grouped) {
+        if (!(cmp instanceof ComboBox)) {
+            return;
         }
+        ComboBox cb = (ComboBox) cmp;
+        if (grouped) {
+            if (cb.getClientProperty("$origSpinner") == null) {
+                cb.putClientProperty("$origSpinner",
+                        cb.isActAsSpinnerDialog() ? Boolean.TRUE : Boolean.FALSE);
+            }
+            cb.setActAsSpinnerDialog(true);
+            return;
+        }
+        Object o = cb.getClientProperty("$origSpinner");
+        cb.setActAsSpinnerDialog(o instanceof Boolean && ((Boolean) o).booleanValue());
     }
 
     @Override
@@ -133,6 +153,9 @@ public class ComponentGroup extends Container {
         if (o != null) {
             cmp.setUIID((String) o);
         }
+        // and the popup mode with it -- restoring the name alone left a removed
+        // ComboBox opening as a spinner for the rest of its life.
+        reverseRadio(cmp, false);
         updateUIIDs();
     }
 
@@ -173,7 +196,7 @@ public class ComponentGroup extends Container {
             c.putClientProperty("$origUIID", c.getUIID());
         }
         c.setUIID(newUIID);
-        reverseRadio(c);
+        reverseRadio(c, true);
     }
 
     /// Whether this group is currently renaming its members' UIIDs. updateUIIDs()
@@ -243,7 +266,7 @@ public class ComponentGroup extends Container {
         if (o != null) {
             c.setUIID(o);
         }
-        reverseRadio(c);
+        reverseRadio(c, false);
     }
 
     /// Indicates that the component group should be horizontal by using the BoxLayout Y

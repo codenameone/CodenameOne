@@ -30,7 +30,9 @@ import org.junit.jupiter.api.Test;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// A horizontal ComponentGroup is a segmented control, and it is the only use of
 /// ComponentGroup the current native themes carry any styling for: they style
@@ -280,5 +282,43 @@ class ComponentGroupSegmentedTest extends UITestBase {
 
         assertEquals("ToggleButtonOnly", b.getUIID(),
                 "turning horizontal is what activates this group, so it has to apply");
+    }
+
+    @Test
+    void testRemovingAComboFromASegmentedGroupRestoresItsPopupMode() {
+        // A grouped ComboBox is forced into spinner mode. Removal restored the UIID and
+        // nothing else, so the combo kept opening as a spinner after it had left. The
+        // self-activating segmented group is what makes this reachable with no theme
+        // constant set.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        ComboBox<String> combo = new ComboBox<String>("a", "b");
+        assertFalse(combo.isActAsSpinnerDialog(), "default popup mode");
+        group.addComponent(combo);
+        assertTrue(combo.isActAsSpinnerDialog(), "a grouped combo opens as a spinner");
+
+        group.removeComponent(combo);
+
+        assertFalse(combo.isActAsSpinnerDialog(),
+                "leaving the group has to hand the popup mode back");
+    }
+
+    @Test
+    void testLeavingAGroupRestoresAnApplicationsOwnSpinnerChoice() {
+        // The restore keyed off the group's dirty flag rather than the value the
+        // application chose, so a combo deliberately set to spinner mode came back
+        // as a popup.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        ComboBox<String> combo = new ComboBox<String>("a", "b");
+        combo.setActAsSpinnerDialog(true);
+        group.addComponent(combo);
+
+        group.removeComponent(combo);
+
+        assertTrue(combo.isActAsSpinnerDialog(),
+                "the application asked for spinner mode, so it survives the group");
     }
 }
