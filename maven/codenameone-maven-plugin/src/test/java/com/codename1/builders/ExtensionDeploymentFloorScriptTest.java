@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -727,5 +728,53 @@ class ExtensionDeploymentFloorScriptTest {
         String out = new String(readAll(p), StandardCharsets.UTF_8);
         assertEquals(0, p.waitFor(), "ruby -c failed: " + out);
         assertTrue(out.contains("Syntax OK"), out);
+    }
+
+    /// A deployment target COMPOSED from several helpers has no per-helper answer. Judging
+    /// $(VERSION_MAJOR).$(VERSION_MINOR) one reference at a time reads the minor as '4',
+    /// which is below every floor, and pinning on it would write a device key of 15.0 over
+    /// an extension whose real minimum is 16.4 -- lowering it, which is worse than leaving
+    /// the pass out entirely. The whole expression has to be resolved in the branch's
+    /// context before the branch is judged.
+    @Test
+    void aComposedExpressionIsJudgedWhole(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Composed|" + EXT + "|VERSION_MAJOR[sdk=iphoneos*]->16;"
+                        + "VERSION_MINOR[sdk=iphoneos*]->4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(VERSION_MAJOR).$(VERSION_MINOR)");
+        // The assertion is about the OUTCOME for a device build, not about one key. Writing
+        // a qualified 15.0 lowers it; so does replacing the base expression with a flat
+        // 15.0, which reaches the same device build through a different key.
+        assertFalse(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
+                "the device branch resolves to 16.4 and clears the floor, so pinning it "
+                        + "would LOWER the extension's minimum: " + got.get(0));
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=$(VERSION_MAJOR).$(VERSION_MINOR)"),
+                "the base expression must survive: overwriting it with the floor lowers the "
+                        + "same device build to 15.0: " + got.get(0));
+    }
+
+    /// The other half of the same rule: when the COMPLETE composed value really is below the
+    /// floor, the branch still gets pinned. Without this the previous test could be passed by
+    /// a change that simply stopped pinning composed expressions at all.
+    @Test
+    void aComposedExpressionBelowTheFloorIsStillPinned(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "ComposedLow|" + EXT + "|VERSION_MAJOR[sdk=iphoneos*]->12;"
+                        + "VERSION_MINOR[sdk=iphoneos*]->1;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(VERSION_MAJOR).$(VERSION_MINOR)");
+        // Asserted as an OUTCOME, not a mechanism. Here BOTH builds are below the floor --
+        // the device resolves to 12.1 and the simulator to nothing, since the helpers are
+        // device-qualified -- so raising the base key covers them both and no qualified key
+        // is needed. What must not survive is the expression itself, which would leave the
+        // device archive at 12.1 for Xcode to reject.
+        assertFalse(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=$(VERSION_MAJOR).$(VERSION_MINOR)"),
+                "12.1 is below the floor, so the expression must not survive: " + got.get(0));
+        assertTrue(got.get(0).contains("=15.0"),
+                "the floor has to be written somewhere the device build reads it: "
+                        + got.get(0));
     }
 }
