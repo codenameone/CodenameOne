@@ -99,6 +99,13 @@ JAVA_LONG com_codename1_backend_Tls_createContextImpl___java_lang_String_java_la
             return 0;
         }
         cert = strdup(tmp);
+        /* Checked like every other failure on this path: free(NULL) is harmless,
+           so the only consequence of skipping it was handing a null filename to
+           SSL_CTX_use_certificate_chain_file, which opens it -- a crash inside
+           OpenSSL in place of the context-creation failure this returns. */
+        if(cert == NULL) {
+            return 0;
+        }
     }
     key = stringToUTF8(threadStateData, keyPath);
     if(key == NULL) {
