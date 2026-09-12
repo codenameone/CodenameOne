@@ -131,6 +131,7 @@ public class SvgTranscodeRunner {
 
     private int transcodedCount;
     private final List<String> failures = new ArrayList<String>();
+    private final List<String> nonVectorInputs = new ArrayList<String>();
 
     /**
      * @param basedir        the module root the source directories are resolved against
@@ -165,6 +166,13 @@ public class SvgTranscodeRunner {
         this.placeholderDir = placeholderDir;
         this.svgPackage = svgPackage == null || svgPackage.isEmpty() ? DEFAULT_PACKAGE : svgPackage;
         this.log = log;
+    }
+
+    /** Names of {@code .json} / {@code .lottie} files a lenient run declined
+     *  to treat as animations at all. Always empty when lenient is off, which
+     *  leaves the bound goal's behaviour exactly as it was. */
+    public List<String> getNonVectorInputs() {
+        return nonVectorInputs;
     }
 
     /** Names of sources that could not be transcoded during a lenient
@@ -206,6 +214,7 @@ public class SvgTranscodeRunner {
     public void run() throws MojoExecutionException {
         transcodedCount = 0;
         failures.clear();
+        nonVectorInputs.clear();
         List<File> svgs = locateSvgs();
         Map<String, CssHint> cssHints = scanCssHints();
 
@@ -241,6 +250,21 @@ public class SvgTranscodeRunner {
             if (fmt == null) {
                 // locateSvgs() already filtered to recognized extensions;
                 // defensive guard for future format additions.
+                continue;
+            }
+            if (lenient && (fmt == VectorFormat.LOTTIE_JSON || fmt == VectorFormat.LOTTIE_PACK)
+                    && !looksLikeLottie(svg, fmt)) {
+                // LottieParser accepts any JSON object -- it reads "layers" and
+                // returns an empty document when there is none -- so an
+                // unrelated .json under src/main/css transcodes "successfully"
+                // and would then be bound to the strict goal forever. The day
+                // someone edits it into an array, or saves it half-written,
+                // every build fails over a file that was never an animation.
+                // A .lottie is a ZIP this parser cannot read at all.
+                //
+                // Only the repair is this picky. A goal the developer bound
+                // keeps its existing behaviour.
+                nonVectorInputs.add(resourceName);
                 continue;
             }
             String className = uniqueClassName(SVGTranscoder.classNameFor(resourceName), usedClassNames);
@@ -482,6 +506,30 @@ public class SvgTranscodeRunner {
             }
         }
         return new String(chars);
+    }
+
+    /**
+     * Whether a Lottie-shaped input is plausibly an animation: a JSON object
+     * carrying a {@code layers} key. A {@code .lottie} is a ZIP archive and is
+     * never readable here, so it never qualifies.
+     *
+     * <p>Deliberately a shape check and not a parse. The parser is permissive
+     * by design -- that permissiveness is exactly what made an unrelated JSON
+     * file look like a successful transcode -- so the question asked here is
+     * the cheap structural one the parser does not ask.</p>
+     */
+    private static boolean looksLikeLottie(File file, VectorFormat fmt) {
+        if (fmt != VectorFormat.LOTTIE_JSON) {
+            return false;
+        }
+        String text;
+        try {
+            text = readFile(file);
+        } catch (IOException ex) {
+            return false;
+        }
+        String trimmed = text.trim();
+        return trimmed.startsWith("{") && trimmed.contains("\"layers\"");
     }
 
     private static String trimToFileName(String url) {

@@ -2144,16 +2144,22 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
 
-        if (!runner.getFailures().isEmpty()) {
-            // Binding the goal now would hand the next build a strict run over
-            // the same unreadable files, which would fail where this one did
-            // not. Report and leave the pom alone.
-            getLog().warn("Not adding the transcode-svg execution: these vector source(s) "
-                    + "could not be transcoded, and the goal would fail on them:");
-            for (String failed : runner.getFailures()) {
-                getLog().warn("    " + failed);
+        List<String> blockers = new ArrayList<String>(runner.getFailures());
+        blockers.addAll(runner.getNonVectorInputs());
+        if (!blockers.isEmpty()) {
+            // Binding the goal now would hand every later build a strict run
+            // over these files. The ones that already failed would fail again;
+            // the ones that merely look like animations because they are JSON
+            // would fail the first day someone edits them. Neither is a trade
+            // this repair gets to make on the developer's behalf, so report and
+            // leave the pom alone.
+            getLog().warn("Not adding the transcode-svg execution: the goal would be bound "
+                    + "to file(s) it cannot be relied on to read:");
+            for (String blocker : blockers) {
+                getLog().warn("    " + blocker);
             }
-            getLog().warn("Remove or fix them, then add the execution yourself, or rebuild.");
+            getLog().warn("Move them out of the vector source directories, or add the "
+                    + "execution yourself if they really are animations.");
             return;
         }
         addTranscodeSvgExecutionToPom();
@@ -2251,13 +2257,47 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
         try {
             FileUtils.copyFile(pomFile, backup);
-            FileUtils.writeStringToFile(pomFile, updated, charset);
+            writeAtomically(pomFile, updated, charset);
         } catch (IOException ex) {
             warnCouldNotEditPom("it could not be written: " + ex.getMessage());
             return;
         }
         getLog().info("Added the transcode-svg execution to " + pomFile
                 + " (previous contents saved as " + backup.getName() + ").");
+    }
+
+    /**
+     * Replaces {@code target} with {@code content}, never leaving it partially
+     * written.
+     *
+     * <p>Writing straight into the pom truncates it first, so a failure part
+     * way through -- a full disk is the obvious one -- leaves the developer
+     * with an empty or half-written pom and a build that no longer starts. The
+     * warning at the call site would then be actively misleading, since it
+     * says only that the execution could not be added. Writing a sibling
+     * temporary file and moving it into place means the pom is either the old
+     * one or the new one and never anything in between.</p>
+     */
+    private static void writeAtomically(File target, String content, Charset charset)
+            throws IOException {
+        File tmp = File.createTempFile(target.getName(), ".tmp", target.getParentFile());
+        try {
+            FileUtils.writeStringToFile(tmp, content, charset);
+            try {
+                java.nio.file.Files.move(tmp.toPath(), target.toPath(),
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ex) {
+                // Same directory, so this should not happen; honour the request
+                // rather than failing the repair over it.
+                java.nio.file.Files.move(tmp.toPath(), target.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            if (tmp.exists()) {
+                tmp.delete();
+            }
+        }
     }
 
     /**

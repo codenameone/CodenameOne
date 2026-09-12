@@ -92,8 +92,10 @@ public class SvgTranscodeRunnerLenientTest {
         SvgTranscodeRunner runner = runner(basedir, true);
         runner.run();
 
-        assertEquals("the unreadable source is reported, not thrown",
-                Arrays.asList("anim.lottie"), runner.getFailures());
+        assertTrue("nothing is thrown, and nothing failed mid-transcode",
+                runner.getFailures().isEmpty());
+        assertEquals("the archive is declined before it is ever parsed",
+                Arrays.asList("anim.lottie"), runner.getNonVectorInputs());
 
         File pkg = new File(basedir, "target/generated-sources/svg/com/codename1/generated/svg");
         assertTrue("the readable source is still transcoded",
@@ -113,6 +115,54 @@ public class SvgTranscodeRunnerLenientTest {
         SvgTranscodeRunner runner = runner(basedir, true);
         runner.run();
         assertTrue("a clean project reports nothing", runner.getFailures().isEmpty());
+    }
+
+    /**
+     * LottieParser reads "layers" and returns an empty document when there is
+     * none, so it accepts any JSON object -- an unrelated config file under
+     * src/main/css transcodes "successfully". Binding the strict goal to that
+     * file means the first edit turning it into an array, or saving it
+     * half-written, fails every build over something that was never an
+     * animation. The lenient path declines it instead.
+     */
+    @Test
+    public void declinesAJsonThatIsNotAnAnimation() throws Exception {
+        File basedir = temp.newFolder();
+        File css = new File(basedir, "src/main/css");
+        assertTrue(css.mkdirs());
+        write(new File(css, "star.svg"), STAR_SVG.getBytes("UTF-8"));
+        write(new File(css, "config.json"),
+                "{\"apiBase\":\"https://example.com\"}".getBytes("UTF-8"));
+
+        SvgTranscodeRunner runner = runner(basedir, true);
+        runner.run();
+
+        assertTrue("it is not a transcode failure", runner.getFailures().isEmpty());
+        assertEquals("it is declined as not an animation",
+                Arrays.asList("config.json"), runner.getNonVectorInputs());
+        File pkg = new File(basedir, "target/generated-sources/svg/com/codename1/generated/svg");
+        assertFalse("no class is emitted for it", new File(pkg, "Config.java").isFile());
+        assertTrue("the real asset is unaffected", new File(pkg, "Star.java").isFile());
+    }
+
+    /** A genuine Lottie is still accepted. */
+    @Test
+    public void acceptsARealLottie() throws Exception {
+        File basedir = temp.newFolder();
+        File css = new File(basedir, "src/main/css");
+        assertTrue(css.mkdirs());
+        write(new File(css, "spin.json"),
+                ("{\"v\":\"5.7.4\",\"fr\":30,\"ip\":0,\"op\":30,\"w\":64,\"h\":64,"
+                        + "\"layers\":[]}").getBytes("UTF-8"));
+
+        SvgTranscodeRunner runner = runner(basedir, true);
+        runner.run();
+
+        assertTrue("not declined: " + runner.getNonVectorInputs(),
+                runner.getNonVectorInputs().isEmpty());
+        assertTrue(runner.getFailures().isEmpty());
+        assertTrue(new File(basedir,
+                "target/generated-sources/svg/com/codename1/generated/svg/Spin.java").isFile());
     }
 
     private static void write(File f, byte[] bytes) throws Exception {
