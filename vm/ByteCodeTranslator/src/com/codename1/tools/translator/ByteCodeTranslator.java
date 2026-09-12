@@ -1544,6 +1544,18 @@ public class ByteCodeTranslator {
         // binary, where the companion exists to turn an address back into a Java method.
         // It is the wrong one for a CI build whose whole job is to be autopsied, so the
         // level is a cache variable: unset it and nothing changes for anybody.
+        // A diagnostic-only define hook, empty by default so nothing changes for
+        // anybody who does not ask. The reason it exists: the collector's own
+        // heap-integrity verifier (-DCN1_GC_VERIFY) is the designed detector for
+        // "the sweep reclaimed something a retained object still references", and
+        // there was no way to turn it on for a generated project without editing
+        // the emitted CMakeLists by hand. Chasing a dangling field reference
+        // through core dumps is what made that gap expensive.
+        writer.append("set(CN1_EXTRA_DEFINES \"\" CACHE STRING\n");
+        writer.append("    \"Extra preprocessor defines for diagnostic builds, semicolon separated (e.g. CN1_GC_VERIFY)\")\n");
+        writer.append("if(CN1_EXTRA_DEFINES)\n");
+        writer.append("    target_compile_definitions(${PROJECT_NAME} PRIVATE ${CN1_EXTRA_DEFINES})\n");
+        writer.append("endif()\n");
         writer.append("set(CN1_DEBUG_INFO_LEVEL \"1\" CACHE STRING\n");
         writer.append("    \"DWARF level for the <exe>.debug companion: 1 = lines + function names (lean, the default), 3 = full variable and type information (autopsyable)\")\n");
         writer.append("target_compile_options(${PROJECT_NAME} PRIVATE -g${CN1_DEBUG_INFO_LEVEL} -fno-asynchronous-unwind-tables -fno-unwind-tables)\n");

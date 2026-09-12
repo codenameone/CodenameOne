@@ -287,6 +287,12 @@ class CleanTargetLinuxIntegrationTest {
         if (Boolean.parseBoolean(System.getenv("CN1_LINUX_FULL_DEBUG"))) {
             configure.add("-DCN1_DEBUG_INFO_LEVEL=3");
         }
+        // Diagnostic defines, e.g. CN1_GC_VERIFY for the collector's heap-integrity
+        // checker. Unset it and the build is exactly what it was.
+        String extraDefines = System.getenv("CN1_LINUX_EXTRA_DEFINES");
+        if (extraDefines != null && !extraDefines.trim().isEmpty()) {
+            configure.add("-DCN1_EXTRA_DEFINES=" + extraDefines.trim());
+        }
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");
