@@ -423,26 +423,6 @@ JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_T
     // Fast path: both backing arrays are char[] -- byte-equality of UTF-16 code
     // units == string equality; libc memcmp is the SIMD-optimized comparison on
     // every target.
-    // BOTH LATIN-1 -- the overwhelmingly common case, and until now the SLOW one.
-    //
-    // The char[] path below already had a memcmp; the compact byte[] path did
-    // not, so two ASCII strings (every class name, method name and descriptor
-    // this translator compares) fell into the per-character loop at the bottom,
-    // which calls cn1StrCharAtRaw TWICE per character. That helper reloads
-    // `value` and `offset` and branches on the backing array's class pointer
-    // EVERY time, so the common case paid a branch and two field loads per char
-    // where a single memcmp would do.
-    //
-    // Latin-1 stores each char as its raw 0..255 byte, so memcmp's unsigned byte
-    // ordering is exactly char ordering; equality is bit-identical.
-    //
-    // MEASURED before the fix: java_lang_String_equals was 6.78% of mutator
-    // self-time on the 5782-class hellocodenameone translation.
-    if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        JAVA_ARRAY_BYTE* ta = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
-        JAVA_ARRAY_BYTE* oa = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
-        return memcmp(ta, oa, (size_t)t->java_lang_String_count) == 0 ? JAVA_TRUE : JAVA_FALSE;
-    }
     if(!cn1StrIsLatin1(__cn1ThisObject) && !cn1StrIsLatin1(__cn1Arg1)) {
         JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
         JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
@@ -491,25 +471,8 @@ JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD
         }
         return tc - oc;
     }
-    // BOTH Latin-1: hoist the coder test and the field reloads OUT of the loop.
-    // cn1StrCharAtRaw re-derives the base pointer and re-tests the backing array's
-    // class on every character, twice per iteration; with both coders known the
-    // loop is two raw byte pointers. Ordering is unchanged -- Latin-1 bytes are
-    // the char values 0..255.
-    if(cn1StrIsLatin1(__cn1ThisObject) && cn1StrIsLatin1(__cn1Arg1)) {
-        struct obj__java_lang_String* ts = (struct obj__java_lang_String*)__cn1ThisObject;
-        struct obj__java_lang_String* os = (struct obj__java_lang_String*)__cn1Arg1;
-        const JAVA_ARRAY_BYTE* tb = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)ts->java_lang_String_value)->data) + ts->java_lang_String_offset;
-        const JAVA_ARRAY_BYTE* ob = ((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)os->java_lang_String_value)->data) + os->java_lang_String_offset;
-        for(JAVA_INT k = 0; k < minL; k++) {
-            int d = (int)(tb[k] & 0xff) - (int)(ob[k] & 0xff);
-            if(d) {
-                return d;
-            }
-        }
-        return tc - oc;
-    }
-    // Mixed coders: one Latin-1, one UTF-16. Rare; keep the general helper.
+    // Coder-aware path: at least one string is Latin-1 (byte[]); compare logical
+    // chars. Same UTF-16 code-unit ordering, bit-identical to the char[] path.
     for(JAVA_INT k = 0; k < minL; k++) {
         int d = (int)cn1StrCharAtRaw(__cn1ThisObject, k) - (int)cn1StrCharAtRaw(__cn1Arg1, k);
         if(d) {
