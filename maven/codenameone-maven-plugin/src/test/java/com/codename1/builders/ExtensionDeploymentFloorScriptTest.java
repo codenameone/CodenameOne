@@ -63,8 +63,16 @@ class ExtensionDeploymentFloorScriptTest {
     /// deployment target, in the order given.
     private static List<String> applyTo(Path dir, String floor, String... nameTypeTarget)
             throws IOException, InterruptedException {
+        return applyWithProject(dir, floor, "{}", nameTypeTarget);
+    }
+
+    /// @param projectSettings a ruby hash literal for the PROJECT's build settings, which is
+    /// what $(inherited) and any other reference resolve against
+    private static List<String> applyWithProject(Path dir, String floor,
+            String projectSettings, String... nameTypeTarget)
+            throws IOException, InterruptedException {
         StringBuilder harness = new StringBuilder();
-        harness.append("Config = Struct.new(:build_settings)\n")
+        harness.append("Config = Struct.new(:name, :build_settings)\n")
                 .append("Target = Struct.new(:name, :product_type, :build_configurations)\n")
                 .append("targets = []\n");
         for (String spec : nameTypeTarget) {
@@ -88,11 +96,14 @@ class ExtensionDeploymentFloorScriptTest {
                 settings = "{'IPHONEOS_DEPLOYMENT_TARGET' => '" + parts[2] + "'}";
             }
             harness.append("targets << Target.new('").append(parts[0]).append("', '")
-                    .append(parts[1]).append("', [Config.new(").append(settings).append(")])\n");
+                    .append(parts[1]).append("', [Config.new('Release', ")
+                    .append(settings).append(")])\n");
         }
-        harness.append("xcproj = Struct.new(:targets, :save_count) do\n")
+        harness.append("project_configs = [Config.new('Release', ")
+                .append(projectSettings).append(")]\n")
+                .append("xcproj = Struct.new(:targets, :build_configurations) do\n")
                 .append("  def save; end\n")
-                .append("end.new(targets)\n")
+                .append("end.new(targets, project_configs)\n")
                 .append(IPhoneBuilder.extensionDeploymentFloorScript(floor))
                 .append("\ntargets.each do |t|\n"
                         + "  bs = t.build_configurations[0].build_settings\n"
@@ -178,13 +189,52 @@ class ExtensionDeploymentFloorScriptTest {
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0));
     }
 
-    /// An expression resolves against the project, which the global pass already raised.
-    /// Rewriting it to a literal would throw away the author's intent for no gain.
+    /// $(inherited) picks up the PROJECT's target, which the global pass already raised, so
+    /// the author's expression is worth keeping. Rewriting it to a literal would throw away
+    /// their intent for no gain.
     @Test
-    void leavesSettingReferencesAlone(@TempDir Path dir) throws Exception {
+    void keepsAnInheritedReferenceThatAlreadyClearsTheFloor(@TempDir Path dir) throws Exception {
         assumeTrue(rubyAvailable(), "needs ruby");
-        List<String> got = applyTo(dir, "15.0", "Inherited|" + EXT + "|$(inherited)");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Inherited|" + EXT + "|$(inherited)");
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(inherited)", got.get(0));
+    }
+
+    /// The finding behind resolving rather than skipping: an imported archive writes
+    /// $(EXTENSION_MIN), that setting is 12.0, and skipping every reference let it through
+    /// while the archive still failed. A reference is judged by what it resolves to.
+    @Test
+    void raisesAReferenceThatResolvesBelowTheFloor(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Imported|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0),
+                "a reference resolving to 12.0 is below the floor however it is spelled");
+    }
+
+    /// ...and one that resolves ABOVE the floor keeps its expression, so this does not
+    /// flatten every archive's settings into literals.
+    @Test
+    void keepsAReferenceThatResolvesAboveTheFloor(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Imported|" + EXT + "|EXTENSION_MIN->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)", got.get(0));
+    }
+
+    /// Xcode expands a reference nothing defines to the empty string, so the extension would
+    /// declare no minimum at all. The floor is the answer there, not the expression.
+    @Test
+    void raisesAReferenceNothingDefines(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "Dangling|" + EXT + "|$(NOTHING_DEFINES_THIS)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0));
     }
 
     /// An extension declaring nothing, or something that is not a version, gets the floor

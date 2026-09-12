@@ -171,6 +171,19 @@ public class MacOSNativeBuilder extends Executor {
         for (String warning : hints.getWarnings()) {
             log(warning);
         }
+        // The macOS SDK has a floor of its own and it moves: Xcode 27 raised it from 10.13 to
+        // 12.0, above this builder's default of 11.0, so an unmodified native macOS app
+        // stopped building. Raised once here because the value is read twice -- written into
+        // the generated pbxproj and passed on the xcodebuild command line.
+        String macOSFloor = AppleSdkFloor.minimumDeploymentTarget(
+                "macosx", null, System.getenv("DEVELOPER_DIR"));
+        String requestedMacOSTarget = hints.getMinDeploymentTarget();
+        if (hints.raiseMinDeploymentTargetTo(macOSFloor)) {
+            log("macos.minDeploymentTarget is " + requestedMacOSTarget + ", but this Xcode's "
+                    + "macOS SDK accepts nothing below " + macOSFloor + "; building against "
+                    + hints.getMinDeploymentTarget() + " instead. Apple raises this floor "
+                    + "between Xcode releases.");
+        }
 
         File tmpFile = getBuildDirectory();
         tmpFile.mkdirs();
