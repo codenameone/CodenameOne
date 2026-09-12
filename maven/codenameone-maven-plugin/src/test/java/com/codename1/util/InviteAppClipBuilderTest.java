@@ -192,4 +192,26 @@ class InviteAppClipBuilderTest {
         assertEquals("CN1InviteClip", InviteAppClipBuilder.CLIP_NAME);
     }
 
+    /**
+     * The clip holds a code to the same grammar the core parser does.
+     *
+     * <p>It used to take any 1-64 url-safe characters. The clip has ONE handoff
+     * slot, so a second invocation carrying a malformed segment overwrote a
+     * valid invite already recorded, and the full app then persisted and
+     * claimed the malformed one -- settling the install as no-match with the
+     * real invite gone. The two halves have to agree because one writes what
+     * the other reads.</p>
+     */
+    @Test
+    void theClipEnforcesTheCoreCodeLength() throws Exception {
+        String src = text(files(), "CN1InviteClipDelegate.m");
+
+        assertTrue(src.contains("code.length != " + InviteAppClipBuilder.CODE_CHARS),
+                "the clip does not require the core's exact code length, so it can "
+                        + "overwrite a valid handoff with a malformed code");
+        assertFalse(src.contains("code.length > 64"),
+                "the clip still accepts a length RANGE, which is not the core's grammar");
+        assertEquals(22, InviteAppClipBuilder.CODE_CHARS,
+                "CODE_CHARS drifted from Invites.CODE_CHARS, which the clip must match");
+    }
 }

@@ -10079,7 +10079,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (listener != null && android.os.Build.VERSION.SDK_INT >= 22) {
                 chooser = buildShareChooserWithCallback(shareIntent, listener);
             } else {
+                // Pre-22 has no chooser callback at all, so the listener is
+                // completed here or never.
+                //
+                // Left unfulfilled, Display.share(..., listener) simply never
+                // answered on API 21 -- the lowest level an app using invites
+                // can run at, since the feature catalog lifts minSdk to 21 for
+                // the Play referrer. Invites.share() emitted no invite_shared,
+                // and InviteButton kept its invite marked outstanding for the
+                // life of the button because the outcome it waits for could
+                // not arrive.
+                //
+                // sharedTo(null) is the honest answer rather than a guess: the
+                // plain chooser does not report which target was picked, and
+                // this is the same synthesis the failure path below already
+                // makes for the same reason.
                 chooser = Intent.createChooser(shareIntent, "Share with...");
+                if (listener != null) {
+                    listener.onResult(com.codename1.share.ShareResult.sharedTo(null));
+                }
             }
         } catch (Throwable t) {
             // Fall back to the plain chooser, then synthesize a listener

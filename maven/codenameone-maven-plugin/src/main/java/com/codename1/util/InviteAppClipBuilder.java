@@ -67,6 +67,18 @@ public final class InviteAppClipBuilder {
     public static final String CLIP_NAME = "CN1InviteClip";
 
     /**
+     * Characters in a code the framework mints, matching
+     * {@code Invites.CODE_CHARS}.
+     *
+     * <p>Restated rather than imported because this builder does not depend on
+     * the core, and the two have to agree: the clip writes the handoff that the
+     * core then reads and claims, so a clip accepting a shape the core refuses
+     * loses a real invite to a malformed one. If the core's code length ever
+     * changes, this moves with it.</p>
+     */
+    public static final int CODE_CHARS = 22;
+
+    /**
      * App Clips exist from iOS 14. Named here rather than inherited from the
      * application because the application's own floor is lower, and a clip
      * built against it does not launch.
@@ -227,12 +239,18 @@ public final class InviteAppClipBuilder {
           .append("    return [last stringByRemovingPercentEncoding];\n")
           .append("}\n\n");
 
-        sb.append("// Only characters an invite code can contain. The url is\n")
-          .append("// somebody else's input and this value is handed to the\n")
-          .append("// application, which claims with it -- so it is constrained\n")
-          .append("// here, where the grammar is known, rather than trusted there.\n")
+        sb.append("// Exactly the grammar the core parser enforces: CODE_CHARS of\n")
+          .append("// url-safe base64. The url is somebody else's input and this\n")
+          .append("// value is handed to the application, which claims with it.\n")
+          .append("//\n")
+          .append("// A LENGTH RANGE was not the same rule, and the difference was\n")
+          .append("// reachable: a second clip invocation carrying any 1-64 url-safe\n")
+          .append("// characters passed here and overwrote the single handoff slot,\n")
+          .append("// so a valid invite already recorded was lost and the full app\n")
+          .append("// went on to persist and claim the malformed one -- settling the\n")
+          .append("// install as no-match with nothing left to fall back to.\n")
           .append("static BOOL cn1InviteCodeIsWellFormed(NSString *code) {\n")
-          .append("    if (code.length == 0 || code.length > 64) { return NO; }\n")
+          .append("    if (code.length != ").append(CODE_CHARS).append(") { return NO; }\n")
           .append("    NSCharacterSet *allowed = [NSCharacterSet\n")
           .append("            characterSetWithCharactersInString:\n")
           .append("            @\"ABCDEFGHIJKLMNOPQRSTUVWXYZ\"\n")
