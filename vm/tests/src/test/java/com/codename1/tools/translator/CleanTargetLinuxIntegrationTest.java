@@ -315,6 +315,20 @@ class CleanTargetLinuxIntegrationTest {
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");
+        // Does the BINARY carry the diagnostic? Every link in the chain above can
+        // report success while the define fails to reach the compiler, and the only
+        // unambiguous answer is whether the code it guards is in the executable.
+        // "[GC-VERIFY]" is a literal in cn1GcVerifyHeap's reporting, so its presence
+        // in the image means CN1_GC_VERIFY was compiled in.
+        try {
+            byte[] image = Files.readAllBytes(elf);
+            String needle = "[GC-VERIFY]";
+            boolean present = new String(image, StandardCharsets.ISO_8859_1).contains(needle);
+            System.out.println("CN1SS:HARNESS: built ELF contains " + needle + ": " + present
+                    + " (" + image.length + " bytes)");
+        } catch (IOException probeFailed) {
+            System.out.println("CN1SS:HARNESS: could not probe the built ELF: " + probeFailed);
+        }
         assertTrue(Files.exists(elf), "native ELF should be produced: " + elf);
         return elf;
     }
