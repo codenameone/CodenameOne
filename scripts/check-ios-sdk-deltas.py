@@ -586,9 +586,14 @@ def main():
 
     stub_dir = tempfile.mkdtemp(prefix="cn1-sdk-delta-stubs-")
     all_defines = defines_for(gates, [d for _, ds in CONFIGURATIONS for d in ds])
-    stubs = synthesize_generated_stubs(clang, new_sdk, project_dir, prefix_header, present,
-                                       all_defines, arc_files, SHIPPING_DEPLOYMENT_TARGET,
-                                       stub_dir, args.jobs)
+    # Against both SDKs: a header missing only under the old one leaves that side truncated,
+    # and a truncated BASELINE turns ordinary diagnostics into invented regressions.
+    stubs = []
+    for sdk in (new_sdk, old_sdk):
+        stubs += synthesize_generated_stubs(clang, sdk, project_dir, prefix_header, present,
+                                            all_defines, arc_files, SHIPPING_DEPLOYMENT_TARGET,
+                                            stub_dir, args.jobs)
+    stubs = sorted(set(stubs))
     print("[ios-sdk-deltas] stubs   : %d translated-class header(s) synthesized%s"
           % (len(stubs), (" (%s)" % ", ".join(stubs)) if args.verbose and stubs else ""))
 
@@ -624,18 +629,28 @@ def main():
                             clean += 1
                 results[sdk_label] = (set(diags), clean, sorted(truncated))
 
-            old_diags, _, _ = results["old"]
+            old_diags, _, old_truncated = results["old"]
             new_diags, new_clean, new_truncated = results["new"]
-            if new_truncated:
-                # A fatal error stops the translation unit, so the rest of that file is
-                # not "clean" -- it is unexamined. Reporting a delta over a file that was
-                # never fully read is the failure this whole script replaces.
-                fail("%d file(s) aborted on a fatal error under the new SDK in %s/%s, so "
-                     "they were only partially examined: %s\n"
+            # BOTH sides, not just the new one. A fatal error stops the translation unit, so
+            # the rest of that file is not "clean" -- it is unexamined. On the new side that
+            # hides regressions. On the OLD side it invents them: everything after the abort
+            # is missing from the baseline, so the new SDK's perfectly ordinary diagnostics
+            # for those lines subtract to nothing and get reported as additions it caused.
+            # That asymmetry was reachable, because the generated stubs are synthesized
+            # against the new SDK alone.
+            truncated = sorted(set(old_truncated) | set(new_truncated))
+            if truncated:
+                sides = []
+                if old_truncated:
+                    sides.append("old")
+                if new_truncated:
+                    sides.append("new")
+                fail("%d file(s) aborted on a fatal error under the %s SDK in %s/%s, so they "
+                     "were only partially examined: %s\n"
                      "Supply the missing header, or add the gate that pulls it in to "
                      "GATE_DENY with the reason."
-                     % (len(new_truncated), sweep_name, config_name,
-                        ", ".join(new_truncated)))
+                     % (len(truncated), "/".join(sides), sweep_name, config_name,
+                        ", ".join(truncated)))
             if new_clean < MIN_CLEAN_FILES:
                 fail("only %d files compiled cleanly under the new SDK in %s/%s (floor is "
                      "%d). An empty delta here would mean nothing was compiled, not that "

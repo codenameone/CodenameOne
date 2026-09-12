@@ -69,8 +69,24 @@ class ExtensionDeploymentFloorScriptTest {
                 .append("targets = []\n");
         for (String spec : nameTypeTarget) {
             String[] parts = spec.split("\\|", -1);
-            String settings = parts[2].equals("<unset>") ? "{}"
-                    : "{'IPHONEOS_DEPLOYMENT_TARGET' => '" + parts[2] + "'}";
+            String settings;
+            if (parts[2].equals("<unset>")) {
+                settings = "{}";
+            } else if (parts[2].indexOf("->") >= 0) {
+                // explicit key=value pairs, so qualified keys can be expressed
+                StringBuilder m = new StringBuilder("{");
+                for (String pair : parts[2].split(";")) {
+                    // "->" because a qualified key contains '=' inside its brackets
+                    String[] kv = pair.split("->", 2);
+                    if (m.length() > 1) {
+                        m.append(", ");
+                    }
+                    m.append("'").append(kv[0]).append("' => '").append(kv[1]).append("'");
+                }
+                settings = m.append("}").toString();
+            } else {
+                settings = "{'IPHONEOS_DEPLOYMENT_TARGET' => '" + parts[2] + "'}";
+            }
             harness.append("targets << Target.new('").append(parts[0]).append("', '")
                     .append(parts[1]).append("', [Config.new(").append(settings).append(")])\n");
         }
@@ -78,8 +94,12 @@ class ExtensionDeploymentFloorScriptTest {
                 .append("  def save; end\n")
                 .append("end.new(targets)\n")
                 .append(IPhoneBuilder.extensionDeploymentFloorScript(floor))
-                .append("\ntargets.each { |t| puts t.build_configurations[0]"
-                        + ".build_settings['IPHONEOS_DEPLOYMENT_TARGET'].inspect }\n");
+                .append("\ntargets.each do |t|\n"
+                        + "  bs = t.build_configurations[0].build_settings\n"
+                        + "  keys = bs.keys.select { |k| k.start_with?('IPHONEOS_DEPLOYMENT_TARGET') }\n"
+                        + "  puts(keys.empty? ? 'nil' : keys.sort.map { |k| \"#{k}=#{bs[k]}\" }"
+                        + ".join(',').inspect)\n"
+                        + "end\n");
 
         File script = dir.resolve("harness.rb").toFile();
         Files.write(script.toPath(), harness.toString().getBytes(StandardCharsets.UTF_8));
@@ -120,11 +140,42 @@ class ExtensionDeploymentFloorScriptTest {
                 "CallDirectory|" + EXT + "|12.0",
                 "Widgets|" + EXT + "|16.1",
                 "HostApp|" + APP + "|12.0");
-        assertEquals("15.0", got.get(0), "a 12.0 VPN tunnel must be raised");
-        assertEquals("15.0", got.get(1), "a 12.0 call directory must be raised");
-        assertEquals("16.1", got.get(2), "a WidgetKit extension must keep its higher target");
-        assertEquals("12.0", got.get(3),
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0), "a 12.0 VPN tunnel must be raised");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "a 12.0 call directory must be raised");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=16.1", got.get(2), "a WidgetKit extension must keep its higher target");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=12.0", got.get(3),
                 "the app target is not this pass's business; the global pass owns it");
+    }
+
+    /// Xcode honours IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] over the plain key for the
+    /// build it matches, and an imported extension archive carries whatever its own project
+    /// had. Raising only the base leaves a qualified 12.0 to win on the device archive, and
+    /// the build fails exactly as before -- a trap this tree has already been caught by once.
+    @Test
+    void raisesQualifiedDeploymentTargetsToo(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "Imported|" + EXT + "|IPHONEOS_DEPLOYMENT_TARGET->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]->14.0",
+                "AlreadyHigh|" + EXT + "|IPHONEOS_DEPLOYMENT_TARGET->16.1;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->16.4");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]=15.0",
+                got.get(0), "every spelling below the floor must be raised");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=16.1,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=16.4",
+                got.get(1), "nothing above the floor may be touched");
+    }
+
+    /// A qualified key that is simply absent must stay absent: writing one would pin a build
+    /// Xcode was resolving from the base value.
+    @Test
+    void doesNotInventQualifiedKeys(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0", "Plain|" + EXT + "|12.0");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0));
     }
 
     /// An expression resolves against the project, which the global pass already raised.
@@ -133,7 +184,7 @@ class ExtensionDeploymentFloorScriptTest {
     void leavesSettingReferencesAlone(@TempDir Path dir) throws Exception {
         assumeTrue(rubyAvailable(), "needs ruby");
         List<String> got = applyTo(dir, "15.0", "Inherited|" + EXT + "|$(inherited)");
-        assertEquals("$(inherited)", got.get(0));
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(inherited)", got.get(0));
     }
 
     /// An extension declaring nothing, or something that is not a version, gets the floor
@@ -145,8 +196,8 @@ class ExtensionDeploymentFloorScriptTest {
         List<String> got = applyTo(dir, "15.0",
                 "Unset|" + EXT + "|<unset>",
                 "Junk|" + EXT + "|not-a-version");
-        assertEquals("15.0", got.get(0));
-        assertEquals("15.0", got.get(1));
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0));
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1));
     }
 
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before

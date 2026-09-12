@@ -10068,19 +10068,35 @@ public class IPhoneBuilder extends Executor {
                 + "    next unless target.respond_to?(:product_type)\n"
                 + "    next unless target.product_type == 'com.apple.product-type.app-extension'\n"
                 + "    target.build_configurations.each do |config|\n"
-                + "      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_s\n"
-                + "      # A $(...) reference resolves against the project, which is already at\n"
-                + "      # or above the floor, so leave the author's expression alone.\n"
-                + "      next if current.include?('$')\n"
-                + "      begin\n"
-                + "        below = current.empty? || Gem::Version.new(current) < Gem::Version.new(sdk_floor)\n"
-                + "      rescue ArgumentError\n"
-                + "        below = true\n"
+                + "      # Every spelling of the setting, not just the bare one. Xcode honours\n"
+                + "      # IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] over the plain key for the\n"
+                + "      # build it matches, and an imported extension archive carries whatever\n"
+                + "      # its own project had -- so raising the base alone leaves a qualified\n"
+                + "      # 12.0 to win on the device archive and the build still fails. The\n"
+                + "      # base key is always considered, present or not, so an extension that\n"
+                + "      # declares no minimum at all still gets one.\n"
+                + "      keys = ['IPHONEOS_DEPLOYMENT_TARGET']\n"
+                + "      keys += config.build_settings.keys.select do |k|\n"
+                + "        k.start_with?('IPHONEOS_DEPLOYMENT_TARGET[')\n"
                 + "      end\n"
-                + "      if below\n"
-                + "        puts \"Raising #{target.name} to the SDK minimum #{sdk_floor} \" +\n"
-                + "             \"(was #{current.empty? ? 'unset' : current})\"\n"
-                + "        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = sdk_floor\n"
+                + "      keys.uniq.each do |key|\n"
+                + "        current = config.build_settings[key].to_s\n"
+                + "        # A $(...) reference resolves against the project, which is already at\n"
+                + "        # or above the floor, so leave the author's expression alone.\n"
+                + "        next if current.include?('$')\n"
+                + "        begin\n"
+                + "          below = current.empty? || Gem::Version.new(current) < Gem::Version.new(sdk_floor)\n"
+                + "        rescue ArgumentError\n"
+                + "          below = true\n"
+                + "        end\n"
+                + "        # An ABSENT qualified key is not below the floor, it is simply absent;\n"
+                + "        # inventing one would pin a build Xcode was resolving from the base.\n"
+                + "        next if current.empty? && key != 'IPHONEOS_DEPLOYMENT_TARGET'\n"
+                + "        if below\n"
+                + "          puts \"Raising #{target.name} #{key} to the SDK minimum #{sdk_floor} \" +\n"
+                + "               \"(was #{current.empty? ? 'unset' : current})\"\n"
+                + "          config.build_settings[key] = sdk_floor\n"
+                + "        end\n"
                 + "      end\n"
                 + "    end\n"
                 + "  end\n"
@@ -10145,11 +10161,27 @@ public class IPhoneBuilder extends Executor {
     /// The developer directory of the selected Xcode -- <Xcode.app>/Contents/Developer -- so a
     /// tool run through the system xcrun still resolves inside it. Null when it cannot be told.
     private String selectedDeveloperDir() {
+        // Derived from the xcodebuild that actually runs, BEFORE the environment. The two
+        // disagree when XCODEBUILD names one Xcode and an inherited DEVELOPER_DIR names
+        // another: resolveXcodebuild() prefers XCODEBUILD, so trusting the environment here
+        // answered for an Xcode the build never uses. That was cosmetic while this only fed
+        // an [sdk=iphoneosNN] qualifier; it stopped being cosmetic once the SDK's minimum
+        // deployment target is read through it, since the wrong Xcode reports the old floor
+        // and the project is then written below what the real one accepts.
+        String selected = resolveXcodebuild();
+        if (selected != null) {
+            File fromXcodebuild = new File(selected).getParentFile();
+            for (int i = 0; i < 2 && fromXcodebuild != null; i++) {
+                fromXcodebuild = fromXcodebuild.getParentFile();
+            }
+            if (isDeveloperDir(fromXcodebuild)) {
+                return fromXcodebuild.getAbsolutePath();
+            }
+        }
         String fromEnvironment = System.getenv("DEVELOPER_DIR");
         if (fromEnvironment != null && fromEnvironment.length() > 0) {
             return fromEnvironment;
         }
-        String selected = resolveXcodebuild();
         if (selected == null) {
             return null;
         }
