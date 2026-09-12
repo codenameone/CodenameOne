@@ -497,6 +497,51 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void aPlaceholderRepeatedInTwoSegmentsIsRefused() throws Exception {
+        // Every other check passes for this route: the @Path finds a placeholder,
+        // the placeholder finds its @Path, and neither segment holds two. The two
+        // halves still describe different routes -- the client can only send
+        // /pairs/a/a, while the server accepts /pairs/a/b and reads "a".
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.PairApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface PairApi {\n"
+                + "    @GET(\"/pairs/{id}/{id}\")\n"
+                + "    void pair(@Path(\"id\") String id,\n"
+                + "              OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        assertTrue("a route cannot hold the same placeholder twice", ctx.hasErrors());
+        String all = ctx.getErrors().toString();
+        assertTrue(all, all.indexOf("more than once") >= 0);
+    }
+
+    @Test
+    public void twoPlaceholdersWithDifferentNamesStillCompile() throws Exception {
+        // The other direction, so the check above cannot pass by refusing every
+        // route with two placeholders in it.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.MoveApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface MoveApi {\n"
+                + "    @GET(\"/move/{from}/{to}\")\n"
+                + "    void move(@Path(\"from\") String from, @Path(\"to\") String to,\n"
+                + "              OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        assertFalse("two differently named placeholders are an ordinary route: "
+                + ctx.getErrors(), ctx.hasErrors());
+    }
+
+    @Test
     public void aJsonStringWhereANumberIsDeclaredIsRefused() throws Exception {
         // The value has already been TYPED by the parser here, so "7" against an
         // int field is the client disagreeing with the contract -- and the

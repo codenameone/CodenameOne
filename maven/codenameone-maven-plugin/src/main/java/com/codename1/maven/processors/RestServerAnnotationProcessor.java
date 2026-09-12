@@ -261,6 +261,27 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                     anyError = true;
                     continue;
                 }
+                // AND NOT TWICE. A name repeated in two segments -- /pairs/{id}/{id}
+                // -- passes every check above: the @Path finds a placeholder, the
+                // placeholder finds its @Path, and neither segment holds two of
+                // them. The two halves of the contract still disagree. The CLIENT
+                // substitutes one value for every occurrence of a name, so it can
+                // only ask for /pairs/a/a; the SERVER binds the argument from the
+                // first occurrence alone and matches anything in the second, so it
+                // accepts /pairs/a/b and hands the method "a". Nothing can be done
+                // with a route that repeats a value anyway: it is a typo for two
+                // names, and saying so is better than generating two halves that
+                // describe different routes.
+                int earlier = placeholderIndex(template, name);
+                if (earlier >= 0 && earlier < ti) {
+                    ctx.error(cls, api.binaryName + "." + op.name + " declares the route "
+                            + op.pathTemplate + ", which holds {" + name + "} more than "
+                            + "once. A client can only send one value for a name, and "
+                            + "the server would read it from the first position alone, "
+                            + "so give the placeholders different names.");
+                    anyError = true;
+                    continue;
+                }
                 boolean bound = false;
                 for (int pi = 0; pi < op.params.size(); pi++) {
                     Param p = op.params.get(pi);
