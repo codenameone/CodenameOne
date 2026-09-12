@@ -281,10 +281,12 @@ class ExtensionDeploymentFloorScriptTest {
                 "Qualified|" + EXT + "|EXTENSION_MIN->12.0;"
                         + "EXTENSION_MIN[sdk=iphoneos*]->16.4;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
-        // The base key is unset on this fixture, so it takes the floor -- a simulator build
-        // would otherwise declare no minimum at all. The qualified key is the one under test.
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
+        // The base key is unset on this fixture and the project supplies 15.0, so the
+        // extension already inherits a value that clears the floor and nothing is written for
+        // it. An earlier version of this comment claimed a simulator build "would otherwise
+        // declare no minimum at all" -- that was wrong: an absent target key inherits the
+        // project's. The qualified key is the one under test.
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
                 got.get(0),
                 "the device build resolves EXTENSION_MIN to 16.4, which clears the floor");
     }
@@ -301,8 +303,7 @@ class ExtensionDeploymentFloorScriptTest {
                 "Mismatched|" + EXT + "|EXTENSION_MIN->12.0;"
                         + "EXTENSION_MIN[sdk=iphonesimulator*]->16.4;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
                 got.get(0),
                 "the device key resolves to the base 12.0; the simulator helper is irrelevant");
     }
@@ -333,8 +334,7 @@ class ExtensionDeploymentFloorScriptTest {
                 "Tied|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
                         + "EXTENSION_MIN[arch=arm64]->16.4;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=$(EXTENSION_MIN)",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=$(EXTENSION_MIN)",
                 got.get(0),
                 "which of the two one-condition helpers wins is not decidable here");
     }
@@ -351,8 +351,7 @@ class ExtensionDeploymentFloorScriptTest {
                 "AllLow|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
                         + "EXTENSION_MIN[arch=arm64]->13.0;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=15.0",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=15.0",
                 got.get(0),
                 "12.0 and 13.0 are both below 15.0, so the tie changes nothing");
     }
@@ -379,8 +378,7 @@ class ExtensionDeploymentFloorScriptTest {
                 "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
                 "Subset|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=15.0",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=15.0",
                 got.get(0),
                 "the sdk-qualified helper applies to this build and resolves to 12.0");
     }
@@ -393,8 +391,7 @@ class ExtensionDeploymentFloorScriptTest {
                 "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
                 "Plain|" + EXT + "|EXTENSION_MIN->12.0;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0", got.get(0));
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0", got.get(0));
     }
 
     /// An exact qualified hit is not a guess. With EXTENSION_MIN qualified for BOTH sdks, the
@@ -410,8 +407,7 @@ class ExtensionDeploymentFloorScriptTest {
                         + "EXTENSION_MIN[sdk=iphonesimulator*]->12.0;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]->$(EXTENSION_MIN);"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN),"
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN),"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]=15.0",
                 got.get(0),
                 "the device key resolves to 16.4 and is kept; the simulator key resolves to "
@@ -472,8 +468,7 @@ class ExtensionDeploymentFloorScriptTest {
                 "Reordered|" + EXT + "|SDKROOT->iphoneos;"
                         + "EXTENSION_MIN[arch=arm64][sdk=iphoneos*]->16.4;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=$(EXTENSION_MIN)",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=$(EXTENSION_MIN)",
                 got.get(0),
                 "the helper is the same one however its conditions are ordered, and 16.4 "
                         + "clears the floor");
@@ -507,8 +502,7 @@ class ExtensionDeploymentFloorScriptTest {
                         + "'IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]' => '12.0'}",
                 "Inherits|" + EXT + "|SDKROOT->iphoneos;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(inherited)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
                 got.get(0),
                 "the device build inherits the project's 12.0, not its 16.4 base");
     }
@@ -566,8 +560,7 @@ class ExtensionDeploymentFloorScriptTest {
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)",
                 // Control: without it this passes when the pass does nothing at all.
                 "MustRise|" + EXT + "|SDKROOT->iphoneos;IPHONEOS_DEPLOYMENT_TARGET->12.0");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
                 got.get(0),
                 "iphoneos27.* may win on a 27 build, so this must not be clamped to 15.0");
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "control: the pass ran");
@@ -583,8 +576,7 @@ class ExtensionDeploymentFloorScriptTest {
                 "Disjoint|" + EXT + "|SDKROOT->iphoneos;EXTENSION_MIN->12.0;"
                         + "EXTENSION_MIN[sdk=iphonesimulator*]->16.4;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
-        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
                 got.get(0),
                 "a simulator-qualified helper cannot win a device build");
     }
@@ -922,5 +914,35 @@ class ExtensionDeploymentFloorScriptTest {
         assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
                 "the target's own 12.0 is what Xcode reads, it is below the floor, and it must "
                         + "be raised rather than left for Xcode to reject: " + got.get(0));
+    }
+
+    /// An extension that declares no deployment target of its own is not an extension with no
+    /// minimum: Xcode falls through to the project, which always carries one here because the
+    /// generated pbxproj is written with ios.deployment_target. Writing the floor into the
+    /// TARGET shadows it, so an app at 16.4 whose extension simply did not restate the value
+    /// came out at 15.0 -- from a project that asked for nothing unusual.
+    @Test
+    void anAbsentTargetValueInheritsTheProjects(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '16.4'}",
+                "Inherited|" + EXT + "|<unset>");
+        assertFalse(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=15.0"),
+                "the extension inherits the project's 16.4; synthesizing 15.0 on the target "
+                        + "shadows it and lowers the extension: " + got.get(0));
+    }
+
+    /// And the other direction: when the project's own value is BELOW the floor, the extension
+    /// inherits something invalid, so the target key is still synthesized. Without this the test
+    /// above could be satisfied by never writing a key for an extension that declares none.
+    @Test
+    void anAbsentTargetValueIsStillRaisedWhenTheProjectIsLow(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '12.0'}",
+                "InheritedLow|" + EXT + "|<unset>");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=15.0"),
+                "the inherited 12.0 is below the floor, so the extension needs its own: "
+                        + got.get(0));
     }
 }
