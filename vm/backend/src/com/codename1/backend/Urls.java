@@ -82,6 +82,11 @@ final class Urls {
      * not worth logging. requireHttp above prints only the scheme for the same
      * reason, and Database.Url.describe does the same thing for a database URL.
      *
+     * <p>AND THE FRAGMENT, for the same reason as the query: an implicit-flow
+     * OAuth token arrives as "#access_token=...", which is a credential in the
+     * one part of a URL that never even reaches the server. Cutting at the query
+     * alone left it in the message verbatim.
+     *
      * <p>indexOf with a String and not a char: vm/JavaAPI has indexOf(String,
      * int) and no indexOf(int, int), so the char form compiles on the JavaSE arm
      * and fails to link in a translated build.
@@ -90,7 +95,15 @@ final class Urls {
         if(url == null) {
             return "a request with no URL";
         }
+        // Whichever comes first. A fragment starts at the first '#' and runs to
+        // the end, so a '#' before the '?' means there is no query at all.
         int query = url.indexOf('?');
+        int fragment = url.indexOf('#');
+        char marker = '?';
+        if(fragment >= 0 && (query < 0 || fragment < query)) {
+            query = fragment;
+            marker = '#';
+        }
         String out = query < 0 ? url : url.substring(0, query);
         int scheme = out.indexOf("://");
         if(scheme >= 0) {
@@ -103,6 +116,6 @@ final class Urls {
                         + out.substring(at + 1);
             }
         }
-        return query < 0 ? out : out + "?<redacted>";
+        return query < 0 ? out : out + marker + "<redacted>";
     }
 }

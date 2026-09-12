@@ -1600,6 +1600,20 @@ public class SelfTest {
         // Still worth logging: the endpoint that failed is named.
         check("the host is still named", "true",
                 String.valueOf(message.indexOf("127.0.0.1") >= 0));
+        // AND THE FRAGMENT, which is where an implicit-flow OAuth token arrives
+        // and which never reaches the server at all.
+        String fragment = "http://127.0.0.1:1/path#access_token=fragmentsecret";
+        String second;
+        try {
+            Web.request("GET", fragment, null, null);
+            second = "<the request unexpectedly succeeded>";
+        } catch (Exception err) {
+            second = String.valueOf(err.getMessage());
+        }
+        check("a fragment secret is not in the message", "false",
+                String.valueOf(second.indexOf("fragmentsecret") >= 0));
+        check("and the host is still named there too", "true",
+                String.valueOf(second.indexOf("127.0.0.1") >= 0));
     }
 
     /**
