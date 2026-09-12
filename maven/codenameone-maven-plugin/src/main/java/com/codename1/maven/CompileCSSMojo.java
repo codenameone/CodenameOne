@@ -114,6 +114,14 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
      * reached a device as a white screen.</p>
      */
     private void warnAboutUnresolvedVectorReferences() throws MojoExecutionException {
+        if (!isCN1ProjectDir() || properties == null) {
+            // AbstractCN1Mojo.execute() only loads properties for a CN1 project,
+            // so outside one this method is the only thing in the goal that
+            // would touch them -- and it turned a goal that quietly did nothing
+            // into a NullPointerException. executeImpl(String) guards itself the
+            // same way; this is the same goal and gets the same answer.
+            return;
+        }
         if (properties.getProperty("codename1.cssTheme", null) == null) {
             // executeImpl(String) compiles nothing for this project, so there
             // is no theme and no placeholder in it. Warning here would send a
