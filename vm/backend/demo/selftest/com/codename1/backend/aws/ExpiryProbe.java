@@ -45,4 +45,21 @@ public final class ExpiryProbe {
     public static long parse(String iso) {
         return Credentials.expiryMillis(iso);
     }
+
+    /**
+     * Credentials.fromJson, which is package private for the same reason
+     * expiryMillis is.
+     *
+     * <p>What it accepts is the whole contract with the metadata providers, and
+     * the interesting cases are the ones it must REFUSE -- a response that parses
+     * but describes a credential nothing can sign with.
+     */
+    public static String rejects(String json) {
+        try {
+            Credentials.fromJson(json);
+            return "accepted";
+        } catch (Exception refused) {
+            return "refused";
+        }
+    }
 }

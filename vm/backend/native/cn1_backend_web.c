@@ -208,6 +208,17 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         const char* tmp = stringToUTF8(threadStateData, headerLines);
         if(tmp != NULL && tmp[0] != 0) {
             char* copy = strdup(tmp);
+            if(copy == NULL) {
+                /* THE SAME RULE AS THE APPEND BELOW, one allocation earlier. A null
+                   copy left "line" null, the loop never ran, and the request went
+                   out with no headers at all while reporting success -- which is
+                   the failure the append was just taught to refuse, reached by the
+                   strdup in front of it. Nothing is on the list yet, so there is
+                   nothing to free but the two copies above. */
+                free(urlCopy);
+                free(methodCopy);
+                return 0;
+            }
             char* line = copy;
             while(line != NULL && *line != 0) {
                 char* nl = strchr(line, '\n');

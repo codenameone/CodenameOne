@@ -955,6 +955,30 @@ public class SelfTest {
                 String.valueOf(ExpiryProbe.parse("2026-08-28T13:45:00-05:00")));
         check("a space where the T belongs is refused", "0",
                 String.valueOf(ExpiryProbe.parse("2026-08-28 13:45:00Z")));
+
+        // AND THE WHOLE RESPONSE. Both callers of fromJson are the metadata
+        // providers, whose credentials are temporary and are signed with a session
+        // token -- so a response carrying a key pair and an expiry but no token
+        // describes something that cannot sign anything. Accepting it meant every
+        // request came back rejected while S3 cached the pair until its refresh
+        // margin, which may be hours.
+        String complete = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"s\","
+                + "\"Token\":\"t\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("a complete credential response is accepted", "accepted",
+                ExpiryProbe.rejects(complete));
+        String noToken = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"s\","
+                + "\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("one with no session token is refused", "refused",
+                ExpiryProbe.rejects(noToken));
+        String emptyToken = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"s\","
+                + "\"Token\":\"\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("and an empty one is not a token", "refused",
+                ExpiryProbe.rejects(emptyToken));
+        // SessionToken is the other spelling the providers use, and it still works.
+        String sessionSpelling = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"s\","
+                + "\"SessionToken\":\"t\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("SessionToken is accepted as the token", "accepted",
+                ExpiryProbe.rejects(sessionSpelling));
     }
 
     private static void expiryMarginIsDistinctFromExpiry() throws Exception {

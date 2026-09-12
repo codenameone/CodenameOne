@@ -216,6 +216,18 @@ public final class Credentials {
         if(token == null) {
             token = string(parsed, "SessionToken");
         }
+        // AND A TOKEN, by the same argument the expiry below is required by: both
+        // callers are the metadata providers and everything they hand out is
+        // temporary, which is signed with x-amz-security-token. Without one every
+        // signed request comes back rejected -- and because the expiry beside it
+        // may be hours away, S3 would cache the unusable credential until the
+        // refresh margin rather than resolving again. A credential that cannot
+        // sign is not a credential.
+        if(token == null || token.length() == 0) {
+            throw new IOException("The credential endpoint returned no session "
+                    + "token. Temporary credentials are signed with one, so every "
+                    + "request made with this pair would be rejected");
+        }
         // AN EXPIRY IS REQUIRED HERE. Both callers of this are the metadata
         // providers -- ECS/EKS and IMDS -- and everything they hand out is
         // TEMPORARY. expiryMillis answers 0 for an Expiration that is missing or
