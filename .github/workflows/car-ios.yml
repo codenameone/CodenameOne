@@ -17,6 +17,7 @@ name: Car (CarPlay) integration
       - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.m'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
       - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
+      - 'scripts/lib/xcode.sh'
   push:
     branches:
       - master
@@ -29,6 +30,7 @@ name: Car (CarPlay) integration
       - 'Ports/iOSPort/nativeSources/CodenameOne_CarPlaySceneDelegate.m'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
       - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
+      - 'scripts/lib/xcode.sh'
 
 jobs:
   car-ios:

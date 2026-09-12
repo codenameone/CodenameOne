@@ -669,6 +669,36 @@ class ExtensionDeploymentFloorScriptTest {
                 "the author already decided that branch, and 16.4 clears the floor");
     }
 
+    /// A branch's own value may itself be a reference. Skipping it for containing a $ left
+    /// the device branch unpinned and the archive at 12.0, so each candidate is resolved in
+    /// ITS OWN condition context before the branch is judged.
+    @Test
+    void resolvesANestedBranchBeforePinningIt(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "Nested|" + EXT + "|SDKROOT->iphoneos;DEVICE_MIN->12.0;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->$(DEVICE_MIN);"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN),"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
+                got.get(0),
+                "the device branch resolves through DEVICE_MIN to 12.0 and is pinned");
+    }
+
+    /// ...and a nested branch that resolves ABOVE the floor is still left alone.
+    @Test
+    void leavesANestedBranchThatClearsTheFloor(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "NestedHigh|" + EXT + "|SDKROOT->iphoneos;DEVICE_MIN->16.4;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->$(DEVICE_MIN);"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)", got.get(0),
+                "both branches clear the floor, so nothing is written");
+    }
+
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before
     /// any of this existed: nothing emitted, nothing changed.
     @Test
