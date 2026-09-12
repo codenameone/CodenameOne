@@ -190,6 +190,16 @@ public class ComponentGroup extends Container {
         restoreDeparting(cmp);
     }
 
+    /// Reordering decides which member is First and which is Last, so it belongs to
+    /// the same family as insertion and removal. Container.drop reorders through here
+    /// and starts a layout animation, reaching neither of the other two hooks, so a
+    /// dragged segment kept the UIID of the position it came from.
+    @Override
+    void setComponentIndex(Component cmp, int location) {
+        super.setComponentIndex(cmp, location);
+        updateUIIDs();
+    }
+
     /// Hands a member that has left this group back what the group took from it.
     ///
     /// #### Parameters
@@ -258,8 +268,9 @@ public class ComponentGroup extends Container {
     /// Whether this group is currently renaming its members' UIIDs. updateUIIDs()
     /// does nothing unless the theme constant is on or grouping is forced, and
     /// Button needs the same answer to know whether a member's live UIID belongs
-    /// to the group or to itself. $origUIID cannot answer it: restoreUIID leaves
-    /// that set, so it says "was renamed once", not "is renamed now".
+    /// to the group or to itself. $origUIID cannot answer it either: it is absent
+    /// between memberships and present during one, but it is set from inside
+    /// updateUIID rather than at the moment ownership begins, so it lags.
     ///
     /// #### Returns
     ///
@@ -321,6 +332,10 @@ public class ComponentGroup extends Container {
         String o = (String) c.getClientProperty("$origUIID");
         if (o != null) {
             c.setUIID(o);
+            // Dropped here as well as on departure, because this is the group giving
+            // the UIID back. Kept, a member renamed while the group is inactive is
+            // restored to the name from the previous grouping the next time round.
+            c.putClientProperty("$origUIID", null);
         }
         reverseRadio(c, false);
     }

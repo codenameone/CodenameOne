@@ -518,4 +518,51 @@ class ComponentGroupSegmentedTest extends UITestBase {
         assertEquals("Custom", b.getUIID(),
                 "the second restore returns the UIID the component actually had");
     }
+
+    @Test
+    void testDeactivatingAlsoDropsTheSavedUiid() {
+        // Deactivating is the group giving the UIID back, so it has to drop the
+        // snapshot for the same reason departing does: kept, a member renamed while
+        // the group is inactive is restored to the earlier name next time round.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        Button b = new Button("One");
+        group.addComponent(b);
+        assertEquals("ToggleButtonOnly", b.getUIID());
+
+        group.setHorizontal(false);
+        assertEquals("Button", b.getUIID(), "deactivating restores");
+
+        b.setUIID("Custom");
+        group.setHorizontal(true);
+        assertEquals("ToggleButtonOnly", b.getUIID(), "and grouping again renames");
+        group.setHorizontal(false);
+
+        assertEquals("Custom", b.getUIID(),
+                "the second restore returns the UIID the component actually had");
+    }
+
+    @Test
+    void testReorderingRefreshesThePositionalUiids() {
+        // Container.drop reorders through setComponentIndex and starts a layout
+        // animation, reaching neither the insertion nor the removal hook, so a dragged
+        // segment kept the UIID of the position it came from.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        Button first = new Button("One");
+        Button last = new Button("Two");
+        group.addComponent(first);
+        group.addComponent(last);
+        assertEquals("ToggleButtonFirst", first.getUIID());
+        assertEquals("ToggleButtonLast", last.getUIID());
+
+        group.setComponentIndex(first, 1);
+
+        assertEquals("ToggleButtonLast", first.getUIID(),
+                "the segment moved to the end is styled as the end");
+        assertEquals("ToggleButtonFirst", last.getUIID(),
+                "and the one now at the start is styled as the start");
+    }
 }

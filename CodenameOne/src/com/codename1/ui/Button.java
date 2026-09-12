@@ -1091,8 +1091,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             // the bar its segmented edges, and it does not re-apply that when the
             // UIID changes under it. Resetting it here would strip the member's
             // styling until the next structural or theme update. $origUIID is not
-            // the test for that -- ComponentGroup sets it once and never clears it,
-            // so it says "was grouped at some point" rather than "is grouped now".
+            // the test for that: ComponentGroup clears it when it hands the UIID
+            // back, but sets it from inside updateUIID rather than when ownership
+            // begins, so it still lags the answer groupOwnsUIID gives directly.
             if (!groupOwnsUIID() && isToggleUIID(uiid)) {
                 setUIID(preToggleUIID);
             }
