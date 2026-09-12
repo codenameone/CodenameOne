@@ -129,7 +129,7 @@ public class IPhoneBuilder extends Executor {
     private File tmpFile;
     private File icon57;
     private File icon512;
-    // Bumped from 12.0 → 13.0 to enable NSURLSessionWebSocketTask
+    // Bumped from 12.0 to 13.0 to enable NSURLSessionWebSocketTask
     // (iOS 13+) used by com.codename1.io.WebSocket's iOS implementation.
     // BuildDaemon's iOS lane needs the same bump.
     private static final String DEFAULT_MIN_DEPLOYMENT_VERSION = "13.0";
