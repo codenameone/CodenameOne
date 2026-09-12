@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="452" viewBox="0 0 900 452">
   <rect x="0" y="0" width="900" height="452" fill="#ffffff"/>
   <text x="450" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Device integrity: what the device can claim, and what your server can trust</text>
-  <text x="450" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">All three of these read the same root, jailbreak and Frida signals. Only one of them produces an answer that</text>
-  <text x="450" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">survives a compromised device, because only one of them is checked somewhere the attacker does not control.</text>
+  <text x="450" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">The first two run the same root, jailbreak and Frida probes, on the device. Attestation does not run them at all: it</text>
+  <text x="450" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">reports the platform's own signed verdict, which is why it is the only one of the three a server can act on.</text>
   <path d="M 540 72 L 540 408" fill="none" stroke="#a33a3a" stroke-width="1.5" stroke-dasharray="6 4"/>
   <text x="532" y="86" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="end" fill="#a33a3a">the device, which the attacker controls</text>
   <text x="548" y="86" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="start" fill="#4a7a3d">your server</text>
@@ -23,8 +23,8 @@
   <rect x="16" y="296" width="490" height="88" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
   <text x="28" y="316" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Platform attestation</text>
   <text x="28" y="332" font-family="Arial, sans-serif" font-size="9" fill="#777777">DeviceIntegrity.requestIntegrityToken(nonce)</text>
-  <text x="28" y="352" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Play Integrity or App Attest signs a token bound to a nonce your server just issued. The</text>
-  <text x="28" y="367" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">device cannot forge it, and the nonce is what stops it being replayed.</text>
+  <text x="28" y="352" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Play Integrity or App Attest reports its own hardware-backed verdict, signed and bound to a fresh</text>
+  <text x="28" y="367" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">nonce your server issued. It does not wrap the checks above: what they see need not appear in it.</text>
   <path d="M 506 340 L 562 340" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <path d="M 557 336 L 562 340 L 557 344" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <rect x="562" y="96" width="322" height="188" rx="4" fill="#fbf6f6" stroke="#d8bcbc" stroke-width="1.2" stroke-dasharray="5 4"/>
