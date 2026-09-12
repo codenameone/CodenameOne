@@ -494,6 +494,44 @@ class ExtensionDeploymentFloorScriptTest {
         assertEquals("nil", got.get(2), "watchOS is still none of this floor's business");
     }
 
+    /// $(inherited) picks up the PROJECT's value for the same setting, and the project can
+    /// qualify it too. A base of 16.4 beside [sdk=iphoneos*] = 12.0 means a device archive
+    /// inherits 12.0 -- reading only the unqualified project value called that "already above
+    /// the floor" and left an extension Xcode 27 rejects.
+    @Test
+    void resolvesInheritedAgainstTheProjectsQualifiedValue(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '16.4', "
+                        + "'IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]' => '12.0'}",
+                "Inherits|" + EXT + "|SDKROOT->iphoneos;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(inherited)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
+                got.get(0),
+                "the device build inherits the project's 12.0, not its 16.4 base");
+    }
+
+    /// And the other way round: a project qualified HIGHER than its base means the inherited
+    /// value clears the floor, so replacing the expression would weaken the extension.
+    @Test
+    void keepsInheritedWhenTheProjectsQualifiedValueClearsTheFloor(@TempDir Path dir)
+            throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '12.0', "
+                        + "'IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]' => '16.4'}",
+                "Inherits|" + EXT + "|SDKROOT->iphoneos;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(inherited)",
+                // Control: without it this passes when the pass does nothing at all.
+                "MustRise|" + EXT + "|SDKROOT->iphoneos;IPHONEOS_DEPLOYMENT_TARGET->12.0");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(inherited)",
+                got.get(0),
+                "the device build inherits 16.4, which clears the floor");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "control: the pass ran");
+    }
+
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before
     /// any of this existed: nothing emitted, nothing changed.
     @Test
