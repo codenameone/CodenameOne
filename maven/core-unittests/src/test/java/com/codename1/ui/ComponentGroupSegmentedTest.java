@@ -455,8 +455,44 @@ class ComponentGroupSegmentedTest extends UITestBase {
 
         assertEquals("Button", original.getUIID(),
                 "a replaced member leaves the group and takes its own UIID with it");
-        // The replacement is deliberately not asserted as grouped: replace() inserts
-        // through insertComponentAtImpl, which this class does not override, so it
-        // never has been. That is long-standing and outside this change.
+        assertEquals("ToggleButtonOnly", replacement.getUIID(),
+                "and the one that took its place is grouped -- replace() inserts through "
+                        + "insertComponentAtImpl, which is why that is hooked rather than "
+                        + "insertComponentAt");
+    }
+
+    @Test
+    void testAnInsertionDuringAnAnimationIsGroupedWhenItCompletes() {
+        // insertComponentAt only queues the insertion while the AnimationManager is
+        // animating, so recomputing positions there does not count the arriving member
+        // and the queued callback goes straight to Container.
+        activateGrouping(false);
+        Form f = new Form("host");
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        Button first = new Button("One");
+        group.addComponent(first);
+        f.add(group);
+        f.show();
+        assertEquals("ToggleButtonOnly", first.getUIID());
+
+        f.getAnimationManager().addAnimation(new ComponentAnimation() {
+            public boolean isInProgress() {
+                return true;
+            }
+
+            protected void updateState() {
+            }
+        });
+        assertTrue(f.getAnimationManager().isAnimating(), "the queued-insertion path needs this");
+
+        Button second = new Button("Two");
+        group.addComponent(second);
+        f.getAnimationManager().flush();
+
+        assertEquals("ToggleButtonFirst", first.getUIID(),
+                "the member that was Only becomes First once a second one arrives");
+        assertEquals("ToggleButtonLast", second.getUIID(),
+                "and the arrival is grouped rather than left plain");
     }
 }

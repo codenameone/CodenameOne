@@ -137,9 +137,17 @@ public class ComponentGroup extends Container {
         cb.putClientProperty("$origSpinner", null);
     }
 
+    /// Hooked on the Impl rather than on insertComponentAt for the same reason the
+    /// removal side is hooked on removeComponentImplNoAnimationSafety: this is where
+    /// the member genuinely enters the component list, and every route arrives here.
+    /// insertComponentAt only QUEUES the insertion while the AnimationManager is
+    /// animating, so positions recomputed there do not count the arriving member, and
+    /// the queued callback goes straight to Container and never returns to this class.
+    /// replace() reaches this too, which is the only way its incoming member is grouped
+    /// at all -- it never calls insertComponentAt.
     @Override
-    void insertComponentAt(int index, Object con, Component cmp) {
-        super.insertComponentAt(index, con, cmp);
+    void insertComponentAtImpl(int index, Component cmp) {
+        super.insertComponentAtImpl(index, cmp);
         updateUIIDs();
     }
 
@@ -173,9 +181,6 @@ public class ComponentGroup extends Container {
     /// two-element group reading Last rather than Only. The queued callback goes
     /// straight to Container, so nothing else would correct it.
     ///
-    /// Note replace() reaches this but inserts through insertComponentAtImpl, which
-    /// this class does not override, so the incoming component is not grouped. That is
-    /// long-standing and left alone here.
     @Override
     void removeComponentImplNoAnimationSafety(Component cmp) {
         super.removeComponentImplNoAnimationSafety(cmp);
