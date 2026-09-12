@@ -52,6 +52,9 @@ public final class Crypto {
      */
     private static final int MAX_VERIFY_ITERATIONS = 10000000;
 
+    /** See verifyPassword: the other half of bounding the work a row can ask for. */
+    private static final int MAX_VERIFY_HASH_BYTES = 64;
+
     private static final int PASSWORD_SALT_BYTES = 16;
     private static final int PASSWORD_HASH_BYTES = 32;
 
@@ -154,7 +157,14 @@ public final class Crypto {
         // field, so the null check above never saw it. The floors are the standard
         // minimums (RFC 8018 wants at least eight bytes of salt); anything this
         // server writes is 16 and 32.
-        if(salt.length < 8 || expected.length < 16) {
+        // AND AN UPPER BOUND ON THE HASH, because its length is the OTHER factor
+        // in the work this does. PBKDF2 runs the iteration count once per output
+        // block, so capping the count alone -- which is what MAX_VERIFY_ITERATIONS
+        // did -- still leaves a few kilobytes of stored hash multiplying it by a
+        // hundred or more. 64 covers anything a sane writer produces, including a
+        // SHA-512-sized digest; this server writes PASSWORD_HASH_BYTES.
+        if(salt.length < 8 || expected.length < 16
+                || expected.length > MAX_VERIFY_HASH_BYTES) {
             return false;
         }
         byte[] actual = pbkdf2Impl(utf8(password), salt, iterations, expected.length);

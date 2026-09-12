@@ -981,6 +981,18 @@ static long cn1H2BuildHeaders(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT status,
         const char* tmp = stringToUTF8(threadStateData, headerLines);
         if(tmp != NULL && tmp[0] != 0) {
             headerCopy = strdup(tmp);
+            if(headerCopy == NULL) {
+                /* A FAILED COPY IS NOT "NO HEADERS". Leaving headerCopy null here
+                   is indistinguishable below from a response that carried none, so
+                   the status and body went out and reported success while every
+                   header the handler set was dropped -- the same silent loss the
+                   comment below describes for a block that did not fit, which is
+                   why that one counts first. A Set-Cookie that does not travel
+                   ends the session; a CORS or cache header that does not travel
+                   changes what the client is allowed to do with the answer. */
+                free(statusCopy);
+                return -1;
+            }
         }
     }
     *statusOut = statusCopy;

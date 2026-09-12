@@ -325,7 +325,7 @@ public final class MySql {
         // A result set. Nothing here wants the rows, but they have to be drained
         // or the next statement reads them as its own answer.
         Reader header = new Reader(packet.body);
-        int columns = (int)header.lengthEncoded();
+        int columns = columnCount(header.lengthEncoded());
         for(int iter = 0 ; iter < columns ; iter++) {
             readPacket();
         }
@@ -486,7 +486,7 @@ public final class MySql {
         }
         // A result set: a column count, the definitions again, then binary rows.
         Reader header = new Reader(first.body);
-        int resultColumns = (int)header.lengthEncoded();
+        int resultColumns = columnCount(header.lengthEncoded());
         Column[] resultDefinitions = new Column[resultColumns];
         for(int iter = 0 ; iter < resultColumns ; iter++) {
             resultDefinitions[iter] = parseColumn(readPacket().body);
@@ -704,6 +704,9 @@ public final class MySql {
     /** The most one MySQL packet can carry: the length field is 24 bits. */
     private static final int MAX_PACKET_BODY = 0xffffff;
 
+    /** See columnCount: the width the protocol's own prepare response can state. */
+    private static final int MAX_RESULT_COLUMNS = 65535;
+
     /**
      * Sends a body, split across packets when it does not fit in one.
      *
@@ -772,6 +775,29 @@ public final class MySql {
         }
         sequence = b3 + 1;
         return b0 | (b1 << 8) | (b2 << 16);
+    }
+
+    /**
+     * A column count the peer chose, checked before it sizes anything.
+     *
+     * <p>It arrives length-encoded, which reaches 2^64, and casting that to an int
+     * gave either an enormous positive -- new Column[] then asked for it in one go
+     * and the OutOfMemoryError is not an IOException, so it took the process --
+     * or a negative, which is a NegativeArraySizeException instead. A few bytes of
+     * result-set header was enough, before any column definition arrived, and the
+     * default sslmode=prefer lets whoever answers the connection send them.
+     *
+     * <p>65535 because that is how the server itself describes this quantity in a
+     * prepare response: sixteen bits. A result set with more columns than the
+     * protocol can describe in its other half is not one this client needs to read.
+     */
+    private int columnCount(long declared) throws IOException {
+        if(declared < 0 || declared > MAX_RESULT_COLUMNS) {
+            close();                    // desynchronised; see readPacketHeader
+            throw new IOException("A MySQL result set claims " + declared
+                    + " columns, past the " + MAX_RESULT_COLUMNS + " this reads");
+        }
+        return (int)declared;
     }
 
     private Packet readPacket() throws IOException {

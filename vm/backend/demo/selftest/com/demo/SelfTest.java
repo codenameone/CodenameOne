@@ -316,6 +316,28 @@ public class SelfTest {
         // did not simply refuse everything.
         check("the stored count still verifies", "true",
                 String.valueOf(Crypto.verifyPassword("hunter2", stored)));
+
+        // AND THE HASH LENGTH, which is the other factor in the same product.
+        // PBKDF2 runs the iteration count once per output BLOCK, and the output
+        // length comes out of the stored value too -- so bounding the count alone
+        // left a few kilobytes of hash multiplying it by a couple of hundred.
+        // Eight kilobytes at the highest count still allowed is 256 blocks of ten
+        // million rounds.
+        //
+        // Timed, not just answered, for the same reason as the count above: an
+        // oversized hash will not match either way, so the boolean is false in
+        // both versions and only the clock tells them apart.
+        byte[] wideSalt = new byte[16];
+        byte[] wideHash = new byte[8192];
+        String oversized = "pbkdf2$10000000$" + Base64Url.encode(wideSalt)
+                + "$" + Base64Url.encode(wideHash);
+        long wideStarted = System.currentTimeMillis();
+        boolean wideAccepted = Crypto.verifyPassword("hunter2", oversized);
+        long wideElapsed = System.currentTimeMillis() - wideStarted;
+        check("an oversized stored hash is rejected", "false without computing",
+                (wideAccepted ? "true" : "false")
+                        + (wideElapsed < 30000 ? " without computing"
+                                               : " only after " + wideElapsed + "ms"));
     }
 
     private static void jwt() throws Exception {
