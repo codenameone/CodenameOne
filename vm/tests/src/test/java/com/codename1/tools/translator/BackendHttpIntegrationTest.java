@@ -2384,6 +2384,40 @@ class BackendHttpIntegrationTest {
         List<Integer> mixed = h2Expect(port, "/echo", "100-continue, custom-extension");
         assertEquals(java.util.Collections.singletonList(417), mixed,
                 "a list this server cannot wholly satisfy is a 417: " + mixed);
+
+        // AND THE SAME LIST SPLIT ACROSS TWO FIELD LINES, which is the same field
+        // value on the wire. Reading only the first occurrence answered 100 to a
+        // client that had also asked for something nobody can satisfy -- the
+        // comma form refused and the repeated form accepted, one spelling apart.
+        List<Integer> repeated = h2Expect(port, "/echo", "100-continue", "custom-extension");
+        assertEquals(java.util.Collections.singletonList(417), repeated,
+                "a repeated field is the same list and is refused too: " + repeated);
+    }
+
+    @Test
+    @DisplayName("a fragment in the request target is refused on both protocols")
+    void aFragmentInTheTargetIsRefused() throws Exception {
+        // A fragment is not part of a request target: RFC 9110 7.1 says a client
+        // must not send one, and the path here ends at '?' alone -- so
+        // "/healthz#x" was a path of "/healthz#x", while an intermediary that
+        // strips the fragment forwards "/healthz" and gets a different answer out
+        // of the same server.
+        assertEquals(400, statusOf(raw("GET /healthz#fragment HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "a raw fragment in the target is malformed");
+        assertEquals(400, statusOf(raw("GET /healthz?name=x#fragment HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "and after a query, which is where one really arrives");
+        // THE ESCAPE IS NOT A FRAGMENT. %23 is an ordinary character in a path and
+        // decodes after the routing, so refusing it would break a legitimate URL.
+        assertEquals(200, statusOf(raw("GET /healthz?name=%23tag HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n")),
+                "an encoded '#' is text, not a fragment");
+        // AND OVER h2, because the handler cannot tell which protocol carried it.
+        assertEquals(400, h2StatusFor(port, "/healthz#fragment"),
+                "a fragment must be refused over h2 as well");
+        assertEquals(200, h2StatusFor(port, "/healthz?name=%23tag"),
+                "and an encoded '#' served, as on HTTP/1.1");
     }
 
     /**
@@ -2396,6 +2430,11 @@ class BackendHttpIntegrationTest {
      * this at the read timeout with nothing in the list rather than passing.
      */
     private List<Integer> h2Expect(int onPort, String path, String expect) throws Exception {
+        return h2Expect(onPort, path, expect, null);
+    }
+
+    private List<Integer> h2Expect(int onPort, String path, String expect, String second)
+            throws Exception {
         List<Integer> statuses = new java.util.ArrayList<Integer>();
         Socket socket = new Socket();
         socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
@@ -2417,6 +2456,11 @@ class BackendHttpIntegrationTest {
             hpackLiteral(block, ":scheme", "http");
             hpackLiteral(block, ":authority", "127.0.0.1");
             hpackLiteral(block, "expect", expect);
+            if (second != null) {
+                // A list field split across field lines, which RFC 9110 5.3 says
+                // is the same field value as the comma form.
+                hpackLiteral(block, "expect", second);
+            }
             // END_HEADERS and NOT END_STREAM: the body is being withheld.
             out.write(frame(1, 0x04, 1, block.toByteArray()));
             out.flush();

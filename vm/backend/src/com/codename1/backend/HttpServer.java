@@ -3882,6 +3882,18 @@ public final class HttpServer {
                     requestsServed.incrementAndGet();
                     continue;
                 }
+                if(targetHasFragment(stream.getPath())) {
+                    // The same rule the HTTP/1 request line takes, beside it for
+                    // the same reason the UTF-8 one is: the handler cannot tell
+                    // which protocol carried the request, so a target refused on
+                    // one and served on the other is one server with two answers.
+                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                            asciiBytes("the request target carries a fragment"))) {
+                        h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
+                    }
+                    requestsServed.incrementAndGet();
+                    continue;
+                }
                 if(!isKnownMethod(stream.getMethod())) {
                     // 501 before the handler, for the same reason the HTTP/1
                     // request line answers 501: the path may well exist, the verb
@@ -4344,6 +4356,37 @@ public final class HttpServer {
      * can be malformed -- decode and are checked exactly as they are on the
      * HTTP/1 side.
      */
+    /**
+     * Whether a request target carries a raw '#'.
+     *
+     * A FRAGMENT IS NOT PART OF A REQUEST TARGET. RFC 9110 7.1 says a client must
+     * not send one, and nothing downstream agrees on what to do when it arrives:
+     * this server's path ends at '?' alone, so "/users/123#x" bound a path
+     * variable of "123#x", while an intermediary that strips the fragment
+     * forwards "/users/123" and gets a different answer out of the same server.
+     * That difference is the whole reason the targets are canonicalized at all.
+     *
+     * <p>Refused rather than trimmed. Trimming would make this server the one
+     * that quietly decided the client meant something else, which is the same
+     * mistake in the other direction.
+     *
+     * <p>The escape is untouched: %23 is an ordinary character in a path segment
+     * and decodes long after the routing is done.
+     */
+    private static boolean targetHasFragment(byte[] raw, int from, int to) {
+        for(int iter = from ; iter < to ; iter++) {
+            if(raw[iter] == '#') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The same question for an h2 :path, which arrives as a String. */
+    private static boolean targetHasFragment(String target) {
+        return target != null && target.indexOf('#') >= 0;
+    }
+
     private static boolean targetDecodesToUtf8(String target) {
         if(target == null) {
             return true;
@@ -4909,6 +4952,9 @@ public final class HttpServer {
         // that is a separate question from whether what DID decode is text.
         if(!targetDecodesToUtf8(raw, targetStart, targetStart + targetLength)) {
             throw new ProtocolException(400, "the request target is not valid UTF-8");
+        }
+        if(targetHasFragment(raw, targetStart, targetStart + targetLength)) {
+            throw new ProtocolException(400, "the request target carries a fragment");
         }
         // The origin-form target when it had to be built rather than pointed at.
         String synthesized = null;
