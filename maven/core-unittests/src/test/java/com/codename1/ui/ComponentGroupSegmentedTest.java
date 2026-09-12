@@ -173,4 +173,93 @@ class ComponentGroupSegmentedTest extends UITestBase {
         assertEquals("ToggleButtonOnly", b.getUIID(),
                 "a segmented control does not stop being one because forcing was cleared");
     }
+
+    @Test
+    void testChangingTheElementUiidOffToggleButtonRestores() {
+        // updateUIIDs only renames and returns early once the group is inactive, so a
+        // setter that deactivates the group and then calls it strands the members on
+        // the names they had in the state the group just left.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        Button b = new Button("One");
+        group.addComponent(b);
+        assertEquals("ToggleButtonOnly", b.getUIID());
+
+        group.setElementUIID("MyElement");
+
+        assertEquals("Button", b.getUIID(),
+                "a custom element UIID is theme-gated, so leaving the segmented UIID "
+                        + "has to hand the member back rather than strand it");
+    }
+
+    @Test
+    void testChangingTheGroupFlagToOneTheThemeSetsActivates() {
+        // setGroupFlag assigned the field and did nothing else, so naming a constant the
+        // theme does set never took effect.
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("@MyGroupBool", "true");
+        UIManager.getInstance().setThemeProps(theme);
+
+        ComponentGroup group = new ComponentGroup();
+        Button b = new Button("One");
+        group.addComponent(b);
+        assertEquals("Button", b.getUIID());
+
+        group.setGroupFlag("MyGroupBool");
+
+        assertEquals("ButtonGroupOnly", b.getUIID(),
+                "naming a constant the theme sets has to activate the group");
+    }
+
+    @Test
+    void testChangingTheGroupFlagAwayFromOneTheThemeSetsRestores() {
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("@ComponentGroupBool", "true");
+        UIManager.getInstance().setThemeProps(theme);
+
+        ComponentGroup group = new ComponentGroup();
+        Button b = new Button("One");
+        group.addComponent(b);
+        assertEquals("ButtonGroupOnly", b.getUIID());
+
+        group.setGroupFlag("SomeConstantNoThemeSets");
+
+        assertEquals("Button", b.getUIID(),
+                "pointing at a constant nothing sets deactivates the group");
+    }
+
+    @Test
+    void testTheGroupFlagPropertySetterUsesItsArgument() {
+        // It passed the field instead of the value, so the property assigned the flag
+        // to itself and a designer edit was silently discarded.
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("@MyGroupBool", "true");
+        UIManager.getInstance().setThemeProps(theme);
+
+        ComponentGroup group = new ComponentGroup();
+        Button b = new Button("One");
+        group.addComponent(b);
+
+        group.setPropertyValue("groupFlag", "MyGroupBool");
+
+        assertEquals("MyGroupBool", group.getGroupFlag());
+        assertEquals("ButtonGroupOnly", b.getUIID(),
+                "the property setter has to use the value it was handed");
+    }
+
+    @Test
+    void testTheForceGroupPropertySetterAppliesImmediately() {
+        // It assigned the field directly, so it skipped the apply the real setter does.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        Button b = new Button("One");
+        group.addComponent(b);
+        assertEquals("Button", b.getUIID());
+
+        group.setPropertyValue("forceGroup", Boolean.TRUE);
+
+        assertEquals("ButtonGroupOnly", b.getUIID(),
+                "the property setter has to go through setForceGroup");
+    }
 }

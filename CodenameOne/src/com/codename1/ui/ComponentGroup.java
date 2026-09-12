@@ -211,6 +211,19 @@ public class ComponentGroup extends Container {
         return isHorizontal() && "ToggleButton".equals(elementUIID);
     }
 
+    /// Applies or undoes this group's renaming to match its current state. Every mutator
+    /// that can change the answer to isGroupingActive has to go through here: updateUIIDs
+    /// only renames and returns early when the group is inactive, so a setter that
+    /// deactivates a group and then calls it leaves the members wearing names from the
+    /// state the group just left.
+    private void applyOrRestore() {
+        if (isGroupingActive()) {
+            updateUIIDs();
+        } else {
+            restoreAllUIIDs();
+        }
+    }
+
     /// Puts every member back to the UIID it had before this group renamed it, if this
     /// group ever did. updateUIIDs only renames, so every path that can deactivate a
     /// group needs this as its other half.
@@ -268,11 +281,7 @@ public class ComponentGroup extends Container {
                     // Leaving the segmented state can deactivate the group, and updateUIIDs
                     // only ever renames -- it has no path back. Restore here, or the members
                     // keep the ToggleButton names a vertical group no longer justifies.
-                    if (isGroupingActive()) {
-                        updateUIIDs();
-                    } else {
-                        restoreAllUIIDs();
-                    }
+                    applyOrRestore();
                 }
             }
         }
@@ -295,7 +304,7 @@ public class ComponentGroup extends Container {
     public void setElementUIID(String elementUIID) {
         this.elementUIID = elementUIID;
         buttonUIID = elementUIID;
-        updateUIIDs();
+        applyOrRestore();
     }
 
     /// {@inheritDoc}
@@ -343,11 +352,14 @@ public class ComponentGroup extends Container {
             return null;
         }
         if ("groupFlag".equals(name)) {
-            setGroupFlag(groupFlag);
+            // Passed the field rather than the value, so setting this property
+            // assigned the flag to itself and the designer's edit was discarded.
+            setGroupFlag((String) value);
             return null;
         }
         if ("forceGroup".equals(name)) {
-            forceGroup = ((Boolean) value).booleanValue();
+            // Assigning the field skips the apply/restore the setter does.
+            setForceGroup(((Boolean) value).booleanValue());
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -372,7 +384,13 @@ public class ComponentGroup extends Container {
     ///
     /// - `groupFlag`: the groupFlag to set
     public void setGroupFlag(String groupFlag) {
+        if (this.groupFlag == null ? groupFlag == null : this.groupFlag.equals(groupFlag)) {
+            return;
+        }
         this.groupFlag = groupFlag;
+        // Naming a different constant can activate or deactivate the group, and
+        // assigning the field was the whole method.
+        applyOrRestore();
     }
 
     /// Component grouping can be an element from the theme but can be forced manually
@@ -399,10 +417,6 @@ public class ComponentGroup extends Container {
         // Assigning the field was the whole method, so the setter only ever took effect
         // if something else happened to call updateUIIDs afterwards -- adding a component,
         // or a theme refresh. Turning it off never restored anything at all.
-        if (isGroupingActive()) {
-            updateUIIDs();
-        } else {
-            restoreAllUIIDs();
-        }
+        applyOrRestore();
     }
 }
