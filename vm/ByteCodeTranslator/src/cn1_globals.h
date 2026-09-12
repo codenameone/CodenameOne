@@ -3140,6 +3140,13 @@ extern JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT s
 
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 
+/* stringToUTF8, plus the byte count, for callers that must not stop at the first
+   NUL. A Java string may legally contain U+0000 and getBytes("UTF-8") encodes it
+   as a single zero byte, so the returned buffer is not always a C string in the
+   sense a length of -1 assumes -- see the sqlite3_bind_text call in the backend,
+   where taking the C length silently persisted a prefix. lengthOut may be NULL. */
+extern const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT* lengthOut);
+
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent);
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 

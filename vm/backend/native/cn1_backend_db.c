@@ -190,10 +190,23 @@ JAVA_INT com_codename1_backend_Db_bindStringImpl___long_int_java_lang_String_R_i
     if(value == JAVA_NULL) {
         return sqlite3_bind_null(stmt, index);
     }
-    /* SQLITE_TRANSIENT: the scratch buffer stringToUTF8 returns is reused by the
+    /* THE ENCODED LENGTH, not -1. A Java string may contain U+0000 -- a JSON value
+       carrying one reaches here intact -- and getBytes("UTF-8") encodes it as a
+       single zero byte, so -1 made sqlite stop there and persist only the prefix.
+       Nothing reported an error: the row was written, just short, and the Java SE
+       arm stored the whole value, so the two arms disagreed about what was saved.
+       The reading side has always passed sqlite3_column_bytes(); this is the same
+       length, on the way in.
+
+       sqlite3_prepare_v2 above keeps -1 deliberately. A NUL there truncates the
+       STATEMENT, which sqlite then rejects as incomplete rather than storing
+       anything, and a statement is ours rather than the user's value.
+
+       SQLITE_TRANSIENT: the scratch buffer stringToUTF8Len returns is reused by the
        next conversion on this thread, so sqlite must take its own copy. */
-    return sqlite3_bind_text(stmt, index, stringToUTF8(threadStateData, value), -1,
-                             SQLITE_TRANSIENT);
+    JAVA_INT textLength = 0;
+    const char* text = stringToUTF8Len(threadStateData, value, &textLength);
+    return sqlite3_bind_text(stmt, index, text, textLength, SQLITE_TRANSIENT);
 }
 
 JAVA_INT com_codename1_backend_Db_bindLongImpl___long_int_long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_LONG value) {

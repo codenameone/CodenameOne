@@ -739,13 +739,43 @@ public final class MySql {
         wire.flush();
     }
 
-    private Packet readPacket() throws IOException {
-        int low = wire.read();
-        if(low < 0) {
-            throw new IOException("The MySQL connection closed unexpectedly");
+    /**
+     * The four header bytes, EVERY ONE of them checked.
+     *
+     * <p>wire.read() answers -1 at end of stream, and only the first byte used to be
+     * tested. A peer that hung up after one or two bytes therefore had its -1 shifted
+     * into the length: "-1 &lt;&lt; 8" makes the result negative, which slips under the
+     * ceiling below -- a bound only rejects values that are too LARGE -- and arrives
+     * at readFully as a negative size. What came back was NegativeArraySizeException,
+     * which is not an IOException, so it went straight past connect()'s cleanup and
+     * left the socket open; retries against a flaky endpoint leaked one descriptor
+     * each. The greeting is read through here before TLS, so the peer doing it need
+     * not be the server.
+     *
+     * <p>Returns a length that is always 0..MAX_PACKET_BODY, which is what lets the
+     * ceiling below be the only check the body size needs.
+     */
+    private int readPacketHeader(boolean continuation) throws IOException {
+        int b0 = wire.read();
+        if(b0 < 0) {
+            // Nothing at all: the peer hung up BETWEEN packets, which is a different
+            // thing from tearing one in half and is worth saying differently.
+            throw new IOException(continuation
+                    ? "The MySQL connection closed mid-packet"
+                    : "The MySQL connection closed unexpectedly");
         }
-        int length = low | (wire.read() << 8) | (wire.read() << 16);
-        sequence = wire.read() + 1;
+        int b1 = wire.read();
+        int b2 = wire.read();
+        int b3 = wire.read();
+        if(b1 < 0 || b2 < 0 || b3 < 0) {
+            throw new IOException("The MySQL connection closed mid-header");
+        }
+        sequence = b3 + 1;
+        return b0 | (b1 << 8) | (b2 << 16);
+    }
+
+    private Packet readPacket() throws IOException {
+        int length = readPacketHeader(false);
         Packet packet = new Packet();
         long allowed = SqlLimits.maxMessageBytes();
         if(length > allowed) {
@@ -777,12 +807,7 @@ public final class MySql {
             // connection can do it, authenticated or not.
             long accumulated = all.size();
             while(length == MAX_PACKET_BODY) {
-                int next = wire.read();
-                if(next < 0) {
-                    throw new IOException("The MySQL connection closed mid-packet");
-                }
-                length = next | (wire.read() << 8) | (wire.read() << 16);
-                sequence = wire.read() + 1;
+                length = readPacketHeader(true);
                 accumulated += length;
                 if(accumulated > allowed) {
                     // Closed for the same reason the PostgreSQL bound closes: the

@@ -941,10 +941,18 @@ public class SelfTest {
             // database -- the check would pass by testing nothing. Assembling it
             // at runtime is the only way the seven characters exist to be stored.
             String escapeText = new String(new char[]{'~', '~', 'u', '0', '0', '4', '1'});
+            // AN EMBEDDED NUL, built the same way and for the same reason. It is a
+            // legal character in a Java string -- JSON carries them -- and
+            // getBytes("UTF-8") encodes it as one zero byte, so binding the value
+            // by its C length stopped there and stored "a" while reporting success.
+            // The Java SE arm goes through JDBC and stored all three characters,
+            // which made it another divergence rather than a plain truncation.
+            String nulText = new String(new char[]{'a', '\0', 'b'});
             String[] values = new String[] {
                 "caf\u00e9",
                 "\ud83d\ude00 smile",
                 escapeText,
+                nulText,
                 "plain ascii",
             };
             for(int iter = 0 ; iter < values.length ; iter++) {
@@ -1229,8 +1237,6 @@ public class SelfTest {
             weakKey = "refused";
         }
         check("a zero iteration count is refused", "refused", weakKey);
-
-        scramIterationCountIsBounded();
     }
 
     /**
@@ -1309,6 +1315,70 @@ public class SelfTest {
         check("a hostile SCRAM iteration count is refused", "refused", outcome);
     }
 
+    /**
+     * A MySQL header torn in half is an IOException, not a wild allocation.
+     *
+     * <p>Only the first of the four header bytes was checked. wire.read() answers -1
+     * at end of stream, so a peer that hung up after two bytes had that -1 shifted
+     * into the length and made it NEGATIVE -- under the size ceiling rather than
+     * over it, because a ceiling only rejects what is too large -- and readFully
+     * asked for an array of that size.
+     *
+     * <p>The two arms then part company, and the packaged one is the worse. On Java
+     * SE that is NegativeArraySizeException: not an IOException, so it walks past
+     * connect()'s cleanup and leaves the socket open, one leaked descriptor per
+     * retry. MEASURED on the packaged binary, there is no exception at all -- the
+     * self-test died on SIGSEGV, exit 139, with no output after the check before
+     * it. A negative array size is simply not checked there, which puts this in the
+     * family of unchecked CHECKCAST and division by zero: a JVM guarantee the
+     * translated target does not honour. The greeting is read through this path
+     * before TLS, so the peer doing it need not have authenticated or be a database.
+     *
+     * <p>The assertion is the wording, not "it threw". Both the old behaviour and
+     * the new one end in an exception out of Database.open, so a check that only
+     * caught something would have passed before the fix.
+     */
+    private static void aTruncatedMySqlHeaderIsRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    // Two bytes of a four byte header, then nothing. Enough to get
+                    // past the one check there used to be.
+                    ServerSocket.write(client, new byte[]{(byte) 0xff, (byte) 0xff}, 0, 2);
+                } catch (Exception ignored) {
+                    // Hanging up IS the scenario.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("mysql://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            db.close();
+            outcome = "connected";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("closed mid-header") >= 0
+                    ? "refused" : "other: " + refused.getClass().getName() + ": " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a truncated MySQL header is refused", "refused", outcome);
+    }
+
     /** One PostgreSQL message: type byte, length that counts itself, payload. */
     private static void pgSend(int fd, char type, byte[] payload) throws IOException {
         byte[] out = new byte[5 + payload.length];
@@ -1366,6 +1436,8 @@ public class SelfTest {
         urlComponentsKeepTheirUnicode();
         boundParametersMustMatchThePlaceholders();
         storedTextComesBackUnchanged();
+        scramIterationCountIsBounded();
+        aTruncatedMySqlHeaderIsRefused();
         expiryMarginIsDistinctFromExpiry();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();

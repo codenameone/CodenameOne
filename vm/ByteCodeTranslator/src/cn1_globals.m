@@ -14368,6 +14368,13 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
 #endif
 
 const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
+    return stringToUTF8Len(threadStateData, str, NULL);
+}
+
+const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT* lengthOut) {
+    if(lengthOut != NULL) {
+        *lengthOut = 0;
+    }
     if(str == NULL) {
         return NULL;
     }
@@ -14395,6 +14402,9 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     char* cs = threadStateData->utf8Buffer;
     memcpy(cs, data, len);
     cs[len] = '\0';
+    if(lengthOut != NULL) {
+        *lengthOut = len;
+    }
     return cs;
 }
 
