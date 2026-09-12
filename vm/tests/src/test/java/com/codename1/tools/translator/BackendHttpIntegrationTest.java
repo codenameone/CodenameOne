@@ -2395,6 +2395,74 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("a drip-fed TLS handshake is bounded by a total deadline")
+    void aDripFedTlsHandshakeIsBounded() throws Exception {
+        Assumptions.assumeTrue(tlsPort > 0, "the TLS server did not start");
+        // SO_RCVTIMEO bounds ONE read, and OpenSSL does several inside
+        // SSL_accept: a byte delivered inside every timeout window means no read
+        // ever times out, so the handshake ran for as long as the client cared to
+        // feed it -- holding a worker throughout, and before the request head's
+        // own wall-clock deadline is armed. That is slowloris one layer down.
+        //
+        // The record header declares 16KB and the bytes then arrive one per
+        // second, so OpenSSL is always waiting for the rest of a record that
+        // never completes. This server runs with CN1_HTTP_TIMEOUT_MS=4000, which
+        // is the budget the handshake now gets in total.
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", tlsPort), 5000);
+        long started = System.currentTimeMillis();
+        long gaveUpAfter = -1;
+        try {
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            socket.setSoTimeout(900);
+            // A handshake record whose declared length will never arrive.
+            out.write(new byte[] { 0x16, 0x03, 0x01, 0x40, 0x00 });
+            out.flush();
+            for (int iter = 0; iter < 14 && gaveUpAfter < 0; iter++) {
+                try {
+                    out.write(0x01);
+                    out.flush();
+                } catch (IOException closed) {
+                    gaveUpAfter = System.currentTimeMillis() - started;
+                    break;
+                }
+                try {
+                    // Anything at all -- EOF, or an alert -- means the server has
+                    // stopped waiting for this handshake.
+                    in.read();
+                    gaveUpAfter = System.currentTimeMillis() - started;
+                } catch (java.net.SocketTimeoutException stillWaiting) {
+                    // Still in the handshake; feed it again.
+                }
+            }
+        } finally {
+            socket.close();
+        }
+        assertTrue(gaveUpAfter >= 0,
+                "the handshake was still open after " + (System.currentTimeMillis() - started)
+                        + "ms of drip feeding, so nothing bounds its total time");
+        assertTrue(gaveUpAfter < 11000,
+                "and it must end on the budget rather than on the client stopping: "
+                        + gaveUpAfter + "ms");
+        // THE ORDINARY HANDSHAKE IS UNAFFECTED, which is the direction a deadline
+        // like this breaks: the descriptor goes non-blocking for the handshake and
+        // has to come back blocking for the rest of the connection's life.
+        SSLSocket ordinary = openTls();
+        try {
+            ordinary.startHandshake();
+            ordinary.getOutputStream().write(("GET /healthz HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Connection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            ordinary.getOutputStream().flush();
+            String served = readFully(ordinary.getInputStream());
+            assertTrue(served.startsWith("HTTP/1.1 200"),
+                    "a normal TLS request must still be served: " + served);
+        } finally {
+            ordinary.close();
+        }
+    }
+
+    @Test
     @DisplayName("a fragment in the request target is refused on both protocols")
     void aFragmentInTheTargetIsRefused() throws Exception {
         // A fragment is not part of a request target: RFC 9110 7.1 says a client

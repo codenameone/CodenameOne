@@ -3460,7 +3460,11 @@ public final class HttpServer {
                 // The handshake runs here, on the worker, because the descriptor is
                 // blocking here and a handshake is several round trips. On the
                 // reactor thread it would stall every other connection.
-                long fresh = tls.accept(fd);
+                // THE SAME WALL CLOCK THE REQUEST HEAD GETS, and for the same
+                // reason: a client that drip-feeds is not a client this server
+                // waits for. The head's deadline cannot cover this, because it is
+                // only armed once the handshake has produced a session.
+                long fresh = tls.accept(fd, SOCKET_TIMEOUT_MILLIS);
                 if(fresh == 0) {
                     // Not a TLS client, or no common cipher. Ordinary traffic.
                     drop(fd);

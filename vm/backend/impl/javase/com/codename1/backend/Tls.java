@@ -51,7 +51,8 @@ public final class Tls {
         throw new IOException(UNSUPPORTED);
     }
 
-    public long accept(int fd) {
+    /** The budget the translated arm bounds its handshake with; see that one. */
+    public long accept(int fd, long budgetMillis) {
         throw new IllegalStateException(UNSUPPORTED);
     }
 

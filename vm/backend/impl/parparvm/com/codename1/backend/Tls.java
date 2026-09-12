@@ -71,8 +71,18 @@ public final class Tls {
      * fails, which is ordinary traffic -- a scanner, a client with no common
      * cipher, or a plaintext request sent to the TLS port.
      */
-    public long accept(int fd) {
-        return acceptImpl(context, fd);
+    /**
+     * Runs the handshake, giving it `budgetMillis` in total.
+     *
+     * <p>A TOTAL budget, because SO_RCVTIMEO bounds one read and a handshake is
+     * several: a client that delivers a byte just inside each timeout never
+     * causes one, so the handshake could be held open for as long as it cared to
+     * drip-feed -- occupying a worker throughout, before the request head's own
+     * deadline is armed. Zero or less means unbounded, which is what the
+     * platforms with no poll in this backend get.
+     */
+    public long accept(int fd, long budgetMillis) {
+        return acceptImpl(context, fd, budgetMillis);
     }
 
     public void close() {
@@ -114,7 +124,7 @@ public final class Tls {
     private static native long createContextImpl(String certPath, String keyPath, boolean offerHttp2);
     private static native String negotiatedProtocolImpl(long session);
     private static native void freeContextImpl(long handle);
-    private static native long acceptImpl(long context, int fd);
+    private static native long acceptImpl(long context, int fd, long budgetMillis);
 
     /**
      * Refuses a slice that does not lie inside the array.

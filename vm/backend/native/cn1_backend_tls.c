@@ -39,6 +39,10 @@
 #include <stdlib.h>
 #ifndef _WIN32
 #include <unistd.h> /* CN1_RESUME_THREAD expands to usleep */
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <time.h>
 #endif
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -142,8 +146,100 @@ JAVA_VOID com_codename1_backend_Tls_freeContextImpl___long(CODENAME_ONE_THREAD_S
     }
 }
 
+#ifndef _WIN32
+/* Milliseconds on a clock that does not move when the system clock is set. */
+static long long cn1TlsNowMillis(void) {
+    struct timespec ts;
+#ifdef CLOCK_MONOTONIC
+    if(clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+        return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+    }
+#endif
+    return (long long)time(NULL) * 1000LL;
+}
+
+/*
+ * Runs the handshake with a TOTAL time budget.
+ *
+ * SO_RCVTIMEO bounds one read, and OpenSSL does several inside SSL_accept: a
+ * client that delivers a byte just inside each timeout never causes one, so a
+ * single blocking SSL_accept could be held open for as long as the client cared
+ * to drip-feed it. That is slowloris against the handshake, and it is worse than
+ * the request-head version it mirrors, because the head's wall-clock deadline is
+ * only armed once the handshake has finished -- and a TLS handshake occupies a
+ * worker for its whole duration, so workerCount of these starve every legitimate
+ * connection. Unauthenticated, and a few hundred bytes each.
+ *
+ * So the descriptor goes non-blocking for the handshake and the wait happens
+ * here, against a deadline that does not restart. Blocking is restored before
+ * returning, because Tls.readImpl maps WANT_READ to a hard error and the rest of
+ * the connection's life depends on a blocking descriptor.
+ */
+static int cn1TlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis) {
+    long long deadline = cn1TlsNowMillis() + budgetMillis;
+    int flags = fcntl(fd, F_GETFL, 0);
+    int restored;
+    int out = 0;
+    if(flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        /* Cannot bound it; the old behaviour is still the best answer available,
+           and it is what every other Windows-or-unsupported path here does. */
+        CN1_YIELD_THREAD;
+        out = SSL_accept(ssl);
+        CN1_RESUME_THREAD;
+        return out;
+    }
+    for(;;) {
+        int err;
+        long long remaining;
+        struct pollfd p;
+        int polled;
+        int pollErrno;
+        CN1_YIELD_THREAD;
+        out = SSL_accept(ssl);
+        CN1_RESUME_THREAD;
+        if(out == 1) {
+            break;
+        }
+        err = SSL_get_error(ssl, out);
+        if(err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
+            break;
+        }
+        remaining = deadline - cn1TlsNowMillis();
+        if(remaining <= 0) {
+            out = 0;                  /* out of time: an unfinished handshake */
+            break;
+        }
+        p.fd = fd;
+        p.events = (short)(err == SSL_ERROR_WANT_READ ? POLLIN : POLLOUT);
+        p.revents = 0;
+        CN1_YIELD_THREAD;
+        polled = poll(&p, 1, (int)remaining);
+        /* Captured before the resume, which is a GC safepoint that can park this
+           thread on a timed wait and leave errno as ETIMEDOUT -- the same trap
+           cn1_backend_server.c documents at its own poll. */
+        pollErrno = errno;
+        CN1_RESUME_THREAD;
+        if(polled == 0) {
+            out = 0;                  /* the budget expired inside the wait */
+            break;
+        }
+        if(polled < 0 && pollErrno != EINTR) {
+            out = 0;
+            break;
+        }
+    }
+    restored = fcntl(fd, F_SETFL, flags);
+    if(restored < 0 && out == 1) {
+        /* A session whose descriptor cannot go back to blocking would fail its
+           first read instead, with no explanation attached. */
+        return 0;
+    }
+    return out;
+}
+#endif
+
 /* Runs the handshake. Returns the session handle, or 0. */
-JAVA_LONG com_codename1_backend_Tls_acceptImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctxHandle, JAVA_INT fd) {
+JAVA_LONG com_codename1_backend_Tls_acceptImpl___long_int_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctxHandle, JAVA_INT fd, JAVA_LONG budgetMillis) {
     SSL_CTX* ctx = (SSL_CTX*)(intptr_t)ctxHandle;
     SSL* ssl;
     int rc;
@@ -158,9 +254,23 @@ JAVA_LONG com_codename1_backend_Tls_acceptImpl___long_int_R_long(CODENAME_ONE_TH
         SSL_free(ssl);
         return 0;
     }
+#ifndef _WIN32
+    if(budgetMillis > 0) {
+        rc = cn1TlsHandshakeWithin(ssl, (int)fd, (long long)budgetMillis);
+    } else {
+        CN1_YIELD_THREAD;
+        rc = SSL_accept(ssl);
+        CN1_RESUME_THREAD;
+    }
+#else
+    /* Unbounded here, as it has always been: this platform has no poll and no
+       socket timeout in this backend either -- ServerSocket.setTimeoutImpl and
+       awaitReadableImpl both answer -1 -- so there is nothing to bound it
+       against and nothing it would make worse. */
     CN1_YIELD_THREAD;
     rc = SSL_accept(ssl);
     CN1_RESUME_THREAD;
+#endif
     if(rc != 1) {
         /* A failed handshake is ordinary traffic -- a scanner, a client with no
            common cipher, a plaintext request to an https port. Drain the error
