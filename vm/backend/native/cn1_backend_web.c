@@ -199,10 +199,29 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
             return 0;
         }
         urlCopy = strdup(tmp);
+        if(urlCopy == NULL) {
+            return 0;
+        }
     }
     if(method != JAVA_NULL) {
         const char* tmp = stringToUTF8(threadStateData, method);
-        methodCopy = tmp == NULL ? NULL : strdup(tmp);
+        if(tmp != NULL) {
+            methodCopy = strdup(tmp);
+            if(methodCopy == NULL) {
+                /* A NULL methodCopy means "no method was asked for", and libcurl
+                   then sends GET -- so a failed copy of DELETE does not fail the
+                   request, it CHANGES it. S3.deleteObject treats 200 as success,
+                   and a GET of an object that exists answers 200, so the object
+                   would be reported deleted and still be there.
+
+                   This is the fourth allocation in this function to need the same
+                   sentence, and the last: url above, the header block and its list
+                   below, and this. The body, the response struct and the easy
+                   handle were already checked. */
+                free(urlCopy);
+                return 0;
+            }
+        }
     }
     if(headerLines != JAVA_NULL) {
         const char* tmp = stringToUTF8(threadStateData, headerLines);

@@ -5045,6 +5045,16 @@ public final class HttpServer {
             // server that stays silent makes every such client pay its whole
             // timeout first.
             conn.write(CONTINUE_100);
+        } else if(request.getHeader("Expect") != null) {
+            // AN EXPECTATION THIS SERVER DOES NOT KNOW, answered now rather than
+            // ignored. The whole point of the mechanism is that the client waits
+            // to be told before it sends the body, so ignoring the field and
+            // dropping into the body read leaves both sides waiting for each other
+            // until the receive deadline expires -- the client for a reply it was
+            // invited to expect, the server for a body that is not coming. 417 is
+            // what RFC 9110 provides for exactly this, and it costs the client one
+            // round trip instead of a timeout.
+            throw new ProtocolException(417, "unsupported expectation");
         }
 
         String body = null;

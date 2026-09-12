@@ -2302,6 +2302,41 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    void anUnsupportedExpectationIsAnsweredNotIgnored() throws Exception {
+        // The expectation mechanism means the client waits to be TOLD before it
+        // sends the body. An Expect this server does not know used to be ignored
+        // and the parser dropped into the body read, so both sides waited for each
+        // other: the client for the reply it was invited to expect, the server for
+        // a body that was never coming, until the receive deadline ended it.
+        //
+        // The head is sent WITHOUT the body, which is the whole point -- a client
+        // that sends the body anyway was never blocked.
+        String head = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Content-Length: 5\r\nExpect: custom-extension\r\n"
+                + "Connection: close\r\n\r\n";
+        long started = System.currentTimeMillis();
+        byte[] answered = rawBytes(head.getBytes(StandardCharsets.ISO_8859_1));
+        long elapsed = System.currentTimeMillis() - started;
+        assertEquals(417, statusOf(answered),
+                "an expectation this server cannot meet is a 417");
+        // AND PROMPTLY. Ignoring the field answers nothing at all until the
+        // deadline, so the status alone would not distinguish a fixed server from
+        // one that happened to time out into an error.
+        assertTrue(elapsed < 5000,
+                "the answer must not wait for the body that is not coming: " + elapsed + "ms");
+
+        // 100-continue still works, which is the expectation this server does meet.
+        String continued = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Content-Length: 5\r\nExpect: 100-continue\r\n"
+                + "Connection: close\r\n\r\nhello";
+        byte[] got = rawBytes(continued.getBytes(StandardCharsets.ISO_8859_1));
+        String text = new String(got, StandardCharsets.ISO_8859_1);
+        assertTrue(text.startsWith("HTTP/1.1 100"),
+                "100-continue is still answered first: " + text.substring(0,
+                        Math.min(40, text.length())));
+    }
+
+    @Test
     void aChunkExtensionCannotHideALineBreak() throws Exception {
         // The extension after ';' on a chunk-size line is discarded unread, so a
         // bare LF inside one went with it: this parser scans on to the next CRLF
