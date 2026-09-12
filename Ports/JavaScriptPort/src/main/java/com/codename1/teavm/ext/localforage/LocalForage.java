@@ -174,6 +174,20 @@ public class LocalForage {
     private LocalForage() {
         
         impl = ((LocalForageFactory)Window.current()).getLocalforage();
+        if (impl == null) {
+            // Every use of this class goes through getInstance(), so a null
+            // impl used to surface as a bare NPE on the impl.config(opts)
+            // below -- no message, and a stack that named the constructor
+            // rather than the thing that actually failed. That is how issue
+            // #5774 read: the real fault was that Window.current() had
+            // answered with the worker global (a host round trip made from a
+            // <clinit> resumed with undefined), so window.localforage was not
+            // there to read. Say which of the two it is.
+            throw new RuntimeException("localforage is unavailable: "
+                    + "Window.current() did not yield a window carrying it. Either "
+                    + "js/localforage-shim.js did not load on the host page, or this "
+                    + "call reached the JSO bridge from a context that cannot suspend.");
+        }
         ConfigOptions opts = newConfigOptions();
         if (driver != null) {
             switch (driver){

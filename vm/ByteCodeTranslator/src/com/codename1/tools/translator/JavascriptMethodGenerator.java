@@ -155,6 +155,13 @@ final class JavascriptMethodGenerator {
     // order, causing a "Cannot set properties of undefined"
     // TypeError).
     private static String currentClassClinitFn = null;
+    // True when the method currently being emitted is a generator
+    // (``function*``). Consumed by ``classInitGuard`` to decide whether a
+    // class-init guard may be emitted as the suspending ``yield* _Ig("X")``
+    // form. A ``yield*`` inside a plain ``function`` is a SyntaxError, so
+    // this flag -- not a guess -- is what gates the rewrite. Set alongside
+    // ``currentEmissionClass`` and cleared with it.
+    private static boolean currentEmissionMethodSuspending = false;
 
     private JavascriptMethodGenerator() {
     }
@@ -163,8 +170,12 @@ final class JavascriptMethodGenerator {
     // Cleared whenever classIndex changes so a stale run can't leak.
     private static final Map<String, Boolean> classNeedsInitCache = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
 
+    // Memoises classClinitCanSuspend(); keyed on the sanitized class name.
+    private static final Map<String, Boolean> classClinitSuspendCache = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
+
     static void setClassIndex(List<ByteCodeClass> allClasses) {
         classNeedsInitCache.clear();
+        classClinitSuspendCache.clear();
         if (allClasses == null) {
             classIndex = null;
             referencedStaticFields = null;
@@ -884,6 +895,124 @@ final class JavascriptMethodGenerator {
         return needs;
     }
 
+    /**
+     * True when initializing {@code className} can SUSPEND -- i.e. its
+     * {@code <clinit>} (or one in its supertype chain) was emitted as a
+     * generator, so driving it can produce a {@code HOST_CALL} / sleep / wait.
+     *
+     * <p>Class init is normally driven synchronously by {@code _I(...)}, whose
+     * run-to-completion loop steps the clinit generator with
+     * {@code result.next()} and DISCARDS whatever it yields. For a host call
+     * that means the message is never posted and the {@code yield} resumes with
+     * {@code undefined} -- which the JSO bridge turns into a Java null with no
+     * error anywhere. Issue #5774 died that way: an app's {@code SystemFont}
+     * clinit read a preference, {@code Window.current()} answered
+     * {@code undefined}, and the NPE surfaced inside
+     * {@code LocalForage.<init>} with nothing in the message to connect it back.
+     *
+     * <p>When this returns true the emitter uses {@code yield* _Ig("X")}
+     * instead, which drives the clinit on the real trampoline.
+     * {@link JavascriptSuspensionAnalysis} records the same guard as a call
+     * edge into that {@code <clinit>}, so the method holding it is classified
+     * suspending and the {@code yield*} is legal -- the two sides MUST agree
+     * here, since a {@code yield*} inside a plain {@code function} is a
+     * SyntaxError rather than a subtle bug. Keep this walk and
+     * {@code JavascriptSuspensionAnalysis.addClinitEdges} identical: self,
+     * superclass chain and interfaces, with the same own-class/ancestor
+     * elisions.
+     *
+     * <p>The emitter ALSO gates on the enclosing method actually being a
+     * generator, and that is what keeps the disagreement harmless rather than
+     * fatal. It is a real gate, not decoration: the analysis deliberately
+     * records no edge for the own-class guard in a static method's wrapper
+     * (see the note in {@code propagate}), so such a method can be synchronous
+     * while this walk says its clinit suspends. Emitting the plain {@code _I}
+     * there is a missed optimisation; emitting {@code yield*} would not parse.
+     *
+     * <p>An unknown class answers {@code false}, NOT {@code true}. The
+     * conservative direction here is the opposite of
+     * {@link #classNeedsInitialization}: an unnecessary guard is free, but an
+     * unnecessary {@code yield*} is a SyntaxError whenever the analysis --
+     * which records no edge for a class it cannot see either -- left the
+     * method synchronous. Nothing is lost: a clinit we cannot read is a clinit
+     * we cannot prove suspends.
+     */
+    private static boolean classClinitCanSuspend(String className) {
+        // Kill-switch shared with JavascriptSuspensionAnalysis: with the edges
+        // off the analysis never escalates a method for a clinit, so the
+        // emitter must not emit ``yield*`` for one either.
+        if (System.getProperty("parparvm.js.clinitedge.off") != null) {
+            return false;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (className == null || idx == null) {
+            return false;
+        }
+        String start = JavascriptNameUtil.sanitizeClassName(className);
+        Boolean cached = classClinitSuspendCache.get(start);
+        if (cached != null) {
+            return cached;
+        }
+        boolean suspends = false;
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String cur = stack.pop();
+            if (cur == null || !seen.add(cur)) {
+                continue;
+            }
+            ByteCodeClass cls = idx.get(cur);
+            if (cls == null) {
+                continue;                // unknown -> the analysis skips it too
+            }
+            if (hasSuspendingClinit(cls)) {
+                suspends = true;
+                break;
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(JavascriptNameUtil.sanitizeClassName(base));
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+        }
+        classClinitSuspendCache.put(start, suspends);
+        return suspends;
+    }
+
+    /**
+     * True when {@code cls} declares a {@code <clinit>} that the suspension
+     * analysis classified as suspending. A class with no explicit clinit can
+     * still get the synthetic one from
+     * {@link #appendSyntheticClinitIfNeeded}, but that only assigns string
+     * constants to static fields and can never suspend.
+     */
+    private static boolean hasSuspendingClinit(ByteCodeClass cls) {
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (!method.isEliminated() && "__CLINIT__".equals(method.getMethodName())) {
+                return method.isJavascriptSuspending();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Renders the class-initialization guard for {@code owner} at
+     * {@code indent}, choosing the suspending form only where it is both legal
+     * (the enclosing method is a generator) and needed (the clinit chain can
+     * suspend). See {@link #classClinitCanSuspend}.
+     */
+    private static String classInitGuard(String owner, boolean suspendingContext, String indent) {
+        if (suspendingContext && classClinitCanSuspend(owner)) {
+            return indent + "yield* _Ig(\"" + owner + "\");\n";
+        }
+        return indent + "_I(\"" + owner + "\");\n";
+    }
+
     static String generateClassJavascript(ByteCodeClass cls, List<ByteCodeClass> allClasses) {
         // Populate the resolution index lazily on first call and keep it
         // alive for the rest of the generation pass. The size check is
@@ -1395,6 +1524,7 @@ final class JavascriptMethodGenerator {
             out.append(applyMethodPeephole(methodOut));
         } finally {
             currentEmissionClass = null;
+            currentEmissionMethodSuspending = false;
         }
     }
 
@@ -2686,6 +2816,7 @@ final class JavascriptMethodGenerator {
         // flag is only false when the analysis has proven the body
         // cannot yield the cooperative scheduler.
         boolean methodSuspending = method.isJavascriptSuspending();
+        currentEmissionMethodSuspending = methodSuspending;
         String fnKeyword = methodSuspending ? "function* " : "function ";
         out.append(fnKeyword).append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append("(");
         boolean first = true;
@@ -2704,7 +2835,7 @@ final class JavascriptMethodGenerator {
         out.append("){\n");
         if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())
                 && classNeedsInitialization(cls.getClsName())) {
-            out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
+            out.append(classInitGuard(cls.getClsName(), methodSuspending, "  "));
         }
         if ("__CLINIT__".equals(method.getMethodName())) {
             appendDeferredStaticFieldInitialization(out, cls);
@@ -3046,7 +3177,7 @@ final class JavascriptMethodGenerator {
         appendMethodParameters(out, method);
         out.append("){\n");
         if (classNeedsInitialization(cls.getClsName())) {
-            out.append("  _I(\"").append(cls.getClsName()).append("\");\n");
+            out.append(classInitGuard(cls.getClsName(), suspending, "  "));
         }
         out.append("  return ").append(suspending ? "yield* " : "").append(bodyName).append("(");
         appendMethodParameterArguments(out, method);
@@ -4999,6 +5130,11 @@ final class JavascriptMethodGenerator {
         String typeName = JavascriptNameUtil.runtimeTypeName(instruction.getTypeName());
         switch (instruction.getOpcode()) {
             case Opcodes.NEW:
+                // ``_O`` initializes the class itself, but only through the
+                // SYNCHRONOUS driver. Emit the guard ahead of it so a
+                // suspending <clinit> runs on the trampoline; ``_O``'s own
+                // call then finds the class initialized and returns. (#5774)
+                appendStraightLineEnsureClassInitialized(out, ctx, typeName);
                 out.append("  ").append(ctx.push("_O(\"" + typeName + "\")")).append(";\n");
                 return true;
             case Opcodes.ANEWARRAY: {
@@ -5108,7 +5244,7 @@ final class JavascriptMethodGenerator {
             return;
         }
         if (ctx.initializedClasses.add(owner)) {
-            out.append("  _I(\"").append(owner).append("\");\n");
+            out.append(classInitGuard(owner, currentEmissionMethodSuspending, "  "));
         }
     }
 
@@ -6860,6 +6996,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String typeName = JavascriptNameUtil.runtimeTypeName(instruction.getTypeName());
         switch (instruction.getOpcode()) {
             case Opcodes.NEW:
+                // See the straight-line NEW case: ``_O`` only ever drives a
+                // clinit synchronously, so the guard goes first. (#5774)
+                appendInterpreterEnsureClassInitialized(out, typeName, false);
                 out.append("        stack.p(_O(\"").append(typeName).append("\")); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ANEWARRAY:
@@ -6989,7 +7128,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         if (isClassAlreadyInitializedForCurrentEmission(owner)) {
             return;
         }
-        out.append("        _I(\"").append(owner).append("\");\n");
+        out.append(classInitGuard(owner, currentEmissionMethodSuspending, "        "));
     }
 
     private static boolean isClassAlreadyInitializedForCurrentEmission(String owner) {

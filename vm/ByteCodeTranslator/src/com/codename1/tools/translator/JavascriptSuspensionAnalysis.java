@@ -207,6 +207,17 @@ final class JavascriptSuspensionAnalysis {
     // back to the signature-wide answer.
     private final Map<String, Integer> dispatchSites = new HashMap<String, Integer>();
 
+    // Kill-switch for the class-initialization edges (issue #5774). With them
+    // off, a <clinit> that suspends is only driven correctly when the guard
+    // happens to sit in a method that is suspending for some other reason --
+    // the pre-fix behaviour, minus the silence. Exists so the generator-count
+    // cost of the edges can be A/B measured on a real bundle from its
+    // suspension-report.txt, and so a regression has something to bisect
+    // against. JavascriptMethodGenerator reads the same property, because the
+    // two sides MUST make the same decision.
+    private static final boolean CLINIT_EDGES_OFF =
+            System.getProperty("parparvm.js.clinitedge.off") != null;
+
     static int run(List<ByteCodeClass> classes, File outputDirectory) {
         // Same reason as JavascriptReachability.run: never let a previous
         // translation's model answer this one's questions. Cleared before the
@@ -503,7 +514,54 @@ final class JavascriptSuspensionAnalysis {
                 if (instructions == null) {
                     continue;
                 }
+                // NOTE: no edge for the own-class guard the emitter puts in a
+                // static method's WRAPPER. It would be nearly redundant --
+                // every INVOKESTATIC call site emits its own guard, which the
+                // instruction scan below already sees -- and it reached
+                // methods that have no translated body at all, including the
+                // SYNC NATIVES (String.charsToBytes and friends). Promoting
+                // one of those is not a slowdown, it is a miscompile: the
+                // binding stays a plain ``function`` returning a byte[], while
+                // every call site starts saying ``yield*`` on it -- and a
+                // ``yield*`` over an array iterates it and evaluates to
+                // ``undefined``, so PrintStream.print(String) read
+                // ``undefined.length``. The wrapper stays correct without the
+                // edge: when the method is synchronous the wrapper is a plain
+                // function emitting the plain ``_I``.
+                //
+                // Dropping the edge is the fix, NOT a blanket sync-native veto
+                // inside markSuspending. ``isSyncNativeBinding`` matches
+                // instance methods signature-wide, so a veto there also
+                // cancelled the STRUCTURAL seeds (``synchronized`` /
+                // monitorenter), which the seed sites deliberately leave
+                // unguarded -- and a synchronized method left classified
+                // synchronous still gets its ``yield* _me(monitor)`` from the
+                // emitter, i.e. ``ReferenceError: yield is not defined``. The
+                // instruction scan below cannot reach a native anyway: a
+                // native has no instructions, so it is never a caller here.
+                //
+                // The residual gap is narrow and no longer silent: a static
+                // method entered through its wrapper, on a class whose clinit
+                // suspends, hits the run-to-completion loop -- which now names
+                // the class and the op instead of answering ``undefined``.
                 for (Instruction instr : instructions) {
+                    // Class-initialization edges. Every guard the emitter
+                    // places (GETSTATIC / PUTSTATIC / INVOKESTATIC / NEW) is a
+                    // call into that class's <clinit>, and a <clinit> that
+                    // suspends can only be driven from a generator -- issue
+                    // #5774, where a host call raised inside one was silently
+                    // answered ``undefined`` because the guard ran on the
+                    // synchronous run-to-completion path. Recording the edge
+                    // here is what lets the emitter use ``yield* _Ig(...)``
+                    // there, and the two sides MUST agree: a ``yield*`` in a
+                    // plain ``function`` is a SyntaxError, so this walk mirrors
+                    // JavascriptMethodGenerator.classClinitCanSuspend exactly
+                    // (self + superclass chain + interfaces) and elides the
+                    // same own-class/ancestor cases the emitter does.
+                    String initOwner = classInitGuardOwner(instr);
+                    if (initOwner != null) {
+                        addClinitEdges(callersOf, caller, initOwner, true);
+                    }
                     if (!(instr instanceof Invoke)) {
                         continue;
                     }
@@ -697,6 +755,109 @@ final class JavascriptSuspensionAnalysis {
     // interface walk on the miss path an unmemoised version made
     // JavascriptTargetIntegrationTest go from 48s to 378s.
     private final Map<String, BytecodeMethod> resolvedTargets = new HashMap<String, BytecodeMethod>();
+
+    /**
+     * The class whose {@code <clinit>} guard the emitter places for this
+     * instruction, or {@code null} when the instruction triggers no guard.
+     * Mirrors the emitter's guard sites: GETSTATIC / PUTSTATIC
+     * (appendStraightLineEnsureClassInitialized /
+     * appendInterpreterEnsureClassInitialized), INVOKESTATIC, and NEW (whose
+     * {@code _O} initializes the class on the way to allocating).
+     */
+    private static String classInitGuardOwner(Instruction instr) {
+        int op = instr.getOpcode();
+        if (instr instanceof com.codename1.tools.translator.bytecodes.Field) {
+            if (op == Opcodes.GETSTATIC || op == Opcodes.PUTSTATIC) {
+                return ((com.codename1.tools.translator.bytecodes.Field) instr).getOwner();
+            }
+            return null;
+        }
+        if (instr instanceof Invoke) {
+            return op == Opcodes.INVOKESTATIC ? ((Invoke) instr).getOwner() : null;
+        }
+        if (instr instanceof com.codename1.tools.translator.bytecodes.TypeInstruction) {
+            return op == Opcodes.NEW
+                    ? ((com.codename1.tools.translator.bytecodes.TypeInstruction) instr).getTypeName()
+                    : null;
+        }
+        return null;
+    }
+
+    /**
+     * Records {@code caller} as a caller of every {@code <clinit>} in
+     * {@code owner}'s initialization chain, and escalates it immediately if one
+     * of them is already known suspending. When {@code elideOwnHierarchy} is
+     * set, a guard for the caller's own class or one of its ancestors is
+     * skipped -- those are already initialized by the time any of its code runs
+     * and the emitter drops the guard for exactly that reason.
+     */
+    private void addClinitEdges(Map<BytecodeMethod, List<BytecodeMethod>> callersOf,
+            BytecodeMethod caller, String owner, boolean elideOwnHierarchy) {
+        if (CLINIT_EDGES_OFF) {
+            return;
+        }
+        String start = JavascriptNameUtil.sanitizeClassName(owner);
+        if (elideOwnHierarchy && isOwnOrAncestor(caller, start)) {
+            return;
+        }
+        Set<String> seen = new java.util.HashSet<String>();
+        Deque<String> stack = new ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String cur = stack.pop();
+            if (cur == null || !seen.add(cur)) {
+                continue;
+            }
+            ByteCodeClass cls = byName.get(cur);
+            if (cls == null) {
+                continue;
+            }
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.isEliminated() || !"__CLINIT__".equals(m.getMethodName())) {
+                    continue;
+                }
+                if (m == caller) {
+                    continue;        // a clinit does not guard against itself
+                }
+                addCaller(callersOf, m, caller);
+                if (suspending.contains(m)) {
+                    markSuspending(caller, "clinit:" + cur);
+                }
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(JavascriptNameUtil.sanitizeClassName(base));
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(JavascriptNameUtil.sanitizeClassName(iface));
+                }
+            }
+        }
+    }
+
+    /**
+     * True when {@code target} is the class declaring {@code caller} or one of
+     * its superclasses. Mirrors
+     * JavascriptMethodGenerator.isClassAlreadyInitializedForCurrentEmission,
+     * including its hop bound, so the analysis never classifies a method
+     * synchronous at a site the emitter would give a {@code yield*}.
+     */
+    private boolean isOwnOrAncestor(BytecodeMethod caller, String target) {
+        String walk = caller.getClsName() == null
+                ? null
+                : JavascriptNameUtil.sanitizeClassName(caller.getClsName());
+        int hops = 0;
+        while (walk != null && hops++ < 64) {
+            if (target.equals(walk)) {
+                return true;
+            }
+            ByteCodeClass cls = byName.get(walk);
+            String base = cls == null ? null : cls.getBaseClass();
+            walk = base == null ? null : JavascriptNameUtil.sanitizeClassName(base);
+        }
+        return false;
+    }
 
     private BytecodeMethod resolveTarget(String owner, String name, String desc) {
         String key = owner + "#" + name + desc;
