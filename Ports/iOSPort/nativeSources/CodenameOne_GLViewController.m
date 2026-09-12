@@ -6680,7 +6680,7 @@ UIPopoverController* popoverControllerInstance;
         if (currentDatePickerDuration >= 0) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
             currentDatePickerDuration = -1;
-            defaultDatePickerDate = nil;
+            defaultDatePickerDate = 0;
             currentDatePickerDate = nil;
         } else if(currentDatePickerDate == nil) {
             if(pickerStringArray == nil) {
@@ -6693,7 +6693,7 @@ UIPopoverController* popoverControllerInstance;
                 }
             } else {
                 com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG stringPickerSelection);
-                defaultDatePickerDate = nil;
+                defaultDatePickerDate = 0;
 #ifndef NEW_CODENAME_ONE_VM
                 pickerStringArray = nil;
 #else
@@ -6702,7 +6702,7 @@ UIPopoverController* popoverControllerInstance;
             }
         } else {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG [currentDatePickerDate timeIntervalSince1970] * 1000);
-            defaultDatePickerDate = nil;
+            defaultDatePickerDate = 0;
             currentDatePickerDate = nil;
         }
     }

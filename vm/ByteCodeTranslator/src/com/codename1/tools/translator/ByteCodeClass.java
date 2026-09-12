@@ -1183,11 +1183,27 @@ public class ByteCodeClass {
         // mark function for the GC mark cycle to tag the objects that are reachable
         b.append("void __GC_MARK_");
         b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force) {\n    struct obj__");
-        b.append(clsName);
-        b.append("* objInstance = (struct obj__");
-        b.append(clsName);
-        b.append("*)objToMark;\n");
+        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force) {\n");
+        // The cast is only worth making for a class that marks fields of its own.
+        // A class that declares no object fields -- and there are thousands, every
+        // one that holds nothing but primitives -- marks nothing here and only
+        // chains to its base, so the declaration would be a variable no statement
+        // in the function reads. Emitting it regardless was ~2,400
+        // -Wunused-variable warnings in one application build.
+        boolean marksOwnFields = false;
+        for(ByteCodeField fld : fullFieldList) {
+            if(!fld.isStaticField() && fld.isObjectType() && fld.getClsName().equals(clsName)) {
+                marksOwnFields = true;
+                break;
+            }
+        }
+        if(marksOwnFields) {
+            b.append("    struct obj__");
+            b.append(clsName);
+            b.append("* objInstance = (struct obj__");
+            b.append(clsName);
+            b.append("*)objToMark;\n");
+        }
         for(ByteCodeField fld : fullFieldList) {
             if(!fld.isStaticField() && fld.isObjectType() && fld.getClsName().equals(clsName)) {
                 if(isReferenceReferent(clsName, fld)) {

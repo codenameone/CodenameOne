@@ -128,6 +128,14 @@ public class ByteCodeTranslator {
 
     public static OutputType output = OutputType.OUTPUT_TYPE_IOS;
     public static boolean verbose = true;
+
+    /**
+     * Provenance of every file that lands in the generated source directory, so a
+     * consumer of the build log can tell a codegen defect from a port bug from
+     * somebody else's vendored code. Written out beside the generated project at the
+     * end of each output handler; see {@link SourceManifest}.
+     */
+    static final SourceManifest sourceManifest = new SourceManifest();
     
     ByteCodeTranslator() {
     }
@@ -173,6 +181,12 @@ public class ByteCodeTranslator {
                     if(!f.isDirectory() && !isBuildMetadata(f)) {
                         // copy the file to the dest dir
                         copy(new FileInputStream(f), new FileOutputStream(new File(outputDir, f.getName())));
+                        // Everything that reaches here is hand-written: a port native, a
+                        // cn1lib's native, or an application resource. This is the only
+                        // point at which its ORIGIN is still known -- one line further on
+                        // it is an anonymous sibling of the generated code -- so record it
+                        // here or lose the distinction for good.
+                        sourceManifest.recordPort(f.getName(), f);
                     }
                 }
             }
@@ -270,19 +284,69 @@ public class ByteCodeTranslator {
     /// #### Parameters
     ///
     /// - `srcRoot`: the directory the translated sources are written to
+    /**
+     * Copies one of the ParparVM runtime sources bundled in the translator's jar into
+     * the generated project, recording its provenance on the way through.
+     *
+     * <p>Every runtime file goes through here rather than calling {@link #copy} directly,
+     * so that one cannot be added later without being recorded. A file the manifest does
+     * not name is indistinguishable from generated code to anything reading the build
+     * log, which is exactly the confusion {@link SourceManifest} exists to prevent.</p>
+     *
+     * @param srcRoot the generated project's source directory
+     * @param name the resource name, which is also the file name it is written under
+     * @return the file that was written, for callers that go on to edit it
+     */
+    private static File copyRuntimeResource(File srcRoot, String name) throws IOException {
+        return copyRuntimeResource(srcRoot, name, name);
+    }
+
+    /**
+     * As {@link #copyRuntimeResource(File, String)}, for the clean target, which writes
+     * several of the runtime sources out under a different name than the resource has --
+     * {@code cn1_globals.m} becomes {@code cn1_globals.c}, because that target compiles C
+     * rather than Objective-C. The manifest records the name the file has ON DISK, since
+     * that is the name a compiler diagnostic will carry.
+     *
+     * @param srcRoot the generated project's source directory
+     * @param name the resource name inside the translator jar
+     * @param destName the file name to write it under
+     * @return the file that was written, for callers that go on to edit it
+     */
+    private static File copyRuntimeResource(File srcRoot, String name, String destName) throws IOException {
+        File dest = new File(srcRoot, destName);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/" + name), new FileOutputStream(dest));
+        sourceManifest.recordRuntime(destName, "/" + name);
+        return dest;
+    }
+
+    /**
+     * As {@link #copyRuntimeResource}, for third-party code we bundle but do not
+     * maintain. Kept separate rather than taking an origin parameter because the two
+     * differ in what a warning MEANS: a warning in the runtime is ours to fix, and one
+     * in vendored code is reported and never gated.
+     *
+     * @param srcRoot the generated project's source directory
+     * @param name the resource name, which is also the file name it is written under
+     * @return the file that was written, for callers that go on to edit it
+     */
+    private static File copyVendoredResource(File srcRoot, String name) throws IOException {
+        File dest = new File(srcRoot, name);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/" + name), new FileOutputStream(dest));
+        sourceManifest.recordVendored(name, "/" + name);
+        return dest;
+    }
+
     private static void emitBundledSqlite(File srcRoot) throws IOException {
         File sqliteUnity = new File(srcRoot, "cn1_sqlite3.c");
         File sqliteHeader = new File(srcRoot, "cn1_sqlite3.h");
         File sqliteAmalgamation = new File(srcRoot, "cn1_sqlite3_amalgamation.h");
         File sqliteCipherMarker = new File(srcRoot, "cn1_sqlite3_cipher.h");
         if (isBundledSqliteEnabled()) {
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.c"),
-                    new FileOutputStream(sqliteUnity));
+            copyVendoredResource(srcRoot, "cn1_sqlite3.c");
             replaceInFile(sqliteUnity, "//#define CN1_INCLUDE_SQLITE", "#define CN1_INCLUDE_SQLITE");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.h"),
-                    new FileOutputStream(sqliteHeader));
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_amalgamation.h"),
-                    new FileOutputStream(sqliteAmalgamation));
+            copyVendoredResource(srcRoot, "cn1_sqlite3.h");
+            copyVendoredResource(srcRoot, "cn1_sqlite3_amalgamation.h");
         } else {
             deleteIfPresent(sqliteUnity);
             deleteIfPresent(sqliteHeader);
@@ -294,8 +358,7 @@ public class ByteCodeTranslator {
             // __has_include is the only thing they can agree on without per-target compiler
             // flags. Emitted only for an application that configures encryption, so everyone else
             // compiles the engine as plain SQLite and links no keying code at all.
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_cipher.h"),
-                    new FileOutputStream(sqliteCipherMarker));
+            copyVendoredResource(srcRoot, "cn1_sqlite3_cipher.h");
         } else {
             // Left behind, this would put the ciphers back into an engine emitted without them --
             // __has_include does not care which run wrote the file.
@@ -323,7 +386,16 @@ public class ByteCodeTranslator {
         }
     }
 
-    public static void main(String[] args) throws Exception {        
+    public static void main(String[] args) throws Exception {
+        // Provenance describes ONE translation, and this is the start of one. It has to
+        // be cleared here rather than in Parser.cleanup(): that runs from the `finally`
+        // of Parser.writeOutput(), which is BEFORE the output handler writes the
+        // manifest, so resetting there threw away everything the translation had just
+        // recorded -- the generated files most of all. Clearing on the way IN is also
+        // the property actually wanted, since what must not leak is the PREVIOUS
+        // application's files, and the tests translate repeatedly in one JVM through
+        // this method.
+        sourceManifest.reset();
         if(args.length == 0) {
             new File("build/kitchen").mkdirs();
             args = new String[] {"ios", "/Users/shai/dev/CodenameOne/ByteCodeTranslator/tmp;/Users/shai/dev/cn1/vm/JavaAPI/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/build/classes;/Users/shai/dev/cn1/Ports/iOSPort/nativeSources;/Users/shai/dev/cn1/CodenameOne/build/classes;/Users/shai/dev/codenameone-demos/KitchenSink/build/classes", 
@@ -359,7 +431,7 @@ public class ByteCodeTranslator {
             // Unrecognized output type falls back to the plain copy-through default handler
             recognizedOutputType = false;
         }
-        String[] sourceDirectories = Util.splitLiteral(args[1], ';');
+        String[] sourceDirectories = args[1].split(";");
         File[] sources = new File[sourceDirectories.length];
         for(int iter = 0 ; iter < sourceDirectories.length ; iter++) {
             sources[iter] = new File(sourceDirectories[iter]);
@@ -436,10 +508,8 @@ public class ByteCodeTranslator {
 
         b.execute(sources, srcRoot);
 
-        File cn1Globals = new File(srcRoot, "cn1_globals.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
-        File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), new FileOutputStream(cn1Intrinsics));
+        File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");
+        copyRuntimeResource(srcRoot, "cn1_intrinsics.h");
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
@@ -451,17 +521,12 @@ public class ByteCodeTranslator {
         if ("true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
-        File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsC));
-        File nativeMethodsC = new File(srcRoot, "nativeMethods.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethodsC));
+        copyRuntimeResource(srcRoot, "cn1_globals.m", "cn1_globals.c");
+        copyRuntimeResource(srcRoot, "nativeMethods.m", "nativeMethods.c");
         if (Util.getProperty("USE_RPMALLOC", "false").equals("true")) {
-            File malloc = new File(srcRoot, "malloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
-            File rpmalloc = new File(srcRoot, "rpmalloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
-            File rpmalloch = new File(srcRoot, "rpmalloc.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+            copyRuntimeResource(srcRoot, "malloc.c");
+            copyRuntimeResource(srcRoot, "rpmalloc.c");
+            copyRuntimeResource(srcRoot, "rpmalloc.h");
         }
         // The bundled SQLite engine is emitted only for applications that actually use
         // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
@@ -470,26 +535,21 @@ public class ByteCodeTranslator {
         // Always emitted: it defines the native entry points either way, as real bindings when
         // the engine is present and as stubs when it is not, so an application that references
         // com.codename1.db links regardless of how the translator was invoked.
-        File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), new FileOutputStream(sqliteBindings));
+        copyRuntimeResource(srcRoot, "cn1_db_sqlite_impl.h");
         emitBundledSqlite(srcRoot);
-        File xmlvm = new File(srcRoot, "xmlvm.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
+        copyRuntimeResource(srcRoot, "xmlvm.h");
 
         // Win32 POSIX compatibility shim. Always emitted; both files are gated on
         // _WIN32 internally, so they compile to nothing on iOS/macOS/Linux and
         // provide pthreads/usleep/gettimeofday on Windows (clang-cl / MSVC ABI).
-        File cn1WinCompatH = new File(srcRoot, "cn1_win_compat.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.h"), new FileOutputStream(cn1WinCompatH));
-        File cn1WinCompatC = new File(srcRoot, "cn1_win_compat.c");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.c"), new FileOutputStream(cn1WinCompatC));
+        copyRuntimeResource(srcRoot, "cn1_win_compat.h");
+        copyRuntimeResource(srcRoot, "cn1_win_compat.c");
 
         Parser.writeOutput(srcRoot);
 
         File javaIoFileHeader = new File(srcRoot, "java_io_File.h");
         if (javaIoFileHeader.exists()) {
-            File javaIoFileC = new File(srcRoot, "java_io_File_runtime.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileC));
+            copyRuntimeResource(srcRoot, "java_io_File.m", "java_io_File_runtime.c");
         }
 
         File classMethodIndexM = new File(srcRoot, "cn1_class_method_index.m");
@@ -499,6 +559,11 @@ public class ByteCodeTranslator {
             if(!classMethodIndexM.delete()) {
                 System.err.println("Deletion of " + classMethodIndexM.getAbsolutePath() + " failed");
             }
+            // Parser recorded the .m it wrote; this target compiles C, so the file that
+            // actually reaches the compiler -- and that a diagnostic will name -- is the
+            // .c. Re-record under the surviving name and drop the one that no longer
+            // exists, or the manifest describes a file nothing will ever build.
+            sourceManifest.renameGenerated("cn1_class_method_index.m", "cn1_class_method_index.c");
         }
 
         // Native Windows produces a single self-contained .exe (there is no .app
@@ -519,6 +584,12 @@ public class ByteCodeTranslator {
         }
 
         writeCmakeProject(root, srcRoot, appName, appType);
+
+        // Written to the project root rather than srcRoot on purpose: writeCmakeProject
+        // globs srcRoot for sources, and the Apple path lists it into the Xcode project,
+        // where an unrecognised extension lands in the resources phase and ships inside
+        // the bundle. See SourceManifest.
+        sourceManifest.write(root);
     }
 
     /**
@@ -571,6 +642,7 @@ public class ByteCodeTranslator {
                 table.append("    {\"").append(escapeCString(e.getKey())).append("\", ").append(id).append("},\n");
                 id++;
             }
+            sourceManifest.recordGenerated("cn1_resources.rc");
             Util.writeBytes(new File(srcRoot, "cn1_resources.rc"),
                     rc.toString().getBytes(StandardCharsets.UTF_8));
         }
@@ -584,6 +656,7 @@ public class ByteCodeTranslator {
         table.append("    }\n");
         table.append("    return 0;\n");
         table.append("}\n");
+        sourceManifest.recordGenerated("cn1_resources_table.c");
         Util.writeBytes(new File(srcRoot, "cn1_resources_table.c"),
                 table.toString().getBytes(StandardCharsets.UTF_8));
     }
@@ -647,6 +720,7 @@ public class ByteCodeTranslator {
                         .append("[]; extern const unsigned char cn1res_").append(id).append("_end[];\n");
                 id++;
             }
+            sourceManifest.recordGenerated("cn1_resources_data.S");
             Util.writeBytes(new File(srcRoot, "cn1_resources_data.S"),
                     asm.toString().getBytes(StandardCharsets.UTF_8));
         }
@@ -672,6 +746,7 @@ public class ByteCodeTranslator {
         table.append("    if (lenOut) { *lenOut = 0; }\n");
         table.append("    return 0;\n");
         table.append("}\n");
+        sourceManifest.recordGenerated("cn1_resources_table.c");
         Util.writeBytes(new File(srcRoot, "cn1_resources_table.c"),
                 table.toString().getBytes(StandardCharsets.UTF_8));
     }
@@ -701,7 +776,7 @@ public class ByteCodeTranslator {
                     || ext.equals("mm") || ext.equals("rc")) {
                 continue;
             }
-            String rel = Util.relativePath(root, f);
+            String rel = root.toPath().relativize(f.toPath()).toString().replace('\\', '/');
             String key = "/" + rel;
             if (!out.containsKey(key)) {
                 out.put(key, f);
@@ -785,10 +860,8 @@ public class ByteCodeTranslator {
 
         b.execute(sources, srcRoot);
 
-        File cn1Globals = new File(srcRoot, "cn1_globals.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
-        File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), new FileOutputStream(cn1Intrinsics));
+        File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");
+        copyRuntimeResource(srcRoot, "cn1_intrinsics.h");
         // Virtual threads: the switch is a few instructions of assembly per
         // architecture, so the .S travels with the runtime rather than being
         // generated. A project that gets the C and not the .S links against a
@@ -800,42 +873,14 @@ public class ByteCodeTranslator {
         if ("true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
-        File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
-        File nativeMethods = new File(srcRoot, "nativeMethods.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
-        // java_io_File_RUNTIME.m, not java_io_File.m.
-        //
-        // Parser.writeOutput below emits one file per surviving class, and on an
-        // Apple target that file is <class>.m -- so a retained java.io.File is
-        // written to exactly the name this copy just used, and the generated class
-        // OVERWRITES the runtime native. The result links only if nothing calls a
-        // java.io.File native: the generated class still declares exists() calling
-        // existsImpl, but existsImpl's only definition has been clobbered.
-        //
-        // OBSERVED as `Undefined symbols: _java_io_File_existsImpl...  referenced
-        // from _java_io_File_exists___R_boolean in java_io_File.o` on build-ios and
-        // build-ios-tv, while build-macos passed -- MacOSNativeBuilder sets
-        // -DconcatenateFiles=true, which routes class output into one buffer and so
-        // never writes the colliding name. IPhoneBuilder sets it only under
-        // ios.superfastBuild, so the collision is live by default there.
-        //
-        // The clean target already avoids this by writing the same resource as
-        // java_io_File_runtime.c; this is the same fix for the Apple path. The
-        // Xcode project collects sources by extension (see the .m/.c glob in the
-        // project writer), so the renamed file is compiled without further change,
-        // and NativeSignatureVerifier reads the RESOURCE "/java_io_File.m" off the
-        // classpath rather than this output path, so it is unaffected.
-        File javaIoFileM = new File(srcRoot, "java_io_File_runtime.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), new FileOutputStream(javaIoFileM));
+        copyRuntimeResource(srcRoot, "cn1_globals.m");
+        copyRuntimeResource(srcRoot, "nativeMethods.m");
+        copyRuntimeResource(srcRoot, "java_io_File.m");
 
         if (Util.getProperty("USE_RPMALLOC", "false").equals("true")) {
-            File malloc = new File(srcRoot, "malloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
-            File rpmalloc = new File(srcRoot, "rpmalloc.c");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
-            File rpmalloch = new File(srcRoot, "rpmalloc.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+            copyRuntimeResource(srcRoot, "malloc.c");
+            copyRuntimeResource(srcRoot, "rpmalloc.c");
+            copyRuntimeResource(srcRoot, "rpmalloc.h");
         }
         // The bundled SQLite engine is emitted only for applications that actually use
         // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
@@ -844,8 +889,7 @@ public class ByteCodeTranslator {
         // Always emitted: it defines the native entry points either way, as real bindings when
         // the engine is present and as stubs when it is not, so an application that references
         // com.codename1.db links regardless of how the translator was invoked.
-        File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), new FileOutputStream(sqliteBindings));
+        copyRuntimeResource(srcRoot, "cn1_db_sqlite_impl.h");
         emitBundledSqlite(srcRoot);
 
         Parser.writeOutput(srcRoot);
@@ -856,8 +900,7 @@ public class ByteCodeTranslator {
         File templatePch = new File(srcRoot, appName + "-Prefix.pch");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Prefix.pch"), new FileOutputStream(templatePch));
 
-        File xmlvm = new File(srcRoot, "xmlvm.h");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
+        copyRuntimeResource(srcRoot, "xmlvm.h");
 
         File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new FileOutputStream(projectWorkspaceData));
@@ -867,7 +910,7 @@ public class ByteCodeTranslator {
         File projectPbx = new File(xcproj, "project.pbxproj");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));
 
-        String[] sourceFiles = Util.list(srcRoot, (pathname, string) ->
+        String[] sourceFiles = srcRoot.list((pathname, string) ->
                 string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string));
 
         StringBuilder fileOneEntry = new StringBuilder();
@@ -884,7 +927,7 @@ public class ByteCodeTranslator {
 
         List<String> includeFrameworks = new ArrayList<>();
         Set<String> optionalFrameworks = new HashSet<>();
-        for (String optionalFramework : Util.splitLiteral(Util.getProperty("optional.frameworks", ""), ';')) {
+        for (String optionalFramework : Util.getProperty("optional.frameworks", "").split(";")) {
             optionalFramework = optionalFramework.trim();
             if (!optionalFramework.isEmpty()) {
                 optionalFrameworks.add(optionalFramework);
@@ -920,17 +963,30 @@ public class ByteCodeTranslator {
         //includeFrameworks.add("StoreKit.framework");
         // CoreMotion has no macOS implementation -- a Mac has no accelerometer to
         // report -- MessageUI and MediaPlayer are UIKit composers, and
-        // MobileCoreServices is the iOS spelling of what macOS calls
-        // UniformTypeIdentifiers. Each of these is a link failure rather than
-        // dead weight if it stays.
+        // MobileCoreServices is the iOS spelling of the C-level type identifier
+        // API that macOS keeps in CoreServices. Each of these is a link failure
+        // rather than dead weight if it stays.
         if (platform.hasIosDeviceIdioms()) {
             includeFrameworks.add("CoreMotion.framework");
             includeFrameworks.add("MessageUI.framework");
             includeFrameworks.add("MediaPlayer.framework");
             includeFrameworks.add("MobileCoreServices.framework");
-        } else {
-            includeFrameworks.add("UniformTypeIdentifiers.framework");
         }
+        // UniformTypeIdentifiers is NOT the macOS spelling of MobileCoreServices, which is what
+        // the split above used to assume: MobileCoreServices carries only the deprecated C
+        // functions (UTTypeCreatePreferredIdentifierForTag and friends), while the UTType CLASS
+        // lives here on every platform from iOS 14 / macOS 11 / watchOS 7 / tvOS 14.
+        // CN1DragAndDrop.m compiles that class into every slice -- the MIME-to-identifier
+        // mapping sits outside its
+        // UIKit guard because the clipboard natives need it too -- so leaving the framework off the
+        // iOS branch linked an application that referenced _OBJC_CLASS_$_UTType and nothing that
+        // defined it, and every device archive failed at the link.
+        //
+        // Weak, because ios.deployment_target reaches back to releases that predate the framework
+        // and a hard link against one the device does not have kills the process at launch. The
+        // uses are @available fenced, so an older device simply takes the legacy path.
+        includeFrameworks.add("UniformTypeIdentifiers.framework");
+        optionalFrameworks.add("UniformTypeIdentifiers.framework");
         includeFrameworks.add("CoreLocation.framework");
         includeFrameworks.add("AVFoundation.framework");
         includeFrameworks.add("CoreText.framework");
@@ -941,7 +997,7 @@ public class ByteCodeTranslator {
         includeFrameworks.add("libz.dylib");
         includeFrameworks.add("AVKit.framework");
         if(!addFrameworks.equalsIgnoreCase("none")) {
-            includeFrameworks.addAll(Arrays.asList(Util.splitLiteral(addFrameworks, ';')));
+            includeFrameworks.addAll(Arrays.asList(addFrameworks.split(";")));
         }
 
         int currentValue = 0xF63EAAA;
@@ -959,10 +1015,10 @@ public class ByteCodeTranslator {
             fileListEntry.append(file);
             fileListEntry.append(" */ = {isa = PBXFileReference; lastKnownFileType = ");
             fileListEntry.append(getFileType(file));
-            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".a")) {
+            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || file.endsWith(".a")) {
                 fileListEntry.append("; name = \"");
                 fileListEntry.append(file);
-                if(file.endsWith(".dylib")) {
+                if(file.endsWith(".dylib") || file.endsWith(".tbd")) {
                     fileListEntry.append("\"; path = \"usr/lib/");
                     fileListEntry.append(file);
                     fileListEntry.append("\"; sourceTree = SDKROOT; };\n");
@@ -1044,7 +1100,7 @@ public class ByteCodeTranslator {
                     fileThreeEntry.append(" */,\n");
                 }
             } else {
-                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
+                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
                     frameworks.append("				0");
                     frameworks.append(referenceValue);
                     frameworks.append("18E9ABBC002F3D1D /* ");
@@ -1089,6 +1145,12 @@ public class ByteCodeTranslator {
 
         String bundleVersion = Util.getProperty("bundleVersionNumber", appVersion);
         replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
+
+        // Written to the project root, NOT to srcRoot. srcRoot.list() above feeds the
+        // Xcode project, and getFileType() has no case for .txt, so a manifest left in
+        // srcRoot would fall through to ***RESOURCES*** and be copied inside the shipped
+        // .app. See SourceManifest.
+        sourceManifest.write(root);
     }
 
     private static void writeCmakeProject(File projectRoot, File srcRoot, String appName, String appType) throws IOException {
@@ -1105,7 +1167,7 @@ public class ByteCodeTranslator {
         boolean windows = "windows".equalsIgnoreCase(appType);
         boolean linux = "linux".equalsIgnoreCase(appType);
         boolean executable = windows || linux;
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(cmakeLists), "UTF-8")) {
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(cmakeLists), StandardCharsets.UTF_8)) {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             // The native Windows port mixes the translated C runtime with a C++
             // layer for the COM APIs that have no C binding (DirectWrite), so the
@@ -1399,7 +1461,16 @@ public class ByteCodeTranslator {
         // <exe>.debug companion: the shipped executable carries no symbol table,
         // debug info or .eh_frame, while crashes still symbolize from the .debug
         // file (function name = the mangled Java method, plus generated-C lines).
-        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE -g1 -fno-asynchronous-unwind-tables -fno-unwind-tables)\n");
+        // -g1 is lines + function names and NOTHING about variables or types, which is
+        // why a post-mortem of a crash from this build answers "No locals", "No
+        // arguments" and "unknown type" for every global -- the core is fine, the DWARF
+        // simply does not describe the data. That is the right default for a shipping
+        // binary, where the companion exists to turn an address back into a Java method.
+        // It is the wrong one for a CI build whose whole job is to be autopsied, so the
+        // level is a cache variable: unset it and nothing changes for anybody.
+        writer.append("set(CN1_DEBUG_INFO_LEVEL \"1\" CACHE STRING\n");
+        writer.append("    \"DWARF level for the <exe>.debug companion: 1 = lines + function names (lean, the default), 3 = full variable and type information (autopsyable)\")\n");
+        writer.append("target_compile_options(${PROJECT_NAME} PRIVATE -g${CN1_DEBUG_INFO_LEVEL} -fno-asynchronous-unwind-tables -fno-unwind-tables)\n");
         writer.append("if(NOT (CMAKE_BUILD_TYPE STREQUAL \"Debug\" OR CMAKE_BUILD_TYPE STREQUAL \"RelWithDebInfo\"))\n");
         writer.append("    find_program(CN1_OBJCOPY NAMES objcopy llvm-objcopy gobjcopy)\n");
         writer.append("    if(CN1_OBJCOPY)\n");
@@ -1431,6 +1502,9 @@ public class ByteCodeTranslator {
         }
         if(s.endsWith(".dylib")) {
             return "compiled.mach-o.dylib";
+        }
+        if(s.endsWith(".tbd")) {
+            return "sourcecode.text-based-dylib-definition";
         }
         if(s.endsWith(".h")) {
             return "sourcecode.c.h";
@@ -1495,12 +1569,12 @@ public class ByteCodeTranslator {
     // to be mutated. Also, expire the temporary byte[] buffer so it can
     // be collected.
     //
-    private static String readFileAsString(File sourceFile) throws IOException
+    private static StringBuilder readFileAsStringBuilder(File sourceFile) throws IOException
     {
         try(DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile))) {
             byte[] data = new byte[(int) sourceFile.length()];
             dis.readFully(data);
-            return new String(data, StandardCharsets.UTF_8);
+            return new StringBuilder(new String(data, StandardCharsets.UTF_8));
         }
     }
     //
@@ -1511,33 +1585,21 @@ public class ByteCodeTranslator {
     // process for large projects.  
     //
     private static void replaceInFile(File sourceFile, String... values) throws IOException {
-        String str = readFileAsString(sourceFile);
+        StringBuilder str = readFileAsStringBuilder(sourceFile);
         int totchanges = 0;
 
-        // One pass per target, appending the untouched runs into a fresh builder
-        // rather than mutating in place. StringBuilder.indexOf/replace do not exist
-        // in ParparVM's JavaAPI, which the translator has to compile against in
-        // order to translate itself; this keeps the same single-buffer-per-pass
-        // memory shape the in-place version had, so the OutOfMemoryError this
-        // method was written to avoid stays avoided.
+    	// perform the mutations on stringbuilder, which ought to implement
+        // these operations efficiently.
         for (int iter = 0; iter < values.length; iter += 2) {
             String target = values[iter];
             String replacement = values[iter + 1];
-            int index = str.indexOf(target);
-            if (index < 0) {
-                continue;
-            }
-            StringBuilder rewritten = new StringBuilder(str.length());
-            int from = 0;
-            while (index >= 0) {
-                rewritten.append(str, from, index);
-                rewritten.append(replacement);
-                from = index + target.length();
-                index = str.indexOf(target, from);
+            int index = 0;
+            while ((index = str.indexOf(target, index)) >= 0) {
+                int targetSize = target.length();
+                str.replace(index, index + targetSize, replacement);
+                index += replacement.length();
                 totchanges++;
             }
-            rewritten.append(str, from, str.length());
-            str = rewritten.toString();
         }
 
         //
@@ -1546,8 +1608,8 @@ public class ByteCodeTranslator {
         if(verbose) {
             System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
         }
-        try(Writer fios = new OutputStreamWriter(new FileOutputStream(sourceFile), "UTF-8")) {
-            fios.write(str);
+        try(Writer fios = new OutputStreamWriter(new FileOutputStream(sourceFile), StandardCharsets.UTF_8)) {
+            fios.write(str.toString());
         }
     }
     
@@ -1605,6 +1667,7 @@ public class ByteCodeTranslator {
                 throw new IOException("virtual-thread runtime resource missing: " + name);
             }
             copy(in, new FileOutputStream(new File(srcRoot, name)));
+            sourceManifest.recordRuntime(name, "/" + name);
         }
     }
 

@@ -27,6 +27,13 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The native warning gate's parser self-test runs from this workflow and nowhere
+      # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
+      # change to the parser, its fixture or a baseline could merge without the one check
+      # that would have caught it ever running.
+      - 'scripts/check-native-warnings.py'
+      - 'scripts/check-native-warnings.sh'
+      - 'scripts/native-warnings/**'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -78,6 +85,13 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The native warning gate's parser self-test runs from this workflow and nowhere
+      # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
+      # change to the parser, its fixture or a baseline could merge without the one check
+      # that would have caught it ever running.
+      - 'scripts/check-native-warnings.py'
+      - 'scripts/check-native-warnings.sh'
+      - 'scripts/native-warnings/**'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -246,9 +260,9 @@ jobs:
         # tests to load the library. Also baked into the pr-ci-container image
         # (.ci/container/Dockerfile); this step covers running against the
         # previously published container before the rebuild propagates.
-        # Bounded, because a stalled mirror is a hang rather than a failure: three jobs on this
-        # branch sat in apt until their job limit, two of them for six hours.
-        run: timeout 300 apt-get update -qq && timeout 300 apt-get install -y -qq libdbus-1-3
+        # Skip the network when installed; otherwise use the shared bounded
+        # installer so a stalled mirror can recover without hiding install failures.
+        run: bash scripts/ci/apt-get-install.sh libdbus-1-3
       - name: Run JavaSE port unit tests
         if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher
@@ -277,8 +291,7 @@ jobs:
         # touch, which no single-platform test would catch, so check ours against the stock
         # sqlcipher client in both directions.
         run: |
-          # Bounded for the same reason as the libdbus install above.
-          timeout 300 apt-get update -qq && timeout 300 apt-get install -y -qq sqlcipher
+          bash scripts/ci/apt-get-install.sh sqlcipher
           scripts/ci/db-cipher-interop.sh
       - name: Determine AI/ad cn1libs to build
         id: cn1libs
@@ -517,11 +530,9 @@ jobs:
         # C it parses the #else branch and reports success. Both are baked into
         # the pr-ci-container image (.ci/container/Dockerfile); this step
         # covers running against the previously published container before the
-        # rebuild propagates. Bounded for the same reason as the libdbus step
-        # above.
-        run: |
-          timeout 300 apt-get update -qq \
-            && timeout 300 apt-get install -y -qq gcc gcc-mingw-w64-x86-64
+        # rebuild propagates. Reuse the installed-package check and bounded
+        # mirror recovery used by the other runtime dependencies above.
+        run: bash scripts/ci/apt-get-install.sh gcc gcc-mingw-w64-x86-64
       # The two platforms whose cn1lib sources need no SDK to check: the C
       # glue the native win32/Linux ports compile into the app, and the
       # JavaScript port implementations, which have no build step at all.
@@ -547,6 +558,16 @@ jobs:
           mvn -B -q -f maven/pom.xml -pl windows,linux -am -DskipTests \
             -Dcn1.binaries="${CN1_BINARIES}" compile
           scripts/check-native-signatures.sh --require-all
+      # The native warning gate itself runs on the macOS/Windows/Linux legs that
+      # actually compile C; what runs HERE is its parser, against a hand-authored
+      # fixture, plus a structural check on the checked-in baselines. Both need no
+      # compiler, and both cover the ways this gate goes wrong silently: a parser
+      # that stops recognising a diagnostic reports zero warnings, which is
+      # indistinguishable from a clean build, and a baseline edited into a shape
+      # that no longer matches masks nothing while looking like it does.
+      - name: Check native warning parser and baselines
+        if: ${{ matrix.java-version == 8 }}
+        run: scripts/check-native-warnings.sh --self-test
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm

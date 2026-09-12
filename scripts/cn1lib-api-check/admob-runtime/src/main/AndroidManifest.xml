@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:theme="@android:style/Theme.Material.Light">
+        <uses-library android:name="android.test.runner" />
+        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713" />
+        <activity android:name="com.codename1.ads.admob.ProbeActivity" android:exported="false" />
+    </application>
+</manifest>

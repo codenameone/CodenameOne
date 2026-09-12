@@ -28,8 +28,10 @@ import com.codename1.util.StringUtil;
 /// algorithm name ("RSA" or "EC") and the encoded key bytes.
 ///
 /// PEM files (`-----BEGIN PUBLIC KEY-----`) go through [#fromPem], which
-/// strips the armor and decodes the base64 for you; [#fromX509] is the lower
-/// level entry point for callers that already hold the DER bytes.
+/// strips the armor and decodes the base64 for you, and which also takes the
+/// `-----BEGIN CERTIFICATE-----` file a server or gateway is more likely to
+/// hand out; [#fromX509] is the lower level entry point for callers that
+/// already hold the DER bytes.
 public final class PublicKey extends Key {
     /// RSA algorithm identifier ("RSA").
     public static final String RSA = "RSA";
@@ -65,6 +67,15 @@ public final class PublicKey extends Key {
     /// file -- bare base64 with no `-----BEGIN-----` armor at all. Line
     /// endings, blank lines and text surrounding the block are ignored, and in
     /// a file holding several blocks the first public key is the one used.
+    ///
+    /// A `CERTIFICATE` block is accepted as well, and its subject public key is
+    /// used. That covers the file a backend usually hands out -- a TLS or
+    /// signing certificate rather than a bare key -- without the caller having
+    /// to run `openssl x509 -pubkey -noout` first. In a certificate chain the
+    /// leaf comes first, so the key that comes out is the chain's own. Note
+    /// that nothing is being trusted by doing this: the signature and the
+    /// validity dates are not checked, and the certificate is read only as a
+    /// container for the key it names.
     ///
     /// Throws [CryptoException] if the text is not a public key, if it is
     /// passphrase-encrypted, or if the key is neither RSA nor EC.

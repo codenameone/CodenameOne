@@ -20,6 +20,7 @@ on:
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/check-ios-framework-links.py'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
@@ -56,6 +57,7 @@ on:
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/check-ios-framework-links.py'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
@@ -241,6 +243,22 @@ jobs:
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
+      # Every framework the port's natives need must be one the project DECLARES.
+      # A framework that only reaches the link through an autolink hint -- a Swift
+      # file's `import SwiftUI`, a CocoaPods dependency, `@import` under the Metal
+      # build's CLANG_ENABLE_MODULES -- links this sample and no plain Objective-C
+      # application. That is how `_OBJC_CLASS_$_UTType` stayed undefined in every
+      # customer archive while this job was green for five days.
+      #
+      # Runs on the project the step above already generated, so it costs seconds
+      # and it never links a Swift object, a pod or an extension.
+      - name: Check the port links only frameworks the project declares
+        run: |
+          set -euo pipefail
+          scripts/check-ios-framework-links.py \
+            "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
+        timeout-minutes: 10
+
       - name: Run iOS UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests
@@ -249,6 +267,18 @@ jobs:
           CN1SS_FAIL_ON_MISMATCH: '1'
           CN1SS_ALLOWED_MISSING: '0'
           CN1SS_PORT_ID: ios-gl
+          # Count this build's compiler warnings and attribute each to whoever owns
+          # the code. This leg is the one that can: it sets no CN1_IOS_DERIVED_DATA,
+          # so run-ios-ui-tests.sh wipes its derived data and compiles every
+          # translation unit from cold -- an incremental build reports no warnings
+          # and is indistinguishable from a clean codebase. Its path filters are
+          # also a superset of the other iOS legs', so a PR touching only
+          # CodenameOne/src is still covered.
+          CN1_WARNING_CENSUS: '1'
+          CN1_WARNING_LEG: ios-sim-debug
+          # build-ios-app.sh stages the manifest under the default artifacts dir,
+          # which is not the per-step one above.
+          CN1_WARNING_MANIFEST: ${{ github.workspace }}/artifacts/cn1-source-manifest.txt
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -285,6 +315,8 @@ jobs:
             artifacts/*-stats.txt
             artifacts/vm_time.txt
             artifacts/xcodebuild-list.txt
+            artifacts/cn1-source-manifest.txt
+            artifacts/ios-ui-tests/native-warnings.json
           if-no-files-found: warn
           retention-days: 14
 
@@ -460,6 +492,22 @@ jobs:
         id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
+
+      # Every framework the port's natives need must be one the project DECLARES.
+      # A framework that only reaches the link through an autolink hint -- a Swift
+      # file's `import SwiftUI`, a CocoaPods dependency, `@import` under the Metal
+      # build's CLANG_ENABLE_MODULES -- links this sample and no plain Objective-C
+      # application. That is how `_OBJC_CLASS_$_UTType` stayed undefined in every
+      # customer archive while this job was green for five days.
+      #
+      # Runs on the project the step above already generated, so it costs seconds
+      # and it never links a Swift object, a pod or an extension.
+      - name: Check the port links only frameworks the project declares (Metal)
+        run: |
+          set -euo pipefail
+          scripts/check-ios-framework-links.py \
+            "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
+        timeout-minutes: 10
 
       - name: Run iOS UI screenshot tests (Metal)
         env:

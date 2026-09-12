@@ -519,7 +519,7 @@ For example: `MacIntel`, `Win32`, `FreeBSD i386`, "WebTV OS"
 [id="native_theme", reftext="Changing the Native Theme"]
 === Changing the native theme
 
-The JavaScript port selects a bundled native theme from the detected browser platform. You can override this behavior by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to the path of a theme included with your app. Place additional JavaScript-only themes in the `native/javascript` directory so they aren't bundled into other platforms.
+The JavaScript port selects a bundled native theme from the detected browser platform. You can override this behavior by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to the path of a theme included with your app. Place additional JavaScript-only themes in `javascript/src/main/resources` so they aren't bundled into other platforms.
 
 === Disabling the 'OnBeforeUnload' handler
 

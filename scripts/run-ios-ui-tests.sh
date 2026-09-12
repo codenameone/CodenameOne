@@ -702,6 +702,27 @@ fi
 CN1_TEST_OPT_LEVEL="${CN1_TEST_OPT_LEVEL:-2}"
 XCODE_BUILD_CMD+=("GCC_OPTIMIZATION_LEVEL=$CN1_TEST_OPT_LEVEL")
 ri_log "Building translated C at -O$CN1_TEST_OPT_LEVEL (GCC_OPTIMIZATION_LEVEL)"
+# Warning census (CN1_WARNING_CENSUS=1, set by our workflows and by nothing a
+# customer runs). The five settings below are OFF in the Xcode template, which
+# quietens the translator's output at the cost of also blinding the ~85k lines of
+# hand-written port natives compiled alongside it. Turning them back on for the
+# census measures what restoring each would cost before any of them is changed in
+# the template.
+#
+# These must be command-line overrides rather than an xcconfig: Xcode's precedence
+# is command line > target > project > xcconfig, so an xcconfig saying YES loses to
+# the project-level NO and would measure nothing at all -- a gate that reads
+# nothing and reports success.
+if [ "${CN1_WARNING_CENSUS:-0}" = "1" ]; then
+  ri_log "Warning census: re-enabling the warnings the template disables"
+  XCODE_BUILD_CMD+=(
+    "CLANG_WARN_EMPTY_BODY=YES"
+    "CLANG_WARN_ENUM_CONVERSION=YES"
+    "CLANG_WARN_INT_CONVERSION=YES"
+    "CLANG_WARN__DUPLICATE_METHOD_MATCH=YES"
+    "GCC_WARN_UNUSED_VARIABLE=YES"
+  )
+fi
 XCODE_BUILD_CMD+=(build)
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
   # CI runners occasionally lose the booted device between simctl boot and the
@@ -737,6 +758,46 @@ fi
 COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
+
+# Attribute this build's warnings to whoever owns the code and hold the result
+# against the leg's baseline. A new warning kind fails here; so does a baselined
+# one that has stopped reproducing, which is what keeps the file from drifting
+# into a description of a build nobody runs.
+#
+# --probe re-runs the whole chain with one synthetic warning injected and asserts
+# it comes back as new. That is what catches this gate going blind -- a missing
+# manifest, a wrong baseline path, everything silently bucketed as vendored -- on
+# the day it breaks rather than the day someone notices it never fired.
+#
+# The tool exits 2 on its own if this build compiled less than the one the
+# baseline came from, so an incremental build cannot quietly report a small
+# number and pass.
+if [ "${CN1_WARNING_CENSUS:-0}" = "1" ]; then
+  CN1_WARNING_MANIFEST="${CN1_WARNING_MANIFEST:-$ARTIFACTS_DIR/cn1-source-manifest.txt}"
+  if [ ! -f "$CN1_WARNING_MANIFEST" ]; then
+    ri_log "STAGE:WARNING_CENSUS_FAILED -> no manifest at $CN1_WARNING_MANIFEST"
+    exit 12
+  fi
+  CN1_WARNING_ARGS=(
+    --leg "${CN1_WARNING_LEG:-ios-sim-debug}"
+    --log "$BUILD_LOG"
+    --manifest "$CN1_WARNING_MANIFEST"
+  )
+  if ! "$REPO_ROOT/scripts/check-native-warnings.sh" "${CN1_WARNING_ARGS[@]}" \
+      --json "$ARTIFACTS_DIR/native-warnings.json"; then
+    ri_log "STAGE:WARNING_CENSUS_FAILED -> see the census output above"
+    exit 12
+  fi
+  # GITHUB_STEP_SUMMARY is cleared for the probe: the tool writes the census to that
+  # file directly, so redirecting stdout does not stop a second one being published --
+  # and the probe's census contains the synthetic warning it injects, which would read
+  # as a real finding to anyone looking at the step summary.
+  if ! GITHUB_STEP_SUMMARY= "$REPO_ROOT/scripts/check-native-warnings.sh" "${CN1_WARNING_ARGS[@]}" --probe > /dev/null; then
+    ri_log "STAGE:WARNING_CENSUS_FAILED -> the gate did not react to an injected warning"
+    exit 12
+  fi
+  ri_log "Warning census clean and the gate verified against an injected warning"
+fi
 
 BUILD_SETTINGS="$("$XCODEBUILD" "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"

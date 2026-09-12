@@ -169,6 +169,12 @@
     <dependencies>
         <dependency>
             <groupId>com.codenameone</groupId>
+            <artifactId>cn1-ads-mock</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
             <artifactId>codenameone-factory</artifactId>
             <scope>provided</scope>
         </dependency>

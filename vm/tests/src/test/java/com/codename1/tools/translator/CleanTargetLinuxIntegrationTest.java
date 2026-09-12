@@ -278,6 +278,15 @@ class CleanTargetLinuxIntegrationTest {
                 "cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
                 "-DCMAKE_BUILD_TYPE=Release", "-G", "Ninja",
                 "-DCMAKE_C_COMPILER=" + cc, "-DCMAKE_ASM_COMPILER=" + cc));
+        // Full DWARF into the <exe>.debug companion when CI asks for it. The generated
+        // project defaults to -g1, which is lines and function names and nothing about
+        // variables or types -- so a post-mortem of a crash from this suite answers
+        // "No locals" for every frame and the core cannot be decoded past the backtrace.
+        // That is what left an intermittent SIGSEGV here undiagnosed across four
+        // occurrences. The binary stays stripped either way; only the companion grows.
+        if (Boolean.parseBoolean(System.getenv("CN1_LINUX_FULL_DEBUG"))) {
+            configure.add("-DCN1_DEBUG_INFO_LEVEL=3");
+        }
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");
@@ -637,38 +646,11 @@ class CleanTargetLinuxIntegrationTest {
         cmd.add("set pagination off");
         cmd.add("-ex");
         cmd.add("thread apply all bt");
-        try {
-            Process gdb = new ProcessBuilder(cmd)
-                    .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
-                    .start();
-            int rc = gdb.waitFor();
-            if (rc != 0) {
-                note(out, "gdb " + (viaSudo ? "(sudo) " : "") + "exited " + rc
-                        + " -- no stacks from this sample");
-            }
-            return rc;
-        } catch (java.io.IOException notInstalled) {
-            // An absent gdb used to throw here and be swallowed by the caller's
-            // catch-all, leaving hang-stacks.txt holding nothing but its sample
-            // headers. That reads as "we looked and the process was fine", which is
-            // the opposite of what happened, and it cost a full CI round to notice
-            // the file was empty rather than uninformative. Say so in the file.
-            note(out, "gdb " + (viaSudo ? "(sudo) " : "") + "could not be started: "
-                    + notInstalled + " -- install gdb on this runner to get stacks");
-            return -1;
-        }
-    }
-
-    /// Appends one diagnostic line to the dump file, so a failure to collect
-    /// evidence is itself recorded as evidence.
-    private static void note(java.io.File out, String msg) {
-        try (java.io.PrintWriter w = new java.io.PrintWriter(
-                new java.io.FileWriter(out, true), true)) {
-            w.println("  !! " + msg);
-        } catch (java.io.IOException ignore) {
-            // nothing further we can do from a diagnostic path
-        }
+        Process gdb = new ProcessBuilder(cmd)
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
+                .start();
+        return gdb.waitFor();
     }
 
     /// Dumps every thread's native stack from the still-running suite process.
@@ -702,18 +684,57 @@ class CleanTargetLinuxIntegrationTest {
             }
             // Plain gdb first; if yama still refuses the attach, retry through sudo,
             // which the runner allows passwordless. Either way a refusal must not
-            // become a second failure.
+            // become a second failure -- but it must not be SILENT either. Four
+            // occurrences of this stall produced a hang-stacks.txt holding nothing but
+            // sample headers, because gdb is absent from the runner image, the install
+            // is best-effort, and the resulting IOException was swallowed whole. A
+            // diagnostic that can quietly produce nothing is not a diagnostic, and it
+            // is the reason this hang has no root cause yet.
+            long before = out.length();
             int rc = runGdbAttach(out, pid.trim(), false);
             if (rc != 0) {
-                runGdbAttach(out, pid.trim(), true);
+                rc = runGdbAttach(out, pid.trim(), true);
             }
-            System.out.println("CN1SS:HARNESS: wrote live thread stacks for pid " + pid.trim()
-                    + " to " + out);
+            if (out.length() > before) {
+                System.out.println("CN1SS:HARNESS: wrote live thread stacks for pid " + pid.trim()
+                        + " to " + out);
+            } else {
+                System.out.println("CN1SS:HARNESS: NO thread stacks captured for pid "
+                        + pid.trim() + " (gdb exit " + rc + ", gdb "
+                        + (gdbOnPath() ? "on PATH" : "NOT on PATH")
+                        + ") -- this stall will again have no evidence. Install gdb on the"
+                        + " runner and allow ptrace before believing any conclusion about"
+                        + " where it hung.");
+            }
         } catch (Exception e) {
-            // A missing gdb or a denied ptrace must not mask the real failure -- but
-            // it must not be invisible either, or an empty dump file gets read as a
-            // clean sample. Print it; the harness output is captured in the job log.
-            System.out.println("CN1SS:HARNESS: live stack dump failed: " + e);
+            // A missing gdb or a denied ptrace must not mask the real failure -- but say
+            // so, rather than leaving the empty file to be read as "nothing was wrong".
+            System.out.println("CN1SS:HARNESS: thread-stack capture failed outright: "
+                    + e.getClass().getName() + ": " + e.getMessage()
+                    + " -- gdb " + (gdbOnPath() ? "is" : "is NOT") + " on PATH.");
+        }
+    }
+
+    /// Whether {@code gdb} can be executed at all.
+    ///
+    /// Reported alongside a failed capture because the two failure modes need
+    /// different fixes and look identical in an empty file: a missing binary is a
+    /// runner-image problem, while a present binary that captured nothing is a ptrace
+    /// or attach problem.
+    ///
+    /// @return true when gdb runs
+    private static boolean gdbOnPath() {
+        try {
+            Process p = new ProcessBuilder("gdb", "--version")
+                    .redirectErrorStream(true).start();
+            try (java.io.InputStream in = p.getInputStream()) {
+                while (in.read() >= 0) {
+                    // Drain so the process can exit rather than block on a full pipe.
+                }
+            }
+            return p.waitFor() == 0;
+        } catch (Exception e) {
+            return false;
         }
     }
 
