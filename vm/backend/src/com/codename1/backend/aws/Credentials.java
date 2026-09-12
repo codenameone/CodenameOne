@@ -209,11 +209,12 @@ public final class Credentials {
         Map parsed = Json.parseObject(json);
         String id = string(parsed, "AccessKeyId");
         String secret = string(parsed, "SecretAccessKey");
-        if(id == null || secret == null) {
-            throw new IOException("The credential endpoint returned no key pair");
+        if(isMissing(id) || isMissing(secret)) {
+            throw new IOException("The credential endpoint returned no usable key "
+                    + "pair");
         }
         String token = string(parsed, "Token");
-        if(token == null) {
+        if(isMissing(token)) {
             token = string(parsed, "SessionToken");
         }
         // AND A TOKEN, by the same argument the expiry below is required by: both
@@ -223,7 +224,7 @@ public final class Credentials {
         // may be hours away, S3 would cache the unusable credential until the
         // refresh margin rather than resolving again. A credential that cannot
         // sign is not a credential.
-        if(token == null || token.length() == 0) {
+        if(isMissing(token)) {
             throw new IOException("The credential endpoint returned no session "
                     + "token. Temporary credentials are signed with one, so every "
                     + "request made with this pair would be rejected");
@@ -322,6 +323,22 @@ public final class Credentials {
 
     private static boolean isLeap(int year) {
         return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    }
+
+    /**
+     * Whether a field the credential endpoint returned is missing in any of the
+     * ways that leave it unusable.
+     *
+     * <p>Absent, empty and whitespace are ONE CASE. A key or a token made of
+     * spaces signs exactly as well as one that is not there -- which is not at
+     * all -- so a response carrying either is malformed, and the only thing the
+     * difference decides is whether the failure is visible here or an hour from
+     * now as an authorization error with nothing attached to explain it. The
+     * expiry beside these fields may be hours away, so S3 would cache the
+     * credential that long rather than resolving again.
+     */
+    private static boolean isMissing(String value) {
+        return value == null || value.trim().length() == 0;
     }
 
     private static String string(Map map, String key) {
