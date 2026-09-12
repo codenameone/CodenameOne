@@ -4510,8 +4510,7 @@ public class IPhoneBuilder extends Executor {
                 String appGroups = request.getArg("ios.app_groups", "");
                 if (!declaresAppGroup(appGroups, group)) {
                     request.putArgument("ios.app_groups",
-                            appGroups.trim().length() == 0 ? group
-                                    : appGroups.trim() + " " + group);
+                            appendAppGroup(appGroups, group));
                 }
                 try {
                     replaceInFile(new File(buildinRes,
@@ -5161,8 +5160,7 @@ public class IPhoneBuilder extends Executor {
                 }
                 if (!present) {
                     request.putArgument("ios.app_groups",
-                            appGroups.trim().length() == 0 ? matterGroup
-                                    : appGroups.trim() + "," + matterGroup);
+                            appendAppGroup(appGroups, matterGroup));
                 }
                 matterAppGroup = matterGroup;
                 // Commissioning talks to the accessory over BLE before it has
@@ -6289,8 +6287,8 @@ public class IPhoneBuilder extends Executor {
             if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 String appGroups = request.getArg("ios.app_groups", "");
                 if (!declaresAppGroup(appGroups, surfacesAppGroup)) {
-                    request.putArgument("ios.app_groups", appGroups.length() == 0
-                            ? surfacesAppGroup : appGroups + "," + surfacesAppGroup);
+                    request.putArgument("ios.app_groups",
+                            appendAppGroup(appGroups, surfacesAppGroup));
                 }
             }
 
@@ -16915,6 +16913,36 @@ public class IPhoneBuilder extends Executor {
      * @param group the group being added
      * @return true when the group is already declared
      */
+    /**
+     * Appends an app group using the delimiter the value ALREADY uses.
+     *
+     * <p>ios.app_groups is documented as a space-delimited list and the
+     * invite and widget blocks write it that way, while the Matter and
+     * surfaces blocks write commas -- and a comment beside one of them calls
+     * comma "the established" form. They cannot all be right, and the code
+     * that finally splits the value is not in this repository, so this does
+     * not pick a winner.</p>
+     *
+     * <p>What it removes is the MIXED value, which is broken whichever way
+     * the split is done: enabling invites alongside Matter or surfaces
+     * produced "group.invite,group.matter" or the reverse, and a split on
+     * either delimiter then yields a token containing the other, so neither
+     * group matches the entitlement generated for the extension or the clip.
+     * Following whatever separator is already there keeps the list
+     * homogeneous no matter which feature ran first.</p>
+     *
+     * @param declared the existing ios.app_groups value, possibly empty
+     * @param group    the group to add
+     * @return the new value
+     */
+    static String appendAppGroup(String declared, String group) {
+        String existing = declared == null ? "" : declared.trim();
+        if (existing.length() == 0) {
+            return group;
+        }
+        return existing + (existing.indexOf(',') >= 0 ? "," : " ") + group;
+    }
+
     static boolean declaresAppGroup(String declared, String group) {
         if (declared == null || group == null || group.length() == 0) {
             return false;
