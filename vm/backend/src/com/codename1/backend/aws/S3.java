@@ -138,8 +138,43 @@ public final class S3 {
         if(resolved == null || resolved.length() == 0) {
             throw new IOException("No AWS region: pass one, or set AWS_REGION");
         }
+        requireRegionName(resolved);
         return new S3(Credentials.resolve(), resolved,
                 "s3." + resolved + ".amazonaws.com", false, true, true);
+    }
+
+    /**
+     * Refuses a region that is not one label of a hostname.
+     *
+     * THE REGION BECOMES PART OF A HOST. "s3." + region + ".amazonaws.com" with a
+     * region of "evil.example/ignored" is a URL whose authority is s3.evil.example
+     * -- the amazonaws.com suffix has landed in the PATH -- so objects would be
+     * uploaded to, and download responses accepted from, a host somebody else
+     * owns, over a TLS connection that verifies correctly for them. A dot is
+     * refused along with the separators because one label is all a region is:
+     * us-east-1, eu-west-2, cn-north-1.
+     *
+     * <p>It matters even though the value comes from configuration rather than
+     * from a request. AWS_REGION is read from the environment, which is exactly
+     * the kind of thing a deployment pipeline templates from somewhere else, and
+     * a region is not a place a reader would look for a way to redirect traffic.
+     */
+    private static void requireRegionName(String region) throws IOException {
+        for(int iter = 0 ; iter < region.length() ; iter++) {
+            char c = region.charAt(iter);
+            boolean allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '-';
+            if(!allowed) {
+                throw new IOException("Not an AWS region: " + region + ". A region "
+                        + "is one hostname label -- letters, digits and hyphens, as "
+                        + "in us-east-1 -- because it is interpolated into the S3 "
+                        + "endpoint's host");
+            }
+        }
+        if(region.charAt(0) == '-' || region.charAt(region.length() - 1) == '-') {
+            throw new IOException("Not an AWS region: " + region
+                    + ". A hostname label cannot begin or end with a hyphen");
+        }
     }
 
     /**
