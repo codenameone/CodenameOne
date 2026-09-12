@@ -297,6 +297,21 @@ class CleanTargetLinuxIntegrationTest {
         // that silently fails to reach the compiler leaves a clean-looking run that
         // measured nothing, which is worse than no diagnostic at all.
         System.out.println("CN1SS:HARNESS: cmake configure: " + String.join(" ", configure));
+        // And whether the project being configured actually HAS the hook those
+        // defines hang on. Passing -DCN1_EXTRA_DEFINES to a CMakeLists that never
+        // declares it is silently accepted by cmake and compiles nothing extra,
+        // which is indistinguishable in the log from a diagnostic that ran and
+        // found nothing.
+        try {
+            String cml = new String(Files.readAllBytes(cmakeRoot.resolve("CMakeLists.txt")),
+                    StandardCharsets.UTF_8);
+            System.out.println("CN1SS:HARNESS: CMakeLists declares CN1_EXTRA_DEFINES: "
+                    + cml.contains("CN1_EXTRA_DEFINES")
+                    + "; declares CN1_DEBUG_INFO_LEVEL: "
+                    + cml.contains("CN1_DEBUG_INFO_LEVEL"));
+        } catch (IOException readFailed) {
+            System.out.println("CN1SS:HARNESS: could not read the generated CMakeLists: " + readFailed);
+        }
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");
