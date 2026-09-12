@@ -106,6 +106,17 @@ public class RestControllerAnnotationProcessorTest {
         // A query string is not part of the route. Matching the whole target instead
         // of the path is the bug this asserts against.
         assertEquals("ok", router.text("GET", "/api/healthz?probe=1"));
+        // THE SAME PATH WITH AN ESCAPE IN IT. %68 is 'h', and RFC 3986 says that
+        // makes /api/%68ealthz the same URI as /api/healthz. Route selection
+        // compares bytes, so the literal route used to miss and the request fell
+        // through to whatever came next -- which for a controller declaring both
+        // /users/me and /users/{id} means the pattern handler answers for the
+        // literal one, chosen by spelling.
+        assertEquals("ok", router.text("GET", "/api/%68ealthz"));
+        assertEquals("ok", router.text("GET", "/api/%68ealthz?probe=1"));
+        // An encoded SLASH is still not a separator: %2F must not split a segment,
+        // or /notes/a%2Fb would become a two-segment path and stop matching.
+        assertEquals("{\"id\":\"a/b\"}", router.text("GET", "/api/notes/a%2Fb"));
         assertEquals("{\"id\":\"42\"}", router.text("GET", "/api/notes/42"));
         assertEquals("{\"id\":\"42\"}", router.text("GET", "/api/notes/42?x=1"));
         assertEquals("{\"id\":\"a b\"}", router.text("GET", "/api/notes/a%20b"));

@@ -105,6 +105,24 @@ public final class HttpServer {
         private int targetLength;
         /** Computed on first use; -1 until then. Reset with the rest of the Request. */
         private int pathLength = -1;
+        /**
+         * The target with percent-encoded UNRESERVED octets resolved, or null when
+         * it carried none and the raw bytes are already canonical.
+         *
+         * <p>RFC 3986 calls %6D and "m" the same character, so /users/%6De and
+         * /users/me are one URI spelled two ways. Route selection compares bytes,
+         * so without this the literal route missed and a sibling pattern route
+         * caught it instead -- /users/me and /users/{id} are different handlers,
+         * and choosing between them by spelling is how a check on one of them gets
+         * walked around. An encoded SLASH is deliberately left alone: %2F is not a
+         * segment boundary, and resolving it would invent one.
+         *
+         * <p>Built only when such an escape is actually there, so an ordinary
+         * target stays on the zero-allocation path the comment above describes.
+         */
+        private byte[] canonicalTarget;
+        private int canonicalLength;
+        private boolean canonicalChecked;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
                 int headerCount, String body) {
@@ -170,6 +188,14 @@ public final class HttpServer {
             if(from >= length) {
                 return "";
             }
+            // The canonical bytes when there are any: the offsets a caller has are
+            // positions in the path THIS returns, and pathIs and pathStartsWith
+            // compare against the same bytes. Reading raw here instead would hand
+            // back a slice measured in one spelling and indexed in the other.
+            canonicalize();
+            if(canonicalTarget != null) {
+                return asciiString(canonicalTarget, from, length - from);
+            }
             if(targetLength <= 0 || raw == null) {
                 return target.substring(from, length);
             }
@@ -181,8 +207,7 @@ public final class HttpServer {
             if(pathLength >= 0) {
                 return pathLength;
             }
-            int length = targetLength > 0 ? targetLength
-                                          : (target == null ? 0 : target.length());
+            int length = targetByteLength();
             int found = length;
             for(int iter = 0 ; iter < length ; iter++) {
                 if(byteAt(iter) == '?') {
@@ -200,8 +225,7 @@ public final class HttpServer {
          * same as absent, and callers that offer a default depend on the difference.
          */
         public String queryParam(String name) {
-            int length = targetLength > 0 ? targetLength
-                                          : (target == null ? 0 : target.length());
+            int length = targetByteLength();
             int pos = pathByteLength();
             if(pos >= length || name == null) {
                 return null;
@@ -235,10 +259,85 @@ public final class HttpServer {
          * UTF-8 decode of :path did.
          */
         private int byteAt(int index) {
+            canonicalize();
+            if(canonicalTarget != null) {
+                return canonicalTarget[index] & 0xff;
+            }
+            return rawByteAt(index);
+        }
+
+        private int rawByteAt(int index) {
             if(targetLength > 0 && raw != null) {
                 return raw[targetStart + index] & 0xff;
             }
             return target.charAt(index) & 0xff;
+        }
+
+        private int rawTargetLength() {
+            return targetLength > 0 ? targetLength
+                                    : (target == null ? 0 : target.length());
+        }
+
+        /** The target's length in bytes, after normalizing if it needed it. */
+        private int targetByteLength() {
+            canonicalize();
+            return canonicalTarget != null ? canonicalLength : rawTargetLength();
+        }
+
+        /**
+         * Resolves percent-encoded unreserved octets, once, and only when there is
+         * at least one. See canonicalTarget.
+         */
+        private void canonicalize() {
+            if(canonicalChecked) {
+                return;
+            }
+            canonicalChecked = true;
+            int length = rawTargetLength();
+            boolean needed = false;
+            for(int iter = 0 ; iter + 2 < length ; iter++) {
+                if(rawByteAt(iter) != '%') {
+                    continue;
+                }
+                int hi = hexDigit(rawByteAt(iter + 1));
+                int lo = hexDigit(rawByteAt(iter + 2));
+                if(hi >= 0 && lo >= 0 && isUnreservedByte((hi << 4) | lo)) {
+                    needed = true;
+                    break;
+                }
+            }
+            if(!needed) {
+                return;             // already canonical; nothing allocated
+            }
+            byte[] out = new byte[length];
+            int count = 0;
+            int pos = 0;
+            while(pos < length) {
+                int c = rawByteAt(pos);
+                if(c == '%' && pos + 2 < length) {
+                    int hi = hexDigit(rawByteAt(pos + 1));
+                    int lo = hexDigit(rawByteAt(pos + 2));
+                    if(hi >= 0 && lo >= 0) {
+                        int decoded = (hi << 4) | lo;
+                        if(isUnreservedByte(decoded)) {
+                            out[count++] = (byte)decoded;
+                            pos += 3;
+                            continue;
+                        }
+                    }
+                }
+                out[count++] = (byte)c;
+                pos++;
+            }
+            canonicalTarget = out;
+            canonicalLength = count;
+        }
+
+        /** ALPHA / DIGIT / "-" / "." / "_" / "~", the RFC 3986 unreserved set. */
+        private static boolean isUnreservedByte(int c) {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '-' || c == '.' || c == '_' || c == '~';
         }
 
         private boolean regionEquals(byte[] expected, int from, int length) {
@@ -473,6 +572,9 @@ public final class HttpServer {
             // Recomputed for this request. A stale value would give the next request
             // on this connection the previous one's path length.
             this.pathLength = -1;
+            this.canonicalTarget = null;
+            this.canonicalLength = 0;
+            this.canonicalChecked = false;
         }
 
         /**
@@ -3726,7 +3828,21 @@ public final class HttpServer {
                     headers.put("host", authority);
                 }
                 Object effectiveHost = headers.get("host");
-                if(effectiveHost != null && !isAuthority(String.valueOf(effectiveHost))) {
+                // AT LEAST ONE OF THEM, which is what the HTTP/1.1 parser requires
+                // of Host. A stream carrying neither :authority nor Host used to
+                // skip this check entirely and reach the handler with no authority
+                // at all, so anything routing or authorising on the host saw a null
+                // over h2 and a 400 over h1 for the same request. RFC 9113 calls
+                // that stream malformed.
+                if(effectiveHost == null) {
+                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                            asciiBytes("the request carries neither :authority nor Host"))) {
+                        h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
+                    }
+                    requestsServed.incrementAndGet();
+                    continue;
+                }
+                if(!isAuthority(String.valueOf(effectiveHost))) {
                     if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
                             asciiBytes("the authority is not a valid authority"))) {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);

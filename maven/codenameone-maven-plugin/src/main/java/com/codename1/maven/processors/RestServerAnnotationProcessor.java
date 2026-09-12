@@ -851,7 +851,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
 
         sb.append("    /** True when this API has a route for the verb and path. */\n");
         sb.append("    public boolean hasRoute(String method, String rawPath) {\n");
-        sb.append("        String path = stripQuery(rawPath);\n");
+        sb.append("        String path = canonical(stripQuery(rawPath));\n");
         sb.append("        String[] seg = split(path);\n");
         for (Op op : api.ops) {
             sb.append("        if(").append(routeCondition(op)).append(") return true;\n");
@@ -871,7 +871,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("            throw new IllegalArgumentException(\"malformed percent-escape in the "
                 + "request target: \" + rawPath);\n");
         sb.append("        }\n");
-        sb.append("        String path = stripQuery(rawPath);\n");
+        sb.append("        String path = canonical(stripQuery(rawPath));\n");
         sb.append("        String query = queryOf(rawPath);\n");
         sb.append("        String[] seg = split(path);\n");
         // Order matters HERE and nowhere else in this file: dispatch returns from
@@ -1295,6 +1295,39 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // so /items/a+b names "a+b" and decoding it to "a b" hands the handler an id the
         // client never sent.
         sb.append("    /** A path segment. '+' is literal here, per RFC 3986. */\n");
+        sb.append("    /**\n");
+        sb.append("     * Percent-encoded UNRESERVED octets resolved, before a route is chosen.\n");
+        sb.append("     *\n");
+        sb.append("     * RFC 3986 calls %6D and \\\"m\\\" the same character, so /users/%6De and\n");
+        sb.append("     * /users/me are one URI spelled two ways. Routes are matched by comparing\n");
+        sb.append("     * segments, so without this a literal route missed and a sibling pattern\n");
+        sb.append("     * route caught it instead -- two different handlers for one request,\n");
+        sb.append("     * chosen by spelling, which is how a check on one of them is walked\n");
+        sb.append("     * around. An encoded SLASH is left alone on purpose: %2F is not a segment\n");
+        sb.append("     * boundary and resolving it here would invent one.\n");
+        sb.append("     */\n");
+        sb.append("    private static String canonical(String value) {\n");
+        sb.append("        if(value == null || value.indexOf('%') < 0) return value;\n");
+        sb.append("        StringBuilder out = new StringBuilder(value.length());\n");
+        sb.append("        for(int i = 0 ; i < value.length() ; i++) {\n");
+        sb.append("            char c = value.charAt(i);\n");
+        sb.append("            if(c == '%' && i + 2 < value.length()) {\n");
+        sb.append("                int hi = hex(value.charAt(i + 1));\n");
+        sb.append("                int lo = hex(value.charAt(i + 2));\n");
+        sb.append("                if(hi >= 0 && lo >= 0) {\n");
+        sb.append("                    int decoded = (hi << 4) | lo;\n");
+        sb.append("                    boolean unreserved = (decoded >= 'a' && decoded <= 'z')\n");
+        sb.append("                            || (decoded >= 'A' && decoded <= 'Z')\n");
+        sb.append("                            || (decoded >= '0' && decoded <= '9')\n");
+        sb.append("                            || decoded == '-' || decoded == '.'\n");
+        sb.append("                            || decoded == '_' || decoded == '~';\n");
+        sb.append("                    if(unreserved) { out.append((char)decoded); i += 2; continue; }\n");
+        sb.append("                }\n");
+        sb.append("            }\n");
+        sb.append("            out.append(c);\n");
+        sb.append("        }\n");
+        sb.append("        return out.toString();\n");
+        sb.append("    }\n\n");
         sb.append("    private static String decodePath(String value) { return decode(value, false); }\n\n");
         sb.append("    /** A query value, which is form-encoded: '+' is a space. */\n");
         sb.append("    private static String decodeQuery(String value) { return decode(value, true); }\n\n");
