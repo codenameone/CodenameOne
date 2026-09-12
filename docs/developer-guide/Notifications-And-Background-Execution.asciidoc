@@ -121,6 +121,8 @@ you. Set `ios.usesBackgroundProcessing=true`, which declares
 with `ios.backgroundProcessingIds`. Without one of those the scheduling call is
 rejected on the device.
 
+image::img/background-work-lifecycle.svg[The life of a background work request,scaledwidth=95%]
+
 [options="header"]
 |===
 | | iOS | Android | Simulator

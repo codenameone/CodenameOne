@@ -21,6 +21,10 @@ Despite that you still need to keep in mind that the binary could still be rever
 
 Each section below discusses some attack vectors against applications and how they can be stopped. Pretty much all these attacks require a sophisticated attacker which will exist for high value targets (for example, bank apps, government etc.).
 
+The sections that follow work through the places a value can be kept, from the weakest to the strongest. They aren't interchangeable: each one answers a different attacker, and the first two barely answer any.
+
+image::img/security-secret-storage.svg[Where a secret can live and what each place protects,scaledwidth=95%]
+
 === Constant obfuscation
 
 One of the first things a hacker will do when compromising an app is look at it. For example, an attacker wanting to exploit a bank's login UI would look at the label next to the login and then search for it in the decompiled code. If the UI has the String "enter username and password" they can search for that.
@@ -182,6 +186,8 @@ Notice that this isn't right, you can't be 100% sure as there are no official wa
 The `isJailbrokenDevice` check above is a single, coarse signal. For high-security apps (banking, payments, healthcare) Codename One exposes a richer, cross-platform device-integrity API in `com.codename1.security.DeviceIntegrity`. It groups three families of runtime self-protection (RASP) primitives, each available both as a *zero-code build hint* (an automatic launch-time guard) and as a *runtime API* (so your app can make granular, per-transaction decisions). The build hints are wired into the build server, so enabling a feature is just a settings entry away.
 
 WARNING: Every on-device check is bypassable on a sufficiently compromised device -- that's an industry truth, not a Codename One limitation. Use the on-device checks for defense-in-depth and UX (warn, degrade, require step-up auth), but gate genuinely sensitive server actions on the *server-verified attestation token* described below, never on a boolean computed on the device itself.
+
+image::img/security-integrity-trust-boundary.svg[The device integrity trust boundary,scaledwidth=95%]
 
 ==== Detecting rooted / jailbroken / tampered devices (RASP)
 
