@@ -44,7 +44,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -172,17 +171,6 @@ public class SvgTranscodeRunner {
      *  placeholder in the compiled theme, which renders as nothing. */
     public Set<String> cssReferencedVectorNames() throws MojoExecutionException {
         return scanCssHints().keySet();
-    }
-
-    /** Filenames of the vector sources this module actually contains. The
-     *  difference between this and {@link #cssReferencedVectorNames()} is the
-     *  set of CSS references that resolve to nothing. */
-    public Set<String> presentVectorSourceNames() {
-        Set<String> names = new LinkedHashSet<String>();
-        for (File f : locateSvgs()) {
-            names.add(f.getName());
-        }
-        return names;
     }
 
     /** The generated registry source file for a given output dir and package. */

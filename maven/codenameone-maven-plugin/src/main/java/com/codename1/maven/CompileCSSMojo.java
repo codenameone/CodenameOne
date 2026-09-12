@@ -122,33 +122,85 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         if (referenced.isEmpty()) {
             return;
         }
-        File registryClass = new File(new File(buildDir, "classes"),
-                SvgTranscodeRunner.DEFAULT_PACKAGE.replace('.', File.separatorChar)
-                        + File.separator + SvgTranscodeRunner.REGISTRY_CLASS_NAME + ".class");
-        boolean registryMissing = !registryClass.isFile();
 
-        Set<String> unresolved = new TreeSet<String>(referenced);
-        unresolved.removeAll(runner.presentVectorSourceNames());
+        String registry = readGeneratedRegistry();
+        if (registry == null) {
+            if (compiledRegistryExists(buildDir)) {
+                // A registry was produced but its source is not on this
+                // module's source roots, so its contents cannot be read.
+                // Something will replace the placeholders; say nothing.
+                return;
+            }
+            getLog().warn("==========================================================");
+            getLog().warn("theme.css references " + referenced.size() + " SVG/Lottie image(s) but this");
+            getLog().warn("module generated no " + SvgTranscodeRunner.REGISTRY_CLASS_NAME + ", so every one of them");
+            getLog().warn("stays a 1x1 transparent placeholder and renders as nothing.");
+            getLog().warn("Put each file under src/main/css (or src/main/svg) so the");
+            getLog().warn("build-time transcoder can generate it.");
+            getLog().warn("==========================================================");
+            return;
+        }
 
-        if (!registryMissing && unresolved.isEmpty()) {
+        Set<String> unresolved = new TreeSet<String>();
+        for (String name : referenced) {
+            if (!registry.contains("\"" + name + "\"")) {
+                unresolved.add(name);
+            }
+        }
+        if (unresolved.isEmpty()) {
             return;
         }
         getLog().warn("==========================================================");
-        if (registryMissing) {
-            getLog().warn("theme.css references " + referenced.size() + " SVG/Lottie image(s) but this");
-            getLog().warn("module compiled no " + SvgTranscodeRunner.REGISTRY_CLASS_NAME + ", so every one of them stays a");
-            getLog().warn("1x1 transparent placeholder and renders as nothing.");
-        } else {
-            getLog().warn("theme.css references " + unresolved.size() + " SVG/Lottie image(s) that this");
-            getLog().warn("module does not contain, so they stay 1x1 transparent");
-            getLog().warn("placeholders and render as nothing:");
-            for (String name : unresolved) {
-                getLog().warn("    " + name);
-            }
+        getLog().warn("theme.css references " + unresolved.size() + " SVG/Lottie image(s) that the");
+        getLog().warn("build-time transcoder did not generate, so they stay 1x1");
+        getLog().warn("transparent placeholders and render as nothing:");
+        for (String name : unresolved) {
+            getLog().warn("    " + name);
         }
         getLog().warn("Put each file under src/main/css (or src/main/svg) so the");
         getLog().warn("build-time transcoder can generate it.");
         getLog().warn("==========================================================");
+    }
+
+    /**
+     * The generated registry's source, or null when this module produced none.
+     *
+     * <p>Resolved through the module's compile source roots rather than by
+     * re-scanning the vector source directories. Two reasons, and each was a
+     * way of reporting a healthy project as broken. The transcoder registers
+     * its own output directory as a source root, so this finds that directory
+     * even for a build that configured {@code cn1.svg.outputDir} or
+     * {@code cn1.svg.sourceDirs} to somewhere this mojo would never have
+     * guessed. And the registry <em>source</em> exists as soon as the
+     * transcoder has run, whereas the compiled class does not appear until
+     * {@code compile} -- which the cn1app lifecycle schedules after the
+     * {@code css} goal, so a class-file check necessarily reported a
+     * successful repair as a total failure.</p>
+     *
+     * <p>The registry names every image it installs as a quoted resource
+     * filename, which is what the caller matches against. That is the real
+     * question here: not whether a file sits in some directory, but whether
+     * anything will replace this placeholder at runtime.</p>
+     */
+    private String readGeneratedRegistry() {
+        for (Object root : project.getCompileSourceRoots()) {
+            File candidate = SvgTranscodeRunner.registrySourceFile(
+                    new File(String.valueOf(root)), null);
+            if (candidate.isFile()) {
+                try {
+                    return FileUtils.readFileToString(candidate, "UTF-8");
+                } catch (IOException ex) {
+                    getLog().debug("Could not read " + candidate + ": " + ex.getMessage());
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean compiledRegistryExists(File buildDir) {
+        return new File(new File(buildDir, "classes"),
+                SvgTranscodeRunner.DEFAULT_PACKAGE.replace('.', File.separatorChar)
+                        + File.separator + SvgTranscodeRunner.REGISTRY_CLASS_NAME + ".class").isFile();
     }
 
     /**

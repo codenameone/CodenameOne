@@ -33,6 +33,10 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.net.URL;
 import java.util.*;
 
@@ -2129,13 +2133,25 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             warnCouldNotEditPom("the module has no pom file on disk");
             return;
         }
-        String pom;
+        // Read and write in the encoding the document declares, not in UTF-8.
+        // A pom that says ISO-8859-1 and carries a non-ASCII developer name or
+        // description would otherwise be decoded wrongly, re-encoded as UTF-8
+        // and written back under an unchanged declaration -- silent corruption
+        // of a file this build does not own. The model-parser check below
+        // cannot see it either, because it is handed a String.
+        byte[] pomBytes;
         try {
-            pom = FileUtils.readFileToString(pomFile, "UTF-8");
+            pomBytes = FileUtils.readFileToByteArray(pomFile);
         } catch (IOException ex) {
             warnCouldNotEditPom("it could not be read: " + ex.getMessage());
             return;
         }
+        Charset charset = declaredXmlEncoding(pomBytes);
+        if (charset == null) {
+            warnCouldNotEditPom("its declared XML encoding is not supported by this JVM");
+            return;
+        }
+        String pom = new String(pomBytes, charset);
         if (pom.contains("transcode-svg")) {
             // Already there in the file even though the resolved model did not
             // report it (a profile that is not active, say). Adding a second
@@ -2156,7 +2172,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
         try {
             FileUtils.copyFile(pomFile, new File(pomFile.getParentFile(), "pom.xml.bak"));
-            FileUtils.writeStringToFile(pomFile, updated, "UTF-8");
+            FileUtils.writeStringToFile(pomFile, updated, charset);
         } catch (IOException ex) {
             warnCouldNotEditPom("it could not be written: " + ex.getMessage());
             return;
@@ -2164,6 +2180,33 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         getLog().info("Added the transcode-svg execution to " + pomFile
                 + " (previous contents saved as pom.xml.bak).");
     }
+
+    /**
+     * The charset named in the document's XML declaration, {@code UTF-8} when
+     * it names none, or null when it names one this JVM cannot provide.
+     *
+     * <p>The declaration is probed as ISO-8859-1, which maps every byte and so
+     * never throws, and is ASCII-compatible with every encoding a pom is
+     * realistically written in -- enough to read the declaration itself
+     * regardless of what it turns out to say.</p>
+     */
+    static Charset declaredXmlEncoding(byte[] bytes) {
+        int probe = Math.min(bytes.length, 256);
+        String head = new String(bytes, 0, probe, StandardCharsets.ISO_8859_1);
+        Matcher m = XML_DECL_ENCODING.matcher(head);
+        if (!m.find()) {
+            return StandardCharsets.UTF_8;
+        }
+        String name = m.group(1).trim();
+        try {
+            return Charset.isSupported(name) ? Charset.forName(name) : null;
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static final Pattern XML_DECL_ENCODING = Pattern.compile(
+            "<\\?xml[^>]*?encoding\\s*=\\s*[\"']([^\"']+)[\"']");
 
     /**
      * The text edit itself, kept pure so it can be tested against real poms.

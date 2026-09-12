@@ -31,6 +31,8 @@ import org.w3c.dom.NodeList;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.io.StringReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -260,6 +262,47 @@ public class SvgExecutionPomInsertTest {
         org.apache.maven.model.Model model =
                 new MavenXpp3Reader().read(new StringReader(updated));
         assertEquals(1, model.getBuild().getPlugins().get(0).getExecutions().size());
+    }
+
+    /**
+     * A pom that declares a non-UTF-8 encoding has to be read and written in
+     * that encoding. Reading ISO-8859-1 bytes as UTF-8 and writing them back
+     * under an unchanged declaration silently rewrites developer-owned text,
+     * and no XML or model check catches it because both are handed a String
+     * that has already lost the original bytes.
+     */
+    @Test
+    public void readsTheEncodingTheDocumentDeclares() {
+        byte[] latin1 = ("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n"
+                + "<project><name>Andr\u00e9</name></project>\n")
+                .getBytes(StandardCharsets.ISO_8859_1);
+        assertEquals(StandardCharsets.ISO_8859_1,
+                AbstractCN1Mojo.declaredXmlEncoding(latin1));
+
+        // A round trip through the declared charset preserves the text; the
+        // same bytes read as UTF-8 do not.
+        Charset declared = AbstractCN1Mojo.declaredXmlEncoding(latin1);
+        assertTrue("declared charset round-trips the name",
+                new String(latin1, declared).contains("Andr\u00e9"));
+        assertTrue("reading the same bytes as UTF-8 loses it",
+                !new String(latin1, StandardCharsets.UTF_8).contains("Andr\u00e9"));
+    }
+
+    /** No declaration, or a UTF-8 one, means UTF-8. */
+    @Test
+    public void defaultsToUtf8WithoutADeclaration() {
+        assertEquals(StandardCharsets.UTF_8, AbstractCN1Mojo.declaredXmlEncoding(
+                "<project/>".getBytes(StandardCharsets.UTF_8)));
+        assertEquals(StandardCharsets.UTF_8, AbstractCN1Mojo.declaredXmlEncoding(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><project/>".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    /** An encoding this JVM cannot provide is declined, not guessed at. */
+    @Test
+    public void declinesAnUnsupportedEncoding() {
+        assertNull(AbstractCN1Mojo.declaredXmlEncoding(
+                "<?xml version=\"1.0\" encoding=\"NOT-A-CHARSET\"?><project/>"
+                        .getBytes(StandardCharsets.ISO_8859_1)));
     }
 
     // ---- helpers -----------------------------------------------------
