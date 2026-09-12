@@ -10073,7 +10073,12 @@ public class IPhoneBuilder extends Executor {
                 + "  end\n"
                 + "  cn1_resolve = lambda do |value, own, proj|\n"
                 + "    out = value.to_s\n"
-                + "    8.times do\n"
+                // The same cap the Java resolver uses, and for the same reason: a setting's
+                // value may name another, so this has to reach a fixed point rather than make
+                // one pass. Diverging from the neighbour by a number nobody can justify is how
+                // two of these reimplementations already went wrong.
+                + "    " + MAX_SETTING_EXPANSIONS + ".times do\n"
+                + "      before = out\n"
                 + "      break unless out.include?('$')\n"
                 // Modifiers included, the same shape as BUILD_SETTING_REFERENCE above.
                 // Without them $(EXTENSION_MIN:lower) matched nothing, survived as an
@@ -10089,6 +10094,7 @@ public class IPhoneBuilder extends Executor {
                 + "          (own[name] || proj[name]).to_s\n"
                 + "        end\n"
                 + "      end\n"
+                + "      break if out == before\n"
                 + "    end\n"
                 + "    out.strip\n"
                 + "  end\n"

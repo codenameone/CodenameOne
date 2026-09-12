@@ -246,6 +246,23 @@ class ExtensionDeploymentFloorScriptTest {
                 "12.0 through a modifier is still below the floor");
     }
 
+    /// A setting's value may name another setting, so resolution has to reach a fixed point
+    /// rather than make one pass. Nesting resolves; a cycle never settles and must fall out
+    /// at the cap rather than spin, which is what the cap is for.
+    @Test
+    void resolvesNestingAndSurvivesACycle(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Nested|" + EXT + "|OUTER->$(INNER);INNER->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(OUTER)",
+                "Cyclic|" + EXT + "|A->$(B);B->$(A);IPHONEOS_DEPLOYMENT_TARGET->$(A)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(OUTER)", got.get(0),
+                "a nested reference resolving to 16.4 clears the floor and is kept");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1),
+                "a cycle resolves to nothing usable, so the floor is the answer");
+    }
+
     /// Xcode expands a reference nothing defines to the empty string, so the extension would
     /// declare no minimum at all. The floor is the answer there, not the expression.
     @Test
