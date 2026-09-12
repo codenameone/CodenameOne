@@ -10161,36 +10161,38 @@ public class IPhoneBuilder extends Executor {
     /// The developer directory of the selected Xcode -- <Xcode.app>/Contents/Developer -- so a
     /// tool run through the system xcrun still resolves inside it. Null when it cannot be told.
     private String selectedDeveloperDir() {
-        // Derived from the xcodebuild that actually runs, BEFORE the environment. The two
-        // disagree when XCODEBUILD names one Xcode and an inherited DEVELOPER_DIR names
-        // another: resolveXcodebuild() prefers XCODEBUILD, so trusting the environment here
-        // answered for an Xcode the build never uses. That was cosmetic while this only fed
-        // an [sdk=iphoneosNN] qualifier; it stopped being cosmetic once the SDK's minimum
-        // deployment target is read through it, since the wrong Xcode reports the old floor
-        // and the project is then written below what the real one accepts.
-        String selected = resolveXcodebuild();
-        if (selected != null) {
-            File fromXcodebuild = new File(selected).getParentFile();
-            for (int i = 0; i < 2 && fromXcodebuild != null; i++) {
-                fromXcodebuild = fromXcodebuild.getParentFile();
+        return developerDirFor(resolveXcodebuild(), System.getenv("DEVELOPER_DIR"));
+    }
+
+    /// The developer directory that goes with the xcodebuild this build actually runs.
+    ///
+    /// Derived from that binary BEFORE the environment is consulted. The two disagree when
+    /// XCODEBUILD names one Xcode and an inherited DEVELOPER_DIR names another:
+    /// resolveXcodebuild() prefers XCODEBUILD, so trusting the environment here answered for
+    /// an Xcode the build never uses. That was cosmetic while this only fed an
+    /// [sdk=iphoneosNN] qualifier; it stopped being cosmetic once the SDK's minimum
+    /// deployment target is read through it, since the wrong Xcode reports the old floor and
+    /// the project is then written below what the real one accepts.
+    ///
+    /// Split out from selectedDeveloperDir so the precedence can be tested without setting
+    /// environment variables, which Java cannot do to its own process.
+    static String developerDirFor(String resolvedXcodebuild, String envDeveloperDir) {
+        if (resolvedXcodebuild != null) {
+            // .../Contents/Developer/usr/bin/xcodebuild -> .../Contents/Developer
+            File developer = new File(resolvedXcodebuild).getParentFile();
+            for (int i = 0; i < 2 && developer != null; i++) {
+                developer = developer.getParentFile();
             }
-            if (isDeveloperDir(fromXcodebuild)) {
-                return fromXcodebuild.getAbsolutePath();
+            if (isDeveloperDir(developer)) {
+                return developer.getAbsolutePath();
             }
         }
-        String fromEnvironment = System.getenv("DEVELOPER_DIR");
-        if (fromEnvironment != null && fromEnvironment.length() > 0) {
-            return fromEnvironment;
+        // Nothing usable derived: the environment is better than nothing, and this is the
+        // path a CommandLineTools-only machine takes.
+        if (envDeveloperDir != null && envDeveloperDir.length() > 0) {
+            return envDeveloperDir;
         }
-        if (selected == null) {
-            return null;
-        }
-        // .../Contents/Developer/usr/bin/xcodebuild -> .../Contents/Developer
-        File developer = new File(selected).getParentFile();
-        for (int i = 0; i < 2 && developer != null; i++) {
-            developer = developer.getParentFile();
-        }
-        return isDeveloperDir(developer) ? developer.getAbsolutePath() : null;
+        return null;
     }
 
     /// Whether this really is an Xcode developer directory.
