@@ -1403,6 +1403,30 @@ public final class Invites {
             // erasure, tombstone included, turning an application's ordinary
             // reset() into a terminal state it never asked for.
             erasurePending = false;
+            // And the DURABLE half, which is the one that actually decides.
+            //
+            // Clearing the flag fixed half of the paragraph above and left the
+            // half that survives the process. resumeOwedErasure() reads
+            // InviteStore.ERASURE, not the flag, so a marker written by an
+            // EARLIER failed reset outlived the retry that satisfied it: the
+            // next gated call read it as work still owed, ran eraseInternal()
+            // over records that were already gone, and wrote the tombstone --
+            // exactly the terminal state this is supposed to prevent, reached
+            // by the ordinary route of calling reset() twice.
+            //
+            // Deleting unconditionally is safe: delete() answers true for a
+            // record that is not there, so the common case where no erasure
+            // was ever owed costs one existence check.
+            if (!InviteStore.delete(InviteStore.ERASURE)) {
+                // The same direction eraseInternal() takes when it cannot
+                // clear the marker: a marker that outlives its erasure is read
+                // as work still owed, so this erasure is reported INCOMPLETE
+                // rather than leaving the flag and the marker disagreeing. The
+                // records really did go; what failed is the bookkeeping, and
+                // the cost of saying so is a retry with nothing left to erase.
+                erasurePending = true;
+                cleared = false;
+            }
         }
         return cleared;
     }
@@ -2483,6 +2507,27 @@ public final class Invites {
 
     private static void beginDeferred() {
         if (deferredStarted) {
+            return;
+        }
+        // And not while a lookup is already on the wire.
+        //
+        // deferredStarted means "this process started the DEFERRED path", and
+        // a direct claim never sets it: handleUrl() writes the pending record,
+        // bumps the epoch and claims. The Android onNewIntent splice queues a
+        // checkForInvite() behind the same external-url dispatch that reached
+        // handleUrl(), and now that handleUrl() consumes the argument, that
+        // queued check finds nothing to handle and falls through to here --
+        // where the state is PENDING and the record still holds the code, so
+        // it claimed the same invite a SECOND time. Both requests carry the
+        // epoch handleUrl() had just bumped to, so neither is discarded: the
+        // funnel event can be emitted twice and two of the five attempts are
+        // spent on one tap.
+        //
+        // resumeDeferred() and flush() both ask this before they clear
+        // deferredStarted; asking it here covers the path where it was never
+        // set. It is the same bound they rely on -- one attempt per
+        // lookupRetryDelay -- rather than a new rule.
+        if (lookupInFlight()) {
             return;
         }
         // Before anything is read off the disk. A failed erasure leaves the

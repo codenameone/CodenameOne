@@ -2675,4 +2675,91 @@ class InviteResilienceTest extends UITestBase {
         Invites.setInviteListener(l);
         assertEquals(1, received[0], "the attribution was never delivered at all");
     }
+
+    /**
+     * A reset that succeeds on the retry does not leave a terminal device
+     * behind.
+     *
+     * <p>The in-memory latch was already cleared on this path. The DURABLE
+     * marker was not, and it is the one that decides: resumeOwedErasure()
+     * reads InviteStore.ERASURE, so a marker written by the earlier FAILED
+     * reset outlived the retry that satisfied it. The next gated call read it
+     * as work still owed, ran a full erasure over records that were already
+     * gone, and wrote the tombstone -- turning "call reset() twice" into a
+     * permanently unattributable install.</p>
+     */
+    @FormTest
+    void aResetThatSucceedsOnTheRetryClearsTheOwedMarker() {
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("RETRY1", "spring", "sms"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
+
+        // The first reset fails, which is what writes the marker.
+        InviteStore.failNextDeleteForTest(InviteStore.ATTRIBUTION);
+        Invites.reset();
+        assertNotNull(InviteStore.read(InviteStore.ERASURE),
+                "the fixture did not leave an erasure owed, so there is nothing to retry");
+
+        // Storage recovers and the application resets again -- the ordinary
+        // way an app retries, through the public API rather than through the
+        // internal resume path.
+        Invites.reset();
+
+        Map<String, String> owed = InviteStore.read(InviteStore.ERASURE);
+        assertTrue(owed == null || owed.isEmpty(),
+                "the successful reset left the owed marker behind, so the next gated call "
+                        + "will erase again and tombstone this install");
+
+        // And the install is not terminal: a fresh invite can still resolve.
+        Invites.checkForInvite();
+        Invites.handleResolution(
+                InviteTestSupport.resolvedJson("RETRY2", "summer", "email"),
+                Invites.MATCH_REFERRER, true);
+        assertNotNull(Invites.getAttribution(),
+                "an ordinary reset retry made the install permanently unattributable");
+    }
+
+    /**
+     * One tapped link produces one claim, even when the application routes the
+     * url itself AND the Android onNewIntent splice queues a check behind it.
+     *
+     * <p>handleUrl() consumes the argument, so the queued check finds nothing
+     * to handle -- and used to fall through to the deferred path, where the
+     * state is PENDING and the record still holds the code, and claim it a
+     * second time. deferredStarted does not catch that: a DIRECT claim never
+     * sets it. Both requests carried the epoch handleUrl() had just bumped to,
+     * so neither was discarded and two of the five attempts went on one tap.</p>
+     */
+    @FormTest
+    void aRoutedLinkFollowedByTheQueuedCheckClaimsOnce() {
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+        Invites.setLinkBase("https://cloud.codenameone.com");
+
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/demo/ONETAP1"),
+                "the fixture url was not recognised as an invite");
+        int afterRouting = claimCount();
+        assertEquals(1, afterRouting, "routing the url did not issue exactly one claim");
+
+        // What the generated onNewIntent splice does, one EDT cycle behind the
+        // dispatch that reached handleUrl().
+        Invites.checkForInvite();
+        assertEquals(1, claimCount(),
+                "the queued check claimed the same invite a second time");
+    }
+
+    /** Claims currently queued, which is what a duplicate shows up as. */
+    private int claimCount() {
+        int n = 0;
+        for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
+            ConnectionRequest r = implementation.getQueuedRequests().get(i);
+            if (r.getUrl() != null && r.getUrl().indexOf("/claim") >= 0) {
+                n++;
+            }
+        }
+        return n;
+    }
 }
