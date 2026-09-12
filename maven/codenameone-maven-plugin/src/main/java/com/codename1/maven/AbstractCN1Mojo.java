@@ -32,6 +32,7 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.net.URL;
 import java.util.*;
 
@@ -42,6 +43,8 @@ import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.doxia.logging.Log;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -2040,6 +2043,26 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (isTranscodeSvgBound()) {
             return;
         }
+        if (!isCN1ApplicationModule()) {
+            // Applications only. getCN1ProjectDir() also recognizes a cn1lib
+            // (codenameone_library_appended.properties) and the cn1lib archetype
+            // binds generate-gui-sources too, so without this a library holding
+            // any .svg would be repaired as well -- and every registry is emitted
+            // under the one fixed name com.codename1.generated.svg.SVGRegistry,
+            // which the per-platform builders look for at that literal path. Two
+            // of them on one classpath means one wins and the other's images stay
+            // placeholders.
+            //
+            // That collision is a property of the transcoder's fixed-name
+            // registry, not of this repair: a library author who adds the
+            // execution by hand hits it exactly the same way. Aggregating
+            // multiple registries is a change to the transcoder's design and does
+            // not belong in a repair path. What does belong here is not creating
+            // the situation silently, in a module whose author never asked for a
+            // registry, while also rewriting their pom.
+            getLog().debug("Skipping the SVG transcoder repair: not an application module.");
+            return;
+        }
         File buildDir = new File(project.getBuild().getDirectory());
         File outputDir = new File(buildDir, "generated-sources" + File.separator + "svg");
         File placeholderDir = new File(buildDir, "css-resources");
@@ -2056,6 +2079,17 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         runner.run();
         registerSourceRoot(outputDir);
         addTranscodeSvgExecutionToPom();
+    }
+
+    /**
+     * True when this module is a Codename One <em>application</em>, as opposed
+     * to a cn1lib. The two are told apart by which marker file the project dir
+     * holds: an app has {@code codenameone_settings.properties}, a library has
+     * {@code codenameone_library_appended.properties} and no settings file.
+     */
+    private boolean isCN1ApplicationModule() {
+        File dir = getCN1ProjectDir();
+        return dir != null && new File(dir, "codenameone_settings.properties").isFile();
     }
 
     /** True when some execution of this plugin binds the transcode-svg goal. */
@@ -2113,9 +2147,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             warnCouldNotEditPom("its codenameone-maven-plugin element could not be located");
             return;
         }
-        if (!isWellFormedXml(updated)) {
-            // The edit produced something that is not a pom. Never write it.
-            warnCouldNotEditPom("the edit did not produce well-formed XML");
+        if (!parsesAndBindsTranscodeSvg(updated)) {
+            // The edit produced something Maven would not accept, or would
+            // accept without actually binding the goal. Never write it.
+            warnCouldNotEditPom("the edit did not produce a pom that Maven can read"
+                    + " with the goal bound");
             return;
         }
         try {
@@ -2149,12 +2185,29 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return null;
         }
         String eol = pom.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
-        int executionsOpen = pom.indexOf("<executions>", pluginStart);
-        if (executionsOpen >= 0 && executionsOpen < pluginEnd) {
-            String indent = indentOfLineAt(pom, executionsOpen) + "    ";
-            int insertAt = executionsOpen + "<executions>".length();
+        int[] executions = findExecutionsTag(pom, pluginStart, pluginEnd);
+        if (executions != null) {
+            int tagStart = executions[0];
+            int tagClose = executions[1];
+            boolean selfClosing = executions[2] == 1;
+            String outerIndent = indentOfLineAt(pom, tagStart);
+            String indent = outerIndent + "    ";
+            if (selfClosing) {
+                // <executions/> has no content to insert into, so expand it into
+                // a real element. Appending a second <executions> sibling instead
+                // is well-formed XML that Maven rejects outright with
+                // "Duplicated tag: 'executions'", which would leave the project
+                // unbuildable until its backup was restored.
+                String openTag = trimTrailingWhitespace(pom.substring(tagStart, tagClose - 1)) + ">";
+                return pom.substring(0, tagStart)
+                        + openTag + eol
+                        + executionBlock(indent, eol) + eol
+                        + outerIndent + "</executions>"
+                        + pom.substring(tagClose + 1);
+            }
             // The text right after <executions> already starts with a line
             // break, so the block must not carry a trailing one of its own.
+            int insertAt = tagClose + 1;
             return pom.substring(0, insertAt)
                     + eol + executionBlock(indent, eol)
                     + pom.substring(insertAt);
@@ -2170,17 +2223,82 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 + pom.substring(pluginEnd);
     }
 
-    private static boolean isWellFormedXml(String text) {
+    /**
+     * Locates the plugin's {@code executions} element between {@code from} and
+     * {@code to}, in any of the spellings a pom may legally use:
+     * {@code <executions>}, {@code <executions/>}, {@code <executions />} and
+     * any of those carrying attributes such as
+     * {@code combine.children="append"}.
+     *
+     * <p>Returns {@code {tagStart, indexOfClosingAngleBracket, selfClosing}} or
+     * null when there is none. An exact search for the literal
+     * {@code "<executions>"} missed every form but the first and fell through to
+     * appending a second element, which Maven refuses to parse. A {@code >}
+     * inside a quoted attribute value would still fool this scan; that is what
+     * the model-parser check on the finished document is for.</p>
+     */
+    private static int[] findExecutionsTag(String pom, int from, int to) {
+        int i = from;
+        while (true) {
+            int tagStart = pom.indexOf("<executions", i);
+            if (tagStart < 0 || tagStart >= to) {
+                return null;
+            }
+            int afterName = tagStart + "<executions".length();
+            char next = afterName < pom.length() ? pom.charAt(afterName) : '\0';
+            // Only a complete tag name counts -- not <executionsSomething>.
+            if (next == '>' || next == '/' || next == ' ' || next == '\t'
+                    || next == '\r' || next == '\n') {
+                int close = pom.indexOf('>', afterName);
+                if (close < 0 || close >= to) {
+                    return null;
+                }
+                return new int[]{tagStart, close, pom.charAt(close - 1) == '/' ? 1 : 0};
+            }
+            i = afterName;
+        }
+    }
+
+    private static String trimTrailingWhitespace(String s) {
+        int end = s.length();
+        while (end > 0 && Character.isWhitespace(s.charAt(end - 1))) {
+            end--;
+        }
+        return s.substring(0, end);
+    }
+
+    /**
+     * Reads the edited document with Maven's own model parser and confirms the
+     * goal is really bound.
+     *
+     * <p>A DOM well-formedness check is not enough, which is the whole lesson
+     * here: two sibling {@code <executions>} elements are perfectly well-formed
+     * XML and Maven still rejects the file with "Duplicated tag". Parsing with
+     * the parser that will actually read this pom catches that and every other
+     * structural mistake, and asking whether the goal came out bound catches an
+     * edit that parsed but landed somewhere useless.</p>
+     */
+    private static boolean parsesAndBindsTranscodeSvg(String pom) {
+        Model model;
         try {
-            javax.xml.parsers.DocumentBuilderFactory factory =
-                    javax.xml.parsers.DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            factory.newDocumentBuilder().parse(
-                    new java.io.ByteArrayInputStream(text.getBytes("UTF-8")));
-            return true;
+            model = new MavenXpp3Reader().read(new StringReader(pom));
         } catch (Exception ex) {
             return false;
         }
+        if (model.getBuild() == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin p : model.getBuild().getPlugins()) {
+            if (!"codenameone-maven-plugin".equals(p.getArtifactId())) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution e : p.getExecutions()) {
+                if (e.getGoals() != null && e.getGoals().contains("transcode-svg")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String executionBlock(String indent, String eol) {

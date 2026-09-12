@@ -22,6 +22,7 @@
  */
 package com.codename1.maven;
 
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.junit.Test;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -29,6 +30,7 @@ import org.w3c.dom.NodeList;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -184,6 +186,80 @@ public class SvgExecutionPomInsertTest {
                 + "    </build>\n"
                 + "</project>\n";
         assertNull(AbstractCN1Mojo.insertTranscodeSvgExecution(pom));
+    }
+
+    /**
+     * Every legal spelling of the executions element has to be recognized as
+     * the existing one. Appending a second element instead is well-formed XML
+     * that Maven refuses outright with "Duplicated tag: 'executions'", so the
+     * automatic edit would leave the project unbuildable until its backup was
+     * restored -- strictly worse than the blank icons it set out to fix.
+     */
+    @Test
+    public void recognizesEveryExecutionsSpelling() throws Exception {
+        String[] spellings = {
+                "<executions></executions>",
+                "<executions/>",
+                "<executions />",
+                "<executions combine.children=\"append\"/>",
+                "<executions combine.children=\"append\"></executions>",
+        };
+        for (String spelling : spellings) {
+            String pom = "<project>\n"
+                    + "    <modelVersion>4.0.0</modelVersion>\n"
+                    + "    <build>\n"
+                    + "        <plugins>\n"
+                    + "            <plugin>\n"
+                    + "                <groupId>com.codenameone</groupId>\n"
+                    + "                <artifactId>codenameone-maven-plugin</artifactId>\n"
+                    + "                " + spelling + "\n"
+                    + "            </plugin>\n"
+                    + "        </plugins>\n"
+                    + "    </build>\n"
+                    + "</project>\n";
+            String updated = AbstractCN1Mojo.insertTranscodeSvgExecution(pom);
+            assertNotNull(spelling + " must be editable", updated);
+            assertEquals("exactly one executions element for " + spelling,
+                    1, count(updated, "<executions"));
+
+            // The real gate: Maven's own parser, not a DOM well-formedness check.
+            org.apache.maven.model.Model model =
+                    new MavenXpp3Reader().read(new StringReader(updated));
+            List<String> goals = new ArrayList<String>();
+            for (org.apache.maven.model.Plugin p : model.getBuild().getPlugins()) {
+                for (org.apache.maven.model.PluginExecution e : p.getExecutions()) {
+                    goals.addAll(e.getGoals());
+                }
+            }
+            assertTrue("Maven binds the goal for " + spelling + ": " + goals,
+                    goals.contains("transcode-svg"));
+        }
+    }
+
+    /** A tag that merely starts with the same letters is not the element. */
+    @Test
+    public void doesNotMistakeALongerTagNameForExecutions() throws Exception {
+        String pom = "<project>\n"
+                + "    <modelVersion>4.0.0</modelVersion>\n"
+                + "    <build>\n"
+                + "        <plugins>\n"
+                + "            <plugin>\n"
+                + "                <groupId>com.codenameone</groupId>\n"
+                + "                <artifactId>codenameone-maven-plugin</artifactId>\n"
+                + "                <configuration>\n"
+                + "                    <executionsEnabled>true</executionsEnabled>\n"
+                + "                </configuration>\n"
+                + "            </plugin>\n"
+                + "        </plugins>\n"
+                + "    </build>\n"
+                + "</project>\n";
+        String updated = AbstractCN1Mojo.insertTranscodeSvgExecution(pom);
+        assertNotNull(updated);
+        assertTrue("the unrelated tag is untouched",
+                updated.contains("<executionsEnabled>true</executionsEnabled>"));
+        org.apache.maven.model.Model model =
+                new MavenXpp3Reader().read(new StringReader(updated));
+        assertEquals(1, model.getBuild().getPlugins().get(0).getExecutions().size());
     }
 
     // ---- helpers -----------------------------------------------------
