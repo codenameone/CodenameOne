@@ -148,9 +148,12 @@ final class InviteStore {
     static boolean write(String record, Map<String, String> values) {
         if (record != null && record.equals(failNextNamed)) {
             failNamedRemaining--;
-            if (failNamedRemaining <= 0) {
-                failNextNamed = null;
-            }
+            // Assigned unconditionally rather than inside an if. The guarded
+            // form is the shape PMD reads as a lazily initialised singleton,
+            // and the answer to that is not a lock -- this runs on the EDT
+            // like the rest of the framework, and it is a test seam, not a
+            // singleton.
+            failNextNamed = failNamedRemaining > 0 ? failNextNamed : null;
             return false;
         }
         try {

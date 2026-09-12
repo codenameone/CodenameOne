@@ -52,7 +52,10 @@ import com.codename1.io.Preferences;
 final class InviteAttributionProvider extends AbstractAnalyticsProvider {
     // The last client id this provider saw. A change means resetClientId()
     // ran, which is what an erasure request looks like from here.
-    private static final String PREF_LAST_CLIENT_ID = "cn1$inviteLastClientId";
+    // Package private: a test models a genuinely first launch by removing it,
+    // which is the state that decides whether a reset is seen as an identity
+    // change at all.
+    static final String PREF_LAST_CLIENT_ID = "cn1$inviteLastClientId";
 
     @Override
     public String getName() {

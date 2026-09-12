@@ -314,9 +314,7 @@ public final class InviteRequest {
                 throw new IllegalArgumentException(
                         "an invite carries at most " + MAX_PARAMETERS + " parameters");
             }
-            for (java.util.Iterator<java.util.Map.Entry<String, String>> it =
-                    parameters.entrySet().iterator(); it.hasNext();) {
-                java.util.Map.Entry<String, String> e = it.next();
+            for (Map.Entry<String, String> e : parameters.entrySet()) {
                 checkLength("parameter name", e.getKey(), MAX_PARAM_KEY_LENGTH);
                 checkLength("parameter " + e.getKey(), e.getValue(), MAX_PARAM_VALUE_LENGTH);
             }

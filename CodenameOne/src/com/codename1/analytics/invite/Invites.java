@@ -297,6 +297,29 @@ public final class Invites {
     private Invites() {
     }
 
+    // The erasure hook goes in HERE, not at the first Invites entry point.
+    //
+    // Analytics.resetClientId() is observed by being a registered provider,
+    // and ensureProvider() used to run only from a facade call. An application
+    // that resets identity during startup -- an early privacy reset, a logout
+    // that runs before anything invite-related -- therefore reset it with no
+    // provider registered, so init() never saw the change and eraseInternal()
+    // never ran. The first checkForInvite() afterwards then found no baseline
+    // and no durable records (the referrer is Play's, not ours, and the
+    // handoff is the App Clip container's), adopted the already-reset id as
+    // its baseline, and went on to attribute the pre-reset referral to the new
+    // identity. resetVerified() has discarded an unconsumed referrer for a
+    // while; nothing was calling it.
+    //
+    // Safe here, and this is the reason: both builders splice these calls into
+    // the stub inside a Display.callSerially, immediately before the
+    // application's own init(this). So this runs on the EDT with Display and
+    // Storage already up, and still before any line of application code that
+    // could reset anything.
+    //
+    // Only when a source is actually being installed. Passing null removes
+    // one, which is what the tests do in teardown, and registering a provider
+    // on the way out is not what that means.
     /// Registers the platform hook that reads the application store's install
     /// referrer. The Codename One build calls this before the application
     /// starts on platforms that have one; an application does not.
@@ -306,6 +329,9 @@ public final class Invites {
     /// - `source`: the platform source, or null to remove it
     public static void registerInstallReferrerSource(InstallReferrerSource source) {
         referrerSource = source;
+        if (source != null) {
+            ensureProvider();
+        }
     }
 
     /// Registers the platform hook that reads the invite code an iOS App Clip
@@ -317,6 +343,9 @@ public final class Invites {
     /// - `source`: the platform source, or null to remove it
     public static void registerAppClipHandoffSource(AppClipHandoffSource source) {
         appClipSource = source;
+        if (source != null) {
+            ensureProvider();
+        }
     }
 
     // ---- sending ---------------------------------------------------------

@@ -26,6 +26,7 @@ import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.ConsentMode;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
@@ -639,5 +640,79 @@ class InviteConsentAndErasureTest extends UITestBase {
                 "consent was granted while the killed lookup still looked outstanding, "
                         + "so nothing restarted it and the invite stays unresolved until "
                         + "the retry interval elapses or the app is launched again");
+    }
+
+    /**
+     * A privacy reset during startup still reaches the referrer, even though
+     * nothing invite-related has been called yet.
+     *
+     * <p>resetClientId() is observed by being a registered provider, and the
+     * provider used to be installed only by an Invites entry point. An
+     * application that resets identity from its own init() therefore reset it
+     * with no provider registered: init() never saw the change, the erasure
+     * never ran, and the Play referrer -- whose one-shot flag was still
+     * unburnt -- was read by the first checkForInvite() afterwards and
+     * attributed the pre-reset referral to the identity the user had just
+     * asked for.</p>
+     *
+     * <p>The state this sets up is deliberately not what freshInstall() leaves
+     * behind: registering a listener there installs the provider AND records a
+     * baseline, and either one alone would have caught the reset. A genuinely
+     * first launch has neither.</p>
+     */
+    @FormTest
+    void aPrivacyResetBeforeAnyInviteCallStillForgetsTheReferrer() {
+        InviteTestSupport.freshInstall();
+        implementation.setAutoProcessConnections(false);
+
+        // The launch state: no provider, no baseline.
+        Analytics.clearProviders();
+        Preferences.delete(InviteAttributionProvider.PREF_LAST_CLIENT_ID);
+        assertEquals("", Preferences.get(InviteAttributionProvider.PREF_LAST_CLIENT_ID, ""),
+                "the fixture left a baseline behind, which would catch the reset on its own "
+                        + "and make this test pass for the wrong reason");
+
+        final boolean[] discarded = new boolean[1];
+        // Both builders splice this call into the generated stub immediately
+        // before the application's own init(this), so it is the last thing
+        // that runs before application code could reset anything.
+        Invites.registerInstallReferrerSource(new InstallReferrerSource() {
+            public boolean isSupported() {
+                return true;
+            }
+
+            public boolean discardReferrer() {
+                discarded[0] = true;
+                return true;
+            }
+
+            public void requestReferrer(InstallReferrerCallback callback) {
+                // Play answers the same install for as long as the one-shot
+                // flag is unburnt, and stops once it has been discarded. That
+                // is the behaviour that makes an unconsumed referrer outlive a
+                // reset, so the fake has to have it.
+                if (discarded[0]) {
+                    callback.onReferrer(null, 0L, 0L);
+                    return;
+                }
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=PRERESET", 0L, 0L);
+            }
+        });
+
+        // The reset, from the application's init().
+        Analytics.resetClientId();
+        assertTrue(discarded[0],
+                "the reset did not reach the referrer, so the next check will attribute "
+                        + "the pre-reset invite to the new identity");
+
+        // And the check that follows finds nothing to attribute.
+        Invites.checkForInvite();
+        for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
+            String body = implementation.getQueuedRequests().get(i).getRequestBody();
+            assertTrue(body == null || body.indexOf("PRERESET") < 0,
+                    "the pre-reset referral was transmitted under the new client id: " + body);
+        }
+        assertNull(Invites.getAttribution(),
+                "the pre-reset referral resolved into an attribution after the reset");
     }
 }

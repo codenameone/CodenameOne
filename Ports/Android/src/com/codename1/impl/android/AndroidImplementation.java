@@ -9991,29 +9991,68 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         getContext().startActivity(chooser);
     }
 
-    private static int nextShareReceiverId = 1;
+    // ONE receiver for the process, and one listener held at a time.
+    //
+    // A receiver per share leaked every cancelled one. It is unregistered from
+    // inside onReceive, and Android sends nothing when the chooser is
+    // dismissed -- there is no public dismissal signal -- so a cancelled share
+    // left its receiver registered on the application context, holding the
+    // listener and, through it, the button and the form it is on. Each cancel
+    // added another, for the life of the process, and a share button is
+    // exactly the kind of control a user opens and backs out of repeatedly.
+    //
+    // Reusing one receiver bounds that at a single retained listener: the next
+    // share replaces the one a dismissal left behind. It cannot be driven to
+    // zero from here, because knowing the chooser was dismissed is the thing
+    // Android does not tell us.
+    //
+    // Instance fields, not static: there is one implementation per process,
+    // the receiver belongs to it, and a lazily initialised static is a
+    // different claim -- one SpotBugs reads as a threading bug, correctly,
+    // because nothing here would make it safe if it were true.
+    //
+    // pendingShareListener is written from the Codename One EDT and read on
+    // the Android main thread, which is why it is volatile. That is a native
+    // boundary crossing, not core framework code.
+    private BroadcastReceiver shareChooserReceiver;
+
+    private String shareChooserAction;
+
+    private volatile com.codename1.share.ShareResultListener pendingShareListener;
 
     @TargetApi(22)
     private Intent buildShareChooserWithCallback(Intent shareIntent, final com.codename1.share.ShareResultListener listener) {
         final Context appCtx = getContext().getApplicationContext();
-        final String action = appCtx.getPackageName() + ".CN1_SHARE_CHOSEN." + (nextShareReceiverId++);
+        // The listener this chooser is for. Set before the receiver can
+        // possibly fire, and replacing whatever a dismissed chooser left.
+        pendingShareListener = listener;
+        if (shareChooserReceiver != null) {
+            // Already registered and listening on the same action, so there is
+            // nothing to build but the PendingIntent below.
+            return chooserFor(appCtx, shareIntent, shareChooserAction);
+        }
+        final String action = appCtx.getPackageName() + ".CN1_SHARE_CHOSEN";
+        shareChooserAction = action;
         // The receiver fires once when the user picks a target. Android
         // does not expose a dismissal signal for the chooser, so the
         // listener simply does not fire on user-cancel (see comment
         // further down).
-        final boolean[] delivered = new boolean[1];
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context ctx, Intent intent) {
-                if (delivered[0]) return;
-                delivered[0] = true;
-                try { appCtx.unregisterReceiver(this); } catch (Throwable ignore) {}
+                // Taken, so a repeat broadcast cannot deliver twice. The
+                // receiver stays registered for the next share.
+                com.codename1.share.ShareResultListener target = pendingShareListener;
+                pendingShareListener = null;
+                if (target == null) {
+                    return;
+                }
                 String pkg = null;
                 try {
                     android.content.ComponentName cn = intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT);
                     if (cn != null) pkg = cn.getPackageName();
                 } catch (Throwable ignore) {}
-                listener.onResult(com.codename1.share.ShareResult.sharedTo(pkg));
+                target.onResult(com.codename1.share.ShareResult.sharedTo(pkg));
             }
         };
         IntentFilter filter = new IntentFilter(action);
@@ -10033,10 +10072,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!registered) {
             appCtx.registerReceiver(receiver, filter);
         }
+        // Recorded only once it is really listening, so a registration that
+        // threw is retried by the next share rather than skipped for ever.
+        shareChooserReceiver = receiver;
         // Android's chooser IntentSender callback never fires on
         // dismissal: there is no public API to observe a user-cancel.
         // Apps that need a dismissal signal must use Activity-resume.
 
+        return chooserFor(appCtx, shareIntent, action);
+    }
+
+    /// The chooser Intent itself, wrapping a broadcast PendingIntent on this
+    /// action.
+    ///
+    /// Split out because it is built on every share while the receiver behind
+    /// it is built once. FLAG_UPDATE_CURRENT is what makes the fixed action
+    /// safe to reuse: the same PendingIntent is handed back with this
+    /// chooser's extras, and only one chooser is ever up at a time.
+    @TargetApi(22)
+    private Intent chooserFor(Context appCtx, Intent shareIntent, String action) {
         Intent pi = new Intent(action).setPackage(appCtx.getPackageName());
         int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (android.os.Build.VERSION.SDK_INT >= 31) {

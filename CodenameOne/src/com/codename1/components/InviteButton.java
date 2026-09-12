@@ -97,6 +97,20 @@ public class InviteButton extends ShareButton {
     // application's listener in a field of our own -- without that, setting a
     // listener would silently replace the chain and the funnel would lose
     // every share.
+    // Unconditional, and it has to be. invite_shared is a MEASUREMENT -- it
+    // carries the package the user actually picked -- so a press with no
+    // listener installed could only report that a chooser was opened, which is
+    // the assumption this event exists to replace.
+    //
+    // What that costs on Android is one dynamically registered receiver, and
+    // it used to be one PER PRESS: the receiver unregisters itself from inside
+    // onReceive, and a dismissed chooser sends nothing, so every cancelled
+    // share left one behind holding this chain, the button and its form.
+    // AndroidImplementation.buildShareChooserWithCallback now reuses a single
+    // receiver for the process, so a cancel replaces the held listener instead
+    // of adding to a pile of them. The fix is there rather than here because
+    // every ShareButton with a result listener had the same leak, invites or
+    // not.
     private void installChain() {
         chain = new ShareResultListener() {
             @Override
