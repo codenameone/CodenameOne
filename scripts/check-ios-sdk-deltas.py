@@ -115,15 +115,25 @@ EXTRA_DEFINES = ["CN1_METAL_COLORSPACE_SRGB"]
 # both sampled endpoints and pass.
 CN1_DEFAULT_DEPLOYMENT_TARGET = "14.0"
 
-# Mutually exclusive renderer configurations. CN1_USE_METAL selects a materially different
-# body in CN1ES2compat/METALView/GLUIImage, so a single pass would leave one of them
+# Build configurations that select materially different code. The first is the baseline;
+# each of the others is compiled as well, because a single pass would leave its half
 # untested -- which is how a deprecation in the GL path survives a green Metal run.
-CONFIGURATIONS = [("gl", []), ("metal", ["CN1_USE_METAL"])]
-
-# The two configurations routinely produce identical diagnostics, which is a perfectly
-# good result and also indistinguishable from one of them having quietly become a copy of
-# the other. This file is checked to actually preprocess differently between them.
-CONFIG_WITNESS = "METALView.m"
+#
+# CN1_ON_DEVICE_DEBUG is here rather than in the harvested gate list because the builder
+# does not uncomment it in the port sources: it rewrites the GENERATED cn1_globals.h. The
+# harvester only reads pristine sources, so the debug bodies of cn1_debugger.m,
+# cn1_debugger_objects.c and CodenameOne_GLAppDelegate.m compiled out of every sweep and an
+# error there under a newer SDK would have passed unnoticed.
+#
+# Each non-baseline entry names a file that must preprocess differently under it. The
+# configurations routinely produce identical DIAGNOSTICS, which is a fine result and also
+# indistinguishable from one of them having quietly become a copy of the baseline, so the
+# difference is checked directly.
+CONFIGURATIONS = [
+    ("gl", [], None),
+    ("metal", ["CN1_USE_METAL"], "METALView.m"),
+    ("ondevicedebug", ["CN1_ON_DEVICE_DEBUG"], "cn1_debugger.m"),
+]
 
 # A run that compiles almost nothing produces an empty delta, which reads as success. If
 # fewer than this many files come back clean the harness itself is broken, not the SDK.
@@ -386,9 +396,11 @@ def compile_one(clang, sdk, project_dir, prefix_header, filename, defines, arc, 
 
 
 def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir, gates):
-    """Confirm the renderer configurations really select different code."""
-    sizes = []
-    for _, extra in CONFIGURATIONS:
+    """Confirm every non-baseline configuration really selects different code.
+
+    Returns a list of (name, witness, baseline_lines, config_lines) for reporting.
+    """
+    def preprocess(extra, witness):
         cmd = [clang, "-E", "-arch", "arm64", "-target", "arm64-apple-ios14.0",
                "-isysroot", sdk, "-fmodules",
                "-fmodules-cache-path=" + os.path.join(tempfile.gettempdir(),
@@ -400,10 +412,16 @@ def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir, gate
             cmd += ["-include", prefix_header]
         for d in defines_for(gates, extra):
             cmd += ["-D", d]
-        cmd.append(os.path.join(NATIVE_SOURCES, CONFIG_WITNESS))
-        sizes.append(len(run(cmd).stdout.splitlines()))
-    return sizes
+        cmd.append(os.path.join(NATIVE_SOURCES, witness))
+        return len(run(cmd).stdout.splitlines())
 
+    baseline_defines = CONFIGURATIONS[0][1]
+    checked = []
+    for name, extra, witness in CONFIGURATIONS[1:]:
+        base_lines = preprocess(baseline_defines, witness)
+        conf_lines = preprocess(extra, witness)
+        checked.append((name, witness, base_lines, conf_lines))
+    return checked
 
 def synthesize_generated_stubs(clang, sdk, project_dir, prefix_header, files, all_defines,
                                arc_files, target, stub_dir, jobs):
@@ -566,8 +584,13 @@ def main():
         fail("no *-Prefix.pch in %s; without it the natives cannot see cn1_globals.h and "
              "most of each file would go unexamined." % project_dir)
 
-    # Every native the port owns -- not a subset of one sample app's build.
-    present = sorted(n for n in os.listdir(NATIVE_SOURCES) if n.endswith(".m"))
+    # Every native the port owns -- not a subset of one sample app's build, and not only
+    # the Objective-C ones. ByteCodeTranslator puts .c into the generated project alongside
+    # .m, and seven of them ship here (the Curve/Dasher/Renderer/Stroker geometry, Helpers.c,
+    # cn1_debugger_objects.c). Selecting only .m meant an SDK regression in any of those
+    # still produced an OK.
+    present = sorted(n for n in os.listdir(NATIVE_SOURCES)
+                     if n.endswith(".m") or n.endswith(".c"))
     if not present:
         fail("no .m files under %s" % NATIVE_SOURCES)
     print("[ios-sdk-deltas] prefix  : %s" % prefix_header)
@@ -639,7 +662,7 @@ def main():
     print("[ios-sdk-deltas] self-test: a blocking finding exits non-zero")
 
     stub_dir = tempfile.mkdtemp(prefix="cn1-sdk-delta-stubs-")
-    all_defines = defines_for(gates, [d for _, ds in CONFIGURATIONS for d in ds])
+    all_defines = defines_for(gates, [d for _, ds, _w in CONFIGURATIONS for d in ds])
     # Against both SDKs: a header missing only under the old one leaves that side truncated,
     # and a truncated BASELINE turns ordinary diagnostics into invented regressions.
     stubs = []
@@ -651,18 +674,19 @@ def main():
     print("[ios-sdk-deltas] stubs   : %d translated-class header(s) synthesized%s"
           % (len(stubs), (" (%s)" % ", ".join(stubs)) if args.verbose and stubs else ""))
 
-    sizes = configurations_differ(clang, new_sdk, project_dir, prefix_header, stub_dir, gates)
-    if len(set(sizes)) != len(sizes) or min(sizes) == 0:
-        fail("the renderer configurations no longer select different code: %s preprocesses "
-             "to %s lines under %s. One of them is a duplicate of the other, so half the "
-             "claimed coverage is not real."
-             % (CONFIG_WITNESS, sizes, [c[0] for c in CONFIGURATIONS]))
-    print("[ios-sdk-deltas] configs : %s preprocess to %s lines of %s -- genuinely distinct"
-          % ([c[0] for c in CONFIGURATIONS], sizes, CONFIG_WITNESS))
+    checked = configurations_differ(clang, new_sdk, project_dir, prefix_header, stub_dir, gates)
+    for name, witness, base_lines, conf_lines in checked:
+        if base_lines == conf_lines or conf_lines == 0:
+            fail("configuration '%s' no longer selects different code: %s preprocesses to %d "
+                 "lines under the baseline and %d under it. It is a duplicate of the "
+                 "baseline, so the coverage it claims is not real."
+                 % (name, witness, base_lines, conf_lines))
+    print("[ios-sdk-deltas] configs : %s"
+          % ", ".join("%s (%s %d vs %d)" % (n, w, b, c) for n, w, b, c in checked))
 
     blocking, informational = {}, {}
     for sweep_name, target in sweeps:
-        for config_name, config_defines in CONFIGURATIONS:
+        for config_name, config_defines, _witness in CONFIGURATIONS:
             defines = defines_for(gates, config_defines)
             results = {}
             for sdk_label, sdk in (("old", old_sdk), ("new", new_sdk)):
@@ -712,9 +736,17 @@ def main():
 
             added = sorted(new_diags - old_diags)
             removed = sorted(old_diags - new_diags)
-            print("[ios-sdk-deltas] %-12s %-5s ios%-5s: %d/%d clean, %d old / %d new diags, "
-                  "%d added" % (sweep_name, config_name, target, new_clean, len(present),
-                                len(old_diags), len(new_diags), len(added)))
+            # Files that fail identically under BOTH SDKs are environmental, not SDK
+            # regressions -- a stale generated header is the usual cause -- and they cancel
+            # in the subtraction. They still cost coverage, so the count is printed rather
+            # than left for someone to notice that "clean" was not all of them.
+            environmental = len(present) - new_clean
+            print("[ios-sdk-deltas] %-12s %-13s ios%-5s: %d/%d clean%s, %d old / %d new "
+                  "diags, %d added"
+                  % (sweep_name, config_name, target, new_clean, len(present),
+                     "" if environmental == 0
+                     else " (%d fail under BOTH sdks: environmental, cancels)" % environmental,
+                     len(old_diags), len(new_diags), len(added)))
             if args.verbose and removed:
                 for line in removed:
                     print("    gone: %s" % line)
