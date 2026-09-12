@@ -282,6 +282,12 @@ jobs:
           # every sweep and doubling that across the matrix buys nothing -- x64 is
           # the leg that reproduces the SIGSEGV.
           CN1_LINUX_EXTRA_DEFINES: ${{ matrix.arch == 'x64' && 'CN1_GC_VERIFY' || '' }}
+          # REQUIRED to tell "verifier clean" from "verifier absent". Without it the
+          # verifier prints nothing on a clean epoch and only speaks when it aborts,
+          # so a silent log is indistinguishable from a build where the define never
+          # reached the compiler -- which is exactly how the first attempt at this
+          # read as "no violations found" when it had in fact measured nothing.
+          CN1_GC_VERIFY_LOG: '1'
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a

@@ -293,6 +293,10 @@ class CleanTargetLinuxIntegrationTest {
         if (extraDefines != null && !extraDefines.trim().isEmpty()) {
             configure.add("-DCN1_EXTRA_DEFINES=" + extraDefines.trim());
         }
+        // Printed so a diagnostic build proves itself from the job log. A define
+        // that silently fails to reach the compiler leaves a clean-looking run that
+        // measured nothing, which is worse than no diagnostic at all.
+        System.out.println("CN1SS:HARNESS: cmake configure: " + String.join(" ", configure));
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");
