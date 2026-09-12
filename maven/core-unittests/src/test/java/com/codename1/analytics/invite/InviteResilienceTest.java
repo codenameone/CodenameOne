@@ -651,7 +651,7 @@ class InviteResilienceTest extends UITestBase {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=USELESS1", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=USELESS1xxxxxxxxxxxxxx", 0L, 0L);
             }
         });
         Invites.checkForInvite();
@@ -693,7 +693,7 @@ class InviteResilienceTest extends UITestBase {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=THROTTLE", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=THROTTLExxxxxxxxxxxxxx", 0L, 0L);
             }
         });
         Invites.checkForInvite();
@@ -738,7 +738,7 @@ class InviteResilienceTest extends UITestBase {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=RETRY1", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=RETRY1xxxxxxxxxxxxxxxx", 0L, 0L);
             }
         });
         try {
@@ -1173,7 +1173,7 @@ class InviteResilienceTest extends UITestBase {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=LATER1", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=LATER1xxxxxxxxxxxxxxxx", 0L, 0L);
             }
         });
         // After the retry interval, which now applies to this path too: a
@@ -1186,7 +1186,7 @@ class InviteResilienceTest extends UITestBase {
         Invites.lookupRetryDelay = 0;
         Invites.flush();
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
-        assertEquals("LATER1", InviteStore.get(pending, "code", null),
+        assertEquals("LATER1xxxxxxxxxxxxxxxx", InviteStore.get(pending, "code", null),
                 "the retried referrer was never read");
     }
 
@@ -1567,11 +1567,11 @@ class InviteResilienceTest extends UITestBase {
         // pending record and issues a claim -- because once a claim goes out
         // under the current epoch nothing downstream can tell it apart from a
         // legitimate one.
-        held[0].onReferrer("utm_source=cn1_invite&cn1_invite=LATE2", 0L, 0L);
+        held[0].onReferrer("utm_source=cn1_invite&cn1_invite=LATE2xxxxxxxxxxxxxxxxx", 0L, 0L);
 
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         String recorded = pending == null ? null : InviteStore.get(pending, "code", null);
-        assertNotEquals("LATE2", recorded,
+        assertNotEquals("LATE2xxxxxxxxxxxxxxxxx", recorded,
                 "a stale referrer callback wrote its code and issued a claim");
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a);
@@ -1800,9 +1800,9 @@ class InviteResilienceTest extends UITestBase {
         assertEquals(issued, Invites.currentLookupEpochForTest(),
                 "flush() superseded a referrer read that was still outstanding");
 
-        held[0].onReferrer("utm_source=cn1_invite&cn1_invite=KEPT1", 0L, 0L);
+        held[0].onReferrer("utm_source=cn1_invite&cn1_invite=KEPT1xxxxxxxxxxxxxxxxx", 0L, 0L);
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
-        assertEquals("KEPT1", InviteStore.get(pending, "code", null),
+        assertEquals("KEPT1xxxxxxxxxxxxxxxxx", InviteStore.get(pending, "code", null),
                 "the exact referrer answer was discarded");
     }
 
@@ -1905,7 +1905,7 @@ class InviteResilienceTest extends UITestBase {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=PROV1", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=PROV1xxxxxxxxxxxxxxxxx", 0L, 0L);
             }
         });
         Invites.checkForInvite();
@@ -1924,7 +1924,7 @@ class InviteResilienceTest extends UITestBase {
             }
         }
         assertNotNull(body, "the persisted referrer code was never resent");
-        assertTrue(body.contains("PROV1"), body);
+        assertTrue(body.contains("PROV1xxxxxxxxxxxxxxxxx"), body);
         assertTrue(body.replace(" ", "").contains("\"source\":\"install_referrer\""),
                 "a referrer answer was resent as a direct link: " + body);
     }
@@ -2693,7 +2693,7 @@ class InviteResilienceTest extends UITestBase {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("RETRY1", "spring", "sms"),
+                InviteTestSupport.resolvedJson("RETRY1xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
         assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
 

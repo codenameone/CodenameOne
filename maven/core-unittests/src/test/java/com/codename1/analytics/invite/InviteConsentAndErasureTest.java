@@ -622,7 +622,7 @@ class InviteConsentAndErasureTest extends UITestBase {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=SUSPEND1", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=SUSPEND1xxxxxxxxxxxxxx", 0L, 0L);
             }
         });
         Invites.checkForInvite();
@@ -695,7 +695,7 @@ class InviteConsentAndErasureTest extends UITestBase {
                     callback.onReferrer(null, 0L, 0L);
                     return;
                 }
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=PRERESET", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=PRERESETxxxxxxxxxxxxxx", 0L, 0L);
             }
         });
 
@@ -709,7 +709,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         Invites.checkForInvite();
         for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
             String body = implementation.getQueuedRequests().get(i).getRequestBody();
-            assertTrue(body == null || body.indexOf("PRERESET") < 0,
+            assertTrue(body == null || body.indexOf("PRERESETxxxxxxxxxxxxxx") < 0,
                     "the pre-reset referral was transmitted under the new client id: " + body);
         }
         assertNull(Invites.getAttribution(),

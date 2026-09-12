@@ -241,4 +241,36 @@ public class InviteButtonMintTest extends UITestBase {
         assertNotSame(first, second,
                 "the press after a completed share did not mint a fresh invite");
     }
+
+    /**
+     * A press after the application changed the campaign mints afresh.
+     *
+     * <p>The outstanding invite is reused so a double tap is one invitation
+     * rather than two codes with the first left registered and never shared.
+     * That was keyed on the field alone -- and a dismissed chooser reports
+     * nothing, so the invite stayed outstanding for the life of the button and
+     * every later press shared it no matter what the application had set
+     * since. setCampaign() before the next press was silently ignored and the
+     * invite kept reporting the campaign it was minted under.</p>
+     */
+    @FormTest
+    void changingTheCampaignBetweenPressesMintsANewInvite() {
+        Invites.reset();
+        Analytics.setConsentMode(ConsentMode.OPT_IN);
+        Analytics.setConsent(AnalyticsConsent.builder().analytics(true).build());
+        InviteButton b = new InviteButton("Invite");
+        b.setCampaign("spring");
+
+        Invite first = b.mintForShare();
+        assertNotNull(first, "the fixture did not mint");
+        assertSame(first, b.mintForShare(),
+                "an unchanged press minted a second code, so a double tap is two invites");
+
+        b.setCampaign("summer");
+        Invite second = b.mintForShare();
+        assertNotNull(second, "no invite was minted after the campaign changed");
+        assertNotSame(first, second,
+                "the campaign changed and the press reused the old invite, so the new "
+                        + "campaign is never reported");
+    }
 }

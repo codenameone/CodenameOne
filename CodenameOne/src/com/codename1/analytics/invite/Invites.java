@@ -1903,7 +1903,7 @@ public final class Invites {
             return null;
         }
         if (q >= 0) {
-            String code = codeFromQuery(url.substring(q + 1));
+            String code = validCodeFromQuery(url.substring(q + 1));
             if (code != null) {
                 return code;
             }
@@ -2014,6 +2014,33 @@ public final class Invites {
 
     // Parses a referrer or query string for the invite key. Split on the
     // FIRST '=' only, and compare the key with equals -- never a case fold.
+    /// The same parse, with the code grammar applied.
+    ///
+    /// Both callers want this one, and they get it from a single place on
+    /// purpose: when the path form was guarded, the query form was not, so a
+    /// same-host url carrying `cn1_invite=<anything>` was consumed and
+    /// persisted exactly as `/i/<anything>` had been. The url query is
+    /// attacker-supplied and the Play referrer is device-local and forgeable
+    /// on a rooted device, so neither is trusted.
+    ///
+    /// Separate from the parser below because the two answer different
+    /// questions: where the value ENDS -- the first `=`, which can only be
+    /// observed with a value no code could be -- and whether it is a code.
+    ///
+    /// #### Parameters
+    ///
+    /// - `query`: the query or referrer string, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the code, or null when there is none or it is not one
+    static String validCodeFromQuery(String query) {
+        String code = codeFromQuery(query);
+        return isWellFormedCode(code) ? code : null;
+    }
+
+    // Parses only: the value as it appears, whatever shape it is in. Callers
+    // that act on it want validCodeFromQuery() above.
     static String codeFromQuery(String query) {
         if (query == null || query.length() == 0) {
             return null;
@@ -2770,7 +2797,7 @@ public final class Invites {
                             if (issued != lookupEpoch) {
                                 return;
                             }
-                            String code = codeFromQuery(rawReferrer);
+                            String code = validCodeFromQuery(rawReferrer);
                             if (code == null) {
                                 // The referrer was read and carries no invite.
                                 // That is an answer, not an outage.

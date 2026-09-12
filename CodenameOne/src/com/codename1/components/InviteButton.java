@@ -31,8 +31,15 @@ import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.events.ActionEvent;
 
-/// A [ShareButton] that mints a fresh invite on every press and shares it, so
-/// the whole invite funnel is wired with one component.
+/// A [ShareButton] that mints an invite and shares it, so the whole invite
+/// funnel is wired with one component.
+///
+/// A press mints a new invite unless one is already outstanding for the SAME
+/// campaign, channel and payload, in which case that one is shared again. Two
+/// presses of an unchanged button are one invitation, not two codes with the
+/// first left registered and never shared; changing any of the three before
+/// the next press mints afresh, because the invite has to carry what the
+/// application last asked for.
 ///
 /// ```java
 /// InviteButton invite = new InviteButton("Invite a friend");
@@ -62,6 +69,14 @@ public class InviteButton extends ShareButton {
     // outcome is taken, so that outcome can be reported exactly once.
     private Invite invite;
     private Invite outstanding;
+
+    // What the outstanding invite was minted from, so a press can tell a
+    // double tap from a request the application has changed since.
+    private String outstandingCampaign;
+
+    private String outstandingChannel;
+
+    private String outstandingPayload;
     private ShareResultListener appListener;
     // The chained listener super was given. Package private so a test can
     // deliver a ShareResult without the share sheet -- getShareResultListener()
@@ -111,6 +126,20 @@ public class InviteButton extends ShareButton {
     // of adding to a pile of them. The fix is there rather than here because
     // every ShareButton with a result listener had the same leak, invites or
     // not.
+    /// Null-tolerant equality, because every one of these may be unset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: one value, may be null
+    /// - `b`: the other, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when they are the same value or both unset
+    private static boolean same(String a, String b) {
+        return a == null ? b == null : a.equals(b);
+    }
+
     private void installChain() {
         chain = new ShareResultListener() {
             @Override
@@ -328,9 +357,24 @@ public class InviteButton extends ShareButton {
         // construction. Sharing one code more than once is the ordinary shape
         // of a referral anyway -- a code is not per recipient, it is the
         // inviter's -- so nothing is lost by not minting a second.
-        if (outstanding == null) {
+        // ... and only while the request is UNCHANGED.
+        //
+        // The reuse above is about a double tap, where nothing can have
+        // changed between the two presses. It was keyed on the field alone,
+        // and a chooser reports nothing when it is dismissed -- so a cancelled
+        // share left the invite outstanding for the life of the button, and
+        // every later press shared it no matter what the application had set
+        // since. setCampaign() before the next press was silently ignored, and
+        // the invite kept reporting the campaign it was minted under.
+        if (outstanding == null
+                || !same(outstandingCampaign, campaign)
+                || !same(outstandingChannel, channel)
+                || !same(outstandingPayload, payload)) {
             try {
                 outstanding = Invites.create(b.build());
+                outstandingCampaign = campaign;
+                outstandingChannel = channel;
+                outstandingPayload = payload;
             } catch (IllegalStateException e) {
                 // The device could not supply secure randomness, so there is
                 // no invite to share. Nothing is presented rather than

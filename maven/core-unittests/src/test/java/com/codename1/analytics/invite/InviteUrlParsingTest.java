@@ -139,12 +139,12 @@ class InviteUrlParsingTest extends UITestBase {
     @EdtTest
     void aFragmentOnAQueryStyleLinkIsAlsoStripped() {
         // The query branch runs first, so stripping on the path branch alone
-        // left it parsing "?cn1_invite=ABC125#section" and claiming a code with
+        // left it parsing "?cn1_invite=ABC125xxxxxxxxxxxxxxxx#section" and claiming a code with
         // the fragment glued to it.
         assertTrue(Invites.handleUrl(
-                "https://cloud.codenameone.com/i/acme?cn1_invite=ABC125#section"));
+                "https://cloud.codenameone.com/i/acme?cn1_invite=ABC125xxxxxxxxxxxxxxxx#section"));
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
-        assertEquals("ABC125", InviteStore.get(pending, "code", null));
+        assertEquals("ABC125xxxxxxxxxxxxxxxx", InviteStore.get(pending, "code", null));
     }
 
     @FormTest
@@ -156,11 +156,11 @@ class InviteUrlParsingTest extends UITestBase {
         // install, or a last-touch re-attribution, to whoever wrote a url this
         // app happens to open.
         assertNull(Invites.extractCode(
-                        "https://partner.example.com/promo?cn1_invite=STOLEN1"),
+                        "https://partner.example.com/promo?cn1_invite=STOLEN1xxxxxxxxxxxxxxx"),
                 "a url on somebody else's host was accepted as an invite");
         // Our own host in the query form is still an invite.
-        assertEquals("MINE123", Invites.extractCode(
-                "https://cloud.codenameone.com/anything?cn1_invite=MINE123"));
+        assertEquals("MINE123xxxxxxxxxxxxxxx", Invites.extractCode(
+                "https://cloud.codenameone.com/anything?cn1_invite=MINE123xxxxxxxxxxxxxxx"));
     }
 
     @FormTest
@@ -302,5 +302,36 @@ class InviteUrlParsingTest extends UITestBase {
         assertEquals("ABC123xxxxxxxxxxxxxxxx",
                 Invites.extractCode(host + "acme/ABC123xxxxxxxxxxxxxxxx"),
                 "a well formed slugged code stopped being recognised");
+    }
+
+    /**
+     * A query-borne code is held to the same grammar as a path-borne one.
+     *
+     * <p>The path form was guarded first and this one was not, so the same
+     * malformed value simply moved: {@code ?cn1_invite=<anything>} on the
+     * shared host was consumed, persisted and claimed exactly as
+     * {@code /i/<anything>} had been. Both callers now go through one
+     * validating entry point rather than each remembering to check.</p>
+     */
+    @FormTest
+    void aQueryBorneCodeMustLookLikeACodeToo() {
+        InviteTestSupport.freshInstall();
+        String base = "https://cloud.codenameone.com/?cn1_invite=";
+
+        assertNull(Invites.extractCode(base + "hello"),
+                "a short word in the query was accepted as an invite code");
+        assertNull(Invites.extractCode(base + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+                "an over-long query value was accepted as an invite code");
+        assertEquals("ABC123xxxxxxxxxxxxxxxx",
+                Invites.extractCode(base + "ABC123xxxxxxxxxxxxxxxx"),
+                "a well formed query code stopped being recognised");
+
+        // The parser underneath still answers the question it is for: where
+        // the value ENDS. That can only be seen with a value no code could be,
+        // which is why the two are separate.
+        assertEquals("a=b", Invites.codeFromQuery("cn1_invite=a=b"),
+                "the parser stopped splitting on the first equals only");
+        assertNull(Invites.validCodeFromQuery("cn1_invite=a=b"),
+                "a value with an equals in it was accepted as a code");
     }
 }
