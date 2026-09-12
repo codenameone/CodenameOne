@@ -171,4 +171,39 @@ class InviteUrlParsingTest extends UITestBase {
                 Invites.extractCode("https://cloud.codenameone.com/i/acme/OURS123"),
                 "our own slugged invite stopped being recognised");
     }
+
+    @FormTest
+    void aRoutedInviteUrlIsNotHandledTwice() {
+        // handleUrl() is the documented route for an app that handles its own
+        // deep links, and on Android it runs from the dispatch that setting
+        // AppArg fires -- with a checkForInvite() queued behind it as the
+        // fallback for apps with no router. The argument stayed set, so that
+        // queued check read the same url and handled it again: invite_opened
+        // twice on a resolved install, and on a pending one a duplicate claim
+        // whose epoch bump discarded the answer to the first.
+        Invites.reset();
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        d.setProperty("AppArg", "https://cloud.codenameone.com/i/ROUTED1");
+
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/ROUTED1"),
+                "the fixture url was not recognised as an invite");
+
+        assertNull(d.getProperty("AppArg", null),
+                "the routed url was left in AppArg, so the queued checkForInvite() "
+                        + "handles the same invite a second time");
+    }
+
+    @FormTest
+    void anUnrelatedAppArgIsLeftAlone() {
+        // An application may pass any string to handleUrl(). Clearing a launch
+        // argument that is not the one being handled is not ours to do.
+        Invites.reset();
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        d.setProperty("AppArg", "myapp://somewhere/else");
+
+        Invites.handleUrl("https://cloud.codenameone.com/i/OTHER1");
+
+        assertEquals("myapp://somewhere/else", d.getProperty("AppArg", null),
+                "an unrelated launch argument was cleared");
+    }
 }

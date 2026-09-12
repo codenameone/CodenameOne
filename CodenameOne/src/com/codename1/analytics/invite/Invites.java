@@ -204,7 +204,6 @@ public final class Invites {
     static final String PREF_SLUG = "cn1$inviteSlug";
     // Kept only so reset() can clear what earlier versions of this class
     // persisted. Nothing writes it any more -- see checkForInvite.
-    static final String PREF_CONSUMED_ARG = "cn1$inviteConsumedArg";
 
     // The referrer key the link service puts on the store url. Compared with
     // equals and never case folded: String.toLowerCase is locale sensitive and
@@ -614,6 +613,24 @@ public final class Invites {
         if (code == null) {
             return false;
         }
+        // CONSUMED here, the moment the url is recognised as an invite.
+        //
+        // This is the documented route for an application that handles its own
+        // deep links, and it is reached from the external-url dispatch that
+        // Display.setProperty("AppArg", ...) fires synchronously. The Android
+        // onNewIntent splice queues a checkForInvite() behind that dispatch as
+        // the fallback for apps with no router -- and for an app that DOES
+        // route, the argument was still sitting there, so the queued check
+        // read the same url and handled it a second time: invite_opened twice
+        // on a resolved install, and on a pending one a duplicate claim whose
+        // epoch bump discarded the answer to the first.
+        //
+        // Only when it really is this url. An application may pass any string
+        // here, and clearing an unrelated launch argument is not ours to do.
+        Display display = Display.getInstance();
+        if (display != null && url != null && url.equals(display.getProperty("AppArg", null))) {
+            display.setProperty("AppArg", null);
+        }
         ensureProvider();
         // A tapped link is a fresh answer and would ordinarily reopen
         // attribution, but not while an erasure is still owed: claiming writes
@@ -914,12 +931,36 @@ public final class Invites {
     /// once, because it cannot be refused -- pointing at a staging service and
     /// accepting the browser is a legitimate thing to do.
     ///
+    /// A bare host is accepted and read as `https://`. Anything else that is
+    /// not HTTPS is REFUSED: Invite.getUrl() promises an absolute https url,
+    /// and the generated Android filter and iOS associated domain match
+    /// nothing else, so an http:// base mints links that always open the
+    /// browser -- and it would pass the host check below, which compares
+    /// hosts and not schemes.
+    ///
     /// #### Parameters
     ///
     /// - `url`: the base address, with no trailing path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the address is not HTTPS
     public static void setLinkBase(String url) {
-        linkBase = url;
-        warnIfNotTheRegisteredHost(url);
+        String normalized = url;
+        if (normalized != null && normalized.trim().length() > 0) {
+            normalized = normalized.trim();
+            if (normalized.indexOf("://") < 0) {
+                // A bare host, which is what the build hint carries and what
+                // an application copying it would naturally pass.
+                normalized = "https://" + normalized;
+            }
+            if (!normalized.regionMatches(true, 0, "https://", 0, 8)) {
+                throw new IllegalArgumentException(
+                        "the invite link base must be https, not " + normalized);
+            }
+        }
+        linkBase = normalized;
+        warnIfNotTheRegisteredHost(normalized);
     }
 
     /// Says so when links will be minted for a host the build did not register.
@@ -1279,7 +1320,6 @@ public final class Invites {
         // next launch, which is the thing being erased.
         cleared &= InviteStore.delete(InviteStore.ATTRIBUTION);
         cleared &= InviteStore.delete(InviteStore.OUTBOX);
-        Preferences.delete(PREF_CONSUMED_ARG);
         clearDimensions();
         resolved = null;
         // Loaded, and the answer is "none" -- not "unknown", or the next call

@@ -133,7 +133,6 @@ final class InviteTestSupport {
         pendingHandoff = new PendingHandoffSource();
         Invites.registerAppClipHandoffSource(pendingHandoff);
         Preferences.delete(Invites.PREF_SLUG);
-        Preferences.delete(Invites.PREF_CONSUMED_ARG);
         // reset() clears the records; clearProviders() above dropped the
         // provider Invites registers, and the next facade call re-adds it.
         RecordingProvider recorder = new RecordingProvider();
@@ -151,7 +150,6 @@ final class InviteTestSupport {
         Analytics.setConsent(null);
         Analytics.setConsentMode(ConsentMode.OPT_IN);
         Preferences.delete(Invites.PREF_SLUG);
-        Preferences.delete(Invites.PREF_CONSUMED_ARG);
     }
 
     // The launch argument is process-wide, so a test that sets one and does
