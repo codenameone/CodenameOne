@@ -777,4 +777,42 @@ class ExtensionDeploymentFloorScriptTest {
                 "the floor has to be written somewhere the device build reads it: "
                         + got.get(0));
     }
+
+    /// Xcode resolves build settings per LEVEL: a TARGET declaration overrides a PROJECT one,
+    /// and conditions rank only WITHIN a level. Pooling the two ranked the project's
+    /// conditional above the target's unconditional purely because it carried a condition, so
+    /// the pass read 12.0 where Xcode reads 16.4 and wrote the floor over a target that did not
+    /// need it -- lowering the extension, which is the one outcome this pass must never cause.
+    @Test
+    void aTargetSettingOverridesAProjectQualifier(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'EXTENSION_MIN[sdk=iphoneos*]' => '12.0'}",
+                "TargetWins|" + EXT + "|EXTENSION_MIN->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)"),
+                "the target's own EXTENSION_MIN is 16.4 and clears the floor, so the project's "
+                        + "qualified 12.0 must not decide this: " + got.get(0));
+    }
+
+    /// Branch discovery has to follow helpers TRANSITIVELY. Here the outer helper carries no
+    /// conditions at all and the branches hang off the inner one, so scanning only the names
+    /// written in the expression produced no candidate context and left the device target at
+    /// 12.0 for the new SDK to reject.
+    @Test
+    void branchDiscoveryFollowsHelpersTransitively(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Transitive|" + EXT + "|EXTENSION_MIN->$(DEVICE_MIN);"
+                        + "DEVICE_MIN[sdk=iphoneos*]->12.0;"
+                        + "DEVICE_MIN[sdk=iphonesimulator*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
+                "the device branch resolves through EXTENSION_MIN to DEVICE_MIN's 12.0 and must "
+                        + "be pinned: " + got.get(0));
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)"),
+                "the simulator branch resolves to 16.4, so the base expression still serves it: "
+                        + got.get(0));
+    }
 }
