@@ -56,7 +56,19 @@ J8="${JDK_8_HOME:?set JDK_8_HOME to a JDK 8 home}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1backend.XXXXXX")"
 
 TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
-if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ]; then
+TRANSLATOR_STAMP="$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class"
+# Rebuild when a TRANSLATOR SOURCE is newer than what was compiled, for the same
+# reason the JavaAPI block below does it -- but here staleness does not merely
+# keep the old behaviour, it fails the build in a place that names nothing. The
+# C runtime sources are copied out of src/ on every run a few lines down, so an
+# old target/classes pairs a NEW cn1_globals.h with the emitter that preceded
+# it. After a merge that renamed the POP2 helper, the generated C still called
+# the previous one and clang reported an undeclared function in a file this
+# script had just written; neither the translator nor target/classes appeared in
+# the message.
+if [ ! -f "$TRANSLATOR_STAMP" ] \
+   || [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" -name '*.java' \
+              -newer "$TRANSLATOR_STAMP" -print -quit)" ]; then
     (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
 fi
 ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/bench-asm-classpath.txt"
