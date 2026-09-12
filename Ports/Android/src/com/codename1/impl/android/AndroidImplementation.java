@@ -10112,25 +10112,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     // different claim -- one SpotBugs reads as a threading bug, correctly,
     // because nothing here would make it safe if it were true.
     //
-    // pendingShareListener is written from the Codename One EDT and read on
-    // the Android main thread, which is why it is volatile. That is a native
-    // boundary crossing, not core framework code.
+    // Each chooser gets its OWN entry, keyed by a token the PendingIntent
+    // carries back, and they share the one receiver.
+    //
+    // A single replaceable listener was wrong: two share() calls that both
+    // present a chooser before either reports a selection would have the
+    // second overwrite the first, so picking a target in the first chooser
+    // invoked the SECOND call's listener and the second result was then
+    // dropped against a field that had already been cleared. The per-call
+    // receiver this replaced did not have that fault -- it gave each chooser
+    // its own action and its own PendingIntent -- so keeping the leak fixed
+    // must not cost that.
+    //
+    // What cannot be reclaimed is an entry for a chooser the user DISMISSED,
+    // because Android reports nothing for one. The map is bounded instead:
+    // beyond MAX_PENDING_SHARES the oldest is dropped, which is the same
+    // outcome the single field gave and only for shares that old. Insertion
+    // order is what LinkedHashMap gives, and the oldest outstanding chooser is
+    // the one the user is least likely to still be looking at.
+    //
+    // Touched from the Codename One EDT (share) and the Android main thread
+    // (onReceive), so every access is synchronized on the map itself. That is
+    // a native boundary crossing, not core framework code.
     private BroadcastReceiver shareChooserReceiver;
 
     private String shareChooserAction;
 
-    private volatile com.codename1.share.ShareResultListener pendingShareListener;
+    private static final String EXTRA_SHARE_TOKEN = "cn1ShareToken";
+
+    private static final int MAX_PENDING_SHARES = 8;
+
+    private int nextShareToken = 1;
+
+    private final java.util.LinkedHashMap<Integer, com.codename1.share.ShareResultListener>
+            pendingShares =
+            new java.util.LinkedHashMap<Integer, com.codename1.share.ShareResultListener>();
 
     @TargetApi(22)
     private Intent buildShareChooserWithCallback(Intent shareIntent, final com.codename1.share.ShareResultListener listener) {
         final Context appCtx = getContext().getApplicationContext();
-        // The listener this chooser is for. Set before the receiver can
-        // possibly fire, and replacing whatever a dismissed chooser left.
-        pendingShareListener = listener;
+        // This chooser's own token, recorded before the receiver can fire.
+        final int token;
+        synchronized (pendingShares) {
+            token = nextShareToken++;
+            pendingShares.put(Integer.valueOf(token), listener);
+            while (pendingShares.size() > MAX_PENDING_SHARES) {
+                java.util.Iterator<Integer> oldest = pendingShares.keySet().iterator();
+                oldest.next();
+                oldest.remove();
+            }
+        }
         if (shareChooserReceiver != null) {
             // Already registered and listening on the same action, so there is
             // nothing to build but the PendingIntent below.
-            return chooserFor(appCtx, shareIntent, shareChooserAction);
+            return chooserFor(appCtx, shareIntent, shareChooserAction, token);
         }
         final String action = appCtx.getPackageName() + ".CN1_SHARE_CHOSEN";
         shareChooserAction = action;
@@ -10141,10 +10176,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context ctx, Intent intent) {
-                // Taken, so a repeat broadcast cannot deliver twice. The
-                // receiver stays registered for the next share.
-                com.codename1.share.ShareResultListener target = pendingShareListener;
-                pendingShareListener = null;
+                // Taken by token, so this delivers to the chooser it belongs
+                // to and a repeat broadcast cannot deliver twice. The receiver
+                // stays registered for the next share.
+                com.codename1.share.ShareResultListener target;
+                synchronized (pendingShares) {
+                    target = pendingShares.remove(Integer.valueOf(
+                            intent.getIntExtra(EXTRA_SHARE_TOKEN, -1)));
+                }
                 if (target == null) {
                     return;
                 }
@@ -10180,7 +10219,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // dismissal: there is no public API to observe a user-cancel.
         // Apps that need a dismissal signal must use Activity-resume.
 
-        return chooserFor(appCtx, shareIntent, action);
+        return chooserFor(appCtx, shareIntent, action, token);
     }
 
     /// The chooser Intent itself, wrapping a broadcast PendingIntent on this
@@ -10191,8 +10230,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// safe to reuse: the same PendingIntent is handed back with this
     /// chooser's extras, and only one chooser is ever up at a time.
     @TargetApi(22)
-    private Intent chooserFor(Context appCtx, Intent shareIntent, String action) {
+    private Intent chooserFor(Context appCtx, Intent shareIntent, String action, int token) {
         Intent pi = new Intent(action).setPackage(appCtx.getPackageName());
+        pi.putExtra(EXTRA_SHARE_TOKEN, token);
         int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (android.os.Build.VERSION.SDK_INT >= 31) {
             // FLAG_MUTABLE was introduced in API 31; its numeric value

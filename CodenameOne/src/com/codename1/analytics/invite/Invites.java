@@ -1950,13 +1950,66 @@ public final class Invites {
             // own, so its later mints advertised their links.
             return null;
         }
-        if (pathSlug != null && (mine == null || mine.length() == 0)) {
-            // Learned only when this build has no slug of its own to
-            // contradict: the bare form is what a first offline mint produces,
-            // and the server hands the slugged one back on registration.
-            Preferences.set(PREF_SLUG, pathSlug);
+        // NOT learned from the link, and the justification that used to sit
+        // here did not survive reading it again. It said the bare form is what
+        // a first offline mint produces and the server hands the slugged one
+        // back on registration -- both true, and neither an argument for this
+        // branch, which only runs when the url DID carry a slug. So the only
+        // thing it ever learned from was a slug somebody else put in a url.
+        //
+        // A build whose App Links filter claims /i/ broadly is handed another
+        // app's /i/<slug>/<code> on the host every enrolled app shares. The
+        // guard above refuses to CLAIM that invite once this build knows its
+        // own slug; a build that does not yet know one adopted the stranger's,
+        // and every invite it minted before its first registration response
+        // then advertised their path.
+        //
+        // The two sources that remain are the ones that can be trusted: the
+        // build hint the builder writes into invite.slug, and the registration
+        // response.
+        //
+        // The CODE has to look like a code.
+        //
+        // Any nonempty final path component was accepted, so a same-host url
+        // like /i/<anything> was consumed, written into the PENDING record and
+        // put through the claim retries -- and on a fresh install the no-match
+        // that came back could settle attribution before the referrer or the
+        // App Clip handoff had been looked at, which is the answer that
+        // actually mattered. The framework's codes are always CODE_CHARS of
+        // url-safe base64, the same shape the server checks before letting a
+        // registration create a row. A manual short code is entered by the
+        // invitee and reaches the claim path directly, so it never comes
+        // through here and this does not narrow it.
+        return isWellFormedCode(code) ? code : null;
+    }
+
+    /// Whether this is the shape the framework mints: CODE_CHARS characters
+    /// of url-safe base64, and nothing else.
+    ///
+    /// Spelled out rather than done with a regex, because the core has to run
+    /// where one is not available, and by hand so no locale can fold a
+    /// character out from under it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `code`: the candidate, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when it could be a code this framework produced
+    static boolean isWellFormedCode(String code) {
+        if (code == null || code.length() != CODE_CHARS) {
+            return false;
         }
-        return code.length() == 0 ? null : code;
+        for (int i = 0; i < code.length(); i++) {
+            char c = code.charAt(i);
+            boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9') || c == '-' || c == '_';
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // Parses a referrer or query string for the invite key. Split on the

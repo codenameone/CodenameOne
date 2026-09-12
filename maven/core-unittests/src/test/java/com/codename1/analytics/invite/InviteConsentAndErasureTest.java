@@ -53,11 +53,11 @@ class InviteConsentAndErasureTest extends UITestBase {
         implementation.setAutoProcessConnections(false);
 
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
         Map<String, String> dims = Analytics.getDimensions();
-        assertEquals("ABC123", dims.get(Invites.DIMENSION_CODE));
+        assertEquals("ABC123xxxxxxxxxxxxxxxx", dims.get(Invites.DIMENSION_CODE));
         assertEquals("spring", dims.get(Invites.DIMENSION_CAMPAIGN));
         assertEquals("sms", dims.get(Invites.DIMENSION_CHANNEL));
         assertEquals(Invites.MATCH_REFERRER, dims.get(Invites.DIMENSION_MATCH));
@@ -68,7 +68,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
         Analytics.clearProviders();
@@ -97,7 +97,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         implementation.setAutoProcessConnections(false);
         Analytics.setDimension("plan", "pro");
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
         assertNotNull(Invites.getAttribution());
 
@@ -134,7 +134,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
         assertNotNull(Invites.getAttribution());
 
@@ -152,7 +152,7 @@ class InviteConsentAndErasureTest extends UITestBase {
 
         // And a NEW invite still reopens it: erasing an identity is not a
         // decision about an invite the person taps afterwards.
-        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/AFTER1"));
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/AFTER1xxxxxxxxxxxxxxxx"));
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
                 "a direct invite could not reopen attribution after an erasure");
     }
@@ -170,7 +170,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
         assertNotNull(Invites.getAttribution());
 
@@ -231,7 +231,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         // own aftermath.
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
-        Invites.handleUrl("https://cloud.codenameone.com/i/ABC123");
+        Invites.handleUrl("https://cloud.codenameone.com/i/ABC123xxxxxxxxxxxxxxxx");
         implementation.clearQueuedRequests();
 
         InviteStore.failNextDeleteForTest(InviteStore.PENDING);
@@ -332,7 +332,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
         // addProvider calls init() with the current client id, exactly as
@@ -458,7 +458,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         Analytics.resetClientId();
 
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true, issuedUnder);
 
         assertNull(Invites.getAttribution(), "an erased identity was re-attributed");
@@ -475,7 +475,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
 
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true, issuedUnder);
 
         assertNull(Invites.getAttribution(), "a refusal was overridden by a late response");
@@ -506,7 +506,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
         Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
@@ -556,7 +556,7 @@ class InviteConsentAndErasureTest extends UITestBase {
         // registered transmitted them. An erasure cannot depend on who happens
         // to be registered when it runs.
         InviteTestSupport.freshInstall();
-        Invites.handleResolution(InviteTestSupport.resolvedJson("CODE1", "spring", "sms"),
+        Invites.handleResolution(InviteTestSupport.resolvedJson("CODE1xxxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_DIRECT, false);
         assertNotNull(Analytics.getDimensions().get("cn1_campaign"));
         Analytics.setDimension("plan", "pro");

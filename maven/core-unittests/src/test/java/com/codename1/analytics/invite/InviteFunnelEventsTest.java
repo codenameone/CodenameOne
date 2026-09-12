@@ -104,7 +104,7 @@ class InviteFunnelEventsTest extends UITestBase {
         RecordingProvider recorder = InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
         recorder.clear();
 
@@ -113,7 +113,7 @@ class InviteFunnelEventsTest extends UITestBase {
         AnalyticsEvent e = recorder.first("invite_converted");
         assertNotNull(e, "expected invite_converted, saw " + recorder.names());
         assertEquals(Invites.CATEGORY, e.getCategory());
-        assertEquals("ABC123", e.getParameters().get("invite_code"));
+        assertEquals("ABC123xxxxxxxxxxxxxxxx", e.getParameters().get("invite_code"));
         assertEquals("spring", e.getParameters().get("campaign"));
         assertEquals("signup", e.getParameters().get("action"));
         assertEquals("USD", e.getParameters().get("currency"));
@@ -127,7 +127,7 @@ class InviteFunnelEventsTest extends UITestBase {
         recorder.clear();
 
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
         assertNotNull(recorder.first("invite_install"));
@@ -143,7 +143,7 @@ class InviteFunnelEventsTest extends UITestBase {
         recorder.clear();
 
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_DIRECT, false);
 
         assertNotNull(recorder.first("invite_opened"));
@@ -157,7 +157,7 @@ class InviteFunnelEventsTest extends UITestBase {
         Invite invite = Invites.create(InviteRequest.create().build());
         Invites.reportShareResult(invite, ShareResult.sharedTo("com.whatsapp"));
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
         Invites.conversion("signup");
 

@@ -66,11 +66,11 @@ class InviteDeliveryTest extends UITestBase {
         Invites.setInviteListener(capture);
 
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
         assertEquals(1, capture.received.size());
-        assertEquals("ABC123", capture.received.get(0).getCode());
+        assertEquals("ABC123xxxxxxxxxxxxxxxx", capture.received.get(0).getCode());
         assertTrue(capture.received.get(0).isDeferred());
 
         // Re-entering the facade, as a later start() would, must not deliver
@@ -88,14 +88,14 @@ class InviteDeliveryTest extends UITestBase {
         // A cold launch from a link resolves before the application has run
         // start(), so the answer has to wait rather than be dropped.
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("ABC123", "spring", "sms"),
+                InviteTestSupport.resolvedJson("ABC123xxxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
         Capture capture = new Capture();
         Invites.setInviteListener(capture);
 
         assertEquals(1, capture.received.size(), "the held attribution was never delivered");
-        assertEquals("ABC123", capture.received.get(0).getCode());
+        assertEquals("ABC123xxxxxxxxxxxxxxxx", capture.received.get(0).getCode());
     }
 
     @FormTest
@@ -131,7 +131,7 @@ class InviteDeliveryTest extends UITestBase {
 
             public void requestReferrer(InstallReferrerCallback callback) {
                 callback.onReferrer(
-                        "utm_source=cn1_invite&utm_medium=referral&cn1_invite=ABC123",
+                        "utm_source=cn1_invite&utm_medium=referral&cn1_invite=ABC123xxxxxxxxxxxxxxxx",
                         1700000000L, 1700000060L);
             }
         });
@@ -148,7 +148,7 @@ class InviteDeliveryTest extends UITestBase {
             if (url.endsWith("/invites/claim")) {
                 sawClaim = true;
                 assertTrue(implementation.getQueuedRequests().get(i)
-                        .getRequestBody().contains("ABC123"));
+                        .getRequestBody().contains("ABC123xxxxxxxxxxxxxxxx"));
             }
         }
         assertTrue(sawClaim, "expected a deterministic claim");
@@ -384,14 +384,14 @@ class InviteDeliveryTest extends UITestBase {
         assertTrue(InviteTestSupport.pendingHandoff.wasAsked());
 
         // A link is tapped while the clip read is still outstanding.
-        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECTWINS"));
-        assertEquals("DIRECTWINS",
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECTWINSxxxxxxxxxxxx"));
+        assertEquals("DIRECTWINSxxxxxxxxxxxx",
                 InviteStore.get(InviteStore.read(InviteStore.PENDING), "code", null));
 
         // The clip finally answers, with something else.
         InviteTestSupport.pendingHandoff.answer("STALECLIP");
 
-        assertEquals("DIRECTWINS",
+        assertEquals("DIRECTWINSxxxxxxxxxxxx",
                 InviteStore.get(InviteStore.read(InviteStore.PENDING), "code", null),
                 "a clip answer from before the link overwrote the newer exact claim");
     }
@@ -404,7 +404,7 @@ class InviteDeliveryTest extends UITestBase {
                 InviteTestSupport.resolvedJson("FIRST", "spring", "sms"),
                 Invites.MATCH_REFERRER, true);
 
-        Invites.handleUrl("https://cloud.codenameone.com/i/SECOND");
+        Invites.handleUrl("https://cloud.codenameone.com/i/SECONDxxxxxxxxxxxxxxxx");
 
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a);

@@ -326,7 +326,7 @@ class InviteResilienceTest extends UITestBase {
         implementation.setAutoProcessConnections(false);
         implementation.clearQueuedRequests();
 
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/CLAIMKILL");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/CLAIMKILLxxxxxxxxxxxxx");
         java.util.List<com.codename1.io.ConnectionRequest> queued =
                 implementation.getQueuedRequests();
         assertTrue(queued.size() > 0, "the fixture queued no claim at all");
@@ -807,7 +807,7 @@ class InviteResilienceTest extends UITestBase {
         assertEquals(Invites.STATE_RESOLVED, Invites.getState());
 
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/second");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/secondxxxxxxxxxxxxxxxx");
         Invites.forgetLoadedState();
 
         assertEquals(Invites.STATE_PENDING, Invites.getState(),
@@ -938,8 +938,8 @@ class InviteResilienceTest extends UITestBase {
         Invites.checkForInvite();
         int deferredEpoch = Invites.currentLookupEpochForTest();
 
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT1");
-        Invites.handleResolution(InviteTestSupport.resolvedJson("DIRECT1", "c1", "sms"),
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT1xxxxxxxxxxxxxxx");
+        Invites.handleResolution(InviteTestSupport.resolvedJson("DIRECT1xxxxxxxxxxxxxxx", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
 
         // The deferred answer arrives late, under the epoch it was issued in.
@@ -948,7 +948,7 @@ class InviteResilienceTest extends UITestBase {
 
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a);
-        assertEquals("DIRECT1", a.getCode(),
+        assertEquals("DIRECT1xxxxxxxxxxxxxxx", a.getCode(),
                 "a late statistical match overwrote the exact direct attribution");
     }
 
@@ -1122,7 +1122,7 @@ class InviteResilienceTest extends UITestBase {
                 told[0] = reason;
             }
         });
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/CODE1");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/CODE1xxxxxxxxxxxxxxxxx");
         assertEquals(Invites.REASON_CONSENT_DENIED, told[0],
                 "a refused direct link told the listener nothing");
     }
@@ -1252,11 +1252,11 @@ class InviteResilienceTest extends UITestBase {
         InviteTestSupport.freshInstall();
         implementation.setAutoProcessConnections(false);
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/PENDSURV");
+        Invites.handleUrl("https://cloud.codenameone.com/i/PENDSURVxxxxxxxxxxxxxx");
 
         InviteStore.failNextDeleteForTest(InviteStore.PENDING);
         Invites.handleResolution(
-                InviteTestSupport.resolvedJson("PENDSURV", "spring", "sms"),
+                InviteTestSupport.resolvedJson("PENDSURVxxxxxxxxxxxxxx", "spring", "sms"),
                 Invites.MATCH_DIRECT, false);
         assertNotNull(Invites.getAttribution(), "the fixture did not resolve");
 
@@ -1314,14 +1314,14 @@ class InviteResilienceTest extends UITestBase {
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
-                callback.onReferrer("utm_source=cn1_invite&cn1_invite=EXACT9", 0L, 0L);
+                callback.onReferrer("utm_source=cn1_invite&cn1_invite=EXACT9xxxxxxxxxxxxxxxx", 0L, 0L);
             }
         });
         Invites.checkForInvite();
 
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         assertNotNull(pending, "the pending record was not kept at all");
-        assertEquals("EXACT9", InviteStore.get(pending, "code", null),
+        assertEquals("EXACT9xxxxxxxxxxxxxxxx", InviteStore.get(pending, "code", null),
                 "the exact referrer code was not persisted before the claim");
     }
 
@@ -1498,14 +1498,14 @@ class InviteResilienceTest extends UITestBase {
                 "the fixture already has a code, so the assertion below proves nothing");
         InviteStore.failNextWriteForTest(InviteStore.PENDING);
 
-        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT7"),
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT7xxxxxxxxxxxxxxx"),
                 "the link was not recognised at all");
         assertEquals(Invites.STATE_PENDING, Invites.getState());
 
         // And the next read of the record still has the code, and persists it.
         Map<String, String> record = Invites.pendingRecordForTest();
         assertNotNull(record, "the failed write was never retried");
-        assertEquals("DIRECT7", InviteStore.get(record, "code", null),
+        assertEquals("DIRECT7xxxxxxxxxxxxxxx", InviteStore.get(record, "code", null),
                 "the exact code was lost, so the retry will guess instead");
         assertEquals(Invites.MATCH_DIRECT, InviteStore.get(record, "codeMatch", null),
                 "the direct claim lost its provenance");
@@ -1558,8 +1558,8 @@ class InviteResilienceTest extends UITestBase {
         Invites.checkForInvite();
         assertNotNull(held[0], "the referrer read was never issued");
 
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT2");
-        Invites.handleResolution(InviteTestSupport.resolvedJson("DIRECT2", "c1", "sms"),
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DIRECT2xxxxxxxxxxxxxxx");
+        Invites.handleResolution(InviteTestSupport.resolvedJson("DIRECT2xxxxxxxxxxxxxxx", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
 
         // The referrer finally answers, carrying a different code. It must be
@@ -1575,7 +1575,7 @@ class InviteResilienceTest extends UITestBase {
                 "a stale referrer callback wrote its code and issued a claim");
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a);
-        assertEquals("DIRECT2", a.getCode());
+        assertEquals("DIRECT2xxxxxxxxxxxxxxx", a.getCode());
     }
 
     @Test
@@ -1817,7 +1817,7 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST3", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND3");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND3xxxxxxxxxxxxxxx");
         assertEquals(Invites.STATE_PENDING, Invites.getState());
 
         Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_DIRECT, false);
@@ -1842,7 +1842,7 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST4", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND4");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND4xxxxxxxxxxxxxxx");
         assertEquals(Invites.STATE_PENDING, Invites.getState());
 
         InviteStore.failNextDeleteForTest(InviteStore.PENDING);
@@ -1939,7 +1939,7 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST4", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND4");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND4xxxxxxxxxxxxxxx");
 
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         pending.put("attempts", "99");
@@ -1994,7 +1994,7 @@ class InviteResilienceTest extends UITestBase {
                 told[0]++;
             }
         });
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND5");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND5xxxxxxxxxxxxxxx");
 
         assertEquals(0, told[0], "a denied link told an attributed install it had no invite");
         Invites.forgetLoadedState();
@@ -2047,10 +2047,10 @@ class InviteResilienceTest extends UITestBase {
         stale.put("attempts", String.valueOf(99));
         InviteStore.write(InviteStore.PENDING, stale);
 
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/FRESH1");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/FRESH1xxxxxxxxxxxxxxxx");
 
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
-        assertEquals("FRESH1", InviteStore.get(pending, "code", null));
+        assertEquals("FRESH1xxxxxxxxxxxxxxxx", InviteStore.get(pending, "code", null));
         assertTrue(InviteStore.getLong(pending, "expiresAt", 0) > System.currentTimeMillis(),
                 "the direct claim inherited an expired window");
         // One, not zero: the reset puts it back to zero and the claim this
@@ -2092,8 +2092,8 @@ class InviteResilienceTest extends UITestBase {
         // one that needs a window to mean anything. A code already in hand is
         // an exact answer that needs none, and refusing to send it reported
         // "unsupported" for an invite the user really did open.
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/EXACT9");
-        assertEquals("EXACT9", InviteStore.get(
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/EXACT9xxxxxxxxxxxxxxxx");
+        assertEquals("EXACT9xxxxxxxxxxxxxxxx", InviteStore.get(
                 InviteStore.read(InviteStore.PENDING), "code", null));
 
         Invites.setAttributionWindow(0);
@@ -2121,17 +2121,17 @@ class InviteResilienceTest extends UITestBase {
         // begins, and refusing a direct claim on the way back in would break
         // the same exemption from the other end. This is why the guard reads
         // the deferred flag rather than bumping the epoch, which is global.
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/EXACT7");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/EXACT7xxxxxxxxxxxxxxxx");
         int inFlight = Invites.currentLookupEpochForTest();
 
         Invites.setAttributionWindow(0);
 
-        Invites.handleResolution(InviteTestSupport.resolvedJson("EXACT7", "c1", "sms"),
+        Invites.handleResolution(InviteTestSupport.resolvedJson("EXACT7xxxxxxxxxxxxxxxx", "c1", "sms"),
                 Invites.MATCH_DIRECT, false, inFlight);
 
         InviteAttribution a = Invites.getAttribution();
         assertNotNull(a, "the kill switch discarded an exact answer we had asked for");
-        assertEquals("EXACT7", a.getCode());
+        assertEquals("EXACT7xxxxxxxxxxxxxxxx", a.getCode());
     }
 
     @Test
@@ -2166,7 +2166,7 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST6", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND6");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND6xxxxxxxxxxxxxxx");
         Invites.setReattribution(false);
 
         // A later process: the listener is registered first, caching the state
@@ -2192,13 +2192,13 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST8", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND8");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND8xxxxxxxxxxxxxxx");
         int inFlight = Invites.currentLookupEpochForTest();
 
         Invites.setReattribution(false);
 
         // The response that was already on the wire lands now.
-        Invites.handleResolution(InviteTestSupport.resolvedJson("SECOND8", "c1", "sms"),
+        Invites.handleResolution(InviteTestSupport.resolvedJson("SECOND8xxxxxxxxxxxxxxx", "c1", "sms"),
                 Invites.MATCH_DIRECT, false, inFlight);
 
         InviteAttribution a = Invites.getAttribution();
@@ -2247,8 +2247,8 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution("{\"resolved\":false}", Invites.MATCH_APP_CLIP, true);
         assertEquals(Invites.STATE_NONE_FOUND, Invites.getState());
 
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/LATER6");
-        Invites.handleResolution(InviteTestSupport.resolvedJson("LATER6", "c1", "sms"),
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/LATER6xxxxxxxxxxxxxxxx");
+        Invites.handleResolution(InviteTestSupport.resolvedJson("LATER6xxxxxxxxxxxxxxxx", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
 
         final String[] unavailable = new String[1];
@@ -2274,7 +2274,7 @@ class InviteResilienceTest extends UITestBase {
         // answer whenever the two coexist -- a zero window, where handleUrl
         // records an expiry of "now", or a first claim that failed and is
         // retried after the window ran out.
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SAVED9");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SAVED9xxxxxxxxxxxxxxxx");
         Map<String, String> pending = InviteStore.read(InviteStore.PENDING);
         assertNotNull(pending);
         pending.put("expiresAt", String.valueOf(System.currentTimeMillis() - 1000L));
@@ -2328,7 +2328,7 @@ class InviteResilienceTest extends UITestBase {
         // was ignored for ever: the install lost its invite_opened
         // re-engagement event, and under re-attribution the later open could
         // never win.
-        String url = "https://cloud.codenameone.com/i/acme/TAP1";
+        String url = "https://cloud.codenameone.com/i/acme/TAP1xxxxxxxxxxxxxxxxxx";
         Display.getInstance().setProperty("AppArg", url);
         assertTrue(Invites.checkForInvite(), "the first delivery was not handled");
 
@@ -2356,7 +2356,7 @@ class InviteResilienceTest extends UITestBase {
         // invite is consumed: an application routing its own deep links must
         // find its argument exactly as it arrived.
         Display.getInstance().setProperty("AppArg",
-                "https://cloud.codenameone.com/i/acme/EATEN1");
+                "https://cloud.codenameone.com/i/acme/EATEN1xxxxxxxxxxxxxxxx");
         assertTrue(Invites.checkForInvite());
         assertNull(Display.getInstance().getProperty("AppArg", null),
                 "the invite argument was left behind for the next read");
@@ -2417,7 +2417,7 @@ class InviteResilienceTest extends UITestBase {
         Invites.handleResolution(InviteTestSupport.resolvedJson("FIRST7", "c1", "sms"),
                 Invites.MATCH_DIRECT, false);
         Invites.setReattribution(true);
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND7");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/SECOND7xxxxxxxxxxxxxxx");
 
         final int[] told = new int[1];
         Invites.setInviteListener(new InviteListener() {
@@ -2463,14 +2463,14 @@ class InviteResilienceTest extends UITestBase {
         // afterwards had the exact claim replaced by a referrer read or a
         // statistical match, which can miss or credit a different click.
         Analytics.setConsent(AnalyticsConsent.builder().analytics(false).build());
-        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DENIED1");
+        Invites.handleUrl("https://cloud.codenameone.com/i/acme/DENIED1xxxxxxxxxxxxxxx");
         assertEquals(Invites.STATE_DECLINED, Invites.getState());
 
         Analytics.setConsent(AnalyticsConsent.granted());
 
         Map<String, String> resumed = InviteStore.read(InviteStore.PENDING);
         assertNotNull(resumed);
-        assertEquals("DENIED1", InviteStore.get(resumed, "code", null),
+        assertEquals("DENIED1xxxxxxxxxxxxxxx", InviteStore.get(resumed, "code", null),
                 "the reopened lookup lost the exact code and fell back to a guess");
     }
 
@@ -2739,7 +2739,7 @@ class InviteResilienceTest extends UITestBase {
         implementation.setAutoProcessConnections(false);
         Invites.setLinkBase("https://cloud.codenameone.com");
 
-        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/demo/ONETAP1"),
+        assertTrue(Invites.handleUrl("https://cloud.codenameone.com/i/demo/ONETAP1xxxxxxxxxxxxxxx"),
                 "the fixture url was not recognised as an invite");
         int afterRouting = claimCount();
         assertEquals(1, afterRouting, "routing the url did not issue exactly one claim");
