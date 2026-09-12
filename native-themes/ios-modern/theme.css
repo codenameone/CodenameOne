@@ -400,6 +400,79 @@ RaisedButton.disabled { color: #ffffff; background-color: #b3a8a0; cn1-backgroun
 FlatButton { cn1-derive: Button; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 FlatButton.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 
+/* iOS segmented control. Button.setToggle(true) rewrites the UIID to
+   ToggleButton, and no theme in the tree defined it, so a toggle rendered as
+   bare unshaped text.
+
+   The control reads as a track of capsules: an unselected segment is the plain
+   glass fill with a black label, and the selected one is the accent capsule
+   with a white label. Selection therefore changes the fill, not only the label
+   colour, which is what keeps it legible against the glass. */
+ToggleButton {
+    color: #1c1c1e;
+    background-color: rgba(199,197,198,0.80);
+    cn1-background-type: cn1-pill-border;
+    padding: 1.1mm 2.6mm 1.1mm 2.6mm;
+    margin: 1mm 0.4mm 1mm 0.4mm;
+    font-family: "native:MainLight";
+    font-size: 2.7mm;
+    text-align: center;
+}
+/* sel# is not the checked look. Button.isPressedStyle() sends a checked toggle
+   to press# when it has no focus and to sel# when it does, and an unchecked
+   toggle with focus lands on sel# as well -- so that one slot means "focused",
+   for either value, and cannot also say which value.
+
+   Neither assignment is lossless, and the choice here is deliberate:
+
+     sel# = the checked fill  -> a focused UNCHECKED control looks checked.
+                                 Arrowing through a radio group makes every
+                                 control you land on claim to be selected.
+     sel# = base + focus ring -> a focused CHECKED control looks unchecked,
+                                 for as long as it holds focus.
+
+   The second is kept because it never asserts a value the control does not
+   have; the first invents one. It is a framework limit rather than a theme
+   bug -- one style slot for two dimensions -- and no CSS here can express
+   both. Until then, do not "fix" this rule by moving the checked fill back
+   into sel#: that trade has been made once already and it is the worse half.
+
+   dis# has the identical problem and the identical resolution. getStyle()
+   returns getDisabledStyle() before it consults isPressedStyle(), so a
+   disabled toggle resolves dis# whether it is checked or not, and a disabled
+   form cannot show which of its toggles were on. dis# is therefore the muted
+   unselected appearance, for the same reason: it declines to state a value
+   rather than stating a wrong one.
+
+   Both cases want the same framework change, which is why neither is patched
+   here: Component.getStyle() would have to combine state with focus and with
+   enabled -- a checked control keeping its fill while disabled or focused,
+   and those conditions drawn some other way -- rather than collapsing three
+   dimensions onto one style lookup. That reaches every focusable component,
+   so it is not a line in a theme. */
+ToggleButton.selected { color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; border: 0.3mm solid var(--accent-color, #007aff); }
+ToggleButton.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButton.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+
+/* ComponentGroup renames the edge controls of a group to <prefix>First,
+   <prefix>Last or <prefix>Only, and UIManager does not fall back from those to
+   ToggleButton. iOS sets ComponentGroupBool by default, so a segmented group
+   here would otherwise lose the styling on everything except its middle
+   control. Each state is written out because cn1-derive is read at base level
+   only. */
+ToggleButtonFirst { cn1-derive: ToggleButton; }
+ToggleButtonFirst.selected { color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; cn1-derive: ToggleButton; border: 0.3mm solid var(--accent-color, #007aff); }
+ToggleButtonFirst.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonFirst.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonLast { cn1-derive: ToggleButton; }
+ToggleButtonLast.selected { color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; cn1-derive: ToggleButton; border: 0.3mm solid var(--accent-color, #007aff); }
+ToggleButtonLast.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonLast.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonOnly { cn1-derive: ToggleButton; }
+ToggleButtonOnly.selected { color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; cn1-derive: ToggleButton; border: 0.3mm solid var(--accent-color, #007aff); }
+ToggleButtonOnly.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color, #007aff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+ToggleButtonOnly.disabled { color: #b0b0b5; background-color: rgba(199,197,198,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+
 TextField {
     color: #000000;
     /* Grouped-list cell (secondarySystemGroupedBackground): a WHITE rounded cell
@@ -537,7 +610,6 @@ SliderFull {
     padding: 0;
     margin: 0;
 }
-/* Disabled slider is translucent (faded track, fill and thumb). */
 /* paintNativeSlider fills with the style's solid bgColor (alpha/transparency is
    ignored), so the disabled tones must be SOLID light colours, not rgba() -- an
    rgba fill rendered as full-saturation blue and read as "not disabled". */
@@ -629,8 +701,6 @@ Title {
 }
 MainTitle { cn1-derive: Title; }
 
-/* iOS 26 nav-bar items: a circular translucent-white glass button holding a blue
-   glyph (no text). cn1-round-border draws the circle; rgba gives the glass fill. */
 /* Leading/trailing margins reproduce the native bar-item inset from the screen
    edge (~2.6mm); flush-to-edge circles were the single biggest Toolbar diff. */
 /* Item 5: the toolbar command glyph/text is sized from the command style's font
@@ -776,16 +846,10 @@ Tab {
     font-size: 1.65mm;
     text-align: center;
 }
-/* iOS 26 bottom tab bar: the selected item sits on its OWN brighter frosted
-   sub-capsule (a lighter glass pill INSIDE the outer bar) and turns blue -- a
-   layered "glass on glass" highlight, like the native UITabBar. */
 /* iOS 26: the SELECTION capsule is the Liquid Glass indicator (the bright frosted
    glass blob), sitting on a more translucent bar -- so the glass material/refraction/
    specular belongs HERE, not on the outer bar. backdrop-filter makes this the glass
    hero; the bar (TabsContainer) is dialled down to a plainer translucent surface. */
-/* The selected-tab background is drawn by the single sliding selection capsule
-   (Tabs.paintSelectionCapsule, tabsSelectionCapsuleBool) so it can tween between
-   tabs -- so the per-tab selected fill is transparent. */
 /* The selected tab paints NO background of its own -- the single sliding glass
    selection capsule (Tabs.paintSelectionCapsule) is the only selection visual.
    A cn1-pill-border here painted a SECOND, smaller, brighter pill on top of the
@@ -935,14 +999,6 @@ MultiLine4 {
     padding: 0;
 }
 
-/* Dialog uses a translucent surface so any backdrop (form bg or
-   the test harness's diagonal-stripe texture) reads through -
-   approximates the iOS 26 vibrancy effect within the CEF-free
-   subset. DialogBody is left fully transparent: it was previously
-   painting its own opaque shade on top of Dialog and reading as a
-   visibly different colour. All Dialog sub-UIIDs share the same
-   translucent surface (or stay transparent so Dialog's surface
-   shows through). */
 /* margin: 0 - CN1's Dialog uses its own UIID margin as a positioning
    hint; a non-zero value here makes Dialog.show() lay the dialog out
    at screen-minus-margin (looks correct for a small modal but for
@@ -980,7 +1036,6 @@ DialogCenteredTitle { cn1-derive: Container; background-color: transparent; padd
 DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
 /* Action row: a hairline separator above the buttons, like the native alert. */
 DialogCommandArea { background-color: transparent; padding: 0; border-top: 0.2mm solid #c6c6c8; }
-/* Alert actions are blue, ~17pt, centred and split the row. */
 /* Defined standalone (NOT cn1-derive: Button) so the Button pill background /
    cn1-pill-border can never leak in and turn the flush alert actions into pills. */
 DialogButton { cn1-background-type: cn1-none; color: var(--accent-color, #007aff); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2mm; margin: 0; border-radius: 0; text-align: center; }
@@ -1090,6 +1145,48 @@ PhoneVerificationLink {
     padding: 1.5mm;
 }
 
+/* ---------------------------------------------------------------------------
+ * UIIDs the framework assigns that no theme defined.
+ *
+ * Same enumeration as the Material theme: every setUIID("...") literal in
+ * CodenameOne/src that appeared in neither theme, so the control had no style
+ * and fell through to the Component default. The retired components
+ * (RSSReader, HTMLComponent, HTMLTable, the feature-phone soft keys and
+ * VKBButton) are left undefined deliberately.
+ * ------------------------------------------------------------------------- */
+
+/* TextComponent: wrapper, floating hint, error line. */
+FloatingHint { cn1-derive: SecondaryLabel; color: #6c6c70; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+FloatingHint.disabled { padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2mm; color: #c6c6c8; background-color: transparent; }
+/* systemRed, the colour iOS uses for validation failures. */
+ErrorLabel { cn1-derive: SecondaryLabel; color: #ff3b30; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+ErrorLabel.disabled { padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; font-family: "native:MainRegular"; font-size: 2mm; color: #c6c6c8; background-color: transparent; }
+
+TableCell { cn1-derive: Label; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader { cn1-derive: Label; color: #6c6c70; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+
+/* Every UIID above is completed to all four states below. A missing state is
+   not inherited: cn1-derive is read at base level only, and a lookup of
+   <UIID>.press# that finds nothing resolves against the global default style,
+   so the control drops its whole appearance for the duration of that state.
+   Where a state is meant to differ it is declared above and left alone here. */
+ErrorLabel.selected { font-family: "native:MainRegular"; color: #ff3b30; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+ErrorLabel.pressed { font-family: "native:MainRegular"; color: #ff3b30; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+FloatingHint.selected { font-family: "native:MainRegular"; color: #6c6c70; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+FloatingHint.pressed { font-family: "native:MainRegular"; color: #6c6c70; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+TableCell.selected { margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableCell.pressed { margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableCell.disabled { margin: 0; font-family: "native:MainRegular"; color: #1c1c1e; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader.selected { margin: 0; color: #6c6c70; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader.pressed { margin: 0; color: #6c6c70; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+TableHeader.disabled { margin: 0; color: #6c6c70; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+
+/* Every UIID above is completed to all four states below. A missing state is
+   not inherited: cn1-derive is read at base level only, and a lookup of
+   <UIID>.press# that finds nothing resolves against the global default style,
+   so the control drops its whole appearance for the duration of that state.
+   Where a state is meant to differ it is declared above and left alone here. */
+
 @media (prefers-color-scheme: dark) {
     Component { color: #ffffff; background-color: #000000; }
     Form { background-color: #1c1c1e; padding: 0; margin: 0; }
@@ -1111,6 +1208,7 @@ PhoneVerificationLink {
     Button.disabled { color: #636366; background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; }
     /* Gray button (.gray): white label on a slightly lighter dark glass pill. */
     FlatButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+
     FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 
     /* Prominent filled button: white label on the OPAQUE dark accent pill. */
@@ -1295,4 +1393,41 @@ PhoneVerificationLink {
     PhoneVerificationText { color: #ebebf5; }
     PhoneVerificationError { color: #ff453a; }
     PhoneVerificationLink { color: var(--accent-color-dark, #0a84ff); }
+
+    /* Dark counterparts for every rule above that names a colour. A light-only
+       state rule is not skipped in dark mode -- with no $Dark entry the light
+       one is what resolves -- so a hard-coded light foreground would be used
+       against the dark surface. */
+    ErrorLabel { cn1-derive: SecondaryLabel; color: #ff453a; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+    ErrorLabel.selected { font-family: "native:MainRegular"; color: #ff453a; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+    ErrorLabel.pressed { font-family: "native:MainRegular"; color: #ff453a; font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
+    ErrorLabel.disabled { font-size: 2mm; padding: 0.3mm 0.5mm 0 0.5mm; margin: 0; color: #636366; background-color: transparent; }
+    FloatingHint { cn1-derive: SecondaryLabel; color: #8e8e93; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+    FloatingHint.selected { font-family: "native:MainRegular"; color: #8e8e93; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+    FloatingHint.pressed { font-family: "native:MainRegular"; color: #8e8e93; font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; background-color: transparent; }
+    FloatingHint.disabled { font-size: 2mm; padding: 0 0.5mm 0.3mm 0.5mm; margin: 0; color: #636366; background-color: transparent; }
+    TableCell { cn1-derive: Label; color: #ffffff; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    TableCell.selected { margin: 0; font-family: "native:MainRegular"; color: #ffffff; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    TableCell.pressed { margin: 0; font-family: "native:MainRegular"; color: #ffffff; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    TableCell.disabled { margin: 0; font-family: "native:MainRegular"; color: #ffffff; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    TableHeader { cn1-derive: Label; color: #8e8e93; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    TableHeader.selected { margin: 0; color: #8e8e93; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    TableHeader.pressed { margin: 0; color: #8e8e93; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    TableHeader.disabled { margin: 0; color: #8e8e93; font-family: "native:MainBold"; padding: 1.5mm 2mm 1.5mm 2mm; background-color: transparent; }
+    ToggleButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButton.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; border: 0.3mm solid var(--accent-color-dark, #0a84ff); }
+    ToggleButton.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButton.disabled { color: #48484a; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonFirst { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonLast { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonOnly { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonFirst.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; border: 0.3mm solid var(--accent-color-dark, #0a84ff); }
+    ToggleButtonFirst.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonFirst.disabled { color: #48484a; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonLast.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; border: 0.3mm solid var(--accent-color-dark, #0a84ff); }
+    ToggleButtonLast.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonLast.disabled { color: #48484a; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonOnly.selected { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; border: 0.3mm solid var(--accent-color-dark, #0a84ff); }
+    ToggleButtonOnly.pressed {  color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
+    ToggleButtonOnly.disabled { color: #48484a; background-color: rgba(58,58,60,0.55); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.6mm 1.1mm 2.6mm; margin: 1mm 0.4mm 1mm 0.4mm; font-family: "native:MainLight"; font-size: 2.7mm; text-align: center; }
 }

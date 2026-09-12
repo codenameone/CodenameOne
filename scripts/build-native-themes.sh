@@ -48,6 +48,12 @@ locate_jar() {
     # Fall back to parent pom version if the module inherits it.
     version="$(grep -m1 '<version>' "$REPO_ROOT/maven/pom.xml" | sed -E 's#.*<version>([^<]+)</version>.*#\1#')"
   fi
+  # A jar in ~/.m2 was built by some other checkout at some other commit, and
+  # nothing here can tell which. Compiling with it re-emits the WHOLE theme the
+  # way that build did, not just the rules you edited, so the committed .res
+  # picks up differences no CSS diff can explain -- which is how a theme change
+  # once moved screens that use none of its UIIDs. CI has no ~/.m2 and always
+  # builds from source, so target/ above is the jar that matches the tree.
   installed_jar="$HOME/.m2/repository/com/codenameone/codenameone-css-compiler/$version/codenameone-css-compiler-${version}-jar-with-dependencies.jar"
   if [ -f "$installed_jar" ]; then
     echo "$installed_jar"
@@ -60,6 +66,13 @@ ensure_jar() {
   local jar
   if jar="$(locate_jar)"; then
     log "Using CSS compiler jar: $jar"
+    case "$jar" in
+      "$HOME"/.m2/*)
+        log "WARNING: that jar comes from ~/.m2 and was built by another checkout."
+        log "WARNING: it re-emits the whole theme its own way. Build the module first"
+        log "WARNING: (mvn -f maven/css-compiler/pom.xml package) to compile with this tree."
+        ;;
+    esac
     printf '%s\n' "$jar"
     return
   fi

@@ -183,6 +183,19 @@ public class ComponentGroup extends Container {
         reverseRadio(c);
     }
 
+    /// Whether this group is currently renaming its members' UIIDs. updateUIIDs()
+    /// does nothing unless the theme constant is on or grouping is forced, and
+    /// Button needs the same answer to know whether a member's live UIID belongs
+    /// to the group or to itself. $origUIID cannot answer it: restoreUIID leaves
+    /// that set, so it says "was renamed once", not "is renamed now".
+    ///
+    /// #### Returns
+    ///
+    /// true when this group assigns its members' UIIDs
+    boolean isGroupingActive() {
+        return getUIManager().isThemeConstant(groupFlag, false) || forceGroup;
+    }
+
     private void restoreUIID(Component c) {
         String o = (String) c.getClientProperty("$origUIID");
         if (o != null) {
