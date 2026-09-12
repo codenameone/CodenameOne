@@ -259,8 +259,20 @@ public final class Db {
                     + " were supplied [" + sql + "]");
         }
         if(params != null) {
-            for(int iter = 0 ; iter < params.length ; iter++) {
-                bind(stmt, iter + 1, params[iter]);
+            try {
+                for(int iter = 0 ; iter < params.length ; iter++) {
+                    bind(stmt, iter + 1, params[iter]);
+                }
+            } catch (IOException refused) {
+                // FINALIZED HERE, because the caller never sees this handle: it
+                // gets one only if this returns, so the finally in execute() and
+                // query() has nothing to close. SQLITE_TOOBIG and SQLITE_NOMEM
+                // both reach here, and the statement they leave behind outlives
+                // the call AND the Database -- sqlite3_close answers SQLITE_BUSY
+                // while any statement is unfinalized, and nothing holds a handle
+                // to finalize. The parameter-count branch above already does this.
+                finalizeImpl(stmt);
+                throw refused;
             }
         }
         return stmt;

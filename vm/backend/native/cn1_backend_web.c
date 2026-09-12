@@ -215,7 +215,25 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
                     *nl = 0;
                 }
                 if(*line != 0) {
-                    headers = curl_slist_append(headers, line);
+                    /* THE OLD LIST IS NOT LOST. curl_slist_append answers NULL on
+                       failure and leaves what it was given allocated, so assigning
+                       its result straight back dropped the only pointer to every
+                       header appended so far -- leaked, and the request then went
+                       out with none of them. An Authorization or If-None-Match
+                       that quietly does not travel is a request that means
+                       something else: the first is unauthenticated and the second
+                       asks for the whole object. Same rule the body below states
+                       outright -- a request whose parts could not be made is a
+                       failed request, not a smaller one. */
+                    struct curl_slist* appended = curl_slist_append(headers, line);
+                    if(appended == NULL) {
+                        curl_slist_free_all(headers);
+                        free(copy);
+                        free(urlCopy);
+                        free(methodCopy);
+                        return 0;
+                    }
+                    headers = appended;
                 }
                 line = nl == NULL ? NULL : nl + 1;
             }
