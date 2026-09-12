@@ -873,4 +873,37 @@ class ExtensionDeploymentFloorScriptTest {
         assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[arch=arm64][sdk=iphoneos*]=16.4"),
                 "the author's own branch must survive untouched: " + got.get(0));
     }
+
+    /// A level chosen only because something in it OVERLAPS has not claimed the build. With a
+    /// project EXTENSION_MIN of 16.4 beneath a target EXTENSION_MIN[sdk=iphoneos27.1*] of 12.0,
+    /// an iphoneos27.0 build does not match the target helper and Xcode falls back to 16.4 --
+    /// which clears the floor. Dropping that possibility left nothing in the options that could
+    /// clear it, so the answer looked decided and the extension was written down to 15.0.
+    @Test
+    void theLowerLevelFallbackCountsAsAPossibility(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'EXTENSION_MIN' => '16.4'}",
+                "Fallback|" + EXT + "|EXTENSION_MIN[sdk=iphoneos27.1*]->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)"),
+                "an iphoneos27.0 build resolves this to the project's 16.4, so the wildcard key "
+                        + "must not be written down to the floor: " + got.get(0));
+    }
+
+    /// The other side: when EVERY possibility is below the floor -- the overlapping target
+    /// helper and the project fallback alike -- there is nothing to protect and the raise still
+    /// happens. Without this, the test above could be satisfied by never writing a key whose
+    /// value involves an overlap.
+    @Test
+    void anOverlapWhoseFallbackIsAlsoLowIsStillRaised(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'EXTENSION_MIN' => '12.0'}",
+                "FallbackLow|" + EXT + "|EXTENSION_MIN[sdk=iphoneos27.1*]->13.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
+                "12.0 and 13.0 are both below the floor, so nothing is lost by raising: "
+                        + got.get(0));
+    }
 }
