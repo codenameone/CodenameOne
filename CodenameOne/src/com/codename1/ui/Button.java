@@ -1034,15 +1034,123 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// #### Parameters
     ///
     /// - `toggle`: the toggle to set
+    /// The UIID this control carried before setToggle(true) replaced it, so
+    /// setToggle(false) can put it back. Null whenever toggle mode was not
+    /// entered from a CheckBox or RadioButton UIID.
+    private String preToggleUIID;
+
     public void setToggle(boolean toggle) {
         if (this.toggle == toggle) {
             return;
         }
         this.toggle = toggle;
         accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE | AccessibilityManager.CHANGE_STATE);
-        if (toggle && "CheckBox".equals(getUIID()) || "RadioButton".equals(getUIID())) {
-            setUIID("ToggleButton");
+        // The UIID follows the mode in both directions. Two things were wrong here
+        // for as long as no theme defined ToggleButton, which is what kept them
+        // invisible:
+        //
+        //   - && binds tighter than ||, so the old condition read
+        //     (toggle && isCheckBox) || isRadioButton. setToggle(false) on a
+        //     RadioButton therefore set its UIID to ToggleButton, the opposite of
+        //     what was asked for.
+        //   - nothing restored the UIID afterwards, so a control taken back out of
+        //     toggle mode kept the toggle's appearance while painting its state
+        //     glyph again.
+        //
+        // setUIID clears preferredSize, so the size computed without the glyph is
+        // recalculated on the next layout pass.
+        String uiid = getUIID();
+        if (toggle) {
+            if ("CheckBox".equals(uiid) || "RadioButton".equals(uiid)) {
+                preToggleUIID = uiid;
+                setUIID("ToggleButton");
+            }
+            // Grouped, the live UIID is the group's alias and says nothing about
+            // what this control is, so the name that matters is the one the group
+            // saved to restore on removal. Entering toggle mode has to move that to
+            // ToggleButton, exactly as leaving it moves it back, or a control
+            // toggled while inside a group is handed a radio UIID on the way out.
+            Object saved = getClientProperty("$origUIID");
+            if (isDefaultToggleableUIID(saved)) {
+                preToggleUIID = (String) saved;
+                putClientProperty("$origUIID", "ToggleButton");
+            }
+        } else if (preToggleUIID != null) {
+            // Two places can be holding the toggle UIID, and which ones depends on
+            // the group this control is in -- horizontal groups rename members to
+            // ToggleButton*, vertical ones to GroupElement*, and an ungrouped
+            // control keeps the name setToggle assigned. So each is corrected on
+            // its own terms rather than by guessing the group's prefix:
+            //
+            //   - the live UIID, when it is still a toggle name;
+            //   - $origUIID, which is what a ComponentGroup puts back when the
+            //     control leaves it, and which holds ToggleButton whatever prefix
+            //     the group itself uses.
+            // While the control is still in a group the live UIID belongs to the
+            // group: a horizontal one renames every member, toggle or not, to give
+            // the bar its segmented edges, and it does not re-apply that when the
+            // UIID changes under it. Resetting it here would strip the member's
+            // styling until the next structural or theme update. $origUIID is not
+            // the test for that -- ComponentGroup sets it once and never clears it,
+            // so it says "was grouped at some point" rather than "is grouped now".
+            if (!groupOwnsUIID() && isToggleUIID(uiid)) {
+                setUIID(preToggleUIID);
+            }
+            Object saved = getClientProperty("$origUIID");
+            if (saved instanceof String && isToggleUIID((String) saved)) {
+                putClientProperty("$origUIID", preToggleUIID);
+            }
+            preToggleUIID = null;
         }
+    }
+
+    /// Whether a ComponentGroup is currently holding this control's UIID. Being
+    /// inside one is not enough: updateUIIDs() returns without renaming anything
+    /// when ComponentGroupBool is off and the group is not forced -- the default,
+    /// and what Android Material ships -- and in that case the live UIID is still
+    /// ours to restore. The group is asked directly rather than inferred from the
+    /// UIID it saved, because restoreUIID leaves that saved value in place when
+    /// grouping is switched off, so it outlives the ownership it recorded.
+    ///
+    /// #### Returns
+    ///
+    /// true if a group renamed this control
+    private boolean groupOwnsUIID() {
+        Container parent = getParent();
+        return parent instanceof ComponentGroup && ((ComponentGroup) parent).isGroupingActive();
+    }
+
+    /// Whether the given saved UIID is one setToggle is allowed to convert. An
+    /// application that assigned its own UIID keeps it: the original code only
+    /// ever converted the two defaults, and the guide says as much.
+    ///
+    /// #### Parameters
+    ///
+    /// - `saved`: the value recorded by a ComponentGroup
+    ///
+    /// #### Returns
+    ///
+    /// true for the default CheckBox and RadioButton UIIDs
+    private static boolean isDefaultToggleableUIID(Object saved) {
+        return "CheckBox".equals(saved) || "RadioButton".equals(saved);
+    }
+
+    /// True for the UIID setToggle assigns and for the three a horizontal
+    /// ComponentGroup renames its edge controls to. Matching only the bare name
+    /// would skip the restore for any toggle that happens to sit in a group.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the UIID to test
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a toggle UIID
+    private static boolean isToggleUIID(String uiid) {
+        return "ToggleButton".equals(uiid)
+                || "ToggleButtonFirst".equals(uiid)
+                || "ToggleButtonLast".equals(uiid)
+                || "ToggleButtonOnly".equals(uiid);
     }
 
     /// Overriden to workaround issue with caps text and different UIID's
