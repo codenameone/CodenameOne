@@ -499,6 +499,21 @@ def main():
     print("[ios-sdk-deltas] self-test: differ detects a known newer-SDK deprecation "
           "(target ios%s)" % new_version)
 
+    # A gate that cannot fail is not a gate. Prove the reporting path still turns a
+    # blocking finding into a non-zero exit, with output suppressed so the check is
+    # invisible unless it breaks.
+    import io
+    import contextlib
+    synthetic = {"probe.m:1:1: error: synthetic self-test finding": {"self-test"}}
+    with contextlib.redirect_stdout(io.StringIO()):
+        must_fail = report(synthetic, {}, new_sdk, new_version, False)
+        must_pass = report({}, {}, new_sdk, new_version, False)
+    if must_fail == 0 or must_pass != 0:
+        fail("the reporting path no longer turns a blocking finding into a failure "
+             "(blocking exited %s, clean exited %s). Every run would report success."
+             % (must_fail, must_pass))
+    print("[ios-sdk-deltas] self-test: a blocking finding exits non-zero")
+
     stub_dir = tempfile.mkdtemp(prefix="cn1-sdk-delta-stubs-")
     all_defines = gates + EXTRA_DEFINES + [d for _, ds in CONFIGURATIONS for d in ds]
     stubs = synthesize_generated_stubs(clang, new_sdk, project_dir, prefix_header, present,
@@ -573,6 +588,17 @@ def main():
                 # with the contexts it was seen in.
                 bucket.setdefault(line, set()).add("%s/%s" % (sweep_name, config_name))
 
+    return report(blocking, informational, new_sdk, new_version, args.verbose)
+
+
+def report(blocking, informational, new_sdk, new_version, verbose):
+    """Print the findings and return the process exit code.
+
+    Separated from main so the exit code is a unit that can be exercised without an Xcode.
+    It was not, once: a refactor of the printing dropped the `if blocking` branch entirely
+    and nothing read the map, so the gate returned 0 whatever it found. Every real run had
+    zero blocking errors, which made the wrong answer look like the right one.
+    """
     print()
     if informational:
         # One deprecated framework produces dozens of lines. Group by the message so the
@@ -596,13 +622,25 @@ def main():
             files = sorted({l.split(":")[0] for l in lines})
             print("  %s  (%d use%s in %s)"
                   % (key, len(lines), "" if len(lines) == 1 else "s", ", ".join(files)))
-            shown = lines if args.verbose else lines[:1]
+            shown = lines if verbose else lines[:1]
             for line in shown:
                 print("      %s" % line)
-            if not args.verbose and len(lines) > 1:
+            if not verbose and len(lines) > 1:
                 print("      ... %d more; re-run with --verbose for every location"
                       % (len(lines) - 1))
         print()
+
+    if blocking:
+        print("FAIL: %d compile error(s) appear only under %s"
+              % (len(blocking), os.path.basename(new_sdk)))
+        for line in sorted(blocking):
+            print("  %s" % line)
+            print("      seen in: %s" % ", ".join(sorted(blocking[line])))
+        print()
+        print("Each is caused by the newer SDK. Fix the call, or -- if the behaviour is")
+        print("deliberate -- record it in scripts/native-warnings/baseline-ios-sim-debug.txt")
+        print("with the reason. Do not widen this script to hide it.")
+        return 1
 
     print("OK: %s introduces no compile errors at the shipping deployment floor."
           % os.path.basename(new_sdk))

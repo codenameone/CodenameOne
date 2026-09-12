@@ -134,6 +134,11 @@ public class IPhoneBuilder extends Executor {
     // BuildDaemon's iOS lane needs the same bump.
     private static final String DEFAULT_MIN_DEPLOYMENT_VERSION = "13.0";
 
+    /// The lowest deployment target the selected Xcode's iOS SDK accepts, or null off a Mac.
+    /// Read once in build() and used again when the extension targets are written, which do
+    /// not go through getDeploymentTarget().
+    private String sdkDeploymentFloor;
+
     // StringBuilder used for constructing ruby script with xcodeproj
     // which adds localized strings files to the project.
     private StringBuilder installLocalizedStringsScript = new StringBuilder();
@@ -1985,7 +1990,7 @@ public class IPhoneBuilder extends Executor {
         // moves: Xcode 27 raised iOS from 12.0 to 15.0, which is above this builder's default
         // of 14.0, so an unmodified project stopped building. Contributing it here raises the
         // target instead, through the same maximum as everything else.
-        String sdkDeploymentFloor = sdkMinimumDeploymentTarget("iphoneos");
+        sdkDeploymentFloor = sdkMinimumDeploymentTarget("iphoneos");
         if (sdkDeploymentFloor != null) {
             addMinDeploymentTarget(sdkDeploymentFloor);
             String pinnedDeploymentTarget = request.getArg("ios.deployment_target", null);
@@ -6813,6 +6818,10 @@ public class IPhoneBuilder extends Executor {
                             + "    # second pass the extension targets already exist -- without this skip the\n"
                             + "    # pass stomps them down to the app's deployment target (seen as WidgetKit\n"
                             + "    # sources compiling at iOS 14 instead of the extension's 16.1).\n"
+                            + "    #\n"
+                            + "    # Skipping them leaves them below the SDK floor, which Xcode 27 refuses. They\n"
+                            + "    # are raised by extensionDeploymentFloorScript(), appended after the fragment\n"
+                            + "    # that CREATES them -- this pass runs before they exist.\n"
                             + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
@@ -7412,7 +7421,11 @@ public class IPhoneBuilder extends Executor {
                             + "  raise e\n"
                             + "end\n"
                             + deploymentTargetStr
-                            + appExtensionsBuilder.toString();
+                            + appExtensionsBuilder.toString()
+                            // Last, because it has to see the extension targets the fragment
+                            // above creates. Ordering is the entire reason this is separate
+                            // from the global deployment-target pass.
+                            + extensionDeploymentFloorScript(sdkDeploymentFloor);
                     File bridgingHeaderFile = new File(new File(tmpDir, "dist"), "cn1-Bridging-Header.h");
                     if (!bridgingHeaderFile.exists()) {
                         this.createFile(bridgingHeaderFile, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
@@ -10030,6 +10043,53 @@ public class IPhoneBuilder extends Executor {
             // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
         }
         return "iphoneos";
+    }
+
+    /// A ruby fragment that raises every app-extension target to the SDK's minimum.
+    ///
+    /// Appended AFTER the fragment that creates the extensions, which is the whole point.
+    /// The global deployment-target pass runs before they exist and deliberately skips the
+    /// ones that do -- extensions own their target, and stomping them down turned a 16.1
+    /// WidgetKit extension into a 14.0 one. But leaving them alone entirely is how an app
+    /// with a VPN tunnel, call directory, share or notification-content extension still
+    /// failed under Xcode 27: those are generated at 12.0, the host target was raised to the
+    /// SDK floor and they were not, and Xcode refuses the whole build for any target below
+    /// the floor.
+    ///
+    /// So this raises and never lowers, which keeps both properties. Off a Mac, or wherever
+    /// the floor cannot be read, it emits nothing at all.
+    static String extensionDeploymentFloorScript(String sdkFloor) {
+        if (sdkFloor == null || sdkFloor.trim().length() == 0) {
+            return "";
+        }
+        return "\nbegin\n"
+                + "  sdk_floor = '" + escapeRubyStr(sdkFloor.trim()) + "'\n"
+                + "  xcproj.targets.each do |target|\n"
+                + "    next unless target.respond_to?(:product_type)\n"
+                + "    next unless target.product_type == 'com.apple.product-type.app-extension'\n"
+                + "    target.build_configurations.each do |config|\n"
+                + "      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_s\n"
+                + "      # A $(...) reference resolves against the project, which is already at\n"
+                + "      # or above the floor, so leave the author's expression alone.\n"
+                + "      next if current.include?('$')\n"
+                + "      begin\n"
+                + "        below = current.empty? || Gem::Version.new(current) < Gem::Version.new(sdk_floor)\n"
+                + "      rescue ArgumentError\n"
+                + "        below = true\n"
+                + "      end\n"
+                + "      if below\n"
+                + "        puts \"Raising #{target.name} to the SDK minimum #{sdk_floor} \" +\n"
+                + "             \"(was #{current.empty? ? 'unset' : current})\"\n"
+                + "        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = sdk_floor\n"
+                + "      end\n"
+                + "    end\n"
+                + "  end\n"
+                + "  xcproj.save\n"
+                + "rescue => e\n"
+                + "  puts \"Error raising app extensions to the SDK minimum: #{$!}\"\n"
+                + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
+                + "  raise e\n"
+                + "end\n";
     }
 
     /// Whether an explicit `ios.deployment_target` sits below the SDK's floor, and is worth
