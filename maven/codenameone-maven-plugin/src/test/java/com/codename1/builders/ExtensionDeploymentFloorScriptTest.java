@@ -197,8 +197,11 @@ class ExtensionDeploymentFloorScriptTest {
         assumeTrue(rubyAvailable(), "needs ruby");
         List<String> got = applyWithProject(dir, "15.0",
                 "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
-                "Inherited|" + EXT + "|$(inherited)");
+                "Inherited|" + EXT + "|$(inherited)",
+                // Control: without it this passes when the pass does nothing at all.
+                "MustRise|" + EXT + "|12.0");
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(inherited)", got.get(0));
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "control: the pass ran");
     }
 
     /// The finding behind resolving rather than skipping: an imported archive writes
@@ -223,8 +226,11 @@ class ExtensionDeploymentFloorScriptTest {
         List<String> got = applyWithProject(dir, "15.0",
                 "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
                 "Imported|" + EXT + "|EXTENSION_MIN->16.4;"
-                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)",
+                // Control: without it this passes when the pass does nothing at all.
+                "MustRise|" + EXT + "|12.0");
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)", got.get(0));
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "control: the pass ran");
     }
 
     /// Xcode accepts modifiers on a reference, and missing that spelling is worse than
@@ -309,9 +315,12 @@ class ExtensionDeploymentFloorScriptTest {
                 "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
                 "BaseKey|" + EXT + "|EXTENSION_MIN->12.0;"
                         + "EXTENSION_MIN[sdk=iphoneos*]->16.4;"
-                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)",
+                // Control: without it this passes when the pass does nothing at all.
+                "MustRise|" + EXT + "|12.0");
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)", got.get(0),
                 "EXTENSION_MIN is 16.4 on a device build, so this must not be clamped to 15.0");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "control: the pass ran");
     }
 
     /// Two equally specific applicable helpers are a genuine tie, and a tie is a guess.
@@ -503,6 +512,11 @@ class ExtensionDeploymentFloorScriptTest {
         Files.write(script.toPath(),
                 ("xcproj = nil\n" + IPhoneBuilder.extensionDeploymentFloorScript("15.0"))
                         .getBytes(StandardCharsets.UTF_8));
+        // An empty fragment also parses, so the emptiness is ruled out first -- otherwise
+        // this passes when the pass has been disabled entirely.
+        String fragment = IPhoneBuilder.extensionDeploymentFloorScript("15.0");
+        assertTrue(fragment.contains("IPHONEOS_DEPLOYMENT_TARGET"),
+                "there is supposed to be a pass here, got: " + fragment);
         Process p = new ProcessBuilder("ruby", "-c", script.getAbsolutePath())
                 .redirectErrorStream(true).start();
         String out = new String(readAll(p), StandardCharsets.UTF_8);
