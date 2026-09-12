@@ -1981,6 +1981,25 @@ public class IPhoneBuilder extends Executor {
             // when MinimumOSVersion is 14 or higher.
             addMinDeploymentTarget("14.0");
         }
+        // Whatever the hints and features ask for, the SDK still has a floor of its own and it
+        // moves: Xcode 27 raised iOS from 12.0 to 15.0, which is above this builder's default
+        // of 14.0, so an unmodified project stopped building. Contributing it here raises the
+        // target instead, through the same maximum as everything else.
+        String sdkDeploymentFloor = sdkMinimumDeploymentTarget("iphoneos");
+        if (sdkDeploymentFloor != null) {
+            addMinDeploymentTarget(sdkDeploymentFloor);
+            String pinnedDeploymentTarget = request.getArg("ios.deployment_target", null);
+            if (pinnedDeploymentTarget != null
+                    && compareVersionStrings(pinnedDeploymentTarget, sdkDeploymentFloor) < 0) {
+                // Raising past an explicit pin is worth a line in the log: the developer asked
+                // for something this Xcode cannot build, and the alternative to raising it is
+                // failing the build.
+                log("ios.deployment_target is pinned to " + pinnedDeploymentTarget
+                        + ", but this Xcode's iOS SDK accepts nothing below "
+                        + sdkDeploymentFloor + "; building against " + sdkDeploymentFloor
+                        + " instead. Apple raises this floor between Xcode releases.");
+            }
+        }
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         appAttest = request.getArg("ios.appAttest", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
@@ -10012,6 +10031,20 @@ public class IPhoneBuilder extends Executor {
             // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
         }
         return "iphoneos";
+    }
+
+    /// The lowest deployment target the selected Xcode will accept for `sdkName`.
+    ///
+    /// Xcode 27 raised every Apple platform's floor at once -- iOS and tvOS from 12.0 to 15.0,
+    /// watchOS from 4.0 to 9.0, macOS from 10.13 to 12.0 -- and a project under the floor fails
+    /// outright rather than warning. See AppleSdkFloor for why this is asked of the SDK instead
+    /// of kept as a version table, and for the measurements.
+    ///
+    /// Package-visible because the tv, mac and watch builders are delegates of this one and
+    /// need the same answer for their own slice; they have no Xcode of their own to ask.
+    String sdkMinimumDeploymentTarget(String sdkName) {
+        return AppleSdkFloor.minimumDeploymentTarget(sdkName, xcrunForSelectedXcode(),
+                selectedDeveloperDir());
     }
 
     /// The xcrun beside the xcodebuild this build selected, or the system one.

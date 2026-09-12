@@ -267,6 +267,25 @@ jobs:
             "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
         timeout-minutes: 10
 
+      # Apple can deprecate an API, or change a behaviour for anything LINKED
+      # against the new SDK, and nothing else here would notice: every check in
+      # this job compiles against one SDK and has nothing to compare it to. This
+      # one compiles the port twice, varying only -isysroot, so what it reports
+      # is caused by the SDK and not by the command line.
+      #
+      # It is a no-op on a runner that carries a single Xcode, which is the case
+      # today -- and it starts working, without another edit, on the first image
+      # that ships two. That is deliberate: the alternative is remembering to add
+      # it at exactly the moment a toolchain moves, which is the moment nobody
+      # has spare attention.
+      - name: Compare the port against the next iOS SDK
+        run: |
+          set -euo pipefail
+          scripts/check-ios-sdk-deltas.py \
+            --skip-if-single-sdk \
+            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+        timeout-minutes: 20
+
       - name: Run iOS UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests
