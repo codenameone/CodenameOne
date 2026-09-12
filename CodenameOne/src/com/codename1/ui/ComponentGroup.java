@@ -381,23 +381,32 @@ public class ComponentGroup extends Container {
         if (horizontal == isHorizontal()) {
             return;
         }
+        // The UIID swap comes first and the layout change second, because setLayout is
+        // what reconciles the members now and it has to see the names this group means
+        // to use. Reversed, it would run once against a half-changed group.
         if (horizontal) {
-            setLayout(new BoxLayout(BoxLayout.X_AXIS));
             if ("GroupElement".equals(elementUIID)) {
                 elementUIID = "ToggleButton";
                 buttonUIID = "ToggleButton";
             }
+            setLayout(new BoxLayout(BoxLayout.X_AXIS));
         } else {
-            setLayout(new BoxLayout(BoxLayout.Y_AXIS));
             if ("ToggleButton".equals(elementUIID)) {
                 elementUIID = "GroupElement";
                 buttonUIID = "ButtonGroup";
             }
+            setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         }
-        // Unconditional, because orientation alone decides this. A group already carrying
-        // the ToggleButton UIID becomes segmented merely by turning horizontal, and the
-        // swap above does not run for it -- so confining this to the swap left such a
-        // group reporting that it owned its members' UIIDs while they kept their own.
+    }
+
+    /// Orientation decides activation for a segmented group, and this is public API on
+    /// Container that reaches it without going through setHorizontal: dropping a Y axis
+    /// layout on a populated horizontal group deactivates it, and an X axis one on a
+    /// group already carrying the ToggleButton UIID activates it. Reconciling here
+    /// rather than in setHorizontal covers both routes with one rule.
+    @Override
+    public void setLayout(Layout layout) {
+        super.setLayout(layout);
         applyOrRestore();
     }
 

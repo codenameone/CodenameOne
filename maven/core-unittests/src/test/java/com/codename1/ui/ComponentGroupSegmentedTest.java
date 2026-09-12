@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.animations.ComponentAnimation;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.Test;
 
@@ -564,5 +565,37 @@ class ComponentGroupSegmentedTest extends UITestBase {
                 "the segment moved to the end is styled as the end");
         assertEquals("ToggleButtonFirst", last.getUIID(),
                 "and the one now at the start is styled as the start");
+    }
+
+    @Test
+    void testDroppingAVerticalLayoutOnASegmentedGroupRestores() {
+        // setLayout is public API on Container, so orientation -- and with it activation
+        // -- can change without going through setHorizontal.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        Button b = new Button("One");
+        group.addComponent(b);
+        assertEquals("ToggleButtonOnly", b.getUIID());
+
+        group.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+
+        assertEquals("Button", b.getUIID(),
+                "a group that is no longer horizontal is no longer segmented");
+    }
+
+    @Test
+    void testDroppingAHorizontalLayoutOnAToggleGroupApplies() {
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        Button b = new Button("One");
+        group.addComponent(b);
+        group.setElementUIID("ToggleButton");
+        assertEquals("Button", b.getUIID(), "still vertical, so still inactive");
+
+        group.setLayout(new BoxLayout(BoxLayout.X_AXIS));
+
+        assertEquals("ToggleButtonOnly", b.getUIID(),
+                "the layout is what makes this a segmented control");
     }
 }
