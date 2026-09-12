@@ -495,4 +495,27 @@ class ComponentGroupSegmentedTest extends UITestBase {
         assertEquals("ToggleButtonLast", second.getUIID(),
                 "and the arrival is grouped rather than left plain");
     }
+
+    @Test
+    void testTheSavedUiidDoesNotSurviveIntoTheNextMembership() {
+        // The snapshot is taken only when none is recorded, so one left over from an
+        // earlier membership means the component is restored to the name it wore two
+        // memberships ago rather than the one it has now.
+        activateGrouping(false);
+        ComponentGroup first = new ComponentGroup();
+        first.setHorizontal(true);
+        Button b = new Button("One");
+        first.addComponent(b);
+        first.removeComponent(b);
+        assertEquals("Button", b.getUIID());
+
+        b.setUIID("Custom");
+        ComponentGroup second = new ComponentGroup();
+        second.setHorizontal(true);
+        second.addComponent(b);
+        second.removeComponent(b);
+
+        assertEquals("Custom", b.getUIID(),
+                "the second restore returns the UIID the component actually had");
+    }
 }

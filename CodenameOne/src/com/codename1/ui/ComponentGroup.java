@@ -199,6 +199,16 @@ public class ComponentGroup extends Container {
         Object o = cmp.getClientProperty("$origUIID");
         if (o != null) {
             cmp.setUIID((String) o);
+            // Cleared on departure, so a later membership snapshots what the component
+            // wears then. Kept, the null check in updateUIID never fires again and a
+            // component that was grouped, given a new UIID, and grouped a second time
+            // is restored to the name it had two memberships ago.
+            //
+            // Only on departure. A group that merely goes inactive still holds the
+            // member, and Button reads this marker while deciding what leaving toggle
+            // mode should restore -- clearing it there would change behaviour that has
+            // its own tests.
+            cmp.putClientProperty("$origUIID", null);
         }
         // and the popup mode with it -- restoring the name alone left a removed
         // ComboBox opening as a spinner for the rest of its life.
