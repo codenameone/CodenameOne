@@ -186,8 +186,18 @@ public final class Db {
         execute("PRAGMA busy_timeout=" + millis, null);
     }
 
-    /** The rowid the most recent insert produced. */
-    public long lastInsertId() {
+    /**
+     * The rowid the most recent insert produced.
+     *
+     * <p>SYNCHRONIZED, like execute, query, transaction and close -- it was the
+     * one operation here that was not, and the only one that hands the native
+     * handle over without holding the lock that guards it. close() frees the
+     * sqlite3 connection and then zeroes the field, so a reader that had already
+     * loaded the handle called sqlite3_last_insert_rowid on freed memory. The
+     * native's own null check cannot help with that: the pointer it is given is
+     * not null, it is dangling.
+     */
+    public synchronized long lastInsertId() {
         return lastInsertRowIdImpl(handle);
     }
 

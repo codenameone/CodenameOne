@@ -244,8 +244,13 @@ public final class Database {
     /**
      * The id the most recent insert produced, or 0 where the engine has no such
      * concept. PostgreSQL is the case that has none: use INSERT ... RETURNING.
+     *
+     * <p>SYNCHRONIZED like every other operation on this class, which is the
+     * point: it was the one that was not. A close on another thread -- a pool
+     * shutting down, a reconnect -- could therefore run between this reading the
+     * engine and the engine reading its own state.
      */
-    public long lastInsertId() {
+    public synchronized long lastInsertId() {
         if(sqlite != null) {
             return sqlite.lastInsertId();
         }

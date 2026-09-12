@@ -210,7 +210,8 @@ public final class Db {
         execute("PRAGMA busy_timeout=" + millis, null);
     }
 
-    public long lastInsertId() {
+    /** Synchronized with close for the reason the translated arm gives. */
+    public synchronized long lastInsertId() {
         return lastInsertId;
     }
 
