@@ -210,7 +210,7 @@ JAVA_INT com_codename1_backend_Web_globalInitImpl___R_int(CODENAME_ONE_THREAD_ST
  * headerLines is one string with '\n' between headers, because passing a
  * String[] would mean walking a Java array from C for no benefit.
  */
-JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_R_long(
+JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT method, JAVA_OBJECT url, JAVA_OBJECT headerLines, JAVA_OBJECT body) {
     CURL* curl;
     CURLcode rc;
@@ -257,9 +257,21 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         }
     }
     if(headerLines != JAVA_NULL) {
-        const char* tmp = stringToUTF8(threadStateData, headerLines);
-        if(tmp != NULL && tmp[0] != 0) {
-            char* copy = strdup(tmp);
+        /* BYTES, one per field-value character. HeaderLines.validate accepts
+           0x20..0xff except 0x7f and says it tests "the byte that will be
+           emitted" -- which was not true of this path: stringToUTF8 encoded an
+           obs-text character into two bytes, so the header libcurl sent was not
+           the one the caller wrote or the validation checked. */
+        int headerLength = (int)((JAVA_ARRAY)headerLines)->length;
+        if(headerLength > 0) {
+            char* copy = (char*)malloc((size_t)headerLength + 1);
+            if(copy != NULL) {
+                memcpy(copy, (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)headerLines)->data,
+                       (size_t)headerLength);
+                /* Terminated because the loop below walks a C string; the
+                   validation refuses every character under 0x20, NUL included. */
+                copy[headerLength] = 0;
+            }
             if(copy == NULL) {
                 /* THE SAME RULE AS THE APPEND BELOW, one allocation earlier. A null
                    copy left "line" null, the loop never ran, and the request went

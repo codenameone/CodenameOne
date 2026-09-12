@@ -176,7 +176,7 @@ public final class Web {
             }
         }
         initialiseCurlOnce();
-        long handle = performImpl(method, url, joined.toString(), body);
+        long handle = performImpl(method, url, HeaderLines.narrowed(joined.toString()), body);
         if(handle == 0) {
             // REDACTED, because this message goes wherever the caller logs it and
             // the URL may be a presigned one whose signature is the credential.
@@ -270,7 +270,8 @@ public final class Web {
     /** curl_global_init's CURLcode -- 0 is CURLE_OK. */
     private static native int globalInitImpl();
 
-    private static native long performImpl(String method, String url, String headerLines, byte[] body);
+    private static native long performImpl(String method, String url, byte[] headerLines,
+                                           byte[] body);
     private static native String headersImpl(long handle);
     private static native int statusImpl(long handle);
     private static native String errorImpl(long handle);

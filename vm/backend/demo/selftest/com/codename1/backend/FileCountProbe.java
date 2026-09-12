@@ -24,7 +24,7 @@
 package com.codename1.backend;
 
 /**
- * Test-only access to the descriptor accounting a Response carries.
+ * Test-only access to backend internals the product does not expose.
  *
  * <p>In this package because that is where the fields are: openFileCount is how
  * StaticFiles reports what it has handed out, and a Response's descriptor is not
@@ -48,5 +48,17 @@ public final class FileCountProbe {
     /** The number of bytes that response means to send from it. */
     public static long lengthOf(HttpServer.Response response) {
         return response.fileLength;
+    }
+
+    /**
+     * A header block as the bytes the natives are handed.
+     *
+     * The wire is not a practical place to check this: nghttp2 may Huffman-code
+     * the value it is given, so what the frame carries is not the octets
+     * themselves. The rule is one character to one byte, and this is where it is
+     * decided.
+     */
+    public static byte[] headerBytes(String value) {
+        return HeaderLines.narrowed(value);
     }
 }

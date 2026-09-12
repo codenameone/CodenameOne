@@ -1065,9 +1065,21 @@ static long cn1H2BuildHeaders(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT status,
         }
     }
     if(headerLines != JAVA_NULL) {
-        const char* tmp = stringToUTF8(threadStateData, headerLines);
-        if(tmp != NULL && tmp[0] != 0) {
-            headerCopy = strdup(tmp);
+        /* BYTES, one per field-value character, because that is what a field
+           value is -- see Http2.headerBytes. stringToUTF8 was encoding them, so
+           an obs-text character the server's own validation accepts went out as
+           one byte over HTTP/1.1 and two here. */
+        int headerLength = (int)((JAVA_ARRAY)headerLines)->length;
+        if(headerLength > 0) {
+            headerCopy = (char*)malloc((size_t)headerLength + 1);
+            if(headerCopy != NULL) {
+                memcpy(headerCopy, (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)headerLines)->data,
+                       (size_t)headerLength);
+                /* Terminated because the parsing below walks a C string. Nothing
+                   in the block can be a NUL: the validation refuses every
+                   character under 0x20. */
+                headerCopy[headerLength] = 0;
+            }
             if(headerCopy == NULL) {
                 /* A FAILED COPY IS NOT "NO HEADERS". Leaving headerCopy null here
                    is indistinguishable below from a response that carried none, so
@@ -1164,7 +1176,7 @@ static long cn1H2BuildHeaders(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT status,
  * Submits a response. headerLines is "name: value" separated by '\n'; the status
  * is passed separately because :status is a pseudo-header nghttp2 requires first.
  */
-JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_java_lang_String_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_OBJECT body) {
+JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_OBJECT body) {
     CN1H2Body* pending;
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
     nghttp2_nv nva[CN1_H2_MAX_HEADERS + 1];
@@ -1250,7 +1262,7 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_jav
  * reset or at teardown. A caller that closed it itself would pull the file out from
  * under the provider mid-response.
  */
-JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String_java_lang_String_int_long_long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_INT fd, JAVA_LONG offset, JAVA_LONG length) {
+JAVA_INT com_codename1_backend_Http2_respondFileImpl___long_int_java_lang_String_byte_1ARRAY_int_long_long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT streamId, JAVA_OBJECT status, JAVA_OBJECT headerLines, JAVA_INT fd, JAVA_LONG offset, JAVA_LONG length) {
     CN1H2Body* pending;
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
     nghttp2_nv nva[CN1_H2_MAX_HEADERS + 1];

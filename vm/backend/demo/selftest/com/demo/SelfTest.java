@@ -1551,6 +1551,29 @@ public class SelfTest {
     }
 
     /**
+     * A field value goes out as one byte per character, on every protocol.
+     *
+     * <p>The server's own validation accepts 0x20 to 0xff except 0x7f -- obs-text
+     * included -- and the HTTP/1.1 writer narrows each character with a cast. The
+     * h2 and libcurl paths handed the native a String instead, which
+     * stringToUTF8 encoded, so a handler returning U+00E9 sent one byte over
+     * HTTP/1.1 and two over h2: the same response, different octets, chosen by
+     * whichever protocol the client negotiated.
+     */
+    private static void aFieldValueIsOctetsOnEveryProtocol() throws Exception {
+        byte[] bytes = FileCountProbe.headerBytes("x-label: caf\u00e9");
+        check("an obs-text character is one byte", "1",
+                String.valueOf(bytes.length - "x-label: caf".length()));
+        check("and it is the byte the validation checked", "-23",
+                String.valueOf(bytes[bytes.length - 1]));
+        // ASCII is unaffected, which is every other header.
+        byte[] plain = FileCountProbe.headerBytes("x-label: plain");
+        check("an ascii header is unchanged", "14", String.valueOf(plain.length));
+        check("and reads back as itself", "x-label: plain",
+                new String(plain, 0, plain.length, "UTF-8"));
+    }
+
+    /**
      * An outbound failure must not put the URL's secrets in its message.
      *
      * <p>A presigned S3 URL carries its signature in the query, and userinfo
@@ -2210,6 +2233,7 @@ public class SelfTest {
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
         anOutboundFailureDoesNotLogTheSecrets();
+        aFieldValueIsOctetsOnEveryProtocol();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
         anImpossibleExpiryIsRefused();

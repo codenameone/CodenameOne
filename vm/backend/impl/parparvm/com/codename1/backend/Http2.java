@@ -168,7 +168,7 @@ public final class Http2 {
     public boolean respond(int streamId, int status, String contentType, List extraHeaders, byte[] body)
             throws IOException {
         int rc = respondImpl(session, streamId, String.valueOf(status),
-                headerLines(contentType, extraHeaders), body);
+                headerBytes(contentType, extraHeaders), body);
         if(rc == OVER_BODY_BUDGET) {
             // Not a failure: the body was refused because submitting it would
             // cross the process-wide ceiling, and NOTHING was allocated or
@@ -226,7 +226,7 @@ public final class Http2 {
     public boolean respondFile(int streamId, int status, String contentType, List extraHeaders,
             int fd, long offset, long length) throws IOException {
         int rc = respondFileImpl(session, streamId, String.valueOf(status),
-                headerLines(contentType, extraHeaders), fd, offset, length);
+                headerBytes(contentType, extraHeaders), fd, offset, length);
         if(rc == OVER_BODY_BUDGET) {
             // The descriptor ceiling was reached and NOTHING was taken -- the
             // caller still owns the fd and has to close it. Reported rather than
@@ -332,8 +332,23 @@ public final class Http2 {
     private static native String headerNameImpl(long session, int index);
     private static native String headerValueImpl(long session, int index);
     private static native byte[] bodyImpl(long session);
-    /** The header block both response forms send, as "name: value" lines. */
-    private static String headerLines(String contentType, List extraHeaders) {
+    /**
+     * The header block both response forms send, as "name: value" lines.
+     *
+     * <p>BYTES, one per character, and not a String for the native to encode. A
+     * field value is octets: the server's own validation accepts anything from
+     * 0x20 to 0xff except 0x7f -- obs-text included -- and says it tests "the
+     * byte that will be emitted", which is exactly what the HTTP/1.1 writer does
+     * when it narrows each char with a cast. Handing the native a String meant
+     * stringToUTF8 encoded it instead, so a handler returning U+00E9 sent one
+     * byte over HTTP/1.1 and two over h2: the same response, different octets,
+     * decided by which protocol the client negotiated.
+     *
+     * <p>This is the exact inverse of newStringFromAsciiLen, which is how the
+     * inbound natives turn a request's header bytes into chars -- so the two
+     * directions agree again.
+     */
+    private static byte[] headerBytes(String contentType, List extraHeaders) {
         StringBuilder joined = new StringBuilder();
         joined.append("content-type: ").append(contentType == null
                 ? "application/octet-stream" : contentType);
@@ -342,17 +357,17 @@ public final class Http2 {
                 joined.append('\n').append(String.valueOf(extraHeaders.get(iter)));
             }
         }
-        return joined.toString();
+        return HeaderLines.narrowed(joined.toString());
     }
 
     private static native int respondFileImpl(long session, int streamId, String status,
-            String headerLines, int fd, long offset, long length);
+            byte[] headerLines, int fd, long offset, long length);
     private static native void setMaxBodyBytesImpl(long limit);
 
     private static native void setMaxFileBodiesImpl(int limit);
 
     private static native int respondImpl(long session, int streamId, String status,
-                                          String headerLines, byte[] body);
+                                          byte[] headerLines, byte[] body);
     private static native boolean wantsMoreImpl(long session);
     private static native long pendingBodyBytesImpl(long session);
     private static native int pendingBodyFilesImpl();

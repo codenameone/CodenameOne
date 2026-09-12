@@ -88,13 +88,37 @@ final class HeaderLines {
             }
             // The same field-value rule the server applies to what it SENDS: HTAB,
             // SP, VCHAR and obs-text. Tested against the byte that will be emitted,
-            // because the packaged arm narrows with a plain cast on the way to the
-            // native -- so U+010A is not '\n' to a char test and is 0x0A on the
-            // wire, which is the same newline by another spelling.
+            // which is what narrowed() below makes true -- so U+010A is not '\n'
+            // to a char test and is 0x0A on the wire, the same newline by another
+            // spelling. Until narrowed() existed this path handed the native a
+            // String for stringToUTF8 to encode, and the byte checked here was not
+            // the byte that went out.
             if(c < 0x20 || c == 0x7f || c > 0xff) {
                 throw new IOException("A request header value carries a character no "
                         + "field value may hold, in " + line.substring(0, colon));
             }
         }
+    }
+
+    /**
+     * A validated field-value line as bytes, ONE PER CHARACTER.
+     *
+     * A field value is octets. validate() above accepts 0x20 to 0xff except
+     * 0x7f -- obs-text included -- so the only faithful conversion narrows each
+     * character with a cast, which is exactly what the HTTP/1.1 writer's
+     * Conn.put does and the inverse of the newStringFromAsciiLen the inbound
+     * natives use. Encoding to UTF-8 instead sent one byte over HTTP/1.1 and two
+     * over h2 for the same header.
+     *
+     * <p>Shared rather than copied into each caller: Http2 and Web both hand a
+     * header block to a native, and both arms compile this file, so the rule and
+     * the test for it live in one place.
+     */
+    static byte[] narrowed(String value) {
+        byte[] out = new byte[value.length()];
+        for(int iter = 0 ; iter < out.length ; iter++) {
+            out[iter] = (byte)value.charAt(iter);
+        }
+        return out;
     }
 }
