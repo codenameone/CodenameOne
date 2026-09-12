@@ -627,10 +627,6 @@ public final class Invites {
         //
         // Only when it really is this url. An application may pass any string
         // here, and clearing an unrelated launch argument is not ours to do.
-        Display display = Display.getInstance();
-        if (display != null && url != null && url.equals(display.getProperty("AppArg", null))) {
-            display.setProperty("AppArg", null);
-        }
         ensureProvider();
         // A tapped link is a fresh answer and would ordinarily reopen
         // attribution, but not while an erasure is still owed: claiming writes
@@ -639,6 +635,22 @@ public final class Invites {
         // what stopped it was transient.
         if (!settleErasure()) {
             return false;
+        }
+        // Consumed HERE, and not before the check above.
+        //
+        // Clearing it first threw the url away on the one path that reports
+        // failure: an erasure still owed and a store still refusing leaves
+        // this returning false, and the argument -- the only copy of a
+        // freshly tapped invite -- was already gone, so the retry that would
+        // have worked once storage recovered had nothing left to read.
+        // Everything below this line returns true, so from here the invite
+        // machinery really does own the url.
+        //
+        // Only when it really is this url. An application may pass any string
+        // here, and clearing an unrelated launch argument is not ours to do.
+        Display display = Display.getInstance();
+        if (display != null && url != null && url.equals(display.getProperty("AppArg", null))) {
+            display.setProperty("AppArg", null);
         }
         // The same guard beginDeferred() has. checkForInvite() treats a
         // consumed URL as handled and skips beginDeferred entirely, so without
@@ -957,6 +969,19 @@ public final class Invites {
             if (!normalized.regionMatches(true, 0, "https://", 0, 8)) {
                 throw new IllegalArgumentException(
                         "the invite link base must be https, not " + normalized);
+            }
+            // An ORIGIN, with no path of its own.
+            //
+            // A prefix check alone accepted https://links.example.com/base,
+            // which mints /base/i/<code> -- and the generated Android filter
+            // matches /i/, so every link opens the browser while the host
+            // check beside this stays silent, because the host is right. The
+            // path is the part the build cannot know about.
+            String origin = trimSlash(normalized);
+            String host = hostOf(origin);
+            if (host == null || origin.length() != "https://".length() + host.length()) {
+                throw new IllegalArgumentException(
+                        "the invite link base must be a bare host, with no path: " + url);
             }
         }
         linkBase = normalized;

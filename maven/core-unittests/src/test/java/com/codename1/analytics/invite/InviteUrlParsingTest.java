@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -205,5 +206,37 @@ class InviteUrlParsingTest extends UITestBase {
 
         assertEquals("myapp://somewhere/else", d.getProperty("AppArg", null),
                 "an unrelated launch argument was cleared");
+    }
+
+    @FormTest
+    void theLinkBaseMustBeAnHttpsOrigin() {
+        // Invite.getUrl() promises an absolute https url, and the generated
+        // Android filter and iOS associated domain match an https host with
+        // the /i/ path and nothing else.
+        Invites.reset();
+        // A bare host is what the build hint carries, so it is accepted and
+        // read as https.
+        Invites.setLinkBase("links.example.com");
+        assertEquals("https://links.example.com", Invites.getLinkBase());
+
+        try {
+            Invites.setLinkBase("http://links.example.com");
+            fail("an http base was accepted, and every link it mints opens the browser");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("https"), expected.getMessage());
+        }
+        try {
+            // Mints /base/i/<code>, which the generated filter -- matching
+            // /i/ -- never sees, while the host check stays silent because
+            // the host is right.
+            Invites.setLinkBase("https://links.example.com/base");
+            fail("a base carrying a path was accepted");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("no path"), expected.getMessage());
+        }
+        // A trailing slash is not a path.
+        Invites.setLinkBase("https://links.example.com/");
+        assertEquals("https://links.example.com", Invites.getLinkBase());
+        Invites.setLinkBase(null);
     }
 }
