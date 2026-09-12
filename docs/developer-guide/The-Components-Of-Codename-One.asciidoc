@@ -775,7 +775,7 @@ Notice the following about the code above and the resulting image:
 
 - When an element is placed alone within a `ComponentGroup` its a special case `UIID`.
 
-IMPORTANT: By default, `ComponentGroup` does *nothing*. You need to explicitly activate it in the theme by setting a theme property to true. Specifically you need to set `ComponentGroupBool` to `true` for `ComponentGroup` to do something otherwise its a box layout container! The `ComponentGroupBool` flag is true by default in the iOS native theme.
+IMPORTANT: A vertical `ComponentGroup` does *nothing* unless the theme sets the `ComponentGroupBool` constant to `true`; without it the group is just a box layout container. The legacy iOS themes set that flag, the current native themes don't, and neither of them styles the `GroupElement` UIIDs a vertical group applies. A *horizontal* group is the exception, as long as it keeps the UIID `setHorizontal` gives it: it's a segmented control, it renames its members to `ToggleButton`, and both native themes style that UIID and its `First` / `Last` / `Only` variants in full, so it needs no constant. Name your own element UIID with `setElementUIID` and it's theme-gated again, exactly like a vertical one.
 
 When `ComponentGroupBool` is set to true, the component group will change the styles of all components placed within it to match the element UIID given to it (GroupElement by default) with special caveats to the first/last/ elements. For example:
 
