@@ -68,7 +68,12 @@ public final class MySql {
     private final Wire wire;
     private int sequence;
     private long lastInsertId;
-    private boolean closed;
+    /**
+     * VOLATILE: isClosed() is read by whoever is deciding whether to reuse this
+     * session -- a pool, a health check -- and that caller does not hold the
+     * monitor close() publishes under. See Database.sqliteClosed.
+     */
+    private volatile boolean closed;
 
     private MySql(Wire wire) {
         this.wire = wire;

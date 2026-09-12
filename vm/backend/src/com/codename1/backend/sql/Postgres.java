@@ -72,7 +72,12 @@ public final class Postgres {
     private final Wire wire;
     private final String user;
     private final String password;
-    private boolean closed;
+    /**
+     * VOLATILE: isClosed() is read by whoever is deciding whether to reuse this
+     * session -- a pool, a health check -- and that caller does not hold the
+     * monitor close() publishes under. See Database.sqliteClosed.
+     */
+    private volatile boolean closed;
 
     /**
      * @param passwordMayCrossInTheClear whether this connection is entitled to

@@ -68,8 +68,22 @@ import com.codename1.backend.sql.Postgres;
  */
 public final class Database {
     private final Db sqlite;
-    /** Db has no isClosed, so closure is recorded where it happens. */
-    private boolean sqliteClosed;
+    /**
+     * Db has no isClosed, so closure is recorded where it happens -- and VOLATILE,
+     * because isOpen() reads it without the monitor.
+     *
+     * <p>close() is synchronized like every other operation on this class, so a
+     * closing thread publishes this under the lock -- but the pool or health check
+     * asking isOpen() never takes that lock, and without a happens-before edge the
+     * memory model lets it keep seeing false indefinitely. The connection is then
+     * handed out again and fails on its next use.
+     *
+     * <p>Volatile rather than synchronizing isOpen(): the caller asking whether a
+     * connection is usable is exactly the caller that must not block behind a
+     * statement already running on it. HttpServer publishes its own `running` flag
+     * the same way.
+     */
+    private volatile boolean sqliteClosed;
     private final Postgres postgres;
     private final MySql mysql;
     private final String describedAs;
