@@ -262,7 +262,7 @@ public class SourceManifest {
         // java.io rather than java.nio.file: the translator compiles against JavaAPI
         // when it translates itself, and JavaAPI has no java.nio.file. See
         // vm/selfhost.
-        try (Writer w = new OutputStreamWriter(new FileOutputStream(out), UTF8)) {
+        try (Writer w = new OutputStreamWriter(new FileOutputStream(out), "UTF-8")) {
             w.write("# Provenance of every file in the generated project's source directory.\n");
             w.write("# Written by the ParparVM translator; consumed by\n");
             w.write("# scripts/check-native-warnings.py to decide who owns a compiler warning.\n");

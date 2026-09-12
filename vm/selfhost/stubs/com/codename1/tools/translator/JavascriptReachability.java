@@ -39,6 +39,11 @@ final class JavascriptReachability {
     private JavascriptReachability() {
     }
 
+    /// Stub: the JavaScript target is excluded from the self-hosted build, so the
+    /// per-application fact cache it clears does not exist here.
+    static void resetExportedFacts() {
+    }
+
     static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
             String[] nativeSources) {
         throw new UnsupportedOperationException("JavaScript target not built into this translator");

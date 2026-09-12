@@ -431,7 +431,7 @@ public class ByteCodeTranslator {
             // Unrecognized output type falls back to the plain copy-through default handler
             recognizedOutputType = false;
         }
-        String[] sourceDirectories = args[1].split(";");
+        String[] sourceDirectories = Util.splitLiteral(args[1], ';');
         File[] sources = new File[sourceDirectories.length];
         for(int iter = 0 ; iter < sourceDirectories.length ; iter++) {
             sources[iter] = new File(sourceDirectories[iter]);
@@ -776,7 +776,19 @@ public class ByteCodeTranslator {
                     || ext.equals("mm") || ext.equals("rc")) {
                 continue;
             }
-            String rel = root.toPath().relativize(f.toPath()).toString().replace('\\', '/');
+            // Relative path by absolute-prefix strip rather than Path.relativize:
+            // JavaAPI has no java.nio.file, and the translator compiles against it
+            // when it translates itself. f is always under root here -- it came from
+            // a walk of root -- so the prefix always matches.
+            String rootAbs = root.getAbsolutePath();
+            String fileAbs = f.getAbsolutePath();
+            String rel = fileAbs.startsWith(rootAbs)
+                    ? fileAbs.substring(rootAbs.length())
+                    : fileAbs;
+            while (rel.startsWith(File.separator) || rel.startsWith("/")) {
+                rel = rel.substring(1);
+            }
+            rel = rel.replace('\\', '/');
             String key = "/" + rel;
             if (!out.containsKey(key)) {
                 out.put(key, f);
@@ -910,8 +922,20 @@ public class ByteCodeTranslator {
         File projectPbx = new File(xcproj, "project.pbxproj");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));
 
-        String[] sourceFiles = srcRoot.list((pathname, string) ->
-                string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string));
+        // File.list(FilenameFilter) is not in JavaAPI; filter the plain listing.
+        String[] allNames = srcRoot.list();
+        java.util.List<String> keptNames = new java.util.ArrayList<String>();
+        if (allNames != null) {
+            for (String string : allNames) {
+                File pathname = new File(srcRoot, string);
+                if (string.endsWith(".bundle") || string.endsWith(".xcdatamodeld")
+                        || !pathname.isHidden() && !string.startsWith(".")
+                           && !"Images.xcassets".equals(string)) {
+                    keptNames.add(string);
+                }
+            }
+        }
+        String[] sourceFiles = keptNames.toArray(new String[keptNames.size()]);
 
         StringBuilder fileOneEntry = new StringBuilder();
         StringBuilder fileTwoEntry = new StringBuilder();
@@ -927,7 +951,7 @@ public class ByteCodeTranslator {
 
         List<String> includeFrameworks = new ArrayList<>();
         Set<String> optionalFrameworks = new HashSet<>();
-        for (String optionalFramework : Util.getProperty("optional.frameworks", "").split(";")) {
+        for (String optionalFramework : Util.splitLiteral(Util.getProperty("optional.frameworks", ""), ';')) {
             optionalFramework = optionalFramework.trim();
             if (!optionalFramework.isEmpty()) {
                 optionalFrameworks.add(optionalFramework);
@@ -997,7 +1021,7 @@ public class ByteCodeTranslator {
         includeFrameworks.add("libz.dylib");
         includeFrameworks.add("AVKit.framework");
         if(!addFrameworks.equalsIgnoreCase("none")) {
-            includeFrameworks.addAll(Arrays.asList(addFrameworks.split(";")));
+            includeFrameworks.addAll(Arrays.asList(Util.splitLiteral(addFrameworks, ';')));
         }
 
         int currentValue = 0xF63EAAA;
@@ -1167,7 +1191,7 @@ public class ByteCodeTranslator {
         boolean windows = "windows".equalsIgnoreCase(appType);
         boolean linux = "linux".equalsIgnoreCase(appType);
         boolean executable = windows || linux;
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(cmakeLists), StandardCharsets.UTF_8)) {
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(cmakeLists), "UTF-8")) {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             // The native Windows port mixes the translated C runtime with a C++
             // layer for the COM APIs that have no C binding (DirectWrite), so the
@@ -1594,9 +1618,12 @@ public class ByteCodeTranslator {
             String target = values[iter];
             String replacement = values[iter + 1];
             int index = 0;
-            while ((index = str.indexOf(target, index)) >= 0) {
+            while ((index = str.toString().indexOf(target, index)) >= 0) {
                 int targetSize = target.length();
-                str.replace(index, index + targetSize, replacement);
+                String replaced = str.toString().substring(0, index) + replacement
+                        + str.toString().substring(index + targetSize);
+                str.setLength(0);
+                str.append(replaced);
                 index += replacement.length();
                 totchanges++;
             }
@@ -1608,7 +1635,7 @@ public class ByteCodeTranslator {
         if(verbose) {
             System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
         }
-        try(Writer fios = new OutputStreamWriter(new FileOutputStream(sourceFile), StandardCharsets.UTF_8)) {
+        try(Writer fios = new OutputStreamWriter(new FileOutputStream(sourceFile), "UTF-8")) {
             fios.write(str.toString());
         }
     }

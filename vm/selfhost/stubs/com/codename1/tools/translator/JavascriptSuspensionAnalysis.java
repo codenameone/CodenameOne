@@ -39,7 +39,7 @@ final class JavascriptSuspensionAnalysis {
     private JavascriptSuspensionAnalysis() {
     }
 
-    static int run(List<ByteCodeClass> classes) {
+    static int run(List<ByteCodeClass> classes, java.io.File outputDirectory) {
         throw new UnsupportedOperationException("JavaScript target not built into this translator");
     }
 }
