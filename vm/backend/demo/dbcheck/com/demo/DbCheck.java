@@ -274,6 +274,7 @@ public class DbCheck {
         db.execute("DROP TABLE cn1_check", null);
         parameterCountsMustMatch(db, postgres);
         oversizeMessagesAreRefused(url, postgres, mysql);
+        wholePacketsPastTheBoundAreRefused(url, mysql);
         concurrentTransactionsOwnTheSession(db, postgres);
     }
 
@@ -394,15 +395,7 @@ public class DbCheck {
      */
     private static void oversizeMessagesAreRefused(String url,
             boolean postgres, boolean mysql) throws Exception {
-        String configured = System.getenv("CN1_DB_MAX_MESSAGE_MB");
-        int limitMb = 0;
-        if(configured != null) {
-            try {
-                limitMb = Integer.parseInt(configured.trim());
-            } catch (NumberFormatException ignored) {
-                limitMb = 0;
-            }
-        }
+        int limitMb = configuredLimitMb();
         if(limitMb < 1 || limitMb > 4) {
             note("oversize-message check skipped: set CN1_DB_MAX_MESSAGE_MB to 1..4");
             return;
@@ -462,6 +455,77 @@ public class DbCheck {
             afterwards = "closed";
         }
         check("and the connection is taken out of service", "closed", afterwards);
+        } finally {
+            db.close();
+        }
+    }
+
+    /** The ceiling the two bound checks run under, or 0 when it is unusable. */
+    private static int configuredLimitMb() {
+        String configured = System.getenv("CN1_DB_MAX_MESSAGE_MB");
+        if(configured == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(configured.trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    /**
+     * The bound holds on a packet that arrives WHOLE, which on MySQL is the case
+     * the check above cannot reach.
+     *
+     * <p>MySQL splits a long value into 16MB packets, and the bound used to live
+     * only in the branch that reassembles them. A ceiling set under 16MB was
+     * therefore enforced nowhere at all: one packet just short of the maximum is
+     * not full-length, so the loop that checks never ran, and the read ahead of it
+     * had already allocated what the peer asked for. The check above asks for 20MB
+     * precisely to exercise the split, which is why it never noticed.
+     *
+     * <p>A few megabytes against a one-megabyte ceiling fits in a single packet and
+     * so proves the bound rather than the reassembly. Before the guard moved ahead
+     * of the read this returned the value in full.
+     *
+     * <p>PostgreSQL has no 16MB floor -- one message is one message -- so its side
+     * is already covered above and this check is MySQL's alone.
+     */
+    private static void wholePacketsPastTheBoundAreRefused(String url, boolean mysql)
+            throws Exception {
+        int limitMb = configuredLimitMb();
+        if(limitMb < 1 || limitMb > 4) {
+            note("whole-packet bound check skipped: set CN1_DB_MAX_MESSAGE_MB to 1..4");
+            return;
+        }
+        if(!mysql) {
+            note("whole-packet bound check skipped: it is MySQL's 16MB packet floor");
+            return;
+        }
+        // Over the ceiling and under MAX_PACKET_BODY, so the server sends it as one.
+        int bytes = (limitMb * 1024 * 1024) + (1024 * 1024);
+        // ITS OWN CONNECTION, for the reason the check above documents: the refusal
+        // closes the connection it arrives on.
+        Database db = Database.open(url);
+        try {
+            List small = db.query("SELECT REPEAT('y', 1024) AS small", null);
+            check("a whole packet inside the bound still arrives", "1024",
+                    small.isEmpty() ? "<none>"
+                            : String.valueOf(String.valueOf(
+                                    ((Map)small.get(0)).get("small")).length()));
+
+            String outcome;
+            try {
+                List rows = db.query("SELECT REPEAT('x', " + bytes + ") AS big", null);
+                Object value = rows.isEmpty() ? null : ((Map)rows.get(0)).get("big");
+                outcome = "returned " + (value == null ? "null"
+                        : String.valueOf(String.valueOf(value).length()));
+            } catch (Exception refused) {
+                String message = String.valueOf(refused.getMessage());
+                outcome = message.indexOf("CN1_DB_MAX_MESSAGE_MB") >= 0
+                        ? "refused" : "other: " + message;
+            }
+            check("a whole packet past the bound is refused", "refused", outcome);
         } finally {
             db.close();
         }

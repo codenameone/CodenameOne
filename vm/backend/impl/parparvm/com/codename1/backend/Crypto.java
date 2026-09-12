@@ -38,6 +38,20 @@ public final class Crypto {
      * stolen table.
      */
     public static final int PASSWORD_ITERATIONS = 210000;
+    /**
+     * The most iterations verifyPassword will compute for a stored value.
+     *
+     * <p>That count is READ OUT of the stored string rather than chosen here, so a
+     * row an attacker can influence -- or an application handing this a value from
+     * somewhere it does not control -- names the work directly. PBKDF2 measured at
+     * roughly 0.08s per million rounds, so an unbounded count is minutes of CPU per
+     * login attempt, and a login endpoint invites the repeat.
+     *
+     * <p>Well clear of PASSWORD_ITERATIONS so raising that stays a local decision:
+     * a hash this server wrote verifies under a second either way.
+     */
+    private static final int MAX_VERIFY_ITERATIONS = 10000000;
+
     private static final int PASSWORD_SALT_BYTES = 16;
     private static final int PASSWORD_HASH_BYTES = 32;
 
@@ -129,7 +143,8 @@ public final class Crypto {
         }
         byte[] salt = Base64Url.decode(parts[2]);
         byte[] expected = Base64Url.decode(parts[3]);
-        if(salt == null || expected == null || iterations <= 0) {
+        if(salt == null || expected == null || iterations <= 0
+                || iterations > MAX_VERIFY_ITERATIONS) {
             return false;
         }
         // Non-EMPTY, not merely non-null. "pbkdf2$1$$" decodes to two empty arrays,

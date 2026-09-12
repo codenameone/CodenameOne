@@ -747,6 +747,20 @@ public final class MySql {
         int length = low | (wire.read() << 8) | (wire.read() << 16);
         sequence = wire.read() + 1;
         Packet packet = new Packet();
+        long allowed = SqlLimits.maxMessageBytes();
+        if(length > allowed) {
+            // BEFORE THE ALLOCATION, and before the continuation branch below --
+            // which is where this bound used to live, and where it could not reach
+            // the packet that matters. One packet carries up to MAX_PACKET_BODY, so
+            // a ceiling set under 16MB was enforced nowhere: a peer sending a single
+            // packet just short of the maximum was never full-length, so the loop
+            // that checks never ran, and a 1MB ceiling still allocated almost 16MB.
+            // The greeting arrives through this same path before TLS is negotiated,
+            // so the peer need not be authenticated, or even be the server.
+            close();                    // desynchronised; see the branch below
+            throw new IOException("A MySQL packet claims " + length + " bytes, past the "
+                    + allowed + " CN1_DB_MAX_MESSAGE_MB allows");
+        }
         packet.body = wire.readFully(length);
         if(length == MAX_PACKET_BODY) {
             // A full-length packet is continued by the next one, and the value only
@@ -762,7 +776,6 @@ public final class MySql {
             // negotiated, so sslmode=require is no protection: whoever answers the
             // connection can do it, authenticated or not.
             long accumulated = all.size();
-            long allowed = SqlLimits.maxMessageBytes();
             while(length == MAX_PACKET_BODY) {
                 int next = wire.read();
                 if(next < 0) {

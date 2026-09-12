@@ -22,6 +22,7 @@
  */
 package com.demo;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -288,6 +289,32 @@ public class SelfTest {
                 String.valueOf(Crypto.verifyPassword("hunter2", "not-a-hash")));
         check("truncated stored value rejected", "false",
                 String.valueOf(Crypto.verifyPassword("hunter2", "pbkdf2$1000$abc")));
+
+        // AN IMPLAUSIBLE ITERATION COUNT, rejected rather than computed. The count
+        // is read out of the stored value, so whoever influences a row -- or an
+        // application that hands this a value from somewhere it does not control --
+        // otherwise names how long the login takes. The salt and hash here are the
+        // right length, so the count is the only thing left to reject it.
+        String hostile = "pbkdf2$" + Integer.MAX_VALUE + "$"
+                + stored.substring(stored.indexOf('$', 7) + 1);
+        long started = System.currentTimeMillis();
+        boolean accepted = Crypto.verifyPassword("hunter2", hostile);
+        long elapsed = System.currentTimeMillis() - started;
+        // BOTH HALVES, because the answer alone does not distinguish them. An
+        // unbounded count still ends in a hash that does not match, so this returns
+        // false either way and a check on the boolean passes with the bound removed
+        // -- measured, not supposed: the whole self-test went on passing while one
+        // call sat in PBKDF2 for 175 of its 178 seconds. What the bound changes is
+        // WHEN the false arrives. Thirty seconds because the gap being measured is
+        // five times that, not because answering is expected to need any of it.
+        check("an implausible iteration count is rejected", "false without computing",
+                (accepted ? "true" : "false")
+                        + (elapsed < 30000 ? " without computing"
+                                           : " only after " + elapsed + "ms"));
+        // And the ordinary count this server writes still verifies, so the bound
+        // did not simply refuse everything.
+        check("the stored count still verifies", "true",
+                String.valueOf(Crypto.verifyPassword("hunter2", stored)));
     }
 
     private static void jwt() throws Exception {
@@ -1202,6 +1229,128 @@ public class SelfTest {
             weakKey = "refused";
         }
         check("a zero iteration count is refused", "refused", weakKey);
+
+        scramIterationCountIsBounded();
+    }
+
+    /**
+     * A SCRAM server does not get to choose how long this client computes.
+     *
+     * <p>The iteration count arrives on the wire and multiplies straight into
+     * PBKDF2. The default sslmode=prefer falls back to plaintext, so whoever answers
+     * the connection can complete the exchange with a valid extended nonce and name
+     * a count near Integer.MAX_VALUE. Measured with the bound removed and this stub
+     * in place: one connection attempt held the thread for about 175 seconds, before
+     * anything was authenticated and repeatable at the peer's choosing.
+     *
+     * <p>Driven by a stub, because a real server will not send a hostile count. The
+     * assertion is the bound's own wording rather than "it threw": a stub that got
+     * the protocol wrong would throw too, and would pass a weaker check while
+     * proving nothing. That this returns at all is the other half of the proof --
+     * without the bound this check fails, and takes those 175 seconds to fail.
+     */
+    private static void scramIterationCountIsBounded() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    if(pgRead(client) == null) {          // StartupMessage
+                        return;
+                    }
+                    // AuthenticationSASL: mechanism 10, one mechanism, list ended
+                    // by its own empty string.
+                    pgSend(client, 'R', join(int32(10), ascii("SCRAM-SHA-256\0\0")));
+                    byte[] initial = pgRead(client);      // SASLInitialResponse
+                    if(initial == null) {
+                        return;
+                    }
+                    // The client refuses a nonce that does not extend its own, so
+                    // the stub has to echo it back. It is the last field of the
+                    // message, which is why the tail is all of it.
+                    String text = new String(initial, "UTF-8");
+                    int at = text.lastIndexOf("r=");
+                    String clientNonce = at < 0 ? "" : text.substring(at + 2);
+                    // AuthenticationSASLContinue, with the count this check exists
+                    // for. The salt is real base64 so that decoding it is not what
+                    // fails.
+                    pgSend(client, 'R', join(int32(11), ascii("r=" + clientNonce
+                            + "stub,s=AAAAAAAAAAAAAAAA,i=" + Integer.MAX_VALUE)));
+                } catch (Exception ignored) {
+                    // The client hanging up mid-exchange is the expected ending.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("postgres://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            db.close();
+            outcome = "connected";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("SCRAM iterations") >= 0
+                    ? "refused" : "other: " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a hostile SCRAM iteration count is refused", "refused", outcome);
+    }
+
+    /** One PostgreSQL message: type byte, length that counts itself, payload. */
+    private static void pgSend(int fd, char type, byte[] payload) throws IOException {
+        byte[] out = new byte[5 + payload.length];
+        out[0] = (byte) type;
+        int length = payload.length + 4;
+        out[1] = (byte) (length >> 24);
+        out[2] = (byte) (length >> 16);
+        out[3] = (byte) (length >> 8);
+        out[4] = (byte) length;
+        System.arraycopy(payload, 0, out, 5, payload.length);
+        ServerSocket.write(fd, out, 0, out.length);
+    }
+
+    /**
+     * Whatever one read answers. Enough here because the client waits for a reply
+     * before sending the next message, so each read is one whole message.
+     */
+    private static byte[] pgRead(int fd) throws IOException {
+        byte[] buffer = new byte[4096];
+        int got = ServerSocket.read(fd, buffer, 0, buffer.length);
+        if(got <= 0) {
+            return null;
+        }
+        byte[] out = new byte[got];
+        System.arraycopy(buffer, 0, out, 0, got);
+        return out;
+    }
+
+    private static byte[] int32(int value) {
+        return new byte[]{(byte) (value >> 24), (byte) (value >> 16),
+                (byte) (value >> 8), (byte) value};
+    }
+
+    private static byte[] ascii(String value) throws IOException {
+        return value.getBytes("UTF-8");
+    }
+
+    private static byte[] join(byte[] a, byte[] b) {
+        byte[] out = new byte[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
     }
 
     private static void json() throws Exception {

@@ -59,6 +59,9 @@ import com.codename1.backend.Tcp;
  */
 public final class Postgres {
     /** Message types the backend sends that this client acts on. */
+    /** See where it is enforced, in the SCRAM exchange, for why this value. */
+    private static final int MAX_SCRAM_ITERATIONS = 1000000;
+
     private static final int AUTHENTICATION = 'R';
     private static final int ERROR_RESPONSE = 'E';
     private static final int ROW_DESCRIPTION = 'T';
@@ -308,6 +311,28 @@ public final class Postgres {
         int iterations = parseInt(iterationText, -1);
         if(iterations < 1) {
             throw new IOException("The server's SCRAM iteration count is not a number");
+        }
+        // AND AN UPPER BOUND, because that count is the peer's and it multiplies
+        // straight into the PBKDF2 below. The default sslmode=prefer falls back to
+        // plaintext, so whoever answers the connection -- an on-path peer included
+        // -- can complete the exchange with a valid extended nonce and name a count
+        // near Integer.MAX_VALUE. The HMAC rounds then run on the calling thread,
+        // before this side has authenticated anything. Measured against a stub that
+        // does exactly that, in the packaged binary: one connection attempt held the
+        // thread for about 175 seconds, and nothing stops a peer repeating it. The
+        // self-test check that drives the stub fails without this bound and takes
+        // those 175 seconds to do it.
+        //
+        // The ceiling is deliberately generous rather than tight. PostgreSQL 16 asks
+        // for 4096 -- its scram_iterations default, read back from a live server --
+        // so a million leaves better than two orders of magnitude for a deployment
+        // that raises it on purpose, while bounding the work at a fraction of a
+        // second. A server beyond that is refused rather than served slowly, because
+        // the alternative is letting the peer choose how long we compute.
+        if(iterations > MAX_SCRAM_ITERATIONS) {
+            throw new IOException("The server asked for " + iterations
+                    + " SCRAM iterations, past the " + MAX_SCRAM_ITERATIONS
+                    + " this client computes");
         }
 
         // The password goes into PBKDF2 as its raw UTF-8, WITHOUT SASLprep, and
