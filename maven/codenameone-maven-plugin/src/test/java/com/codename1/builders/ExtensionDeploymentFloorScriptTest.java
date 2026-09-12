@@ -311,6 +311,27 @@ class ExtensionDeploymentFloorScriptTest {
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0", got.get(0));
     }
 
+    /// An exact qualified hit is not a guess. With EXTENSION_MIN qualified for BOTH sdks, the
+    /// simulator key resolves exactly to 12.0 and must be raised -- treating the device
+    /// sibling as uncertainty left it below the floor and the build failed on it anyway,
+    /// which is the opposite of what the uncertainty guard is for.
+    @Test
+    void anExactQualifiedHitIsNotUncertain(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "BothSdks|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->16.4;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]->$(EXTENSION_MIN);"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN),"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]=15.0",
+                got.get(0),
+                "the device key resolves to 16.4 and is kept; the simulator key resolves to "
+                        + "12.0 and is raised");
+    }
+
     /// Xcode expands a reference nothing defines to the empty string, so the extension would
     /// declare no minimum at all. The floor is the answer there, not the expression.
     @Test
