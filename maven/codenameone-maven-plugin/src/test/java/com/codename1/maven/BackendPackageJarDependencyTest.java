@@ -32,6 +32,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -40,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// A jar on the compile classpath has to be unpacked before the translator sees it.
+/// The compile classpath has to reach the translator as one first-wins tree.
 ///
 /// ByteCodeTranslator walks every input with File.listFiles, which answers null
 /// for a jar and is read as an empty directory -- so a dependency resolved from
@@ -48,10 +49,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// linking the symbols of classes it had never been shown. A module in the same
 /// reactor resolves to its target/classes, which is why this never showed in the
 /// generated project's own contract module.
+///
+/// And order is precedence: Parser.classIndex keeps the FIRST definition it
+/// parsed, exactly as javac resolves the same classpath, so anything that
+/// reorders the inputs compiles against one definition and translates another.
+/// Staging into one tree settles it on disk and leaves no order to get wrong.
 class BackendPackageJarDependencyTest {
 
     @Test
-    void unpacksAJarAndLeavesADirectoryAlone(@TempDir File tmp) throws Exception {
+    void stagesEverythingIntoOneTree(@TempDir File tmp) throws Exception {
         File first = new File(tmp, "first.jar");
         writeJar(first,
                 "com/example/Dto.class", "FIRST",
@@ -61,64 +67,87 @@ class BackendPackageJarDependencyTest {
         writeJar(second, "com/example/Dto.class", "SECOND",
                 "com/example/Only.class", "ONLY");
         File asDirectory = new File(tmp, "sibling-classes");
-        assertTrue(new File(asDirectory, "com/example").mkdirs());
-        File unpacked = new File(tmp, "dependency-classes");
-        assertTrue(unpacked.mkdirs());
+        writeFile(new File(asDirectory, "com/example/Dto.class"), "DIRECTORY");
+        writeFile(new File(asDirectory, "com/example/FromDir.class"), "FROMDIR");
+        File staged = new File(tmp, "dependency-classes");
+        assertTrue(staged.mkdirs());
         File natives = new File(tmp, "native");
         assertTrue(natives.mkdirs());
 
-        List<String> inputs = unpack(Arrays.asList(first.getAbsolutePath(),
+        List<String> inputs = stage(Arrays.asList(first.getAbsolutePath(),
                 asDirectory.getAbsolutePath(), second.getAbsolutePath()),
-                unpacked, natives);
+                staged, natives);
 
-        // The point of the change: no jar may reach the translator as a jar.
-        for (int i = 0; i < inputs.size(); i++) {
-            assertFalse(inputs.get(i).endsWith(".jar"),
-                    "a jar cannot be a translator input: " + inputs);
-        }
-        assertTrue(inputs.contains(asDirectory.getAbsolutePath()),
-                "a classpath entry that is already a directory is passed through: " + inputs);
-        assertTrue(inputs.contains(unpacked.getAbsolutePath()),
-                "the unpacked jars have to be an input: " + inputs);
-        assertTrue(new File(unpacked, "com/example/Only.class").isFile(),
-                "a class only the second jar carries was dropped");
-        // javac's rule for the same classpath: the FIRST entry wins.
-        assertEquals("FIRST", read(new File(unpacked, "com/example/Dto.class")),
-                "the earlier jar on the classpath must win the class both carry");
-        assertFalse(new File(unpacked, "META-INF").exists(),
+        assertEquals(Collections.singletonList(staged.getAbsolutePath()), inputs,
+                "one input, so there is no order for the translator to resolve: " + inputs);
+        assertEquals("FIRST", read(new File(staged, "com/example/Dto.class")),
+                "the first classpath entry wins the class three of them carry, "
+                        + "which is what javac did when the module was compiled");
+        assertEquals("ONLY", read(new File(staged, "com/example/Only.class")),
+                "a class only the last jar carries is still staged");
+        assertEquals("FROMDIR", read(new File(staged, "com/example/FromDir.class")),
+                "and a class only the directory carries, which is copied in rather "
+                        + "than passed through");
+        assertFalse(new File(staged, "META-INF").exists(),
                 "META-INF belongs to the jar, not to the translation");
         assertTrue(new File(natives, "dep.c").isFile(),
                 "a dependency's cn1-native belongs with the runtime's");
     }
 
     @Test
-    void addsNoInputWhenNothingNeededUnpacking(@TempDir File tmp) throws Exception {
+    void letsADirectoryWinWhenItComesFirst(@TempDir File tmp) throws Exception {
+        // The other order, which is the half a reverse traversal got wrong: a
+        // directory ahead of a jar has to keep its precedence.
         File asDirectory = new File(tmp, "sibling-classes");
-        assertTrue(asDirectory.mkdirs());
-        File unpacked = new File(tmp, "dependency-classes");
-        assertTrue(unpacked.mkdirs());
+        writeFile(new File(asDirectory, "com/example/Dto.class"), "DIRECTORY");
+        File jar = new File(tmp, "later.jar");
+        writeJar(jar, "com/example/Dto.class", "JAR");
+        File staged = new File(tmp, "dependency-classes");
+        assertTrue(staged.mkdirs());
         File natives = new File(tmp, "native");
         assertTrue(natives.mkdirs());
 
-        List<String> inputs = unpack(java.util.Collections.singletonList(
-                asDirectory.getAbsolutePath()), unpacked, natives);
+        stage(Arrays.asList(asDirectory.getAbsolutePath(), jar.getAbsolutePath()),
+                staged, natives);
 
-        assertEquals(java.util.Collections.singletonList(asDirectory.getAbsolutePath()),
-                inputs, "an empty directory of unpacked jars is not an input");
+        assertEquals("DIRECTORY", read(new File(staged, "com/example/Dto.class")),
+                "the earlier entry wins whichever kind it is");
     }
 
-    private static List<String> unpack(List<String> classpath, File unpacked, File natives)
+    @Test
+    void addsNoInputWhenThereAreNoDependencies(@TempDir File tmp) throws Exception {
+        File staged = new File(tmp, "dependency-classes");
+        assertTrue(staged.mkdirs());
+        File natives = new File(tmp, "native");
+        assertTrue(natives.mkdirs());
+
+        assertTrue(stage(Collections.<String>emptyList(), staged, natives).isEmpty(),
+                "an empty staging directory is not an input");
+    }
+
+    private static List<String> stage(List<String> classpath, File staged, File natives)
             throws Exception {
         BackendPackageMojo mojo = new BackendPackageMojo();
-        Method unpackJars = BackendPackageMojo.class.getDeclaredMethod(
-                "unpackJarDependencies", List.class, File.class, File.class);
-        unpackJars.setAccessible(true);
-        Object out = unpackJars.invoke(mojo, classpath, unpacked, natives);
+        Method stageClasses = BackendPackageMojo.class.getDeclaredMethod(
+                "stageDependencyClasses", List.class, File.class, File.class);
+        stageClasses.setAccessible(true);
+        Object out = stageClasses.invoke(mojo, classpath, staged, natives);
         return new ArrayList<String>((List<String>) out);
     }
 
     private static String read(File file) throws Exception {
+        assertTrue(file.isFile(), "nothing was staged at " + file);
         return new String(Files.readAllBytes(file.toPath()), "UTF-8");
+    }
+
+    private static void writeFile(File file, String content) throws Exception {
+        assertTrue(file.getParentFile().isDirectory() || file.getParentFile().mkdirs());
+        OutputStream out = new FileOutputStream(file);
+        try {
+            out.write(content.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
     }
 
     /** entries as name, content, name, content ... */

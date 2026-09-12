@@ -456,47 +456,57 @@ public class BackendPackageMojo extends AbstractMojo {
     }
 
     /**
-     * The compile classpath as directories the translator can actually read.
+     * The compile classpath staged as ONE directory the translator can read.
      *
-     * ByteCodeTranslator walks each input with File.listFiles, which answers NULL
-     * for a jar -- and the walk treats null as an empty directory, so a dependency
+     * ByteCodeTranslator walks its inputs with File.listFiles, which answers NULL
+     * for a jar -- and the walk reads null as an empty directory, so a dependency
      * resolved from the repository as a jar contributed nothing at all, without a
      * word. The build then failed much later, while linking, on the symbols of
      * classes the translator had never been shown. A module in the same reactor
      * resolves to its target/classes and worked, which is why the generated
      * project's own contract module never showed this.
      *
-     * <p>Everything is unpacked into ONE directory, and the classpath is walked
-     * backwards so that the FIRST entry is extracted last and wins a class two
-     * jars both carry. That is javac's rule for the same classpath, and the
-     * alternative -- one input directory per jar -- would hand the translator both
-     * copies to parse.
+     * <p>ONE TREE, FIRST WINS, IN CLASSPATH ORDER, and not a list of inputs.
+     * Parser.classIndex keeps the first definition of a class it parsed, so the
+     * order of the translator's inputs IS precedence -- and javac resolved the
+     * same classpath the same way, so anything that reorders it compiles against
+     * one definition and translates another. Staging settles it on disk instead:
+     * whatever arrives first is what is there, every later copy is skipped, and
+     * there is no order left to get wrong. It also means a class two dependencies
+     * both carry is PARSED once rather than twice, which is where duplicate
+     * symbols came from.
+     *
+     * <p>Directories are copied rather than passed through for that reason alone.
+     * They cost a copy of their class files per build, which is a reactor
+     * module's output and small beside the translation that follows.
      *
      * <p>cn1-native goes where the runtime jar's natives go, so a dependency that
-     * ships them is built rather than dropped just as quietly. META-INF is skipped
-     * by the same unpacking the runtime gets.
+     * ships them is built rather than dropped just as quietly. META-INF is
+     * skipped out of jars by the same unpacking the runtime gets; a directory is
+     * copied as it stands, which is what passing it as an input already did.
      *
      * @param classpath compile classpath elements, in classpath order
-     * @param unpacked directory to unpack jars into; assumed empty
+     * @param staged directory to stage into; assumed empty
      * @param nativeSources where a dependency's cn1-native entries belong
      */
-    private List<String> unpackJarDependencies(List<String> classpath, File unpacked,
+    private List<String> stageDependencyClasses(List<String> classpath, File staged,
             File nativeSources) throws MojoExecutionException {
         List<String> out = new ArrayList<String>();
-        boolean anyJar = false;
-        for (int i = classpath.size() - 1; i >= 0; i--) {
+        boolean any = false;
+        for (int i = 0; i < classpath.size(); i++) {
             File element = new File(classpath.get(i));
             if (element.isDirectory()) {
-                out.add(element.getAbsolutePath());
+                copyDirectoryFirstWins(element, staged);
+                any = true;
             } else if (element.isFile()) {
-                unzip(element, unpacked, nativeSources);
-                anyJar = true;
+                unzip(element, staged, nativeSources, true);
+                any = true;
             }
             // An entry that is neither is one javac will complain about; there is
-            // nothing here to unpack and nothing to say that it will not say.
+            // nothing here to stage and nothing to say that it will not say.
         }
-        if (anyJar) {
-            out.add(unpacked.getAbsolutePath());
+        if (any) {
+            out.add(staged.getAbsolutePath());
         }
         return out;
     }
@@ -510,7 +520,7 @@ public class BackendPackageMojo extends AbstractMojo {
 
         // BEFORE the natives are copied below, because a dependency that ships
         // cn1-native adds to them.
-        List<String> dependencyInputs = unpackJarDependencies(
+        List<String> dependencyInputs = stageDependencyClasses(
                 compileClasspathWithoutRuntime(), dependencyClasses, nativeSources);
 
         // The C has to be in the source root BEFORE the translator runs: it reads
@@ -774,6 +784,16 @@ public class BackendPackageMojo extends AbstractMojo {
      */
     private void unzip(File jar, File javaTarget, File nativeTarget)
             throws MojoExecutionException {
+        unzip(jar, javaTarget, nativeTarget, false);
+    }
+
+    /**
+     * @param firstWins leave an entry alone when something is already at its
+     *                  destination, which is how a classpath resolves a class two
+     *                  entries both carry
+     */
+    private void unzip(File jar, File javaTarget, File nativeTarget, boolean firstWins)
+            throws MojoExecutionException {
         try {
             ZipFile zip = new ZipFile(jar);
             try {
@@ -795,6 +815,9 @@ public class BackendPackageMojo extends AbstractMojo {
                         continue;
                     } else {
                         destination = resolveInside(javaTarget, name, jar, name);
+                    }
+                    if (firstWins && destination.isFile()) {
+                        continue;
                     }
                     mkdirs(destination.getParentFile());
                     InputStream in = zip.getInputStream(entry);
@@ -849,6 +872,35 @@ public class BackendPackageMojo extends AbstractMojo {
             }
         } finally {
             out.close();
+        }
+    }
+
+    /** As copyDirectory, but never replacing a file that is already there. */
+    private void copyDirectoryFirstWins(File from, File to) throws MojoExecutionException {
+        File[] children = from.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            File destination = new File(to, child.getName());
+            if (child.isDirectory()) {
+                mkdirs(destination);
+                copyDirectoryFirstWins(child, destination);
+                continue;
+            }
+            if (destination.isFile()) {
+                continue;
+            }
+            try {
+                InputStream in = new java.io.FileInputStream(child);
+                try {
+                    copy(in, destination);
+                } finally {
+                    in.close();
+                }
+            } catch (IOException err) {
+                throw new MojoExecutionException("Could not copy " + child, err);
+            }
         }
     }
 
