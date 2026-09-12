@@ -1606,12 +1606,12 @@ public class ByteCodeTranslator {
     // to be mutated. Also, expire the temporary byte[] buffer so it can
     // be collected.
     //
-    private static StringBuilder readFileAsStringBuilder(File sourceFile) throws IOException
+    private static String readFileAsString(File sourceFile) throws IOException
     {
         try(DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile))) {
             byte[] data = new byte[(int) sourceFile.length()];
             dis.readFully(data);
-            return new StringBuilder(new String(data, StandardCharsets.UTF_8));
+            return new String(data, StandardCharsets.UTF_8);
         }
     }
     //
@@ -1622,24 +1622,38 @@ public class ByteCodeTranslator {
     // process for large projects.  
     //
     private static void replaceInFile(File sourceFile, String... values) throws IOException {
-        StringBuilder str = readFileAsStringBuilder(sourceFile);
+        // A String rather than a StringBuilder because the translator has to compile
+        // against ParparVM's own JavaAPI in order to translate itself, and
+        // StringBuilder there has neither indexOf nor replace.
+        //
+        // One pass per target, appending into a fresh builder. The obvious
+        // translation of the old in-place edit -- indexOf on str.toString(), then
+        // substring/concat the whole buffer back together per match -- copies the
+        // ENTIRE file twice for every occurrence, which is the opposite of this
+        // method's purpose: it exists to avoid the memory spike that made large
+        // Xcode project.pbxproj rewrites fail with OutOfMemoryError. Each target
+        // now costs one traversal and one output buffer regardless of how many
+        // times it matches.
+        String str = readFileAsString(sourceFile);
         int totchanges = 0;
 
-    	// perform the mutations on stringbuilder, which ought to implement
-        // these operations efficiently.
         for (int iter = 0; iter < values.length; iter += 2) {
             String target = values[iter];
             String replacement = values[iter + 1];
-            int index = 0;
-            while ((index = str.toString().indexOf(target, index)) >= 0) {
-                int targetSize = target.length();
-                String replaced = str.toString().substring(0, index) + replacement
-                        + str.toString().substring(index + targetSize);
-                str.setLength(0);
-                str.append(replaced);
-                index += replacement.length();
-                totchanges++;
+            int index = str.indexOf(target);
+            if (index < 0) {
+                continue;
             }
+            StringBuilder out = new StringBuilder(str.length() + 64);
+            int from = 0;
+            while (index >= 0) {
+                out.append(str, from, index).append(replacement);
+                from = index + target.length();
+                totchanges++;
+                index = str.indexOf(target, from);
+            }
+            out.append(str, from, str.length());
+            str = out.toString();
         }
 
         //
@@ -1649,7 +1663,7 @@ public class ByteCodeTranslator {
             System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
         }
         try(Writer fios = new OutputStreamWriter(new FileOutputStream(sourceFile), "UTF-8")) {
-            fios.write(str.toString());
+            fios.write(str);
         }
     }
     
