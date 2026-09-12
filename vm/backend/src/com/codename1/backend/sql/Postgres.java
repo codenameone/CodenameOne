@@ -198,6 +198,12 @@ public final class Postgres {
                 throw new IOException("Expected an authentication message, got '"
                         + (char)message.type + "'");
             }
+            // THE METHOD CODE ITSELF is four bytes the peer sends. sslmode=prefer
+            // lets whoever answers decline TLS, so an unauthenticated peer can send
+            // a shorter body -- and the AIOOBE that followed is not an IOException,
+            // so connect()'s cleanup did not run and the socket was leaked rather
+            // than refused.
+            requireBytes(message.body, 0, 4);
             int method = intAt(message.body, 0);
             if(method == 0) {
                 return; // authentication complete
@@ -239,6 +245,7 @@ public final class Postgres {
                             + "configured for scram-sha-256");
                 }
                 byte[] salt = new byte[4];
+                requireBytes(message.body, 4, 4);   // method code, then the salt
                 System.arraycopy(message.body, 4, salt, 0, 4);
                 sendPasswordMessage(Wire.utf8(md5Password(user, password, salt)));
                 continue;
@@ -290,6 +297,9 @@ public final class Postgres {
         if(serverFirstMessage.type == ERROR_RESPONSE) {
             throw errorFrom(serverFirstMessage);
         }
+        // Four for the code, and the payload is what follows it: a body shorter
+        // than that made the length below negative.
+        requireBytes(serverFirstMessage.body, 0, 4);
         if(serverFirstMessage.type != AUTHENTICATION || intAt(serverFirstMessage.body, 0) != 11) {
             throw new IOException("Expected a SASL continue message");
         }
@@ -366,6 +376,7 @@ public final class Postgres {
         if(finalMessage.type == ERROR_RESPONSE) {
             throw errorFrom(finalMessage);
         }
+        requireBytes(finalMessage.body, 0, 4);
         if(finalMessage.type != AUTHENTICATION || intAt(finalMessage.body, 0) != 12) {
             throw new IOException("Expected the SASL final message");
         }

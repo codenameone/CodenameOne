@@ -1454,6 +1454,117 @@ public class SelfTest {
         }
     }
 
+    /**
+     * A short authentication frame is an IOException, not a wild index.
+     *
+     * <p>The method code is four bytes the peer sends, and the md5 salt is four
+     * more after it. Neither was checked, so a body shorter than that indexed past
+     * the end -- and ArrayIndexOutOfBoundsException is not an IOException, so
+     * connect()'s cleanup did not run and the socket leaked instead of being
+     * refused. sslmode=prefer lets whoever answers decline TLS, so the peer doing
+     * this need not have authenticated or be a server.
+     *
+     * <p>The assertion is the exception TYPE, because that is exactly what the bug
+     * was: both versions throw, and only one of them throws something connect()
+     * can clean up after.
+     */
+    private static void aShortAuthFrameIsRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    if(pgRead(client) == null) {          // StartupMessage
+                        return;
+                    }
+                    // 'R' with two bytes where the method code needs four.
+                    pgSend(client, 'R', new byte[]{0, 0});
+                } catch (Exception ignored) {
+                    // The client hanging up is how this ends.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("postgres://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            db.close();
+            outcome = "connected";
+        } catch (Exception refused) {
+            outcome = refused instanceof IOException
+                    ? "refused" : "other: " + refused.getClass().getName();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a short PostgreSQL auth frame is refused", "refused", outcome);
+    }
+
+    /**
+     * A MySQL packet whose HEADER is complete and whose body is short.
+     *
+     * <p>Distinct from the truncated-header check above: the length arrives intact
+     * and the body does not, so every accessor that walks the packet runs off the
+     * end of it. The greeting is parsed this way before TLS, so a one-byte body is
+     * enough and the peer need not be a database.
+     *
+     * <p>Asserted on the exception TYPE for the same reason as the PostgreSQL one:
+     * the old behaviour threw too, and what mattered was that it threw something
+     * connect() does not catch, so the socket leaked.
+     */
+    private static void aTruncatedMySqlBodyIsRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    // A complete four byte header promising one byte, then that one
+                    // byte: protocol 10, and nothing of the server version that has
+                    // to follow it.
+                    ServerSocket.write(client,
+                            new byte[]{1, 0, 0, 0, (byte) 10}, 0, 5);
+                } catch (Exception ignored) {
+                    // Expected: the client gives up on us.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("mysql://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            db.close();
+            outcome = "connected";
+        } catch (Exception refused) {
+            outcome = refused instanceof IOException
+                    ? "refused" : "other: " + refused.getClass().getName();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a truncated MySQL packet body is refused", "refused", outcome);
+    }
+
     /** try/finally here, the catch one frame up: the shape that works. */
     private static void finallyInACallee() throws IOException {
         try {
@@ -1593,6 +1704,8 @@ public class SelfTest {
         scramIterationCountIsBounded();
         aTruncatedMySqlHeaderIsRefused();
         truncatedRowFramesAreRefused();
+        aShortAuthFrameIsRefused();
+        aTruncatedMySqlBodyIsRefused();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
         malformedDatesAreNotDates();

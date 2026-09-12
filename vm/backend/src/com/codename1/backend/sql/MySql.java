@@ -834,18 +834,29 @@ public final class MySql {
     }
 
     private static IOException errorFrom(Packet packet, String sql) {
-        Reader reader = new Reader(packet.body);
-        reader.skip(1);
-        int code = reader.u16();
-        String state = "";
-        if(reader.remaining() > 0 && packet.body[3] == '#') {
+        try {
+            Reader reader = new Reader(packet.body);
             reader.skip(1);
-            state = Wire.fromUtf8(reader.bytes(5));
+            int code = reader.u16();
+            String state = "";
+            // body.length > 3 as well: the marker is read at a fixed offset, and an
+            // error packet shorter than that is exactly what a hostile peer sends.
+            if(reader.remaining() > 0 && packet.body.length > 3 && packet.body[3] == '#') {
+                reader.skip(1);
+                state = Wire.fromUtf8(reader.bytes(5));
+            }
+            String message = Wire.fromUtf8(reader.rest());
+            return new IOException("MySQL error " + code
+                    + (state.length() == 0 ? "" : " " + state) + ": " + message
+                    + (sql == null ? "" : " [" + sql + "]"));
+        } catch (IOException malformed) {
+            // This method BUILDS the exception rather than throwing one, so a
+            // malformed error packet cannot be reported by failing here -- and the
+            // detail is a courtesy anyway. What the caller needs to know is that
+            // the statement failed, which is still true.
+            return new IOException("MySQL reported an error in a packet too short to"
+                    + " read" + (sql == null ? "" : " [" + sql + "]"));
         }
-        String message = Wire.fromUtf8(reader.rest());
-        return new IOException("MySQL error " + code
-                + (state.length() == 0 ? "" : " " + state) + ": " + message
-                + (sql == null ? "" : " [" + sql + "]"));
     }
 
     /** A cursor over one packet body. MySQL is little endian throughout. */
@@ -861,28 +872,55 @@ public final class MySql {
             return data.length - at;
         }
 
-        void skip(int count) {
+        /**
+         * The span about to be read is INSIDE the packet, checked before it is.
+         *
+         * <p>Every accessor below indexes the peer's bytes at an offset the peer's
+         * own fields moved, so a packet whose header is complete and whose body is
+         * short -- a one-byte greeting will do, before TLS and before anything is
+         * authenticated -- ran off the end. What came back was
+         * ArrayIndexOutOfBoundsException, or NegativeArraySizeException from a
+         * length-encoded count, and neither is an IOException: during setup that
+         * escaped connect()'s cleanup and leaked the socket, and afterwards it left
+         * the session desynchronised for whoever borrowed it next.
+         *
+         * <p>Checked here rather than at each call site because there are dozens of
+         * those and one missed is the same bug; a reader that cannot read past its
+         * own buffer is the property worth having.
+         */
+        private void need(int count) throws IOException {
+            if(count < 0 || at < 0 || count > data.length - at) {
+                throw new IOException("A MySQL packet is shorter than its fields claim");
+            }
+        }
+
+        void skip(int count) throws IOException {
+            need(count);
             at += count;
         }
 
-        int u8() {
+        int u8() throws IOException {
+            need(1);
             return data[at++] & 0xff;
         }
 
-        int u16() {
+        int u16() throws IOException {
+            need(2);
             int value = (data[at] & 0xff) | ((data[at + 1] & 0xff) << 8);
             at += 2;
             return value;
         }
 
-        int i32() {
+        int i32() throws IOException {
+            need(4);
             int value = (data[at] & 0xff) | ((data[at + 1] & 0xff) << 8)
                     | ((data[at + 2] & 0xff) << 16) | ((data[at + 3] & 0xff) << 24);
             at += 4;
             return value;
         }
 
-        long i64() {
+        long i64() throws IOException {
+            need(8);
             long value = 0;
             for(int iter = 0 ; iter < 8 ; iter++) {
                 value |= ((long)(data[at + iter] & 0xff)) << (iter * 8);
@@ -891,21 +929,28 @@ public final class MySql {
             return value;
         }
 
-        byte[] bytes(int count) {
+        byte[] bytes(int count) throws IOException {
+            need(count);
             byte[] out = new byte[count];
             System.arraycopy(data, at, out, 0, count);
             at += count;
             return out;
         }
 
-        byte[] rest() {
+        byte[] rest() throws IOException {
             return bytes(remaining());
         }
 
-        String cString() {
+        String cString() throws IOException {
             int end = at;
             while(end < data.length && data[end] != 0) {
                 end++;
+            }
+            // TERMINATED, not merely run to the end of the packet: a string with no
+            // NUL after it leaves "end" at the length, and the next field would
+            // start past it.
+            if(end >= data.length) {
+                throw new IOException("A MySQL string runs past the end of its packet");
             }
             String out = Wire.fromUtf8(data, at, end - at);
             at = end + 1;
@@ -913,7 +958,7 @@ public final class MySql {
         }
 
         /** A length-encoded integer; 0xfb is the NULL marker, returned as -1. */
-        long lengthEncoded() {
+        long lengthEncoded() throws IOException {
             int first = u8();
             if(first < 0xfb) {
                 return first;
@@ -925,6 +970,7 @@ public final class MySql {
                 return u16();
             }
             if(first == 0xfd) {
+                need(3);
                 int value = (data[at] & 0xff) | ((data[at + 1] & 0xff) << 8)
                         | ((data[at + 2] & 0xff) << 16);
                 at += 3;
@@ -933,8 +979,14 @@ public final class MySql {
             return i64();
         }
 
-        byte[] lengthEncodedBytes() {
+        byte[] lengthEncodedBytes() throws IOException {
             long length = lengthEncoded();
+            if(length > data.length - at) {
+                // Checked as a LONG, before the cast. A count near 2^32 narrows to
+                // a negative int, which bytes() would then hand to new byte[].
+                throw new IOException("A MySQL value claims " + length
+                        + " bytes in a packet holding " + (data.length - at));
+            }
             return length < 0 ? null : bytes((int)length);
         }
 
@@ -943,7 +995,7 @@ public final class MySql {
          * would have to be one the translated runtime also has, and every consumer
          * of this data writes it into JSON anyway.
          */
-        String temporal() {
+        String temporal() throws IOException {
             int length = u8();
             if(length == 0) {
                 return null;
@@ -972,7 +1024,7 @@ public final class MySql {
             return out.toString();
         }
 
-        String time() {
+        String time() throws IOException {
             int length = u8();
             if(length == 0) {
                 return "00:00:00";
