@@ -867,7 +867,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("     * returning null and no route at all both come back as null.\n");
         sb.append("     */\n");
         sb.append("    public Object dispatch(String method, String rawPath, java.util.Map headers, Object body) throws Exception {\n");
-        sb.append("        if(!wellFormedEscapes(rawPath) || !escapesAreUtf8(rawPath)) {\n");
+        sb.append("        if(!wellFormedEscapes(rawPath) || !targetIsUtf8(rawPath)) {\n");
         sb.append("            throw new IllegalArgumentException(\"malformed percent-escape in the "
                 + "request target: \" + rawPath);\n");
         sb.append("        }\n");
@@ -1304,16 +1304,18 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("     * to a space corrupts the token and the session with it.\n");
         sb.append("     */\n");
         sb.append("    private static String decodeCookie(String value) { return decode(value, false); }\n\n");
+        // EVERY character is an octet, escaped or not, so all of them are gathered
+        // and the value is decoded once. The request line and header values arrive
+        // as bytes and each becomes a char, so a client may send an accented letter
+        // raw -- two characters, no escape anywhere -- and returning early when
+        // there was no '%' handed those two characters to the handler while the
+        // percent-encoded spelling of the SAME request produced one. Decoding each
+        // escape RUN on its own had the matching half of the problem, which is why
+        // the runs were gathered; the literals needed it too.
         sb.append("    private static String decode(String value, boolean plusIsSpace) {\n");
         sb.append("        if(value == null) return null;\n");
-        sb.append("        if(value.indexOf('%') < 0 && !(plusIsSpace && value.indexOf('+') >= 0)) return value;\n");
-        // A run of escapes is one UTF-8 sequence, not one character each. Appending
-        // %C3%A9 as two chars produced "\u00c3\u00a9" where the client sent one
-        // accented letter, so consecutive escapes are gathered as bytes and decoded
-        // together.
-        sb.append("        StringBuilder out = new StringBuilder();\n");
-        sb.append("        byte[] pending = new byte[value.length()];\n");
-        sb.append("        int pendingLen = 0;\n");
+        sb.append("        byte[] octets = new byte[value.length()];\n");
+        sb.append("        int len = 0;\n");
         sb.append("        for(int i = 0 ; i < value.length() ; i++) {\n");
         sb.append("            char c = value.charAt(i);\n");
         // Integer.parseInt(_, 16) accepts a SIGN, so "%+1" decoded as 1 and "%-1"
@@ -1321,20 +1323,15 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // digits, tested as digits.
         sb.append("            if(c == '%' && i + 2 < value.length()\n");
         sb.append("                    && hex(value.charAt(i + 1)) >= 0 && hex(value.charAt(i + 2)) >= 0) {\n");
-        sb.append("                pending[pendingLen++] =\n");
+        sb.append("                octets[len++] =\n");
         sb.append("                        (byte)((hex(value.charAt(i + 1)) << 4) | hex(value.charAt(i + 2)));\n");
         sb.append("                i += 2;\n");
         sb.append("                continue;\n");
         sb.append("            }\n");
-        sb.append("            if(pendingLen > 0) {\n");
-        sb.append("                out.append(decodeUtf8(pending, pendingLen));\n");
-        sb.append("                pendingLen = 0;\n");
-        sb.append("            }\n");
-        sb.append("            if(plusIsSpace && c == '+') { out.append(' '); continue; }\n");
-        sb.append("            out.append(c);\n");
+        sb.append("            if(plusIsSpace && c == '+') { octets[len++] = (byte)' '; continue; }\n");
+        sb.append("            octets[len++] = (byte)c;\n");
         sb.append("        }\n");
-        sb.append("        if(pendingLen > 0) out.append(decodeUtf8(pending, pendingLen));\n");
-        sb.append("        return out.toString();\n");
+        sb.append("        return decodeUtf8(octets, len);\n");
         sb.append("    }\n\n");
         sb.append("    /** The gathered escape bytes as text. Malformed input keeps its bytes rather than throwing. */\n");
         sb.append("    private static int hex(char c) {\n");
@@ -1344,7 +1341,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        return -1;\n");
         sb.append("    }\n\n");
         sb.append("    /**\n");
-        sb.append("     * Whether every RUN of escapes decodes to well-formed UTF-8.\n");
+        sb.append("     * Whether the target's octets, escaped AND raw, are well-formed UTF-8.\n");
         sb.append("     *\n");
         sb.append("     * Two hex digits is not enough: %C3%28 is a truncated two-byte\n");
         sb.append("     * sequence, and new String(_, \"UTF-8\") replaces it with U+FFFD\n");
@@ -1354,22 +1351,22 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("     * by the other. RFC 3629, so an overlong form, a surrogate half and\n");
         sb.append("     * anything above U+10FFFF are refused too.\n");
         sb.append("     */\n");
-        sb.append("    private static boolean escapesAreUtf8(String value) {\n");
+        sb.append("    private static boolean targetIsUtf8(String value) {\n");
         sb.append("        if (value == null) { return true; }\n");
-        sb.append("        byte[] run = new byte[value.length()];\n");
+        sb.append("        byte[] octets = new byte[value.length()];\n");
         sb.append("        int len = 0;\n");
-        sb.append("        for (int i = 0 ; i <= value.length() ; i++) {\n");
-        sb.append("            if (i < value.length() && value.charAt(i) == '%'\n");
-        sb.append("                    && i + 2 < value.length()) {\n");
-        sb.append("                run[len++] = (byte)((hex(value.charAt(i + 1)) << 4)\n");
+        sb.append("        for (int i = 0 ; i < value.length() ; i++) {\n");
+        sb.append("            char c = value.charAt(i);\n");
+        sb.append("            if (c == '%' && i + 2 < value.length()) {\n");
+        sb.append("                octets[len++] = (byte)((hex(value.charAt(i + 1)) << 4)\n");
         sb.append("                        | hex(value.charAt(i + 2)));\n");
         sb.append("                i += 2;\n");
         sb.append("                continue;\n");
         sb.append("            }\n");
-        sb.append("            if (len > 0 && !utf8Run(run, len)) { return false; }\n");
-        sb.append("            len = 0;\n");
+        sb.append("            if (c > 0xff) { return false; }\n");
+        sb.append("            octets[len++] = (byte)c;\n");
         sb.append("        }\n");
-        sb.append("        return true;\n");
+        sb.append("        return utf8Run(octets, len);\n");
         sb.append("    }\n\n");
         sb.append("    private static boolean utf8Run(byte[] b, int length) {\n");
         sb.append("        int at = 0;\n");

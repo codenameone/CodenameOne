@@ -327,6 +327,23 @@ public class RestServerAnnotationProcessorTest {
         assertEquals("the value between the literals is what binds",
                 "report", seen[0]);
 
+        // THE SAME REQUEST IN ITS TWO SPELLINGS. A target arrives as one character
+        // per request octet, so an accented name may be sent percent-encoded or
+        // raw and both are valid. The raw one used to bind untouched -- two
+        // characters where the escaped spelling bound one -- because the decoder
+        // returned early whenever the value held no '%'.
+        seen[0] = null;
+        assertNotNull("the escaped spelling must match",
+                dispatch.invoke(dispatcher, "GET", "/files/caf%C3%A9.json", null, null));
+        Object escapedBinding = seen[0];
+        assertEquals("caf" + ((char)0xe9), escapedBinding);
+        seen[0] = null;
+        assertNotNull("and so must the raw one",
+                dispatch.invoke(dispatcher, "GET",
+                        "/files/caf" + ((char)0xc3) + ((char)0xa9) + ".json", null, null));
+        assertEquals("both spellings of one request bind the same value",
+                escapedBinding, seen[0]);
+
         // The literals are part of the match, not decoration.
         seen[0] = null;
         assertNull("a different extension must not match",

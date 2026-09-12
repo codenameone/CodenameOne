@@ -1882,11 +1882,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("     * Percent-decodes one path segment. The octets are gathered and decoded\n");
         sb.append("     * as a run: an escape carries one byte of UTF-8, and decoding them one\n");
         sb.append("     * at a time turns every non-ASCII value into mojibake.\n");
+        sb.append("     *\n");
+        sb.append("     * <p>EVERY character here is an octet, escaped or not. The request line\n");
+        sb.append("     * arrives as bytes and each one becomes a char, so a path may carry raw\n");
+        sb.append("     * UTF-8 with no escape in it anywhere: an accented letter sent as its\n");
+        sb.append("     * two octets is two characters here. Returning early when there is no\n");
+        sb.append("     * '%' handed those to the method unchanged, so the percent-encoded and\n");
+        sb.append("     * raw spellings of the SAME request produced different strings.\n");
         sb.append("     */\n");
         sb.append("    private static String decode(String value) {\n");
-        sb.append("        if (value.indexOf('%') < 0) {\n");
-        sb.append("            return value;\n");
-        sb.append("        }\n");
         sb.append("        byte[] out = new byte[value.length()];\n");
         sb.append("        int length = 0;\n");
         sb.append("        for (int i = 0 ; i < value.length() ; i++) {\n");

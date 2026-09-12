@@ -631,29 +631,30 @@ public final class StaticFiles implements HttpServer.Handler {
                 ? value.substring(0, value.length() - 1) : value;
     }
 
-    /** Null for a malformed escape rather than a partially decoded path. */
+    /**
+     * Null for a malformed escape rather than a partially decoded path.
+     *
+     * <p>EVERY character is an octet here, escaped or not, which is why they are
+     * all gathered and the path is decoded once at the end. The request line
+     * arrives as bytes and each becomes a char, so a client may send an accented
+     * filename raw -- two characters, no escape anywhere -- and the earlier
+     * version returned that untouched because it held no '%'. The name then went
+     * to the open as UTF-8 of those two characters, which is four bytes and not
+     * the file on disk, so the raw spelling 404'd while %C3%A9 found it. Same
+     * request, two answers, and the fast path was the whole difference.
+     */
     static String decode(String value) {
-        if(value.indexOf('%') < 0) {
-            return value;
-        }
-        // A run of escapes is one UTF-8 sequence, not one character per octet.
-        // Appending each octet as a char turned the %C3%A9 a client sends for an
-        // accented letter into two characters, so the lookup missed a file that is
-        // on disk and the request 404'd.
-        StringBuilder out = new StringBuilder();
-        byte[] pending = new byte[value.length()];
-        int pendingLength = 0;
+        byte[] octets = new byte[value.length()];
+        int length = 0;
         for(int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
             if(c != '%') {
-                if(pendingLength > 0) {
-                    if(!Utf8.isValid(pending, 0, pendingLength)) {
-                        return null;
-                    }
-                    out.append(utf8(pending, pendingLength));
-                    pendingLength = 0;
+                // Anything wider than a byte did not come off the wire, and
+                // narrowing it would invent an octet the client never sent.
+                if(c > 0xff) {
+                    return null;
                 }
-                out.append(c);
+                octets[length++] = (byte)c;
                 continue;
             }
             if(iter + 2 >= value.length()) {
@@ -667,22 +668,18 @@ public final class StaticFiles implements HttpServer.Handler {
             if(hi < 0 || lo < 0) {
                 return null;
             }
-            pending[pendingLength++] = (byte)((hi << 4) | lo);
+            octets[length++] = (byte)((hi << 4) | lo);
             iter += 2;
         }
-        if(pendingLength > 0) {
-            // The bytes have to BE UTF-8, not merely be spelled in valid hex.
-            // %C3%28 is a truncated two-byte sequence, and new String(_, "UTF-8")
-            // answers U+FFFD rather than failing -- so that path resolved to the
-            // same file as one genuinely containing U+FFFD, while a bad hex digit
-            // two lines up was already a 400. One file, two spellings, and only
-            // one of them checked.
-            if(!Utf8.isValid(pending, 0, pendingLength)) {
-                return null;
-            }
-            out.append(utf8(pending, pendingLength));
+        // The bytes have to BE UTF-8, not merely be spelled in valid hex. %C3%28
+        // is a truncated two-byte sequence, and new String(_, "UTF-8") answers
+        // U+FFFD rather than failing -- so that path resolved to the same file as
+        // one genuinely containing U+FFFD, while a bad hex digit above was already
+        // a 400. One file, two spellings, and only one of them checked.
+        if(!Utf8.isValid(octets, 0, length)) {
+            return null;
         }
-        return out.toString();
+        return utf8(octets, length);
     }
 
     /** The gathered escape bytes as text; malformed input keeps its bytes. */

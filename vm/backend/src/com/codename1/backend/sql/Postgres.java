@@ -481,6 +481,32 @@ public final class Postgres {
         return collect(sql);
     }
 
+    /**
+     * A frame is only as long as it says it is, checked BEFORE it is indexed.
+     *
+     * <p>intAt and shortAt index raw, and the row frames walk offsets the PEER
+     * chose. A truncated RowDescription, a column name with no terminator, or a
+     * row claiming more columns than its body holds therefore ran off the end,
+     * and what came back was ArrayIndexOutOfBoundsException -- not an IOException.
+     * It left collect() without draining ReadyForQuery and without closing, so
+     * the session went back to the pool with the rest of the exchange still on
+     * the wire, and the next borrower read that as its own answer. The default
+     * sslmode=prefer falls back to plaintext, so the peer doing it need not be
+     * the server.
+     *
+     * <p>Closing is not optional here for the same reason the size ceiling closes:
+     * a frame we could not parse leaves an unknown number of bytes unread, and
+     * nothing in this protocol resynchronises.
+     */
+    private void requireBytes(byte[] body, int offset, int count) throws IOException {
+        // offset > length - count rather than offset + count > length, which
+        // overflows for the lengths a hostile peer is free to name.
+        if(offset < 0 || count < 0 || offset > body.length - count) {
+            close();
+            throw new IOException("A PostgreSQL frame is shorter than it claims");
+        }
+    }
+
     private Result collect(String sql) throws IOException {
         Result result = new Result();
         String[] names = null;
@@ -490,6 +516,7 @@ public final class Postgres {
             Message message = readMessage();
             switch(message.type) {
                 case ROW_DESCRIPTION: {
+                    requireBytes(message.body, 0, 2);
                     int columns = shortAt(message.body, 0);
                     names = new String[columns];
                     types = new int[columns];
@@ -499,25 +526,41 @@ public final class Postgres {
                         while(end < message.body.length && message.body[end] != 0) {
                             end++;
                         }
+                        // TERMINATED, not merely run to the end of the frame: a name
+                        // with no NUL after it leaves "end" at the length, and the
+                        // descriptor read below then starts past it.
+                        requireBytes(message.body, end, 1);
                         names[iter] = Wire.fromUtf8(message.body, at, end - at);
                         at = end + 1;
                         // table oid (4), column number (2), then the type oid (4)
+                        requireBytes(message.body, at, 18);
                         types[iter] = intAt(message.body, at + 6);
                         at += 18; // + type size (2), modifier (4), format (2)
                     }
                     break;
                 }
                 case DATA_ROW: {
+                    requireBytes(message.body, 0, 2);
                     int columns = shortAt(message.body, 0);
+                    // AND NOT MORE THAN THE DESCRIPTION HAD. names and types are
+                    // sized from RowDescription, so a row claiming more columns
+                    // indexes past them -- the same unchecked read, one array along.
+                    if(names != null && columns > names.length) {
+                        close();        // desynchronised; see requireBytes
+                        throw new IOException("A PostgreSQL row claims " + columns
+                                + " columns where its description had " + names.length);
+                    }
                     Map row = new LinkedHashMap();
                     int at = 2;
                     for(int iter = 0 ; iter < columns ; iter++) {
+                        requireBytes(message.body, at, 4);
                         int length = intAt(message.body, at);
                         at += 4;
                         Object value;
                         if(length < 0) {
                             value = null;
                         } else {
+                            requireBytes(message.body, at, length);
                             value = decode(Wire.fromUtf8(message.body, at, length),
                                     types == null ? 0 : types[iter]);
                             at += length;
@@ -528,6 +571,9 @@ public final class Postgres {
                     break;
                 }
                 case COMMAND_COMPLETE: {
+                    // The NUL it counts on being there. An empty body makes the
+                    // length below -1.
+                    requireBytes(message.body, 0, 1);
                     String tag = Wire.fromUtf8(message.body, 0, message.body.length - 1);
                     // A COMMIT on a transaction the server has already marked
                     // aborted completes with the ROLLBACK tag rather than an

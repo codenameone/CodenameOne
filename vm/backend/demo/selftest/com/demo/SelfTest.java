@@ -1379,6 +1379,160 @@ public class SelfTest {
         check("a truncated MySQL header is refused", "refused", outcome);
     }
 
+    /**
+     * An outer catch still catches when the try holds a nested try/finally.
+     *
+     * <p>Not a backend concern -- a VM one, found by a backend test. The row-frame
+     * check below was first written as "open, then try/finally around the query to
+     * close it", with catch(Exception) on the outer try. The packaged binary
+     * printed "Uncaught exception java.io.IOException" and died, with a stack that
+     * ran out through this method: the handler that encloses the throw did not
+     * run. Flattening the method made the same assertion pass, which is why these
+     * two shapes are pinned here rather than left as a puzzle in one test's
+     * history.
+     *
+     * <p>Both arms run this. On Java SE it is trivially true, and that is the
+     * point: if the arms disagree, this names the disagreement.
+     */
+    private static void aNestedFinallyDoesNotDefeatTheOuterCatch() throws Exception {
+        // ORDER MATTERS: the cheap shapes first, because the one under suspicion
+        // does not fail an assertion when it is wrong -- it takes the process with
+        // it, and nothing after it would run to report anything.
+
+        // 1. The finally is in a CALLEE. This is the ordinary shape -- a resource
+        // closed where it was opened, guarded by a caller -- and it works.
+        String belowUs;
+        try {
+            finallyInACallee();
+            belowUs = "returned";
+        } catch (Exception caught) {
+            belowUs = "caught";
+        }
+        check("a callee's finally still reaches this catch", "caught", belowUs);
+
+        // 2. No finally at all, same method. Works.
+        String plain;
+        try {
+            throw new IOException("no finally anywhere");
+        } catch (Exception caught) {
+            plain = "caught";
+        }
+        check("a plain throw is caught in the same method", "caught", plain);
+
+        // 3. BOTH IN ONE METHOD: the catch encloses a try/finally. THIS ONE IS
+        // BROKEN on the packaged binary, which is why it does not run by default.
+        //
+        // Measured: it does not reach the catch at all. The binary prints
+        // "Uncaught exception java.io.IOException: thrown in the inner try" and
+        // exits 1, so it does not fail an assertion -- it takes the process with
+        // it, and every check after it in this file with it. A finally compiles to
+        // a catch-any that rethrows, and that rethrow is evidently not matched
+        // against the handlers enclosing it in the SAME method. Case 1 above is
+        // the same construct with the finally one frame down, and it is fine,
+        // which is why this is not visible in ordinary code: the usual shape puts
+        // the cleanup in the method that owns the resource.
+        //
+        // It is left here, runnable, because the reduced case is the whole bug
+        // report: set CN1_SELFTEST_VM_PROBE=1 to watch it die. Fixing it belongs
+        // in the translator's handler ranges, not here.
+        if("1".equals(System.getenv("CN1_SELFTEST_VM_PROBE"))) {
+            String sameMethod;
+            try {
+                try {
+                    throw new IOException("thrown in the inner try");
+                } finally {
+                    touched++;      // the finally must run, and must not swallow
+                }
+            } catch (Exception caught) {
+                sameMethod = "caught";
+            }
+            check("an enclosing catch sees a throw from a nested finally", "caught",
+                    sameMethod);
+        } else {
+            note("nested-finally VM probe skipped: set CN1_SELFTEST_VM_PROBE=1 "
+                    + "to run the case that kills the process");
+        }
+    }
+
+    /** try/finally here, the catch one frame up: the shape that works. */
+    private static void finallyInACallee() throws IOException {
+        try {
+            throw new IOException("thrown below the try");
+        } finally {
+            touched++;
+        }
+    }
+
+    /** Written by the finally blocks above so they cannot be optimised away. */
+    private static int touched;
+
+    /**
+     * A row frame shorter than it claims is an IOException, not a wild index.
+     *
+     * <p>RowDescription and DataRow are walked at fixed offsets the PEER chose --
+     * a name terminator, then eighteen bytes of descriptor per column. Nothing
+     * checked that the body held them, so a truncated frame ran off the end and
+     * raised ArrayIndexOutOfBoundsException. That is not an IOException: it left
+     * the collect loop without draining ReadyForQuery and without closing, so the
+     * session went back to the pool with the rest of the exchange still unread and
+     * the next borrower would have read it as its own answer.
+     *
+     * <p>The stub authenticates with AuthenticationOk -- no password, no TLS --
+     * and answers the first statement with a RowDescription that promises one
+     * column and then stops. Asserting the wording rather than "it threw" matters
+     * here more than usual: the unfixed code threw too.
+     */
+    private static void truncatedRowFramesAreRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    if(pgRead(client) == null) {              // StartupMessage
+                        return;
+                    }
+                    pgSend(client, 'R', int32(0));            // AuthenticationOk
+                    pgSend(client, 'Z', new byte[]{(byte)'I'}); // ReadyForQuery, idle
+                    // Whatever it asks, answer with a frame that promises one
+                    // column and then ends: the count, a name, and four bytes
+                    // where eighteen of descriptor belong.
+                    while(pgRead(client) != null) {
+                        pgSend(client, 'T', new byte[]{0, 1, (byte)'a', 0, 0, 0, 0, 0});
+                    }
+                } catch (Exception ignored) {
+                    // The client hanging up is how this ends.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("postgres://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            db.query("SELECT 1", null);
+            db.close();
+            outcome = "answered";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("shorter than it claims") >= 0
+                    ? "refused" : "other: " + refused.getClass().getName() + ": " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a truncated PostgreSQL row frame is refused", "refused", outcome);
+    }
+
     /** One PostgreSQL message: type byte, length that counts itself, payload. */
     private static void pgSend(int fd, char type, byte[] payload) throws IOException {
         byte[] out = new byte[5 + payload.length];
@@ -1438,6 +1592,8 @@ public class SelfTest {
         storedTextComesBackUnchanged();
         scramIterationCountIsBounded();
         aTruncatedMySqlHeaderIsRefused();
+        truncatedRowFramesAreRefused();
+        aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();

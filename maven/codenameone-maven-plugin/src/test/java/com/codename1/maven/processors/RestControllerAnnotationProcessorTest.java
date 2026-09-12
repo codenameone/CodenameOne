@@ -109,6 +109,22 @@ public class RestControllerAnnotationProcessorTest {
         assertEquals("{\"id\":\"42\"}", router.text("GET", "/api/notes/42"));
         assertEquals("{\"id\":\"42\"}", router.text("GET", "/api/notes/42?x=1"));
         assertEquals("{\"id\":\"a b\"}", router.text("GET", "/api/notes/a%20b"));
+        // THE DECODER DIRECTLY, not through a request. The harness builds its wire
+        // bytes with getBytes("UTF-8"), so a target carrying raw octets is
+        // re-encoded on the way in and never reaches the router as what was
+        // written -- an end-to-end assertion here reports a mismatch whether the
+        // decoder is right or wrong, and measures the harness either way.
+        Method decode = router.instance.getClass().getDeclaredMethod("decode", String.class);
+        decode.setAccessible(true);
+        String accented = "caf" + ((char)0xe9);
+        assertEquals("the percent-encoded spelling decodes", accented,
+                decode.invoke(null, "caf%C3%A9"));
+        // THE SAME REQUEST, SENT RAW. A target arrives as one character per octet,
+        // so this is what an unescaped accented letter looks like by the time the
+        // router sees it -- and it used to come back untouched, because the decoder
+        // returned early on any value with no '%' in it.
+        assertEquals("and the raw spelling decodes to the same thing", accented,
+                decode.invoke(null, "caf" + ((char)0xc3) + ((char)0xa9)));
         // '+' is a literal in a path segment; it means a space only in a query.
         assertEquals("{\"id\":\"a+b\"}", router.text("GET", "/api/notes/a+b"));
         assertEquals("{\"id\":\"42\",\"tag\":\"red\"}",

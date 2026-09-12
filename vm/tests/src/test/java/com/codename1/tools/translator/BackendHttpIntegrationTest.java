@@ -124,6 +124,11 @@ class BackendHttpIntegrationTest {
             huge[i] = (byte) ((i * 31) & 0xff);
         }
         Files.write(staticRoot.resolve("huge.bin"), huge);
+        // A NON-ASCII NAME, for the two spellings a client may ask for it by. The
+        // name is built from a char rather than written as a literal so this source
+        // stays ASCII.
+        Files.write(staticRoot.resolve("caf" + ((char) 0xe9) + ".txt"),
+                "accented".getBytes(StandardCharsets.UTF_8));
 
         // The real build script, not a reimplementation of it: a test that builds
         // differently from the product is testing something else.
@@ -2226,6 +2231,51 @@ class BackendHttpIntegrationTest {
         }
         assertEquals(before, openStaticFiles(),
                 "ten HEADs must leave the descriptor count exactly where it was");
+    }
+
+    @Test
+    void bothSpellingsOfANonAsciiPathFindTheSameFile() throws Exception {
+        // A target arrives as bytes, and a client may spell a non-ASCII filename
+        // percent-encoded or raw. Both are valid and both name the same file.
+        //
+        // The raw one used to 404. The decoder returned the target untouched when
+        // it held no '%', so its two octets stayed two CHARACTERS, and the name
+        // went to the open re-encoded as UTF-8 -- four bytes, matching nothing on
+        // disk. The escaped spelling decoded to one character and found the file,
+        // which is what made this a divergence between two spellings of one
+        // request rather than a plain miss.
+        byte[] escaped = rawGet("/static/caf%C3%A9.txt");
+        assertEquals(200, statusOf(escaped),
+                "the percent-encoded spelling must find the file");
+        assertEquals("accented", body(escaped));
+
+        ByteArrayOutputStream target = new ByteArrayOutputStream();
+        target.write("/static/caf".getBytes(StandardCharsets.US_ASCII));
+        target.write(0xc3);
+        target.write(0xa9);
+        target.write(".txt".getBytes(StandardCharsets.US_ASCII));
+        byte[] rawSpelling = rawGet(new String(target.toByteArray(),
+                StandardCharsets.ISO_8859_1));
+        assertEquals(200, statusOf(rawSpelling),
+                "and so must the raw one, which names the same file");
+        assertEquals("accented", body(rawSpelling));
+    }
+
+    /**
+     * A GET whose target is written as exactly these octets.
+     *
+     * <p>Not raw(String), which encodes with UTF-8 and so re-spells any non-ASCII
+     * character as a well-formed sequence -- the opposite of a test that needs the
+     * bytes it wrote. The target is carried here as ISO-8859-1 so each char is one
+     * octet on the wire.
+     */
+    private byte[] rawGet(String target) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write("GET ".getBytes(StandardCharsets.US_ASCII));
+        out.write(target.getBytes(StandardCharsets.ISO_8859_1));
+        out.write(" HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+                .getBytes(StandardCharsets.US_ASCII));
+        return rawBytes(out.toByteArray());
     }
 
     /** The server's own count of descriptors handed out and not yet closed. */
