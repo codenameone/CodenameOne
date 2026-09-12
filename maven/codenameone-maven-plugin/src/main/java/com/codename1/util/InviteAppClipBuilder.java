@@ -226,7 +226,7 @@ public final class InviteAppClipBuilder {
           .append("    NSURLComponents *c = [NSURLComponents componentsWithURL:url\n")
           .append("            resolvingAgainstBaseURL:NO];\n")
           .append("    for (NSURLQueryItem *item in c.queryItems) {\n")
-          .append("        if ([item.name isEqualToString:@\"code\"] && item.value.length > 0) {\n")
+          .append("        if ([item.name isEqualToString:@\"cn1_invite\"] && item.value.length > 0) {\n")
           .append("            return item.value;\n")
           .append("        }\n")
           .append("    }\n")

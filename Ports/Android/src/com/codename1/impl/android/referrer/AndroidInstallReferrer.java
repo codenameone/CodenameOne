@@ -117,6 +117,24 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
     /// permanently unattributable -- worse than the problem. iOS has the same
     /// exposure through device transfer and no equivalent signal here at all.
     /// Left as a deliberate gap rather than guessed at.
+    /// This installation's first-install time, or 0 when it cannot be read.
+    ///
+    /// Shared by the discard above and the restore detection, which both need
+    /// the same number to mean the same thing.
+    private long firstInstallTime() {
+        try {
+            Context context = AndroidNativeUtil.getContext();
+            if (context == null) {
+                return 0L;
+            }
+            return context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).firstInstallTime;
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+            return 0L;
+        }
+    }
+
     private void forgetAflagRestoredFromAnotherInstallation(Context context) {
         try {
             long current = context.getPackageManager()
@@ -357,7 +375,27 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
     /// losing the referrer for good.
     @Override
     public boolean discardReferrer() {
-        Preferences.set(PREF_ATTEMPTED, true);
+        // The install time is written WITH the marker, in one batch.
+        //
+        // A discard can be the first thing that ever touches these
+        // preferences: Invites.reset() erases before anything has called
+        // isSupported(), so the marker could be stored with no install time
+        // beside it. Auto Backup then restores the pair into a NEW
+        // installation, and forgetAflagRestoredFromAnotherInstallation() reads
+        // an unknown install time, stamps the current one and RETURNS -- the
+        // restored marker stays set, and this installation's exact Play
+        // referrer is skipped for good.
+        //
+        // Batched for the reason the restore path batches: two per-key writes
+        // have an in-between for the process to die in, and the order that
+        // reads most naturally is the one that loses.
+        Map<String, Object> discarded = new HashMap<String, Object>();
+        discarded.put(PREF_ATTEMPTED, Boolean.TRUE);
+        long installed = firstInstallTime();
+        if (installed > 0L) {
+            discarded.put(PREF_INSTALL_TIME, Long.valueOf(installed));
+        }
+        Preferences.set(discarded);
         // READ BACK, because Preferences.set() answers nothing. A store that
         // refused leaves the marker absent for good, and Play then returns the
         // same install referrer on a later launch -- restoring an attribution

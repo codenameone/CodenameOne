@@ -214,4 +214,25 @@ class InviteAppClipBuilderTest {
         assertEquals(22, InviteAppClipBuilder.CODE_CHARS,
                 "CODE_CHARS drifted from Invites.CODE_CHARS, which the clip must match");
     }
+
+    /**
+     * The clip reads the same query key the core parser does.
+     *
+     * <p>It looked for {@code code} while the core accepts {@code cn1_invite},
+     * so the query form of a same-host link -- {@code /i/acme?cn1_invite=<code>}
+     * -- fell through to the path, took the SLUG as the code, and (now that the
+     * clip enforces the real grammar) rejected it and wrote no handoff at all.
+     * The full app installed afterwards then had nothing to claim, for a url
+     * {@code Invites.extractCode()} accepts.</p>
+     */
+    @Test
+    void theClipReadsTheCoreQueryKey() throws Exception {
+        String src = text(files(), "CN1InviteClipDelegate.m");
+
+        assertTrue(src.contains("@\"cn1_invite\""),
+                "the clip does not read the core's query key, so a query-form link "
+                        + "records no handoff");
+        assertFalse(src.contains("isEqualToString:@\"code\"]"),
+                "the clip still matches the old query key");
+    }
 }
