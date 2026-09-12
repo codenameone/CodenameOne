@@ -2262,6 +2262,46 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    void aLargeDeferredJsonBodyArrivesWhole() throws Exception {
+        // Above the size at which head and body are combined into one write, a
+        // deferred body now goes out as its own write instead of being copied into
+        // the head buffer -- which held the same bytes a second time, and kept the
+        // grown buffer for the life of the connection. Splitting a write is easy
+        // to get wrong in ways that truncate or duplicate, so this reads the whole
+        // thing back and counts it.
+        int pad = 200000;
+        String json = body(request("GET", "/deferred?big=" + pad, null, null));
+        assertTrue(json.startsWith("{"), "the answer is JSON: " + json.substring(0,
+                Math.min(40, json.length())));
+        assertTrue(json.endsWith("}"), "and it is not truncated");
+        int at = json.indexOf("\"pad\":\"");
+        assertTrue(at >= 0, "the padded field is present");
+        int from = at + 7;
+        int to = json.indexOf('"', from);
+        assertEquals(pad, to - from, "every padding byte arrives exactly once");
+        // And the server still answers afterwards: a split write that put the head
+        // and body out of order would corrupt whatever came next on that socket.
+        assertEquals(200, statusOf(rawGet("/healthz")),
+                "the server still answers after a large body");
+    }
+
+    @Test
+    void aLongTargetIsServedAndNotCached() throws Exception {
+        // Targets past a few hundred bytes skip the per-connection memo, because
+        // sixty-four of them near the head limit is megabytes a keep-alive client
+        // can hold without ever sending a body. Skipping the cache must not change
+        // the answer, which is what this pins.
+        StringBuilder q = new StringBuilder("/healthz?pad=");
+        for (int i = 0; i < 2000; i++) {
+            q.append('a');
+        }
+        assertEquals(200, statusOf(rawGet(q.toString())),
+                "a long target is still a valid target");
+        assertEquals(200, statusOf(rawGet(q.toString())),
+                "and still is the second time, when the memo would have answered");
+    }
+
+    @Test
     void aMalformedPercentEscapeIsRefused() throws Exception {
         // RFC 3986 leaves one reading of '%': two hex digits follow it. The server
         // used to decline to DECODE a malformed escape and then copy it through as

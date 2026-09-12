@@ -760,6 +760,21 @@ public final class HttpServer {
          * connection, and deferredJson is the one that would hurt -- it makes the
          * writer serialise an object the handler never returned.
          */
+        /**
+         * Drops what this response pointed at, once it has been written.
+         *
+         * Pooled per connection like the Request, so between responses it goes on
+         * referencing the last one -- and deferredJson is a handler's object
+         * graph, which for a large result is the largest thing either side holds.
+         * reset() assigns every field below before anything reads it.
+         */
+        void releaseRetained() {
+            this.deferredJson = null;
+            this.hasDeferredJson = false;
+            this.body = EMPTY_BODY;
+            this.extraHeaders = null;
+        }
+
         void reset(int status, String contentType, byte[] body, int fileFd,
                    long fileOffset, long fileLength, Map extraHeaders) {
             this.status = status;
@@ -2661,7 +2676,20 @@ public final class HttpServer {
         private final String[] targetCache = new String[TARGET_CACHE_SLOTS];
 
         String internTarget(byte[] data, int start, int length) {
-            if(targetCache.length == 0) {
+            // NOTHING LONG GOES IN. The cache exists for a route asked for over and
+            // over on one connection -- "/plaintext", "/json", "/api/notes/42" --
+            // and every one of those is short. A target may be nearly
+            // MAX_HEADER_BYTES though, and with one slot per hash a client sending
+            // 64 distinct near-limit query strings fills all of them and the
+            // connection then holds megabytes for as long as it stays open. That
+            // needs no body at all, which is what makes it worse than the upload
+            // retention releaseIdleMemory deals with: it is reached by a keep-alive
+            // client that only ever sends request lines.
+            //
+            // Capped rather than cleared when idle: clearing would throw the
+            // memoisation away on every keep-alive request, which is the case it
+            // was measured to help.
+            if(targetCache.length == 0 || length > MAX_CACHED_TARGET_BYTES) {
                 // Cache disabled (CN1_HTTP_TARGET_CACHE=0), for A/B measurement.
                 // Guarded because the slot arithmetic below is a modulo, and a zero
                 // size would divide by it rather than politely doing nothing.
@@ -2779,7 +2807,10 @@ public final class HttpServer {
          * here; the copy into the head buffer afterwards is a memcpy of a body
          * small enough to share a packet with its headers.
          */
-        final ByteSink bodySink = new ByteSink(512);
+        // Not final: an oversized one is REPLACED rather than carried, see
+        // releaseIdleMemory. reset() only rewinds the length, which is the right
+        // thing per request and the wrong thing across an idle wait.
+        ByteSink bodySink = new ByteSink(512);
 
         void reset() {
             outLength = 0;
@@ -3239,6 +3270,23 @@ public final class HttpServer {
             }
             if(pooledRequest != null) {
                 pooledRequest.releaseRetained();
+            }
+            // The RESPONSE side keeps peaks of its own. Both of these grow to fit
+            // and never shrink, which is what makes them cheap per request and
+            // expensive across an idle wait: one large JSON answer leaves the
+            // connection holding it in the sink it was serialised into and again
+            // in the head buffer it was copied to. Anything up to the combine
+            // limit is the working size and is kept; past that it belonged to one
+            // response that has already gone out.
+            if(out.length > MAX_IDLE_BUFFER_BYTES) {
+                out = new byte[1024];
+                outLength = 0;
+            }
+            if(bodySink.bytes().length > MAX_IDLE_BUFFER_BYTES) {
+                bodySink = new ByteSink(512);
+            }
+            if(pooledResponse != null) {
+                pooledResponse.releaseRetained();
             }
         }
 
@@ -5423,10 +5471,22 @@ public final class HttpServer {
         // would cost more than the syscall it saves, and a file body never enters
         // user space at all -- both keep the two-write path.
         if(deferred != null) {
-            if(!noBody && deferredLength > 0) {
+            // THE SAME LIMIT THE ORDINARY BODY GETS. This path used to copy any
+            // deferred body into the head buffer, however large: a big JSON result
+            // was then held twice, once in bodySink where it was serialised and
+            // again in an "out" that had grown to fit it, and both keep their peak
+            // for the life of the connection. Above the limit the copy costs more
+            // than the syscall it saves anyway, which is why the branch below
+            // stops there.
+            if(!noBody && deferredLength > 0 && deferredLength <= COMBINED_WRITE_LIMIT) {
                 conn.put(deferred, 0, deferredLength);
+                writeTo(fd, session, conn.out, 0, conn.outLength);
+                return;
             }
             writeTo(fd, session, conn.out, 0, conn.outLength);
+            if(!noBody && deferredLength > 0) {
+                writeTo(fd, session, deferred, 0, deferredLength);
+            }
             return;
         }
         if(response.fileFd < 0 && !noBody
@@ -5818,6 +5878,28 @@ public final class HttpServer {
      */
     private static final int TARGET_CACHE_SLOTS =
             envIntAtLeast("CN1_HTTP_TARGET_CACHE", 64, 0);
+
+    /**
+     * The longest target worth memoising, and worth HOLDING.
+     *
+     * A route repeated on one connection is short; a target near MAX_HEADER_BYTES
+     * is not a route, it is a query string, and caching sixty-four of those would
+     * let a client that never sends a body hold megabytes per connection for as
+     * long as it keeps the connection open. 512 leaves ample room for a real path
+     * with parameters and none for that.
+     */
+    private static final int MAX_CACHED_TARGET_BYTES = 512;
+
+    /**
+     * The largest per-connection buffer worth carrying across an idle wait.
+     *
+     * The head buffer and the body sink both grow to fit and never shrink, which
+     * is what makes them cheap per request. Across a wait that may last as long as
+     * the client likes, a buffer sized by one big response is just retention, so
+     * anything past this is dropped and rebuilt. Comfortably above
+     * COMBINED_WRITE_LIMIT, so the steady-state buffers survive.
+     */
+    private static final int MAX_IDLE_BUFFER_BYTES = 16 * 1024;
 
     /**
      * Read straight into the thread's reusable buffer instead of a fresh array.

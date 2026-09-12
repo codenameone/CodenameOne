@@ -109,6 +109,26 @@ public class PetServer {
                     Map value = new LinkedHashMap();
                     value.put("name", "deferred");
                     value.put("digits", "1234567890");
+                    // ?big=N pads the answer past the size at which the server
+                    // stops copying a body into the head buffer and writes it
+                    // separately. The padding is a run of one character so a
+                    // truncated or doubled write is visible as a length.
+                    String big = request.queryParam("big");
+                    if(big != null) {
+                        int n = 0;
+                        try {
+                            n = Integer.parseInt(big);
+                        } catch (NumberFormatException ignored) {
+                            n = 0;
+                        }
+                        if(n > 0 && n <= 4 * 1024 * 1024) {
+                            StringBuilder pad = new StringBuilder();
+                            for(int iter = 0 ; iter < n ; iter++) {
+                                pad.append('x');
+                            }
+                            value.put("pad", pad.toString());
+                        }
+                    }
                     return request.respondJson(200, value);
                 }
                 // Deliberately a body on a status that cannot carry one. A handler
