@@ -551,6 +551,76 @@ class ExtensionDeploymentFloorScriptTest {
                 "and an iOS one declared the same way is still raised");
     }
 
+    /// Conditions can OVERLAP without being equal: sdk=iphoneos27.* is narrower than
+    /// sdk=iphoneos* and Xcode picks it for a matching build. Set logic on the raw text calls
+    /// the two unrelated, so the helper looked absent, resolved to nothing, and clamped a
+    /// 16.4 extension to the floor.
+    @Test
+    void treatsOverlappingWildcardConditionsAsUndecidable(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Narrower|" + EXT + "|SDKROOT->iphoneos;"
+                        + "EXTENSION_MIN[sdk=iphoneos27.*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)",
+                // Control: without it this passes when the pass does nothing at all.
+                "MustRise|" + EXT + "|SDKROOT->iphoneos;IPHONEOS_DEPLOYMENT_TARGET->12.0");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
+                got.get(0),
+                "iphoneos27.* may win on a 27 build, so this must not be clamped to 15.0");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "control: the pass ran");
+    }
+
+    /// ...but patterns that cannot both match stay disjoint, so the raise still happens.
+    /// iphoneos* and iphonesimulator* never match the same SDK.
+    @Test
+    void disjointWildcardsDoNotBlockTheRaise(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Disjoint|" + EXT + "|SDKROOT->iphoneos;EXTENSION_MIN->12.0;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
+                got.get(0),
+                "a simulator-qualified helper cannot win a device build");
+    }
+
+    /// $(inherited) means the inherited value of the setting it appears IN. With
+    /// EXTENSION_MIN = $(inherited) and IPHONEOS_DEPLOYMENT_TARGET = $(EXTENSION_MIN), the
+    /// nested one inherits EXTENSION_MIN's project value, not the deployment target's.
+    @Test
+    void nestedInheritedKeepsItsOwnSettingName(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0', 'EXTENSION_MIN' => '12.0'}",
+                "Nested|" + EXT + "|SDKROOT->iphoneos;EXTENSION_MIN->$(inherited);"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0),
+                "it resolves to the project's EXTENSION_MIN of 12.0, which is below the floor");
+    }
+
+    /// The generated project really does carry SDKROOT = iphoneos at PROJECT level, so a
+    /// watch extension's own watchos must outrank it. Pooling the two put the iOS floor back
+    /// onto CN1WatchWidgets in the real project while every fixture here still passed --
+    /// because the fixtures declared no project SDKROOT at all.
+    @Test
+    void theTargetsOwnPlatformOutranksTheProjects(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'SDKROOT' => 'iphoneos', 'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "WatchInIosProject|" + EXT + "|SDKROOT->watchos;"
+                        + "WATCHOS_DEPLOYMENT_TARGET->10.0",
+                // Declares no platform of its own, so it inherits the project's iOS one.
+                "InheritsProjectPlatform|" + EXT + "|IPHONEOS_DEPLOYMENT_TARGET->12.0");
+        assertEquals("nil", got.get(0),
+                "the watch extension's own SDKROOT wins over the iOS project's");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1),
+                "a target naming no platform still takes the project's, and is raised");
+    }
+
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before
     /// any of this existed: nothing emitted, nothing changed.
     @Test
