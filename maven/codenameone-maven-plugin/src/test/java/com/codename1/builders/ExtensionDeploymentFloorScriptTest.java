@@ -815,4 +815,37 @@ class ExtensionDeploymentFloorScriptTest {
                 "the simulator branch resolves to 16.4, so the base expression still serves it: "
                         + got.get(0));
     }
+
+    /// Xcode conditions settings on the build CONFIGURATION as well as the sdk, and this pass
+    /// iterates configurations -- so the configuration is known, not guessed. Leaving it out of
+    /// the context made both branches of a per-configuration helper look inapplicable, the
+    /// answer confidently empty, and wrote the floor over a Release that resolves to 16.4.
+    /// The harness builds one configuration named Release, which is the one being written.
+    @Test
+    void theConfigurationIsPartOfTheResolutionContext(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "PerConfig|" + EXT + "|EXTENSION_MIN[config=Debug]->12.0;"
+                        + "EXTENSION_MIN[config=Release]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)"),
+                "this configuration is Release, where EXTENSION_MIN is 16.4 and clears the "
+                        + "floor; the Debug branch must not decide it: " + got.get(0));
+    }
+
+    /// The other direction, so the test above cannot be satisfied by a change that simply stops
+    /// resolving per-configuration helpers: when THIS configuration's value is below the floor,
+    /// the raise still happens.
+    @Test
+    void aConfigurationBelowTheFloorIsStillRaised(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "PerConfigLow|" + EXT + "|EXTENSION_MIN[config=Debug]->16.4;"
+                        + "EXTENSION_MIN[config=Release]->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
+                "Release resolves to 12.0 here and must be raised: " + got.get(0));
+    }
 }
