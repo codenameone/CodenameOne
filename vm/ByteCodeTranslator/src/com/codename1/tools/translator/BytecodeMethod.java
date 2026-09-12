@@ -2532,6 +2532,23 @@ public class BytecodeMethod implements SignatureSet {
         return -1;
     }
 
+    /// The first local slot that cannot hold an incoming argument.
+    ///
+    /// Parameters occupy locals WITHOUT an ASTORE, so a slot-write count of one
+    /// does not mean the slot holds one value over the method's lifetime -- an
+    /// Iterator parameter in that slot is a second, earlier value. Long and double
+    /// take two slots each, per the JVM numbering the instruction stream uses.
+    ///
+    /// @return the lowest slot index that is definitely not a parameter
+    private int firstNonParameterSlot() {
+        int slots = isStatic() ? 0 : 1;
+        for (ByteCodeMethodArg arg : arguments) {
+            char q = arg.getQualifier();
+            slots += (q == 'l' || q == 'd') ? 2 : 1;
+        }
+        return slots;
+    }
+
     private int countStoresTo(int slot) {
         int n = 0;
         for (Instruction ins : instructions) {
@@ -2600,19 +2617,27 @@ public class BytecodeMethod implements SignatureSet {
                 continue;
             }
             int slot = ((VarOp) store).getIndex();
-            if (countStoresTo(slot) != 1) {
+            // Exactly one ASTORE is not enough on its own: a parameter reaches its
+            // slot without one, so a method that takes an Iterator and later reuses
+            // that slot for this loop's iterator has TWO values in it. Rewriting the
+            // parameter's calls to the concrete type would dispatch methods that
+            // read the wrong object layout -- unchecked, on this VM.
+            if (slot < firstNonParameterSlot() || countStoresTo(slot) != 1) {
                 continue;
             }
-            retypeIteratorUses(slot, itType);
+            retypeIteratorUses(slot, itType, st);
         }
     }
 
-    private void retypeIteratorUses(int slot, String itType) {
+    /// @param storeIdx index of the ASTORE that put the concrete iterator in the
+    ///                 slot; only uses AFTER it are rewritten, since anything
+    ///                 earlier cannot be reading the value this store wrote
+    private void retypeIteratorUses(int slot, String itType, int storeIdx) {
         ByteCodeClass itClass = Parser.getClassObject(Util.mangle(itType));
         if (itClass == null) {
             return;
         }
-        for (int i = 0; i < instructions.size(); i++) {
+        for (int i = storeIdx + 1; i < instructions.size(); i++) {
             Instruction ins = instructions.get(i);
             if (!(ins instanceof Invoke) || ins.getOpcode() != Opcodes.INVOKEINTERFACE) {
                 continue;
@@ -4443,224 +4468,6 @@ public class BytecodeMethod implements SignatureSet {
         }
     }
 
-    /**
-     * Route the javac string-concatenation idiom to the SAME fused path that
-     * invokedynamic concat already uses.
-     *
-     * `a + b` compiles two different ways depending on the source/target level.
-     * JDK 9+ emits `invokedynamic makeConcat(WithConstants)`, which
-     * Parser.visitInvokeDynamicInsn already rewrites to String.cn1ConcatN when
-     * every part is String-typed -- two allocations and no conversion, against
-     * the StringBuilder's four plus a byte->char decode per append and a
-     * char->byte re-encode in toString (StringBuilder is char[]-backed while
-     * Strings are compact byte[]).
-     *
-     * Anything compiled at source/target 8 emits the StringBuilder idiom
-     * directly instead, and reached NONE of that. That is not a corner: the
-     * Codename One core, every port and every cn1lib are built that way, so the
-     * fallback was what nearly all linked code paid, no matter which JDK built
-     * the application on top. MEASURED on the 5782-class hellocodenameone
-     * corpus: 3058 StringBuilder-idiom sites against 499 invokedynamic ones.
-     *
-     * The rewrite is a deletion, because the stack discipline already lines up:
-     *
-     *     NEW/DUP/<init>  -> [sb]
-     *     <code for a>    -> [sb, a]
-     *     append          -> [sb]        (consumes sb and a, returns sb)
-     *     <code for b>    -> [sb, b]
-     *     append          -> [sb]
-     *     toString        -> [String]
-     *
-     * Drop the NEW, the DUP, the constructor and every append, and what is left
-     * is `<code for a><code for b>` leaving exactly [a, b] -- the argument shape
-     * cn1Concat2 wants. Only the terminating toString is replaced, by the static
-     * call. No new runtime: cn1Concat2..5 and their cn1FusedConcatN natives are
-     * the ones the invokedynamic path has been using.
-     *
-     * Conservative on purpose; every bail-out below is a case where a naive
-     * deletion would change behaviour:
-     *   - only all-String append chains, because cn1ConcatN takes Strings. An
-     *     append(int) renders digits straight into the builder, and routing it
-     *     here would mean materialising an intermediate String, which is not
-     *     obviously cheaper. Those chains are left alone.
-     *   - only 2..5 parts, matching the cn1ConcatN arity that exists.
-     *   - a control-flow join inside the chain ends it (srNextRealNoJoin, and
-     *     the explicit isJumpTarget check): control could enter mid-chain, so
-     *     the builder would not be the one this NEW created.
-     *   - a nested `new StringBuilder` inside the chain ends it, so the inner
-     *     concat of `"a" + (x + y)` is not mistaken for the outer one. The inner
-     *     site is rewritten on its own, and the outer becomes eligible on a
-     *     later pass -- hence the fixpoint loop in the caller.
-     *   - any other StringBuilder method (charAt, reverse, ...), or a store or
-     *     return of the builder, ends it: the builder escapes the chain.
-     *
-     * @return true when at least one chain was rewritten
-     */
-    private boolean fuseStringBuilderConcatOnce() {
-        final String SB = "java/lang/StringBuilder";
-        final String APPEND_STR = "(Ljava/lang/String;)Ljava/lang/StringBuilder;";
-        for (int i = 0; i < instructions.size(); i++) {
-            Instruction in = instructions.get(i);
-            if (!(in instanceof TypeInstruction) || in.getOpcode() != Opcodes.NEW
-                    || !SB.equals(((TypeInstruction) in).getTypeName())) {
-                continue;
-            }
-            int iDup = srNextRealNoJoin(i + 1);
-            if (iDup < 0 || instructions.get(iDup).getOpcode() != Opcodes.DUP) {
-                continue;
-            }
-            int iInit = srNextRealNoJoin(iDup + 1);
-            if (iInit < 0) {
-                continue;
-            }
-            Instruction initIns = instructions.get(iInit);
-            if (!(initIns instanceof Invoke) || initIns.getOpcode() != Opcodes.INVOKESPECIAL) {
-                continue;
-            }
-            Invoke init = (Invoke) initIns;
-            if (!SB.equals(init.getOwner()) || !"<init>".equals(init.getName())
-                    || !"()V".equals(init.getDesc())) {
-                continue;
-            }
-
-            java.util.List<Integer> appends = new java.util.ArrayList<Integer>();
-            int toStringIdx = -1;
-            boolean ok = true;
-            for (int j = iInit + 1; j < instructions.size(); j++) {
-                Instruction c = instructions.get(j);
-                if (c instanceof LabelInstruction) {
-                    if (LabelInstruction.isJumpTarget(((LabelInstruction) c).getLabel())) {
-                        ok = false;
-                    }
-                    if (!ok) {
-                        break;
-                    }
-                    continue;
-                }
-                if (c instanceof LineNumber || c instanceof LocalVariable) {
-                    continue;
-                }
-                if (c instanceof Jump) {
-                    ok = false;
-                    break;
-                }
-                if (c instanceof TypeInstruction && c.getOpcode() == Opcodes.NEW
-                        && SB.equals(((TypeInstruction) c).getTypeName())) {
-                    ok = false;
-                    break;
-                }
-                int op = c.getOpcode();
-                // Any opcode that can MOVE OR DISCARD the builder reference ends the
-                // chain, not just the ones that store it somewhere.
-                //
-                // The matcher recognises appends by owner, not by tracking which
-                // object is on the stack, so without this it accepts
-                //     new StringBuilder(); POP; return existing.append(a).append(b).toString();
-                // -- valid bytecode -- and mistakes the appends on `existing` for
-                // appends on the builder it just allocated. Deleting the allocation
-                // and the appends would then leave the POP behind: an operand-stack
-                // underflow, and a concat of the wrong operands.
-                //
-                // The whole DUP/POP/SWAP family is refused rather than reasoned
-                // about. This costs coverage on chains whose argument expressions
-                // happen to contain one, which is the right trade: a missed fusion
-                // is slower, a wrong one is memory corruption. The pattern's own DUP
-                // sits before the scan window and is unaffected.
-                if (op == Opcodes.POP || op == Opcodes.POP2 || op == Opcodes.SWAP
-                        || op == Opcodes.DUP || op == Opcodes.DUP_X1 || op == Opcodes.DUP_X2
-                        || op == Opcodes.DUP2 || op == Opcodes.DUP2_X1 || op == Opcodes.DUP2_X2) {
-                    ok = false;
-                    break;
-                }
-                if (op == Opcodes.ASTORE || op == Opcodes.PUTFIELD || op == Opcodes.PUTSTATIC
-                        || op == Opcodes.AASTORE || op == Opcodes.ARETURN) {
-                    ok = false;
-                    break;
-                }
-                if (c instanceof Invoke) {
-                    Invoke ci = (Invoke) c;
-                    if (SB.equals(ci.getOwner())) {
-                        if ("append".equals(ci.getName()) && APPEND_STR.equals(ci.getDesc())) {
-                            appends.add(Integer.valueOf(j));
-                            continue;
-                        }
-                        if ("toString".equals(ci.getName()) && "()Ljava/lang/String;".equals(ci.getDesc())) {
-                            toStringIdx = j;
-                            break;
-                        }
-                        ok = false;
-                        break;
-                    }
-                }
-            }
-            int n = appends.size();
-            if (!ok || toStringIdx < 0 || n < 2 || n > 5) {
-                continue;
-            }
-
-            StringBuilder sig = new StringBuilder("(");
-            for (int k = 0; k < n; k++) {
-                sig.append("Ljava/lang/String;");
-            }
-            sig.append(")Ljava/lang/String;");
-            Invoke fused = new Invoke(Opcodes.INVOKESTATIC, "java/lang/String",
-                    "cn1Concat" + n, sig.toString(), false);
-            instructions.set(toStringIdx, fused);
-            // Register it exactly as addInstruction() would. Setting the list entry
-            // alone leaves the new call with no owning method, no class dependency
-            // and -- the one that bites -- NO EDGE IN THE DEPENDENCY GRAPH, so the
-            // unused-method cull cannot see that String.cn1ConcatN is now called.
-            fused.setMethod(this);
-            fused.addDependencies(dependentClasses);
-            if (dependencyGraph != null) {
-                String fusedUses = fused.getMethodUsed();
-                if (fusedUses != null) {
-                    dependencyGraph.recordMethodCall(this, fusedUses);
-                }
-            }
-            for (int k = n - 1; k >= 0; k--) {
-                instructions.remove(appends.get(k).intValue());
-            }
-            instructions.remove(iInit);
-            instructions.remove(iDup);
-            instructions.remove(i);
-            // GROW the frame; do not clamp it.
-            //
-            // maxStack sizes the emitted C stack array (DEFINE_METHOD_STACK), so a
-            // value that is too small writes PAST that array. The failure is silent
-            // and arrives far away: the first symptom here was a SIGSEGV in
-            // java_io_File_getParentFile, called from File.mkdirs, nowhere near any
-            // concat.
-            //
-            // While evaluating the LAST part the builder held one persistent slot
-            // (sb) under that part's own working set; the fused form instead holds
-            // n-1 finished parts under it. So the requirement rises by n-2 over
-            // whatever the chain needed before. An earlier `if (maxStack < n + 1)`
-            // was a no-op for every real method, because maxStack is essentially
-            // always already larger than 6.
-            //
-            // Adding n (rather than the n-2 strictly implied) buys a slot of margin
-            // for a couple of pointers per frame, which is the right trade against a
-            // memory-corrupting underestimate.
-            maxStack += n;
-            cn1ConcatFused++;
-            return true;
-        }
-        return false;
-    }
-
-    /** Count of chains rewritten by {@link #fuseStringBuilderConcatOnce}, for reporting. */
-    static int cn1ConcatFused;
-
-    void fuseStringBuilderConcat() {
-        // Fixpoint: rewriting an inner concat makes the outer one all-String and
-        // free of the nested NEW that had disqualified it. Bounded so a bug here
-        // cannot hang a build.
-        int guard = 0;
-        while (guard++ < 64 && fuseStringBuilderConcatOnce()) {
-            // keep going
-        }
-    }
 
     boolean optimize() {
         // FUSED OBJECTS, constructor side: rewrite each planned
