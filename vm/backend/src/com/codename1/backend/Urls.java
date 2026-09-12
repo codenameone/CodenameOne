@@ -65,6 +65,24 @@ final class Urls {
             throw new IOException("Web speaks http and https, not "
                     + (colon < 1 ? "that" : url.substring(0, colon)));
         }
+        // AND NO CONTROL CHARACTER, which is not a matter of tidiness. The
+        // translated arm hands this string to libcurl as a C string --
+        // stringToUTF8 encodes through String.getBytes("UTF-8"), so a U+0000 is
+        // one 0x00 byte and everything after it is GONE. "http://127.0.0.1\u0000
+        // .example.com/" is a request to 127.0.0.1 that an application checking
+        // the .example.com suffix has already approved, and the JavaSE arm
+        // refuses the same URL, so the two arms disagreed about where a request
+        // was even going. CR, LF, TAB and DEL are refused with it: none of them
+        // is legal in a URL, and each is a way to mean two things at once to
+        // whatever parses it next.
+        for(int iter = 0 ; iter < url.length() ; iter++) {
+            char c = url.charAt(iter);
+            if(c <= 0x20 || c == 0x7f) {
+                throw new IOException("A URL cannot hold a control character or a "
+                        + "space; this one does, at index " + iter
+                        + ". Percent-encode it");
+            }
+        }
     }
 
     /**

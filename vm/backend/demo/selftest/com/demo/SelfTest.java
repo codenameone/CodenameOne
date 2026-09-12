@@ -1600,6 +1600,16 @@ public class SelfTest {
         // Still worth logging: the endpoint that failed is named.
         check("the host is still named", "true",
                 String.valueOf(message.indexOf("127.0.0.1") >= 0));
+        // A NUL TRUNCATES THE URL AT THE NATIVE BOUNDARY: stringToUTF8 encodes
+        // through String.getBytes("UTF-8"), so libcurl would be handed
+        // "http://127.0.0.1" and an application that approved the .example.com
+        // suffix would have approved a request to loopback.
+        check("a NUL in a URL is refused", "refused",
+                requestRefused("http://127.0.0.1\u0000.example.com/"));
+        check("and a newline, which means two things to whatever parses it next",
+                "refused", requestRefused("http://127.0.0.1/a\nb"));
+        check("and a raw space", "refused",
+                requestRefused("http://127.0.0.1/a b"));
         // AND THE FRAGMENT, which is where an implicit-flow OAuth token arrives
         // and which never reaches the server at all.
         String fragment = "http://127.0.0.1:1/path#access_token=fragmentsecret";
@@ -1614,6 +1624,18 @@ public class SelfTest {
                 String.valueOf(second.indexOf("fragmentsecret") >= 0));
         check("and the host is still named there too", "true",
                 String.valueOf(second.indexOf("127.0.0.1") >= 0));
+    }
+
+    /** Whether Web refuses a URL outright, rather than trying to fetch it. */
+    private static String requestRefused(String url) {
+        try {
+            Web.request("GET", url, null, null);
+            return "fetched";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            return message.indexOf("control character") >= 0
+                    || message.indexOf("http and https") >= 0 ? "refused" : "fetched";
+        }
     }
 
     /**
@@ -1985,6 +2007,119 @@ public class SelfTest {
         check("a truncated MySQL packet body is refused", "refused", outcome);
     }
 
+    /**
+     * A MySQL packet whose sequence byte is not the one due is refused.
+     *
+     * <p>The counter is this side's: the writer advances it packet by packet and a
+     * read has to advance it the same way. Adopting the peer's byte instead meant
+     * a stale packet -- one left over from an exchange this side thinks is
+     * finished -- was parsed as the current response, and the session stayed
+     * reusable, so desynchronisation turned into wrong data rather than an error.
+     *
+     * <p>The server's first handshake packet is due with sequence 0, so a stub
+     * that sends 7 is the smallest form of the fault.
+     */
+    private static void aMySqlPacketOutOfSequenceIsRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    // One byte of payload, announced with sequence 7 where 0 is due.
+                    ServerSocket.write(client,
+                            new byte[]{1, 0, 0, 7, (byte) 10}, 0, 5);
+                } catch (Exception ignored) {
+                    // Expected: the client gives up on us.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("mysql://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            db.close();
+            outcome = "connected";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("no longer in step") >= 0
+                    ? "refused" : "other: " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a MySQL packet out of sequence is refused", "refused", outcome);
+    }
+
+    /**
+     * A PostgreSQL column length of -2 is a malformed frame, not a NULL.
+     *
+     * <p>The wire protocol gives -1 one meaning and leaves every other negative
+     * undefined. Reading them all as NULL answered the query with a column the
+     * caller sees as absent -- silently altered data -- and kept the session for
+     * the next one.
+     */
+    private static void aNegativePostgresLengthThatIsNotNullIsRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    if(pgRead(client) == null) {              // StartupMessage
+                        return;
+                    }
+                    pgSend(client, 'R', int32(0));            // AuthenticationOk
+                    pgSend(client, 'Z', new byte[]{(byte)'I'}); // ReadyForQuery, idle
+                    while(pgRead(client) != null) {
+                        // One column called "a", described in full, and then a row
+                        // whose single column claims a length of -2.
+                        pgSend(client, 'T', join(join(new byte[]{0, 1}, ascii("a\0")),
+                                new byte[18]));
+                        pgSend(client, 'D', join(new byte[]{0, 1}, int32(-2)));
+                    }
+                } catch (Exception ignored) {
+                    // The client hanging up is how this ends.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("postgres://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            db.query("SELECT a", null);
+            db.close();
+            outcome = "answered";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("only -1 is NULL") >= 0
+                    ? "refused" : "other: " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a PostgreSQL column length of -2 is refused", "refused", outcome);
+    }
+
     /** try/finally here, the catch one frame up: the shape that works. */
     private static void finallyInACallee() throws IOException {
         try {
@@ -2243,6 +2378,8 @@ public class SelfTest {
         aSchemeIsRecognisedInAnyCase();
         aShortAuthFrameIsRefused();
         aTruncatedMySqlBodyIsRefused();
+        aMySqlPacketOutOfSequenceIsRefused();
+        aNegativePostgresLengthThatIsNotNullIsRefused();
         aStaticFileComesBackWhole();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
