@@ -13651,8 +13651,11 @@ public class IPhoneBuilder extends Executor {
                 // app -- a watch that cannot install the app cannot show its complication, so
                 // defaulting to the lower number advertised support that does not exist. The
                 // extension's floor stays where it is for a project that lowers both.
+                // The effective target, not the constant: if the watchOS SDK raised the host
+                // above 10.0 then a complication still defaulting to 10.0 would advertise a
+                // version the app it lives in cannot be installed on.
                 .setDeploymentTarget(request.getArg("watchNative.surfaces.deploymentTarget",
-                        WatchNativeBuilder.MIN_DEPLOYMENT_TARGET));
+                        watchNativeBuilder.minDeploymentTarget()));
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             watchBuilder.addKind(kind);
         }

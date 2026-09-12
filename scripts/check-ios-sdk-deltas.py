@@ -60,6 +60,7 @@ So there are two sweeps, and they answer different questions:
 """
 
 import argparse
+import hashlib
 import os
 import re
 import shutil
@@ -398,7 +399,15 @@ def compile_one(clang, sdk, project_dir, prefix_header, filename, defines, arc, 
 def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir, gates):
     """Confirm every non-baseline configuration really selects different code.
 
-    Returns a list of (name, witness, baseline_lines, config_lines) for reporting.
+    Difference is decided on a DIGEST of the preprocessed output, not its line
+    count. Equal counts do not mean equal content: a gated branch that swaps one
+    implementation for another of the same length is genuinely different code,
+    and judging it by length reported it as a duplicate configuration and aborted
+    the run -- a green tree blocked by an edit that was fine.
+
+    Returns (name, witness, baseline_lines, config_lines, identical) per
+    configuration. The counts are carried for the human-readable report only;
+    `identical` is the answer.
     """
     def preprocess(extra, witness):
         cmd = [clang, "-E", "-arch", "arm64", "-target", "arm64-apple-ios14.0",
@@ -413,14 +422,17 @@ def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir, gate
         for d in defines_for(gates, extra):
             cmd += ["-D", d]
         cmd.append(os.path.join(NATIVE_SOURCES, witness))
-        return len(run(cmd).stdout.splitlines())
+        out = run(cmd).stdout
+        return (hashlib.sha256(out.encode("utf-8", "replace")).hexdigest(),
+                len(out.splitlines()))
 
     baseline_defines = CONFIGURATIONS[0][1]
     checked = []
     for name, extra, witness in CONFIGURATIONS[1:]:
-        base_lines = preprocess(baseline_defines, witness)
-        conf_lines = preprocess(extra, witness)
-        checked.append((name, witness, base_lines, conf_lines))
+        base_digest, base_lines = preprocess(baseline_defines, witness)
+        conf_digest, conf_lines = preprocess(extra, witness)
+        checked.append((name, witness, base_lines, conf_lines,
+                        base_digest == conf_digest))
     return checked
 
 def synthesize_generated_stubs(clang, sdk, project_dir, prefix_header, files, all_defines,
@@ -675,14 +687,17 @@ def main():
           % (len(stubs), (" (%s)" % ", ".join(stubs)) if args.verbose and stubs else ""))
 
     checked = configurations_differ(clang, new_sdk, project_dir, prefix_header, stub_dir, gates)
-    for name, witness, base_lines, conf_lines in checked:
-        if base_lines == conf_lines or conf_lines == 0:
-            fail("configuration '%s' no longer selects different code: %s preprocesses to %d "
-                 "lines under the baseline and %d under it. It is a duplicate of the "
+    for name, witness, base_lines, conf_lines, identical in checked:
+        if identical or conf_lines == 0:
+            reason = ("preprocesses to byte-identical output" if identical
+                      else "preprocesses to nothing")
+            fail("configuration '%s' no longer selects different code: %s %s under the "
+                 "baseline and under it (%d vs %d lines). It is a duplicate of the "
                  "baseline, so the coverage it claims is not real."
-                 % (name, witness, base_lines, conf_lines))
+                 % (name, witness, reason, base_lines, conf_lines))
     print("[ios-sdk-deltas] configs : %s"
-          % ", ".join("%s (%s %d vs %d)" % (n, w, b, c) for n, w, b, c in checked))
+          % ", ".join("%s (%s %d vs %d)" % (n, w, b, c)
+                       for n, w, b, c, _ in checked))
 
     blocking, informational = {}, {}
     for sweep_name, target in sweeps:
