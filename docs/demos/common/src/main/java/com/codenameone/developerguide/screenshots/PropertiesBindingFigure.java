@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -20,92 +20,43 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide.snippets.generated;
 
-import com.codename1.gpu.*;
-import com.codename1.ui.*;
-import com.codename1.ui.animations.*;
-import com.codename1.ui.events.*;
-import com.codename1.ui.geom.*;
-import com.codename1.ui.layouts.*;
-import com.codename1.ui.list.*;
-import com.codename1.ui.plaf.*;
-import com.codename1.ui.util.*;
-import com.codename1.components.*;
-import com.codename1.charts.models.*;
-import com.codename1.charts.renderers.*;
-import com.codename1.charts.views.*;
-import com.codename1.capture.*;
-import com.codename1.io.*;
-import com.codename1.l10n.*;
-import com.codename1.location.*;
-import com.codename1.maps.*;
-import com.codename1.media.*;
-import com.codename1.messaging.*;
-import com.codename1.payment.*;
-import com.codename1.processing.*;
-import com.codename1.properties.*;
-import com.codename1.push.*;
-import com.codename1.security.*;
-import com.codename1.social.*;
-import com.codename1.ui.spinner.*;
-import java.io.*;
-import com.codename1.io.rest.*;
-import com.codename1.xml.*;
-import com.codename1.ui.tree.*;
-import com.codename1.ui.table.*;
-import com.codename1.db.*;
-import com.codename1.io.gzip.*;
-import com.codename1.util.*;
-import com.codename1.system.*;
-import com.codename1.annotations.*;
-import com.codename1.io.services.*;
-import java.util.*;
+package com.codenameone.developerguide.screenshots;
 
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.spinner.Picker;
+import com.codename1.properties.IntProperty;
+import com.codename1.properties.Property;
+import com.codename1.properties.PropertyBusinessObject;
+import com.codename1.properties.PropertyIndex;
+import com.codename1.properties.UiBinding;
+import java.util.Date;
 
-class IoJava172Snippet {
+/// The contact form the properties chapter shows beside its binding sample.
+///
+/// Nothing here reads the network, the clock or the filesystem: every field is
+/// bound to a property of one freshly constructed `Contact`, so the render is
+/// the same on any host. The date picker is deliberately left unset -- it shows
+/// its empty placeholder, which is both what the sample produces and one less
+/// thing that could differ between runs.
+class PropertiesBindingFigure implements GuideFigure {
+    @Override
+    public String id() {
+        return "properties-demo-binding";
+    }
 
-
-    Object context;
-    String url = "https://example.com";
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
-    Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    String myUrl = "https://example.com";
-    String baseUrl = "https://example.com";
-    String token = "token";
-    String myToken = "token";
-    String password = "password";
-    String user = "user";
-    String email = "user@example.com";
-    String fullPathToFile = "/path/to/file.txt";
-    String bodyValueAsString = "{}";
-    String petId = "1";
-    Result result;
-    ConnectionRequest request;
-    java.io.Reader reader;
-    java.io.Writer writer;
-    java.io.InputStream input;
-    java.io.OutputStream outputStream;
-    
-    void snippet() throws Exception {
+    @Override
+    public Form build() {
+        Form hi = new Form("Contact", new BorderLayout());
+        Contact c = new Contact();
         // tag::io-java-172[]
         Container resp = new Container(BoxLayout.y());
         UiBinding uib = new UiBinding();
@@ -147,19 +98,30 @@ class IoJava172Snippet {
         resp.add(c.rank.getLabel()).
                 add(rankTf);
         // end::io-java-172[]
+        hi.add(BorderLayout.CENTER, resp);
+        hi.show();
+        // Focus lands on the first focusable control, and a focused toggle resolves
+        // sel# -- the accent ring -- whether or not it is checked. Focusing a text
+        // field instead keeps that ring off the gender row, which is what this
+        // figure is showing.
+        hi.setFocused(nameTf);
+        return hi;
     }
 
-    public class Contact implements PropertyBusinessObject {
-        public final IntProperty<Contact> id  = new IntProperty<>("id");
+    /// The business object the sample binds against.
+    public static class Contact implements PropertyBusinessObject {
+        public final IntProperty<Contact> id = new IntProperty<>("id");
         public final Property<String, Contact> name = new Property<>("name");
         public final Property<String, Contact> email = new Property<>("email");
         public final Property<String, Contact> phone = new Property<>("phone");
         public final Property<Date, Contact> dateOfBirth = new Property<>("dateOfBirth", Date.class);
-        public final Property<String, Contact> gender  = new Property<>("gender");
-        public final IntProperty<Contact> rank  = new IntProperty<>("rank");
-        public final PropertyIndex idx = new PropertyIndex(this, "Contact", id, name, email, phone, dateOfBirth, gender, rank);
-        public PropertyIndex getPropertyIndex() { return idx; }
-    }
-    Contact c = new Contact();
+        public final Property<String, Contact> gender = new Property<>("gender");
+        public final IntProperty<Contact> rank = new IntProperty<>("rank");
+        public final PropertyIndex idx =
+                new PropertyIndex(this, "Contact", id, name, email, phone, dateOfBirth, gender, rank);
 
+        public PropertyIndex getPropertyIndex() {
+            return idx;
+        }
+    }
 }

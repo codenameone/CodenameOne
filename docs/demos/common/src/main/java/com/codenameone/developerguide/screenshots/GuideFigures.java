@@ -77,6 +77,8 @@ public final class GuideFigures {
             new FigureVariant(new GraphicsFontimageStyleFigure(), FigureDevice.ANDROID, false, "graphics-fontimage-style.png"),
             new FigureVariant(new GraphicsFontimageMaterialFigure(), FigureDevice.ANDROID, false, "graphics-fontimage-material.png"),
             new FigureVariant(new CsvParsingFigure(), FigureDevice.ANDROID, false, "csv-parsing.png"),
+            new FigureVariant(new PropertiesBindingFigure(), FigureDevice.ANDROID, false,
+                    "properties-demo-binding.png"),
             new FigureVariant(new ToggleButtonFigure(), FigureDevice.ANDROID, false,
                     "components-toggle-buttons-android.png"),
             new FigureVariant(new ToggleButtonFigure(), FigureDevice.IOS, false,
