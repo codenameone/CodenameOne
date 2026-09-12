@@ -22,6 +22,7 @@
  */
 package com.demo;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -40,6 +41,7 @@ import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
 import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
+import com.codename1.backend.StaticFiles;
 import com.codename1.backend.Tcp;
 import com.codename1.backend.Web;
 import com.codename1.backend.aws.Credentials;
@@ -1301,6 +1303,81 @@ public class SelfTest {
     }
 
     /**
+     * A static file comes back whole, on whichever path this arm serves it by.
+     *
+     * <p>Both arms run this and they do not share an implementation: the packaged
+     * one splices with sendfile, the Java SE one copies through the deadline-aware
+     * write. That second one used to be FileChannel.transferTo, which writes
+     * straight at the channel and so goes around the deadline every other write
+     * obeys -- on the pooled path the descriptor is blocking, so a client that
+     * filled its buffer and stopped reading held a worker for as long as it liked.
+     * The copy replacing it is the part with no coverage at all until here: a
+     * static download is not something the integration suite reaches on this arm.
+     *
+     * <p>Bigger than one buffer on purpose. The loop that sends it advances by
+     * whatever each call reports, so an implementation that miscounts shows up as
+     * a short or repeated body rather than as an error.
+     */
+    private static void aStaticFileComesBackWhole() throws Exception {
+        String dir = "/tmp/cn1-selftest-static-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        String name = "payload.bin";
+        int size = 300 * 1024;
+        StringBuilder content = new StringBuilder();
+        for(int iter = 0 ; iter < size ; iter++) {
+            content.append((char)('a' + (iter % 26)));
+        }
+        String expected = content.toString();
+        java.io.FileOutputStream out = new java.io.FileOutputStream(dir + "/" + name);
+        try {
+            out.write(expected.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        final StaticFiles files = new StaticFiles(dir, "/static", null, null);
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = files.handle(request);
+                return served == null ? HttpServer.Response.text(404, "no") : served;
+            }
+        });
+        String outcome;
+        try {
+            String body = httpGetBody("127.0.0.1", server.getPort(), "/static/" + name);
+            outcome = body == null ? "<none>" : String.valueOf(body.length());
+        } finally {
+            server.stop(2000);
+            new java.io.File(dir + "/" + name).delete();
+            new java.io.File(dir).delete();
+        }
+        check("a static file comes back whole", String.valueOf(size), outcome);
+    }
+
+    /** One GET, reading to the end of the body by Content-Length. */
+    private static String httpGetBody(String host, int port, String target) throws Exception {
+        Tcp conn = Tcp.connect(host, port, 15000);
+        try {
+            byte[] request = ("GET " + target + " HTTP/1.1\r\nHost: x\r\n"
+                    + "Connection: close\r\n\r\n").getBytes("UTF-8");
+            conn.write(request, 0, request.length);
+            ByteArrayOutputStream all = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            while(true) {
+                int n = conn.read(chunk, 0, chunk.length);
+                if(n <= 0) {
+                    break;
+                }
+                all.write(chunk, 0, n);
+            }
+            String text = new String(all.toByteArray(), "UTF-8");
+            int at = text.indexOf("\r\n\r\n");
+            return at < 0 ? null : text.substring(at + 4);
+        } finally {
+            conn.close();
+        }
+    }
+
+    /**
      * A SCRAM server does not get to choose how long this client computes.
      *
      * <p>The iteration count arrives on the wire and multiplies straight into
@@ -1767,6 +1844,7 @@ public class SelfTest {
         truncatedRowFramesAreRefused();
         aShortAuthFrameIsRefused();
         aTruncatedMySqlBodyIsRefused();
+        aStaticFileComesBackWhole();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
         anImpossibleExpiryIsRefused();

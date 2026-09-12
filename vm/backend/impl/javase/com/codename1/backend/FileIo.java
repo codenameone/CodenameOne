@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -184,6 +183,23 @@ public final class FileIo {
         return 0;
     }
 
+    /**
+     * One bounded chunk of the file to the socket, THROUGH THE DEADLINE.
+     *
+     * <p>Not FileChannel.transferTo, which is what this was. transferTo is sendfile
+     * underneath and moves the bytes without copying them, but it writes straight
+     * to the channel and so goes around ServerSocket.write -- and around
+     * Deadlines.writeWithDeadline, whose whole reason for existing is stated where
+     * it is called: a client that stops reading otherwise parks this worker
+     * indefinitely. In the pooled mode the descriptor here is BLOCKING, so a client
+     * that fills its receive buffer and stops held a worker for as long as it cared
+     * to, and enough slow downloads took the pool. Ordinary responses were never
+     * exposed to that; a static file was.
+     *
+     * <p>The copy this does instead costs a buffer per call on the arm that runs
+     * the local dev server, which is the arm that can afford it. The packaged
+     * server has the real sendfile.
+     */
     public static long sendFile(int socketFd, int fileFd, long offset, long count) {
         Object file = Descriptors.get(fileFd);
         Object socket = Descriptors.get(socketFd);
@@ -195,14 +211,25 @@ public final class FileIo {
             return -1;
         }
         try {
-            return channel.transferTo(offset, count, (WritableByteChannel)socket);
+            int want = (int)Math.min(count, 64L * 1024L);
+            if(want <= 0) {
+                return 0;
+            }
+            ByteBuffer chunk = ByteBuffer.allocate(want);
+            int read = channel.read(chunk, offset);
+            if(read <= 0) {
+                return read < 0 ? -1 : 0;
+            }
+            ServerSocket.write(socketFd, chunk.array(), 0, read);
+            return read;
         } catch (Exception err) {
             return -1;
         }
     }
 
     public static boolean hasSendFile() {
-        // transferTo is sendfile underneath on every platform this runs on.
+        // Still true: the caller's loop is the same either way, and this arm's
+        // implementation copies rather than splicing. See sendFile for why.
         return true;
     }
 

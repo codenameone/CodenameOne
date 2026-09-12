@@ -3400,25 +3400,34 @@ public final class HttpServer {
             serveHttp2(fd, session, null, 0);
             return;
         }
-        try {
-            while(conn.available() < HTTP2_PREFACE.length) {
-                if(!conn.fill(scratch)) {
-                    drop(fd);
+        // CLEARTEXT ONLY, which is what "prior knowledge" means: over TLS the
+        // protocol is ALPN's to decide and it was decided above. Sniffing the
+        // preface on a TLS connection as well let a client negotiate HTTP/1.1 --
+        // or offer no ALPN at all -- and then send the preface anyway, so a server
+        // built with offerHttp2=false spoke h2 to whoever asked in the one way the
+        // operator had turned off. RFC 9113 puts prior knowledge on the cleartext
+        // side for exactly this reason.
+        if(session == 0) {
+            try {
+                while(conn.available() < HTTP2_PREFACE.length) {
+                    if(!conn.fill(scratch)) {
+                        drop(fd);
+                        return;
+                    }
+                    if(!startsWithPrefacePrefix(conn)) {
+                        break; // definitely not h2; parse it as HTTP/1.1
+                    }
+                }
+                if(conn.available() >= HTTP2_PREFACE.length && matchesPreface(conn)) {
+                    byte[] rest = new byte[conn.available()];
+                    System.arraycopy(conn.buffer, conn.pos, rest, 0, rest.length);
+                    serveHttp2(fd, session, rest, rest.length);
                     return;
                 }
-                if(!startsWithPrefacePrefix(conn)) {
-                    break; // definitely not h2; parse it as HTTP/1.1
-                }
-            }
-            if(conn.available() >= HTTP2_PREFACE.length && matchesPreface(conn)) {
-                byte[] rest = new byte[conn.available()];
-                System.arraycopy(conn.buffer, conn.pos, rest, 0, rest.length);
-                serveHttp2(fd, session, rest, rest.length);
+            } catch (Exception err) {
+                drop(fd);
                 return;
             }
-        } catch (Exception err) {
-            drop(fd);
-            return;
         }
 
         while(true) {

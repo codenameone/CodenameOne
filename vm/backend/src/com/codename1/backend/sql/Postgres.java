@@ -553,12 +553,18 @@ public final class Postgres {
                 case DATA_ROW: {
                     requireBytes(message.body, 0, 2);
                     int columns = shortAt(message.body, 0);
-                    // AND NOT MORE THAN THE DESCRIPTION HAD. names and types are
-                    // sized from RowDescription, so a row claiming more columns
-                    // indexes past them -- the same unchecked read, one array along.
-                    if(names != null && columns > names.length) {
+                    // EXACTLY WHAT THE DESCRIPTION SAID, in both directions. More
+                    // than that indexes past names and types, which are sized from
+                    // RowDescription -- the unchecked read one array along, and the
+                    // only half an earlier version of this check covered. FEWER is
+                    // the quieter half and needs saying too: the loop below simply
+                    // stops early and the row comes back missing its trailing
+                    // fields, so a peer can delete columns from an answer without
+                    // anything failing. Under the default sslmode=prefer that peer
+                    // need not be the server.
+                    if(names != null && columns != names.length) {
                         close();        // desynchronised; see requireBytes
-                        throw new IOException("A PostgreSQL row claims " + columns
+                        throw new IOException("A PostgreSQL row has " + columns
                                 + " columns where its description had " + names.length);
                     }
                     Map row = new LinkedHashMap();
