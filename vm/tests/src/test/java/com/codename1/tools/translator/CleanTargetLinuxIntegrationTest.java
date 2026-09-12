@@ -322,7 +322,11 @@ class CleanTargetLinuxIntegrationTest {
         // in the image means CN1_GC_VERIFY was compiled in.
         try {
             byte[] image = Files.readAllBytes(elf);
-            String needle = "[GC-VERIFY]";
+            // Keyed off whatever diagnostic this run asked for, so the probe stays
+            // honest when the define changes.
+            String want = System.getenv("CN1_LINUX_EXTRA_DEFINES");
+            String needle = want != null && want.contains("CN1_BIBOP_VALIDATE")
+                    ? "CN1BIBOP FASTALLOC CORRUPT" : "[GC-VERIFY]";
             boolean present = new String(image, StandardCharsets.ISO_8859_1).contains(needle);
             System.out.println("CN1SS:HARNESS: built ELF contains " + needle + ": " + present
                     + " (" + image.length + " bytes)");

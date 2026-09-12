@@ -270,24 +270,25 @@ jobs:
           # itself is still stripped; only the companion grows, and it is uploaded beside
           # the core so the crash can be autopsied off the runner.
           CN1_LINUX_FULL_DEBUG: 'true'
-          # The collector's heap-integrity verifier, on the x64 leg only.
+          # BiBOP page validation, on the x64 leg only.
           #
-          # It asserts after every sweep that no object the sweep KEPT references
-          # memory it RECLAIMED, and aborts at the cycle that broke it naming holder
-          # class, victim class and the field's mark call site. That is exactly the
-          # fault here: Display.inputEventStackTmp was found holding a reclaimed
-          # int[1000] whose slot a fused object had taken over.
+          # CN1_GC_VERIFY already ran here and came back CLEAN over 2213 epochs, so
+          # the sweep is not reclaiming anything a survivor still references -- the
+          # premise this investigation had been working from is wrong. And the
+          # generated Display.c is semantically identical to master's (14 lines
+          # differ, all of them this PR's class-init guards), so the code that
+          # writes the field is not at fault either.
           #
-          # x64 only, via the matrix arch, because the verifier walks the heap after
-          # every sweep and doubling that across the matrix buys nothing -- x64 is
-          # the leg that reproduces the SIGSEGV.
-          CN1_LINUX_EXTRA_DEFINES: ${{ matrix.arch == 'x64' && 'CN1_GC_VERIFY' || '' }}
-          # REQUIRED to tell "verifier clean" from "verifier absent". Without it the
-          # verifier prints nothing on a clean epoch and only speaks when it aborts,
-          # so a silent log is indistinguishable from a build where the define never
-          # reached the compiler -- which is exactly how the first attempt at this
-          # read as "no violations found" when it had in fact measured nothing.
-          CN1_GC_VERIFY_LOG: '1'
+          # What remains is a pointer that LOOKS valid but addresses the wrong
+          # object, which is what a retired-and-reformatted page produces and what
+          # the verifier would not call reclaimed. This guard checks on every fast
+          # allocation that bibopCurrent[ci] is owned, matches its size class, and
+          # that the bumped slot lies inside the page -- and aborts at the
+          # allocation that breaks it. Its comment names "the intermittent x64
+          # cn1BibopFastAlloc crash"; this is an intermittent x64 crash.
+          #
+          # x64 only via the matrix arch: it is the leg that SIGSEGVs.
+          CN1_LINUX_EXTRA_DEFINES: ${{ matrix.arch == 'x64' && 'CN1_BIBOP_VALIDATE' || '' }}
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a
