@@ -2264,7 +2264,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
         try {
             FileUtils.copyFile(pomFile, backup);
-            writeAtomically(pomFile, updated, charset, getLog());
+            writeInPlace(pomFile, updated, charset, backup, getLog());
         } catch (IOException ex) {
             warnCouldNotEditPom("it could not be written: " + ex.getMessage());
             return;
@@ -2274,81 +2274,51 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /**
-     * Replaces {@code target} with {@code content}, never leaving it partially
-     * written.
+     * Writes {@code content} over {@code target} in place, restoring
+     * {@code backup} if the write fails part way through.
      *
-     * <p>Writing straight into the pom truncates it first, so a failure part
-     * way through -- a full disk is the obvious one -- leaves the developer
-     * with an empty or half-written pom and a build that no longer starts. The
-     * warning at the call site would then be actively misleading, since it
-     * says only that the execution could not be added. Writing a sibling
-     * temporary file and moving it into place means the pom is either the old
-     * one or the new one and never anything in between.</p>
+     * <p>This used to write a sibling temporary file and move it into place,
+     * for atomicity: a failure mid-write would otherwise leave a truncated pom
+     * and a build that no longer starts. The trouble is that a move replaces
+     * the inode, and the inode is what carries everything about the file that
+     * is not its content. Each attribute had to be cloned back by hand, and
+     * each one missed was a silent change to a file this build does not own --
+     * the mode (a group-writable pom came back rw-r--r--), the symlink (a
+     * shared pom quietly became an independent copy), then the owner and group
+     * (a container running as root leaving the developer a root-owned pom),
+     * with ACLs and extended attributes behind them. That list has no end, and
+     * a miss is invisible until it matters.</p>
+     *
+     * <p>Writing in place preserves all of it by construction: same inode, so
+     * same owner, group, mode, ACLs, extended attributes and hard links, and a
+     * symlink is followed rather than replaced. What it gives up is atomicity,
+     * and the backup taken moments earlier already covers that -- restored here
+     * automatically, and named in the error if even that fails. A truncated
+     * write needs the process to die between two syscalls on a file of a few
+     * kilobytes; losing a pom's ownership happens on every successful repair in
+     * a container.</p>
      */
-    /** Test seam for {@link #writeAtomically}. */
-    static void writeAtomicallyForTest(File target, String content, Charset charset)
+    /** Test seam for {@link #writeInPlace}. */
+    static void writeInPlaceForTest(File target, String content, Charset charset, File backup)
             throws IOException {
-        writeAtomically(target, content, charset,
+        writeInPlace(target, content, charset, backup,
                 new org.apache.maven.plugin.logging.SystemStreamLog());
     }
 
-    private static void writeAtomically(File target, String content, Charset charset,
-            org.apache.maven.plugin.logging.Log log) throws IOException {
-        // Follow a symlink to whatever it points at before replacing anything.
-        // Moving onto the link's own path replaces the directory entry, so a
-        // pom.xml symlinked into a shared location would quietly become an
-        // independent regular file and stop tracking the original -- something
-        // the developer would discover much later, from a change that did not
-        // propagate.
-        File real = target;
+    private static void writeInPlace(File target, String content, Charset charset,
+            File backup, org.apache.maven.plugin.logging.Log log) throws IOException {
         try {
-            real = target.toPath().toRealPath().toFile();
+            FileUtils.writeStringToFile(target, content, charset);
         } catch (IOException ex) {
-            log.debug("Could not resolve " + target + " to a real path: " + ex);
-        }
-        File tmp = File.createTempFile(real.getName(), ".tmp", real.getParentFile());
-        try {
-            FileUtils.writeStringToFile(tmp, content, charset);
-            // The move replaces the target's inode, so the pom would silently
-            // take on the temporary file's mode -- measured here as a
-            // group-writable pom coming back rw-r--r--, losing group write on a
-            // shared checkout. Carry the original permissions over first.
-            copyPosixPermissions(real, tmp, log);
             try {
-                java.nio.file.Files.move(tmp.toPath(), real.toPath(),
-                        java.nio.file.StandardCopyOption.ATOMIC_MOVE,
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            } catch (java.nio.file.AtomicMoveNotSupportedException ex) {
-                // Same directory, so this should not happen; honour the request
-                // rather than failing the repair over it.
-                java.nio.file.Files.move(tmp.toPath(), real.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                FileUtils.copyFile(backup, target);
+                log.warn("Writing " + target.getName() + " failed part way through; it has been "
+                        + "restored from " + backup.getName() + ".");
+            } catch (IOException restoreFailed) {
+                log.error(target + " is incomplete and could not be restored automatically. "
+                        + "Its previous contents are in " + backup.getName() + ".");
             }
-        } finally {
-            if (tmp.exists()) {
-                tmp.delete();
-            }
-        }
-    }
-
-    /**
-     * Gives {@code to} the POSIX permissions of {@code from}. A no-op where the
-     * filesystem has no POSIX view (Windows) or the bits cannot be read, since
-     * failing the repair over file modes would be a worse trade than the mode
-     * change it is avoiding.
-     */
-    private static void copyPosixPermissions(File from, File to,
-            org.apache.maven.plugin.logging.Log log) {
-        try {
-            java.nio.file.Files.setPosixFilePermissions(to.toPath(),
-                    java.nio.file.Files.getPosixFilePermissions(from.toPath()));
-        } catch (Exception ex) {
-            // Not POSIX (Windows), or the bits cannot be read. Say so rather
-            // than swallowing it: failing the repair over file modes would be a
-            // worse trade than the mode change, but a silent skip is how the
-            // next person concludes this code never runs.
-            log.debug("Could not carry " + from.getName() + "'s permissions over to "
-                    + to.getName() + ": " + ex);
+            throw ex;
         }
     }
 
