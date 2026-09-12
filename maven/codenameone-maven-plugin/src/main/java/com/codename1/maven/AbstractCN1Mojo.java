@@ -2033,14 +2033,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     /** A transcoder configured exactly as the bound goal would be. */
     protected SvgTranscodeRunner newSvgTranscodeRunner() {
-        return newSvgTranscodeRunner(false);
-    }
-
-    protected SvgTranscodeRunner newSvgTranscodeRunner(boolean lenient) {
         File placeholders = svgPlaceholderDir != null ? svgPlaceholderDir
                 : new File(project.getBuild().getDirectory(), "css-resources");
         return new SvgTranscodeRunner(project.getBasedir(), svgSourceDirs,
-                svgOutputDir(), placeholders, svgPackage(), getLog(), lenient);
+                svgOutputDir(), placeholders, svgPackage(), getLog());
     }
 
     // ------------------------------------------------------------------
@@ -2121,45 +2117,52 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             getLog().debug("Skipping the SVG transcoder repair: not an application module.");
             return;
         }
-        // Lenient, and wrapped: this repair runs on its own initiative in a
-        // build that was passing, so nothing it does may stop that build. A
-        // .lottie is a ZIP the JSON parser rejects, and any unrelated .json in
-        // one of the vector directories looks like a Lottie by extension alone
-        // -- either would otherwise abort generate-gui-sources in a project
-        // that had never asked for a transcoder at all.
-        SvgTranscodeRunner runner = newSvgTranscodeRunner(true);
+        // Screen first, then run the transcoder exactly as the bound goal
+        // will run it. The repair used to have its own tolerant mode, which
+        // meant the run that decided the pom was safe to edit was not the run
+        // the pom then installed -- a file could transcode here and fail
+        // forever afterwards. One behaviour, decided before anything happens:
+        // either every input is something the goal can be relied on to read,
+        // in which case transcode and record it, or none of this happens.
+        SvgTranscodeRunner runner = newSvgTranscodeRunner();
+        List<String> unreadable;
         try {
             if (!runner.hasVectorSources()) {
                 // Nothing to transcode. A project with no vector assets is not
                 // out of date in any way that matters, so leave its pom alone.
                 return;
             }
-            getLog().info("This project has SVG/Lottie assets but its pom does not run the "
-                    + "build-time vector transcoder. Transcoding them now.");
-            runner.run();
-            registerSourceRoot(svgOutputDir());
+            unreadable = runner.unreadableSources();
         } catch (Exception ex) {
-            getLog().warn("The build-time vector transcoder could not run over this project ("
-                    + ex + "). The project has been left exactly as it was.");
+            getLog().warn("Could not examine this project's vector sources (" + ex
+                    + "). The project has been left exactly as it was.");
+            return;
+        }
+        if (!unreadable.isEmpty()) {
+            // A .lottie is a ZIP the JSON parser cannot read, and an unrelated
+            // .json in a vector directory is claimed by extension alone. Running
+            // the goal over either aborts the build -- correct for a goal the
+            // developer bound, unacceptable for a repair that nobody asked for.
+            getLog().warn("Not running the build-time vector transcoder: these file(s) sit in "
+                    + "a vector source directory but are not animations the goal can read:");
+            for (String name : unreadable) {
+                getLog().warn("    " + name);
+            }
+            getLog().warn("Move them elsewhere and rebuild, or add the transcode-svg "
+                    + "execution yourself if they really are animations.");
             return;
         }
 
-        List<String> blockers = new ArrayList<String>(runner.getFailures());
-        blockers.addAll(runner.getNonVectorInputs());
-        if (!blockers.isEmpty()) {
-            // Binding the goal now would hand every later build a strict run
-            // over these files. The ones that already failed would fail again;
-            // the ones that merely look like animations because they are JSON
-            // would fail the first day someone edits them. Neither is a trade
-            // this repair gets to make on the developer's behalf, so report and
-            // leave the pom alone.
-            getLog().warn("Not adding the transcode-svg execution: the goal would be bound "
-                    + "to file(s) it cannot be relied on to read:");
-            for (String blocker : blockers) {
-                getLog().warn("    " + blocker);
-            }
-            getLog().warn("Move them out of the vector source directories, or add the "
-                    + "execution yourself if they really are animations.");
+        getLog().info("This project has SVG/Lottie assets but its pom does not run the "
+                + "build-time vector transcoder. Transcoding them now.");
+        try {
+            runner.run();
+            registerSourceRoot(svgOutputDir());
+        } catch (Exception ex) {
+            // Screened and still unhappy. Whatever it is, this build was
+            // passing before the repair touched it and must still pass.
+            getLog().warn("The build-time vector transcoder could not run over this project ("
+                    + ex + "). The project has been left exactly as it was.");
             return;
         }
         addTranscodeSvgExecutionToPom();
@@ -2232,10 +2235,14 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
         String pom = new String(pomBytes, charset);
-        if (pom.contains("transcode-svg")) {
-            // Already there in the file even though the resolved model did not
-            // report it (a profile that is not active, say). Adding a second
-            // copy would be worse than doing nothing.
+        if (pomDeclaresTranscodeSvg(pom)) {
+            // The file already declares it even though the resolved model did
+            // not report it -- an inactive profile is the usual reason. Adding
+            // a second copy would be worse than doing nothing. Asked of the
+            // parsed model rather than the raw text: a substring search also
+            // matched the goal named in a comment or in some unrelated value,
+            // and then silently refused to repair a project that had never
+            // declared it at all.
             return;
         }
         String updated = insertTranscodeSvgExecution(pom);
@@ -2287,22 +2294,34 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     private static void writeAtomically(File target, String content, Charset charset,
             org.apache.maven.plugin.logging.Log log) throws IOException {
-        File tmp = File.createTempFile(target.getName(), ".tmp", target.getParentFile());
+        // Follow a symlink to whatever it points at before replacing anything.
+        // Moving onto the link's own path replaces the directory entry, so a
+        // pom.xml symlinked into a shared location would quietly become an
+        // independent regular file and stop tracking the original -- something
+        // the developer would discover much later, from a change that did not
+        // propagate.
+        File real = target;
+        try {
+            real = target.toPath().toRealPath().toFile();
+        } catch (IOException ex) {
+            log.debug("Could not resolve " + target + " to a real path: " + ex);
+        }
+        File tmp = File.createTempFile(real.getName(), ".tmp", real.getParentFile());
         try {
             FileUtils.writeStringToFile(tmp, content, charset);
             // The move replaces the target's inode, so the pom would silently
             // take on the temporary file's mode -- measured here as a
             // group-writable pom coming back rw-r--r--, losing group write on a
             // shared checkout. Carry the original permissions over first.
-            copyPosixPermissions(target, tmp, log);
+            copyPosixPermissions(real, tmp, log);
             try {
-                java.nio.file.Files.move(tmp.toPath(), target.toPath(),
+                java.nio.file.Files.move(tmp.toPath(), real.toPath(),
                         java.nio.file.StandardCopyOption.ATOMIC_MOVE,
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             } catch (java.nio.file.AtomicMoveNotSupportedException ex) {
                 // Same directory, so this should not happen; honour the request
                 // rather than failing the repair over it.
-                java.nio.file.Files.move(tmp.toPath(), target.toPath(),
+                java.nio.file.Files.move(tmp.toPath(), real.toPath(),
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         } finally {
@@ -2383,6 +2402,49 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     private static final Pattern XML_DECL_ENCODING = Pattern.compile(
             "<\\?xml[^>]*?encoding\\s*=\\s*[\"']([^\"']+)[\"']");
+
+    /**
+     * Whether this pom declares the transcode-svg goal anywhere Maven would
+     * read it: the build, or any profile's build, active or not.
+     */
+    static boolean pomDeclaresTranscodeSvg(String pom) {
+        Model model;
+        try {
+            model = new MavenXpp3Reader().read(new StringReader(pom));
+        } catch (Exception ex) {
+            // Unparseable: insertTranscodeSvgExecution declines anyway, and the
+            // edited document is validated before it is written.
+            return false;
+        }
+        if (buildBindsTranscodeSvg(model.getBuild())) {
+            return true;
+        }
+        if (model.getProfiles() != null) {
+            for (org.apache.maven.model.Profile profile : model.getProfiles()) {
+                if (buildBindsTranscodeSvg(profile.getBuild())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean buildBindsTranscodeSvg(org.apache.maven.model.BuildBase build) {
+        if (build == null || build.getPlugins() == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin p : build.getPlugins()) {
+            if (!"codenameone-maven-plugin".equals(p.getArtifactId())) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution e : p.getExecutions()) {
+                if (e.getGoals() != null && e.getGoals().contains("transcode-svg")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     /**
      * The text edit itself, kept pure so it can be tested against real poms.
@@ -2504,20 +2566,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         } catch (Exception ex) {
             return false;
         }
-        if (model.getBuild() == null) {
-            return false;
-        }
-        for (org.apache.maven.model.Plugin p : model.getBuild().getPlugins()) {
-            if (!"codenameone-maven-plugin".equals(p.getArtifactId())) {
-                continue;
-            }
-            for (org.apache.maven.model.PluginExecution e : p.getExecutions()) {
-                if (e.getGoals() != null && e.getGoals().contains("transcode-svg")) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return buildBindsTranscodeSvg(model.getBuild());
     }
 
     private static String executionBlock(String indent, String eol) {

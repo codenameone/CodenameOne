@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -358,6 +359,72 @@ public class SvgExecutionPomInsertTest {
         assertEquals("<project2/>", readText(pom));
         assertEquals("rw-rw-r--", java.nio.file.attribute.PosixFilePermissions.toString(
                 java.nio.file.Files.getPosixFilePermissions(pom.toPath())));
+    }
+
+    /**
+     * The goal named inside a comment is not the goal being bound. A substring
+     * search over the raw text refused to repair a project that had never
+     * declared the execution at all.
+     */
+    @Test
+    public void aMentionInACommentIsNotADeclaration() {
+        String pom = "<project>\n"
+                + "    <modelVersion>4.0.0</modelVersion>\n"
+                + "    <build><plugins><plugin>\n"
+                + "        <groupId>com.codenameone</groupId>\n"
+                + "        <artifactId>codenameone-maven-plugin</artifactId>\n"
+                + "        <!-- TODO: we should probably add transcode-svg here one day -->\n"
+                + "    </plugin></plugins></build>\n"
+                + "</project>\n";
+        assertFalse("a comment does not bind a goal",
+                AbstractCN1Mojo.pomDeclaresTranscodeSvg(pom));
+    }
+
+    /** A real declaration is recognized, including one inside a profile. */
+    @Test
+    public void recognizesARealDeclarationAnywhereMavenWouldReadIt() {
+        String execution = "<executions><execution><id>transcode-svg</id>"
+                + "<goals><goal>transcode-svg</goal></goals></execution></executions>";
+        String inBuild = "<project><modelVersion>4.0.0</modelVersion><build><plugins><plugin>"
+                + "<groupId>com.codenameone</groupId>"
+                + "<artifactId>codenameone-maven-plugin</artifactId>"
+                + execution + "</plugin></plugins></build></project>";
+        assertTrue(AbstractCN1Mojo.pomDeclaresTranscodeSvg(inBuild));
+
+        String inProfile = "<project><modelVersion>4.0.0</modelVersion><profiles><profile>"
+                + "<id>p</id><build><plugins><plugin>"
+                + "<groupId>com.codenameone</groupId>"
+                + "<artifactId>codenameone-maven-plugin</artifactId>"
+                + execution + "</plugin></plugins></build></profile></profiles></project>";
+        assertTrue("an inactive profile still declares it",
+                AbstractCN1Mojo.pomDeclaresTranscodeSvg(inProfile));
+    }
+
+    /**
+     * A symlinked pom must keep being a symlink. Moving onto the link's own
+     * path replaces the directory entry, so a pom shared by symlink would
+     * quietly become an independent file and stop tracking the original.
+     */
+    @Test
+    public void keepsASymlinkedPomASymlink() throws Exception {
+        java.nio.file.FileSystem fs = java.nio.file.FileSystems.getDefault();
+        org.junit.Assume.assumeTrue("POSIX only",
+                fs.supportedFileAttributeViews().contains("posix"));
+
+        File shared = temp.newFolder();
+        File realPom = new File(shared, "shared-pom.xml");
+        writeText(realPom, "<project/>");
+
+        File projectDir = temp.newFolder();
+        File link = new File(projectDir, "pom.xml");
+        java.nio.file.Files.createSymbolicLink(link.toPath(), realPom.toPath());
+
+        AbstractCN1Mojo.writeAtomicallyForTest(link, "<project2/>", StandardCharsets.UTF_8);
+
+        assertTrue("pom.xml is still a symlink",
+                java.nio.file.Files.isSymbolicLink(link.toPath()));
+        assertEquals("the edit reached the file it points at",
+                "<project2/>", readText(realPom));
     }
 
     private static void writeText(File f, String text) throws Exception {

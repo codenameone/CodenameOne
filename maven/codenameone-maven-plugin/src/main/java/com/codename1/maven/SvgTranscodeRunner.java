@@ -128,11 +128,8 @@ public class SvgTranscodeRunner {
     private final File placeholderDir;
     private final String svgPackage;
     private final Log log;
-    private final boolean lenient;
 
     private int transcodedCount;
-    private final List<String> failures = new ArrayList<String>();
-    private final List<String> nonVectorInputs = new ArrayList<String>();
 
     /**
      * @param basedir        the module root the source directories are resolved against
@@ -147,20 +144,6 @@ public class SvgTranscodeRunner {
      */
     public SvgTranscodeRunner(File basedir, List<String> sourceDirs, File outputDir,
                               File placeholderDir, String svgPackage, Log log) {
-        this(basedir, sourceDirs, outputDir, placeholderDir, svgPackage, log, false);
-    }
-
-    /**
-     * @param lenient when true, a source that fails to transcode is reported
-     *   through {@link #getFailures()} and skipped instead of aborting. Only
-     *   the automatic repair sets this: a goal the developer bound themselves
-     *   should fail loudly, but a repair nobody asked for must never turn a
-     *   build that was passing into one that is not.
-     */
-    public SvgTranscodeRunner(File basedir, List<String> sourceDirs, File outputDir,
-                              File placeholderDir, String svgPackage, Log log,
-                              boolean lenient) {
-        this.lenient = lenient;
         this.basedir = basedir;
         this.sourceDirs = sourceDirs;
         this.outputDir = outputDir;
@@ -169,18 +152,25 @@ public class SvgTranscodeRunner {
         this.log = log;
     }
 
-    /** Names of {@code .json} / {@code .lottie} files a lenient run declined
-     *  to treat as animations at all. Always empty when lenient is off, which
-     *  leaves the bound goal's behaviour exactly as it was. */
-    public List<String> getNonVectorInputs() {
-        return nonVectorInputs;
-    }
-
-    /** Names of sources that could not be transcoded during a lenient
-     *  {@link #run()}. Always empty when lenient is off, because the run
-     *  would have thrown instead. */
-    public List<String> getFailures() {
-        return failures;
+    /**
+     * The vector sources in this module that the transcoder cannot be relied
+     * on to read: a {@code .lottie} archive, or a {@code .json} that is not a
+     * Lottie document.
+     *
+     * <p>Asked before anything is generated, so a caller that must not break a
+     * build can decide not to start. The transcoder itself has one behaviour
+     * and always had: it reports a source it cannot read and stops.</p>
+     */
+    public List<String> unreadableSources() {
+        List<String> unreadable = new ArrayList<String>();
+        for (File f : locateSvgs()) {
+            VectorFormat fmt = VectorFormat.fromFilename(f.getName());
+            if ((fmt == VectorFormat.LOTTIE_JSON || fmt == VectorFormat.LOTTIE_PACK)
+                    && !looksLikeLottie(f, fmt)) {
+                unreadable.add(f.getName());
+            }
+        }
+        return unreadable;
     }
 
     /** Number of vector sources transcoded by the last {@link #run()}. */
@@ -214,8 +204,6 @@ public class SvgTranscodeRunner {
     /** Transcode every vector source, emit the registry and the CSS placeholders. */
     public void run() throws MojoExecutionException {
         transcodedCount = 0;
-        failures.clear();
-        nonVectorInputs.clear();
         List<File> svgs = locateSvgs();
         Map<String, CssHint> cssHints = scanCssHints();
 
@@ -253,21 +241,6 @@ public class SvgTranscodeRunner {
                 // defensive guard for future format additions.
                 continue;
             }
-            if (lenient && (fmt == VectorFormat.LOTTIE_JSON || fmt == VectorFormat.LOTTIE_PACK)
-                    && !looksLikeLottie(svg, fmt)) {
-                // LottieParser accepts any JSON object -- it reads "layers" and
-                // returns an empty document when there is none -- so an
-                // unrelated .json under src/main/css transcodes "successfully"
-                // and would then be bound to the strict goal forever. The day
-                // someone edits it into an array, or saves it half-written,
-                // every build fails over a file that was never an animation.
-                // A .lottie is a ZIP this parser cannot read at all.
-                //
-                // Only the repair is this picky. A goal the developer bound
-                // keeps its existing behaviour.
-                nonVectorInputs.add(resourceName);
-                continue;
-            }
             String className = uniqueClassName(SVGTranscoder.classNameFor(resourceName), usedClassNames);
             usedClassNames.add(className);
             File outFile = new File(packageDir, className + ".java");
@@ -279,18 +252,7 @@ public class SvgTranscodeRunner {
                 try {
                     transcodeByFormat(fmt, svg, svgPackage, className, outFile);
                 } catch (Exception ex) {
-                    // A .lottie is a ZIP the JSON parser cannot read, and any
-                    // unrelated .json sitting in one of these directories looks
-                    // like a Lottie by extension alone. Both abort the goal --
-                    // correct when the developer bound it, unacceptable when
-                    // this is a repair running on its own initiative.
-                    if (!lenient) {
-                        throw new MojoExecutionException("Failed to transcode " + svg, ex);
-                    }
-                    log.warn("Could not transcode " + svg.getName() + ": " + ex);
-                    failures.add(svg.getName());
-                    outFile.delete();
-                    continue;
+                    throw new MojoExecutionException("Failed to transcode " + svg, ex);
                 }
             }
             transcodedCount++;
