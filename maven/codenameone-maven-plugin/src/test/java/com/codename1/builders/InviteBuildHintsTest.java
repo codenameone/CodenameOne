@@ -69,4 +69,27 @@ public class InviteBuildHintsTest {
         assertEquals("acme", InviteBuildHints.slug(request("invite.slug", " acme ")));
         assertEquals("", InviteBuildHints.slug(request("invite.slug", null)));
     }
+
+    @Test
+    public void aDomainWrittenAsAUrlIsReducedToItsHost() {
+        // "https://links.example.com" is the natural thing to write, and the
+        // runtime accepts it -- getLinkBase() adds the scheme only when it is
+        // missing, so links mint correctly and nothing looks wrong. The
+        // builders take the raw string: android:host gets the whole URL and
+        // iOS emits applinks:https://links.example.com, so the build succeeds
+        // and every invite opens outside the app.
+        assertEquals("links.example.com",
+                InviteBuildHints.domain(request("invite.domain", "https://links.example.com")));
+        assertEquals("links.example.com",
+                InviteBuildHints.domain(request("invite.domain", "https://links.example.com/")));
+        assertEquals("links.example.com",
+                InviteBuildHints.domain(request("invite.domain", "http://links.example.com/base")));
+        // A port belongs in the filter's own attribute and has no place in an
+        // associated domain.
+        assertEquals("links.example.com",
+                InviteBuildHints.domain(request("invite.domain", "links.example.com:8443")));
+        // And a plain host is untouched.
+        assertEquals("links.example.com",
+                InviteBuildHints.domain(request("invite.domain", "links.example.com")));
+    }
 }

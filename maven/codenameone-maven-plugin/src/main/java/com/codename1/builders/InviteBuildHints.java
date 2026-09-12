@@ -61,7 +61,49 @@ class InviteBuildHints {
         // A blank hint is not a host. Left as the empty string it produced an
         // intent filter with no host and an entitlement claiming nothing,
         // which is harder to spot than the default being used.
-        return trimmed.isEmpty() ? DEFAULT_DOMAIN : trimmed;
+        if (trimmed.isEmpty()) {
+            return DEFAULT_DOMAIN;
+        }
+        // Reduced to a bare HOST, because that is what every consumer needs
+        // and none of them checks.
+        //
+        // "https://links.example.com" is the natural thing to write here, and
+        // the runtime accepts it -- getLinkBase() adds the scheme only when it
+        // is missing, so links mint correctly and nothing looks wrong. The
+        // builders do not: the Android filter takes the raw string as
+        // android:host and iOS emits applinks:https://links.example.com.
+        // Neither matches the links being minted, so the build succeeds and
+        // every invite opens outside the app, which is this feature's
+        // signature failure.
+        return hostOf(trimmed);
+    }
+
+    /**
+     * The host part of a hint that may have been written as a URL.
+     *
+     * <p>Strips a scheme, any path, query or fragment, and any port -- an
+     * intent filter names the port separately and an associated domain has no
+     * place for one. A value that reduces to nothing is left alone rather than
+     * silently replaced: the builders report an unusable host far better than
+     * a default nobody asked for.</p>
+     *
+     * @param value the trimmed hint
+     * @return the host it names
+     */
+    private static String hostOf(String value) {
+        String host = value;
+        int scheme = host.indexOf("://");
+        if (scheme >= 0) {
+            host = host.substring(scheme + 3);
+        }
+        for (int i = 0; i < host.length(); i++) {
+            char c = host.charAt(i);
+            if (c == '/' || c == '?' || c == '#' || c == ':') {
+                host = host.substring(0, i);
+                break;
+            }
+        }
+        return host.isEmpty() ? value : host;
     }
 
     /**
