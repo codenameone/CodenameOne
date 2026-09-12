@@ -210,6 +210,15 @@ def clang_for_sdk(sdk_path, dev_dirs):
     """
     resolved = os.path.realpath(sdk_path)
     owners = [d for d in dev_dirs if resolved.startswith(os.path.realpath(d) + os.sep)]
+    # An SDK lives at <developer dir>/Platforms/X.platform/Developer/SDKs/Y.sdk, so the path
+    # names its own Xcode. Needed because dev_dirs only knows about $DEVELOPER_DIR and
+    # /Applications: an --old-sdk or --new-sdk pointing at a beta mounted elsewhere, or an
+    # Xcode in /opt, left owners empty and fell through to whichever compiler /Applications
+    # happened to offer -- reintroducing the compiler/SDK mismatch this function exists to
+    # prevent, and silently.
+    marker = os.sep + "Platforms" + os.sep
+    if marker in resolved:
+        owners.insert(0, resolved[:resolved.index(marker)])
     for dev in owners + list(dev_dirs):
         cand = os.path.join(dev, "Toolchains", "XcodeDefault.xctoolchain", "usr", "bin", "clang")
         if os.path.isfile(cand):

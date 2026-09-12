@@ -227,6 +227,25 @@ class ExtensionDeploymentFloorScriptTest {
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)", got.get(0));
     }
 
+    /// Xcode accepts modifiers on a reference, and missing that spelling is worse than
+    /// missing the reference entirely: the expression survives unresolved, fails to parse as
+    /// a version, and is clamped to the floor -- LOWERING an extension that asked for 16.4 to
+    /// 15.0 and letting it run on an OS its code does not support.
+    @Test
+    void resolvesModifiersRatherThanLoweringTheExtension(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Higher|" + EXT + "|EXTENSION_MIN->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN:lower)",
+                "Lower|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN:lower)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN:lower)", got.get(0),
+                "16.4 through a modifier still clears the floor and must not be lowered");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1),
+                "12.0 through a modifier is still below the floor");
+    }
+
     /// Xcode expands a reference nothing defines to the empty string, so the extension would
     /// declare no minimum at all. The floor is the answer there, not the expression.
     @Test

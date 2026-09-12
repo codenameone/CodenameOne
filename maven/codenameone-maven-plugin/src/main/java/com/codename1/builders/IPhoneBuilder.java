@@ -10075,7 +10075,13 @@ public class IPhoneBuilder extends Executor {
                 + "    out = value.to_s\n"
                 + "    8.times do\n"
                 + "      break unless out.include?('$')\n"
-                + "      out = out.gsub(/\\$[({]([A-Za-z0-9_]+)[)}]/) do\n"
+                // Modifiers included, the same shape as BUILD_SETTING_REFERENCE above.
+                // Without them $(EXTENSION_MIN:lower) matched nothing, survived as an
+                // unresolvable expression, failed Gem::Version and was clamped to the floor
+                // -- LOWERING an extension that asked for 16.4 to 15.0 and letting it run on
+                // an OS its code does not support. This tree has already been caught by the
+                // modifier spelling once; the note on BUILD_SETTING_REFERENCE says so.
+                + "      out = out.gsub(/\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/) do\n"
                 + "        name = $1\n"
                 + "        if name == 'inherited'\n"
                 + "          proj['IPHONEOS_DEPLOYMENT_TARGET'].to_s\n"
