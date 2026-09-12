@@ -532,6 +532,25 @@ class ExtensionDeploymentFloorScriptTest {
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "control: the pass ran");
     }
 
+    /// SDKROOT can be written qualified. Reading only the unqualified key saw nothing,
+    /// called the platform unknown, and wrote an iOS floor onto a watch extension -- the same
+    /// stray setting the platform guard exists to stop, reached through a qualifier.
+    @Test
+    void readsEverySdkrootDeclarationNotJustTheUnqualifiedOne(@TempDir Path dir)
+            throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "WatchQualified|" + EXT + "|SDKROOT[arch=arm64_32]->watchos;"
+                        + "WATCHOS_DEPLOYMENT_TARGET->10.0",
+                "PhoneQualified|" + EXT + "|SDKROOT[sdk=iphoneos*]->iphoneos;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->12.0");
+        assertEquals("nil", got.get(0),
+                "a watch extension declaring SDKROOT only through a qualifier is still a "
+                        + "watch extension");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1),
+                "and an iOS one declared the same way is still raised");
+    }
+
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before
     /// any of this existed: nothing emitted, nothing changed.
     @Test
