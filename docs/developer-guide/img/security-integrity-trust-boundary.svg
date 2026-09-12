@@ -9,8 +9,8 @@
   <rect x="16" y="96" width="490" height="88" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="28" y="116" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a56a3a">Launch-time build hints</text>
   <text x="28" y="132" font-family="Arial, sans-serif" font-size="9" fill="#777777">android.rootCheck / android.fridaDetection / ios.detectJailbreak</text>
-  <text x="28" y="152" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Exits the app before it starts. Zero code, and zero signal to you: the app is simply gone,</text>
-  <text x="28" y="167" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">so nothing is logged and there is no degraded mode to fall back to.</text>
+  <text x="28" y="152" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Exits the app before it starts. Zero code, and no callback the app can act on, so there is no</text>
+  <text x="28" y="167" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">degraded mode -- though the guard does log the signals it fired on, and exits non-zero.</text>
   <path d="M 506 140 L 524 140" fill="none" stroke="#c8a0a0" stroke-width="1.5" stroke-dasharray="4 3"/>
   <path d="M 518 134 L 530 146 M 518 146 L 530 134" stroke="#a33a3a" stroke-width="1.5" fill="none"/>
   <rect x="16" y="196" width="490" height="88" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
