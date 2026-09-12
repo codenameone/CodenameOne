@@ -716,22 +716,33 @@ static int cn1H2OnlyExpects100Continue(const char* value) {
  * Returns 1 when the stream has been answered and freed, 0 when it continues.
  */
 static int cn1H2ResolveExpect(CN1H2Session* s, CN1H2Request* r, int bodyToCome) {
-    const char* value = NULL;
+    int found = 0;
+    int satisfiable = 1;
     int iter;
+    /* EVERY occurrence, not the first. A list field may be split across field
+       lines -- "expect: 100-continue" then "expect: custom-extension" is the same
+       field value as the comma form, and RFC 9110 5.3 says a recipient combines
+       them -- so stopping at the first one answered 100 to a client that had also
+       asked for something nobody can satisfy. The HTTP/1.1 path never had this
+       hole: getHeader joins repeated fields with ", " before the same rule reads
+       them, which is why only this loop needed the correction. */
     for(iter = 0 ; iter < r->headerCount ; iter++) {
         /* Lower case by the protocol: RFC 9113 requires it of a field name and
            nghttp2 has already refused anything else, which is how the
            pseudo-headers above are matched too. */
-        if(r->headers[iter].name != NULL
-                && strcmp(r->headers[iter].name, "expect") == 0) {
-            value = r->headers[iter].value;
-            break;
+        if(r->headers[iter].name == NULL
+                || strcmp(r->headers[iter].name, "expect") != 0) {
+            continue;
+        }
+        found = 1;
+        if(cn1H2OnlyExpects100Continue(r->headers[iter].value) == 0) {
+            satisfiable = 0;
         }
     }
-    if(value == NULL) {
+    if(found == 0) {
         return 0;
     }
-    if(cn1H2OnlyExpects100Continue(value) == 0) {
+    if(satisfiable == 0) {
         /* 417, now. Per-stream rather than closing the connection, which is the
            h2 answer to one bad request -- the status is what has to agree with
            the HTTP/1.1 path, not the framing. */
