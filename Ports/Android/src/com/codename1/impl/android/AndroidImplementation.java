@@ -10090,21 +10090,39 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 // life of the button because the outcome it waits for could
                 // not arrive.
                 //
-                // sharedTo(null) is the honest answer rather than a guess: the
-                // plain chooser does not report which target was picked, and
-                // this is the same synthesis the failure path below already
-                // makes for the same reason.
+                // FAILED, not sharedTo(null), and the difference is the whole
+                // point of the listener.
+                //
+                // This runs BEFORE startActivity, and nothing afterwards can
+                // report the outcome: EXTRA_CHOSEN_COMPONENT arrives with API
+                // 22, and a chooser started for a result answers RESULT_CANCELED
+                // whether or not a target was picked. So a sharedTo here is a
+                // guess, and it is a guess in the direction that costs money --
+                // reportShareResult() emits invite_shared on it, and an
+                // application's reward logic sees a successful share for a
+                // sheet the user swiped away.
+                //
+                // FAILED carries the one thing that is actually known: the
+                // outcome was not observed. reportShareResult() emits nothing
+                // for it, so the funnel stays a measurement, and the callback
+                // still completes -- which is what the unfulfilled listener bug
+                // this branch was added for was about.
                 chooser = Intent.createChooser(shareIntent, "Share with...");
                 if (listener != null) {
-                    listener.onResult(com.codename1.share.ShareResult.sharedTo(null));
+                    listener.onResult(com.codename1.share.ShareResult.failed(
+                            "this Android version does not report the chosen share target"));
                 }
             }
         } catch (Throwable t) {
-            // Fall back to the plain chooser, then synthesize a listener
-            // result so the app doesn't hang on an unfulfilled callback.
+            // Fall back to the plain chooser, then complete the listener so
+            // the app doesn't hang on an unfulfilled callback -- as FAILED,
+            // for the reason the branch above gives: the outcome of a plain
+            // chooser cannot be observed, and reporting a share that was not
+            // measured is the one direction that costs an application money.
             chooser = Intent.createChooser(shareIntent, "Share with...");
             if (listener != null) {
-                listener.onResult(com.codename1.share.ShareResult.sharedTo(null));
+                listener.onResult(com.codename1.share.ShareResult.failed(
+                        "the share target could not be observed: " + t));
             }
         }
         getContext().startActivity(chooser);

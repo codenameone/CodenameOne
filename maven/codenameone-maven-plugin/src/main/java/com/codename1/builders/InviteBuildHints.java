@@ -109,11 +109,58 @@ class InviteBuildHints {
     /**
      * The per-application path segment invite links carry.
      *
+     * <p>Validated rather than passed through, because the slug is
+     * concatenated straight into {@code /i/<slug>/<code>} by three separate
+     * consumers -- the Android App Links filter, the iOS associated domain and
+     * the link the device builds. A reserved delimiter is not merely unsafe
+     * there, it is unreachable: {@code acme?preview} makes the code parse as
+     * query text, while the intent filter waits for the literal path
+     * {@code /i/acme?preview/}, so the link neither opens the application nor
+     * survives extractCode().</p>
+     *
+     * <p>The alphabet is the service's own. It allocates a slug from the
+     * package name through lowercase letters, digits and {@code -}, and stores
+     * it in a 32 character column -- so a hint outside that set cannot name a
+     * slug the service would ever issue, whatever the url does with it. The
+     * build is refused rather than warned: nothing has shipped with this hint,
+     * and the alternative is a link that looks right in the manifest and can
+     * never work in the field.</p>
+     *
      * @param request the build request
      * @return the trimmed hint, or the empty string when it is absent
+     * @throws IllegalArgumentException when the hint is not a usable slug
      */
     static String slug(BuildRequest request) {
         String value = request.getArg("invite.slug", "");
-        return value == null ? "" : value.trim();
+        String slug = value == null ? "" : value.trim();
+        if (!slug.isEmpty() && !isValidSlug(slug)) {
+            throw new IllegalArgumentException("invite.slug=\"" + slug + "\" is not a usable "
+                    + "invite slug. It becomes one path segment of /i/<slug>/<code>, and the "
+                    + "link service allocates slugs from lowercase letters, digits and '-', up "
+                    + "to 32 characters. Remove the hint to let the service choose one.");
+        }
+        return slug;
     }
+
+    /**
+     * Whether this is a slug the link service could have issued.
+     *
+     * @param slug the candidate, never null
+     * @return true when it is one usable path segment
+     */
+    static boolean isValidSlug(String slug) {
+        if (slug.isEmpty() || slug.length() > MAX_SLUG) {
+            return false;
+        }
+        for (int i = 0; i < slug.length(); i++) {
+            char c = slug.charAt(i);
+            if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The service stores the slug in a 32 character column. */
+    private static final int MAX_SLUG = 32;
 }

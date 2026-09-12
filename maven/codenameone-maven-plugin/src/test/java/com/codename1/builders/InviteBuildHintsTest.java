@@ -25,6 +25,8 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The two invite hints are copied into artefacts that must agree byte for
@@ -68,6 +70,32 @@ public class InviteBuildHintsTest {
     void aSlugWithStraySpaceIsNormalised() {
         assertEquals("acme", InviteBuildHints.slug(request("invite.slug", " acme ")));
         assertEquals("", InviteBuildHints.slug(request("invite.slug", null)));
+    }
+
+    @Test
+    void aSlugCarryingAUrlDelimiterIsRefused() {
+        // The slug becomes one path segment of /i/<slug>/<code> in three
+        // independent consumers -- the Android App Links filter, the iOS
+        // associated domain, and the link the device builds. A reserved
+        // delimiter is not merely unsafe there, it is unreachable:
+        // "acme?preview" makes the code parse as query text while the intent
+        // filter waits for the literal path /i/acme?preview/, so the link
+        // neither opens the application nor survives extractCode(). Passing it
+        // through produced a build that looks right in the manifest and a link
+        // that can never work in the field.
+        for (String bad : new String[] {"acme?preview", "acme#frag", "acme/beta",
+                "ACME", "acme beta", "acme.beta", ""}) {
+            if (bad.isEmpty()) {
+                // Absent is not invalid: the service allocates one.
+                assertEquals("", InviteBuildHints.slug(request("invite.slug", bad)));
+                continue;
+            }
+            assertThrows(IllegalArgumentException.class,
+                    () -> InviteBuildHints.slug(request("invite.slug", bad)),
+                    "invite.slug=\"" + bad + "\" built a link that cannot resolve");
+        }
+        assertTrue(InviteBuildHints.isValidSlug("acme-2"),
+                "the rule rejected a slug the service itself allocates");
     }
 
     @Test
