@@ -621,6 +621,54 @@ class ExtensionDeploymentFloorScriptTest {
                 "a target naming no platform still takes the project's, and is raised");
     }
 
+    /// A mixed conditional is not wholly a guess. When the base key resolves through a
+    /// helper whose branches disagree, the LOW branch is decided even though the whole
+    /// expression is not -- and skipping all of them left the device archive at 12.0 for
+    /// Xcode 27 to reject. The floor is pinned for exactly the branch proven below it.
+    @Test
+    void pinsTheFloorForBranchesProvenBelowIt(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "Mixed|" + EXT + "|SDKROOT->iphoneos;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN),"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
+                got.get(0),
+                "the device branch is pinned; the base expression still serves the simulator "
+                        + "branch, which resolves to 16.0");
+    }
+
+    /// ...and no key is invented when every branch already clears the floor.
+    @Test
+    void pinsNothingWhenEveryBranchClearsTheFloor(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "AllHigh|" + EXT + "|SDKROOT->iphoneos;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->16.4;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)", got.get(0),
+                "nothing is below the floor, so nothing is written");
+    }
+
+    /// An author's own qualified value is never overwritten by the pin.
+    @Test
+    void doesNotOverwriteAnExistingBranch(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "HasBranch|" + EXT + "|SDKROOT->iphoneos;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN);"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->16.4");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN),"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=16.4",
+                got.get(0),
+                "the author already decided that branch, and 16.4 clears the floor");
+    }
+
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before
     /// any of this existed: nothing emitted, nothing changed.
     @Test
