@@ -45,6 +45,7 @@ import com.codename1.backend.StaticFiles;
 import com.codename1.backend.Tcp;
 import com.codename1.backend.Web;
 import com.codename1.backend.aws.Credentials;
+import com.codename1.backend.FileCountProbe;
 import com.codename1.backend.aws.ExpiryProbe;
 import com.codename1.backend.aws.S3;
 
@@ -979,6 +980,30 @@ public class SelfTest {
                 + "\"SessionToken\":\"t\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
         check("SessionToken is accepted as the token", "accepted",
                 ExpiryProbe.rejects(sessionSpelling));
+        // THE KEY PAIR BY THE SAME RULE as the token beside it, which is where
+        // this started: the pair was checked for null only, so a response naming
+        // an empty key or secret was accepted and cached until the refresh margin
+        // while every signed request came back rejected. Whitespace signs no
+        // better than nothing.
+        String emptyId = "{\"AccessKeyId\":\"\",\"SecretAccessKey\":\"s\","
+                + "\"Token\":\"t\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("an empty access key is refused", "refused",
+                ExpiryProbe.rejects(emptyId));
+        String emptySecret = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"\","
+                + "\"Token\":\"t\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("an empty secret is refused", "refused",
+                ExpiryProbe.rejects(emptySecret));
+        String blankSecret = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"   \","
+                + "\"Token\":\"t\",\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("a whitespace secret is refused", "refused",
+                ExpiryProbe.rejects(blankSecret));
+        // An empty Token now falls through to SessionToken instead of being read
+        // as a token that is present but unusable.
+        String emptyThenSession = "{\"AccessKeyId\":\"AKIA\",\"SecretAccessKey\":\"s\","
+                + "\"Token\":\"\",\"SessionToken\":\"t\","
+                + "\"Expiration\":\"2026-08-28T13:45:00Z\"}";
+        check("an empty Token falls back to SessionToken", "accepted",
+                ExpiryProbe.rejects(emptyThenSession));
     }
 
     private static void expiryMarginIsDistinctFromExpiry() throws Exception {
@@ -1342,6 +1367,96 @@ public class SelfTest {
      * whatever each call reports, so an implementation that miscounts shows up as
      * a short or repeated body rather than as an error.
      */
+    /**
+     * A file-backed response whose HEAD never reaches the client still closes its
+     * descriptor.
+     *
+     * <p>The close used to sit beside the send, inside the branch that streams the
+     * file, so anything that threw before that branch was reached left the
+     * descriptor open and counted for the life of the process. The head write is
+     * exactly such a thing, and aborted static requests are free to send.
+     *
+     * <p>Provoked rather than waited for: the response carries enough application
+     * headers that its head cannot fit in any socket buffer, and the client closes
+     * without reading a byte. The peer then resets the connection while the server
+     * is still writing the head, which is the case being tested -- and the
+     * descriptor is asserted to have been handed over in the first place, so the
+     * check cannot pass by quietly getting a response with no file behind it.
+     */
+    private static void aFileBackedResponseClosesItsDescriptorWhenTheHeadFails()
+            throws Exception {
+        String dir = "/tmp/cn1-selftest-headfail-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        String name = "payload.bin";
+        StringBuilder content = new StringBuilder();
+        for(int iter = 0 ; iter < 300 * 1024 ; iter++) {
+            content.append((char)('a' + (iter % 26)));
+        }
+        java.io.FileOutputStream out = new java.io.FileOutputStream(dir + "/" + name);
+        try {
+            out.write(content.toString().getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        StringBuilder padding = new StringBuilder();
+        for(int iter = 0 ; iter < 2048 ; iter++) {
+            padding.append('p');
+        }
+        final String pad = padding.toString();
+        final StaticFiles files = new StaticFiles(dir, "/static", null, null);
+        final int[] handedOver = new int[] { -1 };
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = files.handle(request);
+                if(served == null) {
+                    return HttpServer.Response.text(404, "no");
+                }
+                handedOver[0] = FileCountProbe.fdOf(served);
+                if(handedOver[0] < 0) {
+                    return served;
+                }
+                // A head no socket buffer can take, so the write cannot finish
+                // before the reset arrives.
+                Map big = new LinkedHashMap();
+                for(int iter = 0 ; iter < 4000 ; iter++) {
+                    big.put("X-Pad-" + iter, pad);
+                }
+                return HttpServer.Response.file(200, "application/octet-stream",
+                        handedOver[0], 0, FileCountProbe.lengthOf(served), big);
+            }
+        });
+        String outcome;
+        try {
+            Tcp conn = Tcp.connect("127.0.0.1", server.getPort(), 15000);
+            byte[] request = ("GET /static/" + name + " HTTP/1.1\r\nHost: x\r\n"
+                    + "Connection: close\r\n\r\n").getBytes("UTF-8");
+            conn.write(request, 0, request.length);
+            // CLOSED AFTER A PAUSE, not immediately. Closing on the heels of the
+            // write raced the server's read of it, and the request was dropped
+            // before the handler ever saw it -- which the descriptor check below
+            // reported rather than passing. By now the server is blocked writing a
+            // head no buffer can take, so the close arrives in the middle of the
+            // write, and the client's unread receive buffer is what makes the
+            // close a reset rather than a polite half-close.
+            Thread.sleep(100);
+            conn.close();
+            // The write fails on the server's own thread, so the descriptor comes
+            // back a moment after the close rather than during it.
+            long deadline = System.currentTimeMillis() + 10000;
+            while(FileCountProbe.openFiles() > 0 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(20);
+            }
+            outcome = handedOver[0] < 0 ? "no file was served"
+                    : String.valueOf(FileCountProbe.openFiles());
+        } finally {
+            server.stop(2000);
+            new java.io.File(dir + "/" + name).delete();
+            new java.io.File(dir).delete();
+        }
+        check("a file-backed response closes its descriptor when the head fails",
+                "0", outcome);
+    }
+
     private static void aStaticFileComesBackWhole() throws Exception {
         String dir = "/tmp/cn1-selftest-static-" + System.currentTimeMillis();
         new java.io.File(dir).mkdirs();
@@ -1986,6 +2101,7 @@ public class SelfTest {
         aShortAuthFrameIsRefused();
         aTruncatedMySqlBodyIsRefused();
         aStaticFileComesBackWhole();
+        aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
         anImpossibleExpiryIsRefused();

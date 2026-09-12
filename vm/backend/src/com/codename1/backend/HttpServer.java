@@ -5573,7 +5573,37 @@ public final class HttpServer {
         }
     }
 
+    /**
+     * Writes the response, and closes a file-backed one's descriptor however it
+     * goes.
+     *
+     * <p>THE SERVER OWNS THE DESCRIPTOR once a handler hands it over, and on this
+     * path nothing else closes it: the caller traces the failure, drops the
+     * socket and returns without looking at the response. So the close cannot sit
+     * beside the send, which is where it was. A client that resets the connection
+     * before the response head is written makes the HEAD write throw -- before
+     * the file branch is ever reached -- and the descriptor stayed open, counted
+     * against OPEN_FILES for the life of the process. Aborted static requests are
+     * free to send, so a client could repeat that until the process ran out of
+     * descriptors.
+     *
+     * <p>At this scope rather than around the writes, because the head write is
+     * not the only thing above the file branch that can throw: serialising a
+     * deferred JSON body and the two early returns that write a small body in one
+     * syscall are all in front of it.
+     */
     private void writeResponse(Conn conn, int fd, long session, Response response,
+            boolean keepAlive, boolean headOnly) throws IOException {
+        try {
+            writeHeadAndBody(conn, fd, session, response, keepAlive, headOnly);
+        } finally {
+            if(response.fileFd >= 0) {
+                StaticFiles.closeFile(response.fileFd);
+            }
+        }
+    }
+
+    private void writeHeadAndBody(Conn conn, int fd, long session, Response response,
             boolean keepAlive, boolean headOnly) throws IOException {
         // A deferred JSON body is serialised FIRST: Content-Length has to be
         // written before it, and the only honest way to know it is to have the
@@ -5739,15 +5769,11 @@ public final class HttpServer {
         writeTo(fd, session, conn.out, 0, conn.outLength);
 
         if(response.fileFd >= 0) {
-            try {
-                if(!noBody) {
-                    StaticFiles.sendBody(fd, session, response.fileFd, response.fileOffset, response.fileLength);
-                }
-            } finally {
-                // The server owns the descriptor once a handler hands it over, so
-                // this is the only place it is closed -- including when the send
-                // failed halfway.
-                StaticFiles.closeFile(response.fileFd);
+            // Closed by writeResponse, whatever happens here -- including a send
+            // that fails halfway, and including the writes above that never reach
+            // this branch at all.
+            if(!noBody) {
+                StaticFiles.sendBody(fd, session, response.fileFd, response.fileOffset, response.fileLength);
             }
             return;
         }
