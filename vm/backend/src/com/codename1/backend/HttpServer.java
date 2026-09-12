@@ -440,6 +440,22 @@ public final class HttpServer {
             reset(conn, method, target, version, raw, slices, headerCount, body, 0, 0);
         }
 
+        /**
+         * Drops what this request pointed at, once it has been answered.
+         *
+         * This object is pooled per connection and re-pointed by reset() for the
+         * next request, so between the two it goes on referencing the LAST one:
+         * the buffer the headers were sliced from, and the decoded body, which for
+         * an upload is the whole of it. Every field cleared here is assigned again
+         * by reset() before anything reads it.
+         */
+        void releaseRetained() {
+            this.raw = null;
+            this.slices = null;
+            this.body = null;
+            this.headers = null;
+        }
+
         void reset(Conn conn, String method, String target, String version, byte[] raw,
                    int[] slices, int headerCount, String body,
                    int targetStart, int targetLength) {
@@ -3188,6 +3204,44 @@ public final class HttpServer {
             borrowed = false;
         }
 
+        /**
+         * Lets go of an oversized buffer this connection OWNS, and of the request
+         * that pointed into it, before it waits for the next one.
+         *
+         * releaseBorrowed below deals with the THREAD's buffer. This is the other
+         * half, and the one an upload reaches: a body bigger than what is already
+         * buffered grows a private array to fit, and the connection then keeps it.
+         *
+         * CN1_HTTP_MAX_UPLOAD_MB bounds what is IN FLIGHT, and the charge is
+         * dropped when the read completes -- correct, because by then it is this
+         * connection's memory rather than an upload still arriving, but it does
+         * mean the bound stops describing it. A kept-alive connection holds the
+         * whole body while it waits, and under virtual threads it waits for as long
+         * as the client cares to take, so connections that have each uploaded once
+         * and gone quiet hold far more than the in-flight bound ever allowed and
+         * nothing counts it.
+         *
+         * Holding the CHARGE across the wait instead would let idle connections
+         * refuse other people's uploads, which trades a memory problem for a
+         * liveness one. The memory is not needed: the response has been written,
+         * so nothing points into the buffer any more -- the same fact that lets
+         * parsedFromBuffer be cleared at the wait -- and fill() borrows the
+         * thread's buffer for the next request. This is the state a connection
+         * starts in.
+         *
+         * Nothing is dropped while bytes are still unread: a pipelined request
+         * sitting in this buffer is the next request, not residue.
+         */
+        void releaseIdleMemory() {
+            if(!borrowed && buffer.length > 0 && available() == 0) {
+                buffer = EMPTY_BODY;
+                pos = 0;
+            }
+            if(pooledRequest != null) {
+                pooledRequest.releaseRetained();
+            }
+        }
+
         void releaseBorrowed() {
             if(!borrowed) {
                 return;
@@ -3459,6 +3513,10 @@ public final class HttpServer {
             int linger = virtualThreads ? -1 : KEEPALIVE_LINGER_MILLIS;
             if(virtualThreads || linger > 0) {
                 boolean more;
+                // BEFORE THE WAIT, not after it. Under virtual threads this parks
+                // until the client sends something, which may be never, and an
+                // upload's buffer would sit here for all of it.
+                conn.releaseIdleMemory();
                 try {
                     // A readiness wait rather than a timed read: it is one syscall
                     // and it leaves the receive deadline alone, so the request this
@@ -3509,6 +3567,9 @@ public final class HttpServer {
         // bytes. Must come before reactor.add, not after -- the moment the fd is
         // registered, another worker can pick it up.
         conn.releaseBorrowed();
+        // The same reason, for the other way a connection goes quiet: handed back
+        // to the poller, it waits there with everything it was holding.
+        conn.releaseIdleMemory();
         try {
             // Back to the poller for the next request on this connection. Both
             // epoll_ctl and kevent are safe to call from this thread.
