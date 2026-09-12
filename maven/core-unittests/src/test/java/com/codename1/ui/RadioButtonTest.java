@@ -198,16 +198,19 @@ class RadioButtonTest extends UITestBase {
         // UIID back but leaves $origUIID set. Reading that marker as ownership
         // therefore kept reporting "the group has it" long after the group had
         // given it back, and the restore was skipped.
+        // Vertical on purpose: a horizontal group is a segmented control and stays
+        // active on its own, so forcing cannot be switched off underneath it. What this
+        // test is about -- the ownership marker outliving the restore -- is the same
+        // either way.
         ComponentGroup group = new ComponentGroup();
         group.setForceGroup(true);
-        group.setHorizontal(true);
         RadioButton radio = new RadioButton("Choice");
         RadioButton other = new RadioButton("Other");
         radio.setToggle(true);
         other.setToggle(true);
         group.addComponent(radio);
         group.addComponent(other);
-        assertEquals("ToggleButtonFirst", radio.getUIID());
+        assertEquals("GroupElementFirst", radio.getUIID());
 
         group.setForceGroup(false);
         group.refreshTheme(false);

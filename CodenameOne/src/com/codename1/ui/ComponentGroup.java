@@ -117,17 +117,10 @@ public class ComponentGroup extends Container {
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        boolean ignoreGroup = getUIManager().isThemeConstant(groupFlag, false);
-        if (ignoreGroup || forceGroup) {
+        if (isGroupingActive()) {
             updateUIIDs();
         } else {
-            if (uiidsDirty) {
-                uiidsDirty = false;
-                int count = getComponentCount();
-                for (int iter = 0; iter < count; iter++) {
-                    restoreUIID(getComponentAt(iter));
-                }
-            }
+            restoreAllUIIDs();
         }
     }
 
@@ -152,7 +145,7 @@ public class ComponentGroup extends Container {
     }
 
     private void updateUIIDs() {
-        if (!(getUIManager().isThemeConstant(groupFlag, false) || forceGroup)) {
+        if (!isGroupingActive()) {
             return;
         }
         int count = getComponentCount();
@@ -193,7 +186,43 @@ public class ComponentGroup extends Container {
     ///
     /// true when this group assigns its members' UIIDs
     boolean isGroupingActive() {
-        return getUIManager().isThemeConstant(groupFlag, false) || forceGroup;
+        return getUIManager().isThemeConstant(groupFlag, false) || forceGroup || isSegmented();
+    }
+
+    /// True when this group is a segmented control: horizontal, and still using the
+    /// ToggleButton UIIDs that setHorizontal installs. Such a group renames its members
+    /// whether or not the theme sets the group flag.
+    ///
+    /// The flag exists so a theme that doesn't want the grouped-row look isn't forced
+    /// into it, and it still governs the vertical GroupElement path. It cannot govern
+    /// this one: neither modern native theme sets the flag, both style
+    /// ToggleButton/First/Last/Only in full, and a segmented control is the only use of
+    /// ComponentGroup those themes have any styling for -- so honouring the flag here
+    /// means setHorizontal(true) silently does nothing on the themes every new app uses.
+    ///
+    /// Renaming to ToggleButton without asking the theme first is what Button.setToggle
+    /// already does, ungated, so an app that uses toggle buttons at all already depends
+    /// on that UIID resolving.
+    ///
+    /// #### Returns
+    ///
+    /// true when this group is a horizontal ToggleButton segmented control
+    private boolean isSegmented() {
+        return isHorizontal() && "ToggleButton".equals(elementUIID);
+    }
+
+    /// Puts every member back to the UIID it had before this group renamed it, if this
+    /// group ever did. updateUIIDs only renames, so every path that can deactivate a
+    /// group needs this as its other half.
+    private void restoreAllUIIDs() {
+        if (!uiidsDirty) {
+            return;
+        }
+        uiidsDirty = false;
+        int count = getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            restoreUIID(getComponentAt(iter));
+        }
     }
 
     private void restoreUIID(Component c) {
@@ -236,7 +265,14 @@ public class ComponentGroup extends Container {
                 if ("ToggleButton".equals(elementUIID)) {
                     elementUIID = "GroupElement";
                     buttonUIID = "ButtonGroup";
-                    updateUIIDs();
+                    // Leaving the segmented state can deactivate the group, and updateUIIDs
+                    // only ever renames -- it has no path back. Restore here, or the members
+                    // keep the ToggleButton names a vertical group no longer justifies.
+                    if (isGroupingActive()) {
+                        updateUIIDs();
+                    } else {
+                        restoreAllUIIDs();
+                    }
                 }
             }
         }
@@ -356,6 +392,17 @@ public class ComponentGroup extends Container {
     ///
     /// - `forceGroup`: the forceGroup to set
     public void setForceGroup(boolean forceGroup) {
+        if (this.forceGroup == forceGroup) {
+            return;
+        }
         this.forceGroup = forceGroup;
+        // Assigning the field was the whole method, so the setter only ever took effect
+        // if something else happened to call updateUIIDs afterwards -- adding a component,
+        // or a theme refresh. Turning it off never restored anything at all.
+        if (isGroupingActive()) {
+            updateUIIDs();
+        } else {
+            restoreAllUIIDs();
+        }
     }
 }
