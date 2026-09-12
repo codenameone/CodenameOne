@@ -38,27 +38,6 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     /**
      * Constructs a new instance of {@code ArrayList} with ten capacity.
      */
-    // ISOLATION (PR #5766): the lazy default-capacity allocation that used to sit
-    // here is withdrawn. It replaced the eager new Object[10] with a SHARED static
-    // zero-length array, which also gave java.util.ArrayList a <clinit> it had
-    // never had -- master's only static is a compile-time serialVersionUID, so the
-    // class previously emitted no static initializer at all.
-    //
-    // The suite then began stopping after exactly 145 of 166 screenshots on every
-    // target except glibc-x64, with ArrayList state corrupt at the point of
-    // failure: AIOOBE 89 inside pendingIdleSerialCalls.add, then AIOOBE -1, then a
-    // NullPointerException inside ArrayList.get, which only happens when the
-    // backing array reference itself is null.
-    //
-    // The list logic is NOT at fault: a differential fuzz of this exact source
-    // against java.util.ArrayList ran 3000 seeds x 200 random operations with no
-    // divergence, and every access to the corrupted list in Display is inside
-    // synchronized(lock). The corruption is therefore below Java, which makes the
-    // new <clinit> and the process-wide shared array the part worth removing
-    // before anything subtler is blamed.
-    //
-    // The iterator below is the change that carried the measured win (iteration
-    // 25.5% -> 12.4% of mutator self-time) and is kept.
     public ArrayList() {
         this(10);
     }
@@ -341,100 +320,6 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
                 growAtEnd(required);
             }
         }
-    }
-
-    /**
-     * Direct-array iterator, overriding AbstractList's generic SimpleListIterator.
-     *
-     * The inherited one was the single hottest method in a large translation --
-     * 16.45% of mutator self-time on the 5782-class hellocodenameone corpus, more
-     * than twice the next entry. Three costs per element, none inherent:
-     *
-     *   - a try/catch around the body, to turn IndexOutOfBoundsException into
-     *     NoSuchElementException. ParparVM has no zero-cost exception tables, so a
-     *     try block is a setjmp -- once per element, in the hottest loop in the
-     *     program. An explicit bounds test costs a compare.
-     *   - size() and get() as VIRTUAL calls on the outer list, with no JIT to
-     *     inline them.
-     *   - the index recomputed as size() - numLeft every iteration instead of
-     *     being carried in a cursor.
-     *
-     * MEASURED after: the iteration path fell from 25.5% of mutator self-time to
-     * 12.4%, ArrayList.get from 7.42% to 0.55%, and _setjmp from 1.61% to zero.
-     *
-     * Semantics are unchanged: same ConcurrentModificationException on structural
-     * modification, same NoSuchElementException past the end, remove() still
-     * works. Reads array[firstIndex + i] exactly as get(int) does.
-     *
-     * Applies to every `for (x : list)` in every translated application whatever
-     * the loop's static type, because dispatch lands on the concrete ArrayList.
-     */
-    // Package-private, not private: a private inner class whose constructor is
-    // reached from the outer class makes javac synthesise an access bridge and a
-    // ArrayList$1 marker type, so every iterator() paid an extra class and an
-    // aconst_null for the bridge argument. Nothing outside java.util can see it
-    // either way.
-    class ArrayListIterator implements Iterator<E> {
-        private int cursor;
-        private int lastReturned = -1;
-        private int expectedModCount = modCount;
-
-        public boolean hasNext() {
-            return cursor < size;
-        }
-
-        public E next() {
-            if (modCount != expectedModCount) {
-                throw new ConcurrentModificationException();
-            }
-            int i = cursor;
-            if (i >= size) {
-                throw new NoSuchElementException();
-            }
-            // The i < size test is only a bounds check while the list's
-            // firstIndex + size <= array.length invariant holds, so the array
-            // itself has to be checked too. The iterator this replaced could not
-            // read out of range: it went through get(), which bounds-checks, inside
-            // a try that turned IndexOutOfBoundsException into
-            // NoSuchElementException. Dropping that -- the try was the point, since
-            // ParparVM has no zero-cost exception tables -- also dropped the only
-            // bounds check on the read, and ParparVM does NOT check an array read in
-            // a release build. The result was an out-of-bounds read of the heap
-            // rather than a recoverable exception, which is how an unrelated int[]
-            // ended up with a zeroed header and the screenshot suite died 145 tests
-            // in. OpenJDK's own ArrayList.Itr carries this identical guard
-            // (`if (i >= elementData.length) throw new ConcurrentModificationException()`);
-            // omitting it is the whole defect. One compare, and the measured win
-            // stays.
-            E[] a = array;
-            int idx = firstIndex + i;
-            if (idx < 0 || idx >= a.length) {
-                throw new ConcurrentModificationException();
-            }
-            cursor = i + 1;
-            lastReturned = i;
-            return a[idx];
-        }
-
-        public void remove() {
-            if (lastReturned < 0) {
-                throw new IllegalStateException();
-            }
-            if (modCount != expectedModCount) {
-                throw new ConcurrentModificationException();
-            }
-            ArrayList.this.remove(lastReturned);
-            if (lastReturned < cursor) {
-                cursor--;
-            }
-            lastReturned = -1;
-            expectedModCount = modCount;
-        }
-    }
-
-    @Override
-    public Iterator<E> iterator() {
-        return new ArrayListIterator();
     }
 
     @Override
