@@ -24,6 +24,8 @@ package com.codename1.maven;
 
 
 import java.io.File;
+import java.util.Set;
+import java.util.TreeSet;
 import java.io.IOException;
 
 import org.apache.commons.io.FileUtils;
@@ -89,6 +91,64 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                 }
             }
         }
+        warnAboutUnresolvedVectorReferences();
+    }
+
+    /**
+     * Says out loud when the compiled theme is carrying SVG placeholders that
+     * nothing will replace.
+     *
+     * <p>A {@code url(*.svg)} in theme CSS does not become an image at compile
+     * time. The CSS compiler drops a 1x1 transparent PNG under the file's name
+     * and the generated {@code SVGRegistry} swaps the real transcoded image in
+     * at startup. When no registry was generated the placeholder is what the
+     * app gets: a valid, fully transparent, 1x1 image. Every API downstream
+     * behaves normally -- {@code getImage} returns non-null, the label takes an
+     * icon, layout runs -- and the screen comes out blank.</p>
+     *
+     * <p>Ordinarily {@link AbstractCN1Mojo#ensureSvgTranscoderWired} has already
+     * repaired this, so reaching here means the assets are referenced by CSS but
+     * are not present as source files in this module: a name that no longer
+     * matches a file, or SVGs expected from a dependency. Neither is something
+     * to fail a build over, but neither should be silent, which is how it
+     * reached a device as a white screen.</p>
+     */
+    private void warnAboutUnresolvedVectorReferences() throws MojoExecutionException {
+        File buildDir = new File(project.getBuild().getDirectory());
+        SvgTranscodeRunner runner = new SvgTranscodeRunner(project.getBasedir(), null,
+                new File(buildDir, "generated-sources" + File.separator + "svg"),
+                new File(buildDir, "css-resources"), null, getLog());
+        Set<String> referenced = runner.cssReferencedVectorNames();
+        if (referenced.isEmpty()) {
+            return;
+        }
+        File registryClass = new File(new File(buildDir, "classes"),
+                SvgTranscodeRunner.DEFAULT_PACKAGE.replace('.', File.separatorChar)
+                        + File.separator + SvgTranscodeRunner.REGISTRY_CLASS_NAME + ".class");
+        boolean registryMissing = !registryClass.isFile();
+
+        Set<String> unresolved = new TreeSet<String>(referenced);
+        unresolved.removeAll(runner.presentVectorSourceNames());
+
+        if (!registryMissing && unresolved.isEmpty()) {
+            return;
+        }
+        getLog().warn("==========================================================");
+        if (registryMissing) {
+            getLog().warn("theme.css references " + referenced.size() + " SVG/Lottie image(s) but this");
+            getLog().warn("module compiled no " + SvgTranscodeRunner.REGISTRY_CLASS_NAME + ", so every one of them stays a");
+            getLog().warn("1x1 transparent placeholder and renders as nothing.");
+        } else {
+            getLog().warn("theme.css references " + unresolved.size() + " SVG/Lottie image(s) that this");
+            getLog().warn("module does not contain, so they stay 1x1 transparent");
+            getLog().warn("placeholders and render as nothing:");
+            for (String name : unresolved) {
+                getLog().warn("    " + name);
+            }
+        }
+        getLog().warn("Put each file under src/main/css (or src/main/svg) so the");
+        getLog().warn("build-time transcoder can generate it.");
+        getLog().warn("==========================================================");
     }
 
     /**

@@ -47,6 +47,14 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
         if (!isCN1ProjectDir()) {
             return;
         }
+        // Before the once-per-JVM guard below: that guard exists so the GUI
+        // builder sources are generated once per reactor, but the SVG check is
+        // per-module and has to run for each CN1 module that has assets.
+        //
+        // This is the earliest goal every Codename One application module binds,
+        // and it is bound before compile, which is what the repair needs -- see
+        // AbstractCN1Mojo.ensureSvgTranscoderWired.
+        ensureSvgTranscoderWired();
         if (System.getProperty("generate-gui-sources-done") != null) {
             return;
         }

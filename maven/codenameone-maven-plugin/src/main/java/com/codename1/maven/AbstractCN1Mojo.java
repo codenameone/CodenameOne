@@ -1981,5 +1981,240 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return value.isEmpty() || value.indexOf("${") >= 0 ? null : value;
     }
 
+
+    // ------------------------------------------------------------------
+    // SVG transcoder self-repair
+    // ------------------------------------------------------------------
+
+    /**
+     * Adds {@code dir} to the module's compile source roots if it is not
+     * already there. Called by the SVG transcoder and by the self-repair
+     * below, both of which generate Java sources that javac has to see.
+     */
+    protected void registerSourceRoot(File dir) {
+        String path = dir.getAbsolutePath();
+        if (!project.getCompileSourceRoots().contains(path)) {
+            project.addCompileSourceRoot(path);
+            getLog().debug("Added compile source root " + path);
+        }
+    }
+
+    /**
+     * Brings a project created before the build-time SVG transcoder existed up
+     * to date, if and only if it actually has vector assets.
+     *
+     * <p>The {@code transcode-svg} goal is not bound by any lifecycle mapping
+     * an application module uses -- {@code components.xml} only maps the
+     * {@code cn1lib} packaging, and an app's {@code common} module is
+     * {@code jar} -- so it runs only when the pom declares the execution
+     * explicitly. That execution was added to the archetype well after the
+     * Maven project format shipped, which leaves every project generated before
+     * it silently without a transcoder.</p>
+     *
+     * <p>"Silently" is the problem worth fixing. The CSS compiler writes a 1x1
+     * transparent PNG into the theme for every {@code url(*.svg)} it sees and
+     * relies on the generated {@code SVGRegistry} to replace those entries at
+     * startup. With no registry nothing replaces them, so
+     * {@code theme.getImage("logo.svg")} returns a perfectly valid fully
+     * transparent 1x1 image: no exception, no warning, no null -- just a screen
+     * with nothing on it. The simulator hides this, because JavaSEPort finds
+     * the registry reflectively by class name and therefore tolerates any
+     * classpath layout, while the device builders look for the compiled class
+     * at one fixed path and emit no {@code installGlobal()} call when it is
+     * absent. The result is an app that looks correct in the simulator and
+     * renders blank on the device.</p>
+     *
+     * <p>So this does both halves: it transcodes now, into the current build,
+     * and then rewrites the pom so subsequent builds bind the goal the ordinary
+     * way. Doing only the second half would leave this build shipping the blank
+     * placeholders it just diagnosed.</p>
+     *
+     * <p>Must be called before {@code compile} for the first half to have any
+     * effect -- the generated sources are handed to javac through
+     * {@link #registerSourceRoot}.</p>
+     */
+    protected void ensureSvgTranscoderWired() throws MojoExecutionException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
+        if (isTranscodeSvgBound()) {
+            return;
+        }
+        File buildDir = new File(project.getBuild().getDirectory());
+        File outputDir = new File(buildDir, "generated-sources" + File.separator + "svg");
+        File placeholderDir = new File(buildDir, "css-resources");
+        SvgTranscodeRunner runner = new SvgTranscodeRunner(project.getBasedir(), null,
+                outputDir, placeholderDir, null, getLog());
+        if (!runner.hasVectorSources()) {
+            // Nothing to transcode. A project with no vector assets is not out
+            // of date in any way that matters, so leave its pom alone.
+            return;
+        }
+
+        getLog().info("This project has SVG/Lottie assets but its pom does not run the "
+                + "build-time vector transcoder. Transcoding them now.");
+        runner.run();
+        registerSourceRoot(outputDir);
+        addTranscodeSvgExecutionToPom();
+    }
+
+    /** True when some execution of this plugin binds the transcode-svg goal. */
+    private boolean isTranscodeSvgBound() {
+        List<org.apache.maven.model.Plugin> plugins = project.getBuildPlugins();
+        if (plugins == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin p : plugins) {
+            if (!GROUP_ID.equals(p.getGroupId())
+                    || !"codenameone-maven-plugin".equals(p.getArtifactId())) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution e : p.getExecutions()) {
+                if (e.getGoals() != null && e.getGoals().contains("transcode-svg")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Inserts the {@code transcode-svg} execution into this module's pom.
+     *
+     * <p>Edited as text rather than through the Maven model: a pom is a file a
+     * developer owns and reads, and round-tripping it through a model writer
+     * reflows whitespace and can drop comments across the whole document to add
+     * eight lines. A located insert changes exactly the bytes being added. The
+     * result is parsed before it is written, and the original is kept as
+     * {@code pom.xml.bak}, so a pom this does not understand is left alone
+     * rather than damaged.</p>
+     */
+    private void addTranscodeSvgExecutionToPom() {
+        File pomFile = project.getFile();
+        if (pomFile == null || !pomFile.isFile()) {
+            warnCouldNotEditPom("the module has no pom file on disk");
+            return;
+        }
+        String pom;
+        try {
+            pom = FileUtils.readFileToString(pomFile, "UTF-8");
+        } catch (IOException ex) {
+            warnCouldNotEditPom("it could not be read: " + ex.getMessage());
+            return;
+        }
+        if (pom.contains("transcode-svg")) {
+            // Already there in the file even though the resolved model did not
+            // report it (a profile that is not active, say). Adding a second
+            // copy would be worse than doing nothing.
+            return;
+        }
+        String updated = insertTranscodeSvgExecution(pom);
+        if (updated == null) {
+            warnCouldNotEditPom("its codenameone-maven-plugin element could not be located");
+            return;
+        }
+        if (!isWellFormedXml(updated)) {
+            // The edit produced something that is not a pom. Never write it.
+            warnCouldNotEditPom("the edit did not produce well-formed XML");
+            return;
+        }
+        try {
+            FileUtils.copyFile(pomFile, new File(pomFile.getParentFile(), "pom.xml.bak"));
+            FileUtils.writeStringToFile(pomFile, updated, "UTF-8");
+        } catch (IOException ex) {
+            warnCouldNotEditPom("it could not be written: " + ex.getMessage());
+            return;
+        }
+        getLog().info("Added the transcode-svg execution to " + pomFile
+                + " (previous contents saved as pom.xml.bak).");
+    }
+
+    /**
+     * The text edit itself, kept pure so it can be tested against real poms.
+     *
+     * <p>Returns the updated document, or null when this pom's shape is not
+     * understood well enough to edit safely -- the caller then leaves the file
+     * alone and tells the developer what to add by hand. The caller is also
+     * responsible for checking that the execution is not already present and
+     * for re-parsing the result before writing it.</p>
+     */
+    static String insertTranscodeSvgExecution(String pom) {
+        int marker = pom.indexOf("<artifactId>codenameone-maven-plugin</artifactId>");
+        if (marker < 0) {
+            return null;
+        }
+        int pluginStart = pom.lastIndexOf("<plugin>", marker);
+        int pluginEnd = pom.indexOf("</plugin>", marker);
+        if (pluginStart < 0 || pluginEnd < 0) {
+            return null;
+        }
+        String eol = pom.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+        int executionsOpen = pom.indexOf("<executions>", pluginStart);
+        if (executionsOpen >= 0 && executionsOpen < pluginEnd) {
+            String indent = indentOfLineAt(pom, executionsOpen) + "    ";
+            int insertAt = executionsOpen + "<executions>".length();
+            // The text right after <executions> already starts with a line
+            // break, so the block must not carry a trailing one of its own.
+            return pom.substring(0, insertAt)
+                    + eol + executionBlock(indent, eol)
+                    + pom.substring(insertAt);
+        }
+        // The plugin is declared without any executions -- wrap ours in a
+        // new <executions> element just before </plugin>.
+        String indent = indentOfLineAt(pom, pluginEnd);
+        return pom.substring(0, pluginEnd)
+                + "<executions>" + eol
+                + executionBlock(indent + "        ", eol) + eol
+                + indent + "</executions>" + eol
+                + indent
+                + pom.substring(pluginEnd);
+    }
+
+    private static boolean isWellFormedXml(String text) {
+        try {
+            javax.xml.parsers.DocumentBuilderFactory factory =
+                    javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            factory.newDocumentBuilder().parse(
+                    new java.io.ByteArrayInputStream(text.getBytes("UTF-8")));
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private static String executionBlock(String indent, String eol) {
+        return indent + "<execution>" + eol
+                + indent + "    <!-- Added automatically: this project has SVG/Lottie" + eol
+                + indent + "         assets, and without this execution they compile to" + eol
+                + indent + "         blank 1x1 placeholders on the device. -->" + eol
+                + indent + "    <id>transcode-svg</id>" + eol
+                + indent + "    <phase>generate-sources</phase>" + eol
+                + indent + "    <goals>" + eol
+                + indent + "        <goal>transcode-svg</goal>" + eol
+                + indent + "    </goals>" + eol
+                + indent + "</execution>";
+    }
+
+    /** The leading whitespace of the line containing {@code pos}. */
+    private static String indentOfLineAt(String text, int pos) {
+        int lineStart = text.lastIndexOf('\n', pos) + 1;
+        int i = lineStart;
+        while (i < pos && (text.charAt(i) == ' ' || text.charAt(i) == '\t')) {
+            i++;
+        }
+        return text.substring(lineStart, i);
+    }
+
+    private void warnCouldNotEditPom(String why) {
+        getLog().warn("Could not add the transcode-svg execution to this project's pom because "
+                + why + ". This build transcoded the SVGs anyway, but add the execution "
+                + "yourself so later builds do the same:");
+        getLog().warn("    <execution>");
+        getLog().warn("        <id>transcode-svg</id>");
+        getLog().warn("        <phase>generate-sources</phase>");
+        getLog().warn("        <goals><goal>transcode-svg</goal></goals>");
+        getLog().warn("    </execution>");
+    }
+
 }
-    

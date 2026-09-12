@@ -113,6 +113,17 @@ The `cn1app` archetype binds the `transcode-svg` goal to the
 include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.xml[tag=svg-transcoder-xml-001,indent=0]
 ----
 
+That execution was added to the archetype after the Maven project format
+itself shipped, so a project generated before it has no transcoder bound.
+Because nothing fails when the transcoder is missing -- the CSS compiler
+leaves a transparent placeholder in the theme and the app renders nothing
+where the icon should be -- the build repairs the gap rather than waiting
+to be asked. A module that contains vector assets but binds no
+`transcode-svg` execution is transcoded in place during the current build
+and has the execution written into its POM, with the previous contents
+kept as `pom.xml.bak`. A project that already binds the goal, or that has
+no vector assets, is left untouched.
+
 When Maven runs the mojo:
 
 . It scans `src/main/css/` and `src/main/svg/` for `*.svg` files. If
@@ -245,10 +256,12 @@ the relevant frame as an SVG and use the SVG transcoder path directly
 === Troubleshooting
 
 `Resources.getImage("name.svg")` returns null or a 1×1 transparent PNG::
-  The transcoder didn't run, or it ran with zero source files. Confirm
-  the asset lives under `src/main/css/` (or `src/main/svg/` /
-  `src/main/lottie/` for the dedicated directories) and that the
-  `transcode-svg` goal is bound in the project POM. The same goal
+  The transcoder ran with zero source files: the name in the CSS
+  `url(...)` does not match any file under `src/main/css/` (or
+  `src/main/svg/` / `src/main/lottie/` for the dedicated directories).
+  The build names each unmatched reference in a warning. A POM that does
+  not bind the `transcode-svg` goal at all is repaired automatically, so
+  it is not the likely cause. The same goal
   handles `.svg`, `.json`, and `.lottie` -- one goal, both formats.
   For arbitrary Resources bundles loaded outside the global slot, call
   `com.codename1.ui.util.Resources.registerGeneratedImage(name, image)`
