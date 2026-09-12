@@ -100,24 +100,7 @@ public final class StringBuilder implements CharSequence, Appendable {
     }    
     
     private void enlargeBuffer(int min) {
-        // Double, as OpenJDK's AbstractStringBuilder does, rather than the 1.5x
-        // ((len>>1)+len+2) inherited from Harmony.
-        //
-        // Growing to N chars costs sum(capacity) in ABANDONED intermediate
-        // arrays, and that sum is N*r/(r-1): 3N at r=1.5, 2N at r=2. The
-        // difference is pure garbage, and on ParparVM garbage is expensive in a
-        // way it is not on a generational JVM -- the collector is a concurrent
-        // mark/sweep with no nursery, so a dead intermediate array occupies its
-        // slot until a later cycle sweeps it.
-        //
-        // MEASURED on the 5782-class hellocodenameone translation, where the
-        // emit phase is StringBuilder-bound: char[] occupancy 1529.84MB and the
-        // legacy (large-array) heap 1533.43MB before the emit-buffer reuse fix.
-        //
-        // The cost is peak overshoot: a buffer can now be up to 2x the chars
-        // actually needed rather than 1.5x. That is bounded and transient, where
-        // the reallocation garbage is unbounded in the number of appends.
-        int newCount = (value.length << 1) + 2;
+        int newCount = ((value.length >> 1) + value.length) + 2;
         char[] newData = new char[min > newCount ? min : newCount];
         System.arraycopy(value, 0, newData, 0, count);
         value = newData;
