@@ -32,9 +32,15 @@ import com.codename1.ui.layouts.Layout;
 /// GroupElementFirst/GroupElementLast UIID's applied to them. If a group has only one element
 /// the word "Only" is appended to the element UIID as in GroupElementOnly.
 ///
-/// **Important!!!** A component group does nothing by default unless explicitly activated by
+/// **Important!!!** A *vertical* component group does nothing by default unless explicitly activated by
 /// the theme by enabling the ComponentGroupBool constant (by default, this can be customized via the groupFlag property).
 /// This allows logical grouping without changing the UI for themes that don't need grouping.
+///
+/// A *horizontal* group is the exception and needs no constant. setHorizontal(true) makes it a
+/// segmented control and renames its members to ToggleButton, which the native themes style along
+/// with its First/Last/Only variants, so honouring the constant here would leave setHorizontal(true)
+/// doing nothing on the themes new applications use. The exception is exactly that wide: give the
+/// group your own UIID with setElementUIID and it is theme-gated again, like a vertical one.
 ///
 /// This container uses box X/Y layout (defaults to Y), other layout managers shouldn't be used
 /// since this container relies on the specific behavior of the box layout.
@@ -278,7 +284,8 @@ public class ComponentGroup extends Container {
     }
 
     /// Whether this group is currently renaming its members' UIIDs. updateUIIDs()
-    /// does nothing unless the theme constant is on or grouping is forced, and
+    /// does nothing unless the theme constant is on, grouping is forced, or this is
+    /// a horizontal group still using the ToggleButton UIIDs setHorizontal gives it, and
     /// Button needs the same answer to know whether a member's live UIID belongs
     /// to the group or to itself. $origUIID cannot answer it either: it is absent
     /// between memberships and present during one, but it is set from inside
