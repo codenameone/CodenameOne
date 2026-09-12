@@ -1119,7 +1119,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // boolean, so a decoder that refused would only turn a malformed escape
         // into "no route" -- a 404 for what is a syntax error the client can fix.
         sb.append("        if (!wellFormedEscapes(request.getTarget())\n");
-        sb.append("                || !escapesAreUtf8(request.getTarget())) {\n");
+        sb.append("                || !targetIsUtf8(request.getTarget())) {\n");
         sb.append("            return request.respond(400, \"text/plain; charset=utf-8\",\n");
         sb.append("                    utf8(\"malformed percent-escape in the request target\"));\n");
         sb.append("        }\n");
@@ -1934,7 +1934,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("        return true;\n");
         sb.append("    }\n\n");
         sb.append("    /**\n");
-        sb.append("     * Whether every RUN of escapes decodes to well-formed UTF-8.\n");
+        sb.append("     * Whether the target's octets, escaped AND raw, are well-formed UTF-8.\n");
+        sb.append("     *\n");
+        sb.append("     * Gathered into ONE buffer, because a character may be spelled half one\n");
+        sb.append("     * way and half the other: a raw 0xC3 followed by %A9 is a perfectly good\n");
+        sb.append("     * e-acute, and decode() below and the server both read it as one. Checking\n");
+        sb.append("     * each escape RUN on its own saw %A9 alone, called it a stray continuation\n");
+        sb.append("     * byte, and answered 400 for a target this router's own decoder accepts.\n");
         sb.append("     *\n");
         sb.append("     * Two hex digits is not enough: %C3%28 is a truncated two-byte\n");
         sb.append("     * sequence, and new String(_, \"UTF-8\") replaces it with U+FFFD\n");
@@ -1944,22 +1950,22 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("     * by the other. RFC 3629, so an overlong form, a surrogate half and\n");
         sb.append("     * anything above U+10FFFF are refused too.\n");
         sb.append("     */\n");
-        sb.append("    private static boolean escapesAreUtf8(String value) {\n");
+        sb.append("    private static boolean targetIsUtf8(String value) {\n");
         sb.append("        if (value == null) { return true; }\n");
-        sb.append("        byte[] run = new byte[value.length()];\n");
+        sb.append("        byte[] octets = new byte[value.length()];\n");
         sb.append("        int len = 0;\n");
-        sb.append("        for (int i = 0 ; i <= value.length() ; i++) {\n");
-        sb.append("            if (i < value.length() && value.charAt(i) == '%'\n");
-        sb.append("                    && i + 2 < value.length()) {\n");
-        sb.append("                run[len++] = (byte)((hex(value.charAt(i + 1)) << 4)\n");
+        sb.append("        for (int i = 0 ; i < value.length() ; i++) {\n");
+        sb.append("            char c = value.charAt(i);\n");
+        sb.append("            if (c == '%' && i + 2 < value.length()) {\n");
+        sb.append("                octets[len++] = (byte)((hex(value.charAt(i + 1)) << 4)\n");
         sb.append("                        | hex(value.charAt(i + 2)));\n");
         sb.append("                i += 2;\n");
         sb.append("                continue;\n");
         sb.append("            }\n");
-        sb.append("            if (len > 0 && !utf8Run(run, len)) { return false; }\n");
-        sb.append("            len = 0;\n");
+        sb.append("            if (c > 0xff) { return false; }\n");
+        sb.append("            octets[len++] = (byte)c;\n");
         sb.append("        }\n");
-        sb.append("        return true;\n");
+        sb.append("        return utf8Run(octets, len);\n");
         sb.append("    }\n\n");
         sb.append("    private static boolean utf8Run(byte[] b, int length) {\n");
         sb.append("        int at = 0;\n");

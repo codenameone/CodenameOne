@@ -125,6 +125,24 @@ public class RestControllerAnnotationProcessorTest {
         // returned early on any value with no '%' in it.
         assertEquals("and the raw spelling decodes to the same thing", accented,
                 decode.invoke(null, "caf" + ((char)0xc3) + ((char)0xa9)));
+
+        // AND THE VALIDATOR AGREES WITH THE DECODER. One character may be spelled
+        // half raw and half escaped -- a raw 0xC3 then %A9 is an e-acute, and both
+        // decode() above and the server read it as one. Checking each escape RUN
+        // on its own saw %A9 alone, called it a stray continuation byte, and
+        // answered 400 for a target this router's own decoder accepts.
+        Method targetIsUtf8 = router.instance.getClass()
+                .getDeclaredMethod("targetIsUtf8", String.class);
+        targetIsUtf8.setAccessible(true);
+        assertEquals("a character split across both spellings is a character",
+                Boolean.TRUE,
+                targetIsUtf8.invoke(null, "/api/notes/caf" + ((char)0xc3) + "%A9"));
+        // Still refuses what is genuinely malformed: a lead byte with no
+        // continuation after it, in either spelling.
+        assertEquals("a truncated sequence is still refused", Boolean.FALSE,
+                targetIsUtf8.invoke(null, "/api/notes/caf" + ((char)0xc3) + "("));
+        assertEquals("and so is the escaped spelling of the same", Boolean.FALSE,
+                targetIsUtf8.invoke(null, "/api/notes/caf%C3("));
         // '+' is a literal in a path segment; it means a space only in a query.
         assertEquals("{\"id\":\"a+b\"}", router.text("GET", "/api/notes/a+b"));
         assertEquals("{\"id\":\"42\",\"tag\":\"red\"}",
