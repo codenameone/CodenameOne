@@ -52,7 +52,23 @@ public final class S3 {
      */
     private static final long CREDENTIAL_REFRESH_MARGIN = 5 * 60 * 1000L;
 
-    private Credentials credentials;
+    /**
+     * VOLATILE, because the refresh below happens on whichever request thread
+     * noticed the expiry and every other worker reads it without a lock.
+     *
+     * <p>Credentials is immutable with final fields, so a thread that sees the new
+     * reference sees the whole credential -- but without volatile nothing makes it
+     * see the new reference at all, and it would go on signing with the expired
+     * one until something else happened to publish it. Those requests come back
+     * rejected, which is the outcome the refresh exists to prevent.
+     *
+     * <p>Volatile and not a synchronized credentials(): the refresh calls
+     * Credentials.resolve, which is an HTTP round trip to the metadata service, so
+     * a monitor around it would stop every other S3 operation on this client for
+     * its duration. The benign race the method already documents -- two threads
+     * resolving at once and one answer being dropped -- is deliberate and stays.
+     */
+    private volatile Credentials credentials;
     private final String region;
     private final String endpoint;
     private final boolean pathStyle;
