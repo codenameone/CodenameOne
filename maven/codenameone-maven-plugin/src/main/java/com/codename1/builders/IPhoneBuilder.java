@@ -10085,6 +10085,11 @@ public class IPhoneBuilder extends Executor {
                 + "    end\n"
                 + "  end\n"
                 + "  xcproj.save\n"
+                // Raises, where the older deployment-target pass beside it warns and carries
+                // on. Deliberate: if this pass cannot run, the extensions stay under the floor
+                // and Xcode refuses the whole build anyway -- failing here names the cause,
+                // failing there does not. It also matches the newer fragments in this same
+                // script, which raise.
                 + "rescue => e\n"
                 + "  puts \"Error raising app extensions to the SDK minimum: #{$!}\"\n"
                 + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"

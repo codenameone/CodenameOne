@@ -77,6 +77,12 @@ NATIVE_SOURCES = os.path.join(REPO_ROOT, "Ports", "iOSPort", "nativeSources")
 GATE_DENY = {
     # A function-like macro (a logging helper), not a gate.
     "CN1Log(str,...)",
+    # The renderer selector, not a feature gate: CONFIGURATIONS owns it. Harvested along
+    # with everything else it was defined for BOTH sweeps, so the "gl" run was a second
+    # Metal run and a GL-only regression could not be seen. The renderer self-check missed
+    # it because it built its defines differently from the sweeps -- which is why it now
+    # builds them through the same helper.
+    "CN1_USE_METAL",
     # A placeholder LINE that IPhoneBuilder replaces wholesale with one of the
     # CN1_METAL_COLORSPACE_* defines. Defining the placeholder itself selects nothing;
     # EXTRA_DEFINES below supplies the default the builder would have chosen.
@@ -130,14 +136,20 @@ MISSING_HEADER_RE = re.compile(r"fatal error: '([^']+)' file not found")
 MAX_STUB_ROUNDS = 40
 
 # Proves the differ can see an SDK-caused change at all.
-PROBE_SOURCE = """#import <UIKit/UIKit.h>
-void cn1_sdk_delta_probe(void) {
-    // Deprecated in iOS 27. If subtracting the two runs does not surface this, the
-    // comparison is not working and every real finding would be invisible too.
-    [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:@"https://example.com"]];
-}
+#
+# Derived from the SDK versions rather than naming a real deprecation. It used to compile a
+# call to [UIApplication canOpenURL:], deprecated in iOS 27, which only produces a delta for
+# a pair that straddles 27: two pre-27 SDKs emit nothing and 27-vs-28 emits it twice, and in
+# both cases the self-test fails and takes the whole gate with it. Since this check activates
+# automatically whenever a runner has two Xcodes, a routine image bump would have broken it
+# before it looked at the port. __IPHONE_OS_VERSION_MAX_ALLOWED is the SDK describing itself,
+# so the same probe works for any pair, in either direction, forever.
+PROBE_MARKER = "cn1-sdk-delta-probe"
+PROBE_SOURCE = """#include <Availability.h>
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= %d
+#warning cn1-sdk-delta-probe
+#endif
 """
-PROBE_EXPECT = "canOpenURL"
 
 
 def run(cmd, **kw):
@@ -168,6 +180,17 @@ def discover_sdks(developer_dirs):
             if res.returncode == 0:
                 found[res.stdout.strip()] = path
     return found
+
+
+def defines_for(gates, config_defines):
+    """The exact -D set a sweep compiles with.
+
+    Shared with the renderer self-check on purpose. When the check built its own list it
+    reported the configurations as distinct while both sweeps were compiling the same
+    Metal path, because CN1_USE_METAL had been harvested as a feature gate and applied to
+    both. A self-check that does not mirror the real invocation can only confirm itself.
+    """
+    return gates + EXTRA_DEFINES + config_defines
 
 
 def clang_for_sdk(sdk_path, dev_dirs):
@@ -321,10 +344,22 @@ def compile_one(clang, sdk, project_dir, prefix_header, filename, defines, arc, 
         elif kind == "error":
             errors += 1
         diags.append(normalize(line, project_dir))
+    if res.returncode != 0 and errors == 0:
+        # clang can exit nonzero with nothing this parser recognises: a frontend crash, a
+        # signal, or a driver-level error such as an SDK it cannot open. Those carry no
+        # "file:line:col: kind:" prefix, so both counters stayed at zero and the file was
+        # recorded as clean -- which means every compile under the new SDK could fail this
+        # way and the run would still satisfy the clean-file floor and print OK.
+        errors += 1
+        fatal += 1
+        detail = out.strip().splitlines()
+        diags.append("%s:0:0: fatal error: clang exited %d with no parseable diagnostic%s"
+                     % (filename, res.returncode,
+                        (" (" + detail[-1].strip() + ")") if detail else ""))
     return diags, errors, fatal
 
 
-def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir):
+def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir, gates):
     """Confirm the renderer configurations really select different code."""
     sizes = []
     for _, extra in CONFIGURATIONS:
@@ -337,7 +372,7 @@ def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir):
             cmd += ["-I", stub_dir]
         if prefix_header:
             cmd += ["-include", prefix_header]
-        for d in extra:
+        for d in defines_for(gates, extra):
             cmd += ["-D", d]
         cmd.append(os.path.join(NATIVE_SOURCES, CONFIG_WITNESS))
         sizes.append(len(run(cmd).stdout.splitlines()))
@@ -384,12 +419,20 @@ def synthesize_generated_stubs(clang, sdk, project_dir, prefix_header, files, al
     return sorted(created)
 
 
-def compile_probe(clang, sdk, target):
+def sdk_version_macro(version):
+    """The SDK version as __IPHONE_OS_VERSION_MAX_ALLOWED spells it: 27.0 -> 270000."""
+    parts = [int(x) for x in re.findall(r"\d+", version)[:3]]
+    while len(parts) < 3:
+        parts.append(0)
+    return parts[0] * 10000 + parts[1] * 100 + parts[2]
+
+
+def compile_probe(clang, sdk, target, threshold):
     tmp = tempfile.mkdtemp(prefix="cn1-sdk-probe-")
     try:
         src = os.path.join(tmp, "probe.m")
         with open(src, "w") as fh:
-            fh.write(PROBE_SOURCE)
+            fh.write(PROBE_SOURCE % threshold)
         res = run([clang, "-fsyntax-only", "-arch", "arm64",
                    "-target", "arm64-apple-ios" + target,
                    "-isysroot", sdk, "-fno-objc-arc", "-Wdeprecated-declarations", src])
@@ -485,19 +528,27 @@ def main():
         ("future-floor", new_version),
     ]
 
-    # Self-test first: if the differ cannot see a known deprecation, nothing it reports
-    # afterwards means anything. Run it at the new SDK's own version -- at the shipping
-    # floor clang is silent about it by design, which is exactly the trap this guards.
-    probe_old = compile_probe(clang, old_sdk, new_version)
-    probe_new = compile_probe(clang, new_sdk, new_version)
-    probe_fires = (PROBE_EXPECT in probe_new and "is deprecated" in probe_new
-                   and not ("is deprecated" in probe_old and PROBE_EXPECT in probe_old))
-    if not probe_fires:
-        fail("self-test did not fire: a selector deprecated in the newer SDK produced no "
-             "delta. The comparison is not working, so an empty result would be a lie.\n"
-             "  old: %s\n  new: %s" % (probe_old.strip()[:400], probe_new.strip()[:400]))
-    print("[ios-sdk-deltas] self-test: differ detects a known newer-SDK deprecation "
-          "(target ios%s)" % new_version)
+    # Self-test first: if the differ cannot see an SDK-caused difference, nothing it
+    # reports afterwards means anything. The threshold is the newer SDK's own version, so
+    # the probe warns under it and stays silent under the older one whatever the two are.
+    old_version = sdk_version(old_sdk)
+    if sdk_version_macro(new_version) <= sdk_version_macro(old_version):
+        # Everything below reads "appears only under the newer SDK", so the arguments being
+        # the wrong way round would report removals as additions. Caught here rather than
+        # left to the probe, whose failure would describe a symptom and not this cause.
+        fail("--new-sdk is %s and --old-sdk is %s: the new one must be the NEWER SDK."
+             % (new_version, old_version))
+    threshold = sdk_version_macro(new_version)
+    probe_old = compile_probe(clang, old_sdk, new_version, threshold)
+    probe_new = compile_probe(clang, new_sdk, new_version, threshold)
+    if PROBE_MARKER not in probe_new or PROBE_MARKER in probe_old:
+        fail("self-test did not fire: a probe keyed to __IPHONE_OS_VERSION_MAX_ALLOWED >= %d "
+             "should warn under %s and not under %s. The comparison is not working, so an "
+             "empty result would be a lie.\n  old: %s\n  new: %s"
+             % (threshold, os.path.basename(new_sdk), os.path.basename(old_sdk),
+                probe_old.strip()[:300] or "<silent>", probe_new.strip()[:300] or "<silent>"))
+    print("[ios-sdk-deltas] self-test: differ sees a delta only the newer SDK produces "
+          "(__IPHONE_OS_VERSION_MAX_ALLOWED >= %d)" % threshold)
 
     # A gate that cannot fail is not a gate. Prove the reporting path still turns a
     # blocking finding into a non-zero exit, with output suppressed so the check is
@@ -515,14 +566,14 @@ def main():
     print("[ios-sdk-deltas] self-test: a blocking finding exits non-zero")
 
     stub_dir = tempfile.mkdtemp(prefix="cn1-sdk-delta-stubs-")
-    all_defines = gates + EXTRA_DEFINES + [d for _, ds in CONFIGURATIONS for d in ds]
+    all_defines = defines_for(gates, [d for _, ds in CONFIGURATIONS for d in ds])
     stubs = synthesize_generated_stubs(clang, new_sdk, project_dir, prefix_header, present,
                                        all_defines, arc_files, SHIPPING_DEPLOYMENT_TARGET,
                                        stub_dir, args.jobs)
     print("[ios-sdk-deltas] stubs   : %d translated-class header(s) synthesized%s"
           % (len(stubs), (" (%s)" % ", ".join(stubs)) if args.verbose and stubs else ""))
 
-    sizes = configurations_differ(clang, new_sdk, project_dir, prefix_header, stub_dir)
+    sizes = configurations_differ(clang, new_sdk, project_dir, prefix_header, stub_dir, gates)
     if len(set(sizes)) != len(sizes) or min(sizes) == 0:
         fail("the renderer configurations no longer select different code: %s preprocesses "
              "to %s lines under %s. One of them is a duplicate of the other, so half the "
@@ -534,7 +585,7 @@ def main():
     blocking, informational = {}, {}
     for sweep_name, target in sweeps:
         for config_name, config_defines in CONFIGURATIONS:
-            defines = gates + EXTRA_DEFINES + config_defines
+            defines = defines_for(gates, config_defines)
             results = {}
             for sdk_label, sdk in (("old", old_sdk), ("new", new_sdk)):
                 diags, clean, truncated = [], 0, []
