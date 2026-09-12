@@ -270,9 +270,9 @@ public class TypeInstruction extends Instruction {
                     // in ByteCodeClass. A plain load here let a thread see the flag
                     // set while the vtable / classToInterfaceMap rows it describes
                     // were still invisible.
-                    b.append("if(__builtin_expect(!__atomic_load_n(&class__");
+                    b.append("if(__builtin_expect(!__atomic_load_n(&__");
                     b.append(type);
-                    b.append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
+                    b.append("_LOADED__, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
                     b.append(type);
                     b.append("(threadStateData); memset(&__cn1stk_");
                     b.append(stackAllocId);

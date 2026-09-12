@@ -1549,7 +1549,15 @@ public class ByteCodeClass {
         }
         
         // insert static initializer
-        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
+        // NOT static: the inline guards emitted at allocation and static-access
+        // sites live in OTHER translation units and have to test COMPLETION. They
+        // used to test class__X.initialized instead, which is the wrong flag --
+        // that one is the JLS recursion guard and is deliberately set BEFORE
+        // __CLINIT__ runs, so a thread observing it could skip the initialiser
+        // while another thread was still inside the class initialiser, and then
+        // read statics that had not been written yet. Releasing on "started"
+        // cannot publish writes that happen after it.
+        b.append("int __").append(clsName).append("_LOADED__=0;\n");
         b.append("void __STATIC_INITIALIZER_");
         b.append(clsName);
         // ACQUIRE, not a plain load. This is the fast path of a double-checked
@@ -1658,11 +1666,13 @@ public class ByteCodeClass {
         }
         b.append("    __atomic_store_n(&class__");
         b.append(clsName);
-        // RELEASE store, matching the one on __X_LOADED__ above. Readers outside
-        // this monitor (the inline guards emitted at allocation and static-access
-        // sites) do a plain-or-acquire load of this flag and SKIP the call
-        // entirely when it is set, so the monitor's own release is not enough on
-        // its own -- the guard never takes the monitor.
+        // This flag means STARTED, not completed: the JLS requires a class whose
+        // initialiser re-enters itself to proceed rather than deadlock, so it has
+        // to be set before __CLINIT__ runs, and the check above the monitor is
+        // that recursion guard. Nothing outside this function may treat it as
+        // "safe to use the class" -- the inline guards test __X_LOADED__, which is
+        // stored after __CLINIT__ returns. The release here is still wanted for
+        // the vtable and classToInterfaceMap rows written just above.
         b.append(".initialized, JAVA_TRUE, __ATOMIC_RELEASE);\n");
         // init static fields and invoke the static initializer code block
         if(clInitMethod != null) {
@@ -2048,6 +2058,11 @@ public class ByteCodeClass {
         b.append("extern void __STATIC_INITIALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE);\n");
+        // The COMPLETION flag, for the inline guards. Set with a release store
+        // after __CLINIT__ returns; see the note where it is defined.
+        b.append("extern int __");
+        b.append(clsName);
+        b.append("_LOADED__;\n");
         
         b.append("extern void __FINALIZER_");
         b.append(clsName);

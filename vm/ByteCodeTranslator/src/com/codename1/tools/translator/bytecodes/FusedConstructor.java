@@ -555,8 +555,8 @@ public final class FusedConstructor {
                                  int recvSlot, int survSlot) {
         b.append("    { /* FUSED construction of ").append(cType).append(" */\n");
         // ACQUIRE; see the note in TypeInstruction.
-        b.append("    if(__builtin_expect(!__atomic_load_n(&class__").append(cType)
-         .append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_").append(cType).append("(threadStateData);\n");
+        b.append("    if(__builtin_expect(!__atomic_load_n(&__").append(cType)
+         .append("_LOADED__, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_").append(cType).append("(threadStateData);\n");
         for (int i = 0; i < children.size(); i++) {
             b.append("    int __fLen").append(i).append(" = ").append(lenExprs[i]).append(";\n");
         }
