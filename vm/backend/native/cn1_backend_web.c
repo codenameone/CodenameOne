@@ -188,6 +188,24 @@ static size_t cn1WebWrite(void* contents, size_t size, size_t count, void* userp
     return total;
 }
 
+/**
+ * curl_global_init, called once from Java before any thread can be inside
+ * libcurl.
+ *
+ * curl_easy_init below does this implicitly on first use, and that path is NOT
+ * thread safe in a libcurl older than 7.84 or one whose curl_version_info does
+ * not report CURL_VERSION_THREADSAFE -- two workers whose first outbound
+ * request overlaps would both enter it. Nothing here can choose the system
+ * libcurl's version, so the initialisation is made explicit instead and
+ * Web.initialiseCurlOnce serialises it.
+ *
+ * Returns the CURLcode, so a failure is visible to the caller rather than
+ * remembered as a successful initialisation.
+ */
+JAVA_INT com_codename1_backend_Web_globalInitImpl___R_int(CODENAME_ONE_THREAD_STATE) {
+    return (JAVA_INT)curl_global_init(CURL_GLOBAL_DEFAULT);
+}
+
 /*
  * headerLines is one string with '\n' between headers, because passing a
  * String[] would mean walking a Java array from C for no benefit.

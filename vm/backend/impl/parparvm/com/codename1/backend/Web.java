@@ -175,6 +175,7 @@ public final class Web {
                 joined.append(String.valueOf(headers.get(iter)));
             }
         }
+        initialiseCurlOnce();
         long handle = performImpl(method, url, joined.toString(), body);
         if(handle == 0) {
             throw new IOException("Could not start a request to " + url);
@@ -229,6 +230,42 @@ public final class Web {
         }
         return out;
     }
+
+    /** Whether libcurl's global initialisation has been done successfully. */
+    private static boolean curlInitialised;
+
+    /**
+     * Initialises libcurl once, before any thread can be inside the library.
+     *
+     * curl_easy_init does this implicitly on first use, and the implicit path is
+     * NOT thread safe below libcurl 7.84 or in a build whose curl_version_info
+     * does not report CURL_VERSION_THREADSAFE. Two workers whose first outbound
+     * request overlaps would both enter it. The link is against whatever -lcurl
+     * the system provides, with no version floor, so this cannot be assumed away.
+     *
+     * <p>Every path into libcurl here is request(), and request() is the only
+     * caller of performImpl, so holding the monitor across the initialisation is
+     * enough: no other thread can be inside curl while it runs.
+     *
+     * <p>Under the monitor rather than behind a double-checked volatile read.
+     * Every caller is about to make a network request, beside which an
+     * uncontended monitor costs nothing, and it keeps the guarantee off the
+     * question of how the translated runtime orders a volatile.
+     *
+     * <p>The flag is set only when the initialisation SUCCEEDED, so a failure is
+     * retried rather than remembered as done. There is no matching
+     * curl_global_cleanup: the process is exiting by the time one would apply,
+     * and calling it while another thread might still be in libcurl is the very
+     * thing this avoids.
+     */
+    private static synchronized void initialiseCurlOnce() {
+        if(!curlInitialised) {
+            curlInitialised = globalInitImpl() == 0;
+        }
+    }
+
+    /** curl_global_init's CURLcode -- 0 is CURLE_OK. */
+    private static native int globalInitImpl();
 
     private static native long performImpl(String method, String url, String headerLines, byte[] body);
     private static native String headersImpl(long handle);
