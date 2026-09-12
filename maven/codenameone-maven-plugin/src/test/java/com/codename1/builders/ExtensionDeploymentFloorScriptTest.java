@@ -848,4 +848,29 @@ class ExtensionDeploymentFloorScriptTest {
         assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
                 "Release resolves to 12.0 here and must be raised: " + got.get(0));
     }
+
+    /// Xcode compares a key's conditions as a SET, so [arch=arm64][sdk=iphoneos*] and
+    /// [sdk=iphoneos*][arch=arm64] are one branch written two ways. Deciding "this branch has
+    /// no setting yet" by exact string match missed the author's own 16.4 and appended a second
+    /// key for the same build carrying the floor -- which can win, lowering it to 15.0.
+    ///
+    /// The simulator helper is what makes this reach the branch path at all: without a branch
+    /// that CLEARS the floor the whole expression is not uncertain, the base key is simply
+    /// raised, and no branch is ever considered. An earlier version of this test omitted it and
+    /// passed against the unfixed builder, proving nothing.
+    @Test
+    void aReorderedConditionSetIsTheSameBranch(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Reordered|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*][arch=arm64]->12.0;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN);"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[arch=arm64][sdk=iphoneos*]->16.4");
+        assertFalse(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=15.0"),
+                "that branch already has the author's 16.4, spelled in the other order; adding "
+                        + "a competing key for the same build can lower it: " + got.get(0));
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[arch=arm64][sdk=iphoneos*]=16.4"),
+                "the author's own branch must survive untouched: " + got.get(0));
+    }
 }
