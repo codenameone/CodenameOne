@@ -180,7 +180,7 @@ public final class Web {
         try {
             connection = (HttpURLConnection)new URL(url).openConnection();
         } catch (IOException err) {
-            throw new IOException("Request to " + url + " failed: " + err.getMessage());
+            throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage());
         }
         try {
             String verb = method == null ? "GET" : method;
@@ -247,7 +247,7 @@ public final class Web {
             } catch (IOException err) {
                 // No status at all: DNS, connect or TLS failed. The translated twin
                 // throws here too rather than reporting a status of -1.
-                throw new IOException("Request to " + url + " failed: " + err.getMessage());
+                throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage());
             }
             InputStream in = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -265,7 +265,7 @@ public final class Web {
                 while((n = in.read(chunk)) > 0) {
                     total += n;
                     if(total > allowed) {
-                        throw new IOException("Request to " + url + " failed: the response "
+                        throw new IOException("Request to " + Urls.forMessage(url) + " failed: the response "
                                 + "is larger than the " + (allowed / (1024 * 1024))
                                 + "MB CN1_WEB_MAX_RESPONSE_MB allows");
                     }

@@ -66,4 +66,43 @@ final class Urls {
                     + (colon < 1 ? "that" : url.substring(0, colon)));
         }
     }
+
+    /**
+     * A URL with everything secret taken out of it, for a message a caller will
+     * log.
+     *
+     * Userinfo goes, and so does the WHOLE query -- not the parameters whose
+     * names look sensitive. That list is never finished (X-Amz-Signature,
+     * X-Amz-Credential, access_token, sig, key, token, password) and the case
+     * that matters most here is a presigned S3 URL, whose signature IS the
+     * credential. Dropping the query wholesale and saying so is the only version
+     * of this that cannot be wrong about a name nobody thought of.
+     *
+     * <p>The host and path stay, because an error naming no endpoint at all is
+     * not worth logging. requireHttp above prints only the scheme for the same
+     * reason, and Database.Url.describe does the same thing for a database URL.
+     *
+     * <p>indexOf with a String and not a char: vm/JavaAPI has indexOf(String,
+     * int) and no indexOf(int, int), so the char form compiles on the JavaSE arm
+     * and fails to link in a translated build.
+     */
+    static String forMessage(String url) {
+        if(url == null) {
+            return "a request with no URL";
+        }
+        int query = url.indexOf('?');
+        String out = query < 0 ? url : url.substring(0, query);
+        int scheme = out.indexOf("://");
+        if(scheme >= 0) {
+            int at = out.indexOf("@", scheme + 3);
+            int slash = out.indexOf("/", scheme + 3);
+            // A '@' before the authority ends is userinfo; one after it is an
+            // ordinary path character and has nothing to do with credentials.
+            if(at >= 0 && (slash < 0 || at < slash)) {
+                out = out.substring(0, scheme + 3) + "<redacted>@"
+                        + out.substring(at + 1);
+            }
+        }
+        return query < 0 ? out : out + "?<redacted>";
+    }
 }

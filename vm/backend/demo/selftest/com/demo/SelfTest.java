@@ -1551,6 +1551,35 @@ public class SelfTest {
     }
 
     /**
+     * An outbound failure must not put the URL's secrets in its message.
+     *
+     * <p>A presigned S3 URL carries its signature in the query, and userinfo
+     * carries a password outright. The message goes wherever the caller logs it,
+     * which is the whole reason Urls.requireHttp prints only the scheme and
+     * Database.Url.describe omits the password -- Web's own errors were printing
+     * the lot. Port 1 is not listening, so the transfer fails without needing a
+     * server, and this runs on both arms: the JavaSE Web and the translated one
+     * have their own copies of these messages.
+     */
+    private static void anOutboundFailureDoesNotLogTheSecrets() throws Exception {
+        String url = "http://someone:hunter2@127.0.0.1:1/path?X-Amz-Signature=deadbeef";
+        String message;
+        try {
+            Web.request("GET", url, null, null);
+            message = "<the request unexpectedly succeeded>";
+        } catch (Exception err) {
+            message = String.valueOf(err.getMessage());
+        }
+        check("the password is not in the message", "false",
+                String.valueOf(message.indexOf("hunter2") >= 0));
+        check("nor is the signature", "false",
+                String.valueOf(message.indexOf("deadbeef") >= 0));
+        // Still worth logging: the endpoint that failed is named.
+        check("the host is still named", "true",
+                String.valueOf(message.indexOf("127.0.0.1") >= 0));
+    }
+
+    /**
      * Whether S3 refuses `region` as a hostname label.
      *
      * forRegion resolves credentials before it returns, which needs a metadata
@@ -2180,6 +2209,7 @@ public class SelfTest {
         aStaticFileComesBackWhole();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
+        anOutboundFailureDoesNotLogTheSecrets();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
         anImpossibleExpiryIsRefused();

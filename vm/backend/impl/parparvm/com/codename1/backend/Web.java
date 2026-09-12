@@ -178,13 +178,16 @@ public final class Web {
         initialiseCurlOnce();
         long handle = performImpl(method, url, joined.toString(), body);
         if(handle == 0) {
-            throw new IOException("Could not start a request to " + url);
+            // REDACTED, because this message goes wherever the caller logs it and
+            // the URL may be a presigned one whose signature is the credential.
+            throw new IOException("Could not start a request to "
+                    + Urls.forMessage(url));
         }
         try {
             int status = statusImpl(handle);
             String error = errorImpl(handle);
             if(status < 0) {
-                throw new IOException("Request to " + url + " failed: "
+                throw new IOException("Request to " + Urls.forMessage(url) + " failed: "
                         + (error == null ? "unknown error" : error));
             }
             return new Result(status, bodyImpl(handle), error,
