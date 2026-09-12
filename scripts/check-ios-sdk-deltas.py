@@ -107,9 +107,13 @@ GATE_DENY = {
 # ios.metal.colorSpace defaults to sRGB, so this is the define a default build really sees.
 EXTRA_DEFINES = ["CN1_METAL_COLORSPACE_SRGB"]
 
-# The deployment floor a default build really ships (IPhoneBuilder adds 14.0 when
-# ios.deployment_target is unset, over a DEFAULT_MIN_DEPLOYMENT_VERSION of 13.0).
-SHIPPING_DEPLOYMENT_TARGET = "14.0"
+# What a default build really ships. IPhoneBuilder adds 14.0 when ios.deployment_target is
+# unset, over a DEFAULT_MIN_DEPLOYMENT_VERSION of 13.0 -- but it also raises to the SDK's own
+# minimum, so under Xcode 27 a default app ships 15.0, not 14.0. Sampling 14.0 here would
+# compile the port at a different __IPHONE_OS_VERSION_MIN_REQUIRED than the project that
+# actually ships, and a regression visible only at the effective target would sit between
+# both sampled endpoints and pass.
+CN1_DEFAULT_DEPLOYMENT_TARGET = "14.0"
 
 # Mutually exclusive renderer configurations. CN1_USE_METAL selects a materially different
 # body in CN1ES2compat/METALView/GLUIImage, so a single pass would leave one of them
@@ -441,6 +445,21 @@ def synthesize_generated_stubs(clang, sdk, project_dir, prefix_header, files, al
     return sorted(created)
 
 
+def sdk_minimum_deployment_target(sdk_path):
+    """The lowest deployment target this SDK accepts, or None.
+
+    The same value AppleSdkFloor reads in the builder, and read the same way, so the sweep
+    compiles at the target the build will actually use.
+    """
+    settings = os.path.join(sdk_path, "SDKSettings.plist")
+    if not os.path.isfile(settings):
+        return None
+    res = run(["/usr/bin/plutil", "-extract",
+               "SupportedTargets.iphoneos.MinimumDeploymentTarget", "raw", settings])
+    value = res.stdout.strip()
+    return value if res.returncode == 0 and value and value[0].isdigit() else None
+
+
 def sdk_version_macro(version):
     """The SDK version as __IPHONE_OS_VERSION_MAX_ALLOWED spells it: 27.0 -> 270000."""
     parts = [int(x) for x in re.findall(r"\d+", version)[:3]]
@@ -543,11 +562,17 @@ def main():
           % (len(arc_files), ", ".join(sorted(arc_files)) or "none"))
 
     new_version = sdk_version(new_sdk)
+    # The builder raises the app to the SDK's floor, so that -- not the bare CN1 default --
+    # is what a default project ships against.
+    sdk_floor = sdk_minimum_deployment_target(new_sdk)
+    shipping_target = CN1_DEFAULT_DEPLOYMENT_TARGET
+    if sdk_floor and sdk_version_macro(sdk_floor) > sdk_version_macro(shipping_target):
+        shipping_target = sdk_floor
     sweeps = [
         # (label, deployment target). What blocks the run is the KIND of diagnostic, not
         # which sweep found it: an error is a broken build wherever it shows up, and a
         # deprecation is a warning wherever it shows up.
-        ("shipping-floor", SHIPPING_DEPLOYMENT_TARGET),
+        ("shipping-floor", shipping_target),
         ("future-floor", new_version),
     ]
 
@@ -585,8 +610,8 @@ def main():
     import contextlib
     synthetic = {"probe.m:1:1: error: synthetic self-test finding": {"self-test"}}
     with contextlib.redirect_stdout(io.StringIO()):
-        must_fail = report(synthetic, {}, new_sdk, new_version, False)
-        must_pass = report({}, {}, new_sdk, new_version, False)
+        must_fail = report(synthetic, {}, new_sdk, new_version, shipping_target, False)
+        must_pass = report({}, {}, new_sdk, new_version, shipping_target, False)
     if must_fail == 0 or must_pass != 0:
         fail("the reporting path no longer turns a blocking finding into a failure "
              "(blocking exited %s, clean exited %s). Every run would report success."
@@ -600,7 +625,7 @@ def main():
     stubs = []
     for sdk in (new_sdk, old_sdk):
         stubs += synthesize_generated_stubs(clang, sdk, project_dir, prefix_header, present,
-                                            all_defines, arc_files, SHIPPING_DEPLOYMENT_TARGET,
+                                            all_defines, arc_files, shipping_target,
                                             stub_dir, args.jobs)
     stubs = sorted(set(stubs))
     print("[ios-sdk-deltas] stubs   : %d translated-class header(s) synthesized%s"
@@ -682,10 +707,11 @@ def main():
                 # with the contexts it was seen in.
                 bucket.setdefault(line, set()).add("%s/%s" % (sweep_name, config_name))
 
-    return report(blocking, informational, new_sdk, new_version, args.verbose)
+    return report(blocking, informational, new_sdk, new_version, shipping_target,
+                  args.verbose)
 
 
-def report(blocking, informational, new_sdk, new_version, verbose):
+def report(blocking, informational, new_sdk, new_version, shipping_target, verbose):
     """Print the findings and return the process exit code.
 
     Separated from main so the exit code is a unit that can be exercised without an Xcode.
@@ -706,7 +732,7 @@ def report(blocking, informational, new_sdk, new_version, verbose):
         print("%d deprecation(s) in %d group(s) inherited from %s."
               % (len(informational), len(groups), os.path.basename(new_sdk)))
         print("Nothing is broken at the shipping deployment floor of ios%s -- clang cannot"
-              % SHIPPING_DEPLOYMENT_TARGET)
+              % shipping_target)
         print("even warn about an ios%s deprecation there -- but these are live the moment"
               % new_version)
         print("the floor rises, and they are invisible to every other check we have.")

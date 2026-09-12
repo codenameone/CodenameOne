@@ -282,11 +282,12 @@ class ExtensionDeploymentFloorScriptTest {
                 "the device build resolves EXTENSION_MIN to 16.4, which clears the floor");
     }
 
-    /// And when the qualifiers do not line up, the resolution is a guess. A guess may only
-    /// RAISE: refusing to act leaves a genuinely low value for Xcode to reject by name, which
-    /// beats silently weakening an extension on the strength of a value it may never see.
+    /// A helper qualified for a DIFFERENT build cannot win this one, so it is not
+    /// uncertainty: [sdk=iphonesimulator*] never applies to an [sdk=iphoneos*] key, the base
+    /// 12.0 is what Xcode uses, and raising it is correct. An earlier, coarser version of
+    /// this pass treated any sibling as ambiguity and left the target standing.
     @Test
-    void willNotLowerOnAnUncertainResolution(@TempDir Path dir) throws Exception {
+    void aSiblingForAnotherBuildDoesNotBlockTheRaise(@TempDir Path dir) throws Exception {
         assumeTrue(rubyAvailable(), "needs ruby");
         List<String> got = applyWithProject(dir, "15.0",
                 "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
@@ -294,9 +295,53 @@ class ExtensionDeploymentFloorScriptTest {
                         + "EXTENSION_MIN[sdk=iphonesimulator*]->16.4;"
                         + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
         assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
-                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0",
                 got.get(0),
-                "a helper qualified in a way this pass cannot match must not be clamped down");
+                "the device key resolves to the base 12.0; the simulator helper is irrelevant");
+    }
+
+    /// The base key IS uncertain: no condition is known, so a qualified helper really can win
+    /// on the real build. A guess may raise but never lower, so the expression stands.
+    @Test
+    void anUnqualifiedKeyWithAQualifiedHelperIsUncertain(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "BaseKey|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)", got.get(0),
+                "EXTENSION_MIN is 16.4 on a device build, so this must not be clamped to 15.0");
+    }
+
+    /// Two equally specific applicable helpers are a genuine tie, and a tie is a guess.
+    @Test
+    void twoEquallySpecificHelpersAreATie(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Tied|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "EXTENSION_MIN[arch=arm64]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=$(EXTENSION_MIN)",
+                got.get(0),
+                "which of the two one-condition helpers wins is not decidable here");
+    }
+
+    /// A helper qualified on only SOME of the key's conditions still applies, and requiring an
+    /// identical suffix found nothing -- leaving a 12.0 extension for Xcode 27 to reject.
+    @Test
+    void resolvesAHelperQualifiedOnASubsetOfTheConditions(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Subset|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=15.0",
+                got.get(0),
+                "the sdk-qualified helper applies to this build and resolves to 12.0");
     }
 
     /// The certain case still raises: one unqualified helper, genuinely below the floor.
