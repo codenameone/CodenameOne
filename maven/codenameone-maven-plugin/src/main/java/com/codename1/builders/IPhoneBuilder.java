@@ -5636,8 +5636,7 @@ public class IPhoneBuilder extends Executor {
                         // either separator when READING, which is what hid
                         // this.
                         request.putArgument("ios.app_groups",
-                                appGroups.trim().length() == 0 ? group
-                                        : appGroups.trim() + " " + group);
+                                appendAppGroup(appGroups, group));
                     }
                 }
                 // The call provider's identity is written into Info.plist
@@ -6299,8 +6298,8 @@ public class IPhoneBuilder extends Executor {
             if (documentProviderEnabled) {
                 String appGroups = request.getArg("ios.app_groups", "");
                 if (!declaresAppGroup(appGroups, documentsAppGroup)) {
-                    request.putArgument("ios.app_groups", appGroups.length() == 0
-                            ? documentsAppGroup : appGroups + "," + documentsAppGroup);
+                    request.putArgument("ios.app_groups",
+                            appendAppGroup(appGroups, documentsAppGroup));
                 }
             }
 

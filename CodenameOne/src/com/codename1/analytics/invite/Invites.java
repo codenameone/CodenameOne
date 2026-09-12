@@ -2181,6 +2181,7 @@ public final class Invites {
         pendingFallback = written ? null : record;
         if (written) {
             ackHandoff(record);
+            ackReferrer(record);
         }
         return written;
     }
@@ -2228,6 +2229,41 @@ public final class Invites {
         handoffSurvived = !gone;
         return gone;
     }
+
+    /// Lets the install-referrer source burn its one-shot flag, once ours is
+    /// durable.
+    ///
+    /// The twin of `ackHandoff`, and here for the same reason: the first write
+    /// is not the only one that can make the record durable. A write that
+    /// fails leaves it in `pendingFallback`, and `readPending()` retries it --
+    /// which `claim()` reaches on its way out -- so the referrer became
+    /// durable with the flag unburnt, and Play answered the same install again
+    /// on a later launch, restoring an attribution a reset had removed.
+    private static void ackReferrer(Map<String, String> record) {
+        if (!referrerAwaitingAck
+                || !"install_referrer".equals(record.get("codeSource"))) {
+            return;
+        }
+        InstallReferrerSource source = referrerSource;
+        if (source == null) {
+            referrerAwaitingAck = false;
+            return;
+        }
+        boolean told = true;
+        try {
+            source.referrerPersisted();
+        } catch (Throwable t) {
+            Log.e(t);
+            told = false;
+        }
+        if (told) {
+            referrerAwaitingAck = false;
+        }
+    }
+
+    // True when a referrer has been handed over and not yet made durable. The
+    // source is holding a one-shot flag until it is.
+    private static boolean referrerAwaitingAck;
 
     private static void ackHandoff(Map<String, String> record) {
         if (!handoffAwaitingAck || !"app_clip".equals(record.get("codeSource"))) {
@@ -2598,13 +2634,16 @@ public final class Invites {
                             // inside the marshalling window. A failed write
                             // leaves the flag unburnt, so the next launch asks
                             // again, which is the outcome a retry can fix.
-                            if (writePending(pending)) {
-                                try {
-                                    source.referrerPersisted();
-                                } catch (Throwable t) {
-                                    Log.e(t);
-                                }
-                            }
+                            // Owed from here until the record is durable,
+                            // which may be this write or a later retry of it.
+                            // writePending() reports it either way -- keying
+                            // it on this call alone missed the retry inside
+                            // readPending(), which claim() reaches on its way
+                            // out, so the record became durable with the
+                            // one-shot flag left unburnt and Play answered the
+                            // same install again after a reset.
+                            referrerAwaitingAck = true;
+                            writePending(pending);
                             claim(code, "install_referrer",
                                     rawReferrer == null ? "" : rawReferrer,
                                     MATCH_REFERRER, true,
