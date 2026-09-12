@@ -979,7 +979,7 @@ static void init_gc_thresholds() {
  * happens before comments are removed, so an unbackslashed comment line inside
  * the macro would silently end the definition.
  */
-#define CN1_DEFINE_PRIMITIVE_CLASS(cname, jname) \
+#define CN1_DEFINE_PRIMITIVE_CLASS_ARR(cname, jname, arrCls) \
 struct clazz cn1_primitive_class_##cname = { \
     .__codenameOneParentClsReference = &class__java_lang_Class, \
     .classId = CN1_PRIMITIVE_CLASS_ID, \
@@ -987,6 +987,7 @@ struct clazz cn1_primitive_class_##cname = { \
     .isArray = JAVA_FALSE, \
     .dimensions = 0, \
     .arrayType = 0, \
+    .arrayClass = arrCls, \
     .primitiveType = JAVA_TRUE, \
     .baseClass = 0, \
     .baseInterfaces = EMPTY_INTERFACES, \
@@ -994,14 +995,23 @@ struct clazz cn1_primitive_class_##cname = { \
     .initialized = JAVA_TRUE \
 }
 
-CN1_DEFINE_PRIMITIVE_CLASS(int, "int");
-CN1_DEFINE_PRIMITIVE_CLASS(long, "long");
-CN1_DEFINE_PRIMITIVE_CLASS(short, "short");
-CN1_DEFINE_PRIMITIVE_CLASS(byte, "byte");
-CN1_DEFINE_PRIMITIVE_CLASS(char, "char");
-CN1_DEFINE_PRIMITIVE_CLASS(float, "float");
-CN1_DEFINE_PRIMITIVE_CLASS(double, "double");
-CN1_DEFINE_PRIMITIVE_CLASS(boolean, "boolean");
+/*
+ * arrayClass is what java.lang.reflect.Array.newInstance resolves int.class to
+ * before allocating; left zero the reflective allocator rejects every primitive
+ * array outright. void is the one that stays zero on purpose -- void[] does not
+ * exist, so Array.newInstance(void.class, n) must keep throwing.
+ */
+#define CN1_DEFINE_PRIMITIVE_CLASS(cname, jname) \
+    CN1_DEFINE_PRIMITIVE_CLASS_ARR(cname, jname, 0)
+
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(int, "int", &class_array1__JAVA_INT);
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(long, "long", &class_array1__JAVA_LONG);
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(short, "short", &class_array1__JAVA_SHORT);
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(byte, "byte", &class_array1__JAVA_BYTE);
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(char, "char", &class_array1__JAVA_CHAR);
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(float, "float", &class_array1__JAVA_FLOAT);
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(double, "double", &class_array1__JAVA_DOUBLE);
+CN1_DEFINE_PRIMITIVE_CLASS_ARR(boolean, "boolean", &class_array1__JAVA_BOOLEAN);
 CN1_DEFINE_PRIMITIVE_CLASS(void, "void");
 
 struct clazz class_array1__JAVA_BOOLEAN = {

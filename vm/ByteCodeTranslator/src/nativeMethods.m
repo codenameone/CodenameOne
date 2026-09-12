@@ -610,7 +610,25 @@ JAVA_OBJECT java_lang_reflect_Array_newInstanceImpl___java_lang_Class_int_R_java
         throwException(threadStateData, ex);
         return NULL;
     }
-    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz->arrayClass, sizeof(JAVA_OBJECT), 1);
+    // Element WIDTH, not sizeof(JAVA_OBJECT). This allocator only ever saw
+    // reference component types before, because a primitive class object did not
+    // exist to pass in -- Integer.TYPE and friends were null. Now that they do,
+    // allocating an int[] at 8 bytes per element would size the block off the end
+    // of what the array header declares, so the width has to come from the
+    // component type.
+    int cn1ElemSize = (int)sizeof(JAVA_OBJECT);
+    if (clz->primitiveType) {
+        if (clz == &cn1_primitive_class_boolean || clz == &cn1_primitive_class_byte) {
+            cn1ElemSize = 1;
+        } else if (clz == &cn1_primitive_class_char || clz == &cn1_primitive_class_short) {
+            cn1ElemSize = 2;
+        } else if (clz == &cn1_primitive_class_int || clz == &cn1_primitive_class_float) {
+            cn1ElemSize = 4;
+        } else if (clz == &cn1_primitive_class_long || clz == &cn1_primitive_class_double) {
+            cn1ElemSize = 8;
+        }
+    }
+    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz->arrayClass, cn1ElemSize, 1);
     finishedNativeAllocations();
     return out;
 }
@@ -2030,7 +2048,10 @@ JAVA_OBJECT java_lang_Class_cn1EmbeddedResource___java_lang_String_R_byte_1ARRAY
     }
     int len = 0;
     const unsigned char* data = cn1FindResource(n, &len);
-    if(data == 0 || len <= 0) {
+    // A NULL pointer means "not found". A zero LENGTH does not -- an embedded
+    // resource is allowed to be empty, and getResourceAsStream must hand back an
+    // empty stream for one rather than null, which callers read as absent.
+    if(data == 0 || len < 0) {
         return JAVA_NULL;
     }
     JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(threadStateData, len);

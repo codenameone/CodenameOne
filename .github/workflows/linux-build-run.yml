@@ -338,15 +338,12 @@ jobs:
           # frames (e.g. a stack overflow's recursion / the caller that ran CN1 on a small
           # native stack). The suite binary is not stripped, so addr2line resolves them.
           elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
-          # Ship the unstripped binary with the artifact: a core or a raw backtrace
-          # is addresses and nothing else once the runner is gone.
-          if [ -n "$elf" ]; then
-            cp "$elf" "$(dirname "$CN1_APP_LOG_TEE")/LinuxHelloMain" 2>/dev/null || true
-          fi
-          for core in /tmp/cn1-cores/core.*; do
-            [ -f "$core" ] || continue
-            cp "$core" "$(dirname "$CN1_APP_LOG_TEE")/" 2>/dev/null || true
-          done
+          # The binary and the cores are NOT copied here. "Package core dump for
+          # offline autopsy" below already ships the unstripped ELF (plus .debug)
+          # and zstd-compresses each core into its own artifact. Copying them into
+          # the screenshot directory as well would upload multi-gigabyte cores twice
+          # on exactly the runs that crashed -- the runs whose screenshots and
+          # backtrace most need to survive the disk and upload budget.
           if [ -n "$elf" ] && [ -f "$CN1_APP_LOG_TEE" ]; then
             {
               echo "=== addr2line of CN1 backtrace addresses (from app log) ==="

@@ -887,7 +887,20 @@ public class ByteCodeTranslator {
         }
         copyRuntimeResource(srcRoot, "cn1_globals.m");
         copyRuntimeResource(srcRoot, "nativeMethods.m");
-        copyRuntimeResource(srcRoot, "java_io_File.m");
+        // java_io_File_RUNTIME.m, not java_io_File.m. When the application retains
+        // java.io.File -- which the filesystem fallback makes ordinary -- Parser
+        // .writeOutput emits the translated class to java_io_File.m and overwrites
+        // the port's hand-written native that was copied here first. The generated
+        // File.exists() then has no existsImpl to link against.
+        //
+        // OBSERVED as `Undefined symbols: _java_io_File_existsImpl ... referenced
+        // from _java_io_File_exists___R_boolean in java_io_File.o` on the iOS legs.
+        // The clean target already avoids the same collision by emitting
+        // java_io_File_runtime.c; this is that fix for the Apple path. The name only
+        // has to differ from the generated one -- the compiler globs the directory,
+        // and NativeSignatureVerifier reads the RESOURCE "/java_io_File.m" rather
+        // than the emitted filename.
+        copyRuntimeResource(srcRoot, "java_io_File.m", "java_io_File_runtime.m");
 
         if (Util.getProperty("USE_RPMALLOC", "false").equals("true")) {
             copyRuntimeResource(srcRoot, "malloc.c");

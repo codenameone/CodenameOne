@@ -40,6 +40,11 @@ public final class Class<T> implements java.lang.reflect.Type {
     
     
     public ClassLoader getClassLoader() {
+        if (isPrimitive()) {
+            // A primitive class is bootstrap-defined and must report null, which is
+            // what reflection code tests to tell such a type from a loaded one.
+            return null;
+        }
         return ClassLoader.getSystemClassLoader();
     }
 
@@ -54,11 +59,21 @@ public final class Class<T> implements java.lang.reflect.Type {
      * Returns the Class object for {@code className}.
      *
      * ParparVM links the whole program ahead of time, so there is no second class
-     * loader to consult and nothing to defer: both extra arguments are accepted and
-     * ignored, and the class is resolved exactly as the one-argument form resolves
-     * it. The overload exists because library bytecode calls it -- ASM's
+     * loader to consult: both extra arguments are accepted and ignored, and the
+     * class is resolved exactly as the one-argument form resolves it. The overload
+     * exists because library bytecode calls it -- ASM's
      * ClassWriter.getCommonSuperClass does -- and an absent overload is a link
      * error in translated code, not a compile error here.
+     *
+     * &lt;p&gt;What {@code initialize == true} does NOT do here: it does not run the
+     * named class's static initializer. ParparVM runs one on first use -- the
+     * generated code calls the class's static initializer at every NEW, GETSTATIC
+     * and INVOKESTATIC -- so any code that goes on to TOUCH the class sees its
+     * statics initialized as normal. What does not work is using forName purely for
+     * a registration side effect and never referencing the class again, the
+     * JDBC-driver idiom. That pattern cannot work on this platform for a second
+     * reason anyway: obfuscation rewrites class names, so a name looked up as a
+     * string does not survive a release build.
      */
     public static java.lang.Class forName(java.lang.String className, boolean initialize,
             ClassLoader loader) throws java.lang.ClassNotFoundException {
@@ -301,6 +316,12 @@ public final class Class<T> implements java.lang.reflect.Type {
      * Creates a new instance of a class.
      */
     public java.lang.Object newInstance() throws java.lang.InstantiationException, java.lang.IllegalAccessException {
+        if (isPrimitive()) {
+            // A primitive descriptor has no constructor, and its newInstanceFp is
+            // zero -- the native calls that pointer unconditionally, so letting one
+            // through jumps to address zero instead of throwing.
+            throw new InstantiationException();
+        }
         Object o = newInstanceImpl();
         if(o == null) {
             throw new InstantiationException();
@@ -319,6 +340,11 @@ public final class Class<T> implements java.lang.reflect.Type {
      * returns "void".
      */
     public java.lang.String toString() {
+        if (isPrimitive()) {
+            // "int", not "int class" -- java.lang.Class documents the primitive form
+            // as the name alone.
+            return getName();
+        }
         return getName() + " class";
     }
 
