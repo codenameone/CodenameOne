@@ -263,6 +263,13 @@ jobs:
           # The Windows pipeline passes a real boolean, which is why its gate
           # works. 'true' arms it here.
           CN1_REQUIRE_SUITE: 'true'
+          # Full DWARF into the <exe>.debug companion. The generated project defaults to
+          # -g1 -- lines and function names only -- so a core from this suite decodes to a
+          # backtrace and nothing else: every frame answers "No locals". That is what left
+          # the intermittent SIGSEGV here undiagnosed across four occurrences. The binary
+          # itself is still stripped; only the companion grows, and it is uploaded beside
+          # the core so the crash can be autopsied off the runner.
+          CN1_LINUX_FULL_DEBUG: 'true'
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a
@@ -271,7 +278,17 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -e
-          bash scripts/ci/apt-get-install.sh gdb >/dev/null 2>&1 || true
+          # Not silenced, and the outcome is stated. The hang dump attaches gdb from
+          # inside the test JVM, so an install that quietly failed here produced a
+          # hang-stacks.txt with nothing but sample headers -- which is how four
+          # occurrences of the suite stall ended up with no evidence at all. Still
+          # best-effort: a runner without gdb must not fail the suite, it must say so.
+          bash scripts/ci/apt-get-install.sh gdb || echo "WARNING: gdb install failed"
+          if command -v gdb >/dev/null 2>&1; then
+            echo "gdb available: $(gdb --version | head -1)"
+          else
+            echo "WARNING: gdb is NOT on PATH -- a hang in this job will capture no thread stacks."
+          fi
           Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb-run.log 2>&1 &
           export DISPLAY=:99
           sleep 2
@@ -338,6 +355,63 @@ jobs:
           name: linux-screenshot-raw-${{ matrix.arch }}
           path: artifacts/linux-port/raw
           if-no-files-found: warn
+          retention-days: 14
+
+      # The core itself, with everything needed to decode it off the runner: the
+      # stripped ELF the core refers to and its .debug companion. crash-stacks.txt is
+      # only ever the backtrace gdb could produce in-place; a real autopsy -- printing
+      # the object a faulting pointer came from, the slot beside it, the register that
+      # held it -- needs the core in hand. Cores of this app run to hundreds of MB, so
+      # they are compressed, capped, and collected ONLY when one exists, which means
+      # only when the suite actually crashed.
+      - name: Package core dump for offline autopsy
+        if: always()
+        run: |
+          set -u
+          shopt -s nullglob
+          cores=(/tmp/cn1-cores/core.*)
+          if [ ${#cores[@]} -eq 0 ]; then
+            echo "no core dumped -- nothing to package"
+            exit 0
+          fi
+          out="${GITHUB_WORKSPACE}/artifacts/linux-port/core"
+          mkdir -p "$out"
+          elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+          if [ -n "$elf" ]; then
+            cp "$elf" "$out/" || true
+            [ -f "$elf.debug" ] && cp "$elf.debug" "$out/" || true
+          fi
+          for c in "${cores[@]}"; do
+            sz=$(stat -c%s "$c" 2>/dev/null || echo 0)
+            echo "core $c is $((sz/1024/1024))MB"
+            # zstd where available (far faster on a GB-scale core), else gzip.
+            if command -v zstd >/dev/null 2>&1; then
+              zstd -q -T0 -3 -o "$out/$(basename "$c").zst" "$c" || true
+            else
+              gzip -c "$c" > "$out/$(basename "$c").gz" || true
+            fi
+          done
+          echo "--- packaged ---"; ls -la "$out"
+          cat > "$out/README.txt" <<'TXT'
+          Decode this core off the runner:
+
+            zstd -d core.LinuxHelloMain.*.zst      # or gunzip for the .gz
+            gdb ./LinuxHelloMain ./core.LinuxHelloMain.*
+
+          LinuxHelloMain.debug must sit beside the binary -- it is linked by
+          --add-gnu-debuglink and carries all the DWARF, because the shipped binary is
+          stripped. Built with CN1_LINUX_FULL_DEBUG so variables and types are present:
+          "info locals", "p *someObject" and "info registers" all work, which they do
+          not on a default -g1 build.
+          TXT
+
+      - name: Upload core dump
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-core-${{ matrix.arch }}
+          path: artifacts/linux-port/core
+          if-no-files-found: ignore
           retention-days: 14
 
       # A runnable, self-contained windowed demo binary for this arch (opens a

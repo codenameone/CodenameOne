@@ -230,6 +230,12 @@ class WatchNativeBuilder {
             + "LocalAuthentication.framework;MobileCoreServices.framework;"
             + "NaturalLanguage.framework;NetworkExtension.framework;PhotosUI.framework;"
             + "QuartzCore.framework;Security.framework;UserNotifications.framework;"
+            // In every project's link phase (ByteCodeTranslator.includeFrameworks), and present in
+            // BOTH watch SDKs -- verified against WatchOS26.2 and WatchSimulator26.2, the pair
+            // BackgroundTasks taught us to check separately. The watch slice really does reference
+            // it: CN1DragAndDrop.m's MIME-to-identifier mapping is outside the UIKit guard, so the
+            // UTType class is compiled for the watch the same as everywhere else.
+            + "UniformTypeIdentifiers.framework;"
             // Linked on the iOS slice alongside ContactsUI when the app references
             // com.codename1.contacts.ContactPicker. Present in both watch SDKs, and the watch
             // never calls into it -- but a framework that IS there links harmlessly, and

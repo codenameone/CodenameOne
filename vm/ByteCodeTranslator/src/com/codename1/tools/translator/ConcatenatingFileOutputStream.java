@@ -72,6 +72,15 @@ public class ConcatenatingFileOutputStream extends java.io.OutputStream {
                 FileOutputStream pfos = new FileOutputStream(destFile);
                 pfos.write(byteArrayOutputStream.toByteArray());
                 pfos.close();
+                // Generated, and the compiler will name THIS file in any diagnostic --
+                // the per-class identity is gone by now, which is why the warning census
+                // keys generated code on the emitter rather than the file. Recording it
+                // is still what keeps a warning from a concatenated unit attributable at
+                // all: unrecorded, it matches no manifest entry and no external-path
+                // marker, and the census refuses the whole build rather than guess.
+                // macOS translates this way unconditionally, and iOS does under
+                // ios.superfastBuild.
+                ByteCodeTranslator.sourceManifest.recordGenerated(destFile.getName());
             }
         }
     }

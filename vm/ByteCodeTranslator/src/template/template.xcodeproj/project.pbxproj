@@ -278,11 +278,19 @@
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_EMPTY_BODY = NO;
+				/* Both of these were off, along with three others, to quieten the
+				   translated C. A census of a full application build with all five
+				   forced on found ZERO of either -- in generated code, in the
+				   ParparVM runtime, in the iOS port natives and in the pods. They
+				   were suppressing nothing, so turning them on costs nothing and an
+				   application author gets them for their own native code too. The
+				   other three do still fire and stay off until what they find is
+				   fixed; the counts are in scripts/native-warnings/. */
+				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = NO;
 				CLANG_WARN_INT_CONVERSION = NO;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = NO;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
@@ -325,11 +333,19 @@
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_EMPTY_BODY = NO;
+				/* Both of these were off, along with three others, to quieten the
+				   translated C. A census of a full application build with all five
+				   forced on found ZERO of either -- in generated code, in the
+				   ParparVM runtime, in the iOS port natives and in the pods. They
+				   were suppressing nothing, so turning them on costs nothing and an
+				   application author gets them for their own native code too. The
+				   other three do still fire and stay off until what they find is
+				   fixed; the counts are in scripts/native-warnings/. */
+				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = NO;
 				CLANG_WARN_INT_CONVERSION = NO;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = NO;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;

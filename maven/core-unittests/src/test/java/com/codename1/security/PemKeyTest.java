@@ -253,6 +253,89 @@ class PemKeyTest extends UITestBase {
             + "/+kk1lZcl5DdXBwSi5mcV2dUxnlnnl6hRANCAAQuvJBWnyj34TNN2JkU/cNhAunw"
             + "rhvng2GP75DM7w4q4AWLdjtYgYy8K+edaMc7afUeVg3aqMhy6ahN75VzSUuj";
 
+    /// A throwaway self-signed X.509 v3 certificate over the RSA key above, as
+    /// `openssl req -x509` writes it: `[0]` version, `[3]` extensions, and the
+    /// same SubjectPublicKeyInfo as RSA_SPKI seven fields in.
+    private static final String CERT_RSA_LABEL = "CERTIFICATE";
+    private static final String CERT_RSA = ""
+            + "MIIDIzCCAgugAwIBAgIURop8Hd6XYlsSLWsG6QhzmE/XF/UwDQYJKoZIhvcNAQEL"
+            + "BQAwIDEeMBwGA1UEAwwVQ29kZW5hbWUgT25lIFBFTSB0ZXN0MCAXDTI2MDkxMTIy"
+            + "MDgwNVoYDzIxMjYwODE4MjIwODA1WjAgMR4wHAYDVQQDDBVDb2RlbmFtZSBPbmUg"
+            + "UEVNIHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDKbhYepFWu"
+            + "XOHh4TWNdD7dmzDMrurYjI5fJQ5t7JPqblbCVXaxhPH4xmkm0DRfb9XSpiGJMPcV"
+            + "HR4cHW3GYSWiO3SgZer5sahkKzNRUou/Mhw1gEo+rXDedwRk6COyPni6P02R6t+4"
+            + "ayAXpJJmbgzJKrD0eYgWzio6a7UCe6338DsT/viXA7jc3qGuRw3WZgMNUV8itmeE"
+            + "/WnkpQZ871PM8To/5362/ohfCE7wO/9NNiTmNi0yjZxkVbHIbKcaU0qL6ByKGJry"
+            + "HZgtpXYc49mWG+lAfq0+MIAXsr9qugcxHa2MQOVa8ceThbMfEmxFr7f5vLdnSRDD"
+            + "TzTdZA3ieWUTAgMBAAGjUzBRMB0GA1UdDgQWBBRckUl/ziVbuEB8grFjl2z8OJ8D"
+            + "MjAfBgNVHSMEGDAWgBRckUl/ziVbuEB8grFjl2z8OJ8DMjAPBgNVHRMBAf8EBTAD"
+            + "AQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCPLJziv3J7Fd8j5MmfcWIptk9Zi9vfKMMd"
+            + "gjQHtjBcMcDoyLbzuDcX18oZVZm6etWIZMYfm1j7d1A3QwuhfKOrnpDcCKDToUPj"
+            + "6FYbA6aBbJTsOYfmo5MZ8WP1jm8D1ndlvyxcNmuW7dWdq026GBB26FE1X+M7s2wI"
+            + "nsLLGQd2r1PAK05enu2V9VRVS2C2qx49wcOwYc8AT64lRpB3RiHDTAyfX/NYvwhW"
+            + "ML6vHzOSNKWWtZIwDZTsZvPUBs4lu/D8u9cy8Kezyh+Kbb38OL3amlN/af4qZKvm"
+            + "c55CJKvZpIk5up06SNXys6qCXiSQA5+t3FcyfNpFhcKUmHlCorl8";
+
+    /// The same certificate as a v1: no `[0]` version and no `[3]` extensions,
+    /// so the TBSCertificate is the six mandatory fields and nothing else.
+    /// OpenSSL 3 will not write one, so it was made by re-encoding CERT_RSA
+    /// without those two fields -- which invalidates the signature, and nothing
+    /// here verifies signatures.
+    private static final String CERT_RSA_V1 = ""
+            + "MIICyTCCAbECFEaKfB3el2JbEi1rBukIc5hP1xf1MA0GCSqGSIb3DQEBCwUAMCAx"
+            + "HjAcBgNVBAMMFUNvZGVuYW1lIE9uZSBQRU0gdGVzdDAgFw0yNjA5MTEyMjA4MDVa"
+            + "GA8yMTI2MDgxODIyMDgwNVowIDEeMBwGA1UEAwwVQ29kZW5hbWUgT25lIFBFTSB0"
+            + "ZXN0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAym4WHqRVrlzh4eE1"
+            + "jXQ+3ZswzK7q2IyOXyUObeyT6m5WwlV2sYTx+MZpJtA0X2/V0qYhiTD3FR0eHB1t"
+            + "xmElojt0oGXq+bGoZCszUVKLvzIcNYBKPq1w3ncEZOgjsj54uj9NkerfuGsgF6SS"
+            + "Zm4MySqw9HmIFs4qOmu1Anut9/A7E/74lwO43N6hrkcN1mYDDVFfIrZnhP1p5KUG"
+            + "fO9TzPE6P+d+tv6IXwhO8Dv/TTYk5jYtMo2cZFWxyGynGlNKi+gcihia8h2YLaV2"
+            + "HOPZlhvpQH6tPjCAF7K/aroHMR2tjEDlWvHHk4WzHxJsRa+3+by3Z0kQw0803WQN"
+            + "4nllEwIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQCPLJziv3J7Fd8j5MmfcWIptk9Z"
+            + "i9vfKMMdgjQHtjBcMcDoyLbzuDcX18oZVZm6etWIZMYfm1j7d1A3QwuhfKOrnpDc"
+            + "CKDToUPj6FYbA6aBbJTsOYfmo5MZ8WP1jm8D1ndlvyxcNmuW7dWdq026GBB26FE1"
+            + "X+M7s2wInsLLGQd2r1PAK05enu2V9VRVS2C2qx49wcOwYc8AT64lRpB3RiHDTAyf"
+            + "X/NYvwhWML6vHzOSNKWWtZIwDZTsZvPUBs4lu/D8u9cy8Kezyh+Kbb38OL3amlN/"
+            + "af4qZKvmc55CJKvZpIk5up06SNXys6qCXiSQA5+t3FcyfNpFhcKUmHlCorl8";
+
+    /// CERT_RSA with an issuerUniqueID `[1]` and a subjectUniqueID `[2]`
+    /// inserted between the key and the extensions -- the two optional fields
+    /// no certificate authority has issued in decades and which the walk still
+    /// has to step over in the right order. Re-encoded, so unsigned.
+    private static final String CERT_RSA_UNIQUE_IDS = ""
+            + "MIIDMTCCAhmgAwIBAgIURop8Hd6XYlsSLWsG6QhzmE/XF/UwDQYJKoZIhvcNAQEL"
+            + "BQAwIDEeMBwGA1UEAwwVQ29kZW5hbWUgT25lIFBFTSB0ZXN0MCAXDTI2MDkxMTIy"
+            + "MDgwNVoYDzIxMjYwODE4MjIwODA1WjAgMR4wHAYDVQQDDBVDb2RlbmFtZSBPbmUg"
+            + "UEVNIHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDKbhYepFWu"
+            + "XOHh4TWNdD7dmzDMrurYjI5fJQ5t7JPqblbCVXaxhPH4xmkm0DRfb9XSpiGJMPcV"
+            + "HR4cHW3GYSWiO3SgZer5sahkKzNRUou/Mhw1gEo+rXDedwRk6COyPni6P02R6t+4"
+            + "ayAXpJJmbgzJKrD0eYgWzio6a7UCe6338DsT/viXA7jc3qGuRw3WZgMNUV8itmeE"
+            + "/WnkpQZ871PM8To/5362/ohfCE7wO/9NNiTmNi0yjZxkVbHIbKcaU0qL6ByKGJry"
+            + "HZgtpXYc49mWG+lAfq0+MIAXsr9qugcxHa2MQOVa8ceThbMfEmxFr7f5vLdnSRDD"
+            + "TzTdZA3ieWUTAgMBAAGBBQDerb7vggUAyv66vqNTMFEwHQYDVR0OBBYEFFyRSX/O"
+            + "JVu4QHyCsWOXbPw4nwMyMB8GA1UdIwQYMBaAFFyRSX/OJVu4QHyCsWOXbPw4nwMy"
+            + "MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAI8snOK/cnsV3yPk"
+            + "yZ9xYim2T1mL298owx2CNAe2MFwxwOjItvO4NxfXyhlVmbp61Yhkxh+bWPt3UDdD"
+            + "C6F8o6uekNwIoNOhQ+PoVhsDpoFslOw5h+ajkxnxY/WObwPWd2W/LFw2a5bt1Z2r"
+            + "TboYEHboUTVf4zuzbAiewssZB3avU8ArTl6e7ZX1VFVLYLarHj3Bw7BhzwBPriVG"
+            + "kHdGIcNMDJ9f81i/CFYwvq8fM5I0pZa1kjANlOxm89QGziW78Py71zLwp7PKH4pt"
+            + "vfw4vdqaU39p/ipkq+ZznkIkq9mkiTm6nTpI1fKzqoJeJJADn63cVzJ82kWFwpSY"
+            + "eUKiuXw=";
+
+    /// A throwaway self-signed certificate over the EC key above, so the
+    /// extraction is exercised on a key whose AlgorithmIdentifier names a
+    /// curve rather than being the fixed rsaEncryption one.
+    private static final String CERT_EC = ""
+            + "MIIBnDCCAUOgAwIBAgIUMlgbS+kU8jFnOq++G1M0sd1vC0UwCgYIKoZIzj0EAwIw"
+            + "IzEhMB8GA1UEAwwYQ29kZW5hbWUgT25lIFBFTSB0ZXN0IEVDMCAXDTI2MDkxMTIy"
+            + "MDgwNVoYDzIxMjYwODE4MjIwODA1WjAjMSEwHwYDVQQDDBhDb2RlbmFtZSBPbmUg"
+            + "UEVNIHRlc3QgRUMwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR16t1j6j5exfNw"
+            + "dOVqh7zavejexeHi22FUegbfDALznA5Ria4r9zik9nRlB1Ef4Y4BeAH6hE1+PxZJ"
+            + "gz2ZKGueo1MwUTAdBgNVHQ4EFgQUFRGLlO0ZooFlgt09RO7prR3f3zQwHwYDVR0j"
+            + "BBgwFoAUFRGLlO0ZooFlgt09RO7prR3f3zQwDwYDVR0TAQH/BAUwAwEB/zAKBggq"
+            + "hkjOPQQDAgNHADBEAiBuBzW+bXdm6gjQ9dta//gSv/kEJBgqFEBUBk3h1F3PrgIg"
+            + "GmQbLi2NUmX4YQ54SeHF4PA9bpOqmgCum17cAzSW+VA=";
+
     private static String pem(String label, String base64) {
         StringBuilder sb = new StringBuilder("-----BEGIN ").append(label).append("-----\n");
         for (int i = 0; i < base64.length(); i += 64) {
@@ -415,11 +498,290 @@ class PemKeyTest extends UITestBase {
         assertTrue(e.getMessage().contains("PUBLIC KEY"), e.getMessage());
     }
 
+    // ---- the second half of the report: the key arrives inside a certificate ----
+
     @Test
-    void certificateIsRejectedWithTheExtractCommand() {
+    void certificateYieldsItsSubjectPublicKey() {
+        // The case from the discussion: the backend hands out a CERTIFICATE and
+        // the key inside it is the one to encrypt to. What comes out has to be
+        // the SubjectPublicKeyInfo byte for byte -- the same bytes a PUBLIC KEY
+        // block holding that key would have produced.
+        PublicKey pub = PublicKey.fromPem(pem(CERT_RSA_LABEL, CERT_RSA));
+
+        assertEquals(PublicKey.RSA, pub.getAlgorithm());
+        assertEquals("X.509", pub.getFormat());
+        assertArrayEquals(der(RSA_SPKI), pub.getEncoded());
+
+        // and it is a usable key, not merely the right bytes
+        PrivateKey priv = PrivateKey.fromPem(pem(RSA_PKCS8_LABEL, RSA_PKCS8));
+        byte[] plaintext = "Secret message".getBytes();
+        byte[] ciphertext = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, pub, plaintext);
+        assertArrayEquals(plaintext, Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, priv, ciphertext));
+    }
+
+    @Test
+    void certificateWorksForEcKeysToo() {
+        PublicKey pub = PublicKey.fromPem(pem(CERT_RSA_LABEL, CERT_EC));
+        assertEquals(PublicKey.EC, pub.getAlgorithm());
+        assertArrayEquals(der(EC_SPKI), pub.getEncoded());
+    }
+
+    @Test
+    void everyOptionalTbsCertificateFieldIsWalked() {
+        // v1: no [0] version and no [3] extensions at all
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem(pem(CERT_RSA_LABEL, CERT_RSA_V1)).getEncoded());
+
+        // issuerUniqueID [1] and subjectUniqueID [2] sit between the key and
+        // the extensions, so a walk that stops at the key would have taken the
+        // right bytes here by luck and the trailing-field check would not.
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem(pem(CERT_RSA_LABEL, CERT_RSA_UNIQUE_IDS)).getEncoded());
+    }
+
+    @Test
+    void certificateIsAcceptedUnarmoredAndUnderTheOlderLabel() {
+        // bare DER, which is how a certificate arrives in a JWK's x5c entry
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(CERT_RSA).getEncoded());
+
+        // the label OpenSSL wrote before RFC 7468
+        assertArrayEquals(der(RSA_SPKI),
+                PublicKey.fromPem(pem("X509 CERTIFICATE", CERT_RSA)).getEncoded());
+    }
+
+    @Test
+    void theLeafOfAChainIsTheKeyThatComesOut() {
+        // A chain file is leaf first. Taking any other block would hand back an
+        // intermediate's key, which is a different key that fails much later.
+        String chain = pem(CERT_RSA_LABEL, CERT_RSA) + pem(CERT_RSA_LABEL, CERT_EC);
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(chain).getEncoded());
+
+        // "openssl x509 -pubkey" writes the extracted key ahead of the
+        // certificate; both blocks name the same key, and the first wins
+        String both = pem(RSA_SPKI_LABEL, RSA_SPKI) + pem(CERT_RSA_LABEL, CERT_RSA);
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(both).getEncoded());
+    }
+
+    @Test
+    void aCertificateIsNotAPrivateKey() {
+        CryptoException armored = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(pem(CERT_RSA_LABEL, CERT_RSA)));
+        assertTrue(armored.getMessage().contains("CERTIFICATE"), armored.getMessage());
+
+        // unarmored, where there is no label to refuse it by and the shape has
+        // to say so
+        CryptoException bare = assertThrows(CryptoException.class,
+                () -> PrivateKey.fromPem(CERT_RSA));
+        assertTrue(bare.getMessage().contains("certificate"), bare.getMessage());
+    }
+
+    @Test
+    void anOpensslTrustedCertificateSaysWhatItIs() {
+        // Its body is the certificate followed by OpenSSL's trust settings, so
+        // it is two DER elements and cannot be read as a key. Refused for that
+        // reason rather than for the trailing bytes it would otherwise report.
         CryptoException e = assertThrows(CryptoException.class,
-                () -> PublicKey.fromPem(pem("CERTIFICATE", RSA_SPKI)));
+                () -> PublicKey.fromPem(pem("TRUSTED CERTIFICATE", CERT_RSA)));
+        assertTrue(e.getMessage().contains("trusted certificate"), e.getMessage());
         assertTrue(e.getMessage().contains("openssl x509"), e.getMessage());
+    }
+
+    @Test
+    void aTruncatedCertificateIsRefusedRatherThanMisread() {
+        // Every mandatory field before the key is walked, so a certificate that
+        // stops early cannot reach the seventh position and return whatever is
+        // sitting there. Built by cutting fields off the real TBSCertificate.
+        byte[] certificate = der(CERT_RSA);
+        for (int fields = 0; fields < 7; fields++) {
+            byte[] truncated = certificateWithTbsFields(certificate, fields);
+            CryptoException e = assertThrows(CryptoException.class,
+                    () -> PublicKey.fromPem(pem(CERT_RSA_LABEL,
+                            Base64.encodeNoNewline(truncated))),
+                    "a TBSCertificate of " + fields + " fields was accepted");
+            assertTrue(e.getMessage().contains("certificate"), e.getMessage());
+        }
+
+        // and the whole thing still reads, so the loop is not passing because
+        // the fixture is broken
+        assertArrayEquals(der(RSA_SPKI), PublicKey.fromPem(pem(CERT_RSA_LABEL, CERT_RSA))
+                .getEncoded());
+    }
+
+    @Test
+    void aCertificateWhoseSeventhFieldIsNotAKeyIsRefused() {
+        // The position is right and the tag is right; it is the validity period
+        // moved into the key's place. Accepting it on position alone handed a
+        // SEQUENCE of two UTCTimes to the platform as a public key.
+        byte[] certificate = der(CERT_RSA);
+        int[] bounds = tbsFieldBounds(certificate);
+        // field 4 of the TBSCertificate is the validity period
+        byte[] validity = new byte[bounds[9] - bounds[8]];
+        System.arraycopy(certificate, bounds[8], validity, 0, validity.length);
+        byte[] spliced = certificateWithTbs(certificate,
+                concatFields(certificate, bounds, 6), validity);
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(CERT_RSA_LABEL, Base64.encodeNoNewline(spliced))));
+        assertTrue(e.getMessage().contains("subject public key"), e.getMessage());
+    }
+
+    @Test
+    void nothingMayFollowTheOptionalTrailersOfATbsCertificate() {
+        // The three optional trailers are the end of a TBSCertificate. Stopping
+        // at the key would accept a spliced one on the strength of the seven
+        // fields ahead of the splice, which is the whole reason the walk
+        // continues past the thing it came for.
+        byte[] certificate = der(CERT_RSA);
+        int[] bounds = tbsFieldBounds(certificate);
+        byte[] spliced = certificateWithTbs(certificate,
+                concatFields(certificate, bounds, bounds.length / 2), hex("0500"));
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(CERT_RSA_LABEL, Base64.encodeNoNewline(spliced))));
+        assertTrue(e.getMessage().contains("unexpected field"), e.getMessage());
+    }
+
+    @Test
+    void theExtensionsTagHasToHoldAPopulatedSequence() {
+        // "[3] is present" is not "[3] holds extensions": an empty SEQUENCE
+        // breaks Extensions' SIZE (1..MAX), and a [3] holding something else
+        // entirely is a certificate that has been rewritten.
+        byte[] certificate = der(CERT_RSA);
+        int[] bounds = tbsFieldBounds(certificate);
+        byte[] withoutExtensions = concatFields(certificate, bounds, 7);
+
+        CryptoException empty = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(CERT_RSA_LABEL, Base64.encodeNoNewline(
+                        certificateWithTbs(certificate, withoutExtensions, hex("a3023000"))))));
+        assertTrue(empty.getMessage().contains("extensions"), empty.getMessage());
+
+        CryptoException notASequence = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(CERT_RSA_LABEL, Base64.encodeNoNewline(
+                        certificateWithTbs(certificate, withoutExtensions, hex("a3020500"))))));
+        assertTrue(notASequence.getMessage().contains("extensions"), notASequence.getMessage());
+    }
+
+    @Test
+    void aVersionOtherThanV1ToV3IsRefused() {
+        // The version does not change the key that comes out, which is exactly
+        // why it has to be checked: a [0] holding something other than a
+        // version means the field counted on as the serial number is not one,
+        // and the walk would carry on and return the seventh thing it found.
+        byte[] certificate = der(CERT_RSA);
+        byte[] bad = certificate.clone();
+        int at = indexOf(bad, hex("a003020102"));
+        assertTrue(at > 0, "the [0] version was not found in the fixture");
+        bad[at + 4] = 0x07;
+
+        CryptoException e = assertThrows(CryptoException.class,
+                () -> PublicKey.fromPem(pem(CERT_RSA_LABEL, Base64.encodeNoNewline(bad))));
+        assertTrue(e.getMessage().contains("version"), e.getMessage());
+    }
+
+    /// Offsets of the TBSCertificate's fields within `certificate`, as start,
+    /// end pairs -- so field `i` is `[bounds[2 * i], bounds[2 * i + 1])`.
+    private static int[] tbsFieldBounds(byte[] certificate) {
+        int[] out = new int[32];
+        int count = 0;
+        int p = contentStart(certificate, contentStart(certificate, 0));
+        int end = elementEnd(certificate, contentStart(certificate, 0));
+        while (p < end) {
+            int next = elementEnd(certificate, p);
+            out[count++] = p;
+            out[count++] = next;
+            p = next;
+        }
+        int[] trimmed = new int[count];
+        System.arraycopy(out, 0, trimmed, 0, count);
+        return trimmed;
+    }
+
+    private static int contentStart(byte[] der, int at) {
+        int length = der[at + 1] & 0xFF;
+        return length < 0x80 ? at + 2 : at + 2 + (length & 0x7F);
+    }
+
+    private static int elementEnd(byte[] der, int at) {
+        int first = der[at + 1] & 0xFF;
+        if (first < 0x80) {
+            return at + 2 + first;
+        }
+        int count = first & 0x7F;
+        int length = 0;
+        for (int i = 0; i < count; i++) {
+            length = (length << 8) | (der[at + 2 + i] & 0xFF);
+        }
+        return at + 2 + count + length;
+    }
+
+    /// The first `fields` fields of the TBSCertificate, concatenated.
+    private static byte[] concatFields(byte[] certificate, int[] bounds, int fields) {
+        int size = 0;
+        for (int i = 0; i < fields; i++) {
+            size += bounds[2 * i + 1] - bounds[2 * i];
+        }
+        byte[] out = new byte[size];
+        int at = 0;
+        for (int i = 0; i < fields; i++) {
+            int length = bounds[2 * i + 1] - bounds[2 * i];
+            System.arraycopy(certificate, bounds[2 * i], out, at, length);
+            at += length;
+        }
+        return out;
+    }
+
+    /// `certificate` with its TBSCertificate replaced by the first `fields`
+    /// of its own fields, the signature left as it was.
+    private static byte[] certificateWithTbsFields(byte[] certificate, int fields) {
+        return certificateWithTbs(certificate,
+                concatFields(certificate, tbsFieldBounds(certificate), fields), new byte[0]);
+    }
+
+    private static byte[] certificateWithTbs(byte[] certificate, byte[] fields, byte[] extra) {
+        int tbsEnd = elementEnd(certificate, contentStart(certificate, 0));
+        byte[] rest = new byte[certificate.length - tbsEnd];
+        System.arraycopy(certificate, tbsEnd, rest, 0, rest.length);
+        byte[] content = new byte[fields.length + extra.length];
+        System.arraycopy(fields, 0, content, 0, fields.length);
+        System.arraycopy(extra, 0, content, fields.length, extra.length);
+        return tlv(0x30, concat(tlv(0x30, content), rest));
+    }
+
+    private static byte[] tlv(int tag, byte[] content) {
+        byte[] length;
+        if (content.length < 0x80) {
+            length = new byte[] {(byte) content.length};
+        } else if (content.length < 0x100) {
+            length = new byte[] {(byte) 0x81, (byte) content.length};
+        } else {
+            length = new byte[] {(byte) 0x82,
+                (byte) (content.length >> 8), (byte) content.length};
+        }
+        byte[] out = new byte[1 + length.length + content.length];
+        out[0] = (byte) tag;
+        System.arraycopy(length, 0, out, 1, length.length);
+        System.arraycopy(content, 0, out, 1 + length.length, content.length);
+        return out;
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+        byte[] out = new byte[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
+    }
+
+    private static int indexOf(byte[] haystack, byte[] needle) {
+        for (int i = 0; i + needle.length <= haystack.length; i++) {
+            int j = 0;
+            while (j < needle.length && haystack[i + j] == needle[j]) {
+                j++;
+            }
+            if (j == needle.length) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @Test

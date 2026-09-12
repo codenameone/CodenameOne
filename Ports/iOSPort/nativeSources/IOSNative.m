@@ -1665,7 +1665,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     int l = strlen(chr) + 1;
     char cc[l];
     memcpy(cc, chr, l);
-    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
+    Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, (void*)(uintptr_t)n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
                                                                    padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), hintColor, showToolbar, blockCopyPaste, alignment, verticalAlignment, returnExitsEditing);
     POOL_END();
 #endif
@@ -2304,7 +2304,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     CGColorSpaceRelease(cs);
     free(srcBuf); free(dstBuf);
     POOL_END();
-    return resultGl != nil ? (BRIDGE_CAST void*)resultGl : n1;
+    return resultGl != nil ? (JAVA_LONG)(uintptr_t)(BRIDGE_CAST void*)resultGl : n1;
 #endif // !TARGET_OS_WATCH
 }
 
@@ -4187,7 +4187,7 @@ void connectionReceivedData(void* peer, NSData* data) {
 void connectionError(void* peer, NSString* message) {
     POOL_BEGIN();
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG message);
-    com_codename1_impl_ios_IOSImplementation_networkError___long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG peer, str);
+    com_codename1_impl_ios_IOSImplementation_networkError___long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)(uintptr_t)peer, str);
     POOL_END();
 }
 
@@ -15482,7 +15482,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 #endif
 #if defined(USE_ES2) && !defined(CN1_USE_METAL) && !TARGET_OS_WATCH
 
-    __block JAVA_LONG outTexture = NULL;
+    __block JAVA_LONG outTexture = 0;
 
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -15527,7 +15527,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         jbyte* maskArray = malloc(sizeof(jbyte)*ac->width*ac->height);
 
         ac->alphas = maskArray;
-        Renderer_produceAlphas(renderer, ac);
+        Renderer_produceAlphas(r, ac);
         
         _glEnableClientState(GL_VERTEX_ARRAY);
         //glEnableClientState(GL_NORMAL_ARRAY);

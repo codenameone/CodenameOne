@@ -2044,6 +2044,22 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-09-11T17:01:55+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/722f79a6115e/edit",
+        "syndicated_at": "2026-09-11T19:01:34+00:00"
+      }
+    },
+    "dialogs-in-native-windows": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-dialog-can-now-be-a-native-desktop-window",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa49612e6a7f480eca4e6b4",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-12T00:01:13+00:00"
       }
     }
   }

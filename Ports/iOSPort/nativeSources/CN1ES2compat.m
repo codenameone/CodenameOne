@@ -52,33 +52,39 @@ static BOOL CN1ClientState_GL_VERTEX_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_ALPHA_TEXTURE = FALSE;
 static GLenum CN1matrixMode;
 
-GLuint CN1activeProgram = NULL;
+// 0, not NULL. A GL object name is an unsigned integer handle, not a pointer, and
+// 0 is its documented "no object" value; NULL is a pointer constant and
+// initialising an integer with it is what -Wint-conversion reports here. The two
+// happen to be the same bits today, so nothing was broken -- but the warning is
+// the compiler correctly refusing to assume that, and 18 of these were enough to
+// bury the rest of the file's diagnostics.
+GLuint CN1activeProgram = 0;
 
 // Vertex buffers
-static GLuint CN1TextureMaskVertexBuffer = NULL;
-static GLuint CN1TextureRGBAVertexBuffer = NULL;
-static GLuint CN1VertexBuffer = NULL;
-static GLuint CN1VertexColorBuffer = NULL;
+static GLuint CN1TextureMaskVertexBuffer = 0;
+static GLuint CN1TextureRGBAVertexBuffer = 0;
+static GLuint CN1VertexBuffer = 0;
+static GLuint CN1VertexColorBuffer = 0;
 
 // Shader Attributes
-static GLuint CN1TextureMaskCoordAtt = NULL;
-static GLuint CN1TextureRGBACoordAtt = NULL;
-static GLuint CN1VertexCoordAtt = NULL;
-static GLuint CN1VertexColorCoordAtt = NULL;
+static GLuint CN1TextureMaskCoordAtt = 0;
+static GLuint CN1TextureRGBACoordAtt = 0;
+static GLuint CN1VertexCoordAtt = 0;
+static GLuint CN1VertexColorCoordAtt = 0;
 
 // Shader Uniforms
-static GLuint CN1TextureMaskUniform = NULL;
-static GLuint CN1TextureRGBAUniform = NULL;
-static GLuint CN1ColorUniform = NULL;
+static GLuint CN1TextureMaskUniform = 0;
+static GLuint CN1TextureRGBAUniform = 0;
+static GLuint CN1ColorUniform = 0;
 
-static GLuint CN1modelViewMatrixUniform = NULL;
-static GLuint CN1projectionMatrixUniform = NULL;
-static GLuint CN1transformMatrixUniform = NULL;
+static GLuint CN1modelViewMatrixUniform = 0;
+static GLuint CN1projectionMatrixUniform = 0;
+static GLuint CN1transformMatrixUniform = 0;
 
 // Shader Uniform Flags
-static GLuint CN1useVertexColorsUniform = NULL;
-static GLuint CN1useAlphaMaskTextureUniform = NULL;
-static GLuint CN1useRGBATextureUniform = NULL;
+static GLuint CN1useVertexColorsUniform = 0;
+static GLuint CN1useAlphaMaskTextureUniform = 0;
+static GLuint CN1useRGBATextureUniform = 0;
 static BOOL CN1ProgramLoaded = NO;
 
 static BOOL GL_TEXTURE_ENABLED = NO;
