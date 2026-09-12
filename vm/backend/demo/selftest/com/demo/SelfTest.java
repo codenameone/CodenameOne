@@ -43,6 +43,7 @@ import com.codename1.backend.ServerSocket;
 import com.codename1.backend.Tcp;
 import com.codename1.backend.Web;
 import com.codename1.backend.aws.Credentials;
+import com.codename1.backend.aws.ExpiryProbe;
 import com.codename1.backend.aws.S3;
 
 /**
@@ -894,6 +895,44 @@ public class SelfTest {
      * failing Credentials.resolve(), and there is no seam to inject either --
      * S3's constructor is private and resolve() reads the real environment.
      */
+    /**
+     * An expiry that does not exist is refused, rather than read as a later one.
+     *
+     * <p>Every field was taken by position and parsed as digits, and the
+     * arithmetic that follows is a running total -- so February the 31st simply
+     * carried into March and an hour of 99 added four days. Both read LATER than
+     * the provider meant, which is the direction that matters: the credential
+     * would be treated as live after AWS had retired it, and the failure arrives
+     * as an authorization error with nothing pointing at the cause.
+     *
+     * <p>Zero is the answer for everything refused, because that is what
+     * fromJson() turns into its "cannot read this Expiration" error.
+     */
+    private static void anImpossibleExpiryIsRefused() throws Exception {
+        check("a real expiry still parses", "true",
+                String.valueOf(ExpiryProbe.parse("2026-08-28T13:45:00Z") > 0));
+        check("and so does one with fractional seconds", "true",
+                String.valueOf(ExpiryProbe.parse("2026-08-28T13:45:00.123Z") > 0));
+        check("a day that month does not have is refused", "0",
+                String.valueOf(ExpiryProbe.parse("2026-02-31T00:00:00Z")));
+        check("an hour of 99 is refused", "0",
+                String.valueOf(ExpiryProbe.parse("2026-08-28T99:00:00Z")));
+        check("a month of 13 is refused", "0",
+                String.valueOf(ExpiryProbe.parse("2026-13-01T00:00:00Z")));
+        // February the 29th exists in 2028 and not in 2026, and the check has to
+        // know the difference rather than allowing 29 every year.
+        check("the 29th of February is refused in a common year", "0",
+                String.valueOf(ExpiryProbe.parse("2026-02-29T00:00:00Z")));
+        check("and accepted in a leap year", "true",
+                String.valueOf(ExpiryProbe.parse("2028-02-29T00:00:00Z") > 0));
+        // The arithmetic has no notion of an offset, so one would be read as if it
+        // were Zulu and the expiry would move by hours.
+        check("an offset rather than Z is refused", "0",
+                String.valueOf(ExpiryProbe.parse("2026-08-28T13:45:00-05:00")));
+        check("a space where the T belongs is refused", "0",
+                String.valueOf(ExpiryProbe.parse("2026-08-28 13:45:00Z")));
+    }
+
     private static void expiryMarginIsDistinctFromExpiry() throws Exception {
         long now = System.currentTimeMillis();
         // Two minutes of life left: inside a five-minute refresh margin, and not
@@ -1708,6 +1747,7 @@ public class SelfTest {
         aTruncatedMySqlBodyIsRefused();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
         expiryMarginIsDistinctFromExpiry();
+        anImpossibleExpiryIsRefused();
         malformedDatesAreNotDates();
         asciiFoldingIsLocaleIndependent();
         Map parsed = Json.parseObject("{\"a\":1,\"b\":\"two\",\"c\":true,\"d\":null,\"e\":1.5}");

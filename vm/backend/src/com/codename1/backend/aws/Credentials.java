@@ -243,7 +243,33 @@ public final class Credentials {
      * locale-aware and this format is not.
      */
     static long expiryMillis(String iso) {
-        if(iso == null || iso.length() < 19) {
+        if(iso == null || iso.length() < 20) {
+            return 0;
+        }
+        // THE SEPARATORS, because every field below is taken by POSITION. Without
+        // this, anything with digits in the right places parses: "2026-08-28
+        // 13:45:00Z" with a space for the T, or a local time with an offset, which
+        // the arithmetic then reads as if it were UTC.
+        if(iso.charAt(4) != '-' || iso.charAt(7) != '-' || iso.charAt(10) != 'T'
+                || iso.charAt(13) != ':' || iso.charAt(16) != ':') {
+            return 0;
+        }
+        // Optional fractional seconds, then Z and nothing else. An offset is
+        // refused rather than misread: this arithmetic has no notion of one, so
+        // "-05:00" would move the expiry five hours the wrong way.
+        int at = 19;
+        if(iso.charAt(at) == '.') {
+            at++;
+            int digits = 0;
+            while(at < iso.length() && iso.charAt(at) >= '0' && iso.charAt(at) <= '9') {
+                at++;
+                digits++;
+            }
+            if(digits == 0) {
+                return 0;
+            }
+        }
+        if(at != iso.length() - 1 || iso.charAt(at) != 'Z') {
             return 0;
         }
         try {
@@ -253,11 +279,25 @@ public final class Credentials {
             int hour = Integer.parseInt(iso.substring(11, 13));
             int minute = Integer.parseInt(iso.substring(14, 16));
             int second = Integer.parseInt(iso.substring(17, 19));
+            int[] lengths = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+            // A DATE THAT EXISTS. Digits alone are not enough: the arithmetic below
+            // is a running total, so February the 31st simply carries into March
+            // and an hour of 99 adds four days. Both are LATER than the provider
+            // meant, which is the direction that matters -- the credentials would
+            // be treated as live after they had been retired, and the failure would
+            // arrive as an authorization error with no visible cause.
+            if(year < 1970 || month < 1 || month > 12 || day < 1
+                    || hour > 23 || minute > 59 || second > 60) {
+                return 0;
+            }
+            int maxDay = lengths[month - 1] + (month == 2 && isLeap(year) ? 1 : 0);
+            if(day > maxDay) {
+                return 0;
+            }
             long days = 0;
             for(int y = 1970 ; y < year ; y++) {
                 days += isLeap(y) ? 366 : 365;
             }
-            int[] lengths = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
             for(int m = 0 ; m < month - 1 ; m++) {
                 days += lengths[m] + (m == 1 && isLeap(year) ? 1 : 0);
             }

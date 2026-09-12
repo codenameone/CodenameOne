@@ -4242,14 +4242,27 @@ public final class HttpServer {
         int pos = from;
         while(pos < to) {
             int c = raw[pos] & 0xff;
-            if(c == '%' && pos + 2 < to) {
+            if(c == '%') {
+                // EVERY '%' INTRODUCES TWO HEX DIGITS, or the target is malformed.
+                // RFC 3986 leaves no other reading, and this used to fall through
+                // and copy the '%' as a literal byte -- which is valid UTF-8, so
+                // /?name=%ZZ and /x%2 were accepted here and handed to a
+                // hand-written handler's queryParam() as themselves. The generated
+                // routers and StaticFiles both refuse them, so one target was
+                // rejected or served depending on which kind of handler sat behind
+                // it, and an intermediary that normalises escapes could disagree
+                // with all three.
+                if(pos + 2 >= to) {
+                    return false;
+                }
                 int hi = Request.hexDigit(raw[pos + 1] & 0xff);
                 int lo = Request.hexDigit(raw[pos + 2] & 0xff);
-                if(hi >= 0 && lo >= 0) {
-                    out[length++] = (byte)((hi << 4) | lo);
-                    pos += 3;
-                    continue;
+                if(hi < 0 || lo < 0) {
+                    return false;
                 }
+                out[length++] = (byte)((hi << 4) | lo);
+                pos += 3;
+                continue;
             }
             out[length++] = (byte)c;
             pos++;

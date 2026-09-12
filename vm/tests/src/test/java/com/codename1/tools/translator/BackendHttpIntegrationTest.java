@@ -2261,6 +2261,26 @@ class BackendHttpIntegrationTest {
         assertEquals("accented", body(rawSpelling));
     }
 
+    @Test
+    void aMalformedPercentEscapeIsRefused() throws Exception {
+        // RFC 3986 leaves one reading of '%': two hex digits follow it. The server
+        // used to decline to DECODE a malformed escape and then copy it through as
+        // literal bytes, which are valid UTF-8, so the target was accepted and
+        // handed to a hand-written handler as itself -- while the generated routers
+        // and StaticFiles refused the same target. One request, two answers,
+        // depending on which kind of handler sat behind it.
+        assertEquals(400, statusOf(rawGet("/healthz?name=%ZZ")),
+                "a non-hex escape is not a target");
+        assertEquals(400, statusOf(rawGet("/healthz?name=%2")),
+                "and neither is a truncated one");
+        assertEquals(400, statusOf(rawGet("/healthz%")),
+                "nor a bare percent at the end");
+        // The well-formed spelling of the same thing still works, so what was
+        // refused is the malformation and not the escape.
+        assertEquals(200, statusOf(rawGet("/healthz?name=%41")),
+                "a well-formed escape is still served");
+    }
+
     /**
      * A GET whose target is written as exactly these octets.
      *
