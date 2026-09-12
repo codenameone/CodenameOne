@@ -233,6 +233,67 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void ignoresAControllerWhoseSourceIsGone() throws Exception {
+        // Maven does not clean target/classes on its own, so the .class of a
+        // controller whose .java was deleted or renamed is still sitting there and
+        // still carries the annotation. Generating from it republishes the routes
+        // of a controller the project no longer has.
+        File classes = compile(CONTROLLER_SOURCE);
+        File emptySourceRoot = tmp.newFolder();
+        ProcessorContext ctx = run(classes,
+                Collections.singletonList(emptySourceRoot.getAbsolutePath()));
+        assertFalse("a class with no backing source must not be treated as an error",
+                ctx.hasErrors());
+        assertNull("the routes of a deleted controller were generated again",
+                ctx.getEmittedResources()
+                        .get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE));
+        assertTrue("no router may be generated for a class with no source: "
+                        + ctx.getEmittedClasses().keySet(),
+                ctx.getEmittedClasses().isEmpty());
+    }
+
+    @Test
+    public void stillGeneratesWhenTheSourceIsThere() throws Exception {
+        // The other direction of the same check: a root that DOES hold the source
+        // must be unaffected. Without this the test above passes for a processor
+        // that never generates anything at all.
+        File classes = compile(CONTROLLER_SOURCE);
+        File root = tmp.newFolder();
+        File pkg = new File(root, "com/example");
+        assertTrue(pkg.mkdirs());
+        writeUtf8(new File(pkg, "Notes.java"), CONTROLLER_SOURCE);
+        ProcessorContext ctx = run(classes,
+                Collections.singletonList(root.getAbsolutePath()));
+        assertNotNull("a controller with its source present must still be generated",
+                ctx.getEmittedResources()
+                        .get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE));
+    }
+
+    @Test
+    public void removesTheMainMarkerWhenNoControllerRemains() throws Exception {
+        // Deleting the last controller used to leave the marker behind, naming a
+        // bootstrap that still chained the routers compiled beside it -- so the
+        // packaging goal went on serving endpoints whose source was gone.
+        File classes = tmp.newFolder();
+        File marker = new File(classes,
+                RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE);
+        assertTrue(marker.getParentFile().mkdirs());
+        writeUtf8(marker, "com.example.BackendApplication");
+        run(classes);
+        assertFalse("a stale backend entry point survived a build with no controllers",
+                marker.exists());
+    }
+
+    private static void writeUtf8(File f, String text) throws Exception {
+        java.io.OutputStream out = new java.io.FileOutputStream(f);
+        try {
+            out.write(text.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+    }
+
+    @Test
     public void namesTheBootstrapForThePackagingGoal() throws Exception {
         ProcessorContext ctx = run(compile(CONTROLLER_SOURCE));
         byte[] name = ctx.getEmittedResources()
@@ -1709,6 +1770,13 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     private ProcessorContext run(File classes) throws Exception {
+        return run(classes, Collections.<String>emptyList());
+    }
+
+    /// Runs with explicit compile source roots, so a test can put the processor in
+    /// front of a class whose `.java` is NOT among them -- a `target/classes`
+    /// left over from before the source was deleted or renamed.
+    private ProcessorContext run(File classes, List<String> compileSourceRoots) throws Exception {
         Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
         RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
         List<String> cp = new java.util.ArrayList<String>();
@@ -1717,7 +1785,7 @@ public class RestControllerAnnotationProcessorTest {
         }
         ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
                 new SystemStreamLog(), tmp.newFolder(), new Properties(), null,
-                Collections.<String>emptyList(), "UTF-8", cp);
+                compileSourceRoots, "UTF-8", cp);
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
             if (!cls.getClassAnnotations().isEmpty()) {

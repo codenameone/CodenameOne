@@ -205,6 +205,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (cls.getClassAnnotation(CONTROLLER) == null) {
             return;
         }
+        // A CLASS WHOSE SOURCE IS GONE is not a controller any more. Maven leaves
+        // the old .class in target/classes when a source file is deleted or moved
+        // and the module is rebuilt without clean, so a controller that no longer
+        // exists went on generating its router and the cn1-backend-main marker --
+        // and its endpoints went on being packaged and served, which is the one
+        // outcome nobody would look for after deleting the file.
+        //
+        // Answered conservatively by the check BuildHintAnnotationProcessor
+        // already uses for the same problem: only a class it can positively show
+        // has no source is skipped, so a live one is never dropped.
+        if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                ctx.getSourceEncoding())) {
+            return;
+        }
         if (cls.isInterface() || cls.isAbstract()) {
             ctx.error(cls, "@RestController must be a concrete class: " + cls.getBinaryName());
             return;
@@ -999,7 +1013,26 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
-        if (ctx.hasErrors() || controllers.isEmpty()) {
+        if (ctx.hasErrors()) {
+            return;
+        }
+        if (controllers.isEmpty()) {
+            // NOTHING LEFT, so a marker from an earlier build has to go. Maven
+            // keeps target/classes across a build without clean, and returning
+            // early without this left the marker naming a bootstrap that still
+            // chains the routers compiled beside it -- the endpoints of
+            // controllers that no longer exist, packaged and served.
+            //
+            // The generated classes themselves are left alone on purpose: with no
+            // marker nothing names them as an entry point, and deleting .class
+            // files by pattern out of an output directory this processor does not
+            // own is a worse trade than leaving them unreferenced.
+            File marker = new File(ctx.getOutputClassDir(), MAIN_CLASS_RESOURCE);
+            if (marker.isFile() && !marker.delete()) {
+                ctx.getLog().warn("could not remove the stale " + MAIN_CLASS_RESOURCE
+                        + "; a build without clean may still package a backend entry "
+                        + "point for controllers that no longer exist");
+            }
             return;
         }
         Map<String, String> sources = new LinkedHashMap<String, String>();
