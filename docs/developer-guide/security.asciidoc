@@ -412,6 +412,10 @@ To use a key that was generated outside the app, feed the DER bytes to the stati
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava040Snippet.java[tag=security-java-040,indent=0]
 ----
 
+A key that arrives as a file is usually PEM rather than raw DER -- base64 between `-----BEGIN-----` lines -- so `PublicKey.fromPem` and `PrivateKey.fromPem` take that text, or the bytes of the file straight from `Util.readInputStream`, and work out the algorithm from the key itself.
+
+`fromPem` also reads the containers that aren't the one the platform wants: the older PKCS#1 `RSA PRIVATE KEY` and SEC1 `EC PRIVATE KEY` blocks, and the `-----BEGIN CERTIFICATE-----` file a server or payment gateway is more likely to hand out than a bare key, whose subject public key it uses. It doesn't verify the certificate -- neither its signature nor its dates -- it only reads the key out of it, so a certificate you didn't already trust is no more trustworthy for having been parsed here.
+
 The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WITH_RSA`, `SHA384_WITH_RSA`, `SHA512_WITH_RSA`, `SHA256_WITH_ECDSA`, `SHA384_WITH_ECDSA`, and `SHA512_WITH_ECDSA`.
 
 ==== JSON Web Tokens
@@ -546,6 +550,8 @@ The string constants exposed by these classes are listed below so you can pick t
 | `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`
 | Same as the JWT `alg` header value
 |===
+
+NOTE: `RSA_OAEP_SHA256` uses SHA-256 for the label hash and for MGF1 alike. The JCE reading of that same transformation name leaves MGF1 on SHA-1, so a JVM backend that names the string and nothing else produces a `BadPaddingException` against ciphertext from a Codename One app, and the other way round. Codename One can't follow the JCE here: Web Crypto and Apple's SecKey both take one hash and apply it to both, so the split pairing can't be expressed on the JavaScript or iOS ports at all. Have the other side name SHA-256 for the mask as well, which on a JVM means passing an `OAEPParameterSpec` of `("SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT)` to `Cipher.init` rather than relying on the provider default. Dropping to `RSA_PKCS1` also makes the two sides agree, and is the wrong fix: PKCS#1 v1.5 encryption padding is what OAEP exists to replace.
 
 ==== Key sizes and recommended defaults
 
