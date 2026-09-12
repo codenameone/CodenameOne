@@ -6952,10 +6952,31 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             // sleep-until-done park. See cn1GcMutatorAssist.
             if(!threadStateData->threadBlockedByGC
                     && cn1GcMutatorAssist(threadStateData) > 0) {
-                // PROBE: the safepoint park added by this PR is withdrawn here. It
-                // is the last change this branch makes to GC/thread interaction, and
-                // everything else has been eliminated by measurement. Restore it
-                // (with the iOS force-stop rationale) once the answer is in.
+                // HONOUR A STOP REQUESTED WHILE WE WERE ASSISTING.
+                //
+                // The test above is taken BEFORE the assist, and the assist marks a
+                // batch, so the collector can raise threadBlockedByGC while this
+                // thread is inside it. Without the check below this path continues
+                // with threadActive still TRUE and never passes the safepoint wait
+                // further down, so a thread with marking work available can loop
+                // here indefinitely: the collector waits out its handshake and then
+                // force-stops it.
+                //
+                // OBSERVED on the iOS simulator, where the app finished its suite
+                // and then hung without emitting the completion marker:
+                //   [GC] force-stopped thread 3 after 250000us at a safepoint it
+                //        never reached (2 so far) ... (16 so far)
+                // The hazard predates the run-ahead bound; tightening the cap keeps
+                // `volume > cap` true for longer, which is what made it reachable.
+                if(threadStateData->threadBlockedByGC) {
+                    threadStateData->threadActive = JAVA_FALSE;
+                    while(threadStateData->threadBlockedByGC) {
+                        if(!cn1VirtualThreadYieldIfVirtual()) {
+                            usleep((JAVA_INT)(500));
+                        }
+                    }
+                    threadStateData->threadActive = JAVA_TRUE;
+                }
                 continue;
             }
             threadStateData->threadActive = JAVA_FALSE;
