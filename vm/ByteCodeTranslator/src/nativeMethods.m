@@ -1997,6 +1997,21 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
  * they are matched by CN1_PRIM_* there.
  */
 JAVA_OBJECT java_lang_Class_getPrimitiveClass___int_R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_INT typeCode) {
+    // java.lang.Class MUST be initialised before one of these is handed out.
+    //
+    // The nine descriptors are static struct clazz, and they are returned as
+    // java.lang.Class OBJECTS: each carries
+    // __codenameOneParentClsReference = &class__java_lang_Class, so every virtual
+    // call on Integer.TYPE and friends -- hashCode, equals, toString, getClass --
+    // dispatches through class__java_lang_Class.vtable. That vtable is malloc'd by
+    // java.lang.Class's own static initialiser, and NOTHING on this path ran it:
+    // the callers are the wrapper classes' clinits (Integer, Boolean, ...), any of
+    // which can be the first class the program touches. Until it runs, the vtable
+    // is the zero a static initialises to.
+    //
+    // The initialiser is idempotent and returns on its completion flag, so this
+    // costs one acquire load once the class is up.
+    __STATIC_INITIALIZER_java_lang_Class(threadStateData);
     switch(typeCode) {
         case 0: return (JAVA_OBJECT)&cn1_primitive_class_int;
         case 1: return (JAVA_OBJECT)&cn1_primitive_class_long;

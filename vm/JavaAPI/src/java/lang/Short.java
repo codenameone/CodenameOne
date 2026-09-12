@@ -27,6 +27,12 @@ package java.lang;
  * Since: JDK1.1, CLDC 1.0
  */
 public final class Short extends Number implements Comparable<Short> {
+
+    /**
+     * The class object for the primitive type this class wraps.
+     */
+    public static final Class<Short> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_SHORT);
+
     /**
      * The maximum value a Short can have.
      * See Also:Constant Field Values
