@@ -1053,16 +1053,24 @@ struct clazz class_array3__JAVA_DOUBLE = {
 };
 
 
-void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** SP) {
+// Takes SP by value and returns the new one. The previous form took
+// struct elementStruct** and wrote through it, which meant every caller in a
+// frame that declares SP volatile -- the frames that emit setjmp, where the
+// qualifier is what stops longjmp clobbering it -- passed a pointer that
+// discarded the qualifier. Passing the value sidesteps it: the caller's SP keeps
+// whatever qualifiers its own frame gave it, and the assignment back through the
+// POP_MANY macro is an ordinary volatile store where that applies.
+struct elementStruct* cn1PopMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* sp) {
     while(count > 0) {
-        --(*SP);
-        javaTypes t = (*SP)->type;
+        --sp;
+        javaTypes t = sp->type;
         if(t == CN1_TYPE_DOUBLE || t == CN1_TYPE_LONG) {
             count -= 2;
         } else {
             count--;
         }
     }
+    return sp;
 }
 
 
@@ -14095,7 +14103,10 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     memcpy((*dat).data, chars, length * sizeof(JAVA_ARRAY_BYTE));
     java_lang_String___INIT_____byte_1ARRAY_java_lang_String(threadStateData, s, (JAVA_OBJECT)dat, utf8String);
     struct obj__java_lang_String* nnn = (struct obj__java_lang_String*)s;
-    nnn->java_lang_String_nsString = str;
+    // The field is a JAVA_LONG carrying a retained NSString peer -- the read side
+    // casts back with (void*)s->java_lang_String_nsString, so say so on the way in
+    // rather than letting the compiler convert a pointer to an integer silently.
+    nnn->java_lang_String_nsString = (JAVA_LONG)(uintptr_t)str;
     [str retain];
     // The retained NSString peer must be released when this String's slot is
     // reclaimed. With String.finalize() gone, peer release happens in the BiBOP

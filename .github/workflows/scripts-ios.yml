@@ -267,6 +267,18 @@ jobs:
           CN1SS_FAIL_ON_MISMATCH: '1'
           CN1SS_ALLOWED_MISSING: '0'
           CN1SS_PORT_ID: ios-gl
+          # Count this build's compiler warnings and attribute each to whoever owns
+          # the code. This leg is the one that can: it sets no CN1_IOS_DERIVED_DATA,
+          # so run-ios-ui-tests.sh wipes its derived data and compiles every
+          # translation unit from cold -- an incremental build reports no warnings
+          # and is indistinguishable from a clean codebase. Its path filters are
+          # also a superset of the other iOS legs', so a PR touching only
+          # CodenameOne/src is still covered.
+          CN1_WARNING_CENSUS: '1'
+          CN1_WARNING_LEG: ios-sim-debug
+          # build-ios-app.sh stages the manifest under the default artifacts dir,
+          # which is not the per-step one above.
+          CN1_WARNING_MANIFEST: ${{ github.workspace }}/artifacts/cn1-source-manifest.txt
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -303,6 +315,8 @@ jobs:
             artifacts/*-stats.txt
             artifacts/vm_time.txt
             artifacts/xcodebuild-list.txt
+            artifacts/cn1-source-manifest.txt
+            artifacts/ios-ui-tests/native-warnings.json
           if-no-files-found: warn
           retention-days: 14
 

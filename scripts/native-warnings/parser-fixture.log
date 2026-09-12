@@ -1,0 +1,123 @@
+# Hand-authored input for scripts/check-native-warnings.py --self-test.
+#
+# One line for every branch of the parser that has a way to be wrong. Do not
+# regenerate this from a real build: the point is that each line is here because
+# somebody reasoned about it, and a real log would not reliably contain all of
+# them at once.
+#
+# Not a real log format -- comments are simply lines the grammars do not match,
+# which is itself worth asserting.
+
+CompileC /tmp/dd/Objects-normal/arm64/IOSNative.o /tmp/proj/HelloApp-src/IOSNative.m normal arm64 objective-c com.apple.compilers.llvm.clang.1_0.compiler (in target 'HelloApp' from project 'HelloApp')
+# A .metal goes through a DIFFERENT task. Matching only CompileC made it look
+# like a source the build skipped, which is how "in the manifest but not in this
+# target" got confused with "this build was incremental".
+CompileMetalFile /tmp/dd/Metal/default.air /tmp/proj/HelloApp-src/CN1MetalShaders.metal normal arm64 metal com.apple.compilers.metal (in target 'HelloApp' from project 'HelloApp')
+[1/9] Building C object CMakeFiles/HelloApp.dir/HelloApp-src/cn1_globals.c.o
+# The SAME announcement from CMake's other generator. Make counts percent where
+# ninja counts jobs; missing this form made a complete build look like one that
+# compiled nothing, which the completeness guard reports as a hard failure.
+[ 42%] Building C object CMakeFiles/HelloApp.dir/HelloApp-src/cn1_virtual_thread.c.o
+
+# 1. GNU format, flagged. The most common shape.
+/tmp/proj/HelloApp-src/IOSNative.m:4211:9: warning: 'keyWindow' is deprecated: first deprecated in iOS 13.0 [-Wdeprecated-declarations]
+
+# 2. GNU format, NO flag. Cannot be -Wno-'d individually; must parse anyway.
+/tmp/proj/HelloApp-src/cn1_globals.m:913:12: warning: implicit declaration of function 'cn1_missing_helper'
+
+# 3. MSVC/clang-cl location format. Still carries the clang flag.
+C:\build\proj\HelloApp-src\CN1Vpn.m(77,5): warning: unused variable 'unusedLocal' [-Wunused-variable]
+
+# 4-6. The SAME header warning, from two translation units and then from a
+# second architecture. Must dedupe to exactly one: it is one defect, and
+# counting it per TU would make the number depend on how many files include it.
+In file included from /tmp/proj/HelloApp-src/com_codename1_ui_Form.m:3:
+/tmp/proj/HelloApp-src/cn1_globals.h:2201:30: warning: comparison of integer expressions of different signedness [-Wsign-compare]
+In file included from /tmp/proj/HelloApp-src/com_codename1_ui_Label.m:3:
+/tmp/proj/HelloApp-src/cn1_globals.h:2201:30: warning: comparison of integer expressions of different signedness [-Wsign-compare]
+/tmp/proj/HelloApp-src/cn1_globals.h:2201:30: warning: comparison of integer expressions of different signedness [-Wsign-compare]
+
+# 7. A linker diagnostic with no source file at all. ThinLTO puts real findings
+# here, so it has to be captured even though it belongs to no file.
+ld: warning: object file was built for newer iOS version than being linked
+
+# 8. A note. Must be DROPPED, not attached to the warning above it: xcodebuild
+# interleaves parallel target output, so a note is not reliably adjacent to the
+# diagnostic it belongs to.
+/tmp/proj/HelloApp-src/cn1_globals.h:2199:1: note: expanded from macro 'CN1_COMPARE'
+
+# 9. Two generated-code warnings whose only difference is the local's number.
+# These must collapse to ONE baseline row: one emitter, one fix.
+/tmp/proj/HelloApp-src/com_codename1_ui_Form.m:1502:17: warning: unused variable 'locals_3_' [-Wunused-variable]
+/tmp/proj/HelloApp-src/com_codename1_ui_Form.m:1502:17: warning: unused variable 'locals_17_' [-Wunused-variable]
+
+# 10. A source snippet and its caret. Both start with whitespace and neither is
+# a diagnostic; if either matched, every warning would be counted twice.
+ 1502 |     JAVA_OBJECT locals_3_;
+      |                 ^
+
+# ---------------------------------------------------------------------------
+# Splits observed in a real iOS build log (92,129 warnings, ~18 split lines).
+# xcodebuild's output reaches the log through a pipe and a long diagnostic can
+# arrive broken at an arbitrary byte. Three shapes, all found in real output:
+
+# 11. Split inside the PATH. Alone, the second line names a file that does not
+# exist and belongs to nobody; joined, it is com_codename1_ui_Display.m.
+/tmp/proj/HelloApp-src/watch-src/com_c
+odename1_ui_Display.m:5646:5: warning: unused variable 'SP' [-Wunused-variable]
+
+# 12. Split inside the MESSAGE. The first line parses on its own, which is worse
+# than not parsing: it yields the message shape "unuse" and a baseline row that
+# could never match again.
+/tmp/proj/HelloApp-src/com_codename1_ui_Form.m:912:9: warning: unuse
+d variable 'methodBlockOffset' [-Wunused-variable]
+
+# 13. Bytes LOST, not merely split -- the path and location are gone outright, so
+# nothing can put this back. It must be counted as lost rather than attributed to
+# the toolchain, and never baselined: a row keyed on no file can never recur.
+warning: unused variable 'currentOffset' [-Wunused-variable]
+
+# 14. A genuine fileless build-system warning, which looks similar and must NOT be
+# treated as truncation. It carries no [-Wflag], because clang flags belong to
+# file-scoped diagnostics -- that is what separates the two.
+warning: Skipping duplicate build file in Compile Sources build phase
+
+# 15. Split immediately BEFORE a space, so the continuation is indented. This is
+# the shape that reddened CI: excluding every indented line as "probably a source
+# snippet" also excluded this, and the diagnostic kept a truncated message with no
+# flag. Distinguishing it from a real snippet is what the snippet/caret patterns
+# are for; the join must still complete a flag.
+/tmp/proj/HelloApp-src/com_codename1_ui_Button.m:77:9: warning: unused variable 'iterations'
+ [-Wunused-variable]
+
+# 16. A real snippet and caret pair following an UNFLAGGED diagnostic. Neither may
+# be glued on, which is what separates 15 from noise.
+/tmp/proj/HelloApp-src/cn1_globals.m:42:3: warning: implicit declaration of function 'cn1_absent'
+   42 |   cn1_absent();
+      |   ^
+
+# ---------------------------------------------------------------------------
+# Shapes a code review found missing. Each one was being dropped silently, which
+# for a census is the worst failure: the gate reports clean.
+
+# 17. No COLUMN. gcc and several tools emit "path:line: warning: ..." and the
+# grammar used to require :line:col:, so every one of these vanished.
+/tmp/proj/HelloApp-src/cn1_globals.c:77: warning: implicit declaration of function 'cn1_no_column' [-Wimplicit-function-declaration]
+
+# 18. A diagnostic about a FILE with no line at all. Xcode emits these per project.
+/tmp/proj/HelloApp.xcodeproj: warning: The iOS Simulator deployment target is set to 8.0
+
+# 19. A genuine fileless DRIVER warning. It carries a flag AND a tool prefix; the
+# prefix is what separates it from a file-scoped diagnostic whose path the log
+# transport lost, which must not be attributed to anyone.
+clang: warning: argument unused during compilation: '-stdlib=libc++' [-Wunused-command-line-argument]
+
+# 20. A message containing the field delimiter. Unescaped it produces a six-field
+# baseline row that the reader truncates and the format check then rejects.
+/tmp/proj/HelloApp-src/cn1_globals.c:88:5: warning: suggest parentheses around arithmetic in operand of '|' [-Wparentheses]
+
+# 21. Swift, which is announced unlike anything else: the architecture comes
+# second, and the line carries a "Compiling\ A.swift,\ B.swift" summary followed
+# by the paths. Both .swift files below must register as compiled, or adding
+# .swift to the completeness set would fail every build that contains one.
+SwiftCompile normal x86_64 Compiling\ SwiftKotlinNativeImpl.swift,\ CN1WatchApp.swift /tmp/proj/HelloApp-src/SwiftKotlinNativeImpl.swift /tmp/proj/HelloApp-src/CN1WatchApp.swift (in target 'HelloApp' from project 'HelloApp')
