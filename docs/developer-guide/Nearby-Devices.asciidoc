@@ -47,6 +47,8 @@ work across the divide are already in the framework:
 `com.codename1.io.bonjour` plus ordinary sockets when both devices share a
 Wi-Fi network.
 
+image::img/nearby-transport-choice.svg[Which nearby transport suits which pair of devices,scaledwidth=95%]
+
 *Ranging needs `com.codename1.bluetooth`, or something like it.* Both platforms
 require the two devices to swap a token over a channel they already share
 before any radio ranging can begin. A GATT characteristic is the usual channel.
