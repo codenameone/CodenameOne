@@ -83,7 +83,7 @@ and the user can turn the *Incoming calls* notification channel down in
 Settings. Anything below high importance files the notification in the shade
 instead of ringing, so the port treats it as it treats a revoked
 `POST_NOTIFICATIONS`: `Calls.getAvailability()` answers `NOT_PERMITTED` and
-`reportIncomingCall` is refused, rather than reporting a call that rings
+`Calls.reportIncoming` is refused, rather than reporting a call that rings
 nowhere.
 
 *Implement `providerReset`.* It means every call your app had is gone,
