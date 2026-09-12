@@ -160,6 +160,7 @@ public class BackendPackageMojo extends AbstractMojo {
         File runtimeSources = new File(work, "runtime-src");
         File nativeSources = new File(work, "native");
         File translated = new File(work, "translated");
+        File dependencyClasses = new File(work, "dependency-classes");
         // Emptied, not just created. Every one of these is derived, and nothing here
         // removes a file that stopped being produced: a renamed or deleted source
         // left its old .class behind, the translator still read it, and even
@@ -167,8 +168,10 @@ public class BackendPackageMojo extends AbstractMojo {
         // package that came out was the previous implementation. Rebuilding from
         // clean costs nothing, since neither the javac nor the clang pass below was
         // ever incremental.
-        emptyDirs(classes, javaApi, runtimeSources, nativeSources, translated);
-        mkdirs(work, classes, javaApi, runtimeSources, nativeSources, translated);
+        emptyDirs(classes, javaApi, runtimeSources, nativeSources, translated,
+                dependencyClasses);
+        mkdirs(work, classes, javaApi, runtimeSources, nativeSources, translated,
+                dependencyClasses);
 
         // The version of the runtime THIS MODULE compiles against, not the
         // module's own: the sources handed to the translator have to be the same
@@ -194,7 +197,8 @@ public class BackendPackageMojo extends AbstractMojo {
         compile(jdk8, javaApi, runtimeSources, classes);
         generateControllers(classes, work);
         requireMainClass(classes);
-        translate(jdk8, compilerJar, javaApi, classes, nativeSources, translated);
+        translate(jdk8, compilerJar, javaApi, classes, nativeSources, translated,
+                dependencyClasses);
         File binary = output != null ? output
                 : new File(project.getBuild().getDirectory(), project.getArtifactId());
         link(translated, binary);
@@ -451,12 +455,63 @@ public class BackendPackageMojo extends AbstractMojo {
         return out;
     }
 
+    /**
+     * The compile classpath as directories the translator can actually read.
+     *
+     * ByteCodeTranslator walks each input with File.listFiles, which answers NULL
+     * for a jar -- and the walk treats null as an empty directory, so a dependency
+     * resolved from the repository as a jar contributed nothing at all, without a
+     * word. The build then failed much later, while linking, on the symbols of
+     * classes the translator had never been shown. A module in the same reactor
+     * resolves to its target/classes and worked, which is why the generated
+     * project's own contract module never showed this.
+     *
+     * <p>Everything is unpacked into ONE directory, and the classpath is walked
+     * backwards so that the FIRST entry is extracted last and wins a class two
+     * jars both carry. That is javac's rule for the same classpath, and the
+     * alternative -- one input directory per jar -- would hand the translator both
+     * copies to parse.
+     *
+     * <p>cn1-native goes where the runtime jar's natives go, so a dependency that
+     * ships them is built rather than dropped just as quietly. META-INF is skipped
+     * by the same unpacking the runtime gets.
+     *
+     * @param classpath compile classpath elements, in classpath order
+     * @param unpacked directory to unpack jars into; assumed empty
+     * @param nativeSources where a dependency's cn1-native entries belong
+     */
+    private List<String> unpackJarDependencies(List<String> classpath, File unpacked,
+            File nativeSources) throws MojoExecutionException {
+        List<String> out = new ArrayList<String>();
+        boolean anyJar = false;
+        for (int i = classpath.size() - 1; i >= 0; i--) {
+            File element = new File(classpath.get(i));
+            if (element.isDirectory()) {
+                out.add(element.getAbsolutePath());
+            } else if (element.isFile()) {
+                unzip(element, unpacked, nativeSources);
+                anyJar = true;
+            }
+            // An entry that is neither is one javac will complain about; there is
+            // nothing here to unpack and nothing to say that it will not say.
+        }
+        if (anyJar) {
+            out.add(unpacked.getAbsolutePath());
+        }
+        return out;
+    }
+
     private void translate(File jdk8, File compilerJar, File javaApi, File classes,
-            File nativeSources, File translated)
+            File nativeSources, File translated, File dependencyClasses)
             throws MojoExecutionException, MojoFailureException {
         String simpleName = mainClass.substring(mainClass.lastIndexOf('.') + 1);
         String packageName = mainClass.lastIndexOf('.') < 0 ? ""
                 : mainClass.substring(0, mainClass.lastIndexOf('.'));
+
+        // BEFORE the natives are copied below, because a dependency that ships
+        // cn1-native adds to them.
+        List<String> dependencyInputs = unpackJarDependencies(
+                compileClasspathWithoutRuntime(), dependencyClasses, nativeSources);
 
         // The C has to be in the source root BEFORE the translator runs: it reads
         // the directory to decide which native-only Java methods to keep, and the
@@ -488,8 +543,8 @@ public class BackendPackageMojo extends AbstractMojo {
         StringBuilder translatorInput = new StringBuilder();
         translatorInput.append(javaApi.getAbsolutePath())
                 .append(';').append(classes.getAbsolutePath());
-        for (String element : compileClasspathWithoutRuntime()) {
-            translatorInput.append(';').append(element);
+        for (int i = 0; i < dependencyInputs.size(); i++) {
+            translatorInput.append(';').append(dependencyInputs.get(i));
         }
         command.add(translatorInput.toString());
         command.add(translated.getAbsolutePath());
