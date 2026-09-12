@@ -3956,6 +3956,19 @@ public final class Invites {
         // code. Held nowhere else: the outbox goes with an erasure, and the
         // proof goes with it.
         body.put("proof", proof);
+        // The mint time as the DEVICE saw it, which is the only record of when
+        // an offline invite was actually created.
+        //
+        // The server stamped createdAt at registration, and for an invite
+        // minted offline that can be hours or days late. Everything downstream
+        // that asks "was this person already here before the invite existed"
+        // then compares against the wrong instant: the recipient's own
+        // post-install events fall BEFORE it, the genuine acquisition is
+        // marked a prior user, and it drops out of the ranking referral
+        // bounties are paid from.
+        //
+        // A device clock is not trusted, only offered -- the server clamps it.
+        body.put("createdAt", Long.valueOf(invite.getCreatedTimestamp()));
         putIfSet(body, "campaign", invite.getCampaign());
         putIfSet(body, "channel", invite.getChannel());
         putIfSet(body, "payload", invite.getPayload());
