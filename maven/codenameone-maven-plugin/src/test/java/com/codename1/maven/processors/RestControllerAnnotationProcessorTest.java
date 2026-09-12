@@ -1017,6 +1017,77 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void bindsSeveralVariablesInOneSegment() throws Exception {
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/r/{a}x{b}x{c}Z\")\n"
+                + "    public String get(@PathVariable(\"a\") String a,\n"
+                + "            @PathVariable(\"b\") String b, @PathVariable(\"c\") String c) {\n"
+                + "        return a + \"|\" + b + \"|\" + c;\n"
+                + "    }\n"
+                + "}\n");
+        assertEquals("A|B|C", router.text("GET", "/r/AxBxCZ"));
+        assertNull(router.call("GET", "/r/AxBxC", null));
+        assertNull(router.call("GET", "/r/A/BxCxDZ", null));
+    }
+
+    /**
+     * The route above with a path that matches nothing.
+     *
+     * <p>Three variables separated by repeated literals used to re-explore every
+     * placement of every separator, so a path of x characters with no final Z
+     * cost the square of its length -- up to the server's 64KiB header limit,
+     * from one unauthenticated request. The timeout is what makes this a test
+     * rather than a benchmark: bounded it is thousands of steps and returns in
+     * milliseconds, unbounded it is hundreds of millions and does not return.
+     */
+    @Test(timeout = 20000)
+    public void doesNotBacktrackForeverOverALongPath() throws Exception {
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/r/{a}x{b}x{c}Z\")\n"
+                + "    public String get(@PathVariable(\"a\") String a,\n"
+                + "            @PathVariable(\"b\") String b, @PathVariable(\"c\") String c) {\n"
+                + "        return a + b + c;\n"
+                + "    }\n"
+                + "}\n");
+        StringBuilder path = new StringBuilder("/r/");
+        for (int i = 0 ; i < 20000 ; i++) {
+            path.append('x');
+        }
+        assertNull("a path with no final Z must not match this route",
+                router.call("GET", path.toString(), null));
+    }
+
+    @Test
+    public void decodesEachVariableOnceTheWholeRouteMatched() throws Exception {
+        // The decode used to happen inside the search, so a candidate placement
+        // that did not pan out decoded its value anyway. Nothing about the result
+        // changes -- this pins the escapes down so the move cannot quietly drop
+        // one.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/r/{a}-{b}\")\n"
+                + "    public String get(@PathVariable(\"a\") String a,\n"
+                + "            @PathVariable(\"b\") String b) { return a + \"|\" + b; }\n"
+                + "}\n");
+        assertEquals("a b|c/d", router.text("GET", "/r/a%20b-c%2Fd"));
+        // The first separator wins and the second one is part of the second
+        // value: the trailing variable runs to the end of the path, so there is
+        // nothing for it to be anchored against.
+        assertEquals("a|b-c", router.text("GET", "/r/a-b-c"));
+    }
+
+    @Test
     public void processingTwiceWithoutCleaningStillWorks() throws Exception {
         // The second pass of an incremental build scans target/classes, which by
         // then contains the FIRST pass's NotesRouter. The collision check looked it
