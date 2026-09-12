@@ -15980,7 +15980,6 @@ JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
     return arrObj;
 }
 
-=======
 void initConstantPool() {
     cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
