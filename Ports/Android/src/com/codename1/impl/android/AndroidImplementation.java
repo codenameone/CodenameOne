@@ -10142,7 +10142,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private static final int MAX_PENDING_SHARES = 8;
 
-    private int nextShareToken = 1;
+    // UNGUESSABLE, because the token is what authenticates the broadcast.
+    //
+    // The receiver is registered exported -- RECEIVER_EXPORTED on API 33+, and
+    // the two-argument registration is externally reachable on older releases
+    // -- so any installed app can send <package>.CN1_SHARE_CHOSEN. setPackage()
+    // constrains the PendingIntent the framework creates; it does nothing to a
+    // forged explicit broadcast. With a counter starting at 1 that forgery was
+    // trivial, and it reported a fabricated successful ShareResult:
+    // invite_shared for a share that never happened, and whatever reward logic
+    // an application hangs off its own listener.
+    //
+    // A random token is the half of the repair that can be made from here.
+    // onReceive looks the token up and returns when it is not one this process
+    // issued, so a forged broadcast has to guess a 32-bit value that never
+    // leaves the PendingIntent. Registering the receiver non-exported is the
+    // better answer on API 33+ and is NOT done blind: a PendingIntent
+    // broadcast is delivered with this app's own identity, so it should still
+    // arrive -- but "should" is doing real work in that sentence and the
+    // failure mode is silent, the callback simply stopping and invite_shared
+    // stopping with it. That wants a device rather than an inference.
+    private final java.security.SecureRandom shareTokens = new java.security.SecureRandom();
 
     private final java.util.LinkedHashMap<Integer, com.codename1.share.ShareResultListener>
             pendingShares =
@@ -10154,7 +10174,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // This chooser's own token, recorded before the receiver can fire.
         final int token;
         synchronized (pendingShares) {
-            token = nextShareToken++;
+            token = shareTokens.nextInt();
             pendingShares.put(Integer.valueOf(token), listener);
             while (pendingShares.size() > MAX_PENDING_SHARES) {
                 java.util.Iterator<Integer> oldest = pendingShares.keySet().iterator();
@@ -10226,9 +10246,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// action.
     ///
     /// Split out because it is built on every share while the receiver behind
-    /// it is built once. FLAG_UPDATE_CURRENT is what makes the fixed action
-    /// safe to reuse: the same PendingIntent is handed back with this
-    /// chooser's extras, and only one chooser is ever up at a time.
+    /// it is built once.
+    ///
+    /// **The token is the REQUEST CODE, not merely an extra.** What stood here
+    /// said FLAG_UPDATE_CURRENT made a fixed action safe because the
+    /// PendingIntent "is handed back with this chooser's extras, and only one
+    /// chooser is ever up at a time". Both halves were wrong. Android does not
+    /// include extras in PendingIntent identity, so with request code 0 and one
+    /// action every share resolved to the SAME PendingIntent and
+    /// FLAG_UPDATE_CURRENT overwrote the first chooser's token with the
+    /// second's -- selecting from the first chooser then delivered the second
+    /// token, invoked the second listener and stranded the first, which is the
+    /// per-chooser callback the token map exists to provide. And a second
+    /// chooser is the case being defended against, so assuming only one is up
+    /// assumed the bug away.
+    ///
+    /// The request code IS part of that identity, so passing the token makes
+    /// each chooser's PendingIntent distinct and its extras its own.
     @TargetApi(22)
     private Intent chooserFor(Context appCtx, Intent shareIntent, String action, int token) {
         Intent pi = new Intent(action).setPackage(appCtx.getPackageName());
@@ -10240,7 +10274,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // still compiles against pre-31 android.jar build deps.
             piFlags |= 0x02000000;
         }
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(appCtx, 0, pi, piFlags);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(appCtx, token, pi, piFlags);
         return Intent.createChooser(shareIntent, "Share with...", pendingIntent.getIntentSender());
     }
 
