@@ -597,6 +597,8 @@ public class BackendPackageMojo extends AbstractMojo {
         if (cflags != null && cflags.trim().length() > 0) {
             command.addAll(Arrays.asList(cflags.trim().split("\\s+")));
         }
+        // Before -I on the generated sources, which is where build.sh puts them.
+        command.addAll(hostLibraryFlags(opensslPrefixes(), nghttp2Prefixes()));
         command.add("-I" + sourceDir.getAbsolutePath());
         File[] cFiles = sourceDir.listFiles();
         if (cFiles == null) {
@@ -619,6 +621,69 @@ public class BackendPackageMojo extends AbstractMojo {
         command.add("-o");
         command.add(binary.getAbsolutePath());
         run(command, project.getBasedir(), "compile the generated C");
+    }
+
+    /**
+     * -I and -L for the TLS and HTTP/2 libraries, where this machine keeps them.
+     *
+     * macOS ships libcrypto WITHOUT its headers, so a stock machine with the
+     * usual Homebrew OpenSSL could not compile the generated C at all: the goal
+     * the documentation tells a developer to run failed on openssl/ssl.h, and the
+     * only way out was to work out cn1.backend.cflags for themselves. The same
+     * prefixes and the same probe headers as vm/backend/build.sh, so the two ways
+     * of building a backend look in the same places -- including OPENSSL_PREFIX
+     * and NGHTTP2_PREFIX, which a developer who has already set them for build.sh
+     * should not have to set again under another name.
+     *
+     * <p>On a Linux box the distribution's -dev package puts the headers where
+     * clang already looks, none of these probes match, and this adds nothing.
+     *
+     * @param openssl candidate prefixes for OpenSSL, in order of preference
+     * @param nghttp2 candidate prefixes for nghttp2
+     */
+    static List<String> hostLibraryFlags(List<String> openssl, List<String> nghttp2) {
+        List<String> out = new ArrayList<String>();
+        addPrefix(out, openssl, "include/openssl/sha.h");
+        addPrefix(out, nghttp2, "include/nghttp2/nghttp2.h");
+        return out;
+    }
+
+    /** The first prefix that actually carries `probe`, as -I and -L. */
+    private static void addPrefix(List<String> out, List<String> prefixes, String probe) {
+        if (prefixes == null) {
+            return;
+        }
+        for (int i = 0; i < prefixes.size(); i++) {
+            String prefix = prefixes.get(i);
+            if (prefix == null || prefix.length() == 0) {
+                continue;
+            }
+            if (new File(prefix, probe).isFile()) {
+                out.add("-I" + new File(prefix, "include").getAbsolutePath());
+                out.add("-L" + new File(prefix, "lib").getAbsolutePath());
+                return;
+            }
+        }
+    }
+
+    private List<String> opensslPrefixes() {
+        return prefixesFrom(System.getenv("OPENSSL_PREFIX"),
+                "/opt/homebrew/opt/openssl@3", "/usr/local/opt/openssl@3");
+    }
+
+    private List<String> nghttp2Prefixes() {
+        return prefixesFrom(System.getenv("NGHTTP2_PREFIX"),
+                "/opt/homebrew/opt/libnghttp2", "/opt/homebrew/opt/nghttp2",
+                "/usr/local/opt/libnghttp2");
+    }
+
+    private static List<String> prefixesFrom(String fromEnvironment, String... defaults) {
+        List<String> out = new ArrayList<String>();
+        if (fromEnvironment != null && fromEnvironment.length() > 0) {
+            out.add(fromEnvironment);
+        }
+        out.addAll(Arrays.asList(defaults));
+        return out;
     }
 
     /**
