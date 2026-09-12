@@ -257,11 +257,11 @@ the relevant frame as an SVG and use the SVG transcoder path directly
 
 `Resources.getImage("name.svg")` returns null or a 1×1 transparent PNG::
   The transcoder ran with zero source files: the name in the CSS
-  `url(...)` does not match any file under `src/main/css/` (or
+  `url(...)` doesn't match any file under `src/main/css/` (or
   `src/main/svg/` / `src/main/lottie/` for the dedicated directories).
-  The build names each unmatched reference in a warning. A POM that does
-  not bind the `transcode-svg` goal at all is repaired automatically, so
-  it is not the likely cause. The same goal
+  The build names each unmatched reference in a warning. A POM that
+  doesn't bind the `transcode-svg` goal at all is repaired
+  automatically, so it's not the likely cause. The same goal
   handles `.svg`, `.json`, and `.lottie` -- one goal, both formats.
   For arbitrary Resources bundles loaded outside the global slot, call
   `com.codename1.ui.util.Resources.registerGeneratedImage(name, image)`
