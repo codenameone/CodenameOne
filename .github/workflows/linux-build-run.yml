@@ -283,7 +283,15 @@ jobs:
           # hang-stacks.txt with nothing but sample headers -- which is how four
           # occurrences of the suite stall ended up with no evidence at all. Still
           # best-effort: a runner without gdb must not fail the suite, it must say so.
-          bash scripts/ci/apt-get-install.sh gdb || echo "WARNING: gdb install failed"
+          # $GITHUB_WORKSPACE, not a relative path: this step runs with
+          # working-directory: vm, so "scripts/ci/..." resolved to vm/scripts/ci and
+          # bash answered "No such file or directory". gdb was therefore NEVER
+          # installed on any Linux leg, and every hang-stacks.txt and crash-stacks.txt
+          # this job has ever produced was empty for that reason alone -- including
+          # the ones collected while chasing a SIGSEGV that dumped a 12GB core nobody
+          # could symbolise. The retry.sh call twenty lines below already had this
+          # right.
+          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-install.sh" gdb || echo "WARNING: gdb install failed"
           if command -v gdb >/dev/null 2>&1; then
             echo "gdb available: $(gdb --version | head -1)"
           else
