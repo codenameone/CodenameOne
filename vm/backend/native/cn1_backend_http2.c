@@ -369,6 +369,13 @@ static void cn1H2Enqueue(CN1H2Session* s, CN1H2Request* r) {
    handed over, and offers it again after the drain. */
 #define CN1_H2_MAX_OUT_BYTES (1024 * 1024)
 
+/* What a session is worth keeping between responses. The same figure as
+   HttpServer.MAX_IDLE_BUFFER_BYTES, which bounds the HTTP/1.1 side's per
+   connection buffers for the same reason and with the same arithmetic behind it:
+   the connection ceiling is in the thousands, so anything a session holds while
+   it is doing nothing is multiplied by that. */
+#define CN1_H2_IDLE_OUT_BYTES (16 * 1024)
+
 static ssize_t cn1H2Send(nghttp2_session* session, const uint8_t* data, size_t length,
                          int flags, void* userData) {
     CN1H2Session* s = (CN1H2Session*)userData;
@@ -831,13 +838,26 @@ JAVA_OBJECT com_codename1_backend_Http2_drainImpl___long_R_byte_1ARRAY(CODENAME_
     }
     /* Give the CAPACITY back too, not just the length. A session that once sent
        something large otherwise keeps that buffer for as long as it stays open,
-       and a keep-alive pool of them holds every peak it ever reached. Shrunk to
-       the ordinary size, so the common case reallocates nothing. */
-    if(s->outCapacity > CN1_H2_MAX_OUT_BYTES) {
-        unsigned char* shrunk = (unsigned char*)realloc(s->out, 8192);
+       and a keep-alive pool of them holds every peak it ever reached.
+
+       ONE CONSTANT for the test and for the size it shrinks to, because them
+       being two different numbers is what went wrong: the test asked for more
+       than CN1_H2_MAX_OUT_BYTES while the shrink went to 8KB, so a peer whose
+       window kept the buffer just under a megabyte -- which the doubling growth
+       lands on easily -- was never shrunk at all, and that capacity is in no
+       accounting the process-wide ceilings cover. Multiplied by the connection
+       limit, a client that fills and drains one response per connection and then
+       leaves it open holds gigabytes the response-body guard never sees.
+
+       So: anything above the idle size goes back to the idle size. The cost is a
+       realloc per drain for a session whose framing exceeds 16KB, against a
+       memcpy of the whole payload and a write syscall on the same path. */
+    if(s->outCapacity > CN1_H2_IDLE_OUT_BYTES) {
+        unsigned char* shrunk = (unsigned char*)realloc(s->out,
+                                                        CN1_H2_IDLE_OUT_BYTES);
         if(shrunk != NULL) {
             s->out = shrunk;
-            s->outCapacity = 8192;
+            s->outCapacity = CN1_H2_IDLE_OUT_BYTES;
         }
     }
     return arr;
