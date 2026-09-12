@@ -2257,7 +2257,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
         try {
             FileUtils.copyFile(pomFile, backup);
-            writeAtomically(pomFile, updated, charset);
+            writeAtomically(pomFile, updated, charset, getLog());
         } catch (IOException ex) {
             warnCouldNotEditPom("it could not be written: " + ex.getMessage());
             return;
@@ -2278,11 +2278,23 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * temporary file and moving it into place means the pom is either the old
      * one or the new one and never anything in between.</p>
      */
-    private static void writeAtomically(File target, String content, Charset charset)
+    /** Test seam for {@link #writeAtomically}. */
+    static void writeAtomicallyForTest(File target, String content, Charset charset)
             throws IOException {
+        writeAtomically(target, content, charset,
+                new org.apache.maven.plugin.logging.SystemStreamLog());
+    }
+
+    private static void writeAtomically(File target, String content, Charset charset,
+            org.apache.maven.plugin.logging.Log log) throws IOException {
         File tmp = File.createTempFile(target.getName(), ".tmp", target.getParentFile());
         try {
             FileUtils.writeStringToFile(tmp, content, charset);
+            // The move replaces the target's inode, so the pom would silently
+            // take on the temporary file's mode -- measured here as a
+            // group-writable pom coming back rw-r--r--, losing group write on a
+            // shared checkout. Carry the original permissions over first.
+            copyPosixPermissions(target, tmp, log);
             try {
                 java.nio.file.Files.move(tmp.toPath(), target.toPath(),
                         java.nio.file.StandardCopyOption.ATOMIC_MOVE,
@@ -2297,6 +2309,27 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (tmp.exists()) {
                 tmp.delete();
             }
+        }
+    }
+
+    /**
+     * Gives {@code to} the POSIX permissions of {@code from}. A no-op where the
+     * filesystem has no POSIX view (Windows) or the bits cannot be read, since
+     * failing the repair over file modes would be a worse trade than the mode
+     * change it is avoiding.
+     */
+    private static void copyPosixPermissions(File from, File to,
+            org.apache.maven.plugin.logging.Log log) {
+        try {
+            java.nio.file.Files.setPosixFilePermissions(to.toPath(),
+                    java.nio.file.Files.getPosixFilePermissions(from.toPath()));
+        } catch (Exception ex) {
+            // Not POSIX (Windows), or the bits cannot be read. Say so rather
+            // than swallowing it: failing the repair over file modes would be a
+            // worse trade than the mode change, but a silent skip is how the
+            // next person concludes this code never runs.
+            log.debug("Could not carry " + from.getName() + "'s permissions over to "
+                    + to.getName() + ": " + ex);
         }
     }
 

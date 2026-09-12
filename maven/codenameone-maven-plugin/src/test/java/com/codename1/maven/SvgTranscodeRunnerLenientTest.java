@@ -165,6 +165,76 @@ public class SvgTranscodeRunnerLenientTest {
                 "target/generated-sources/svg/com/codename1/generated/svg/Spin.java").isFile());
     }
 
+    /**
+     * A substring search for the word "layers" matched it nested inside another
+     * property, or inside an unrelated string value. The parser only ever looks
+     * at a top-level array, so that is the question to ask.
+     */
+    @Test
+    public void declinesJsonWhoseLayersIsNotATopLevelArray() throws Exception {
+        String[] impostors = {
+                "{\"config\":{\"layers\":[1,2]}}",
+                "{\"note\":\"we render layers here\"}",
+                "{\"layers\":\"not-an-array\"}",
+                "{\"layers\":{\"a\":1}}",
+        };
+        for (String json : impostors) {
+            File basedir = temp.newFolder();
+            File css = new File(basedir, "src/main/css");
+            assertTrue(css.mkdirs());
+            write(new File(css, "thing.json"), json.getBytes("UTF-8"));
+
+            SvgTranscodeRunner runner = runner(basedir, true);
+            runner.run();
+            assertEquals("declined: " + json,
+                    Arrays.asList("thing.json"), runner.getNonVectorInputs());
+        }
+    }
+
+    /**
+     * When every candidate is rejected there is nothing to register, and an
+     * empty registry is not harmless: it carries the one fixed name the
+     * per-platform builders look for, so it would be wired into the stub and
+     * run, shadowing a dependency's registry and leaving that library's images
+     * as placeholders.
+     */
+    @Test
+    public void emitsNoRegistryWhenEverythingWasRejected() throws Exception {
+        File basedir = temp.newFolder();
+        File css = new File(basedir, "src/main/css");
+        assertTrue(css.mkdirs());
+        write(new File(css, "config.json"), "{\"apiBase\":\"x\"}".getBytes("UTF-8"));
+        write(new File(css, "anim.lottie"), new byte[]{'P', 'K', 3, 4});
+
+        SvgTranscodeRunner runner = runner(basedir, true);
+        runner.run();
+
+        assertEquals(2, runner.getNonVectorInputs().size());
+        assertFalse("no registry is written when it would register nothing",
+                new File(basedir,
+                        "target/generated-sources/svg/com/codename1/generated/svg/SVGRegistry.java")
+                        .isFile());
+    }
+
+    /** A stale registry from an earlier build is swept rather than left behind. */
+    @Test
+    public void sweepsAStaleRegistryWhenEverythingWasRejected() throws Exception {
+        File basedir = temp.newFolder();
+        File css = new File(basedir, "src/main/css");
+        assertTrue(css.mkdirs());
+        write(new File(css, "star.svg"), STAR_SVG.getBytes("UTF-8"));
+        SvgTranscodeRunner runner = runner(basedir, true);
+        runner.run();
+        File registry = new File(basedir,
+                "target/generated-sources/svg/com/codename1/generated/svg/SVGRegistry.java");
+        assertTrue("precondition: a registry exists", registry.isFile());
+
+        assertTrue(new File(css, "star.svg").delete());
+        write(new File(css, "config.json"), "{\"apiBase\":\"x\"}".getBytes("UTF-8"));
+        runner(basedir, true).run();
+        assertFalse("the stale registry is removed", registry.isFile());
+    }
+
     private static void write(File f, byte[] bytes) throws Exception {
         OutputStream out = new FileOutputStream(f);
         try {

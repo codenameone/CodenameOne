@@ -335,6 +335,31 @@ public class SvgExecutionPomInsertTest {
         assertEquals("pom.xml.bak.2", AbstractCN1Mojo.unusedBackupFile(pom).getName());
     }
 
+    /**
+     * The atomic replace swaps the target's inode, so without care the pom
+     * takes on the temporary file's mode. Measured before this was handled: a
+     * group-writable pom came back rw-r--r--, losing group write on a shared
+     * checkout.
+     */
+    @Test
+    public void keepsThePomsPermissionsAcrossTheReplace() throws Exception {
+        java.nio.file.FileSystem fs = java.nio.file.FileSystems.getDefault();
+        org.junit.Assume.assumeTrue("POSIX only",
+                fs.supportedFileAttributeViews().contains("posix"));
+
+        File dir = temp.newFolder();
+        File pom = new File(dir, "pom.xml");
+        writeText(pom, "<project/>");
+        java.nio.file.Files.setPosixFilePermissions(pom.toPath(),
+                java.nio.file.attribute.PosixFilePermissions.fromString("rw-rw-r--"));
+
+        AbstractCN1Mojo.writeAtomicallyForTest(pom, "<project2/>", StandardCharsets.UTF_8);
+
+        assertEquals("<project2/>", readText(pom));
+        assertEquals("rw-rw-r--", java.nio.file.attribute.PosixFilePermissions.toString(
+                java.nio.file.Files.getPosixFilePermissions(pom.toPath())));
+    }
+
     private static void writeText(File f, String text) throws Exception {
         java.io.OutputStream out = new java.io.FileOutputStream(f);
         try {

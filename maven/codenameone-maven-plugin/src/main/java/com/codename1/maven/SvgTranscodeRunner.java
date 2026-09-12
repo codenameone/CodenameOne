@@ -23,6 +23,7 @@
 package com.codename1.maven;
 
 import com.codename1.lottie.transcoder.LottieTranscoder;
+import com.codename1.lottie.transcoder.parser.JsonParser;
 import com.codename1.svg.transcoder.SVGTranscoder;
 import com.codename1.svg.transcoder.SVGTranscoder.GeneratedClass;
 
@@ -301,7 +302,20 @@ public class SvgTranscodeRunner {
                     sourceDensity, widthMm, heightMm));
         }
 
-        emitRegistry(packageDir, generated, registrySrcMtime);
+        if (generated.isEmpty()) {
+            // Every candidate was rejected. Emitting a registry that registers
+            // nothing is not harmless: it carries the one fixed name the
+            // per-platform builders look for, so it would be found, wired into
+            // the stub, and run -- shadowing a dependency's registry and
+            // leaving that library's images as placeholders. Sweep any stale
+            // one for the same reason the no-sources path above does.
+            File leftover = new File(packageDir, REGISTRY_CLASS_NAME + ".java");
+            if (leftover.exists()) {
+                leftover.delete();
+            }
+        } else {
+            emitRegistry(packageDir, generated, registrySrcMtime);
+        }
         emitPlaceholders(cssHints.keySet());
     }
 
@@ -522,14 +536,17 @@ public class SvgTranscodeRunner {
         if (fmt != VectorFormat.LOTTIE_JSON) {
             return false;
         }
-        String text;
+        Object root;
         try {
-            text = readFile(file);
-        } catch (IOException ex) {
+            root = JsonParser.parse(readFile(file));
+        } catch (Exception ex) {
             return false;
         }
-        String trimmed = text.trim();
-        return trimmed.startsWith("{") && trimmed.contains("\"layers\"");
+        // Ask the same question the parser answers: a top-level object whose
+        // "layers" is an array. A substring search for the word was not enough
+        // -- it matched a nested property, or the text inside an unrelated
+        // string value, and let a config file be bound to the strict goal.
+        return root instanceof Map && ((Map<?, ?>) root).get("layers") instanceof List;
     }
 
     private static String trimToFileName(String url) {
