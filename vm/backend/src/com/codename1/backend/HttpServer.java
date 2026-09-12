@@ -1397,8 +1397,21 @@ public final class HttpServer {
             listener.close();
             throw err;
         }
-        ServerSocket.setBlocking(listener.getFd(), false);
-        reactor.add(listener.getFd(), CONN_EVENTS);
+        try {
+            ServerSocket.setBlocking(listener.getFd(), false);
+            reactor.add(listener.getFd(), CONN_EVENTS);
+        } catch (IOException err) {
+            // Both of these can fail -- descriptor exhaustion reaches epoll_ctl as
+            // readily as anything else -- and they sit AFTER the bind and the
+            // reactor, with no HttpServer in existence yet for the caller to close.
+            // Left uncovered, the port stayed bound so a retry met "address already
+            // in use", and each attempt leaked another poller descriptor. The same
+            // cleanup the Reactor.create() above and the virtual-thread setup below
+            // already get.
+            reactor.close();
+            listener.close();
+            throw err;
+        }
 
         // No worker pool in virtual-thread mode. workers.execute() is reached only
         // from handOff(), which is reached only from pump(), which runs only in

@@ -14,8 +14,17 @@
 
   The contract compiles against codenameone-core because it names @GET,
   OnComplete and Response. What comes OUT - the server interface, the dispatcher
-  and the DTO codecs - references nothing outside java.*, which is what lets it
-  link into a binary that has no Codename One implementation.
+  and the DTO codecs - references nothing outside java.* IN ITS CODE, which is
+  what lets it link into a binary that has no Codename One implementation.
+
+  One exception, and it is metadata rather than code: each generated type carries
+  @com.codename1.backend.annotations.Generated, which is how a later incremental
+  pass tells its own output from a class the developer wrote. It is
+  RetentionPolicy.CLASS, so it is never resolved at runtime and the translator
+  reads it as a descriptor string it can ignore. javac, though, has to resolve it
+  to COMPILE the generated sources, which is why codenameone-backend appears
+  below at provided scope. Without it the documented command fails before
+  producing anything.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -39,6 +48,28 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+            For one annotation. With cn1.restServer=true the processor emits
+            @com.codename1.backend.annotations.Generated onto the server interface,
+            the dispatcher and every DTO codec, and javac has to resolve it to
+            compile them, so without this the documented command on this module
+            fails before producing any of them.
+
+            The marker is not decoration: it is how an incremental build tells its
+            own previous output from a class the developer wrote, and it has to be
+            readable from BYTECODE, which rules out a comment. Everything else the
+            generated code touches is java.* or a type from this module, which is
+            why this is the only backend dependency here.
+
+            provided, like the core above: the generated sources are compiled
+            against it and the server that eventually runs them brings its own.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend</artifactId>
             <version>${cn1.version}</version>
             <scope>provided</scope>
         </dependency>

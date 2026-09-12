@@ -240,7 +240,17 @@ public final class Database {
         return sqlite;
     }
 
-    public void close() {
+    /**
+     * SYNCHRONIZED, like execute, query and transaction on this class.
+     *
+     * <p>Without it a shutdown or a reconnect could close the engine while another
+     * handler was inside an operation, so Postgres.close or MySql.close wrote its
+     * termination packet into a Wire another thread was mid-exchange on -- and on
+     * the packaged TLS path freed the native session while that thread was reading
+     * through it. The engines' own close() methods were given this lock already;
+     * the facade that fronts them was not, which left the same race one level up.
+     */
+    public synchronized void close() {
         if(sqlite != null) {
             sqliteClosed = true;
             sqlite.close();
