@@ -1996,6 +1996,22 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
  * The codes are an implementation detail shared only with java/lang/Class.java;
  * they are matched by CN1_PRIM_* there.
  */
+/** The descriptor for a primitive type code, or 0 for an unknown code. */
+static struct clazz* cn1PrimitiveClassFor(JAVA_INT typeCode) {
+    switch(typeCode) {
+        case 0: return &cn1_primitive_class_int;
+        case 1: return &cn1_primitive_class_long;
+        case 2: return &cn1_primitive_class_short;
+        case 3: return &cn1_primitive_class_byte;
+        case 4: return &cn1_primitive_class_char;
+        case 5: return &cn1_primitive_class_float;
+        case 6: return &cn1_primitive_class_double;
+        case 7: return &cn1_primitive_class_boolean;
+        case 8: return &cn1_primitive_class_void;
+    }
+    return 0;
+}
+
 JAVA_OBJECT java_lang_Class_getPrimitiveClass___int_R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_INT typeCode) {
     // java.lang.Class MUST be initialised before one of these is handed out.
     //
@@ -2012,6 +2028,20 @@ JAVA_OBJECT java_lang_Class_getPrimitiveClass___int_R_java_lang_Class(CODENAME_O
     // The initialiser is idempotent and returns on its completion flag, so this
     // costs one acquire load once the class is up.
     __STATIC_INITIALIZER_java_lang_Class(threadStateData);
+    // And REGISTER the descriptor in the GC's exact clazz registry.
+    //
+    // Every generated class__X is registered by CN1_CLAZZ_REGISTER on the first
+    // allocation of one of its instances, from every allocation entry point, so
+    // by construction the collector has seen every clazz address that can reach
+    // it. These nine allocate nothing -- they are static and handed out directly
+    // -- so they were the only clazz addresses in the process that reached Java
+    // while permanently unregistered, and the mark guard is documented to
+    // recognise a genuine clazz address "via an exact registry instead of a
+    // distance heuristic".
+    //
+    // The macro is idempotent and tests the trailing cn1ClazzRegistered flag
+    // first, so this is one predictable load after the first call.
+    CN1_CLAZZ_REGISTER(cn1PrimitiveClassFor(typeCode));
     switch(typeCode) {
         case 0: return (JAVA_OBJECT)&cn1_primitive_class_int;
         case 1: return (JAVA_OBJECT)&cn1_primitive_class_long;
