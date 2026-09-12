@@ -280,8 +280,10 @@ static void cn1H2FreeRequest(CN1H2Request* r) {
     if(r == NULL) {
         return;
     }
+    /* bodyCapacity, matching what the growth path charged: free() below returns
+       the whole allocation, not the part of it that was filled. */
     atomic_fetch_sub_explicit(&cn1H2InboundBytes,
-            (long)(r->bodyLength + r->headerBytes + sizeof(CN1H2Request)),
+            (long)(r->bodyCapacity + r->headerBytes + sizeof(CN1H2Request)),
             memory_order_relaxed);
     free(r->method);
     free(r->path);
@@ -549,25 +551,42 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
        it refused everything. The load-then-add can overshoot when two sessions
        cross together, by at most one chunk each, which is the right trade for a
        coarse memory guard -- the alternative is a lock on the data path. */
-    if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed) + (long)length
-            > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
-        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-    }
     if(r->bodyLength + length > r->bodyCapacity) {
+        /* CAPACITY, NOT LENGTH, on both the test and the charge. This grows to
+           twice what is needed, so charging the payload left roughly half of every
+           buffer unaccounted -- a client that stopped just after a growth boundary
+           held 8MB while the guard had been told 4MB, and across the permitted
+           sessions and streams that is a process-wide ceiling admitting twice what
+           it says. The capacity is what free() gives back, so it is what the
+           counter has to follow.
+
+           Tested before the realloc and charged after it, which is the order the
+           previous version had and for the same reason: a growth that FAILS must
+           leave the counter where it was. The load-then-add can still overshoot by
+           one chunk per session when two cross together, which remains the right
+           trade for a coarse guard against a lock on the data path. */
         size_t grown = (r->bodyLength + length) * 2 + 1024;
+        size_t added;
+        unsigned char* buf;
         if(grown > CN1_H2_MAX_BODY_BYTES) {
             grown = CN1_H2_MAX_BODY_BYTES;
         }
-        unsigned char* buf = (unsigned char*)realloc(r->body, grown);
+        added = grown - r->bodyCapacity;
+        if(atomic_load_explicit(&cn1H2InboundBytes, memory_order_relaxed) + (long)added
+                > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        }
+        buf = (unsigned char*)realloc(r->body, grown);
         if(buf == NULL) {
             return NGHTTP2_ERR_CALLBACK_FAILURE;
         }
         r->body = buf;
         r->bodyCapacity = grown;
+        atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)added,
+                                  memory_order_relaxed);
     }
     memcpy(r->body + r->bodyLength, data, length);
     r->bodyLength += length;
-    atomic_fetch_add_explicit(&cn1H2InboundBytes, (long)length, memory_order_relaxed);
     return 0;
 }
 

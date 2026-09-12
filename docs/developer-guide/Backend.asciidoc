@@ -142,10 +142,21 @@ There is no JDBC driver involved. SQLite is linked into the binary, and the
 PostgreSQL and MySQL clients speak their wire protocols directly.
 
 `DbPool` pools SQLite connections, and only those: it opens them from a file
-path. There is no pool for the server engines yet. A `Database` over PostgreSQL
-or MySQL owns one wire connection and doesn't serialize access to it, so two
-handlers sharing one interleave their prepared-statement exchanges on the same
-socket. Give each request its own connection until there is a pool for them.
+path. There is no pool for the server engines.
+
+A `Database` over PostgreSQL or MySQL owns one wire connection, and every
+operation on it -- `execute`, `query`, `transaction` and `close` -- is
+synchronized. Sharing one across handlers is therefore safe, and serialized:
+concurrent requests queue behind whichever exchange is on the socket. A
+transaction holds the lock for its whole body, so keep the work inside one
+short.
+
+Share one `Database` unless the queueing is what limits you. When it does, open
+a few -- one per worker, say -- and hand each request one of those. What to avoid
+is opening one per request: every `Database.open` against a server engine is a
+fresh TCP connection and a fresh authentication handshake, which costs a round
+trip or several before any statement runs, and enough concurrent requests doing
+it will reach the server's own connection limit.
 
 === Sharing the contract with the app
 
