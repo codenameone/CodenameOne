@@ -102,6 +102,11 @@ public class SafeArea extends com.codename1.flutter.StatelessWidget implements H
         Padding pad = new Padding();
         pad.padding(EdgeInsets.fromLTRB(l, t, r, b));
         pad.child(child);
-        return pad;
+        // The inset is spent here, so the subtree must not see it again. Flutter
+        // does the same, and without it two nested safe areas inset twice for
+        // one notch.
+        return com.codename1.flutter.MediaQuery.removePadding(context,
+                Boolean.valueOf(left), Boolean.valueOf(top),
+                Boolean.valueOf(right), Boolean.valueOf(bottom), pad);
     }
 }

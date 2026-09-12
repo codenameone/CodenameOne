@@ -95,7 +95,7 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         if (c == null || c.alpha() == 0) {
             return;
         }
-        int rgb = (int) (c.value() & 0xFFFFFF);
+        int rgb = (int) (c.value() & 0xFFFFFFL);
         boolean oldAA = g.isAntiAliased();
         int oldColor = g.getColor();
         int oldAlpha = g.getAlpha();

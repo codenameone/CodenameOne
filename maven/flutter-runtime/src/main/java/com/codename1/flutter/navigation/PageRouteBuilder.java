@@ -115,4 +115,16 @@ public class PageRouteBuilder<T> extends Route<T> {
     public Duration getTransitionDuration() {
         return transitionDuration;
     }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public com.codename1.flutter.Widget buildPage(com.codename1.flutter.BuildContext context) {
+        if (!(pageBuilder instanceof dart.runtime.Funcs.Func3)) {
+            return null;
+        }
+        // The two animations a page builder is handed; a route shown without a
+        // transition is at its end state.
+        return (com.codename1.flutter.Widget) ((dart.runtime.Funcs.Func3<Object, Object, Object, Object>)
+                pageBuilder).call(context, null, null);
+    }
 }

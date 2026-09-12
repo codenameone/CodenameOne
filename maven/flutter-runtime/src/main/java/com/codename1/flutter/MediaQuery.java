@@ -99,7 +99,7 @@ public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
     public static MediaQueryData of(BuildContext context) {
         if (context != null) {
             try {
-                MediaQuery q = context.dependOnInheritedWidgetOfExactType(MediaQuery.class);
+                MediaQuery q = context.maybeDependOnInheritedWidgetOfExactType(MediaQuery.class);
                 if (q != null && q.data != null) {
                     return q.data;
                 }
@@ -164,13 +164,20 @@ public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
     }
 
     /**
-     * {@code MediaQuery.removePadding}: returns a subtree with the selected
-     * padding edges removed from the ambient media query. This runtime does not
-     * scope media metrics through the element tree, so the child is returned
-     * unchanged (the removed edges are a no-op).
+     * {@code MediaQuery.removePadding}: a subtree that sees the ambient metrics
+     * with the selected padding edges already spent.
      */
     public static Widget removePadding(BuildContext context, Boolean removeLeft, Boolean removeTop,
             Boolean removeRight, Boolean removeBottom, Widget child) {
-        return child;
+        return scope(of(context).removePadding(
+                removeLeft, removeTop, removeRight, removeBottom), child);
+    }
+
+    /** A subtree that sees {@code data} instead of whatever is ambient. */
+    public static MediaQuery scope(MediaQueryData data, Widget child) {
+        MediaQuery q = new MediaQuery();
+        q.data(data);
+        q.child(child);
+        return q;
     }
 }

@@ -68,4 +68,10 @@ public class MaterialPageRoute<T> extends Route<T> {
     public Funcs.Func1<BuildContext, Widget> getBuilder() {
         return builder;
     }
+
+    @Override
+    public Widget buildPage(BuildContext context) {
+        Funcs.Func1<BuildContext, Widget> b = getBuilder();
+        return b == null ? null : b.call(context);
+    }
 }

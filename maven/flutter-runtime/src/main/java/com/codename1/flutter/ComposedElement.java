@@ -60,6 +60,42 @@ public abstract class ComposedElement extends Element {
         performRebuild();
     }
 
+    private static long diagMs;
+    private static long buildMs;
+    private static long updateMs;
+    private static int builds;
+
+    /// Build cost per widget class, keyed by the Class itself so the hot path
+    /// never formats a name. "115 builds cost 462ms" is not actionable; knowing
+    /// WHICH build method owns them is.
+    private static final java.util.Map<Class<?>, long[]> BY_CLASS =
+            new java.util.HashMap<Class<?>, long[]>();
+
+    /** Where a composed element's rebuild time goes, worst build methods first. */
+    public static String rebuildCost() {
+        java.util.List<java.util.Map.Entry<Class<?>, long[]>> rows =
+                new java.util.ArrayList<java.util.Map.Entry<Class<?>, long[]>>(BY_CLASS.entrySet());
+        java.util.Collections.sort(rows, new java.util.Comparator<java.util.Map.Entry<Class<?>, long[]>>() {
+            @Override
+            public int compare(java.util.Map.Entry<Class<?>, long[]> a,
+                    java.util.Map.Entry<Class<?>, long[]> b) {
+                return Long.compare(b.getValue()[0], a.getValue()[0]);
+            }
+        });
+        StringBuilder sb = new StringBuilder();
+        sb.append(builds).append(" build(s) diag=").append(diagMs).append("ms build=")
+                .append(buildMs).append("ms; hottest:");
+        for (int i = 0; i < rows.size() && i < 6; i++) {
+            java.util.Map.Entry<Class<?>, long[]> e = rows.get(i);
+            String n = e.getKey().getName();
+            int dot = n.lastIndexOf('.');
+            sb.append(' ').append(dot < 0 ? n : n.substring(dot + 1))
+                    .append('=').append(e.getValue()[0]).append("ms/")
+                    .append(e.getValue()[1]).append('x');
+        }
+        return sb.toString();
+    }
+
     @Override
     protected void performRebuild() {
         dirty = false;
@@ -67,17 +103,40 @@ public abstract class ComposedElement extends Element {
         // something that turned out null, most often) reports where it
         // happened. The transpiled build methods are inlined into the
         // framework's frame on some backends, so the stack trace alone shows
-        // nothing but this class's own recursion.
-        String previous = dart.runtime.DartRuntime.diagnosticContext();
-        dart.runtime.DartRuntime.diagnosticContext(
-                "building " + (widget == null ? "null" : widget.getClass().getName()));
+        // nothing but this class's own recursion. The WIDGET is handed over
+        // rather than a description of it: describing costs a String per
+        // build, and nothing reads the description unless a build throws.
+        Object previous = dart.runtime.DartRuntime.diagnosticContextValue();
+        dart.runtime.DartRuntime.diagnosticContext(widget);
+        if (!Trace.on()) {
+            try {
+                child = updateChild(child, build(), 0);
+            } finally {
+                dart.runtime.DartRuntime.diagnosticContext(previous);
+            }
+            return;
+        }
+        builds++;
+        long d1 = System.currentTimeMillis();
         Widget built;
         try {
             built = build();
         } finally {
             dart.runtime.DartRuntime.diagnosticContext(previous);
         }
+        long d2 = System.currentTimeMillis();
+        buildMs += d2 - d1;
+        if (widget != null) {
+            long[] row = BY_CLASS.get(widget.getClass());
+            if (row == null) {
+                row = new long[2];
+                BY_CLASS.put(widget.getClass(), row);
+            }
+            row[0] += d2 - d1;
+            row[1]++;
+        }
         child = updateChild(child, built, 0);
+        updateMs += System.currentTimeMillis() - d2;
     }
 
     /**

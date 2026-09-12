@@ -56,6 +56,13 @@ public class InheritedElement extends StatelessElement {
         super(widget);
     }
 
+    @Override
+    public void mount(Element parent, int slot) {
+        super.mount(parent, slot);
+        // Add itself to what its subtree can see; see Element.publishAsInherited.
+        publishAsInherited();
+    }
+
     /** Registers {@code e} as reading this widget; idempotent, since a rebuild re-reads. */
     public void addDependent(Element e) {
         if (e != null && !dependents.contains(e)) {

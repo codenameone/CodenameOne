@@ -51,6 +51,11 @@ public class Scrollbar extends Widget implements HasChild {
         this.thumbVisibility = v;
     }
 
+    /** Whether the thumb stays on screen when nothing is scrolling. */
+    public boolean isThumbVisible() {
+        return thumbVisibility;
+    }
+
     public void trackVisibility(boolean v) {
         this.trackVisibility = v;
     }

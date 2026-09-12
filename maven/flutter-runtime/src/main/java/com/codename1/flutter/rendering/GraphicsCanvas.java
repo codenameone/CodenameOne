@@ -201,6 +201,158 @@ public class GraphicsCanvas extends Canvas {
         emit(p, paint);
     }
 
+    /**
+     * Fills a triangle mesh — {@code Canvas.drawVertices}.
+     *
+     * <p>Codename One has no mesh primitive, so each triangle is filled as a
+     * path. A mesh whose vertices all share one colour is filled as a single
+     * polygon instead: it is the same picture without the hairline seams that
+     * antialiased abutting triangles leave, and it is the shape the
+     * 2D-transformations demo actually draws — one flat hexagon per board
+     * point, as a triangle fan.
+     *
+     * <p>Per-vertex colour interpolation (Gouraud shading) is not modelled; a
+     * multi-coloured triangle takes its first vertex's colour. The blend mode is
+     * ignored — Codename One composites source-over.
+     *
+     * <p>Points go through {@link #mapX}/{@link #mapY} like every other
+     * primitive here: a painter works in logical pixels and the canvas carries
+     * the device-pixel-ratio scale, so a path built from raw coordinates comes
+     * out at a third of its size on a 3x screen.
+     *
+     * <p>This used to draw nothing at all, so the demo's entire board — the only
+     * content on that screen — was invisible against its background.
+     */
+    @Override
+    public void drawVertices(Object vertices, Object blendMode, Paint paint) {
+        if (!(vertices instanceof com.codename1.flutter.Vertices)) {
+            return;
+        }
+        com.codename1.flutter.Vertices v = (com.codename1.flutter.Vertices) vertices;
+        List<Offset> points = order(v);
+        if (points.size() < 3) {
+            return;
+        }
+        List<Color> colors = colorsOf(v, points.size());
+
+        if (v.getMode() == com.codename1.flutter.VertexMode.triangleFan && uniform(colors)) {
+            GeneralPath p = new GeneralPath();
+            p.moveTo(mapX(points.get(0).dx(), points.get(0).dy()),
+                    mapY(points.get(0).dx(), points.get(0).dy()));
+            for (int i = 1; i < points.size(); i++) {
+                p.lineTo(mapX(points.get(i).dx(), points.get(i).dy()),
+                        mapY(points.get(i).dx(), points.get(i).dy()));
+            }
+            p.closePath();
+            fillShape(p, meshPaint(paint, colors.isEmpty() ? null : colors.get(0)));
+            return;
+        }
+
+        for (int t = 0; t + 2 < triangleLimit(v, points.size()); t += triangleStep(v)) {
+            int a;
+            int b;
+            int c;
+            switch (v.getMode()) {
+                case triangleFan:
+                    a = 0;
+                    b = t + 1;
+                    c = t + 2;
+                    break;
+                case triangleStrip:
+                    a = t;
+                    b = t + 1;
+                    c = t + 2;
+                    break;
+                default:
+                    a = t;
+                    b = t + 1;
+                    c = t + 2;
+                    break;
+            }
+            if (c >= points.size()) {
+                break;
+            }
+            GeneralPath p = new GeneralPath();
+            p.moveTo(mapX(points.get(a).dx(), points.get(a).dy()),
+                    mapY(points.get(a).dx(), points.get(a).dy()));
+            p.lineTo(mapX(points.get(b).dx(), points.get(b).dy()),
+                    mapY(points.get(b).dx(), points.get(b).dy()));
+            p.lineTo(mapX(points.get(c).dx(), points.get(c).dy()),
+                    mapY(points.get(c).dx(), points.get(c).dy()));
+            p.closePath();
+            fillShape(p, meshPaint(paint, colors.isEmpty() ? null : colors.get(a)));
+        }
+    }
+
+    /** The mesh's positions, resolved through its index buffer when it has one. */
+    private static List<Offset> order(com.codename1.flutter.Vertices v) {
+        List<Offset> out = new ArrayList<Offset>();
+        dart.core.DartList<Offset> positions = v.getPositions();
+        if (positions == null) {
+            return out;
+        }
+        dart.core.DartList<Integer> indices = v.getIndices();
+        if (indices == null || indices.isEmpty()) {
+            for (Offset o : positions) {
+                out.add(o);
+            }
+            return out;
+        }
+        for (Integer i : indices) {
+            if (i != null && i.intValue() >= 0 && i.intValue() < positions.size()) {
+                out.add(positions.get(i.intValue()));
+            }
+        }
+        return out;
+    }
+
+    private static List<Color> colorsOf(com.codename1.flutter.Vertices v, int count) {
+        List<Color> out = new ArrayList<Color>();
+        dart.core.DartList<Color> colors = v.getColors();
+        if (colors == null) {
+            return out;
+        }
+        for (int i = 0; i < count; i++) {
+            out.add(i < colors.size() ? colors.get(i) : null);
+        }
+        return out;
+    }
+
+    private static boolean uniform(List<Color> colors) {
+        if (colors.isEmpty()) {
+            return true;
+        }
+        Color first = colors.get(0);
+        for (Color c : colors) {
+            if (c == null || first == null) {
+                if (c != first) {
+                    return false;
+                }
+            } else if (c.value() != first.value()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The paint to fill a triangle with: the mesh's vertex colour wins over the Paint's. */
+    private static Paint meshPaint(Paint paint, Color vertexColor) {
+        if (vertexColor == null) {
+            return paint;
+        }
+        Paint p = new Paint();
+        p.color(vertexColor);
+        return p;
+    }
+
+    private static int triangleLimit(com.codename1.flutter.Vertices v, int count) {
+        return count;
+    }
+
+    private static int triangleStep(com.codename1.flutter.Vertices v) {
+        return v.getMode() == com.codename1.flutter.VertexMode.triangles ? 3 : 1;
+    }
+
     @Override
     public void drawColor(Color color, Object blendMode) {
         if (color == null) {

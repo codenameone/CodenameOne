@@ -51,6 +51,35 @@ public class TextTheme {
     private TextStyle labelMedium;
     private TextStyle labelSmall;
 
+    /**
+     * This theme with {@code other}'s properties layered on top, role by role —
+     * Flutter's {@code TextTheme.merge}. Used to combine a type GEOMETRY (sizes,
+     * weights, tracking) with an INK theme (colours), which is how
+     * {@link Typography} composes its two halves.
+     */
+    public TextTheme merge(TextTheme other) {
+        if (other == null) {
+            return this;
+        }
+        TextTheme t = new TextTheme();
+        t.displayLarge = displayLarge().merge(other.displayLarge);
+        t.displayMedium = displayMedium().merge(other.displayMedium);
+        t.displaySmall = displaySmall().merge(other.displaySmall);
+        t.headlineLarge = headlineLarge().merge(other.headlineLarge);
+        t.headlineMedium = headlineMedium().merge(other.headlineMedium);
+        t.headlineSmall = headlineSmall().merge(other.headlineSmall);
+        t.titleLarge = titleLarge().merge(other.titleLarge);
+        t.titleMedium = titleMedium().merge(other.titleMedium);
+        t.titleSmall = titleSmall().merge(other.titleSmall);
+        t.bodyLarge = bodyLarge().merge(other.bodyLarge);
+        t.bodyMedium = bodyMedium().merge(other.bodyMedium);
+        t.bodySmall = bodySmall().merge(other.bodySmall);
+        t.labelLarge = labelLarge().merge(other.labelLarge);
+        t.labelMedium = labelMedium().merge(other.labelMedium);
+        t.labelSmall = labelSmall().merge(other.labelSmall);
+        return t;
+    }
+
     private static TextStyle sized(double size) {
         TextStyle t = new TextStyle();
         t.fontSize(size);

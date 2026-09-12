@@ -92,11 +92,95 @@ public abstract class RenderElement extends Element {
     // Element lifecycle
     // ------------------------------------------------------------------
 
+    /// How much of start-up goes into creating and styling Codename One
+    /// components, and how many there are. Read via {@link #componentCost()}.
+    /// Attribution, not a feature: the first frame is dominated by layout, and
+    /// "layout" here includes realising a component for every box.
+    private static long componentMs;
+    private static int componentCount;
+
+    private static long attachMs;
+    private static long selfMountMs;
+    private static long neutralizeMs;
+
+    /// Component creation cost per render-element class. Creating a Codename
+    /// One component is 330us on the native build, which is two orders of
+    /// magnitude more than allocating one should cost; this says which
+    /// elements own it.
+    private static final java.util.Map<Class<?>, long[]> CREATE_BY_CLASS =
+            new java.util.HashMap<Class<?>, long[]>();
+
+    /** Component creation, worst render-element classes first. */
+    public static String componentBreakdown() {
+        java.util.List<java.util.Map.Entry<Class<?>, long[]>> rows =
+                new java.util.ArrayList<java.util.Map.Entry<Class<?>, long[]>>(
+                        CREATE_BY_CLASS.entrySet());
+        java.util.Collections.sort(rows,
+                new java.util.Comparator<java.util.Map.Entry<Class<?>, long[]>>() {
+                    @Override
+                    public int compare(java.util.Map.Entry<Class<?>, long[]> a,
+                            java.util.Map.Entry<Class<?>, long[]> b) {
+                        return Long.compare(b.getValue()[0], a.getValue()[0]);
+                    }
+                });
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < rows.size() && i < 8; i++) {
+            java.util.Map.Entry<Class<?>, long[]> e = rows.get(i);
+            String n = e.getKey().getName();
+            int dot = n.lastIndexOf('.');
+            sb.append(' ').append(dot < 0 ? n : n.substring(dot + 1))
+                    .append('=').append(e.getValue()[0]).append("ms/")
+                    .append(e.getValue()[1]).append('x');
+        }
+        return sb.toString();
+    }
+
+    /** Components created so far, and what they cost. */
+    public static String componentCost() {
+        return componentCount + " component(s) in " + componentMs + "ms"
+                + " (create=" + (componentMs - neutralizeMs) + "ms neutralize=" + neutralizeMs
+                + "ms attach=" + attachMs + "ms selfMount=" + selfMountMs + "ms)";
+    }
+
     @Override
     public void mount(Element parent, int slot) {
+        if (!Trace.on()) {
+            super.mount(parent, slot);
+            component = createComponent();
+            neutralizeCn1Behaviors(component);
+            if (component != null) {
+                componentCount++;
+            }
+            if (host != null && ownsComponent()) {
+                host.attach(this);
+            }
+            dirty = true;
+            performRebuild();
+            return;
+        }
+        // Everything here EXCEPT performRebuild is this element's own cost;
+        // performRebuild recurses into the subtree, so timing it would just
+        // report the total again.
+        long m0 = System.currentTimeMillis();
         super.mount(parent, slot);
+        long t0 = System.currentTimeMillis();
         component = createComponent();
+        long tn = System.currentTimeMillis();
         neutralizeCn1Behaviors(component);
+        if (component != null) {
+            componentCount++;
+            long took = System.currentTimeMillis() - t0;
+            componentMs += took;
+            neutralizeMs += System.currentTimeMillis() - tn;
+            long[] row = CREATE_BY_CLASS.get(getClass());
+            if (row == null) {
+                row = new long[2];
+                CREATE_BY_CLASS.put(getClass(), row);
+            }
+            row[0] += took;
+            row[1]++;
+        }
+        long a0 = System.currentTimeMillis();
         if (host != null && ownsComponent()) {
             // Components attach in mount (depth-first) order, which equals
             // element-tree order; when this mount replaces an existing
@@ -105,6 +189,8 @@ public abstract class RenderElement extends Element {
             // container's z-order stays in sync with the tree.
             host.attach(this);
         }
+        attachMs += System.currentTimeMillis() - a0;
+        selfMountMs += System.currentTimeMillis() - m0;
         dirty = true;
         performRebuild();
     }
@@ -441,6 +527,21 @@ public abstract class RenderElement extends Element {
     /// True while a dry measurement is running, so nested layout() calls measure dryly too.
     private static boolean dryPass;
 
+    /**
+     * Whether the pass currently running is a dry measurement.
+     *
+     * <p>performLayout is allowed to have side effects — it writes child
+     * offsets, and a text box writes the lines it wrapped — but a DRY pass runs
+     * against constraints that are not the ones the box will be painted at, so
+     * anything it publishes for the painter is wrong. Text was writing its
+     * wrapped lines unconditionally, so a dry measurement at unbounded width
+     * left the label holding one long unwrapped line and it painted straight
+     * past its own edge.
+     */
+    protected static boolean isDryPass() {
+        return dryPass;
+    }
+
     static long layoutCalls;
     static long layoutHits;
     static long layoutMissDirty;
@@ -485,6 +586,9 @@ public abstract class RenderElement extends Element {
 
     /// Runs performLayout while attributing only its OWN time to this element's class.
     private Size timedPerformLayout(BoxConstraints constraints) {
+        if (!Trace.on()) {
+            return performLayout(constraints);
+        }
         long start = System.nanoTime();
         long childrenBefore = childNanos;
         childNanos = 0;

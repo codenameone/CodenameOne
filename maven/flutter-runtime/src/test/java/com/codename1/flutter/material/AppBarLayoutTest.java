@@ -132,6 +132,64 @@ class AppBarLayoutTest {
     }
 
     @Test
+    @DisplayName("flexibleSpace fills the whole bar, behind the row")
+    void flexibleSpaceFillsTheBarBehindTheRow() {
+        AppBar b = barWith(new ProbeBox(40, 40), new ProbeBox(100, 20));
+        ProbeBox background = new ProbeBox(10, 10);
+        b.flexibleSpace(background);
+
+        Bar bar = mountAndLayout(b, BoxConstraints.tight(400, 56));
+
+        assertEquals(3, bar.children.size(),
+                "flexibleSpace joins leading and title as a child");
+        RenderElement flexible = bar.children.get(0);
+        assertEquals(0, flexible.x(), "the background starts at the bar's leading edge");
+        assertEquals(0, flexible.y(), "and at its top, not centred like a slot");
+        assertEquals(400, flexible.size().width(), "it is stretched across the bar");
+        assertEquals(56, flexible.size().height(), "and down it");
+    }
+
+    @Test
+    @DisplayName("flexibleSpace does not take width from the row")
+    void flexibleSpaceIsNotAFourthSlot() {
+        ProbeBox leading = new ProbeBox(40, 40);
+        ProbeBox title = new ProbeBox(100, 20);
+        ProbeBox action = new ProbeBox(40, 40);
+
+        AppBar plain = barWith(leading, title, action);
+        Bar without = mountAndLayout(plain, BoxConstraints.tight(400, 56));
+        double titleXWithout = without.children.get(1).x();
+        double actionXWithout = without.children.get(2).x();
+
+        AppBar withBackground = barWith(new ProbeBox(40, 40), new ProbeBox(100, 20),
+                new ProbeBox(40, 40));
+        withBackground.flexibleSpace(new ProbeBox(180, 56));
+        Bar with = mountAndLayout(withBackground, BoxConstraints.tight(400, 56));
+
+        assertEquals(titleXWithout, with.children.get(2).x(),
+                "the title sits where it did before a background was added");
+        assertEquals(actionXWithout, with.children.get(3).x(),
+                "and so does the action");
+    }
+
+    @Test
+    @DisplayName("a bar with only a flexibleSpace still has a width")
+    void flexibleSpaceOnlyBarMeasuresItsBackground() {
+        // Crane's bar is exactly this: no title, no leading, no actions — the
+        // whole thing is the flexibleSpace. Summing the row alone would measure
+        // the bar as zero wide and collapse it.
+        AppBar b = new AppBar();
+        b.automaticallyImplyLeading(false);
+        b.flexibleSpace(new ProbeBox(240, 56));
+
+        AppBarRenderElement element = (AppBarRenderElement)
+                FlutterUI.mount(b, new RenderHost(), new BuildOwner());
+        assertEquals(240, element.layout(
+                BoxConstraints.loose(Double.POSITIVE_INFINITY, 56)).width(),
+                "the bar measures its background when it has nothing else");
+    }
+
+    @Test
     @DisplayName("slots are centred vertically in the bar")
     void slotsAreVerticallyCentred() {
         Bar bar = mountAndLayout(

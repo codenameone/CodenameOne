@@ -40,7 +40,15 @@ import com.codename1.flutter.Widget;
  * is what remembers the descendants that read it so {@link #updateShouldNotify} can rebuild
  * them.</p>
  */
-public class InheritedWidget extends StatelessWidget {
+/*
+ * Implements HasChild so that the helpers which walk down a wrapper chain --
+ * "what glyph is inside this button?", "what text is inside this label?" --
+ * can see THROUGH an inherited widget. IconTheme and DefaultTextStyle are
+ * inherited widgets, and they are exactly what a theme puts between a button
+ * and its icon: the gallery wraps every study's back arrow in an IconTheme, and
+ * the FAB's glyph search stopped there and fell back to a plus sign.
+ */
+public class InheritedWidget extends StatelessWidget implements HasChild {
 
     private Widget child;
 
@@ -48,6 +56,7 @@ public class InheritedWidget extends StatelessWidget {
         this.child = v;
     }
 
+    @Override
     public Widget getChild() {
         return child;
     }

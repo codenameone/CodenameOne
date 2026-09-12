@@ -350,8 +350,62 @@ public class MaterialApp extends StatelessWidget
         // A push that arrives from outside the widget tree - a deep link, a notification
         // tap, a test harness - inherits from here, so it sees the same Theme,
         // MediaQuery, Localizations and providers a push from a widget would.
-        return wrapWithLocalizations(
-                new com.codename1.flutter.navigation.Navigator.RootScope(content, rootApp));
+        // The app's theme is INSTALLED as a widget, exactly as Flutter installs
+        // one below WidgetsApp. Without it `Theme.of` found no Theme ancestor,
+        // fell through to `findAncestorWidgetOfExactType(MaterialApp)` -- a walk
+        // to the root -- and reported a missing ancestor on the way. Every themed
+        // widget calls Theme.of on every build, so the intended hash lookup was
+        // never actually taken, and the diagnostic budget for genuinely missing
+        // providers was spent on this one false alarm.
+        return wrapWithTheme(wrapWithLocalizations(
+                new com.codename1.flutter.navigation.Navigator.RootScope(content, rootApp)));
+    }
+
+    /**
+     * Publishes {@link #effectiveTheme()} to the subtree as a real Theme
+     * widget, together with the two ambient defaults Flutter installs
+     * alongside it: the icon theme and the default text style.
+     *
+     * <p>Neither was present, so {@code IconTheme.of} and
+     * {@code DefaultTextStyle.of} found nothing above them anywhere in the app
+     * and each fell back to a walk plus a synthesised default -- on every Icon
+     * and every Text, on every build. Installing them is both the faithful
+     * shape and the one that makes those lookups a hash hit.</p>
+     */
+    private Widget wrapWithTheme(Widget content) {
+        if (content == null) {
+            return null;
+        }
+        ThemeData data = effectiveTheme();
+
+        com.codename1.flutter.widgets.DefaultTextStyle text =
+                new com.codename1.flutter.widgets.DefaultTextStyle();
+        com.codename1.flutter.TextStyle body = null;
+        try {
+            body = data.textTheme() == null ? null : data.textTheme().bodyMedium();
+        } catch (Throwable ignore) {
+            body = null;
+        }
+        if (body != null) {
+            text.style(body);
+        }
+        text.child(content);
+
+        IconTheme icons = new IconTheme();
+        icons.data(data.iconTheme());
+        icons.child(text);
+
+        Theme t = new Theme();
+        t.data(data);
+        t.child(icons);
+        // No MediaQuery is installed here, deliberately. Flutter's
+        // MediaQuery.fromView is fed by a view whose metrics are already known;
+        // ours would have to snapshot the Display during the app's FIRST build,
+        // which happens before the Form is showing and therefore before the
+        // safe-area insets exist. Every descendant then inherited a zero top
+        // inset and the whole app rode 44dp too high. MediaQuery.of resolves
+        // against the Display instead, and MediaQueryData caches that.
+        return t;
     }
 
     /**
@@ -426,7 +480,17 @@ public class MaterialApp extends StatelessWidget
     private static boolean loggedLocale;
 
     /** What each delegate actually produced — the list is what every lookup searches. */
+    /**
+     * Localisation tracing, GATED. These ran on every app's startup path, and a
+     * Log.p is not free -- on a device it is file IO, and six of them landed
+     * inside the first frame. They answer a question ("which delegate produced
+     * the resources this app is using?") worth keeping, just not worth paying
+     * for when nobody asked it.
+     */
     private static void logLoaded(Object delegate, Object value) {
+        if (!com.codename1.flutter.Trace.on()) {
+            return;
+        }
         try {
             com.codename1.io.Log.p("Flutter runtime:   delegate "
                     + delegate.getClass().getName() + " -> "
@@ -437,7 +501,7 @@ public class MaterialApp extends StatelessWidget
     }
 
     private void logResolvedLocale(Locale loc) {
-        if (loggedLocale) {
+        if (loggedLocale || !com.codename1.flutter.Trace.on()) {
             return;
         }
         loggedLocale = true;

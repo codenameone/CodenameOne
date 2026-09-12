@@ -48,9 +48,19 @@ public class Color {
     }
 
     /**
-     * The full 32-bit ARGB value.
+     * The full ARGB value, as Dart sees it — {@code Color.value}.
+     *
+     * <p>Unsigned, and a {@code long}, because Dart's {@code int} is 64-bit and
+     * the gallery prints this: {@code color.value.toRadixString(16)}. Returning
+     * the signed 32-bit word made every opaque colour negative, so the colors
+     * demo listed "#000-1412" beside each swatch instead of "#FFFFEBEE".</p>
      */
-    public int value() {
+    public long value() {
+        return value & 0xFFFFFFFFL;
+    }
+
+    /** The same word as a signed 32-bit int, for Codename One's style API. */
+    public int argb() {
         return value;
     }
 

@@ -131,4 +131,29 @@ public class AppBarTheme {
     public IconThemeData iconTheme() {
         return iconTheme;
     }
+
+    /** {@code AppBarTheme.actionsIconTheme}, falling back to the bar's icon theme. */
+    public IconThemeData actionsIconTheme() {
+        return actionsIconTheme != null ? actionsIconTheme : iconTheme;
+    }
+
+    public Color foregroundColor() {
+        return foregroundColor;
+    }
+
+    public TextStyle titleTextStyle() {
+        return titleTextStyle;
+    }
+
+    public TextStyle toolbarTextStyle() {
+        return toolbarTextStyle;
+    }
+
+    public Object shape() {
+        return shape;
+    }
+
+    public Boolean centerTitle() {
+        return centerTitle;
+    }
 }

@@ -73,12 +73,39 @@ public class Image extends Widget {
      */
     public void image(ImageProvider v) {
         this.imageProvider = v;
-        if (v != null) {
-            String key = v.sourceKey();
+        // Providers WRAP: ResizeImage(AssetImage(...)) is the ordinary way to
+        // ask for a thumbnail, and its own source key reads
+        // "resize:80x80:asset:...". Matching the prefix on the outermost key
+        // therefore found no asset at all, so Crane's destination photographs
+        // never loaded -- and, because nothing had failed, nothing was
+        // reported either.
+        ImageProvider inner = v;
+        for (int depth = 0; inner instanceof com.codename1.flutter.ResizeImage && depth < 8; depth++) {
+            com.codename1.flutter.ResizeImage rz = (com.codename1.flutter.ResizeImage) inner;
+            // A ResizeImage is a DECODE instruction, in raw pixels: "give me
+            // this picture at 80x80 and never hold it larger". Discarding it
+            // meant a list of thumbnails each kept a full-resolution decode --
+            // for the gallery's 3.0x artwork that is roughly a thousand times
+            // the pixels the screen ever shows. The innermost wrapper wins,
+            // as it does in Flutter.
+            if (rz.getWidth() != null) {
+                resizeWidthPx = rz.getWidth();
+            }
+            if (rz.getHeight() != null) {
+                resizeHeightPx = rz.getHeight();
+            }
+            inner = rz.getImageProvider();
+        }
+        if (inner != null) {
+            String key = inner.sourceKey();
             if (key != null && key.startsWith("asset:")) {
                 this.assetName = key.substring("asset:".length());
             } else if (key != null && key.startsWith("url:")) {
                 this.url = key.substring("url:".length());
+            } else {
+                com.codename1.flutter.FlutterErrorReport.unimplemented("ImageProvider",
+                        inner.getClass().getName() + " resolves to no asset or URL ("
+                        + key + "), so nothing will be drawn");
             }
         }
     }
@@ -136,6 +163,20 @@ public class Image extends Widget {
         i.height = height;
         i.fit = fit;
         return i;
+    }
+
+    /// The decode size a ResizeImage asked for, in raw pixels, or null.
+    private Long resizeWidthPx;
+    private Long resizeHeightPx;
+
+    /** The width a {@code ResizeImage} asked this picture to be decoded at, or null. */
+    public Long getResizeWidthPx() {
+        return resizeWidthPx;
+    }
+
+    /** The height a {@code ResizeImage} asked this picture to be decoded at, or null. */
+    public Long getResizeHeightPx() {
+        return resizeHeightPx;
     }
 
     public String getAssetName() {

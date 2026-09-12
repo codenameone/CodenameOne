@@ -37,10 +37,9 @@ import com.codename1.flutter.Widget;
  * {@link MaterialApp}'s effective theme (and a default {@link ThemeData} when
  * there is none).
  */
-public class Theme extends StatelessWidget {
+public class Theme extends com.codename1.flutter.widgets.InheritedWidget {
 
     private ThemeData data;
-    private Widget child;
 
     public Theme() {
     }
@@ -49,27 +48,23 @@ public class Theme extends StatelessWidget {
         this.data = v;
     }
 
-    public void child(Widget v) {
-        this.child = v;
-    }
-
     public ThemeData getData() {
         return data;
     }
 
-    public Widget getChild() {
-        return child;
-    }
-
     @Override
-    public Widget build(BuildContext context) {
-        return child;
+    public boolean updateShouldNotify(com.codename1.flutter.widgets.InheritedWidget oldWidget) {
+        return !(oldWidget instanceof Theme) || ((Theme) oldWidget).data != data;
     }
 
     public static ThemeData of(BuildContext context) {
+        // An INHERITED lookup, so it is a hash lookup rather than a walk to the
+        // root, and so a widget that reads the theme is rebuilt when the theme
+        // changes. Theme.of is called by most themed widgets on every build;
+        // as an ancestor search it was one of the hottest paths in the runtime.
         Theme t = context == null
                 ? null
-                : context.findAncestorWidgetOfExactType(Theme.class);
+                : context.maybeDependOnInheritedWidgetOfExactType(Theme.class);
         if (t != null && t.data != null) {
             return t.data;
         }

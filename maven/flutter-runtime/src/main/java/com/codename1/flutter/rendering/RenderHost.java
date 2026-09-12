@@ -295,6 +295,12 @@ public class RenderHost {
         if (container == null) {
             return;
         }
+        // Never from inside a pass. A relayout requested mid-pass walks a tree
+        // that is currently being replaced; see FlutterRootLayout.inLayout.
+        if (FlutterRootLayout.inLayout()) {
+            FlutterRootLayout.deferRevalidate(this);
+            return;
+        }
         // Run OUR constraint pass and nothing else. It writes every component's bounds
         // absolutely, so none of Codename One's own layout machinery has to participate.
         //

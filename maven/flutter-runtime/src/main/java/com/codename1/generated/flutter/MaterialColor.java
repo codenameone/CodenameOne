@@ -26,28 +26,53 @@ package com.codename1.generated.flutter;
 import com.codename1.flutter.Color;
 
 /**
- * A color swatch with a primary value plus ten indexed shades (50, 100..900) —
- * Flutter's {@code MaterialColor}. The colors demo indexes it (Dart's
- * {@code swatch[key]}, transpiled to {@link #idx(long)}) to list every shade of
- * a palette.
+ * A color swatch with a primary value plus its indexed shades (50, 100..900, and
+ * for grey also 350 and 850) — Flutter's {@code MaterialColor}. The colors demo
+ * indexes it (Dart's {@code swatch[key]}, transpiled to {@link #idx(long)}) to
+ * list every shade of a palette.
  *
  * <p>Lives in the transpiler's generated package because new_gallery references
  * it unqualified (the Flutter SDK type carries no {@code @JavaName} mapping) and
- * {@code _Palette} names it in the same package. Structural for this milestone:
- * every shade resolves to the primary value; a later milestone can carry the
- * real per-shade swatch.</p>
+ * {@code _Palette} names it in the same package.</p>
+ *
+ * <p>The swatch is two parallel {@code long} arrays rather than a map: a swatch
+ * has at most a dozen entries, so a scan beats a hash, and primitive arrays cost
+ * no boxing on the ports with the tightest runtime.</p>
  */
 public class MaterialColor extends Color {
 
+    private final long[] keys;
+    private final long[] values;
+
+    /**
+     * A swatch whose shades all resolve to {@code primary}.
+     *
+     * <p>Retained for a palette that has no shade table of its own; prefer the
+     * three-argument constructor, because a swatch that answers the same color
+     * for every shade renders a palette as one flat block.</p>
+     */
     public MaterialColor(long primary) {
+        this(primary, null, null);
+    }
+
+    public MaterialColor(long primary, long[] keys, long[] values) {
         super(primary);
+        this.keys = keys;
+        this.values = values;
     }
 
     /**
-     * The shade for {@code key} (Dart's {@code operator []}). Returns the
-     * primary value for any shade in this structural milestone.
+     * The shade for {@code key} (Dart's {@code operator []}), or the primary
+     * value when this swatch does not define that shade.
      */
     public Color idx(long key) {
+        if (keys != null) {
+            for (int i = 0; i < keys.length; i++) {
+                if (keys[i] == key) {
+                    return new Color(values[i]);
+                }
+            }
+        }
         return this;
     }
 

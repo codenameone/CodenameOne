@@ -125,12 +125,20 @@ public class Navigator extends StatelessWidget {
             RouteSettings settings = new RouteSettings();
             settings.name(initialRoute);
             Object route = onGenerateRoute.call(settings);
-            if (route instanceof MaterialPageRoute) {
-                dart.runtime.Funcs.Func1<com.codename1.flutter.BuildContext,
-                        com.codename1.flutter.Widget> b = ((MaterialPageRoute) route).getBuilder();
-                if (b != null) {
-                    return b.call(context);
+            if (route instanceof Route) {
+                com.codename1.flutter.Widget page = ((Route<?>) route).buildPage(context);
+                if (page != null) {
+                    return page;
                 }
+                com.codename1.flutter.FlutterErrorReport.noRoute(
+                        String.valueOf(initialRoute),
+                        "a nested Navigator's " + route.getClass().getName()
+                                + " built no page");
+            } else if (route != null) {
+                com.codename1.flutter.FlutterErrorReport.noRoute(
+                        String.valueOf(initialRoute),
+                        "onGenerateRoute returned a " + route.getClass().getName()
+                                + ", which is not a Route");
             }
         }
         return null;
@@ -658,16 +666,15 @@ public class Navigator extends StatelessWidget {
      */
     static final class RouteWidget extends StatelessWidget {
 
-        private final MaterialPageRoute route;
+        private final Route<?> route;
 
-        RouteWidget(MaterialPageRoute route) {
+        RouteWidget(Route<?> route) {
             this.route = route;
         }
 
         @Override
         public Widget build(BuildContext context) {
-            Funcs.Func1<BuildContext, Widget> b = route.getBuilder();
-            return b == null ? null : b.call(context);
+            return route.buildPage(context);
         }
     }
 }

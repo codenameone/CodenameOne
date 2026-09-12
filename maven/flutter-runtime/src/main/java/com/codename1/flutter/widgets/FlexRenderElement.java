@@ -152,9 +152,17 @@ public class FlexRenderElement extends RenderElement {
                 }
                 BoxConstraints childConstraints;
                 if (boundedMain) {
+                    // Expanded is a TIGHT fit — it must fill its share. Flexible
+                    // defaults to LOOSE: it may take less, and whatever it leaves
+                    // is free space for mainAxisAlignment to distribute. Treating
+                    // both as tight is why a `Row(spaceBetween, [Text,
+                    // Flexible(Text)])` put its second child straight after the
+                    // first instead of at the far end — the colors demo's shade
+                    // name and hex value ran together as "50#FFFFEBEE".
+                    double minExtent = looseFit(child) ? 0 : extent;
                     childConstraints = vertical
-                            ? new BoxConstraints(minCrossChild, maxCrossChild, extent, extent)
-                            : new BoxConstraints(extent, extent, minCrossChild, maxCrossChild);
+                            ? new BoxConstraints(minCrossChild, maxCrossChild, minExtent, extent)
+                            : new BoxConstraints(minExtent, extent, minCrossChild, maxCrossChild);
                 } else {
                     // Degenerate case (flex inside unbounded main axis is an
                     // error in Flutter); fall back to intrinsic sizing.
@@ -227,6 +235,16 @@ public class FlexRenderElement extends RenderElement {
         }
 
         return vertical ? new Size(crossSize, mainSize) : new Size(mainSize, crossSize);
+    }
+
+    /** Whether this flexible child may take less than its share ({@code FlexFit.loose}). */
+    private static boolean looseFit(RenderElement child) {
+        if (!(child instanceof ExpandedRenderElement)) {
+            return false;
+        }
+        com.codename1.flutter.Widget w = child.widget();
+        return w instanceof Flexible
+                && ((Flexible) w).getFit() == com.codename1.flutter.FlexFit.loose;
     }
 
     private static long flexOf(RenderElement child) {

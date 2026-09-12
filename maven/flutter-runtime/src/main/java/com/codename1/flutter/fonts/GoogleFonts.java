@@ -46,8 +46,8 @@ public abstract class GoogleFonts {
     /// {@code textStyle:} is the BASE the rest are layered onto - google_fonts copies the
     /// given style and overrides only what was named. Ignoring it dropped whichever theme
     /// style the caller was extending, so the text kept the font and lost everything else.
-    private static TextStyle style(double fontSize, FontWeight fontWeight, Color color,
-            Double letterSpacing, Double height,
+    private static TextStyle style(String family, double fontSize, FontWeight fontWeight,
+            Color color, Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
         TextStyle t = textStyle != null
@@ -69,6 +69,10 @@ public abstract class GoogleFonts {
         if (height != null) {
             t.height(height.doubleValue());
         }
+        // NAMING the family is the whole point of the call. It used to be
+        // dropped, so every google_fonts style resolved to the platform face
+        // and the studies rendered in the wrong typeface throughout.
+        t.fontFamily(family);
         return t;
     }
 
@@ -76,7 +80,7 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("Eczar", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
@@ -84,7 +88,7 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("LibreFranklin", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
@@ -92,7 +96,7 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("Merriweather", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
@@ -100,7 +104,7 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("Montserrat", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
@@ -108,7 +112,7 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("Oswald", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
@@ -116,7 +120,7 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("RobotoCondensed", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
@@ -124,7 +128,7 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("RobotoMono", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
@@ -132,19 +136,30 @@ public abstract class GoogleFonts {
             Double letterSpacing, Double height,
             com.codename1.flutter.TextStyle textStyle, Object fontStyle, Object decoration,
             Double wordSpacing) {
-        return style(fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
+        return style("WorkSans", fontSize, fontWeight, color, letterSpacing, height, textStyle, fontStyle,
                 decoration, wordSpacing);
     }
 
+    /**
+     * {@code GoogleFonts.<family>TextTheme(theme)} — the given text theme with
+     * every role re-pointed at that family, which is how a study sets its
+     * typeface once for a whole app. Passing the theme through unchanged (what
+     * this used to do) left every one of those roles on the platform face.
+     */
+    private static TextTheme themed(String family, TextTheme textTheme) {
+        TextTheme base = textTheme != null ? textTheme : new TextTheme();
+        return base.apply(family, null, null, null, null, null, null);
+    }
+
     public static TextTheme ralewayTextTheme(TextTheme textTheme) {
-        return textTheme != null ? textTheme : new TextTheme();
+        return themed("Raleway", textTheme);
     }
 
     public static TextTheme rubikTextTheme(TextTheme textTheme) {
-        return textTheme != null ? textTheme : new TextTheme();
+        return themed("Rubik", textTheme);
     }
 
     public static TextTheme workSansTextTheme(TextTheme textTheme) {
-        return textTheme != null ? textTheme : new TextTheme();
+        return themed("WorkSans", textTheme);
     }
 }

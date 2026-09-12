@@ -135,6 +135,36 @@ public class TextStyle {
      * (fontStyle, wordSpacing, background, foreground, decoration) are accepted
      * for API shape and ignored.
      */
+    /**
+     * This style with {@code other}'s set properties layered on top — Flutter's
+     * {@code TextStyle.merge}. A null {@code other} returns this style.
+     */
+    public TextStyle merge(TextStyle other) {
+        if (other == null) {
+            return this;
+        }
+        TextStyle t = shallowClone();
+        if (other.color != null) {
+            t.color = other.color;
+        }
+        if (other.fontSize != null) {
+            t.fontSize = other.fontSize;
+        }
+        if (other.fontWeight != null) {
+            t.fontWeight = other.fontWeight;
+        }
+        if (other.fontFamily != null) {
+            t.fontFamily = other.fontFamily;
+        }
+        if (other.letterSpacing != null) {
+            t.letterSpacing = other.letterSpacing;
+        }
+        if (other.height != null) {
+            t.height = other.height;
+        }
+        return t;
+    }
+
     public TextStyle copyWith(Boolean inherit, Color color, Color backgroundColor, String fontFamily,
                               Double fontSize, FontWeight fontWeight, Object fontStyle, Double letterSpacing,
                               Double wordSpacing, Double height, Object background, Object foreground,

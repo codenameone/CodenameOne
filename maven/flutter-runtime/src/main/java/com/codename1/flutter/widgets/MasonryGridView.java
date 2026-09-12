@@ -32,10 +32,8 @@ import dart.runtime.Funcs;
 
 /**
  * A staggered, Pinterest-style grid from the {@code flutter_staggered_grid_view}
- * package — {@code MasonryGridView}. crane's backdrop builds one via the
- * {@code .count} constructor to lay out destination cards. This milestone
- * captures the grid configuration and item builder; the staggered layout /
- * windowed building is deferred to a later milestone.
+ * package — {@code MasonryGridView}. Crane's backdrop builds one via the
+ * {@code .count} constructor to lay out its destination cards.
  */
 public class MasonryGridView extends Widget {
 
@@ -80,6 +78,16 @@ public class MasonryGridView extends Widget {
 
     public String getRestorationId() {
         return restorationId;
+    }
+
+    /** The gap between items down a column, in logical pixels. */
+    public double getMainAxisSpacing() {
+        return mainAxisSpacing == null ? 0 : mainAxisSpacing.doubleValue();
+    }
+
+    /** The gap between columns, in logical pixels. */
+    public double getCrossAxisSpacing() {
+        return crossAxisSpacing == null ? 0 : crossAxisSpacing.doubleValue();
     }
 
     @Override

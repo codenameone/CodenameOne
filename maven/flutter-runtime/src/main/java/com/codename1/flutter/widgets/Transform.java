@@ -51,6 +51,7 @@ public class Transform extends Widget {
 
     // --- default constructor: named-param setters -----------------------
 
+    /** {@code Transform(transform: ...)} — the general 4x4 form. */
     public void transform(Object v) {
         this.transform = v;
     }
@@ -131,7 +132,10 @@ public class Transform extends Widget {
         if (scaleX != null) {
             return scaleX.doubleValue();
         }
-        return scale != null ? scale.doubleValue() : 1.0;
+        if (scale != null) {
+            return scale.doubleValue();
+        }
+        return matrixEntry(0, 0, 1.0);
     }
 
     /// The vertical scale in effect: scaleY when given, else the uniform scale, else 1.
@@ -139,7 +143,10 @@ public class Transform extends Widget {
         if (scaleY != null) {
             return scaleY.doubleValue();
         }
-        return scale != null ? scale.doubleValue() : 1.0;
+        if (scale != null) {
+            return scale.doubleValue();
+        }
+        return matrixEntry(1, 1, 1.0);
     }
 
     /// The rotation in radians, or null when this is not a rotation.
@@ -149,8 +156,39 @@ public class Transform extends Widget {
 
     /// The translation, or null when this is not a translation.
     public com.codename1.flutter.Offset effectiveOffset() {
-        return offset instanceof com.codename1.flutter.Offset
-                ? (com.codename1.flutter.Offset) offset : null;
+        if (offset instanceof com.codename1.flutter.Offset) {
+            return (com.codename1.flutter.Offset) offset;
+        }
+        double tx = matrixEntry(0, 3, 0);
+        double ty = matrixEntry(1, 3, 0);
+        return tx == 0 && ty == 0 ? null : new com.codename1.flutter.Offset(tx, ty);
+    }
+
+    /**
+     * One cell of the {@code transform} matrix, when this Transform was given one.
+     *
+     * <p>{@code Transform(transform: matrix)} is the general form — the named
+     * constructors are conveniences over it — and it was accepted and ignored,
+     * so anything driving a widget through a matrix rendered untransformed. The
+     * 2D-transformations demo positions its whole board that way, through an
+     * {@code InteractiveViewer}'s controller, and drew it in the corner.
+     *
+     * <p>Only the scale and translation cells are read; a matrix carrying a
+     * rotation or a skew is not decomposed.</p>
+     */
+    private double matrixEntry(int row, int col, double fallback) {
+        if (!(transform instanceof com.codename1.flutter.vectormath.Matrix4)) {
+            return fallback;
+        }
+        dart.core.DartList<Double> m =
+                ((com.codename1.flutter.vectormath.Matrix4) transform).storage();
+        // vector_math stores column-major: index = col * 4 + row.
+        int i = col * 4 + row;
+        if (m == null || i < 0 || i >= m.size()) {
+            return fallback;
+        }
+        Double v = m.get(i);
+        return v == null ? fallback : v.doubleValue();
     }
 
     @Override

@@ -41,6 +41,18 @@ public class IconRenderElement extends RenderElement {
     /** Flutter's default icon size in logical pixels. */
     public static final double DEFAULT_SIZE_LP = 24;
 
+    /// Glyph rasterisation cost, and how much of it is REPEATED work: a
+    /// material icon is drawn into an image per element, so the same glyph at
+    /// the same size and colour is rasterised once per place it appears.
+    private static long glyphMs;
+    private static int glyphCount;
+    private static final java.util.Set<String> GLYPHS = new java.util.HashSet<String>();
+
+    /** Icon rasterisations, distinct glyphs among them, and the cost. */
+    public static String glyphCost() {
+        return glyphCount + " icon(s) (" + GLYPHS.size() + " distinct) in " + glyphMs + "ms";
+    }
+
     public IconRenderElement(Icon widget) {
         super(widget);
     }
@@ -49,8 +61,40 @@ public class IconRenderElement extends RenderElement {
         return (Icon) widget();
     }
 
+    /**
+     * The ambient icon theme, or an empty one.
+     *
+     * <p>Resolved per paint rather than cached: the theme an icon sits under can
+     * change when an ancestor rebuilds, and an icon that sampled its colour once
+     * would keep the first one forever.</p>
+     */
+    private com.codename1.flutter.material.IconThemeData ambient() {
+        try {
+            return com.codename1.flutter.material.IconTheme.of(this);
+        } catch (Throwable t) {
+            return new com.codename1.flutter.material.IconThemeData();
+        }
+    }
+
     private double sizeLp() {
-        return icon().getSize() != null ? icon().getSize() : DEFAULT_SIZE_LP;
+        return sizeLp(icon().getSize() != null ? null : ambient());
+    }
+
+    private double sizeLp(com.codename1.flutter.material.IconThemeData themed) {
+        if (icon().getSize() != null) {
+            return icon().getSize();
+        }
+        Double size = themed == null ? null : themed.size();
+        return size != null ? size.doubleValue() : DEFAULT_SIZE_LP;
+    }
+
+    /** {@code Icon.color}, else the ambient {@code IconTheme}'s, else the default ink. */
+    private com.codename1.flutter.Color effectiveColor(
+            com.codename1.flutter.material.IconThemeData themed) {
+        if (icon().getColor() != null) {
+            return icon().getColor();
+        }
+        return themed == null ? null : themed.color();
     }
 
     @Override
@@ -76,13 +120,25 @@ public class IconRenderElement extends RenderElement {
             l.setIcon(null);
             return;
         }
+        // One lookup for both the colour and the size: each is a walk to the
+        // root of the element tree, and this runs for every icon on screen.
+        com.codename1.flutter.material.IconThemeData themed =
+                (icon().getColor() == null || icon().getSize() == null) ? ambient() : null;
         Style s = new Style(l.getUnselectedStyle());
-        if (icon().getColor() != null) {
-            s.setFgColor(icon().getColor().rgb());
+        com.codename1.flutter.Color fg = effectiveColor(themed);
+        if (fg != null) {
+            s.setFgColor(fg.rgb());
+            l.getAllStyles().setFgColor(fg.rgb());
         }
         s.setBgTransparency(0);
         try {
-            l.setIcon(FontImage.createMaterial(icon().getIcon().codePoint(), s, Dp.mm(sizeLp())));
+            long g0 = System.currentTimeMillis();
+            l.setIcon(FontImage.createMaterial(icon().getIcon().codePoint(), s,
+                    Dp.mm(sizeLp(themed))));
+            glyphMs += System.currentTimeMillis() - g0;
+            glyphCount++;
+            GLYPHS.add(icon().getIcon().codePoint() + "/" + (int) sizeLp(themed)
+                    + "/" + (fg == null ? -1 : fg.rgb()));
         } catch (Exception err) {
             // headless or missing icon font: layout still reserves the box
         }

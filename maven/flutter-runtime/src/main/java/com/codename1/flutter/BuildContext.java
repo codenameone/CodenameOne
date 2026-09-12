@@ -45,6 +45,16 @@ public interface BuildContext {
     <W extends Widget> W dependOnInheritedWidgetOfExactType(Class<W> type);
 
     /**
+     * As {@link #dependOnInheritedWidgetOfExactType(Class)}, but SILENT when
+     * nothing above provides the value. For the lookups whose callers have a
+     * documented fallback ({@code Theme.of}, {@code MediaQuery.of}, ...), where
+     * a miss is an ordinary answer rather than a fault worth a diagnostic.
+     */
+    default <W extends Widget> W maybeDependOnInheritedWidgetOfExactType(Class<W> type) {
+        return dependOnInheritedWidgetOfExactType(type);
+    }
+
+    /**
      * The no-type-argument form ({@code context.dependOnInheritedWidgetOfExactType()}), where Dart
      * infers the widget type from the surrounding context. Java infers {@code W} from the call's
      * target type. Not tree-walked at this milestone — returns null.
@@ -90,10 +100,18 @@ public interface BuildContext {
     }
 
     /**
-     * The render object for this context ({@code BuildContext.findRenderObject}).
-     * Not modelled at this milestone — returns null.
+     * The render object for this context — {@code BuildContext.findRenderObject}.
+     *
+     * <p>Returns a {@link com.codename1.flutter.rendering.RenderBox} backed by
+     * the nearest render element at or below this context, so its {@code size}
+     * and {@code localToGlobal} report the live layout. Null when this context
+     * has no render element below it (nothing has been laid out yet).</p>
      */
     default Object findRenderObject() {
-        return null;
+        if (!(this instanceof Element)) {
+            return null;
+        }
+        RenderElement r = RenderElement.findRenderElement((Element) this);
+        return r == null ? null : new com.codename1.flutter.rendering.RenderBox(r);
     }
 }

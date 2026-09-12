@@ -35,9 +35,8 @@ import dart.runtime.Funcs;
  * {@code LayoutBuilder}. The builder receives {@link BoxConstraints} (logical
  * pixels).
  *
- * <p>Flutter invokes the builder during layout; this milestone invokes it once
- * at build time with the constraints of the available viewport (best effort),
- * which is correct for the common top-level responsive-breakpoint use.</p>
+ * <p>The builder runs during layout, against the constraints the parent
+ * actually handed down — see {@link LayoutBuilderElement}.</p>
  */
 public class LayoutBuilder extends Widget {
 

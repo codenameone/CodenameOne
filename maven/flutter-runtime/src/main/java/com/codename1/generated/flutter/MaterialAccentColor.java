@@ -32,20 +32,36 @@ import com.codename1.flutter.Color;
  * list every accent shade of a palette.
  *
  * <p>Lives in the transpiler's generated package for the same reason as
- * {@link MaterialColor}. Structural for this milestone: every shade resolves to
- * the primary value.</p>
+ * {@link MaterialColor}.</p>
  */
 public class MaterialAccentColor extends Color {
 
+    private final long[] keys;
+    private final long[] values;
+
+    /** A swatch whose shades all resolve to {@code primary}. */
     public MaterialAccentColor(long primary) {
+        this(primary, null, null);
+    }
+
+    public MaterialAccentColor(long primary, long[] keys, long[] values) {
         super(primary);
+        this.keys = keys;
+        this.values = values;
     }
 
     /**
-     * The shade for {@code key} (Dart's {@code operator []}). Returns the
-     * primary value for any shade in this structural milestone.
+     * The shade for {@code key} (Dart's {@code operator []}), or the primary
+     * value when this swatch does not define that shade.
      */
     public Color idx(long key) {
+        if (keys != null) {
+            for (int i = 0; i < keys.length; i++) {
+                if (keys[i] == key) {
+                    return new Color(values[i]);
+                }
+            }
+        }
         return this;
     }
 

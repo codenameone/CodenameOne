@@ -2052,8 +2052,9 @@ public final class Display extends CN1Constants {
         }
         processSerialCalls();
         if (edtTrace) {
-            long t = System.currentTimeMillis();
-            traceSerial = t - traceMark;
+            // Not `t`: the main surface's timer clock is declared above in this scope.
+            long traceNow = System.currentTimeMillis();
+            traceSerial = traceNow - traceMark;
             edtTraceReport(tracePassStart, traceIdle, traceEvents, traceRevalidate,
                     tracePaint, traceAnimations, traceSerial);
         }

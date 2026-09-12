@@ -284,8 +284,15 @@ public class ButtonRenderElement extends RenderElement {
                 // IconButton (and other glyph triggers): bare glyph
                 int pad = (int) Math.round(Dp.px(8));
                 all.setPadding(pad, pad, pad, pad);
+                // Flutter's order: the button's own colour, then the ambient
+                // IconTheme, then the default ink. The middle step was missing,
+                // so an icon button in a themed app bar came out onSurface —
+                // a black back arrow on a bar whose theme asks for white.
                 com.codename1.flutter.Color tint = w instanceof IconButton
                         ? ((IconButton) w).getColor() : null;
+                if (tint == null) {
+                    tint = IconTheme.of(this).color();
+                }
                 all.setFgColor(tint != null ? tint.rgb() : cs.onSurface().rgb());
                 all.setBorder(Border.createEmpty());
                 clearBackground(all);

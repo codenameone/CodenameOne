@@ -24,21 +24,43 @@
 package com.codename1.flutter.rendering;
 
 import com.codename1.flutter.Offset;
+import com.codename1.flutter.rendering.Dp;
 
 /**
  * A render object laid out with the box protocol (a Cartesian size) — Flutter's
- * {@code RenderBox}. The transformations and reply studies read {@link #size()}
- * and map points through {@link #localToGlobal} / {@link #globalToLocal}. This
- * is a structural stub returning neutral geometry; a later rendering milestone
- * will back it with the live Codename One layout.
+ * {@code RenderBox}.
+ *
+ * <p>Backed by the live layout when it is obtained from
+ * {@code BuildContext.findRenderObject()}: the size and the global position
+ * come from the Codename One component the element owns, converted to the
+ * LOGICAL pixels a Flutter caller expects.
+ *
+ * <p>It used to answer zero and the identity mapping, which is worse than
+ * unimplemented — a caller positioning something by these numbers puts it in
+ * the top-left corner with no indication anything went wrong. The gallery's
+ * feature-discovery highlight centres itself this way.
  */
 public class RenderBox extends RenderObject {
 
     private Size size = Size.ZERO;
+    /** The element this box reports for, when it was obtained from the live tree. */
+    private com.codename1.flutter.RenderElement element;
 
-    /** The size of this box after layout. */
+    public RenderBox() {
+    }
+
+    public RenderBox(com.codename1.flutter.RenderElement element) {
+        this.element = element;
+    }
+
+    /** The size of this box after layout, in logical pixels. */
     public Size size() {
-        return size;
+        if (element == null) {
+            return size;
+        }
+        double scale = scale();
+        Size s = element.size();
+        return s == null ? Size.ZERO : new Size(s.width() / scale, s.height() / scale);
     }
 
     /** Named setter used by the runtime once layout is known. */
@@ -48,24 +70,41 @@ public class RenderBox extends RenderObject {
 
     /** Whether this box has been through layout and has a valid size. */
     public boolean hasSize() {
-        return size != null;
+        return size() != null;
     }
 
     /**
      * Converts a point from this box's local coordinate space to the global
-     * (screen) space, optionally relative to {@code ancestor}. Identity in this
-     * milestone.
+     * (screen) space, optionally relative to {@code ancestor}.
      */
     public Offset localToGlobal(Offset point, RenderObject ancestor) {
-        return point == null ? Offset.zero : point;
+        Offset p = point == null ? Offset.zero : point;
+        if (element == null) {
+            return p;
+        }
+        // The layout pass writes every box's position absolutely within the
+        // host, so the element already knows where it is; no component needed
+        // (many elements own none).
+        double scale = scale();
+        return new Offset(p.dx() + element.x() / scale, p.dy() + element.y() / scale);
     }
 
     /**
      * Converts a point from global (screen) space to this box's local space,
-     * optionally relative to {@code ancestor}. Identity in this milestone.
+     * optionally relative to {@code ancestor}.
      */
     public Offset globalToLocal(Offset point, RenderObject ancestor) {
-        return point == null ? Offset.zero : point;
+        Offset p = point == null ? Offset.zero : point;
+        if (element == null) {
+            return p;
+        }
+        double scale = scale();
+        return new Offset(p.dx() - element.x() / scale, p.dy() - element.y() / scale);
+    }
+
+    private static double scale() {
+        double s = Dp.scale();
+        return s <= 0 ? 1 : s;
     }
 
     /**

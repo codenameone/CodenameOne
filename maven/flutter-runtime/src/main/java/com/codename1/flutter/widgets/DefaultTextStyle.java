@@ -31,9 +31,13 @@ import com.codename1.flutter.Widget;
 /**
  * The default {@link TextStyle} for descendant {@code Text} widgets that do not
  * supply their own — Flutter's {@code DefaultTextStyle}, an
- * {@link InheritedWidget}. This pass stores the style and text layout hints and
- * renders its single {@code child}; propagating the style into unstyled Text is
- * deferred to the text layer.
+ * {@link InheritedWidget}.
+ *
+ * <p>This is the mechanism a container uses to style the text inside it without
+ * touching each {@code Text}: an app bar sets one default and its title picks up
+ * the colour and weight. While {@link #of(BuildContext)} returned an empty
+ * fallback, none of that reached the text, so a themed bar rendered its title in
+ * the default ink.</p>
  */
 public class DefaultTextStyle extends InheritedWidget {
 
@@ -71,12 +75,47 @@ public class DefaultTextStyle extends InheritedWidget {
         return textAlign;
     }
 
+    public Boolean getSoftWrap() {
+        return softWrap;
+    }
+
+    public Integer getMaxLines() {
+        return maxLines;
+    }
+
+    public Object getOverflow() {
+        return overflow;
+    }
+
     /**
      * Nearest ancestor DefaultTextStyle — Flutter's {@code
-     * DefaultTextStyle.of(context)}. Inherited-widget lookup is not yet wired,
-     * so this returns an empty fallback whose style is null.
+     * DefaultTextStyle.of(context)}, or an empty one when nothing above sets a
+     * default (its {@code getStyle()} is then null, meaning "inherit").
      */
     public static DefaultTextStyle of(BuildContext context) {
+        if (context != null) {
+            DefaultTextStyle d =
+                    context.maybeDependOnInheritedWidgetOfExactType(DefaultTextStyle.class);
+            if (d != null) {
+                return d;
+            }
+        }
         return new DefaultTextStyle();
+    }
+
+    /** Convenience for the runtime's own wrapping: a default style over a child. */
+    public static DefaultTextStyle wrap(TextStyle style, Widget child) {
+        DefaultTextStyle d = new DefaultTextStyle();
+        d.style(style);
+        d.child(child);
+        return d;
+    }
+
+    @Override
+    public boolean updateShouldNotify(com.codename1.flutter.widgets.InheritedWidget oldWidget) {
+        if (!(oldWidget instanceof DefaultTextStyle)) {
+            return true;
+        }
+        return ((DefaultTextStyle) oldWidget).style != style;
     }
 }

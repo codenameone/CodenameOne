@@ -45,6 +45,8 @@ public class FloatingActionButton extends Widget {
     private com.codename1.flutter.Color backgroundColor;
     private com.codename1.flutter.Color foregroundColor;
     private Double elevation;
+    private Widget icon;
+    private boolean isExtended;
 
     public void heroTag(Object v) {
         this.heroTag = v;
@@ -86,10 +88,31 @@ public class FloatingActionButton extends Widget {
         return child;
     }
 
+    /** The leading glyph of an extended FAB, or null. */
+    public Widget getIcon() {
+        return icon;
+    }
+
+    /** Whether this is the pill-shaped {@code FloatingActionButton.extended} form. */
+    public boolean isExtended() {
+        return isExtended;
+    }
+
+    public com.codename1.flutter.Color getBackgroundColor() {
+        return backgroundColor;
+    }
+
+    public com.codename1.flutter.Color getForegroundColor() {
+        return foregroundColor;
+    }
+
     /**
-     * {@code FloatingActionButton.extended}: a pill-shaped FAB with a label
-     * (and optional leading icon). The label is consumed as the FAB content;
-     * the leading icon is used when no label is supplied.
+     * {@code FloatingActionButton.extended}: a pill-shaped FAB carrying a label
+     * and, usually, a leading glyph.
+     *
+     * <p>The icon and the background colour used to be dropped and the result
+     * rendered as an ordinary round FAB with the default plus sign — which is
+     * what every gallery study showed instead of its "Back to gallery" pill.</p>
      */
     public static FloatingActionButton extended(Key key, Funcs.VoidFunc0 onPressed, Widget label,
             Widget icon, String tooltip, Object heroTag, Color backgroundColor) {
@@ -97,7 +120,13 @@ public class FloatingActionButton extends Widget {
         f.key(key);
         f.onPressed(onPressed);
         f.tooltip(tooltip);
-        f.child(label != null ? label : icon);
+        f.child(label);
+        f.icon = icon;
+        f.isExtended = true;
+        f.heroTag(heroTag);
+        if (backgroundColor != null) {
+            f.backgroundColor(backgroundColor);
+        }
         return f;
     }
 

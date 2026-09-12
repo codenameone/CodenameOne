@@ -78,7 +78,10 @@ public class RadioListTile<T> extends StatelessWidget {
     public void dense(boolean v) {
     }
 
+    private Object controlAffinity;
+
     public void controlAffinity(Object v) {
+        this.controlAffinity = v;
     }
 
     public void activeColor(Object v) {
@@ -101,10 +104,21 @@ public class RadioListTile<T> extends StatelessWidget {
         if (subtitle != null) {
             tile.subtitle(subtitle);
         }
-        if (secondary != null) {
-            tile.leading(secondary);
+        // Flutter puts a radio on the LEADING edge by default —
+        // ListTileControlAffinity.platform resolves to leading for radios and
+        // checkboxes (only a switch trails). Putting it on the trailing edge
+        // mirrored every settings list in the app.
+        if (ListTileControlAffinity.isTrailing(controlAffinity, false)) {
+            if (secondary != null) {
+                tile.leading(secondary);
+            }
+            tile.trailing(radio);
+        } else {
+            tile.leading(radio);
+            if (secondary != null) {
+                tile.trailing(secondary);
+            }
         }
-        tile.trailing(radio);
         return tile;
     }
 }

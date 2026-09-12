@@ -1,0 +1,3 @@
+direct a,b,c
+forEach a,b,c
+length 3

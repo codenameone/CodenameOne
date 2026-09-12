@@ -52,8 +52,153 @@ public final class FlutterUI {
      */
     public static void runApp(Widget app) {
         assertEdt();
+        long t0 = System.currentTimeMillis();
         installMaterialBaseTheme();
-        mountInNewForm(app).form().show();
+        if (startupTrace()) {
+            probeComponentCost();
+        }
+        long t1 = System.currentTimeMillis();
+        RenderHost host = mountInNewForm(app);
+        long t2 = System.currentTimeMillis();
+        host.form().show();
+        long t3 = System.currentTimeMillis();
+        // From here on, artwork is resolved in the frame that asks for it.
+        com.codename1.flutter.widgets.ImageRenderElement.firstFrameShown();
+        collectStartupGarbage(host.form());
+        // Attribution for the first frame, gated so it costs nothing normally.
+        // "The app takes 250ms to start" is not actionable; knowing whether that
+        // is the theme, the widget build, or the first layout is.
+        if (startupTrace()) {
+            System.out.println("BENCH:STARTUP theme=" + (t1 - t0) + "ms mount=" + (t2 - t1)
+                    + "ms show=" + (t3 - t2) + "ms images="
+                    + com.codename1.flutter.widgets.ImageRenderElement.scalingCost()
+                    + " components=" + RenderElement.componentCost()
+                    + " " + com.codename1.flutter.rendering.FlutterRootLayout.rootLayoutCost()
+                    + " elements=" + Element.mountedCount()
+                    + " layoutBuilder[" + com.codename1.flutter.widgets.LayoutBuilderElement.cost() + "]"
+                    + " composed[" + ComposedElement.rebuildCost() + "]"
+                    + " icons=" + com.codename1.flutter.widgets.IconRenderElement.glyphCost()
+                    + " createdBy:" + RenderElement.componentBreakdown()
+                    + " layoutSelf:" + RenderElement.hotLayoutClasses(8)
+                    + " replaced:" + Element.replacementCensus(6)
+                    + " discarded:" + Element.discardCensus(6)
+                    + " display:" + com.codename1.flutter.MediaQueryData.sizeHistory());
+            System.out.flush();
+        }
+    }
+
+    /**
+     * Asks for one collection once the first screen is up.
+     *
+     * <p>Start-up is when a UI toolkit makes the most garbage it will ever
+     * make: every image decoded at a size it was then resampled from, every
+     * builder temporary, every string built to look something up once. None of
+     * it is referenced by the frame now on screen, and an application that then
+     * sits idle gives the collector no reason to run — so the peak stays
+     * charged to the process. Measured on the Mac build, the collector's own
+     * freed-but-unreturned pages alone were 21MB against 0.1MB for the same
+     * app built with another toolchain.</p>
+     *
+     * <p>Deferred, so the collection lands after the frame rather than inside
+     * it, and it runs on the collector's thread either way.</p>
+     */
+    private static void collectStartupGarbage(final Form form) {
+        try {
+            com.codename1.ui.CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    System.gc();
+                }
+            });
+            // And once more a moment later. Start-up garbage clears in two
+            // waves: the first collection frees the objects, and only then do
+            // the allocator's pages become wholly empty and returnable. One
+            // pass leaves most of them still holding a single survivor.
+            if (form != null) {
+                com.codename1.ui.util.UITimer.timer(1200, false, form, new Runnable() {
+                    @Override
+                    public void run() {
+                        System.gc();
+                    }
+                });
+            }
+        } catch (Throwable ignore) {
+            // headless, or a port with no collector to ask
+        }
+    }
+
+    /**
+     * Isolates what creating one Codename One component actually costs.
+     *
+     * <p>Attribution said ~0.3ms per component, uniformly across every element
+     * type — which rules out per-widget logic and points at something every
+     * component pays. This separates the three candidates: constructing the
+     * component, resolving its four styles out of the theme, and mutating
+     * those styles.
+     */
+    private static void probeComponentCost() {
+        final int n = 200;
+        com.codename1.ui.Label[] kept = new com.codename1.ui.Label[n];
+        long t0 = System.currentTimeMillis();
+        for (int i = 0; i < n; i++) {
+            kept[i] = new com.codename1.ui.Label("x", "FlutterText");
+        }
+        long t1 = System.currentTimeMillis();
+        for (int i = 0; i < n; i++) {
+            kept[i].getAllStyles();
+        }
+        long t2 = System.currentTimeMillis();
+        for (int i = 0; i < n; i++) {
+            kept[i].getAllStyles().setPadding(0, 0, 0, 0);
+        }
+        long t3 = System.currentTimeMillis();
+        System.out.println("BENCH:PROBE " + n + " labels: construct=" + (t1 - t0)
+                + "ms resolveStyles=" + (t2 - t1) + "ms mutateStyles=" + (t3 - t2) + "ms");
+        System.out.flush();
+    }
+
+    /**
+     * Times the FIRST paint of the root container and reports it once.
+     *
+     * <p>Building and laying out the tree is only half of a first frame; the
+     * other half is rasterising it, and that half is invisible to every counter
+     * that stops when {@code show()} returns. Without this the gap between
+     * "the app finished building" and "the marker printed" is unattributed
+     * time, which is where wrong explanations come from.
+     */
+    private static final class TimedRootContainer extends Container {
+        private boolean painted;
+
+        TimedRootContainer(com.codename1.ui.layouts.Layout layout) {
+            super(layout);
+        }
+
+        @Override
+        public void paint(com.codename1.ui.Graphics g) {
+            if (painted) {
+                super.paint(g);
+                return;
+            }
+            long t0 = System.currentTimeMillis();
+            try {
+                super.paint(g);
+            } finally {
+                painted = true;
+                System.out.println("BENCH:STARTUP firstPaint="
+                        + (System.currentTimeMillis() - t0) + "ms");
+                System.out.flush();
+            }
+        }
+    }
+
+    /** {@code cn1.flutter.startupTrace} — prints the first-frame phase split. */
+    private static boolean startupTrace() {
+        try {
+            return "true".equals(com.codename1.ui.Display.getInstance()
+                    .getProperty("cn1.flutter.startupTrace", "false"));
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /**
@@ -75,6 +220,11 @@ public final class FlutterUI {
      */
     public static RenderHost mountInNewForm(Widget root, Element contextFallback) {
         assertEdt();
+        // Every route lives inside an Overlay, as it does in Flutter, so that
+        // anything reaching for `Overlay.of(context)` — a dialog, a modal
+        // sheet, a coach mark — finds the one belonging to the route it is on
+        // rather than nothing at all.
+        root = com.codename1.flutter.widgets.Overlay.hosting(root);
         Form f = new Form(new BorderLayout());
         // Flutter owns the whole canvas: the widget tree draws its own padding
         // and safe areas, so any CN1 chrome inset on the Form or its content
@@ -84,9 +234,15 @@ public final class FlutterUI {
         stripChrome(f.getContentPane());
         RenderHost host = new RenderHost();
         host.form(f);
-        Container c = new Container(new FlutterRootLayout(host));
+        Container c = startupTrace() ? new TimedRootContainer(new FlutterRootLayout(host))
+                : new Container(new FlutterRootLayout(host));
         host.container(c);
+        long mt0 = System.currentTimeMillis();
         Element mounted = mount(root, host, new BuildOwner(), contextFallback);
+        if (startupTrace()) {
+            System.out.println("BENCH:STARTUP   build=" + (System.currentTimeMillis() - mt0) + "ms");
+            System.out.flush();
+        }
         // Kept on the Form rather than in a static: the Form owns its tree, so a popped
         // route's element cannot outlive it here and currentContext() always answers for
         // whatever is actually showing.
@@ -346,7 +502,8 @@ public final class FlutterUI {
      */
     public static Container wrap(Widget w) {
         RenderHost host = new RenderHost();
-        Container c = new Container(new FlutterRootLayout(host));
+        Container c = startupTrace() ? new TimedRootContainer(new FlutterRootLayout(host))
+                : new Container(new FlutterRootLayout(host));
         host.container(c);
         mount(w, host, new BuildOwner());
         return c;

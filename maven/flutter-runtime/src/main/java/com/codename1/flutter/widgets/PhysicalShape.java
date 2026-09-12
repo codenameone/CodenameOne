@@ -23,18 +23,28 @@
  */
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.Element;
-import com.codename1.flutter.Widget;
+import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.Clip;
 import com.codename1.flutter.Color;
+import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Widget;
+import com.codename1.flutter.material.Material;
 
 /**
- * Clips/elevates its {@code child} to an arbitrary shape — Flutter's {@code PhysicalShape}.
+ * Fills, clips and elevates its {@code child} to an arbitrary shape — Flutter's
+ * {@code PhysicalShape}.
  *
- * <p>Structural pass-through for this milestone: the single {@code child}
- * renders unchanged (see {@link PassThroughRenderElement}); the captured
- * parameters are held for a later render pass.</p>
+ * <p>Built on {@link Material}, which already paints a coloured surface, clips
+ * its subtree to a rounded shape and draws an elevation shadow. The two widgets
+ * describe the same thing; the only difference is that PhysicalShape names its
+ * shape through a clipper.</p>
+ *
+ * <p>It was a pass-through, which is a quiet way to lose a whole surface: Crane
+ * builds its front layer — the white rounded card the destination list sits on
+ * — as a PhysicalShape, so the card simply did not exist and its contents
+ * floated on the backdrop.</p>
  */
-public class PhysicalShape extends Widget implements HasChild {
+public class PhysicalShape extends StatelessWidget implements HasChild {
 
     private Object clipper;
     private Object clipBehavior;
@@ -59,7 +69,27 @@ public class PhysicalShape extends Widget implements HasChild {
     }
 
     @Override
-    public Element createElement() {
-        return new PassThroughRenderElement(this);
+    public Widget build(BuildContext context) {
+        if (child == null) {
+            return null;
+        }
+        Material m = new Material();
+        if (color != null) {
+            m.color(color);
+        }
+        if (shadowColor != null) {
+            m.shadowColor(shadowColor);
+        }
+        m.elevation(elevation);
+        Object shape = clipper instanceof ShapeBorderClipper
+                ? ((ShapeBorderClipper) clipper).getShape() : null;
+        if (shape != null) {
+            m.shape(shape);
+            // A shape is only a shape if the subtree is held to it; Flutter's
+            // PhysicalShape always clips.
+            m.clipBehavior(Clip.antiAlias);
+        }
+        m.child(child);
+        return m;
     }
 }

@@ -151,11 +151,23 @@ public abstract class ScrollRenderElement extends RenderElement {
      * <p>An ancestor walk is the right test because that is exactly the relationship
      * Flutter uses: {@code Scrollbar} WRAPS the scrollable it decorates.</p>
      */
+    /**
+     * Whether this pane draws no scrollbar.
+     *
+     * <p>A Flutter {@code Scrollbar} is INVISIBLE at rest — the thumb fades in
+     * while the list is moving and fades out again — unless the app asks for
+     * {@code thumbVisibility: true}. Codename One's is always on, so wrapping a
+     * list in a Scrollbar used to paint a permanent bar down the edge of a
+     * screen that should have none.</p>
+     */
     protected boolean hideScrollbar() {
         for (Element a = parent(); a != null; a = a.parent()) {
             Widget w = a.widget();
-            if (w instanceof Scrollbar || w instanceof RawScrollbar) {
-                return false;
+            if (w instanceof Scrollbar) {
+                return !((Scrollbar) w).isThumbVisible();
+            }
+            if (w instanceof RawScrollbar) {
+                return !((RawScrollbar) w).isThumbVisible();
             }
         }
         return true;

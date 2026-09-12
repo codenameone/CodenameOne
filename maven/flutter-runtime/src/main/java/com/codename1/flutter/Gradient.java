@@ -94,7 +94,7 @@ public abstract class Gradient {
         java.util.List<Integer> out = new java.util.ArrayList<Integer>();
         for (Object o : list) {
             if (o instanceof Color) {
-                out.add(Integer.valueOf(((Color) o).value()));
+                out.add(Integer.valueOf(((Color) o).argb()));
             }
         }
         int[] ramp = new int[out.size()];

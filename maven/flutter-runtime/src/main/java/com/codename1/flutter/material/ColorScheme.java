@@ -81,7 +81,7 @@ public class ColorScheme {
      * Canonical two-parameter form: a null brightness means light.
      */
     public static ColorScheme fromSeed(Color seedColor, Brightness brightness) {
-        double[] hsl = toHsl(seedColor.value());
+        double[] hsl = toHsl(seedColor.argb());
         double h = hsl[0];
         double s = hsl[1];
         ColorScheme c = new ColorScheme();

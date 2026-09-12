@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -726,6 +727,7 @@ public final class JavaEmitter {
             }
             impls.append(javaType(itf, false, ctx));
         }
+        body.append(emitStubGetterBridges(c, ctx));
         // Dart 3 sealed → Java sealed: a sealed class with subtypes lists them in a permits clause and
         // its direct subtypes are marked non-sealed. Falls back to a plain abstract class when the
         // hierarchy has no subtypes (a permits-less sealed class is illegal in Java).
@@ -1100,6 +1102,67 @@ public final class JavaEmitter {
             return stubMethodReturnsVoid(p.superclass.name, m);
         }
         return false;
+    }
+
+    /**
+     * Bridges a program class's field or getter onto the method name a stub
+     * interface declares for it.
+     *
+     * <p>The two halves of the contract name the same property differently. A
+     * stub's instance getter {@code E get current} is a Java method
+     * {@code current()}; a program class's field {@code current} is a private
+     * field with {@code get$current()} accessors. A class that satisfies the
+     * stub interface with a field therefore does not implement the interface
+     * method at all — Java silently keeps the interface's default.
+     *
+     * <p>That is not a compile error and it does not throw. It just answers the
+     * default forever: {@code Board with IterableMixin} iterated correctly and
+     * handed every element back as null, so the 2D-transformations demo's
+     * painter died on the first {@code boardPoint!} and the entire board — the
+     * only content on that screen — never drew.
+     */
+    private String emitStubGetterBridges(ClassDecl c, Ctx ctx) {
+        StringBuilder out = new StringBuilder();
+        Set<String> done = new HashSet<String>();
+        List<TypeRef> supers = new ArrayList<TypeRef>(c.interfaces);
+        supers.addAll(c.mixins);
+        for (TypeRef ref : supers) {
+            Ast.ClassDecl sc = stubs.classes.get(ref.name);
+            while (sc != null) {
+                for (Ast.MethodDecl sm : sc.methods) {
+                    if (!sm.isGetter || sm.isStatic || done.contains(sm.name)) {
+                        continue;
+                    }
+                    // Only when the property is a FIELD. A Dart getter is already
+                    // emitted under the interface's own name, so bridging it would
+                    // declare the method twice; a class that supplies neither is a
+                    // gap the interface's default is entitled to fill.
+                    FieldDecl f = c.field(sm.name);
+                    if (f == null) {
+                        continue;
+                    }
+                    boolean declaresMethod = false;
+                    for (MethodDecl m : c.methods) {
+                        if (sm.name.equals(m.name) && (m.isGetter
+                                || (!m.isSetter && m.params.isEmpty()))) {
+                            declaresMethod = true;
+                            break;
+                        }
+                    }
+                    if (declaresMethod) {
+                        continue;
+                    }
+                    done.add(sm.name);
+                    String jt = javaType(fieldType(f, ctx), false, ctx);
+                    out.append("    @Override\n");
+                    out.append("    public ").append(jt).append(' ').append(sm.name)
+                            .append("() {\n        return get$").append(sm.name)
+                            .append("();\n    }\n\n");
+                }
+                sc = sc.superclass != null ? stubs.classes.get(sc.superclass.name) : null;
+            }
+        }
+        return out.toString();
     }
 
     /** As {@link #stubSigMatches} but reports whether the matched stub method returns {@code void}. */

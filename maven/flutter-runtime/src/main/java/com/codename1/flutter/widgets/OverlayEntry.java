@@ -59,13 +59,26 @@ public class OverlayEntry {
         return builder;
     }
 
+    private OverlayState owner;
+
+    void attach(OverlayState state) {
+        this.owner = state;
+    }
+
     /** Marks the entry as needing to rebuild its content on the next frame. */
     public void markNeedsBuild() {
+        if (owner != null) {
+            owner.rebuild();
+        }
     }
 
     /** Removes this entry from its overlay. */
     public void remove() {
         mounted = false;
+        if (owner != null) {
+            owner.forget(this);
+            owner = null;
+        }
     }
 
     public boolean mounted() {

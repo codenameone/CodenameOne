@@ -111,10 +111,22 @@ public class BottomNavigationBarRenderElement extends RenderElement {
         style(c);
     }
 
+    /**
+     * The bar's own {@code backgroundColor} first, the theme's surface second.
+     *
+     * <p>The three colours a caller can set -- background, selected item,
+     * unselected item -- were all accepted and discarded, so a bar that names
+     * them (the bottom-navigation demo asks for a primary-coloured bar with
+     * white labels) came out surface-coloured with dark ink: the right shape in
+     * entirely the wrong palette.</p>
+     */
     private void style(Component c) {
         try {
-            ColorScheme cs = Theme.of(this).colorScheme();
-            c.getAllStyles().setBgColor(cs.surface().rgb());
+            Color bg = bar().getBackgroundColor();
+            if (bg == null) {
+                bg = Theme.of(this).colorScheme().surface();
+            }
+            c.getAllStyles().setBgColor(bg.rgb());
             c.getAllStyles().setBgTransparency(255);
         } catch (Exception err) {
             // styling is best-effort; the base theme look remains
@@ -148,6 +160,10 @@ public class BottomNavigationBarRenderElement extends RenderElement {
     }
 
     private Color tintFor(boolean selected) {
+        Color own = selected ? bar().getSelectedItemColor() : bar().getUnselectedItemColor();
+        if (own != null) {
+            return own;
+        }
         ColorScheme cs = Theme.of(this).colorScheme();
         return selected ? cs.primary() : cs.onSurface();
     }

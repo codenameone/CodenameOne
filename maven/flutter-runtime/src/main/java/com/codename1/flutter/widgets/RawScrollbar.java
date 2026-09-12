@@ -43,7 +43,15 @@ public class RawScrollbar extends StatelessWidget {
     public void controller(Object v) {
     }
 
+    private boolean thumbVisibility;
+
     public void thumbVisibility(boolean v) {
+        this.thumbVisibility = v;
+    }
+
+    /** Whether the thumb stays on screen when nothing is scrolling. */
+    public boolean isThumbVisible() {
+        return thumbVisibility;
     }
 
     public void thumbColor(Object v) {

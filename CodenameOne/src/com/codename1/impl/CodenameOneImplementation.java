@@ -1174,6 +1174,8 @@ public abstract class CodenameOneImplementation {
     /// half the smaller side
     public void drawImageRounded(Object graphics, Object img, int x, int y, int w, int h, float cornerRadius) {
         drawImage(graphics, img, x, y, w, h);
+    }
+
     /**
      * Creates an image whose peer need not keep a decoded copy of the pixels for
      * its own recovery, because the caller retains the encoded bytes and will

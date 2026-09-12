@@ -48,14 +48,34 @@ public final class DartRuntime {
      * transpiled call sites are inlined into their caller's frame and the
      * stack trace shows only the framework's own recursion.
      */
-    private static String diagnosticContext;
+    private static Object diagnosticContext;
 
-    /** Sets (or clears, with null) the context appended to runtime errors. */
-    public static void diagnosticContext(String context) {
+    /**
+     * Sets (or clears, with null) the context appended to runtime errors.
+     *
+     * <p>Takes an OBJECT, not a formatted string. The context is set on every
+     * widget build and read only when something actually fails, so formatting
+     * it eagerly allocated one String per widget per frame to describe an
+     * error that almost never happens. A non-String value is described by its
+     * class when — and only when — a failure asks for it.</p>
+     */
+    public static void diagnosticContext(Object context) {
         diagnosticContext = context;
     }
 
     public static String diagnosticContext() {
+        Object c = diagnosticContext;
+        if (c == null) {
+            return null;
+        }
+        if (c instanceof String) {
+            return (String) c;
+        }
+        return "building " + c.getClass().getName();
+    }
+
+    /** The raw context value, for a caller that only wants to save and restore it. */
+    public static Object diagnosticContextValue() {
         return diagnosticContext;
     }
 
@@ -64,7 +84,7 @@ public final class DartRuntime {
      */
     public static <T> T nn(T v) {
         if (v == null) {
-            String where = diagnosticContext;
+            String where = diagnosticContext();
             throw new TypeError("Null check operator used on a null value"
                     + (where == null ? "" : " (while " + where + ")"));
         }

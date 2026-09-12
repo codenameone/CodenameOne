@@ -41,7 +41,8 @@ public class ThemeData {
     private static final Color DEFAULT_SEED = new Color(0xFF6750A4);
 
     private ColorScheme colorScheme;
-    private TextTheme textTheme = new TextTheme();
+    private TextTheme textTheme;
+    private TextTheme resolvedTextTheme;
     private TextTheme primaryTextTheme = new TextTheme();
     private boolean useMaterial3 = true;
     private Brightness brightness;
@@ -194,7 +195,27 @@ public class ThemeData {
         return colorScheme;
     }
 
-    public TextTheme textTheme() { return textTheme; }
+    /**
+     * The effective text theme: what {@code textTheme:} was given, otherwise the
+     * scale the {@code typography:} asks for, otherwise the Material 3 defaults.
+     *
+     * <p>A theme that names {@code Typography.material2018} is asking for the
+     * Material 2 type scale and inks, which differ from M3 in every size and in
+     * the colour of the display roles. Ignoring that (which is what returning a
+     * bare TextTheme did) rendered the gallery's demos in the wrong scale
+     * throughout, most visibly on its own typography page.</p>
+     */
+    public TextTheme textTheme() {
+        if (textTheme != null) {
+            return textTheme;
+        }
+        if (resolvedTextTheme == null) {
+            resolvedTextTheme = typography instanceof Typography
+                    ? ((Typography) typography).resolve(brightness == Brightness.dark)
+                    : new TextTheme();
+        }
+        return resolvedTextTheme;
+    }
     public TextTheme primaryTextTheme() { return primaryTextTheme; }
     public Color primaryColor() { return primaryColor; }
     public Color scaffoldBackgroundColor() { return scaffoldBackgroundColor; }

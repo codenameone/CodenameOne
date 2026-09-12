@@ -53,7 +53,7 @@ public class ColorTween extends Tween<Color> {
 
     private static Color scaleAlpha(Color c, double t) {
         int a = lerpChannel(0, c.alpha(), t);
-        return new Color((a << 24) | (c.value() & 0xFFFFFF));
+        return new Color((a << 24) | (c.value() & 0xFFFFFFL));
     }
 
     private static int lerpChannel(int a, int b, double t) {

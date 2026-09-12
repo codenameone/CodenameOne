@@ -72,7 +72,10 @@ public class SwitchListTile extends StatelessWidget {
     public void dense(boolean v) {
     }
 
+    private Object controlAffinity;
+
     public void controlAffinity(Object v) {
+        this.controlAffinity = v;
     }
 
     public void activeColor(Object v) {
@@ -94,10 +97,18 @@ public class SwitchListTile extends StatelessWidget {
         if (subtitle != null) {
             tile.subtitle(subtitle);
         }
-        if (secondary != null) {
-            tile.leading(secondary);
+        // A switch trails by default; see ListTileControlAffinity.
+        if (ListTileControlAffinity.isTrailing(controlAffinity, true)) {
+            if (secondary != null) {
+                tile.leading(secondary);
+            }
+            tile.trailing(sw);
+        } else {
+            tile.leading(sw);
+            if (secondary != null) {
+                tile.trailing(secondary);
+            }
         }
-        tile.trailing(sw);
         return tile;
     }
 }

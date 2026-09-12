@@ -66,6 +66,18 @@ public class BottomNavigationBar extends Widget {
         this.unselectedItemColor = v;
     }
 
+    public Color getBackgroundColor() {
+        return backgroundColor;
+    }
+
+    public Color getSelectedItemColor() {
+        return selectedItemColor;
+    }
+
+    public Color getUnselectedItemColor() {
+        return unselectedItemColor;
+    }
+
     public void selectedFontSize(double v) {
         this.selectedFontSize = v;
     }

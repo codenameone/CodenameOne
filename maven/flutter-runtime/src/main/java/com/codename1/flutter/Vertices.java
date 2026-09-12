@@ -28,8 +28,7 @@ import dart.core.DartList;
 /**
  * A raw triangle mesh handed to {@code Canvas.drawVertices} — dart:ui's
  * {@code Vertices}. The 2D-transformations demo builds one per hexagon of its
- * board. Holds the geometry structurally; actual mesh rasterization is a later
- * rendering milestone.
+ * board.
  */
 public class Vertices {
 
@@ -66,5 +65,10 @@ public class Vertices {
 
     public DartList<Color> getColors() {
         return colors;
+    }
+
+    /** The index buffer, or null when the positions are used in order. */
+    public DartList<Integer> getIndices() {
+        return indices;
     }
 }

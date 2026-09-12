@@ -86,6 +86,16 @@ public class MaterialAppElement extends StatelessElement {
         super.mount(parent, slot);
     }
 
+    // No size-changed listener here, deliberately. One was added to keep a
+    // root MediaQuery snapshot honest across a window resize; that snapshot
+    // turned out to be wrong for a different reason and was removed, leaving a
+    // listener that rebuilt the ENTIRE application every time the Form
+    // reported a size -- which a desktop window does once, just after it is
+    // shown. Measured on the Mac build that was the whole first screen built
+    // twice: 2099 elements and 751 components where the app has 1062 and 376.
+    // MediaQuery.of resolves against the Display at the moment it is asked, so
+    // there is nothing here that a resize can invalidate.
+
     @Override
     public void update(Widget newWidget) {
         ThemeData eff = ((MaterialApp) newWidget).effectiveTheme();

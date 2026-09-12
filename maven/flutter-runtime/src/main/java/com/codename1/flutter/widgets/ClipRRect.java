@@ -28,8 +28,8 @@ import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
 
 /**
- * Clips its child with a rounded rectangle. Clipping is not yet applied; the
- * child renders unchanged. See {@link PassThroughRenderElement}.
+ * Clips its child with a rounded rectangle. See
+ * {@link ClipRRectRenderElement}.
  */
 public class ClipRRect extends Widget implements HasChild {
 
@@ -40,6 +40,14 @@ public class ClipRRect extends Widget implements HasChild {
 
     public void borderRadius(Object v) {
         this.borderRadius = v;
+    }
+
+    public Object getBorderRadius() {
+        return borderRadius;
+    }
+
+    public Clip getClipBehavior() {
+        return clipBehavior;
     }
 
     public void clipper(Object v) {
@@ -59,8 +67,12 @@ public class ClipRRect extends Widget implements HasChild {
         return child;
     }
 
+    /** {@code Clip.none} means do not clip, so it must not get a clipping pane. */
     @Override
     public Element createElement() {
-        return new PassThroughRenderElement(this);
+        if (clipBehavior == Clip.none) {
+            return new PassThroughRenderElement(this);
+        }
+        return new ClipRRectRenderElement(this);
     }
 }

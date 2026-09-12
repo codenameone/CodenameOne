@@ -23,17 +23,23 @@
  */
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.EdgeInsets;
-import com.codename1.flutter.Element;
+import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 
 /**
  * A pan/zoom viewport for its {@code child} — Flutter's {@code InteractiveViewer}.
- * Structural pass-through for this milestone: the {@code child} renders
- * unchanged; the {@link TransformationController} and interaction callbacks are
- * captured for a later render pass that applies the live matrix.
+ *
+ * <p>Applies the controller's matrix; the interactive half (dragging and
+ * pinching to change it) is not wired yet, so a viewer whose matrix never
+ * changes renders correctly and one the user expects to pan does not move.
+ *
+ * <p>It was a pass-through, which meant the matrix an app sets up front was
+ * dropped too: the 2D-transformations demo centres its board by handing its
+ * controller a translation, and the board rendered in the corner instead.</p>
  */
-public class InteractiveViewer extends Widget implements HasChild {
+public class InteractiveViewer extends StatelessWidget implements HasChild {
 
     private TransformationController transformationController;
     private EdgeInsets boundaryMargin;
@@ -78,7 +84,20 @@ public class InteractiveViewer extends Widget implements HasChild {
     }
 
     @Override
-    public Element createElement() {
-        return new PassThroughRenderElement(this);
+    public Widget build(BuildContext context) {
+        if (child == null) {
+            return null;
+        }
+        if (transformationController == null
+                || transformationController.value() == null) {
+            return child;
+        }
+        Transform t = new Transform();
+        t.transform(transformationController.value());
+        t.child(child);
+        // The viewport clips what the matrix pushes outside it.
+        ClipRect clip = new ClipRect();
+        clip.child(t);
+        return clip;
     }
 }

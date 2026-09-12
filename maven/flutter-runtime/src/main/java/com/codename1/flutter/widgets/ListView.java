@@ -187,16 +187,39 @@ public class ListView extends Widget {
     }
 
     /**
-     * Dart's {@code ListView.separated} named constructor. The separators are
-     * not materialized at this milestone (a later pass interleaves
-     * {@code separatorBuilder(context, index)} between items); the items
-     * themselves build exactly like {@link #builder}.
+     * Dart's {@code ListView.separated} named constructor.
+     *
+     * <p>The separators are real: a separated list of n items is a builder list
+     * of 2n-1 children where the odd ones come from
+     * {@code separatorBuilder(context, i)}. Dropping them (what this used to do)
+     * is not a cosmetic omission — the mail study's inbox separates its cards
+     * with a 4dp gap through which the page's background shows, so without the
+     * separators the whole list rendered as one continuous white slab.</p>
+     *
+     * <p>An {@code itemCount} of null means an unbounded list, where "2n-1" has
+     * no meaning; such a list keeps building items alone.</p>
      */
     public static ListView separated(Key key, Boolean primary, Long itemCount,
-                                     Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
-                                     Funcs.Func2<BuildContext, Long, Widget> separatorBuilder,
+                                     final Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
+                                     final Funcs.Func2<BuildContext, Long, Widget> separatorBuilder,
                                      EdgeInsets padding, Boolean shrinkWrap) {
-        ListView l = builder(key, itemCount, itemBuilder, padding, shrinkWrap,
+        Long count = itemCount;
+        Funcs.Func2<BuildContext, Long, Widget> children = itemBuilder;
+        if (itemCount != null && separatorBuilder != null && itemCount.longValue() > 0) {
+            count = Long.valueOf(itemCount.longValue() * 2 - 1);
+            children = new Funcs.Func2<BuildContext, Long, Widget>() {
+                @Override
+                public Widget call(BuildContext context, Long index) {
+                    long i = index == null ? 0 : index.longValue();
+                    if ((i & 1L) == 0L) {
+                        return itemBuilder == null ? null
+                                : itemBuilder.call(context, Long.valueOf(i / 2));
+                    }
+                    return separatorBuilder.call(context, Long.valueOf(i / 2));
+                }
+            };
+        }
+        ListView l = builder(key, count, children, padding, shrinkWrap,
                 null, null, null, null, null, null, null);
         if (shrinkWrap != null) {
             l.shrinkWrap(shrinkWrap);

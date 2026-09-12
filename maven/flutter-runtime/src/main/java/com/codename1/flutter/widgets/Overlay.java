@@ -24,50 +24,137 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.ComposedElement;
 import com.codename1.flutter.Element;
+import com.codename1.flutter.StackFit;
 import com.codename1.flutter.Widget;
 
 import dart.core.DartList;
 
 /**
- * The stack of {@link OverlayEntry} objects floating above the navigator —
- * Flutter's {@code Overlay}. new_gallery reaches the ambient overlay through the
- * static {@link #of(BuildContext, boolean, Object)} to insert feature-discovery
- * entries; the {@code Overlay} widget itself is provided by the navigator and is
- * not constructed by the app, so its element holds no children at this pass.
+ * The stack of {@link OverlayEntry} objects floating above a route — Flutter's
+ * {@code Overlay}.
+ *
+ * <p>An overlay is what lets something be drawn over the whole screen without
+ * the widget that asked for it having to sit at the top of the tree: dialogs,
+ * modal sheets, drag feedback, and the gallery's feature-discovery coach marks
+ * all reach the nearest overlay and insert an entry.
+ *
+ * <p>The whole subsystem used to be inert — {@code of()} answered one shared
+ * state whose {@code insert} was an empty method body, so every entry ever
+ * created went into a void. Nothing threw, and the only sign was a screen that
+ * quietly lacked whatever should have floated above it.
+ *
+ * <p>Every route mounts inside one (see {@code Navigator}), so {@code of()}
+ * finds the overlay belonging to the route the caller is on rather than a
+ * process-wide singleton.
  */
 public class Overlay extends Widget {
 
-    private static final OverlayState SHARED_STATE = new OverlayState();
-
     private DartList<OverlayEntry> initialEntries;
     private Object clipBehavior;
+    /** The widget the entries float above — supplied by the runtime, not by the app. */
+    private Widget base;
 
     public void initialEntries(DartList<OverlayEntry> v) {
         this.initialEntries = v;
+    }
+
+    public DartList<OverlayEntry> getInitialEntries() {
+        return initialEntries;
     }
 
     public void clipBehavior(Object v) {
         this.clipBehavior = v;
     }
 
+    public Widget getBase() {
+        return base;
+    }
+
+    /** An overlay hosting {@code base}, which every route is wrapped in. */
+    public static Overlay hosting(Widget base) {
+        Overlay o = new Overlay();
+        o.base = base;
+        return o;
+    }
+
     /** Flutter's {@code Overlay.of} — the nearest ancestor overlay's state. */
     public static OverlayState of(BuildContext context, boolean rootOverlay, Object debugRequiredFor) {
-        return SHARED_STATE;
+        OverlayState s = maybeOf(context, rootOverlay);
+        return s == null ? new OverlayState() : s;
     }
 
     /** Flutter's {@code Overlay.maybeOf}. */
     public static OverlayState maybeOf(BuildContext context, boolean rootOverlay) {
-        return SHARED_STATE;
+        Element e = context instanceof Element ? (Element) context : null;
+        OverlayElement found = null;
+        while (e != null) {
+            if (e instanceof OverlayElement) {
+                found = (OverlayElement) e;
+                if (!rootOverlay) {
+                    return found.state();
+                }
+            }
+            e = e.ancestor();
+        }
+        return found == null ? null : found.state();
     }
 
     @Override
     public Element createElement() {
-        return new SimpleChildrenRenderElement(this, new SimpleChildrenRenderElement.Children() {
-            @Override
-            public DartList<Widget> get() {
+        return new OverlayElement(this);
+    }
+
+    /**
+     * Builds the overlay's content: the base with every live entry stacked on
+     * top, in insertion order.
+     */
+    static final class OverlayElement extends ComposedElement {
+
+        private final OverlayState state = new OverlayState();
+
+        OverlayElement(Overlay widget) {
+            super(widget);
+            state.attach(this);
+            Overlay o = widget;
+            if (o.initialEntries != null) {
+                state.entries().addAll(o.initialEntries);
+            }
+        }
+
+        OverlayState state() {
+            return state;
+        }
+
+        @Override
+        protected Widget build() {
+            Overlay o = (Overlay) widget();
+            DartList<Widget> children = new DartList<Widget>();
+            if (o.getBase() != null) {
+                children.add(o.getBase());
+            }
+            for (OverlayEntry entry : state.entries()) {
+                if (!entry.mounted() || entry.getBuilder() == null) {
+                    continue;
+                }
+                Widget w = entry.getBuilder().call(this);
+                if (w != null) {
+                    children.add(w);
+                }
+            }
+            if (children.isEmpty()) {
                 return null;
             }
-        });
+            if (children.size() == 1) {
+                return children.get(0);
+            }
+            Stack stack = new Stack();
+            stack.children(children);
+            // The entries cover the route, so the stack takes the whole box
+            // rather than shrink-wrapping its largest child.
+            stack.fit(StackFit.expand);
+            return stack;
+        }
     }
 }

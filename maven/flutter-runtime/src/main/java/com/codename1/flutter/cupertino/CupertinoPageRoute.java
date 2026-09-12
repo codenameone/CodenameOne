@@ -79,4 +79,10 @@ public class CupertinoPageRoute<T> extends Route<T> {
                                    Animation<Double> secondaryAnimation, Widget child) {
         return child;
     }
+
+    @Override
+    public Widget buildPage(BuildContext context) {
+        Funcs.Func1<BuildContext, Widget> b = getBuilder();
+        return b == null ? null : b.call(context);
+    }
 }

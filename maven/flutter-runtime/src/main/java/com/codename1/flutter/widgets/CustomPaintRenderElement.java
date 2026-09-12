@@ -167,8 +167,14 @@ public class CustomPaintRenderElement extends SingleChildRenderElement {
                 // ran and nothing appeared.
                 painter.paint(new GraphicsCanvas(g, getX(), getY(), dpr), logical);
             } catch (Throwable t) {
-                // one misbehaving painter must not take the whole frame down
-                Log.p("Flutter runtime: CustomPainter failed: " + t);
+                // One misbehaving painter must not take the whole frame down —
+                // but it must be REPORTED. A painter that throws leaves the
+                // screen looking merely empty, and a log line is invisible to
+                // the sweep: the 2D-transformations demo drew no board at all
+                // and every check said the route was fine.
+                com.codename1.flutter.FlutterErrorReport.unimplemented(
+                        painter.getClass().getName(),
+                        "its paint() threw " + t + "; nothing was drawn");
             } finally {
                 g.setClip(clipX, clipY, clipW, clipH);
                 g.setColor(color);

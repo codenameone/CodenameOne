@@ -62,6 +62,11 @@ public class Scaffold extends Widget {
         this.persistentFooterButtons = v;
     }
 
+    /** {@code Scaffold.persistentFooterButtons} — controls pinned above the bottom edge. */
+    public DartList<Widget> getPersistentFooterButtons() {
+        return persistentFooterButtons;
+    }
+
     public void endDrawer(Widget v) {
         this.endDrawer = v;
     }

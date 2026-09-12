@@ -136,6 +136,11 @@ public abstract class Element implements BuildContext {
      */
     public void contextFallback(Element e) {
         this.contextFallback = e;
+        if (parent == null && inheritedElements == null) {
+            // A route root inherits what the context that pushed it could see;
+            // the fallback is usually set after mount, so pick the map up here.
+            this.inheritedElements = inheritedFrom(e);
+        }
     }
 
     @Override
@@ -150,22 +155,96 @@ public abstract class Element implements BuildContext {
         return null;
     }
 
+    /**
+     * The inherited widgets visible from here, by type — Flutter's
+     * {@code _inheritedElements}.
+     *
+     * <p>Shared BY REFERENCE with the parent, because the overwhelming majority
+     * of elements inherit exactly what their parent could see; only an
+     * {@link com.codename1.flutter.widgets.InheritedElement} copies the map to
+     * add itself. So the whole tree costs one map per inherited widget, not one
+     * per element.
+     *
+     * <p>Without it, {@code dependOnInheritedWidgetOfExactType} is a walk to the
+     * root — and it is on the hottest path there is. Every {@code Text} asks for
+     * the ambient text style, every {@code Icon} for the icon theme, and every
+     * themed widget for the theme; a screen with a few hundred widgets in a tree
+     * twenty-five deep pays thousands of pointer hops per build, and a lookup
+     * that finds NOTHING pays the full depth every time.</p>
+     */
+    private java.util.Map<Class<?>, Element> inheritedElements;
+
+    /** The map a child mounted under this element should see. */
+    java.util.Map<Class<?>, Element> inheritedElementsForChild() {
+        return inheritedElements;
+    }
+
+    /**
+     * Publishes this element under {@code type} and every inherited supertype.
+     *
+     * <p>Keyed by the whole chain because a lookup here matches on
+     * {@code instanceof}, not on the exact class: an app that subclasses an
+     * inherited widget must still be found by a query for the base type.</p>
+     */
+    protected void publishAsInherited() {
+        java.util.Map<Class<?>, Element> map =
+                new java.util.HashMap<Class<?>, Element>(
+                        inheritedElements == null
+                                ? java.util.Collections.<Class<?>, Element>emptyMap()
+                                : inheritedElements);
+        for (Class<?> c = widget == null ? null : widget.getClass();
+                c != null && Widget.class.isAssignableFrom(c); c = c.getSuperclass()) {
+            map.put(c, this);
+        }
+        inheritedElements = map;
+    }
+
+    @Override
+    public <W extends Widget> W maybeDependOnInheritedWidgetOfExactType(Class<W> type) {
+        return lookUpInherited(type, false);
+    }
+
     @Override
     public <W extends Widget> W dependOnInheritedWidgetOfExactType(Class<W> type) {
-        Element a = ancestorOf(this);
-        while (a != null) {
-            if (isInstanceOf(type, a.widget)) {
-                // REGISTER, do not merely read: the name is depend-on. Flutter records this
-                // element as a dependent so a later change to the widget rebuilds it, and
-                // without that every consumer is a one-shot read.
-                if (a instanceof com.codename1.flutter.widgets.InheritedElement) {
-                    ((com.codename1.flutter.widgets.InheritedElement) a).addDependent(this);
-                }
-                return type.cast(a.widget);
+        return lookUpInherited(type, true);
+    }
+
+    /**
+     * The inherited lookup, with or without a diagnostic when it comes up empty.
+     *
+     * <p>{@code report} is false for the lookups that have a documented
+     * fallback -- {@code Theme.of}, {@code MediaQuery.of},
+     * {@code IconTheme.of}, {@code DefaultTextStyle.of} all answer sensibly
+     * when nothing above them provides a value, so a miss is normal rather
+     * than a fault. Reporting it anyway was not merely noisy: the report walks
+     * two dozen ancestors building a string and writes it through
+     * {@code Log.p}, which on a device is file IO, and the gallery's root page
+     * paid that on its first build. The diagnostic is for the case it was
+     * written for -- a {@code Foo.of(context)!} that is about to throw.</p>
+     */
+    @SuppressWarnings("unchecked")
+    private <W extends Widget> W lookUpInherited(Class<W> type, boolean report) {
+        Element a = inheritedElements == null ? null : inheritedElements.get(type);
+        if (a == null && inheritedElements == null) {
+            // No map (an element mounted outside the normal path): fall back to
+            // the walk rather than answering a wrong "nothing here".
+            a = ancestorOf(this);
+            while (a != null && !isInstanceOf(type, a.widget)) {
+                a = ancestorOf(a);
             }
-            a = ancestorOf(a);
         }
-        reportMissingAncestor(type);
+        if (a != null) {
+            // REGISTER, do not merely read: the name is depend-on. Flutter records this
+            // element as a dependent so a later change to the widget rebuilds it, and
+            // without that every consumer is a one-shot read.
+            if (a instanceof com.codename1.flutter.widgets.InheritedElement) {
+                ((com.codename1.flutter.widgets.InheritedElement) a).addDependent(this);
+            }
+            return type.cast(a.widget);
+        }
+        if (report) {
+            reportMissingAncestor(type);
+        }
         return null;
     }
 
@@ -177,13 +256,21 @@ public abstract class Element implements BuildContext {
      * lookup surfaces as a null-check TypeError somewhere else entirely, with
      * no indication of WHICH widget was missing or what the context could
      * actually see. Reporting it at the point of failure turns that into a
-     * one-line diagnosis. Capped, because a missing provider is usually
-     * missing on every build of every frame.</p>
+     * one-line diagnosis. Reported ONCE PER TYPE rather than capped at a flat
+     * count: a provider that is missing is missing on every build of every
+     * frame, so a flat cap is spent entirely on whichever lookup happens to
+     * fail first and the genuinely interesting second and third failures never
+     * print. An overall ceiling still applies as a backstop.</p>
      */
     private static int missingAncestorReports;
+    private static final java.util.Set<String> REPORTED_MISSING =
+            new java.util.HashSet<String>();
 
     private void reportMissingAncestor(Class<?> type) {
-        if (missingAncestorReports >= 5) {
+        if (missingAncestorReports >= 40) {
+            return;
+        }
+        if (!REPORTED_MISSING.add(type == null ? "?" : type.getName())) {
             return;
         }
         missingAncestorReports++;
@@ -331,7 +418,18 @@ public abstract class Element implements BuildContext {
      * Adds this element to the tree. Subclasses extend this to create their
      * retained objects (State, CN1 components) and inflate their children.
      */
+    /// Elements mounted so far. The comparison that matters is not "how fast is
+    /// each runtime" but "is each one doing the same work" — a first frame that
+    /// built a tenth of the tree is not a faster first frame.
+    private static int mountedElements;
+
+    /** How many elements have been mounted. */
+    public static int mountedCount() {
+        return mountedElements;
+    }
+
     public void mount(Element parent, int slot) {
+        mountedElements++;
         this.parent = parent;
         this.slot = slot;
         if (parent != null) {
@@ -339,7 +437,12 @@ public abstract class Element implements BuildContext {
             this.host = parent.hostForChild(slot);
             this.depth = parent.depth + 1;
         }
+        this.inheritedElements = inheritedFrom(parent != null ? parent : contextFallback);
         this.mounted = true;
+    }
+
+    private static java.util.Map<Class<?>, Element> inheritedFrom(Element from) {
+        return from == null ? null : from.inheritedElementsForChild();
     }
 
     /**
@@ -431,6 +534,52 @@ public abstract class Element implements BuildContext {
     // Reconciliation
     // ------------------------------------------------------------------
 
+    /// Subtrees thrown away and rebuilt because reconciliation refused to
+    /// update them in place, by widget class.
+    ///
+    /// A REPLACEMENT is the expensive outcome: the old element tree is
+    /// discarded along with every Codename One component under it, and an
+    /// equivalent one is built from scratch. One high in the tree costs the
+    /// whole screen twice. Flutter's rule is that a widget of the same runtime
+    /// type and key updates in place, so a replacement of a widget that "looks
+    /// the same" is a reconciliation bug, not a cost of doing business.
+    private static final java.util.Map<String, int[]> REPLACED =
+            new java.util.HashMap<String, int[]>();
+
+    private static void noteReplacement(Widget from, Widget to) {
+        if (!Trace.on()) {
+            return;
+        }
+        String key = (from == null ? "null" : from.getClass().getSimpleName())
+                + "->" + (to == null ? "null" : to.getClass().getSimpleName());
+        int[] n = REPLACED.get(key);
+        if (n == null) {
+            n = new int[1];
+            REPLACED.put(key, n);
+        }
+        n[0]++;
+    }
+
+    /** The replacement census, worst first; see {@link #REPLACED}. */
+    public static String replacementCensus(int top) {
+        java.util.List<java.util.Map.Entry<String, int[]>> all =
+                new java.util.ArrayList<java.util.Map.Entry<String, int[]>>(REPLACED.entrySet());
+        java.util.Collections.sort(all, new java.util.Comparator<java.util.Map.Entry<String, int[]>>() {
+            @Override
+            public int compare(java.util.Map.Entry<String, int[]> a, java.util.Map.Entry<String, int[]> b) {
+                return b.getValue()[0] - a.getValue()[0];
+            }
+        });
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < Math.min(top, all.size()); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(all.get(i).getKey()).append('=').append(all.get(i).getValue()[0]);
+        }
+        return sb.append(']').toString();
+    }
+
     /**
      * Flutter's updateChild decision table:
      * <pre>
@@ -459,6 +608,7 @@ public abstract class Element implements BuildContext {
                 child.update(newWidget);
                 return child;
             }
+            noteReplacement(child.widget, newWidget);
             // Mid-life replacement: anchor the host's attach cursor at the
             // flat-container index the replaced subtree's components occupy,
             // so the replacement's components land there (element-tree order)
@@ -610,8 +760,53 @@ public abstract class Element implements BuildContext {
      * reactivation, so deactivation unmounts immediately and recursively.
      */
     protected void deactivateChild(Element child) {
+        noteDiscard(child);
         child.unmountRecursively();
         child.parent = null;
+    }
+
+    /// Subtrees THROWN AWAY, by widget class — the other half of the
+    /// replacement census.
+    ///
+    /// A child that becomes null is discarded without ever being offered a
+    /// replacement, so it does not show up as a failed reconciliation; it is
+    /// simply a subtree that was built and then dropped. On a start-up trace
+    /// that is the difference between "the app was built once" and "the app was
+    /// built, discarded and built again".
+    private static final java.util.Map<String, int[]> DISCARDED =
+            new java.util.HashMap<String, int[]>();
+
+    private static void noteDiscard(Element child) {
+        if (!Trace.on() || child == null) {
+            return;
+        }
+        String key = child.widget == null ? "null" : child.widget.getClass().getSimpleName();
+        int[] n = DISCARDED.get(key);
+        if (n == null) {
+            n = new int[1];
+            DISCARDED.put(key, n);
+        }
+        n[0]++;
+    }
+
+    /** The discard census, worst first; see {@link #DISCARDED}. */
+    public static String discardCensus(int top) {
+        java.util.List<java.util.Map.Entry<String, int[]>> all =
+                new java.util.ArrayList<java.util.Map.Entry<String, int[]>>(DISCARDED.entrySet());
+        java.util.Collections.sort(all, new java.util.Comparator<java.util.Map.Entry<String, int[]>>() {
+            @Override
+            public int compare(java.util.Map.Entry<String, int[]> a, java.util.Map.Entry<String, int[]> b) {
+                return b.getValue()[0] - a.getValue()[0];
+            }
+        });
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < Math.min(top, all.size()); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(all.get(i).getKey()).append('=').append(all.get(i).getValue()[0]);
+        }
+        return sb.append(']').toString();
     }
 
     final void unmountRecursively() {

@@ -126,13 +126,29 @@ public class MediaQueryData {
 
     /**
      * Returns a copy with the selected padding edges zeroed — Flutter's
-     * {@code MediaQueryData.removePadding}. This runtime does not scope media
-     * metrics through the element tree, so a same-metrics copy is returned
-     * (the removed edges are treated as a no-op).
+     * {@code MediaQueryData.removePadding}.
+     *
+     * <p>This is how a safe area is spent exactly once. A {@code SafeArea} or a
+     * {@code Scaffold} that insets its child for the notch hands the child a
+     * media query with that edge already consumed; without it, every nested
+     * safe area insets for the same notch again. Returning {@code this} made
+     * the whole idiom inert.</p>
      */
     public MediaQueryData removePadding(Boolean removeLeft, Boolean removeTop,
             Boolean removeRight, Boolean removeBottom) {
-        return this;
+        boolean left = Boolean.TRUE.equals(removeLeft);
+        boolean top = Boolean.TRUE.equals(removeTop);
+        boolean right = Boolean.TRUE.equals(removeRight);
+        boolean bottom = Boolean.TRUE.equals(removeBottom);
+        if (!left && !top && !right && !bottom) {
+            return this;
+        }
+        EdgeInsets p = padding();
+        return copyWith(null, null, null, EdgeInsets.fromLTRB(
+                left ? 0 : p.left(),
+                top ? 0 : p.top(),
+                right ? 0 : p.right(),
+                bottom ? 0 : p.bottom()), null);
     }
 
     /**
@@ -162,8 +178,34 @@ public class MediaQueryData {
         } catch (Throwable ignore) {
             // ports without dark-mode detection
         }
+        noteFirstSize(d.getDisplayWidth(), d.getDisplayHeight());
         return compute(d.getDisplayWidth(), d.getDisplayHeight(), Dp.scale(), dark,
                 safeAreaInsets(d, form));
+    }
+
+    /// The display size the FIRST ambient lookup saw, against the one in force
+    /// now. An adaptive application asks the media query which layout it is, so
+    /// if these differ the app was built for a screen it is not on.
+    private static String firstSize;
+
+    private static void noteFirstSize(int w, int h) {
+        if (firstSize == null) {
+            firstSize = w + "x" + h;
+        }
+    }
+
+    /** {@code first@now} display sizes; see {@link #firstSize}. */
+    public static String sizeHistory() {
+        String now = "?";
+        try {
+            if (Display.isInitialized()) {
+                Display d = Display.getInstance();
+                now = d.getDisplayWidth() + "x" + d.getDisplayHeight();
+            }
+        } catch (Throwable ignore) {
+            now = "?";
+        }
+        return (firstSize == null ? "-" : firstSize) + "->" + now + "@" + Dp.scale();
     }
 
     /**
