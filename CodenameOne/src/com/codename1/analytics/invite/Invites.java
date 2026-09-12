@@ -1265,7 +1265,7 @@ public final class Invites {
         // our storage returned false and latched nothing: no durable marker,
         // nothing blocked, nothing retrying, and the surviving code read by
         // the next launch.
-        if (handoffSurvived) {
+        if (handoffSurvived || referrerSurvived) {
             return true;
         }
         Map<String, String> record = InviteStore.read(InviteStore.PENDING);
@@ -1326,6 +1326,15 @@ public final class Invites {
         // re-attributes from. That is the one failure this method exists to
         // refuse to hide.
         boolean cleared = discardAnyHandoff();
+        // The Play referrer too, and the case that needs it is the one where
+        // it was never CONSUMED.
+        //
+        // A reset before the first checkForInvite() -- an early logout, a
+        // privacy reset -- cleared the records and left the source's one-shot
+        // flag unburnt. Play answers the same install for as long as that flag
+        // is unset, so the next check read the original referrer and restored
+        // exactly the attribution the reset promised to forget.
+        cleared &= discardAnyReferrer();
         cleared &= InviteStore.delete(InviteStore.PENDING);
         forgetPendingFallback();
         // ATTRIBUTION names the inviter, and the OUTBOX is the queued
@@ -1820,6 +1829,16 @@ public final class Invites {
         // query string with no host at all, and it calls codeFromQuery()
         // directly, so nothing about that path changes.
         int q = url.indexOf('?');
+        // HTTPS only, and the scheme is checked before the host.
+        //
+        // An application that forwards its broader deep links here could hand
+        // over myapp://cloud.codenameone.com/i/CODE or the http:// form, and a
+        // host-only test accepted both: the code was persisted and claimed
+        // although nothing the framework mints or the platforms associate is
+        // anything but https. The host being right is what made it look safe.
+        if (!url.regionMatches(true, 0, "https://", 0, 8)) {
+            return null;
+        }
         String host = hostOf(url);
         if (host == null) {
             return null;
@@ -2206,6 +2225,38 @@ public final class Invites {
     /// Separate from `ackHandoff` because the obligation flag does not apply:
     /// forgetting has to reach a handoff this process never read, and there is
     /// no record to check a codeSource against.
+    /// Tells the install-referrer source to burn its one-shot flag, whatever
+    /// the framework's reason.
+    ///
+    /// Separate from `ackReferrer` for the reason `discardAnyHandoff` is
+    /// separate from `ackHandoff`: forgetting has to reach a referrer this
+    /// process never read, and there is no record to check a codeSource
+    /// against.
+    private static boolean discardAnyReferrer() {
+        InstallReferrerSource source = referrerSource;
+        if (source == null) {
+            referrerAwaitingAck = false;
+            return true;
+        }
+        boolean gone;
+        try {
+            gone = source.discardReferrer();
+        } catch (Throwable t) {
+            Log.e(t);
+            gone = false;
+        }
+        if (gone) {
+            referrerAwaitingAck = false;
+        }
+        referrerSurvived = !gone;
+        return gone;
+    }
+
+    // True when the last discard left the referrer readable. Play answers the
+    // same install until the source's flag is burnt, so this is the only way a
+    // reset can tell that something survived it.
+    private static boolean referrerSurvived;
+
     private static boolean discardAnyHandoff() {
         AppClipHandoffSource source = appClipSource;
         if (source == null) {
@@ -2249,16 +2300,17 @@ public final class Invites {
             referrerAwaitingAck = false;
             return;
         }
-        boolean told = true;
+        boolean gone;
         try {
-            source.referrerPersisted();
+            gone = source.discardReferrer();
         } catch (Throwable t) {
             Log.e(t);
-            told = false;
+            gone = false;
         }
-        if (told) {
+        if (gone) {
             referrerAwaitingAck = false;
         }
+        referrerSurvived = !gone;
     }
 
     // True when a referrer has been handed over and not yet made durable. The

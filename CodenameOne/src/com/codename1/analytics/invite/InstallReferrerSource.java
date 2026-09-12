@@ -52,8 +52,8 @@ public interface InstallReferrerSource {
     /// - `callback`: receives the answer, never null
     void requestReferrer(InstallReferrerCallback callback);
 
-    /// Told that the referrer handed over is now stored somewhere that
-    /// survives the process, so a source holding a one-shot flag may burn it.
+    /// Told that the framework is done with the referrer, so a source holding
+    /// a one-shot flag must burn it.
     ///
     /// The Android source may only ask Play once: the API answers a given
     /// install once, and the port records that it has asked so a later launch
@@ -64,8 +64,23 @@ public interface InstallReferrerSource {
     /// an invited install as no-match, permanently, on the one platform whose
     /// answer is exact.
     ///
-    /// Called once per accepted referrer, and never when the write failed: the
-    /// source should keep its flag unburnt so the next launch can ask again.
-    /// A source with no such flag does nothing here.
-    void referrerPersisted();
+    /// Two things end the framework's interest, and BOTH have to burn the
+    /// flag, which is why this is one method rather than a "persisted" one:
+    ///
+    /// - the referrer reached durable storage. Never called while that write
+    ///   is still failing: the flag stays unburnt so the next launch can ask
+    ///   again, which is the outcome a retry can fix.
+    /// - the framework is FORGETTING -- [Invites#reset] or an erasure. An
+    ///   unconsumed referrer is still an exact code naming an inviter, and
+    ///   Play answers the same install for as long as the flag is unburnt, so
+    ///   one left behind re-attributes the device afterwards and undoes
+    ///   exactly what was erased.
+    ///
+    /// #### Returns
+    ///
+    /// true when nothing is left that could answer again. An erasure is
+    /// REFUSED on false, for the same reason the App Clip handoff is:
+    /// reporting an erasure that did not happen is worse than failing one
+    /// that can be retried. A source with no flag answers true.
+    boolean discardReferrer();
 }

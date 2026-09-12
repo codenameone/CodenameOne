@@ -616,7 +616,8 @@ class InviteConsentAndErasureTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {

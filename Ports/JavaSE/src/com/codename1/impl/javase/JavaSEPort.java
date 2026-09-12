@@ -7578,9 +7578,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
 
                     @Override
-                    public void referrerPersisted() {
+                    public boolean discardReferrer() {
                         // The simulator has no one-shot flag to burn: the menu
                         // item is the trigger, and it can be used again.
+                        return true;
                     }
                 });
                 Display.getInstance().callSerially(new Runnable() {

@@ -239,4 +239,20 @@ class InviteUrlParsingTest extends UITestBase {
         assertEquals("https://links.example.com", Invites.getLinkBase());
         Invites.setLinkBase(null);
     }
+
+    @FormTest
+    void onlyHttpsUrlsCarryInvites() {
+        // An application forwarding its broader deep links here could hand
+        // over a custom scheme or plain http on the right host, and a
+        // host-only test accepted both -- persisting and claiming a code
+        // although nothing the framework mints or the platforms associate is
+        // anything but https.
+        assertNull(Invites.extractCode("myapp://cloud.codenameone.com/i/SCHEME1"),
+                "a custom-scheme url was accepted as an invite");
+        assertNull(Invites.extractCode("http://cloud.codenameone.com/i/PLAIN1"),
+                "an http url was accepted as an invite");
+        assertEquals("REAL123",
+                Invites.extractCode("https://cloud.codenameone.com/i/REAL123"),
+                "the https form stopped being recognised");
+    }
 }

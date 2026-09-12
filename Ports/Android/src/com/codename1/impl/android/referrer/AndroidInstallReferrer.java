@@ -332,7 +332,7 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
             }
             return;
         }
-        // The handoff only. The flag is burnt by referrerPersisted(), which
+        // The handoff only. The flag is burnt by discardReferrer(), which
         // the framework calls once the code is in durable storage.
         //
         // Burning it here lost the exact code whenever the process died first:
@@ -356,8 +356,14 @@ public class AndroidInstallReferrer implements InstallReferrerSource {
     /// lands leaves it unset, and the next launch asks Play again instead of
     /// losing the referrer for good.
     @Override
-    public void referrerPersisted() {
+    public boolean discardReferrer() {
         Preferences.set(PREF_ATTEMPTED, true);
+        // READ BACK, because Preferences.set() answers nothing. A store that
+        // refused leaves the marker absent for good, and Play then returns the
+        // same install referrer on a later launch -- restoring an attribution
+        // an erasure had removed. The caller gates that erasure on this, so
+        // "I called set()" is not the answer it needs.
+        return Preferences.get(PREF_ATTEMPTED, false);
     }
 
     /// The one-shot flag is burnt by the exchange that ANSWERED, and only by

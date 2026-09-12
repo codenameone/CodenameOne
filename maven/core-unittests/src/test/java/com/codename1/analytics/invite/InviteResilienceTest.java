@@ -646,7 +646,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -687,7 +688,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -731,7 +733,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -998,7 +1001,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1144,7 +1148,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1163,7 +1168,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1196,7 +1202,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1302,7 +1309,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1539,7 +1547,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1775,7 +1784,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -1890,7 +1900,8 @@ class InviteResilienceTest extends UITestBase {
                 return true;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
@@ -2005,7 +2016,8 @@ class InviteResilienceTest extends UITestBase {
                 return !spent;
             }
 
-            public void referrerPersisted() {
+            public boolean discardReferrer() {
+                return true;
             }
 
             public void requestReferrer(InstallReferrerCallback callback) {
