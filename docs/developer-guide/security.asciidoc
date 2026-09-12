@@ -112,7 +112,7 @@ Some values are too sensitive for `Storage` or `Preferences`, which are plaintex
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava032Snippet.java[tag=security-java-032,indent=0]
 ----
 
-Where there's no key store the answer differs by port, and a `null` read isn't the only thing to watch for. The base implementation returns `false` / `null`, so treat that as "not available" and fall back accordingly -- but the browser port writes through ordinary `Storage`, so the read succeeds and the value is readable by any script on the origin, including anything an XSS gets to run. The non-prompting tier on the desktop ports describes itself as obfuscation rather than security. Treat `SecureStorage` as a protected store on iOS and Android, and as persistence everywhere else.
+What backs it differs by port, and a `null` read isn't the only thing to watch for. The native ports all put the value behind something real: Keychain Services on iOS, an `AndroidKeyStore` key on Android, DPAPI on Windows and the Secret Service on Linux. The base implementation returns `false` / `null` where there's nothing to use, so treat that as "not available" and fall back accordingly. Two cases answer instead of refusing, and neither protects anything: the browser port writes through ordinary `Storage`, so the value is readable by any script on the origin including anything an XSS gets to run, and the simulator's non-prompting tier describes itself as obfuscation rather than security. Don't let a successful read in either of those stand in for a test on a device.
 
 ==== Secrets (fetched from the cloud, never shipped in the binary)
 
