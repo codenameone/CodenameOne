@@ -116,7 +116,7 @@ On a platform without a keychain the base implementation returns `false` / `null
 
 ==== Secrets (fetched from the cloud, never shipped in the binary)
 
-Baking an API key (for example a Google Maps key) into your app is unsafe: anyone can extract it from the binary, and rotating it means shipping a new build. `com.codename1.security.Secrets` solves this. You define the secret once in the Codename One Cloud vault, and the app fetches it at runtime and caches it in `SecureStorage`:
+Baking an API key (for example a Google Maps key) into your app means it's in the binary forever, and rotating it means shipping a new build. `com.codename1.security.Secrets` keeps the value out of the binary and lets you rotate it server-side. Be clear about what that does and doesn't buy you: the fetch is authenticated with the build key, which *is* in the binary, so a determined attacker who extracts it can call the vault the same way your app does. What you gain is rotation without a release, and a vault that decides what a client may ever read -- not secrecy against someone reverse engineering the binary. You define the secret once in the Codename One Cloud vault, and the app fetches it at runtime and caches it in `SecureStorage`:
 
 [source,java]
 ----
@@ -204,7 +204,7 @@ When you'd rather respond in-app than be hard-killed -- for example to block onl
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava013Snippet.java[tag=security-java-013,indent=0]
 ----
 
-`isDeviceCompromised()` aggregates the same root/jailbreak/Frida signals as the launch gates plus emulator heuristics, but never terminates the app. On the simulator and unsupported ports it simply returns `false`.
+`isDeviceCompromised()` aggregates the same root/jailbreak/Frida signals as the launch gates plus emulator heuristics, but never terminates the app. On unsupported ports it returns `false`. The simulator returns `false` too until you set a signal under *Simulate > App Shield*, which is how you exercise your warning, degradation and step-up branches without a compromised device.
 
 NOTE: If your security policy mandates a specific commercial Mobile Threat Defense (MTD) / RASP vendor (Zimperium, Promon SHIELD, etc.), you integrate that vendor's SDK through the standard `android.gradleDep` / `ios.pods` build hints -- Codename One's built-in checks complement, but don't claim to replace, a dedicated MTD product.
 
