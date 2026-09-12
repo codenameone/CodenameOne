@@ -400,4 +400,63 @@ class ComponentGroupSegmentedTest extends UITestBase {
         assertEquals("ComboBox", combo.getUIID(),
                 "and its UIID with it");
     }
+
+    @Test
+    void testSurvivorsAreRegroupedAfterAnAnimatedRemovalCompletes() {
+        // removeComponentImpl runs while the AnimationManager still has the departing
+        // member queued, so positional UIIDs recomputed there count it and the survivor
+        // of a two-element group reads Last instead of Only.
+        activateGrouping(false);
+        Form f = new Form("host");
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        Button first = new Button("One");
+        Button second = new Button("Two");
+        group.addComponent(first);
+        group.addComponent(second);
+        f.add(group);
+        f.show();
+        assertEquals("ToggleButtonFirst", first.getUIID());
+        assertEquals("ToggleButtonLast", second.getUIID());
+
+        f.getAnimationManager().addAnimation(new ComponentAnimation() {
+            public boolean isInProgress() {
+                return true;
+            }
+
+            protected void updateState() {
+            }
+        });
+        assertTrue(f.getAnimationManager().isAnimating(), "the queued-removal path needs this");
+
+        group.removeComponent(first);
+        f.getAnimationManager().flush();
+
+        assertEquals("ToggleButtonOnly", second.getUIID(),
+                "the last member standing is Only, not Last");
+        assertEquals("Button", first.getUIID(),
+                "and the one that left keeps nothing of the group's");
+    }
+
+    @Test
+    void testReplacingAMemberHandsTheOutgoingOneItsUiidBack() {
+        // replace() goes to removeComponentImplNoAnimationSafety directly, so an
+        // override on removeComponentImpl never saw it and the replaced component kept
+        // the group's UIID for good.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        Button original = new Button("One");
+        group.addComponent(original);
+        assertEquals("ToggleButtonOnly", original.getUIID());
+
+        Button replacement = new Button("Two");
+        group.replace(original, replacement, null);
+
+        assertEquals("Button", original.getUIID(),
+                "a replaced member leaves the group and takes its own UIID with it");
+        // The replacement is deliberately not asserted as grouped: replace() inserts
+        // through insertComponentAtImpl, which this class does not override, so it
+        // never has been. That is long-standing and outside this change.
+    }
 }

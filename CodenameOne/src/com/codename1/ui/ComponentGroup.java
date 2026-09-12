@@ -157,15 +157,40 @@ public class ComponentGroup extends Container {
     @Override
     void removeComponentImpl(Component cmp) {
         super.removeComponentImpl(cmp);
+        // An animated removal only QUEUES the physical removal, so this member can sit
+        // in the component list for the length of the animation. Give it its own UIID
+        // back now rather than at completion, or it spends the animation wearing the
+        // group's -- and if the animation never completes, keeps it.
+        restoreDeparting(cmp);
+    }
 
-        // Re-group what genuinely remains BEFORE restoring the member that left.
-        // An animated removal keeps cmp in the component list until its animation
-        // callback fires, so a restore placed ahead of this is immediately undone --
-        // and that callback goes to Container.removeComponentImplNoAnimationSafety,
-        // which never reaches this class, so nothing would put it back.
+    /// Also hooked here, because this is the point at which the member is genuinely
+    /// out of the component list, and every route arrives at it: the immediate
+    /// removal, the one the AnimationManager queues, and replace().
+    ///
+    /// removeComponentImpl runs BEFORE a queued removal completes, so positional UIIDs
+    /// recomputed there still count the departing member and leave the survivor of a
+    /// two-element group reading Last rather than Only. The queued callback goes
+    /// straight to Container, so nothing else would correct it.
+    ///
+    /// Note replace() reaches this but inserts through insertComponentAtImpl, which
+    /// this class does not override, so the incoming component is not grouped. That is
+    /// long-standing and left alone here.
+    @Override
+    void removeComponentImplNoAnimationSafety(Component cmp) {
+        super.removeComponentImplNoAnimationSafety(cmp);
+        // Survivors first, then the member that left, so nothing re-applies the
+        // group's names to it.
         updateUIIDs();
+        restoreDeparting(cmp);
+    }
 
-        // restore original UIID
+    /// Hands a member that has left this group back what the group took from it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the departing member
+    private void restoreDeparting(Component cmp) {
         Object o = cmp.getClientProperty("$origUIID");
         if (o != null) {
             cmp.setUIID((String) o);
