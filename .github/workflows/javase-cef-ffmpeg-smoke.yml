@@ -3,6 +3,19 @@ name: JavaSE CEF/FFmpeg Smoke
 permissions:
   contents: read
 
+# Supersede a superseded run. This workflow watches maven/codenameone-maven-plugin/**,
+# so a PR iterating on the plugin queues one run per push -- and with no group they all
+# survive: nine were pending at once on a single PR here, every one of them waiting for a
+# runner to test a commit that had already been replaced, while every other workflow on
+# the same branch sat at exactly one because it had a group.
+#
+# head_ref is empty outside a pull request, so a push to master falls back to run_id and
+# each master run is its own group -- superseding applies to PR iteration only, never to
+# the branch's own history.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     paths:
