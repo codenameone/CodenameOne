@@ -262,4 +262,23 @@ class ComponentGroupSegmentedTest extends UITestBase {
         assertEquals("ButtonGroupOnly", b.getUIID(),
                 "the property setter has to go through setForceGroup");
     }
+
+    @Test
+    void testTurningHorizontalAppliesWhenTheUiidWasAlreadyToggleButton() {
+        // setHorizontal only renamed inside its "GroupElement" branch, so a group that
+        // already carried the ToggleButton UIID became segmented on the orientation
+        // change and applied nothing: isGroupingActive said the group owned its members'
+        // UIIDs while they still wore their own, until an unrelated insert or refresh.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        Button b = new Button("One");
+        group.addComponent(b);
+        group.setElementUIID("ToggleButton");
+        assertEquals("Button", b.getUIID(), "still vertical, so still inactive");
+
+        group.setHorizontal(true);
+
+        assertEquals("ToggleButtonOnly", b.getUIID(),
+                "turning horizontal is what activates this group, so it has to apply");
+    }
 }

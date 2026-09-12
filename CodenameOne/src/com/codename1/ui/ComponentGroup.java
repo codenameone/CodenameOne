@@ -265,26 +265,27 @@ public class ComponentGroup extends Container {
     ///
     /// - `horizontal`: the horizontal to set
     public void setHorizontal(boolean horizontal) {
-        if (horizontal != isHorizontal()) {
-            if (horizontal) {
-                setLayout(new BoxLayout(BoxLayout.X_AXIS));
-                if ("GroupElement".equals(elementUIID)) {
-                    elementUIID = "ToggleButton";
-                    buttonUIID = "ToggleButton";
-                    updateUIIDs();
-                }
-            } else {
-                setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-                if ("ToggleButton".equals(elementUIID)) {
-                    elementUIID = "GroupElement";
-                    buttonUIID = "ButtonGroup";
-                    // Leaving the segmented state can deactivate the group, and updateUIIDs
-                    // only ever renames -- it has no path back. Restore here, or the members
-                    // keep the ToggleButton names a vertical group no longer justifies.
-                    applyOrRestore();
-                }
+        if (horizontal == isHorizontal()) {
+            return;
+        }
+        if (horizontal) {
+            setLayout(new BoxLayout(BoxLayout.X_AXIS));
+            if ("GroupElement".equals(elementUIID)) {
+                elementUIID = "ToggleButton";
+                buttonUIID = "ToggleButton";
+            }
+        } else {
+            setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+            if ("ToggleButton".equals(elementUIID)) {
+                elementUIID = "GroupElement";
+                buttonUIID = "ButtonGroup";
             }
         }
+        // Unconditional, because orientation alone decides this. A group already carrying
+        // the ToggleButton UIID becomes segmented merely by turning horizontal, and the
+        // swap above does not run for it -- so confining this to the swap left such a
+        // group reporting that it owned its members' UIIDs while they kept their own.
+        applyOrRestore();
     }
 
     /// The UIID to apply to the elements within this container
