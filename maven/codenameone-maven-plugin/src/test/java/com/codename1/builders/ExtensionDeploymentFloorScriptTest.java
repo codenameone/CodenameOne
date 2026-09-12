@@ -263,6 +263,54 @@ class ExtensionDeploymentFloorScriptTest {
                 "a cycle resolves to nothing usable, so the floor is the answer");
     }
 
+    /// A helper may be qualified too. Xcode reads EXTENSION_MIN[sdk=iphoneos*] for a device
+    /// build, so taking the base 12.0 would resolve a 16.4 extension down to the floor and
+    /// weaken it below what its code needs.
+    @Test
+    void resolvesAHelperInTheQualifiedKeysContext(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Qualified|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        // The base key is unset on this fixture, so it takes the floor -- a simulator build
+        // would otherwise declare no minimum at all. The qualified key is the one under test.
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
+                got.get(0),
+                "the device build resolves EXTENSION_MIN to 16.4, which clears the floor");
+    }
+
+    /// And when the qualifiers do not line up, the resolution is a guess. A guess may only
+    /// RAISE: refusing to act leaves a genuinely low value for Xcode to reject by name, which
+    /// beats silently weakening an extension on the strength of a value it may never see.
+    @Test
+    void willNotLowerOnAnUncertainResolution(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Mismatched|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=$(EXTENSION_MIN)",
+                got.get(0),
+                "a helper qualified in a way this pass cannot match must not be clamped down");
+    }
+
+    /// The certain case still raises: one unqualified helper, genuinely below the floor.
+    @Test
+    void stillRaisesWhenTheResolutionIsCertain(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Plain|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0", got.get(0));
+    }
+
     /// Xcode expands a reference nothing defines to the empty string, so the extension would
     /// declare no minimum at all. The floor is the answer there, not the expression.
     @Test
