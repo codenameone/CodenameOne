@@ -79,6 +79,8 @@ public final class GuideFigures {
             new FigureVariant(new CsvParsingFigure(), FigureDevice.ANDROID, false, "csv-parsing.png"),
             new FigureVariant(new PropertiesBindingFigure(), FigureDevice.ANDROID, false,
                     "properties-demo-binding.png"),
+            new FigureVariant(new FloatingHintFigure(), FigureDevice.ANDROID, false,
+                    "components-floatinghint.png"),
             new FigureVariant(new ToggleButtonFigure(), FigureDevice.ANDROID, false,
                     "components-toggle-buttons-android.png"),
             new FigureVariant(new ToggleButtonFigure(), FigureDevice.IOS, false,
