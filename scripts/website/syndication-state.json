@@ -2060,6 +2060,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-12T00:01:13+00:00"
+      },
+      "devto": {
+        "id": 4639932,
+        "url": "https://dev.to/codenameone/a-dialog-can-now-be-a-native-desktop-window-1jgk",
+        "syndicated_at": "2026-09-12T16:17:44+00:00"
       }
     }
   }
