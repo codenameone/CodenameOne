@@ -96,7 +96,24 @@ jobs:
     uses: ./.github/workflows/_build-ios-port.yml
 
   build-ios:
-    if: ${{ !inputs.watch_only }}
+    # The OpenGL lane does not run on pull requests. Every macOS job in this
+    # workflow shares one concurrency group ("ensure only one mac build runs at
+    # once" below), so the four of them execute strictly in series and this one
+    # sits in the middle of that chain: measured on run 34683216894 it occupied
+    # 40.8 minutes and delayed build-ios-tv behind it, about 50 minutes of the
+    # critical path for every PR.
+    #
+    # Metal is the default backend (ios.metal defaults to true), so a PR still
+    # gets the renderer its users get. GL remains selectable via ios.metal=false
+    # and is still built and screenshot-gated here on the nightly schedule, on
+    # master pushes and on workflow_dispatch -- the 143 baselines in
+    # scripts/ios/screenshots stay live rather than rotting untested.
+    #
+    # The SDK-delta gate compiles BOTH renderer configurations on every run
+    # (scripts/check-ios-sdk-deltas.py), so a GL-only compile regression is
+    # still caught on the PR itself; what moves to nightly is the GL runtime and
+    # screenshot coverage.
+    if: ${{ !inputs.watch_only && github.event_name != 'pull_request' }}
     needs: build-port
     permissions:
       contents: read
