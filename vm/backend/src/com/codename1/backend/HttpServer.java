@@ -22,7 +22,6 @@
  */
 package com.codename1.backend;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -5156,21 +5155,30 @@ public final class HttpServer {
             throw new ProtocolException(400, "both Content-Length and Transfer-Encoding");
         }
 
-        if(request.headerContains("expect", "100-continue")) {
-            // The client is entitled to wait for this before sending the body. A
-            // server that stays silent makes every such client pay its whole
-            // timeout first.
+        String expectation = request.getHeader("Expect");
+        if(expectation != null) {
+            // EVERY token, not just whether the one we know is among them. An
+            // earlier version asked headerContains for 100-continue and answered
+            // it, so "Expect: 100-continue, custom-extension" got its interim
+            // response and the extension nobody can satisfy was ignored -- leniency
+            // chosen on purpose and wrong, because the field is a list of things
+            // the client expects to hold and this server cannot make one of them
+            // true.
+            //
+            // An expectation this server does not know is answered NOW rather than
+            // ignored, whichever way it arrives. The mechanism exists so the client
+            // waits to be told before sending, so ignoring the field and dropping
+            // into the body read leaves both sides waiting for each other until the
+            // receive deadline -- the client for a reply it was invited to expect,
+            // the server for a body that is not coming. 417 is what RFC 9110
+            // provides, and it costs one round trip instead of a timeout.
+            if(!onlyExpects100Continue(expectation)) {
+                throw new ProtocolException(417, "unsupported expectation");
+            }
+            // The client is entitled to this before sending the body. A server
+            // that stays silent makes every such client pay its whole timeout
+            // first.
             conn.write(CONTINUE_100);
-        } else if(request.getHeader("Expect") != null) {
-            // AN EXPECTATION THIS SERVER DOES NOT KNOW, answered now rather than
-            // ignored. The whole point of the mechanism is that the client waits
-            // to be told before it sends the body, so ignoring the field and
-            // dropping into the body read leaves both sides waiting for each other
-            // until the receive deadline expires -- the client for a reply it was
-            // invited to expect, the server for a body that is not coming. 417 is
-            // what RFC 9110 provides for exactly this, and it costs the client one
-            // round trip instead of a timeout.
-            throw new ProtocolException(417, "unsupported expectation");
         }
 
         String body = null;
@@ -5250,7 +5258,15 @@ public final class HttpServer {
         // necessary in the first place.
         long[] charged = { 0 };
         try {
-        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        // A ByteSink rather than a ByteArrayOutputStream, because the reservation
+        // below has to follow the ALLOCATION and a stream does not say how big its
+        // array is. Both double when they grow, so charging the logical body left
+        // roughly half of a grown buffer uncounted: a client crossing a growth
+        // boundary and then pausing held about 8MB against a 4MB charge, and enough
+        // connections doing it hold close to twice CN1_HTTP_MAX_UPLOAD_MB while the
+        // guard believes it is inside the limit. bytes().length is the capacity, so
+        // it can be charged for what it really is.
+        ByteSink body = new ByteSink(1024);
         // The same floor rate the fixed-length path got, over the WHOLE chunked
         // read: the size lines, the data and the trailers. Each of the three fill
         // loops below restarts the socket timeout on every successful read, so a
@@ -5269,8 +5285,8 @@ public final class HttpServer {
                 if(conn.available() > MAX_HEADER_BYTES) {
                     throw new ProtocolException(400, "chunk size line too long");
                 }
-                requireChunkedProgress(started, body.size() + conn.available());
-                reserveUploadUpTo(charged, body.size() + conn.available());
+                requireChunkedProgress(started, body.length() + conn.available());
+                reserveUploadUpTo(charged, body.length() + conn.available());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -5315,8 +5331,8 @@ public final class HttpServer {
                         if(conn.available() > MAX_HEADER_BYTES) {
                             throw new ProtocolException(400, "chunk trailer too long");
                         }
-                        requireChunkedProgress(started, body.size() + conn.available());
-                        reserveUploadUpTo(charged, body.size() + conn.available());
+                        requireChunkedProgress(started, body.length() + conn.available());
+                        reserveUploadUpTo(charged, body.length() + conn.available());
                         if(!conn.fill(scratch)) {
                             // EOF before the blank line that ends the trailers: the
                             // chunked framing never finished, so this is a truncated
@@ -5369,23 +5385,23 @@ public final class HttpServer {
                     }
                     conn.pos = trailerEnd + 2;
                     if(blank) {
-                        return body.toByteArray();
+                        return usedBytes(body);
                     }
                 }
             }
-            // Subtraction, not addition: body.size() + size overflows to a negative
+            // Subtraction, not addition: body.length() + size overflows to a negative
             // for a chunk size near Integer.MAX_VALUE and sails past the cap, after
             // which the loop below grows the buffer toward the declared multi-gigabyte
             // chunk. Four bytes and a "7ffffffd" header was enough for an
             // unauthenticated client to take the process out. Both sides here are
             // non-negative, so there is nothing left to overflow.
-            if(size > MAX_BODY_BYTES - body.size()) {
+            if(size > MAX_BODY_BYTES - body.length()) {
                 throw new ProtocolException(413, "chunked body too large");
             }
             // The chunk and its trailing CRLF must both be present before it is taken.
             while(conn.available() < size + 2) {
-                requireChunkedProgress(started, body.size() + conn.available());
-                reserveUploadUpTo(charged, body.size() + conn.available());
+                requireChunkedProgress(started, body.length() + conn.available());
+                reserveUploadUpTo(charged, body.length() + conn.available());
                 if(!conn.fill(scratch)) {
                     return null;
                 }
@@ -5393,8 +5409,11 @@ public final class HttpServer {
             // Reserved for the copy BEFORE it is made, like every other growth
             // point: a budget checked afterwards has already spent what it meant
             // to withhold.
-            reserveUploadUpTo(charged, body.size() + size + conn.available());
-            body.write(conn.buffer, conn.pos, size);
+            // Reserved against the capacity this write will leave behind, not the
+            // bytes it adds: ensure() doubles, and the doubling is the memory.
+            body.ensure(size);
+            reserveUploadUpTo(charged, body.bytes().length + conn.available());
+            body.put(conn.buffer, conn.pos, size);
             conn.pos += size;
             if(conn.buffer[conn.pos] != '\r' || conn.buffer[conn.pos + 1] != '\n') {
                 throw new ProtocolException(400, "malformed chunk terminator");
@@ -5419,6 +5438,48 @@ public final class HttpServer {
      * refused upload, which is the slowest possible way to run a server out of
      * budget.
      */
+    /**
+     * The filled prefix of a sink, copied out.
+     *
+     * ByteSink.bytes() is the whole backing array -- capacity, not content -- so
+     * handing it to a caller that reads buffer.length would hand it the padding
+     * too.
+     */
+    private static byte[] usedBytes(ByteSink sink) {
+        byte[] out = new byte[sink.length()];
+        System.arraycopy(sink.bytes(), 0, out, 0, out.length);
+        return out;
+    }
+
+    /**
+     * Whether an Expect field asks for nothing but 100-continue.
+     *
+     * <p>It is a comma-separated list, and one member this server cannot satisfy
+     * makes the whole field unsatisfiable -- there is no partial answer to give.
+     * Compared without case folding a token by hand: equalsIgnoreCase is
+     * locale-independent, which toLowerCase is not.
+     */
+    private static boolean onlyExpects100Continue(String value) {
+        int at = 0;
+        boolean any = false;
+        while(at <= value.length()) {
+            int comma = value.indexOf(',', at);
+            int end = comma < 0 ? value.length() : comma;
+            String token = value.substring(at, end).trim();
+            if(token.length() > 0) {
+                any = true;
+                if(!"100-continue".equalsIgnoreCase(token)) {
+                    return false;
+                }
+            }
+            if(comma < 0) {
+                break;
+            }
+            at = comma + 1;
+        }
+        return any;
+    }
+
     private static void reserveUploadUpTo(long[] charged, long needed)
             throws ProtocolException {
         if(needed <= charged[0]) {

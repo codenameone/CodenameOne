@@ -801,6 +801,21 @@ public final class MySql {
     }
 
     private Packet readPacket() throws IOException {
+        try {
+            return readPacketFrame();
+        } catch (IOException failed) {
+            // The same rule as the PostgreSQL reader: a session whose read failed
+            // is finished either way. EOF between packets left `closed` false, so
+            // isOpen() kept describing a dead connection as usable and the pool
+            // kept handing it out, one descriptor per disconnect; a failure part
+            // way through leaves an unknown number of bytes on the wire. close()
+            // is idempotent, so the bounds below that already close are unaffected.
+            close();
+            throw failed;
+        }
+    }
+
+    private Packet readPacketFrame() throws IOException {
         int length = readPacketHeader(false);
         Packet packet = new Packet();
         long allowed = SqlLimits.maxMessageBytes();

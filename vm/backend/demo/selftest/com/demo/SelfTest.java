@@ -1806,6 +1806,66 @@ public class SelfTest {
         check("a truncated PostgreSQL row frame is refused", "refused", outcome);
     }
 
+    /**
+     * A session whose peer hangs up is closed, not merely broken.
+     *
+     * <p>EOF between messages threw with the session still marked open, so
+     * isOpen() described a dead connection as usable: DbPool handed it back out
+     * and every disconnect left another descriptor behind. The stub authenticates,
+     * says it is ready, and then simply goes away -- which is what a server
+     * restart looks like from here.
+     *
+     * <p>The assertion is isOpen(), not that the query threw. The query threw
+     * before this fix too; what it did not do was leave the session takeable.
+     */
+    private static void aDeadSessionReportsItselfClosed() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    if(pgRead(client) == null) {              // StartupMessage
+                        return;
+                    }
+                    pgSend(client, 'R', int32(0));            // AuthenticationOk
+                    pgSend(client, 'Z', new byte[]{(byte)'I'}); // ReadyForQuery
+                    pgRead(client);                           // the first statement
+                    // And then nothing: hang up mid-conversation.
+                } catch (Exception ignored) {
+                    // Going away IS the scenario.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("postgres://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            try {
+                db.query("SELECT 1", null);
+                outcome = "answered";
+            } catch (Exception expected) {
+                outcome = db.isOpen() ? "still open" : "closed";
+            }
+        } catch (Exception refused) {
+            outcome = "open failed: " + refused.getMessage();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a session whose peer hung up reports itself closed", "closed", outcome);
+    }
+
     /** One PostgreSQL message: type byte, length that counts itself, payload. */
     private static void pgSend(int fd, char type, byte[] payload) throws IOException {
         byte[] out = new byte[5 + payload.length];
@@ -1866,6 +1926,7 @@ public class SelfTest {
         scramIterationCountIsBounded();
         aTruncatedMySqlHeaderIsRefused();
         truncatedRowFramesAreRefused();
+        aDeadSessionReportsItselfClosed();
         aShortAuthFrameIsRefused();
         aTruncatedMySqlBodyIsRefused();
         aStaticFileComesBackWhole();

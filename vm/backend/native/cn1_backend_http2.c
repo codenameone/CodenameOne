@@ -454,22 +454,26 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
             > CN1_H2_MAX_PROCESS_INBOUND_BYTES) {
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
-    /* The pseudo-headers carry what a request line carries in HTTP/1.1. */
+    /* The pseudo-headers carry what a request line carries in HTTP/1.1.
+       A FAILED COPY FAILS THE STREAM, the same answer the ordinary header below
+       gives to the same failure: reporting success left the request queued with a
+       required pseudo-header missing, and it was answered much later with an
+       unrelated 400, 501 or 500 that says nothing about what happened. */
     if(nameLen == 7 && memcmp(name, ":method", 7) == 0) {
         r->method = cn1H2Dup(value, valueLen);
-        return 0;
+        return r->method == NULL ? NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE : 0;
     }
     if(nameLen == 5 && memcmp(name, ":path", 5) == 0) {
         r->path = cn1H2Dup(value, valueLen);
-        return 0;
+        return r->path == NULL ? NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE : 0;
     }
     if(nameLen == 7 && memcmp(name, ":scheme", 7) == 0) {
         r->scheme = cn1H2Dup(value, valueLen);
-        return 0;
+        return r->scheme == NULL ? NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE : 0;
     }
     if(nameLen == 10 && memcmp(name, ":authority", 10) == 0) {
         r->authority = cn1H2Dup(value, valueLen);
-        return 0;
+        return r->authority == NULL ? NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE : 0;
     }
     if(nameLen > 0 && name[0] == ':') {
         return 0; /* an unknown pseudo-header; nghttp2 has already validated it */

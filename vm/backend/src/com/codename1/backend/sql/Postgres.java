@@ -751,6 +751,23 @@ public final class Postgres {
     }
 
     private Message readMessage() throws IOException {
+        try {
+            return readMessageFrame();
+        } catch (IOException failed) {
+            // ANY read failure here ends the session. EOF between messages threw
+            // with `closed` still false, so isOpen() went on describing a dead
+            // connection as usable: DbPool handed it out again and every
+            // disconnect left another descriptor behind. A failure part way
+            // through a message is the same answer for a different reason --
+            // whatever is left on the wire is unknown, so nothing can be asked of
+            // it. close() is idempotent, so the branches below that already close
+            // before throwing lose nothing by passing through here.
+            close();
+            throw failed;
+        }
+    }
+
+    private Message readMessageFrame() throws IOException {
         int type = wire.read();
         if(type < 0) {
             throw new IOException("The PostgreSQL connection closed unexpectedly");

@@ -2325,6 +2325,21 @@ class BackendHttpIntegrationTest {
         assertTrue(elapsed < 5000,
                 "the answer must not wait for the body that is not coming: " + elapsed + "ms");
 
+        // MIXED WITH ONE WE KNOW is still unsatisfiable. An earlier version asked
+        // only whether 100-continue was among the tokens, answered it, and ignored
+        // the rest -- so this got its interim response and then waited for a body
+        // the client was still holding.
+        String mixed = "POST /echo HTTP/1.1\r\nHost: x\r\n"
+                + "Content-Length: 5\r\nExpect: 100-continue, custom-extension\r\n"
+                + "Connection: close\r\n\r\n";
+        long mixedStarted = System.currentTimeMillis();
+        byte[] mixedAnswer = rawBytes(mixed.getBytes(StandardCharsets.ISO_8859_1));
+        long mixedElapsed = System.currentTimeMillis() - mixedStarted;
+        assertEquals(417, statusOf(mixedAnswer),
+                "a list this server cannot wholly satisfy is a 417");
+        assertTrue(mixedElapsed < 5000,
+                "and promptly, for the same reason: " + mixedElapsed + "ms");
+
         // 100-continue still works, which is the expectation this server does meet.
         String continued = "POST /echo HTTP/1.1\r\nHost: x\r\n"
                 + "Content-Length: 5\r\nExpect: 100-continue\r\n"
