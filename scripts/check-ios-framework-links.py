@@ -47,6 +47,29 @@ def run(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
+def use_developer_dir(developer_dir):
+    """Pin every xcrun/clang below to one Xcode.
+
+    Without this the script shells out to whatever `xcrun` is on PATH. Locally
+    that is usually fine; in CI it is not -- the build scripts select their own
+    Xcode through scripts/lib/xcode.sh and export DEVELOPER_DIR only for their
+    own process, so this check ran against the runner's ambient Xcode and
+    resolved the project's frameworks against a DIFFERENT SDK than the one the
+    project was built with. A framework added in the newer SDK would then look
+    undeclared, or worse, a symbol our natives no longer get would still resolve.
+    """
+    if not developer_dir:
+        return
+    if not os.path.isdir(os.path.join(developer_dir, "Platforms")):
+        fail("--developer-dir %s has no Platforms directory; that is a "
+             "CommandLineTools install or a bad path, not an Xcode." % developer_dir)
+    os.environ["DEVELOPER_DIR"] = developer_dir
+    # xcrun honours DEVELOPER_DIR, but a bare `clang` on PATH does not, so put
+    # the matching toolchain first.
+    bindir = os.path.join(developer_dir, "usr", "bin")
+    os.environ["PATH"] = bindir + os.pathsep + os.environ.get("PATH", "")
+
+
 def fail(message):
     sys.stderr.write("check-ios-framework-links: %s\n" % message)
     sys.exit(2)
@@ -361,8 +384,15 @@ def main():
     parser.add_argument("--sdk", default="iphoneos", help="SDK to resolve against")
     parser.add_argument("--configuration", default="Release",
                         help="build configuration whose settings to use")
+    parser.add_argument("--developer-dir",
+                        default=os.environ.get("DEVELOPER_DIR"),
+                        help="Xcode Contents/Developer to resolve xcrun and clang "
+                             "against. Defaults to $DEVELOPER_DIR. Pass the same one the "
+                             "project was built with, or the SDK this resolves against "
+                             "and the SDK that produced the project will differ.")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    use_developer_dir(args.developer_dir)
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdk = sdk_path(args.sdk)

@@ -255,7 +255,15 @@ jobs:
       - name: Check the port links only frameworks the project declares
         run: |
           set -euo pipefail
+          # Resolve against the SAME Xcode build-ios-app.sh used. This step used
+          # to shell out to the runner's ambient xcrun, so it answered "is this
+          # symbol declared?" against a different SDK than the one that produced
+          # the project it was checking.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
           scripts/check-ios-framework-links.py \
+            --developer-dir "$DEVELOPER_DIR" \
             "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
         timeout-minutes: 10
 
@@ -454,14 +462,12 @@ jobs:
         # without re-downloading.
         run: |
           set -euo pipefail
-          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-          if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
-            echo "Xcode 26 not found under /Applications. Cannot install Metal Toolchain." >&2
-            exit 1
-          fi
-          echo "Using $XCODE_APP"
-          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-          "$DEVELOPER_DIR/usr/bin/xcodebuild" -downloadComponent MetalToolchain
+          # Same selection the build scripts use, so this cannot install the
+          # component into one Xcode and then build with another.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
 
       - name: Enable Metal backend for hellocodenameone
@@ -505,7 +511,15 @@ jobs:
       - name: Check the port links only frameworks the project declares (Metal)
         run: |
           set -euo pipefail
+          # Resolve against the SAME Xcode build-ios-app.sh used. This step used
+          # to shell out to the runner's ambient xcrun, so it answered "is this
+          # symbol declared?" against a different SDK than the one that produced
+          # the project it was checking.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
           scripts/check-ios-framework-links.py \
+            --developer-dir "$DEVELOPER_DIR" \
             "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
         timeout-minutes: 10
 
