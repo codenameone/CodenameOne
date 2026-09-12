@@ -170,6 +170,30 @@ def discover_sdks(developer_dirs):
     return found
 
 
+def clang_for_sdk(sdk_path, dev_dirs):
+    """The clang belonging to the Xcode that ships `sdk_path`.
+
+    ONE compiler is used for both runs, on purpose: each Xcode's own clang would fold
+    compiler changes into the result and the output would stop being about the SDK. But
+    WHICH one matters, and the obvious choice is wrong. This used to take the first clang
+    found while walking /Applications in name order, and "Xcode.app" sorts before
+    "Xcode27.app", so the older compiler was handed the newer SDK -- the one direction that
+    misfires, since new SDK headers can use attributes an old clang does not know. Those
+    errors appear only under the new SDK and are indistinguishable from the regressions
+    this script exists to report. A newer clang on older headers is the safe direction.
+
+    Falls back to any clang under the known developer directories, so a machine with an
+    unusual layout still runs rather than refusing.
+    """
+    resolved = os.path.realpath(sdk_path)
+    owners = [d for d in dev_dirs if resolved.startswith(os.path.realpath(d) + os.sep)]
+    for dev in owners + list(dev_dirs):
+        cand = os.path.join(dev, "Toolchains", "XcodeDefault.xctoolchain", "usr", "bin", "clang")
+        if os.path.isfile(cand):
+            return cand
+    return None
+
+
 def default_developer_dirs():
     dirs = []
     env = os.environ.get("DEVELOPER_DIR")
@@ -407,15 +431,7 @@ def main():
         if not os.path.isdir(path):
             fail("%s is not a directory: %s" % (label, path))
 
-    clang = args.clang
-    if not clang:
-        # ONE compiler for both runs. Using each Xcode's own clang would fold compiler
-        # changes into the result and the output would no longer be about the SDK.
-        for dev in dev_dirs:
-            cand = os.path.join(dev, "Toolchains", "XcodeDefault.xctoolchain", "usr", "bin", "clang")
-            if os.path.isfile(cand):
-                clang = cand
-                break
+    clang = args.clang or clang_for_sdk(new_sdk, dev_dirs)
     if not clang or not os.path.isfile(clang):
         fail("could not locate clang; pass --clang")
 
@@ -425,7 +441,9 @@ def main():
              "pass --project-dir <...-ios-source/...-src>.")
 
     gates = harvest_gates()
-    print("[ios-sdk-deltas] clang   : %s" % clang)
+    clang_version = run([clang, "--version"]).stdout.splitlines()
+    print("[ios-sdk-deltas] clang   : %s%s"
+          % (clang, "  (%s)" % clang_version[0].strip() if clang_version else ""))
     print("[ios-sdk-deltas] old sdk : %s" % old_sdk)
     print("[ios-sdk-deltas] new sdk : %s" % new_sdk)
     print("[ios-sdk-deltas] project : %s" % project_dir)

@@ -1989,8 +1989,7 @@ public class IPhoneBuilder extends Executor {
         if (sdkDeploymentFloor != null) {
             addMinDeploymentTarget(sdkDeploymentFloor);
             String pinnedDeploymentTarget = request.getArg("ios.deployment_target", null);
-            if (pinnedDeploymentTarget != null
-                    && compareVersionStrings(pinnedDeploymentTarget, sdkDeploymentFloor) < 0) {
+            if (pinnedTargetIsBelow(pinnedDeploymentTarget, sdkDeploymentFloor)) {
                 // Raising past an explicit pin is worth a line in the log: the developer asked
                 // for something this Xcode cannot build, and the alternative to raising it is
                 // failing the build.
@@ -10031,6 +10030,25 @@ public class IPhoneBuilder extends Executor {
             // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
         }
         return "iphoneos";
+    }
+
+    /// Whether an explicit `ios.deployment_target` sits below the SDK's floor, and is worth
+    /// telling the developer about.
+    ///
+    /// Deliberately NOT compareVersionStrings, which parses each dot-separated component with
+    /// Integer.parseInt and neither trims nor tolerates an empty one. Every other caller of
+    /// that helper arrives through maxVersionString, which trims entries and skips empty ones
+    /// first, so a hint written as `codename1.arg.ios.deployment_target=` or with a stray
+    /// space around the value has always been harmless. getArg returns that as a non-null
+    /// empty or padded string, so comparing it here directly would turn a tolerated typo into
+    /// a NumberFormatException on every Mac build.
+    ///
+    /// A blank pin is not a pin: nothing was asked for, so there is nothing to report.
+    static boolean pinnedTargetIsBelow(String pinned, String floor) {
+        if (pinned == null || pinned.trim().length() == 0) {
+            return false;
+        }
+        return AppleSdkFloor.compare(pinned, floor) < 0;
     }
 
     /// The lowest deployment target the selected Xcode will accept for `sdkName`.
