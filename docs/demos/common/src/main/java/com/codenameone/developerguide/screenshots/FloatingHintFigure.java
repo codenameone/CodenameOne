@@ -31,10 +31,11 @@ import com.codename1.ui.layouts.BoxLayout;
 
 /// The FloatingHint component beside the sample that builds it.
 ///
-/// Both fields are left empty, which is the state the hint exists for: the hint
-/// text sits inside the field until there is content to displace it. The UIID
-/// it draws with is FloatingHint, which no theme defined until recently -- the
-/// label had been inheriting the default style.
+/// The sample creates both fields empty, and the hint animates up on focus
+/// gained, so the field the renderer focuses shows the floated state and the
+/// other shows the hint still inside it. That is both states of the component
+/// in one still, which is why focus is left where the renderer puts it rather
+/// than moved or cleared.
 class FloatingHintFigure implements GuideFigure {
     @Override
     public String id() {

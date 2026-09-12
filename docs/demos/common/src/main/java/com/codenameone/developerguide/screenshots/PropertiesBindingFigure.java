@@ -109,6 +109,17 @@ class PropertiesBindingFigure implements GuideFigure {
     }
 
     /// The business object the sample binds against.
+    ///
+    /// It matches the Contact the chapter prints for this section, field for
+    /// field, deliberately: the figure exists so that the picture is what the
+    /// printed listing produces. That listing calls no setLabel, and
+    /// PropertyBase.getLabel() answers with the property's name when none was
+    /// set, so the form is labelled name, email, dateOfBirth. Prettier labels
+    /// would need setLabel calls, and adding them only here would make the
+    /// picture show something the chapter's own Contact cannot produce -- the
+    /// exact mismatch this figure replaced. If the form should read Name and
+    /// Date Of Birth, the chapter's Contact is where that belongs, and then
+    /// this class follows it.
     public static class Contact implements PropertyBusinessObject {
         public final IntProperty<Contact> id = new IntProperty<>("id");
         public final Property<String, Contact> name = new Property<>("name");

@@ -2619,7 +2619,7 @@ https://www.codenameone.com/javadoc/com/codename1/components/FloatingHint.html[F
 include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/FloatingHintFigure.java[tag=the-components-of-codename-one-java-137,indent=0]
 ----
 
-.The FloatingHint component with one component that contains text and another that doesn't
+.The hint floats on the field being edited and stays inside the one that isn't
 image::img/generated/components-floatinghint.png[Floating hint,scaledwidth=30%]
 
 === Floating Button
