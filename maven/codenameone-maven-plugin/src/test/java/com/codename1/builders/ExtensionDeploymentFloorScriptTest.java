@@ -945,4 +945,56 @@ class ExtensionDeploymentFloorScriptTest {
                 "the inherited 12.0 is below the floor, so the extension needs its own: "
                         + got.get(0));
     }
+
+    /// A FRAGMENT is not a version. With $(PREFIX)$(SUFFIX), PREFIX of 1 and SUFFIX either 2.0
+    /// or 6.4, every fragment is below any floor -- while the arm64 build composes to 16.4.
+    /// Judging the fragments called that build low and wrote 15.0 over it, so the whole
+    /// expression is now resolved once per candidate CONTEXT before any of it is judged.
+    @Test
+    void composedAlternativesAreJudgedComposed(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Composed2|" + EXT + "|PREFIX->1;SUFFIX->2.0;SUFFIX[arch=arm64]->6.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(PREFIX)$(SUFFIX)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=$(PREFIX)$(SUFFIX)"),
+                "the arm64 build composes to 16.4 and clears the floor, so the expression must "
+                        + "survive: " + got.get(0));
+    }
+
+    /// The tie candidates must survive the merge with the hidden-condition siblings. Replacing
+    /// rather than unioning threw away the high half of a tie, and an answer that still had a
+    /// 16.4 among its possibilities looked decided at 12.0.
+    ///
+    /// The sibling is qualified on `variant`, deliberately. An earlier version used
+    /// [config=Other], which proves nothing: the configuration IS known here, so that sibling is
+    /// decidable and never reaches the merge this test is about.
+    @Test
+    void aTieSurvivesTheUnknownSiblingMerge(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "TiedPlus|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "EXTENSION_MIN[arch=arm64]->16.4;"
+                        + "EXTENSION_MIN[variant=normal]->13.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains(
+                        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=$(EXTENSION_MIN)"),
+                "16.4 is still one of the possibilities, so this is not decided at 12.0: "
+                        + got.get(0));
+    }
+
+    /// The project can carry the inherited value on a QUALIFIER. A bare proj[key] lookup missed
+    /// it and wrote an unqualified 15.0 onto the target, which outranks a project qualifier and
+    /// so lowered the device build from the 16.4 it was inheriting.
+    @Test
+    void anAbsentTargetValueSeesTheProjectsQualifier(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]' => '16.4'}",
+                "QualifiedInherit|" + EXT + "|<unset>");
+        assertFalse(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=15.0"),
+                "the device build inherits the project's qualified 16.4; an unqualified key here "
+                        + "outranks it and lowers the extension: " + got.get(0));
+    }
 }
