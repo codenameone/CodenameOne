@@ -505,16 +505,36 @@ def main():
     old_sdk, new_sdk = args.old_sdk, args.new_sdk
     if not (old_sdk and new_sdk):
         sdks = discover_sdks(dev_dirs)
+        # An explicitly supplied SDK counts toward the pair. Requiring two DISCOVERED ones
+        # refused the case this option exists for: --new-sdk on a beta mounted outside
+        # /Applications, next to the single SDK the machine has installed.
+        for explicit in (args.old_sdk, args.new_sdk):
+            if explicit and os.path.isdir(explicit):
+                sdks[sdk_version(explicit)] = explicit
         if len(sdks) < 2:
             if args.skip_if_single_sdk:
-                print("[ios-sdk-deltas] only %d iPhoneOS SDK installed (%s); nothing to "
+                print("[ios-sdk-deltas] only %d iPhoneOS SDK available (%s); nothing to "
                       "compare, skipping." % (len(sdks), ", ".join(sorted(sdks)) or "none"))
                 return 0
             fail("need two iPhoneOS SDKs to compare; found %d (%s). Install a second Xcode "
                  "or pass --old-sdk/--new-sdk." % (len(sdks), ", ".join(sorted(sdks)) or "none"))
         ordered = sorted(sdks, key=version_key)
-        new_sdk = new_sdk or sdks[ordered[-1]]
-        old_sdk = old_sdk or sdks[ordered[-2]]
+        if not new_sdk:
+            new_sdk = sdks[ordered[-1]]
+        if not old_sdk:
+            # The newest SDK strictly BELOW the one under test, not simply the second
+            # newest: with an explicit --new-sdk the closest baseline beneath it is the
+            # one that isolates what that SDK changed.
+            target = version_key(sdk_version(new_sdk))
+            below = [v for v in ordered if version_key(v) < target]
+            if not below:
+                if args.skip_if_single_sdk:
+                    print("[ios-sdk-deltas] no iPhoneOS SDK older than %s to compare "
+                          "against; skipping." % sdk_version(new_sdk))
+                    return 0
+                fail("no iPhoneOS SDK older than %s to compare against; found %s."
+                     % (sdk_version(new_sdk), ", ".join(sorted(sdks))))
+            old_sdk = sdks[below[-1]]
     for label, path in (("--old-sdk", old_sdk), ("--new-sdk", new_sdk)):
         if not os.path.isdir(path):
             fail("%s is not a directory: %s" % (label, path))
