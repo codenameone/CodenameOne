@@ -90,17 +90,35 @@ public final class Database {
      * Opens the database the URL names. Anything that is not a recognised scheme
      * is taken as a SQLite path, so an ordinary file name keeps working.
      */
+    /**
+     * Whether the URL opens with this scheme, IGNORING CASE.
+     *
+     * <p>RFC 3986 makes a scheme case-insensitive, and anything unrecognised here
+     * is taken as a SQLite path -- so "PostgreSQL://user@host/db" was not a
+     * mismatch that got reported, it was a file name. The caller ended up
+     * creating or opening a local database, or failing on a pathname containing
+     * "//", with nothing saying the server had never been contacted.
+     *
+     * <p>regionMatches rather than toLowerCase: String.toLowerCase is locale
+     * sensitive and this runtime has no Locale to ask for the root one, so on a
+     * Turkish device the I of a scheme folds to a dotless i and stops matching.
+     */
+    private static boolean hasScheme(String url, String scheme) {
+        return url.length() >= scheme.length()
+                && url.regionMatches(true, 0, scheme, 0, scheme.length());
+    }
+
     public static Database open(String url) throws IOException {
         if(url == null) {
             throw new IOException("No database URL");
         }
-        if(url.startsWith("postgres://") || url.startsWith("postgresql://")) {
+        if(hasScheme(url, "postgres://") || hasScheme(url, "postgresql://")) {
             Url parsed = Url.parse(url, 5432);
             return new Database(null, Postgres.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
                     parsed.caFile, parsed.timeoutMillis), null, parsed.describe("postgres"));
         }
-        if(url.startsWith("mysql://") || url.startsWith("mariadb://")) {
+        if(hasScheme(url, "mysql://") || hasScheme(url, "mariadb://")) {
             Url parsed = Url.parse(url, 3306);
             return new Database(null, null, MySql.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,

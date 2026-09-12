@@ -591,7 +591,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + cls.getBinaryName() + "." + m.getName());
                 return null;
             }
-            variableNames.add(route.pattern.substring(pos + 1, close));
+            String variableName = route.pattern.substring(pos + 1, close);
+            // A NAME ONCE. Every binding is resolved with indexOf, which answers
+            // the FIRST match, so /pairs/{id}/{id} bound both @PathVariable("id")
+            // parameters to the first segment and dropped the second without a
+            // word: the route matches, the handler runs, and one of its arguments
+            // is the wrong one. Refused here rather than guessed at.
+            if (variableNames.contains(variableName)) {
+                ctx.error(cls, "The route " + route.pattern + " uses {"
+                        + variableName + "} more than once, and every binding of it "
+                        + "would get the first segment: " + cls.getBinaryName() + "."
+                        + m.getName());
+                return null;
+            }
+            variableNames.add(variableName);
             int next = route.pattern.indexOf('{', close);
             String following = next < 0 ? route.pattern.substring(close + 1)
                                         : route.pattern.substring(close + 1, next);

@@ -1540,6 +1540,40 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aRepeatedPlaceholderNameIsRefused() throws Exception {
+        // Every binding is resolved with indexOf, which answers the FIRST match,
+        // so both @PathVariable("id") parameters took the first segment and the
+        // second was dropped without a word -- the route matched, the handler ran,
+        // and one of its arguments was the wrong one. There is no reading of
+        // /pairs/{id}/{id} that makes both bindings right, so it does not compile.
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Pairs {\n"
+                + "    @GetMapping(\"/pairs/{id}/{id}\")\n"
+                + "    public String pair(@PathVariable(\"id\") String a,\n"
+                + "                       @PathVariable(\"id\") String b) { return a + b; }\n"
+                + "}\n"));
+        assertTrue("a route repeating a placeholder name should not compile",
+                ctx.hasErrors());
+
+        // The same two segments with DIFFERENT names are fine, so what was refused
+        // is the repetition and not two variables in one route.
+        ProcessorContext fine = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Pairs2 {\n"
+                + "    @GetMapping(\"/pairs/{left}/{right}\")\n"
+                + "    public String pair(@PathVariable(\"left\") String a,\n"
+                + "                       @PathVariable(\"right\") String b) { return a + b; }\n"
+                + "}\n"));
+        assertFalse("two differently named variables are still allowed: "
+                + fine.getErrors(), fine.hasErrors());
+    }
+
+    @Test
     public void anOverflowingFloatDefaultIsRefused() throws Exception {
         // The float branch had the bug in the other direction: Double.isInfinite
         // was its "did they mean it" test, and Double.parseDouble("1e999") is

@@ -721,6 +721,21 @@ public final class MySql {
      * packet, which is how the protocol says the sequence is over.
      */
     private void sendPacket(byte[] body) throws IOException {
+        try {
+            sendPacketFrames(body);
+        } catch (IOException failed) {
+            // The read side closes on any failure; the write side needs the same
+            // rule. A peer that resets mid-write leaves a connection carrying part
+            // of a packet and no record of the rest, and `closed` stayed false --
+            // so isOpen() called it reusable and the pool handed it out. close()
+            // sends COM_QUIT through here, and arriving in this catch from there is
+            // harmless: close() has already set the flag and returns at once.
+            close();
+            throw failed;
+        }
+    }
+
+    private void sendPacketFrames(byte[] body) throws IOException {
         int offset = 0;
         while(true) {
             int chunk = body.length - offset;

@@ -153,7 +153,7 @@ public final class Postgres {
     private static boolean requestTls(Wire wire) throws IOException {
         wire.writeIntBE(8);
         wire.writeIntBE(80877103); // 1234 << 16 | 5679
-        wire.flush();
+        wire.flush();   // static, pre-session: connect() closes the socket on failure
         int answer = wire.read();
         if(answer == 'S') {
             return true;
@@ -181,7 +181,7 @@ public final class Postgres {
         byte[] payload = body.toByteArray();
         wire.writeIntBE(payload.length + 4);
         wire.writeBytes(payload);
-        wire.flush();
+        flushOrClose();
         authenticate();
         // Everything from here to ReadyForQuery is parameter status, the backend
         // key and notices: none of it changes what this client does.
@@ -487,7 +487,7 @@ public final class Postgres {
         stageMessage('E', execute.toByteArray());
 
         stageMessage('S', new byte[0]);
-        wire.flush();
+        flushOrClose();
 
         return collect(sql);
     }
@@ -747,7 +747,29 @@ public final class Postgres {
 
     private void sendMessage(int type, byte[] body) throws IOException {
         stageMessage(type, body);
-        wire.flush();
+        flushOrClose();
+    }
+
+    /**
+     * Sends what is staged, and ends the session if it cannot.
+     *
+     * <p>The read side closes on any failure; this is the same rule for the other
+     * direction, which it did not have. take() clears the staged frame before the
+     * write is attempted, so a peer that resets mid-write leaves a connection that
+     * has had part of a protocol frame written to it and no record of the rest --
+     * and `closed` stayed false, so isOpen() called it reusable and the pool
+     * handed it out.
+     *
+     * <p>close() sends its own terminate through wire.flush() directly rather than
+     * through here, which is also what keeps this from recursing.
+     */
+    private void flushOrClose() throws IOException {
+        try {
+            wire.flush();
+        } catch (IOException failed) {
+            close();
+            throw failed;
+        }
     }
 
     private Message readMessage() throws IOException {

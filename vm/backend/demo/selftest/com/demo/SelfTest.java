@@ -1807,6 +1807,61 @@ public class SelfTest {
     }
 
     /**
+     * A URL scheme is recognised whatever case it is written in.
+     *
+     * <p>RFC 3986 makes a scheme case-insensitive, and anything unrecognised here
+     * is taken as a SQLite PATH -- so "PostgreSQL://host/db" was not a mismatch
+     * that got reported, it was a file name. The caller opened or created a local
+     * database, or failed on a pathname with "//" in it, and nothing said the
+     * server had never been contacted.
+     *
+     * <p>The stub only has to authenticate: reaching "connected" at all means the
+     * URL was parsed as PostgreSQL rather than handed to SQLite.
+     */
+    private static void aSchemeIsRecognisedInAnyCase() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    if(pgRead(client) == null) {
+                        return;
+                    }
+                    pgSend(client, 'R', int32(0));              // AuthenticationOk
+                    pgSend(client, 'Z', new byte[]{(byte)'I'}); // ReadyForQuery
+                    pgRead(client);                             // whatever follows
+                } catch (Exception ignored) {
+                    // The client closing is the end of it.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("PostgreSQL://u:pw@127.0.0.1:" + port
+                    + "/db?sslmode=disable");
+            outcome = db.isOpen() ? "connected" : "opened closed";
+            db.close();
+        } catch (Exception failed) {
+            outcome = "failed: " + failed.getMessage();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a mixed-case scheme still names PostgreSQL", "connected", outcome);
+    }
+
+    /**
      * A session whose peer hangs up is closed, not merely broken.
      *
      * <p>EOF between messages threw with the session still marked open, so
@@ -1927,6 +1982,7 @@ public class SelfTest {
         aTruncatedMySqlHeaderIsRefused();
         truncatedRowFramesAreRefused();
         aDeadSessionReportsItselfClosed();
+        aSchemeIsRecognisedInAnyCase();
         aShortAuthFrameIsRefused();
         aTruncatedMySqlBodyIsRefused();
         aStaticFileComesBackWhole();
