@@ -404,7 +404,10 @@ def main():
     ap.add_argument("--old-sdk", help="Baseline iPhoneOS sdk path (default: second newest installed)")
     ap.add_argument("--new-sdk", help="iPhoneOS sdk path under test (default: newest installed)")
     ap.add_argument("--project-dir", help="A generated *-ios-source/*-src directory")
-    ap.add_argument("--clang", help="clang to use for BOTH runs (default: the newest Xcode's)")
+    ap.add_argument("--clang",
+                    help="clang to use for BOTH runs. Defaults to the one belonging to "
+                         "the Xcode that ships --new-sdk, which is the safe direction: a "
+                         "newer compiler reads older headers, not the other way round.")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--skip-if-single-sdk", action="store_true",
                     help="Exit 0 with a note when only one iPhoneOS SDK is installed. For "
