@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="740" height="534" viewBox="0 0 740 534">
   <rect x="0" y="0" width="740" height="534" fill="#ffffff"/>
-  <text x="370" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">The life of a BackgroundWork, and where your object stops existing</text>
-  <text x="370" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">The gap between scheduling the work and running it can span a cold launch, so the worker that runs is not the</text>
-  <text x="370" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">object you scheduled. That is the one thing worth knowing before writing the first line of it.</text>
+  <text x="370" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">The life of a BackgroundWork, and why the worker never remembers anything</text>
+  <text x="370" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">You schedule a class name and some input data, never an object, and the scheduler constructs a fresh worker for</text>
+  <text x="370" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">every single run. Nothing you set on a field survives to reach it. That is the thing to know before writing one.</text>
   <rect x="56" y="66" width="668" height="68" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
   <circle cx="34" cy="100" r="13" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="34" y="104" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">1</text>
   <text x="68" y="85" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">You schedule</text>
-  <text x="268" y="85" font-family="Arial, sans-serif" font-size="9" fill="#777777">BackgroundWork.schedule(...)</text>
-  <text x="68" y="105" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Constraints go in here: network, unmetered, charging, idle. On iOS the identifier has to be declared at</text>
-  <text x="68" y="120" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">build time with ios.usesBackgroundProcessing or ios.backgroundProcessingIds, or the call is rejected.</text>
+  <text x="268" y="85" font-family="Arial, sans-serif" font-size="9" fill="#777777">WorkRequest.builder(id, Worker.class)</text>
+  <text x="68" y="105" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The request records the worker's class name, the input data and the constraints. On iOS the identifier</text>
+  <text x="68" y="120" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">has to be declared at build time with ios.usesBackgroundProcessing or ios.backgroundProcessingIds.</text>
   <path d="M 34 134 L 34 143" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
   <path d="M 29 137 L 34 143 L 39 137" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
   <rect x="56" y="143" width="668" height="68" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
@@ -17,17 +17,17 @@
   <text x="34" y="181" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">2</text>
   <text x="68" y="162" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">The system waits</text>
   <text x="268" y="162" font-family="Arial, sans-serif" font-size="9" fill="#777777">your process may be killed</text>
-  <text x="68" y="182" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The request outlives the app. Nothing of yours is running, nothing of yours is remembered, and the</text>
-  <text x="68" y="197" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">operating system decides when the constraints have been met.</text>
+  <text x="68" y="182" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The request outlives the app and the process may be gone entirely. The operating system decides when</text>
+  <text x="68" y="197" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">the constraints have been met, and only then is anything of yours run.</text>
   <path d="M 34 211 L 34 220" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
   <path d="M 29 214 L 34 220 L 39 214" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
   <rect x="56" y="220" width="668" height="68" rx="4" fill="#ffffff" stroke="#a33a3a" stroke-width="1.5"/>
   <circle cx="34" cy="254" r="13" fill="#ffffff" stroke="#a33a3a" stroke-width="1.5"/>
   <text x="34" y="258" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a33a3a">3</text>
-  <text x="68" y="239" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">Your worker is rebuilt</text>
-  <text x="268" y="239" font-family="Arial, sans-serif" font-size="9" fill="#777777">public no-argument constructor</text>
-  <text x="68" y="259" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">After a cold launch the class is constructed again from nothing. Every field is back at its default, so</text>
-  <text x="68" y="274" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">anything the work needs has to arrive through the input data rather than through the instance.</text>
+  <text x="68" y="239" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">A fresh worker is built</text>
+  <text x="268" y="239" font-family="Arial, sans-serif" font-size="9" fill="#777777">Class.forName(name).newInstance()</text>
+  <text x="68" y="259" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Every run constructs a new instance through the public no-argument constructor, cold launch or not. Its</text>
+  <text x="68" y="274" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">fields are always at their defaults, so what the work needs has to arrive in the input data.</text>
   <path d="M 34 288 L 34 297" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
   <path d="M 29 291 L 34 297 L 39 291" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
   <rect x="56" y="297" width="668" height="68" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>

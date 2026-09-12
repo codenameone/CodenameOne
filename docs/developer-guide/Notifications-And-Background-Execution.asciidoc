@@ -106,8 +106,10 @@ channel id you assign is still carried so the notification behaves consistently.
 === Constraint-aware background work
 
 `BackgroundWork` schedules deferrable work that the OS runs when its constraints are met.
-Implement `BackgroundWorker` in a class with a public no-argument constructor (it's
-reconstructed after a cold launch -- pass state through the input data, not fields):
+Implement `BackgroundWorker` in a class with a public no-argument constructor. You
+schedule the class, never an instance: the request records its name, and the scheduler
+constructs a fresh worker for every run, even when the process was never killed. Its
+fields are always at their defaults, so pass state through the input data:
 
 [source,java]
 ----
