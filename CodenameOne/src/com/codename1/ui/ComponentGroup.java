@@ -124,7 +124,17 @@ public class ComponentGroup extends Container {
             return;
         }
         Object o = cb.getClientProperty("$origSpinner");
-        cb.setActAsSpinnerDialog(o instanceof Boolean && ((Boolean) o).booleanValue());
+        if (!(o instanceof Boolean)) {
+            // No snapshot means this group never took the combo's popup mode, so there
+            // is nothing of ours to undo. Treating that as false would take spinner
+            // mode away from an application that had asked for it, merely because the
+            // combo passed through an inert group.
+            return;
+        }
+        cb.setActAsSpinnerDialog(((Boolean) o).booleanValue());
+        // Scoped to one membership. Left set, the next grouping keeps a snapshot taken
+        // before the application's later change and restores the stale value.
+        cb.putClientProperty("$origSpinner", null);
     }
 
     @Override
@@ -148,6 +158,13 @@ public class ComponentGroup extends Container {
     void removeComponentImpl(Component cmp) {
         super.removeComponentImpl(cmp);
 
+        // Re-group what genuinely remains BEFORE restoring the member that left.
+        // An animated removal keeps cmp in the component list until its animation
+        // callback fires, so a restore placed ahead of this is immediately undone --
+        // and that callback goes to Container.removeComponentImplNoAnimationSafety,
+        // which never reaches this class, so nothing would put it back.
+        updateUIIDs();
+
         // restore original UIID
         Object o = cmp.getClientProperty("$origUIID");
         if (o != null) {
@@ -156,7 +173,6 @@ public class ComponentGroup extends Container {
         // and the popup mode with it -- restoring the name alone left a removed
         // ComboBox opening as a spinner for the rest of its life.
         reverseRadio(cmp, false);
-        updateUIIDs();
     }
 
     private String elementPrefix(Component c) {

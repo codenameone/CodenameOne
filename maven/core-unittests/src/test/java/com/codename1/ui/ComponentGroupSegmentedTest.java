@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.Test;
 
@@ -320,5 +321,83 @@ class ComponentGroupSegmentedTest extends UITestBase {
 
         assertTrue(combo.isActAsSpinnerDialog(),
                 "the application asked for spinner mode, so it survives the group");
+    }
+
+    @Test
+    void testAnInertGroupDoesNotTakeSpinnerModeAway() {
+        // An inactive group never records a snapshot, so a missing one must not be read
+        // as "it was false". Otherwise passing a combo through an inert ComponentGroup
+        // quietly turns off spinner mode the application asked for.
+        activateGrouping(false);
+        ComponentGroup group = new ComponentGroup();
+        ComboBox<String> combo = new ComboBox<String>("a", "b");
+        combo.setActAsSpinnerDialog(true);
+        group.addComponent(combo);
+        assertTrue(combo.isActAsSpinnerDialog(), "an inert group changes nothing");
+
+        group.removeComponent(combo);
+
+        assertTrue(combo.isActAsSpinnerDialog(),
+                "a group that never grouped it has nothing to restore");
+    }
+
+    @Test
+    void testTheSpinnerSnapshotDoesNotSurviveIntoTheNextMembership() {
+        // The snapshot is per membership. Kept across two, the second restore hands back
+        // a value the application had already changed.
+        activateGrouping(false);
+        ComponentGroup first = new ComponentGroup();
+        first.setHorizontal(true);
+        ComboBox<String> combo = new ComboBox<String>("a", "b");
+        first.addComponent(combo);
+        first.removeComponent(combo);
+        assertFalse(combo.isActAsSpinnerDialog());
+
+        combo.setActAsSpinnerDialog(true);
+        ComponentGroup second = new ComponentGroup();
+        second.setHorizontal(true);
+        second.addComponent(combo);
+        second.removeComponent(combo);
+
+        assertTrue(combo.isActAsSpinnerDialog(),
+                "the second restore has to return what the application set, not the "
+                        + "snapshot the first membership took");
+    }
+
+    @Test
+    void testRemovalDuringAnAnimationStillRestoresTheMember() {
+        // Container.removeComponentImpl queues the physical removal while the
+        // AnimationManager is animating and leaves the child in the component list, so a
+        // restore that runs before updateUIIDs is immediately reapplied -- and the
+        // queued callback goes to removeComponentImplNoAnimationSafety, which never
+        // reaches ComponentGroup, so nothing would put it back.
+        activateGrouping(false);
+        Form f = new Form("host");
+        ComponentGroup group = new ComponentGroup();
+        group.setHorizontal(true);
+        ComboBox<String> combo = new ComboBox<String>("a", "b");
+        Button other = new Button("Two");
+        group.addComponent(combo);
+        group.addComponent(other);
+        f.add(group);
+        f.show();
+        assertTrue(combo.isActAsSpinnerDialog());
+
+        f.getAnimationManager().addAnimation(new ComponentAnimation() {
+            public boolean isInProgress() {
+                return true;
+            }
+
+            protected void updateState() {
+            }
+        });
+        assertTrue(f.getAnimationManager().isAnimating(), "the queued-removal path needs this");
+
+        group.removeComponent(combo);
+
+        assertFalse(combo.isActAsSpinnerDialog(),
+                "a member that leaves during an animation still has to be restored");
+        assertEquals("ComboBox", combo.getUIID(),
+                "and its UIID with it");
     }
 }
