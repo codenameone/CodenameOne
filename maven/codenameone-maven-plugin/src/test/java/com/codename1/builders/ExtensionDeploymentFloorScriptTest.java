@@ -906,4 +906,21 @@ class ExtensionDeploymentFloorScriptTest {
                 "12.0 and 13.0 are both below the floor, so nothing is lost by raising: "
                         + got.get(0));
     }
+
+    /// A project-level qualifier cannot outrank an applicable TARGET declaration, so it must not
+    /// make the answer uncertain either. Xcode reads the target's 12.0 whatever
+    /// EXTENSION_MIN[arch=arm64] the project carries. Marking it uncertain described a build
+    /// Xcode never produces -- and the cost was the opposite of a lowering: a qualified key
+    /// cannot take the branch path, so the invalid 12.0 simply survived for the SDK to reject.
+    @Test
+    void aProjectQualifierCannotUnsettleAnApplicableTargetValue(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'EXTENSION_MIN[arch=arm64]' => '16.4'}",
+                "Shadowed|" + EXT + "|EXTENSION_MIN->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
+                "the target's own 12.0 is what Xcode reads, it is below the floor, and it must "
+                        + "be raised rather than left for Xcode to reject: " + got.get(0));
+    }
 }
