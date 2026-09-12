@@ -23,13 +23,16 @@
 package com.codename1.maven;
 
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -52,6 +55,9 @@ import static org.junit.Assert.assertTrue;
  * when the pom is not shaped the way it expects.</p>
  */
 public class SvgExecutionPomInsertTest {
+
+    @Rule
+    public TemporaryFolder temp = new TemporaryFolder();
 
     /** A pom shaped like the one the archetype emitted before #5042. */
     private static String oldStyleProjectPom() {
@@ -303,6 +309,55 @@ public class SvgExecutionPomInsertTest {
         assertNull(AbstractCN1Mojo.declaredXmlEncoding(
                 "<?xml version=\"1.0\" encoding=\"NOT-A-CHARSET\"?><project/>"
                         .getBytes(StandardCharsets.ISO_8859_1)));
+    }
+
+    /**
+     * An existing pom.xml.bak is never overwritten. It may be the developer's
+     * own backup, or the only surviving copy from an earlier repair, and a
+     * routine build destroying it is not a trade this repair gets to make.
+     */
+    @Test
+    public void neverOverwritesAnExistingBackup() throws Exception {
+        File dir = temp.newFolder();
+        File pom = new File(dir, "pom.xml");
+        writeText(pom, "<project/>");
+
+        File first = AbstractCN1Mojo.unusedBackupFile(pom);
+        assertEquals("pom.xml.bak", first.getName());
+
+        writeText(first, "a backup somebody else made");
+        File second = AbstractCN1Mojo.unusedBackupFile(pom);
+        assertEquals("pom.xml.bak.1", second.getName());
+        assertEquals("the existing backup is untouched",
+                "a backup somebody else made", readText(first));
+
+        writeText(second, "and another");
+        assertEquals("pom.xml.bak.2", AbstractCN1Mojo.unusedBackupFile(pom).getName());
+    }
+
+    private static void writeText(File f, String text) throws Exception {
+        java.io.OutputStream out = new java.io.FileOutputStream(f);
+        try {
+            out.write(text.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+    }
+
+    private static String readText(File f) throws Exception {
+        byte[] buf = new byte[(int) f.length()];
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            int read = 0;
+            while (read < buf.length) {
+                int n = in.read(buf, read, buf.length - read);
+                if (n < 0) break;
+                read += n;
+            }
+        } finally {
+            in.close();
+        }
+        return new String(buf, "UTF-8");
     }
 
     // ---- helpers -----------------------------------------------------

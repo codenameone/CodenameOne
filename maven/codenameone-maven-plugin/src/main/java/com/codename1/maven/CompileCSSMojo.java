@@ -114,10 +114,23 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
      * reached a device as a white screen.</p>
      */
     private void warnAboutUnresolvedVectorReferences() throws MojoExecutionException {
+        if (properties.getProperty("codename1.cssTheme", null) == null) {
+            // executeImpl(String) compiles nothing for this project, so there
+            // is no theme and no placeholder in it. Warning here would send a
+            // developer after a runtime problem that cannot happen.
+            return;
+        }
         File buildDir = new File(project.getBuild().getDirectory());
-        SvgTranscodeRunner runner = new SvgTranscodeRunner(project.getBasedir(), null,
-                new File(buildDir, "generated-sources" + File.separator + "svg"),
-                new File(buildDir, "css-resources"), null, getLog());
+        // Scope: this module's own src/main/css, which is exactly what the
+        // transcoder scans. CSS merged in from a cn1css dependency is
+        // deliberately not included. A library that ships vector assets ships
+        // its own SVGRegistry, under the same fixed name this module's would
+        // use, and nothing here can read a dependency's registrations -- so
+        // widening the scan would report a library's working images as broken
+        // placeholders on a healthy project. A warning that fires on working
+        // builds is worse than the one it would add. Two registries on one
+        // classpath is separately unsupported; see ensureSvgTranscoderWired.
+        SvgTranscodeRunner runner = newSvgTranscodeRunner();
         Set<String> referenced = runner.cssReferencedVectorNames();
         if (referenced.isEmpty()) {
             return;
@@ -185,7 +198,7 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
     private String readGeneratedRegistry() {
         for (Object root : project.getCompileSourceRoots()) {
             File candidate = SvgTranscodeRunner.registrySourceFile(
-                    new File(String.valueOf(root)), null);
+                    new File(String.valueOf(root)), svgPackage());
             if (candidate.isFile()) {
                 try {
                     return FileUtils.readFileToString(candidate, "UTF-8");
@@ -199,7 +212,7 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
 
     private boolean compiledRegistryExists(File buildDir) {
         return new File(new File(buildDir, "classes"),
-                SvgTranscodeRunner.DEFAULT_PACKAGE.replace('.', File.separatorChar)
+                svgPackage().replace('.', File.separatorChar)
                         + File.separator + SvgTranscodeRunner.REGISTRY_CLASS_NAME + ".class").isFile();
     }
 

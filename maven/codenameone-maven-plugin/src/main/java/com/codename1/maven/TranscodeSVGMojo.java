@@ -26,11 +26,8 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
-import java.io.File;
-import java.util.List;
 
 /**
  * Scans an application module for vector animation files (SVG and
@@ -75,27 +72,14 @@ import java.util.List;
         requiresDependencyCollection = ResolutionScope.NONE)
 public class TranscodeSVGMojo extends AbstractCN1Mojo {
 
-    @Parameter(property = "cn1.svg.sourceDirs")
-    private List<String> svgSourceDirs;
-
-    @Parameter(property = "cn1.svg.outputDir",
-            defaultValue = "${project.build.directory}/generated-sources/svg")
-    private File svgOutputDir;
-
-    @Parameter(property = "cn1.svg.placeholderDir",
-            defaultValue = "${project.build.directory}/css-resources")
-    private File svgPlaceholderDir;
-
-    @Parameter(property = "cn1.svg.package", defaultValue = SvgTranscodeRunner.DEFAULT_PACKAGE)
-    private String svgPackage;
-
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         // The work lives in SvgTranscodeRunner because the self-repair in
         // AbstractCN1Mojo.ensureSvgTranscoderWired has to perform it for a
         // project whose pom never binds this mojo. See that class.
-        new SvgTranscodeRunner(project.getBasedir(), svgSourceDirs, svgOutputDir,
-                svgPlaceholderDir, svgPackage, getLog()).run();
-        registerSourceRoot(svgOutputDir);
+        // Parameters live on AbstractCN1Mojo so the self-repair and the
+        // placeholder diagnostic resolve the same configuration this goal does.
+        newSvgTranscodeRunner().run();
+        registerSourceRoot(svgOutputDir());
     }
 }

@@ -127,8 +127,10 @@ public class SvgTranscodeRunner {
     private final File placeholderDir;
     private final String svgPackage;
     private final Log log;
+    private final boolean lenient;
 
     private int transcodedCount;
+    private final List<String> failures = new ArrayList<String>();
 
     /**
      * @param basedir        the module root the source directories are resolved against
@@ -143,12 +145,33 @@ public class SvgTranscodeRunner {
      */
     public SvgTranscodeRunner(File basedir, List<String> sourceDirs, File outputDir,
                               File placeholderDir, String svgPackage, Log log) {
+        this(basedir, sourceDirs, outputDir, placeholderDir, svgPackage, log, false);
+    }
+
+    /**
+     * @param lenient when true, a source that fails to transcode is reported
+     *   through {@link #getFailures()} and skipped instead of aborting. Only
+     *   the automatic repair sets this: a goal the developer bound themselves
+     *   should fail loudly, but a repair nobody asked for must never turn a
+     *   build that was passing into one that is not.
+     */
+    public SvgTranscodeRunner(File basedir, List<String> sourceDirs, File outputDir,
+                              File placeholderDir, String svgPackage, Log log,
+                              boolean lenient) {
+        this.lenient = lenient;
         this.basedir = basedir;
         this.sourceDirs = sourceDirs;
         this.outputDir = outputDir;
         this.placeholderDir = placeholderDir;
         this.svgPackage = svgPackage == null || svgPackage.isEmpty() ? DEFAULT_PACKAGE : svgPackage;
         this.log = log;
+    }
+
+    /** Names of sources that could not be transcoded during a lenient
+     *  {@link #run()}. Always empty when lenient is off, because the run
+     *  would have thrown instead. */
+    public List<String> getFailures() {
+        return failures;
     }
 
     /** Number of vector sources transcoded by the last {@link #run()}. */
@@ -182,6 +205,7 @@ public class SvgTranscodeRunner {
     /** Transcode every vector source, emit the registry and the CSS placeholders. */
     public void run() throws MojoExecutionException {
         transcodedCount = 0;
+        failures.clear();
         List<File> svgs = locateSvgs();
         Map<String, CssHint> cssHints = scanCssHints();
 
@@ -229,8 +253,19 @@ public class SvgTranscodeRunner {
                         + " -> " + className + ".java");
                 try {
                     transcodeByFormat(fmt, svg, svgPackage, className, outFile);
-                } catch (IOException ex) {
-                    throw new MojoExecutionException("Failed to transcode " + svg, ex);
+                } catch (Exception ex) {
+                    // A .lottie is a ZIP the JSON parser cannot read, and any
+                    // unrelated .json sitting in one of these directories looks
+                    // like a Lottie by extension alone. Both abort the goal --
+                    // correct when the developer bound it, unacceptable when
+                    // this is a repair running on its own initiative.
+                    if (!lenient) {
+                        throw new MojoExecutionException("Failed to transcode " + svg, ex);
+                    }
+                    log.warn("Could not transcode " + svg.getName() + ": " + ex);
+                    failures.add(svg.getName());
+                    outFile.delete();
+                    continue;
                 }
             }
             transcodedCount++;

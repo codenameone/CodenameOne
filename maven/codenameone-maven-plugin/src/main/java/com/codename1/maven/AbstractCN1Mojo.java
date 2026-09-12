@@ -1990,6 +1990,60 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
 
     // ------------------------------------------------------------------
+    // SVG transcoder configuration
+    // ------------------------------------------------------------------
+    //
+    // Declared here rather than on TranscodeSVGMojo alone so that Maven injects
+    // them into every goal of this plugin. Two goals other than the transcoder
+    // need the same answers -- the self-repair below, and the placeholder
+    // diagnostic in CompileCSSMojo -- and both were reading defaults while the
+    // project had configured something else. A repair that transcodes from a
+    // directory the next build will not use, into an output directory the next
+    // build will not read, is worse than no repair. Maven resolves plugin-level
+    // <configuration> and the cn1.svg.* properties for any goal that declares
+    // the parameter, so declaring it once here covers both without anyone
+    // parsing Xpp3Dom by hand.
+
+    @Parameter(property = "cn1.svg.sourceDirs")
+    protected List<String> svgSourceDirs;
+
+    @Parameter(property = "cn1.svg.outputDir",
+            defaultValue = "${project.build.directory}/generated-sources/svg")
+    protected File svgOutputDir;
+
+    @Parameter(property = "cn1.svg.placeholderDir",
+            defaultValue = "${project.build.directory}/css-resources")
+    protected File svgPlaceholderDir;
+
+    @Parameter(property = "cn1.svg.package", defaultValue = SvgTranscodeRunner.DEFAULT_PACKAGE)
+    protected String svgPackage;
+
+    /** Where generated vector sources go, falling back to the standard location
+     *  when the parameter was not injected (a directly constructed mojo). */
+    protected File svgOutputDir() {
+        return svgOutputDir != null ? svgOutputDir
+                : new File(project.getBuild().getDirectory(),
+                        "generated-sources" + File.separator + "svg");
+    }
+
+    protected String svgPackage() {
+        return svgPackage != null && !svgPackage.isEmpty()
+                ? svgPackage : SvgTranscodeRunner.DEFAULT_PACKAGE;
+    }
+
+    /** A transcoder configured exactly as the bound goal would be. */
+    protected SvgTranscodeRunner newSvgTranscodeRunner() {
+        return newSvgTranscodeRunner(false);
+    }
+
+    protected SvgTranscodeRunner newSvgTranscodeRunner(boolean lenient) {
+        File placeholders = svgPlaceholderDir != null ? svgPlaceholderDir
+                : new File(project.getBuild().getDirectory(), "css-resources");
+        return new SvgTranscodeRunner(project.getBasedir(), svgSourceDirs,
+                svgOutputDir(), placeholders, svgPackage(), getLog(), lenient);
+    }
+
+    // ------------------------------------------------------------------
     // SVG transcoder self-repair
     // ------------------------------------------------------------------
 
@@ -2067,21 +2121,41 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             getLog().debug("Skipping the SVG transcoder repair: not an application module.");
             return;
         }
-        File buildDir = new File(project.getBuild().getDirectory());
-        File outputDir = new File(buildDir, "generated-sources" + File.separator + "svg");
-        File placeholderDir = new File(buildDir, "css-resources");
-        SvgTranscodeRunner runner = new SvgTranscodeRunner(project.getBasedir(), null,
-                outputDir, placeholderDir, null, getLog());
-        if (!runner.hasVectorSources()) {
-            // Nothing to transcode. A project with no vector assets is not out
-            // of date in any way that matters, so leave its pom alone.
+        // Lenient, and wrapped: this repair runs on its own initiative in a
+        // build that was passing, so nothing it does may stop that build. A
+        // .lottie is a ZIP the JSON parser rejects, and any unrelated .json in
+        // one of the vector directories looks like a Lottie by extension alone
+        // -- either would otherwise abort generate-gui-sources in a project
+        // that had never asked for a transcoder at all.
+        SvgTranscodeRunner runner = newSvgTranscodeRunner(true);
+        try {
+            if (!runner.hasVectorSources()) {
+                // Nothing to transcode. A project with no vector assets is not
+                // out of date in any way that matters, so leave its pom alone.
+                return;
+            }
+            getLog().info("This project has SVG/Lottie assets but its pom does not run the "
+                    + "build-time vector transcoder. Transcoding them now.");
+            runner.run();
+            registerSourceRoot(svgOutputDir());
+        } catch (Exception ex) {
+            getLog().warn("The build-time vector transcoder could not run over this project ("
+                    + ex + "). The project has been left exactly as it was.");
             return;
         }
 
-        getLog().info("This project has SVG/Lottie assets but its pom does not run the "
-                + "build-time vector transcoder. Transcoding them now.");
-        runner.run();
-        registerSourceRoot(outputDir);
+        if (!runner.getFailures().isEmpty()) {
+            // Binding the goal now would hand the next build a strict run over
+            // the same unreadable files, which would fail where this one did
+            // not. Report and leave the pom alone.
+            getLog().warn("Not adding the transcode-svg execution: these vector source(s) "
+                    + "could not be transcoded, and the goal would fail on them:");
+            for (String failed : runner.getFailures()) {
+                getLog().warn("    " + failed);
+            }
+            getLog().warn("Remove or fix them, then add the execution yourself, or rebuild.");
+            return;
+        }
         addTranscodeSvgExecutionToPom();
     }
 
@@ -2170,15 +2244,44 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                     + " with the goal bound");
             return;
         }
+        File backup = unusedBackupFile(pomFile);
+        if (backup == null) {
+            warnCouldNotEditPom("no free name was available for a backup of it");
+            return;
+        }
         try {
-            FileUtils.copyFile(pomFile, new File(pomFile.getParentFile(), "pom.xml.bak"));
+            FileUtils.copyFile(pomFile, backup);
             FileUtils.writeStringToFile(pomFile, updated, charset);
         } catch (IOException ex) {
             warnCouldNotEditPom("it could not be written: " + ex.getMessage());
             return;
         }
         getLog().info("Added the transcode-svg execution to " + pomFile
-                + " (previous contents saved as pom.xml.bak).");
+                + " (previous contents saved as " + backup.getName() + ").");
+    }
+
+    /**
+     * A backup path that does not already exist: {@code pom.xml.bak}, else
+     * {@code pom.xml.bak.1} and upward. Null when none is free.
+     *
+     * <p>Copying onto {@code pom.xml.bak} unconditionally would destroy a
+     * developer's own backup, or the only copy left by an earlier repair, and
+     * an ordinary build is not allowed to do that. Never overwrite a file whose
+     * whole purpose is to be the copy of last resort.</p>
+     */
+    static File unusedBackupFile(File pomFile) {
+        File dir = pomFile.getParentFile();
+        File candidate = new File(dir, pomFile.getName() + ".bak");
+        if (!candidate.exists()) {
+            return candidate;
+        }
+        for (int i = 1; i <= 100; i++) {
+            candidate = new File(dir, pomFile.getName() + ".bak." + i);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /**
