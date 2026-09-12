@@ -451,6 +451,40 @@ class ExtensionDeploymentFloorScriptTest {
                 "the iOS extension beside them is still raised");
     }
 
+    /// Xcode does not care in which order a key spells its conditions, so a helper declared
+    /// [arch=arm64][sdk=iphoneos*] is the same helper as [sdk=iphoneos*][arch=arm64]. Matching
+    /// the text missed it, resolved to nothing, and clamped a 16.4 extension to the floor.
+    @Test
+    void matchesConditionsRegardlessOfOrder(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Reordered|" + EXT + "|SDKROOT->iphoneos;"
+                        + "EXTENSION_MIN[arch=arm64][sdk=iphoneos*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]->$(EXTENSION_MIN)");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0,"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]=$(EXTENSION_MIN)",
+                got.get(0),
+                "the helper is the same one however its conditions are ordered, and 16.4 "
+                        + "clears the floor");
+    }
+
+    /// IPHONEOS_DEPLOYMENT_TARGET governs simulator builds too, and Xcode 27's simulator
+    /// floor is the same 15.0. Recognising only "iphoneos" skipped a simulator-only
+    /// configuration and left it below the floor.
+    @Test
+    void governsSimulatorOnlyConfigurations(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyTo(dir, "15.0",
+                "SimOnly|" + EXT + "|SDKROOT->iphonesimulator;IPHONEOS_DEPLOYMENT_TARGET->12.0",
+                "SimPlatforms|" + EXT + "|SUPPORTED_PLATFORMS->iphonesimulator;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->12.0",
+                "WatchStillSkipped|" + EXT + "|SDKROOT->watchos;WATCHOS_DEPLOYMENT_TARGET->10.0");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(0), "SDKROOT=iphonesimulator");
+        assertEquals("IPHONEOS_DEPLOYMENT_TARGET=15.0", got.get(1), "SUPPORTED_PLATFORMS sim");
+        assertEquals("nil", got.get(2), "watchOS is still none of this floor's business");
+    }
+
     /// Off a Mac there is no SDK to ask, and the build must behave exactly as it did before
     /// any of this existed: nothing emitted, nothing changed.
     @Test
