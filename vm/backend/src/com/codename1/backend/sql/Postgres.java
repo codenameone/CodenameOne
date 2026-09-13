@@ -358,14 +358,38 @@ public final class Postgres {
         // (RFC 4013) is a stringprep profile whose mapping step is NFKC, and
         // there is no Normalizer on this platform -- this class is translated
         // for the packaged server, so it may only use what vm/JavaAPI and
-        // CLDC11 define, and neither has java.text. Implementing the part that
-        // needs no Unicode tables would make things WORSE, not better:
-        // PostgreSQL falls back to the raw password whenever its own saslprep
-        // rejects the input, so a half-prepared password would stop matching
-        // verifiers that work today. Printable ASCII -- which SASLprep leaves
-        // untouched -- is therefore correct here; a password that SASLprep
-        // would normalise is rejected, and has to be set in ASCII or
-        // authenticated by another method.
+        // CLDC11 define, and neither has java.text.
+        //
+        // Rejecting every non-ASCII password would be the wrong reading of that.
+        // Most of them work: SASLprep changes nothing about a character NFKC
+        // already leaves alone, so a verifier built from an o-umlaut matches the
+        // raw bytes sent here, and refusing it would break deployments that
+        // authenticate today. And where SASLprep FAILS rather than maps -- a
+        // prohibited character, RFC 3454 tables C.2 through C.9 -- PostgreSQL
+        // falls back to the raw password, which is again exactly what goes out.
+        //
+        // What breaks is the narrow middle: a character SASLprep MAPS, where the
+        // server's verifier is built from the mapped form and this proof is not.
+        // The two mapping tables are small and fixed, so they are recognised by
+        // value below -- B.1, mapped to nothing, and C.1.2, non-ASCII space
+        // mapped to a space. A no-break space pasted out of a browser is the
+        // everyday way to meet this, and answering it with "password
+        // authentication failed" sends the reader to look at the role's grants.
+        // The comment here used to CLAIM this refusal while nothing did it.
+        //
+        // A character NFKC would rewrite for some other reason -- a ligature, a
+        // fullwidth form -- still cannot be recognised without the tables, and
+        // still fails as an authentication error. That is the residue, and it is
+        // smaller than the sentence it replaces implied.
+        int prepared = saslprepWouldMap(password);
+        if(prepared >= 0) {
+            throw new IOException("The password's character at index " + prepared
+                    + " is one SASLprep (RFC 4013) rewrites before the server "
+                    + "builds its verifier, and this runtime has no Normalizer to "
+                    + "rewrite it with, so the proof computed here could not "
+                    + "match. Set this role an ASCII password, or authenticate it "
+                    + "by another method.");
+        }
         byte[] saltedPassword = Crypto.pbkdf2Sha256(
                 Wire.utf8(password == null ? "" : password), salt, iterations, 32);
         byte[] clientKey = Crypto.hmacSha256(saltedPassword, Wire.utf8("Client Key"));
@@ -431,6 +455,48 @@ public final class Postgres {
             at = end + 1;
         }
         return null;
+    }
+
+    /**
+     * The index of the first character SASLprep would MAP, or -1 when there is
+     * none this runtime can recognise.
+     *
+     * <p>RFC 4013 maps two sets and this checks both: RFC 3454 table B.1, the
+     * characters commonly mapped to nothing, and table C.1.2, the non-ASCII
+     * spaces it maps to a plain space. Both are small, closed and entirely in
+     * the basic plane, so they are matched by value -- there is no Unicode table
+     * on this platform to look them up in, which is the whole reason the
+     * password is not prepared in the first place.
+     *
+     * <p>The prohibited tables are deliberately NOT here. SASLprep FAILS on
+     * those rather than mapping them, and PostgreSQL then stores a verifier
+     * built from the raw password -- the same bytes this client sends -- so
+     * refusing them would break an account that authenticates today.
+     */
+    private static int saslprepWouldMap(String password) {
+        if(password == null) {
+            return -1;
+        }
+        for(int iter = 0 ; iter < password.length() ; iter++) {
+            char c = password.charAt(iter);
+            if(c < 0x80) {
+                continue;
+            }
+            // C.1.2, non-ASCII space.
+            if(c == 0x00a0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200a)
+                    || c == 0x2028 || c == 0x2029 || c == 0x202f || c == 0x205f
+                    || c == 0x3000) {
+                return iter;
+            }
+            // B.1, commonly mapped to nothing.
+            if(c == 0x00ad || c == 0x034f || c == 0x1806
+                    || (c >= 0x180b && c <= 0x180d)
+                    || (c >= 0x200b && c <= 0x200d) || c == 0x2060
+                    || (c >= 0xfe00 && c <= 0xfe0f) || c == 0xfeff) {
+                return iter;
+            }
+        }
+        return -1;
     }
 
     private void sendPasswordMessage(byte[] password) throws IOException {

@@ -203,6 +203,12 @@ public final class MySql {
         for(int iter = 0 ; iter < 23 ; iter++) {
             login.write(0);
         }
+        // Every one of these refuses a NUL, inside writeCString itself rather
+        // than here: the protocol ends each field with one, so a NUL in a value
+        // does not truncate it but ENDS it and makes the rest the next field. Two
+        // reviews have now read this line and asked for the check at the call
+        // site instead -- one place that covers user, database, plugin and
+        // whatever is added later beats three that cover what someone remembered.
         writeCString(login, user);
         writeLengthEncoded(login, authResponse);
         if((capabilities & CLIENT_CONNECT_WITH_DB) != 0) {

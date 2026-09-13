@@ -3650,6 +3650,94 @@ public class SelfTest {
     }
 
     /**
+     * A password SASLprep would rewrite is refused, not silently mismatched.
+     *
+     * <p>PostgreSQL builds its SCRAM verifier from the SASLprepped password, and
+     * this runtime has no Normalizer to prep with, so a character the profile
+     * MAPS -- a no-break space is the everyday one, pasted out of a browser --
+     * makes a proof that cannot match a verifier that is otherwise correct. The
+     * comment at that code claimed such a password was rejected while nothing
+     * rejected it, so the symptom was "password authentication failed" and the
+     * reader went to look at the role's grants.
+     *
+     * <p>Driven by the same stub as the iteration count, because a real server
+     * cannot be made to disagree on demand. The assertion is the refusal's own
+     * wording: "it threw" would pass on the authentication failure this exists to
+     * replace. The ASCII half is the control -- the same stub, the same exchange,
+     * a password with nothing to prepare -- so a check that refused everything
+     * would fail it.
+     */
+    private static void scramRefusesAPasswordItCannotPrepare() throws Exception {
+        // %C2%A0 is U+00A0, RFC 3454 table C.1.2, which SASLprep maps to a space.
+        check("a SCRAM password SASLprep would rewrite is refused", "refused",
+                scramOutcomeFor("p%C2%A0w", "SASLprep"));
+        // And the same exchange with an ASCII password must get past this check
+        // and fail on the proof instead, which is the stub hanging up.
+        check("and an ASCII password is still computed", "reached the proof",
+                scramOutcomeFor("pw", "SASLprep"));
+    }
+
+    /**
+     * Opens a SCRAM connection against a stub that gets as far as the challenge,
+     * and says whether the named refusal or the exchange itself ended it.
+     */
+    private static String scramOutcomeFor(String password, String refusal)
+            throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    if(pgRead(client) == null) {          // StartupMessage
+                        return;
+                    }
+                    pgSend(client, 'R', join(int32(10), ascii("SCRAM-SHA-256\0\0")));
+                    byte[] initial = pgRead(client);      // SASLInitialResponse
+                    if(initial == null) {
+                        return;
+                    }
+                    String text = new String(initial, "UTF-8");
+                    int at = text.lastIndexOf("r=");
+                    String clientNonce = at < 0 ? "" : text.substring(at + 2);
+                    // A COUNT THE CLIENT WILL ACTUALLY COMPUTE, unlike the bound
+                    // check's stub: the point here is to reach PBKDF2, so that a
+                    // password refused before it is refused by the new rule rather
+                    // than by the old ceiling.
+                    pgSend(client, 'R', join(int32(11), ascii("r=" + clientNonce
+                            + "stub,s=AAAAAAAAAAAAAAAA,i=4096")));
+                } catch (Exception ignored) {
+                    // The client hanging up mid-exchange is the expected ending.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("postgres://u:" + password + "@127.0.0.1:"
+                    + port + "/db?sslmode=disable");
+            db.close();
+            outcome = "connected";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf(refusal) >= 0 ? "refused" : "reached the proof";
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        return outcome;
+    }
+
+    /**
      * A MySQL header torn in half is an IOException, not a wild allocation.
      *
      * <p>Only the first of the four header bytes was checked. wire.read() answers -1
@@ -4521,6 +4609,7 @@ public class SelfTest {
         boundParametersMustMatchThePlaceholders();
         storedTextComesBackUnchanged();
         scramIterationCountIsBounded();
+        scramRefusesAPasswordItCannotPrepare();
         aTruncatedMySqlHeaderIsRefused();
         aMalformedRowClosesTheMySqlSession();
         anUnknownSslModeIsRefused();

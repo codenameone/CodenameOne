@@ -4151,9 +4151,12 @@ public final class HttpServer {
                     // handler cannot tell which protocol carried it. Fixing this in
                     // the parser alone left "?name=%C3%28" refused over HTTP/1 and
                     // served over h2 -- one server, two answers, which is the shape
-                    // of defect this whole file keeps closing.
+                    // of defect this whole file keeps closing. The control-byte
+                    // rule rides in the same call on both, which is why this says
+                    // what the HTTP/1 side says.
                     if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
-                            asciiBytes("the request target is not valid UTF-8"))) {
+                            asciiBytes("the request target holds a control character "
+                                    + "or is not valid UTF-8"))) {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
                     }
                     requestsServed.incrementAndGet();
@@ -5277,8 +5280,19 @@ public final class HttpServer {
         // Note this does not reject a malformed ESCAPE. percentDecode passes "%zz"
         // through as literal bytes, browsers do send a bare '%', and tightening
         // that is a separate question from whether what DID decode is text.
+        // AND A RAW CONTROL BYTE, which this same call refuses first: NUL, TAB, a
+        // bare LF and DEL are all rejected before any decoding, because every one
+        // of them IS valid UTF-8 and a UTF-8 test alone would pass them straight
+        // through to whatever routes on the target. The rule is inside
+        // targetDecodesToUtf8 rather than beside it so that the h2 path, which
+        // calls the String form of the same function, cannot be given one and not
+        // the other -- a review has read the name here and concluded the check
+        // was missing, so this says where it is. The message names both for the
+        // same reason: a client that sent a TAB was being told its target was not
+        // valid UTF-8, which is true of neither the byte nor the complaint.
         if(!targetDecodesToUtf8(raw, targetStart, targetStart + targetLength)) {
-            throw new ProtocolException(400, "the request target is not valid UTF-8");
+            throw new ProtocolException(400,
+                    "the request target holds a control character or is not valid UTF-8");
         }
         if(targetHasFragment(raw, targetStart, targetStart + targetLength)) {
             throw new ProtocolException(400, "the request target carries a fragment");
