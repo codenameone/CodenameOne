@@ -125,11 +125,16 @@ automatically.
 ==== Limitation -- cross-field setter chains
 
 When a setter synchronously mutates a *second* bound field
-(`setFirstName` also calls `setFullName`, for example), the second
-field's `notifyChanged` lands inside the same update region as the
-first and is suppressed. The bound component for `fullName` won't
-catch up until something exits the region and a separate event drives
-the refresh. If you need the cross-field update to propagate, call
+(`setFirstName` also calls `setFullName`, for example), whether the
+second field's `notifyChanged` is suppressed depends on who called the
+first. An application calling `setFirstName` directly isn't inside an
+update region, so the nested `setFullName` notifies at depth zero and
+its component refreshes normally. Reached from the generated component
+listener or from `commit()`, the chain runs inside a region that's
+already open, the second field's `notifyChanged` lands in it and is
+suppressed, and the bound component for `fullName` won't catch up
+until something exits the region and a separate event drives the
+refresh. If you need the cross-field update to propagate, call
 `binding.refresh()` explicitly after the setter chain completes, or
 restructure the model so the cross-field mutation happens outside the
 setter's call frame -- for example via a `Display.callSerially`.

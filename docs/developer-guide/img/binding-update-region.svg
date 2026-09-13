@@ -24,9 +24,9 @@
   <text x="30" y="235" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Every framework-initiated mutation runs inside a region guarded by a thread-local depth counter. While it is positive,</text>
   <text x="30" y="250" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">notifyChanged does nothing and component listeners short-circuit. bind, refresh and commit each enter one.</text>
   <rect x="16" y="278" width="868" height="104" rx="4" fill="#fbf6f6" stroke="#a33a3a" stroke-width="1.5"/>
-  <text x="30" y="300" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">And that is exactly why a cross-field setter chain does not reach the screen</text>
-  <text x="30" y="322" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">A setter that synchronously writes a second bound field -- setFirstName also calling setFullName -- raises the second</text>
-  <text x="30" y="337" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">field's notifyChanged inside the region the first one opened, where it is suppressed like any other. The component</text>
-  <text x="30" y="352" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">bound to fullName keeps the old value until something else drives a refresh.</text>
-  <text x="30" y="367" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Call binding.refresh() after the chain, or move the second write out of the setter's call frame with callSerially.</text>
+  <text x="30" y="300" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">And that is why a cross-field setter chain can fail to reach the screen</text>
+  <text x="30" y="322" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">It depends on who called. An application calling setFirstName directly is not inside a region, so the nested</text>
+  <text x="30" y="337" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">setFullName notifies at depth zero and its component refreshes normally. Reached from the component listener or</text>
+  <text x="30" y="352" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">from commit(), the same chain runs inside a region already open, and the second field's notification is suppressed.</text>
+  <text x="30" y="367" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">For that case call binding.refresh() after the chain, or move the second write out of the call frame with callSerially.</text>
 </svg>
