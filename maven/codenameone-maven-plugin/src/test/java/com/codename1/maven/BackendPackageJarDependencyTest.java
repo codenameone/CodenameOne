@@ -95,6 +95,47 @@ class BackendPackageJarDependencyTest {
     }
 
     @Test
+    void stagesTheNativesOfADirectoryDependencyToo(@TempDir File tmp) throws Exception {
+        // The SAME dependency in the two shapes it takes: target/classes while it
+        // is a reactor module, and a jar once it has been installed. The jar
+        // branch routed cn1-native to the translator's C root; the directory
+        // branch copied the tree as it stood, so the C landed among the classes
+        // where nothing looks for it. Nothing fails at that point either -- a
+        // native method is kept alive BY its symbol appearing in the native
+        // sources, so the dead-code pass drops the method instead and the build
+        // is green with the feature inert on the device.
+        File asDirectory = new File(tmp, "sibling-classes");
+        writeFile(new File(asDirectory, "com/example/Dto.class"), "FROMDIR");
+        writeFile(new File(asDirectory, "cn1-native/dep.c"), "int dep(void) { return 1; }\n");
+        writeFile(new File(asDirectory, "cn1-native/nested/more.m"), "@implementation X @end\n");
+        // NOT this one: cn1-native is the root of the dependency, not any
+        // directory of that name anywhere in it, which is the prefix the jar
+        // branch matches.
+        writeFile(new File(asDirectory, "com/example/cn1-native/keep.c"), "int keep(void);\n");
+        File staged = new File(tmp, "dependency-classes");
+        assertTrue(staged.mkdirs());
+        File natives = new File(tmp, "native");
+        assertTrue(natives.mkdirs());
+
+        stage(Collections.singletonList(asDirectory.getAbsolutePath()), staged, natives);
+
+        assertTrue(new File(natives, "dep.c").isFile(),
+                "a directory dependency's cn1-native belongs with the runtime's, "
+                        + "exactly as the same dependency's jar does");
+        assertTrue(new File(natives, "nested/more.m").isFile(),
+                "and everything under it, not just its top level");
+        assertFalse(new File(staged, "cn1-native").exists(),
+                "and it does not stay among the classes, where the translator has "
+                        + "nothing that would find it");
+        assertEquals("FROMDIR", read(new File(staged, "com/example/Dto.class")),
+                "while the classes are staged as before");
+        assertEquals("int keep(void);\n",
+                read(new File(staged, "com/example/cn1-native/keep.c")),
+                "a directory of that name deeper in the tree is an ordinary "
+                        + "resource and is left where it was");
+    }
+
+    @Test
     void letsADirectoryWinWhenItComesFirst(@TempDir File tmp) throws Exception {
         // The other order, which is the half a reverse traversal got wrong: a
         // directory ahead of a jar has to keep its precedence.

@@ -541,7 +541,7 @@ public class BackendPackageMojo extends AbstractMojo {
         for (int i = 0; i < classpath.size(); i++) {
             File element = new File(classpath.get(i));
             if (element.isDirectory()) {
-                copyDirectoryFirstWins(element, staged);
+                copyDirectoryFirstWins(element, staged, nativeSources);
                 any = true;
             } else if (element.isFile()) {
                 unzip(element, staged, nativeSources, true);
@@ -922,11 +922,38 @@ public class BackendPackageMojo extends AbstractMojo {
 
     /** As copyDirectory, but never replacing a file that is already there. */
     private void copyDirectoryFirstWins(File from, File to) throws MojoExecutionException {
+        copyDirectoryFirstWins(from, to, null);
+    }
+
+    /**
+     * @param nativeTarget where a top-level cn1-native subtree belongs, or null
+     *                     when this is already below one
+     *
+     * <p>The same routing the jar branch does, and for the same reason: the
+     * translator has no code that looks for cn1-native inside a class input, and
+     * only nativeSources is copied into its C source root. Copied as it stood,
+     * a reactor module's C was staged among the classes where nothing reads it --
+     * and a native whose C is absent is not a link error, because a Java native
+     * method is kept alive BY its symbol appearing in the native sources, so the
+     * dead-code pass drops the method and the build stays green with the feature
+     * inert. The same dependency packaged correctly once it was installed as a
+     * jar and consumed that way, which is the worst shape for this to take.
+     */
+    private void copyDirectoryFirstWins(File from, File to, File nativeTarget)
+            throws MojoExecutionException {
         File[] children = from.listFiles();
         if (children == null) {
             return;
         }
         for (File child : children) {
+            if (nativeTarget != null && child.isDirectory()
+                    && "cn1-native".equals(child.getName())) {
+                mkdirs(nativeTarget);
+                // Without the native target below it: cn1-native is matched at the
+                // root only, exactly as the jar branch matches the prefix.
+                copyDirectoryFirstWins(child, nativeTarget);
+                continue;
+            }
             File destination = new File(to, child.getName());
             if (child.isDirectory()) {
                 mkdirs(destination);

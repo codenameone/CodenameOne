@@ -91,6 +91,15 @@ public final class Tcp {
      * choose, so that is an error rather than a fallback.
      */
     public void startTls(String host, String caFile) throws IOException {
+        // BOTH STRINGS, and the name is the one that decides who the peer is
+        // allowed to be. It crosses to a native as a C string, so a NUL inside it
+        // ends the name there and OpenSSL verifies the certificate against the
+        // prefix alone: "attacker.example\0.trusted.example" satisfies a caller's
+        // own endsWith(".trusted.example") check and then verifies as
+        // "attacker.example". connect() validating the address it dialled does not
+        // cover this, because the verification name is supplied separately and may
+        // come from somewhere else entirely.
+        Urls.requireHostName(host);
         // The trust root is a file name that crosses to a native; see
         // Urls.requireNoNul for what a NUL in it loads instead.
         Urls.requireNoNul("An sslrootcert path", caFile);

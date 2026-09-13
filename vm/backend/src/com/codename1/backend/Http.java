@@ -158,16 +158,37 @@ public final class Http {
             // HTTP sent every "the host went away" shutdown to the wrong diagnosis.
             throw new IOException("Connection closed before any response was sent");
         }
-        int headerEnd = indexOfHeaderEnd(all);
-        if(headerEnd < 0) {
-            throw new IOException("Malformed HTTP response: no header terminator");
+        // PAST THE INTERIM ONES. A 1xx is a complete response with its own status
+        // line and header block and no body, and the final response follows it on
+        // the same connection -- RFC 9110 15.2. Taking the first header terminator
+        // handed back "103 Early Hints", or the "100 Continue" this very server
+        // sends when a request carries Expect, as though it were the answer, with
+        // the real status line and headers delivered to the caller as the body of
+        // it. A client that checks the status then reads 103 and treats a
+        // successful request as a failed one, or the reverse.
+        int blockStart = 0;
+        int headerEnd;
+        String[] lines;
+        int status;
+        while(true) {
+            headerEnd = indexOfHeaderEnd(all, blockStart);
+            if(headerEnd < 0) {
+                throw new IOException("Malformed HTTP response: no header terminator");
+            }
+            String headerText = new String(all, blockStart, headerEnd - blockStart, "UTF-8");
+            lines = split(headerText, "\r\n");
+            if(lines.length == 0) {
+                throw new IOException("Malformed HTTP response: empty");
+            }
+            status = parseStatus(lines[0]);
+            if(status < 100 || status >= 200) {
+                break;
+            }
+            // blockStart only ever moves forward, so a peer sending nothing but
+            // interim responses runs out of bytes and is reported as malformed
+            // rather than looping here.
+            blockStart = headerEnd + 4;
         }
-        String headerText = new String(all, 0, headerEnd, "UTF-8");
-        String[] lines = split(headerText, "\r\n");
-        if(lines.length == 0) {
-            throw new IOException("Malformed HTTP response: empty");
-        }
-        int status = parseStatus(lines[0]);
         List names = new ArrayList();
         List values = new ArrayList();
         for(int iter = 1 ; iter < lines.length ; iter++) {
@@ -366,7 +387,11 @@ public final class Http {
     }
 
     private static int indexOfHeaderEnd(byte[] data) {
-        for(int iter = 0 ; iter + 3 < data.length ; iter++) {
+        return indexOfHeaderEnd(data, 0);
+    }
+
+    private static int indexOfHeaderEnd(byte[] data, int from) {
+        for(int iter = from ; iter + 3 < data.length ; iter++) {
             if(data[iter] == '\r' && data[iter + 1] == '\n' && data[iter + 2] == '\r' && data[iter + 3] == '\n') {
                 return iter;
             }

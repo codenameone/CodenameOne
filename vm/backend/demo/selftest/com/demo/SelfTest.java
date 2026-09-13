@@ -1755,6 +1755,115 @@ public class SelfTest {
      * would pass the corrupted half and fail this one.
      */
     /**
+     * An interim response is not the answer.
+     *
+     * <p>RFC 9110 15.2: a 1xx is a complete response with its own status line and
+     * header block and no body, and the final response follows it on the same
+     * connection. Taking the first header terminator handed back "103 Early
+     * Hints" as though it were the answer, with the real status line, headers and
+     * body delivered to the caller as the 103's body -- so a client checking the
+     * status read 103 for a request that had actually succeeded. This server
+     * sends an interim 100 itself whenever a request carries Expect, so the two
+     * halves of this codebase could not talk to each other about it.
+     */
+    private static void anInterimResponseIsSkipped() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    // DRAINED FIRST. Closing with the request still unread makes
+                    // the peer send RST instead of FIN, and the client then loses
+                    // the reply it had already been sent -- which turned this into
+                    // a race between the reset and the last read rather than a
+                    // check of what the client makes of an interim response.
+                    byte[] request = new byte[4096];
+                    ServerSocket.read(client, request, 0, request.length);
+                    byte[] reply = ("HTTP/1.1 103 Early Hints\r\n"
+                            + "Link: </style.css>; rel=preload\r\n\r\n"
+                            + "HTTP/1.1 200 OK\r\n"
+                            + "Content-Length: 2\r\n\r\n"
+                            + "hi").getBytes("UTF-8");
+                    ServerSocket.write(client, reply, 0, reply.length);
+                } catch (Exception ignored) {
+                    // The check below reports what the client made of it.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Http.Response response = Http.request("127.0.0.1", port, "GET", "/x", null);
+            outcome = response.getStatus() + "/" + response.getBodyAsString();
+        } catch (Exception err) {
+            outcome = "failed: " + err.getMessage();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("an interim response is not read as the answer", "200/hi", outcome);
+    }
+
+    /**
+     * The name TLS verifies against is checked before it becomes a C string.
+     *
+     * <p>A NUL inside it ends the name there, so OpenSSL verifies the certificate
+     * against the prefix alone and a caller's own suffix check -- endsWith on the
+     * trusted domain -- passes on a name that is never used. connect() validating
+     * the address it dialled does not cover this: the verification name is a
+     * separate argument and may come from somewhere else entirely.
+     */
+    private static void aTlsVerificationNameWithANulIsRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        // ACCEPTS AND HANGS UP, rather than accepting and going quiet. Without the
+        // check below the name reaches OpenSSL, which blocks in sock_read waiting
+        // for a server hello that a silent peer never sends -- so a regression
+        // here would HANG this suite instead of failing it. Closing makes the
+        // handshake fail at once, and the outcome says which of the two happened.
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    int client = listener.accept();
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                } catch (Exception ignored) {
+                    // The check below reports what the client made of it.
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 2000);
+            try {
+                conn.startTls("attacker.example\u0000.trusted.example");
+                outcome = "accepted";
+            } catch (java.io.IOException refused) {
+                String message = String.valueOf(refused.getMessage());
+                outcome = message.indexOf("host name") >= 0 || message.indexOf("NUL") >= 0
+                        ? "refused"
+                        : "reached the handshake instead: " + message;
+            } finally {
+                conn.close();
+            }
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a TLS verification name holding a NUL is refused", "refused", outcome);
+    }
+
+    /**
      * A HEAD response declares the length of a body it correctly did not send.
      *
      * <p>RFC 9110 6.4.1: a response to HEAD ends at the blank line whatever the
@@ -2973,6 +3082,8 @@ public class SelfTest {
         aMySqlPacketOutOfSequenceIsRefused();
         aNegativePostgresLengthThatIsNotNullIsRefused();
         aStaticFileComesBackWhole();
+        anInterimResponseIsSkipped();
+        aTlsVerificationNameWithANulIsRefused();
         aHeadResponseIsNotReadAsTruncated();
         aNullMethodIsGet();
         anOutboundFragmentIsRefused();
