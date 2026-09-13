@@ -158,4 +158,34 @@ final class HeaderLines {
             }
         }
     }
+
+    /**
+     * Refuses a request target that is not origin-form.
+     *
+     * The other half of the request line, and the same injection: Http.request
+     * writes the path into it verbatim, so a path carrying a CR or LF adds
+     * whatever the caller likes to a request the upstream trusts. A space ends
+     * the target and makes the rest of it the HTTP version.
+     *
+     * <p>Origin-form because that is what this client sends: a path beginning
+     * with "/" and, optionally, a query. Anything else -- an absolute URL, an
+     * authority, an asterisk -- is a shape it does not construct.
+     */
+    static void requireOriginForm(String path) throws IOException {
+        if(path == null || path.length() == 0) {
+            throw new IOException("No request path");
+        }
+        if(path.charAt(0) != '/') {
+            throw new IOException("A request path is origin-form and begins with "
+                    + "'/'; this one does not");
+        }
+        for(int iter = 0 ; iter < path.length() ; iter++) {
+            char c = path.charAt(iter);
+            if(c <= 0x20 || c == 0x7f) {
+                throw new IOException("A request path cannot hold a control "
+                        + "character or a space; this one does, at index " + iter
+                        + ". Percent-encode it");
+            }
+        }
+    }
 }

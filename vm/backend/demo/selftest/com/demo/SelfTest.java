@@ -683,6 +683,61 @@ public class SelfTest {
                 String.valueOf("POST".equals(outcome)));
     }
 
+    /**
+     * Http is a public client of its own, and its request line is built by hand.
+     *
+     * <p>Web's verb is checked now; this one writes both fields of the request
+     * line verbatim, so a method or a path carrying a CRLF adds whatever the
+     * caller likes to a request the upstream trusts. Refused before the socket
+     * is opened, which is what these assert: the failure is the token, not a
+     * connection.
+     */
+    private static void theOtherClientChecksItsRequestLine() throws Exception {
+        check("Http refuses a method carrying a request line", "refused",
+                httpRefused("GET /admin HTTP/1.1\r\nX-Evil: yes\r\nX:", "/x"));
+        check("and a path carrying a header", "refused",
+                httpRefused("GET", "/x\r\nX-Evil: yes"));
+        check("and a path that is not origin-form", "refused",
+                httpRefused("GET", "http://elsewhere/x"));
+        // AND AN ORDINARY REQUEST still gets as far as the connection, which is
+        // what says the refusals above are about the request line.
+        check("an ordinary request reaches the socket", "connected or refused",
+                httpRefused("GET", "/x"));
+    }
+
+    /** Whether Http refuses the request line, or gets as far as connecting. */
+    private static String httpRefused(String method, String path) {
+        try {
+            Http.request("127.0.0.1", 1, method, path, null);
+            return "connected or refused";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            return message.indexOf("one token") >= 0
+                    || message.indexOf("origin-form") >= 0
+                    || message.indexOf("control character") >= 0
+                    ? "refused" : "connected or refused";
+        }
+    }
+
+    /**
+     * An IPv6 literal has to be bracketed in the Host field.
+     *
+     * <p>RFC 3986 gives the authority no other way to say where the address ends
+     * and the port begins, and Tcp.connect accepts "::1" quite happily -- so an
+     * otherwise valid request over IPv6 went out as "Host: ::1:8080" and a
+     * conforming server refused it.
+     */
+    private static void anIpv6HostIsBracketed() throws Exception {
+        check("an IPv6 literal is bracketed", "[::1]:8080",
+                FileCountProbe.hostField("::1", 8080));
+        check("one already bracketed is left alone", "[::1]:8080",
+                FileCountProbe.hostField("[::1]", 8080));
+        check("and a name is not bracketed", "example.com:80",
+                FileCountProbe.hostField("example.com", 80));
+        check("nor is an IPv4 literal", "127.0.0.1:8080",
+                FileCountProbe.hostField("127.0.0.1", 8080));
+    }
+
     private static void patchIsASendableVerb() throws Exception {
         String outcome;
         try {
@@ -2451,6 +2506,8 @@ public class SelfTest {
         patchIsASendableVerb();
         aMethodIsOneToken();
         aGetWithABodyKeepsItsVerb();
+        theOtherClientChecksItsRequestLine();
+        anIpv6HostIsBracketed();
         outboundHeadersCannotCarryANewline();
         repeatedOutboundHeadersSurvive();
         anOversizedResponseIsRefusedNotAccumulated();

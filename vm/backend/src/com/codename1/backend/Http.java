@@ -79,6 +79,23 @@ public final class Http {
         }
     }
 
+    /**
+     * The Host field's value: "[::1]:8080" for an IPv6 literal, "host:8080"
+     * otherwise.
+     *
+     * An address literal with colons in it has to be bracketed -- RFC 3986 gives
+     * the authority no other way to say where the address ends and the port
+     * begins -- and Tcp.connect accepts "::1" quite happily, so an otherwise
+     * valid request over IPv6 went out as "Host: ::1:8080" and a conforming
+     * server refused it. A colon cannot appear in a registered name, so it is
+     * what tells the two apart.
+     */
+    static String authority(String host, int port) {
+        String named = host != null && host.indexOf(':') >= 0
+                && host.charAt(0) != '[' ? "[" + host + "]" : host;
+        return named + ":" + port;
+    }
+
     public static Response get(String host, int port, String path) throws IOException {
         return request(host, port, "GET", path, null);
     }
@@ -88,11 +105,16 @@ public final class Http {
     }
 
     public static Response request(String host, int port, String method, String path, byte[] body) throws IOException {
+        // BEFORE THE SOCKET, and not only in Web: this is a public client of its
+        // own, and both fields of the request line are written into it verbatim.
+        // Tcp.connect checks the host; these two were nobody's.
+        HeaderLines.requireMethod(method);
+        HeaderLines.requireOriginForm(path);
         Tcp socket = Tcp.connect(host, port, 0);
         try {
             StringBuilder head = new StringBuilder();
             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n");
-            head.append("Host: ").append(host).append(':').append(port).append("\r\n");
+            head.append("Host: ").append(authority(host, port)).append("\r\n");
             head.append("Connection: close\r\n");
             head.append("Content-Length: ").append(body == null ? 0 : body.length).append("\r\n");
             head.append("\r\n");

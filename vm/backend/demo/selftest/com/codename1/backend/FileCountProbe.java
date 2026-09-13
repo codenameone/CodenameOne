@@ -61,4 +61,15 @@ public final class FileCountProbe {
     public static byte[] headerBytes(String value) {
         return HeaderLines.narrowed(value);
     }
+
+    /**
+     * The Host field Http builds for a host and port.
+     *
+     * Asked here rather than over the wire: an IPv6 loopback is not something a
+     * build machine can be relied on to have, and the formatting is the whole of
+     * what went wrong.
+     */
+    public static String hostField(String host, int port) {
+        return Http.authority(host, port);
+    }
 }
