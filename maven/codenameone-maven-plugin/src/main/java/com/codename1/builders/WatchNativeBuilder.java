@@ -74,6 +74,44 @@ class WatchNativeBuilder {
      */
     static final String MIN_DEPLOYMENT_TARGET = "10.0";
 
+    /**
+     * <p>The watch deployment target this build will actually use: {@link
+     * #MIN_DEPLOYMENT_TARGET}, unless the selected watchOS SDK refuses it, in which case that
+     * SDK's own minimum.</p>
+     *
+     * <p>The constant above is what Codename One WANTS; this is what Xcode will take. Every
+     * other Apple slice already asks the SDK rather than trusting a literal, and the watch was
+     * the last one that did not -- so a watchOS SDK raising its floor the way Xcode 27 raised
+     * every other one would have failed the watch build with a number nobody could find in the
+     * project.</p>
+     */
+    private String effectiveMinDeploymentTarget;
+
+    /**
+     * <p>The watch deployment target this build will use; see {@link
+     * #effectiveMinDeploymentTarget}.</p>
+     *
+     * <p>Resolved on first use rather than while parsing hints. Asking costs an out-of-process
+     * xcrun and plutil, and a build that never generates a watch target should not pay for it
+     * -- nor should hint parsing require an Xcode to be installed at all.</p>
+     */
+    String minDeploymentTarget() {
+        if (effectiveMinDeploymentTarget == null) {
+            // Ask the SDK what it will accept rather than trusting the constant. Xcode 27
+            // raised the watchOS floor from 4 to 9; 10.0 clears that, but the next one will
+            // move again and nothing here would have noticed. See AppleSdkFloor.
+            String floor = owner.sdkMinimumDeploymentTarget("watchos");
+            String raised = AppleSdkFloor.raiseTo(MIN_DEPLOYMENT_TARGET, floor);
+            if (!raised.equals(MIN_DEPLOYMENT_TARGET)) {
+                owner.log("The watch slice targets watchOS " + MIN_DEPLOYMENT_TARGET
+                        + ", but this Xcode's watchOS SDK accepts nothing below " + floor
+                        + "; building against " + raised + " instead.");
+            }
+            effectiveMinDeploymentTarget = raised;
+        }
+        return effectiveMinDeploymentTarget;
+    }
+
     // Derived build state.
     private boolean enabled;
     private boolean standalone;        // codename1.watchStandalone
@@ -2198,7 +2236,7 @@ class WatchNativeBuilder {
                 // here would put a single-target app on the paired product type with no extension
                 // beside it.
                 .append("  watch_target = xcproj.new_target(:application, watch_name, :watchos, '")
-                .append(IPhoneBuilder.escapeRubyStr(MIN_DEPLOYMENT_TARGET)).append("')\n")
+                .append(IPhoneBuilder.escapeRubyStr(minDeploymentTarget())).append("')\n")
                 .append("end\n")
                 // Compile the shared ParparVM sources for the watch, minus the
                 // GL/Metal-only files. Reuse the app target's compile sources so
@@ -2336,7 +2374,7 @@ class WatchNativeBuilder {
                 .append("  bs['ARCHS[sdk=watchsimulator*]'] = '$(ARCHS_STANDARD)'\n")
                 .append("  bs['ONLY_ACTIVE_ARCH'] = 'YES'\n")
                 .append("  bs['WATCHOS_DEPLOYMENT_TARGET'] = '")
-                .append(IPhoneBuilder.escapeRubyStr(MIN_DEPLOYMENT_TARGET)).append("'\n")
+                .append(IPhoneBuilder.escapeRubyStr(minDeploymentTarget())).append("'\n")
                 .append("  bs['TARGETED_DEVICE_FAMILY'] = '4'\n")
                 .append("  bs['PRODUCT_BUNDLE_IDENTIFIER'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(bundleId)).append("'\n")
@@ -3581,6 +3619,10 @@ class WatchNativeBuilder {
         if (target == null || target.length() == 0) {
             target = IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET;
         }
+        // The complication is embedded in the watch app, so it can never require LESS than the
+        // SDK will accept -- and an extension the SDK rejects fails the whole archive, not just
+        // itself.
+        target = AppleSdkFloor.raiseTo(target, minDeploymentTarget());
 
         // Guarded so re-running the script (the build re-executes the schemes ruby after
         // dependency integration) does not duplicate the target.

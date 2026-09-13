@@ -513,6 +513,25 @@ public class MacOSBuildHints {
         return minDeploymentTarget;
     }
 
+    /// Raise the deployment target to the SDK's own minimum, and report whether it moved.
+    ///
+    /// Apple raises this between Xcode releases and a project below the floor does not warn,
+    /// it fails: Xcode 26's macOS SDK accepts 10.13 and Xcode 27's accepts nothing below
+    /// 12.0, while the default here is 11.0. This value is read in two places -- written into
+    /// the generated pbxproj and passed on the xcodebuild command line -- so it is raised
+    /// once, here, rather than at each use.
+    ///
+    /// A null or unreadable floor changes nothing, which is the behaviour on a machine that
+    /// cannot be asked.
+    public boolean raiseMinDeploymentTargetTo(String sdkFloor) {
+        String raised = AppleSdkFloor.raiseTo(minDeploymentTarget, sdkFloor);
+        if (raised.equals(minDeploymentTarget)) {
+            return false;
+        }
+        minDeploymentTarget = raised;
+        return true;
+    }
+
     /// The Xcode configuration to archive. Reads the legacy macNative. spelling
     /// too, like every other setting here -- the builder used to look
     /// macos.configuration up directly, so a project saying

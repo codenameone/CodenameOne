@@ -171,6 +171,26 @@ public class MacOSNativeBuilder extends Executor {
         for (String warning : hints.getWarnings()) {
             log(warning);
         }
+        // The macOS SDK has a floor of its own and it moves: Xcode 27 raised it from 10.13 to
+        // 12.0, above this builder's default of 11.0, so an unmodified native macOS app
+        // stopped building. Raised once here because the value is read twice -- written into
+        // the generated pbxproj and passed on the xcodebuild command line.
+        // Through the xcodebuild this builder will actually run, not the environment.
+        // buildChannel() executes the bare name, so PATH decides -- and PATH can disagree with
+        // DEVELOPER_DIR. Asking the other one answers for an Xcode the build never runs: too
+        // high and the app is raised for nothing, too low and the real Xcode rejects the target
+        // written here. IPhoneBuilder already resolves it this way; this was the instance that
+        // did not.
+        String developerDir = IPhoneBuilder.developerDirFor(
+                xcodebuildOnPath(System.getenv("PATH")), System.getenv("DEVELOPER_DIR"));
+        String macOSFloor = AppleSdkFloor.minimumDeploymentTarget("macosx", null, developerDir);
+        String requestedMacOSTarget = hints.getMinDeploymentTarget();
+        if (hints.raiseMinDeploymentTargetTo(macOSFloor)) {
+            log("macos.minDeploymentTarget is " + requestedMacOSTarget + ", but this Xcode's "
+                    + "macOS SDK accepts nothing below " + macOSFloor + "; building against "
+                    + hints.getMinDeploymentTarget() + " instead. Apple raises this floor "
+                    + "between Xcode releases.");
+        }
 
         File tmpFile = getBuildDirectory();
         tmpFile.mkdirs();
@@ -2817,5 +2837,30 @@ public class MacOSNativeBuilder extends Executor {
             sb.append(f.getAbsolutePath());
         }
         return sb.toString();
+    }
+
+    /// The {@code xcodebuild} this builder will actually execute.
+    ///
+    /// <p>{@code buildChannel()} runs the bare name, so PATH decides which Xcode performs the
+    /// build. Package-visible and taking the PATH as an argument so the precedence can be
+    /// tested without setting environment variables, which Java cannot do to its own
+    /// process.</p>
+    ///
+    /// @param path the PATH to search, typically {@code System.getenv("PATH")}
+    /// @return the first executable {@code xcodebuild} on it, or null when there is none
+    static String xcodebuildOnPath(String path) {
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        for (String dir : path.split(File.pathSeparator)) {
+            if (dir.length() == 0) {
+                continue;
+            }
+            File candidate = new File(dir, "xcodebuild");
+            if (candidate.isFile() && candidate.canExecute()) {
+                return candidate.getAbsolutePath();
+            }
+        }
+        return null;
     }
 }

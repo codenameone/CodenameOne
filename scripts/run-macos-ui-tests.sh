@@ -84,20 +84,12 @@ rm_log "Loading workspace environment from $ENV_FILE"
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
-# Pin Xcode 26 for CI validation. Building against the macOS SDK 26+ needs the
-# SDK 26+ headers / Metal Toolchain to compile.
-if [ -z "${XCODE_APP:-}" ]; then
-  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-fi
-if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
-  rm_log "Xcode 26 not found. Set XCODE_APP to an installed Xcode 26 app bundle path." >&2
-  exit 3
-fi
-export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-export XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
-export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
-rm_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
-rm_log "Using XCODEBUILD=$XCODEBUILD"
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh for the
+# resolution order and for CN1_XCODE_MAJOR, the single knob that moves the
+# whole tree to the next Xcode.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode rm_log || exit 3
 
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
   rm_log "JAVA17_HOME not set correctly" >&2

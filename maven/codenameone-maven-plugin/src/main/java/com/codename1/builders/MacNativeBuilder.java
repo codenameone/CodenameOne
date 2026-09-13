@@ -134,6 +134,25 @@ class MacNativeBuilder {
         deriveBundleId = !"false".equals(request.getArg("macNative.deriveBundleId", "true"));
         minDeploymentTarget = request.getArg("macNative.minDeploymentTarget", "10.15");
         iosMinDeploymentTarget = request.getArg("macNative.iosMinDeploymentTarget", "13.1");
+        // Both floors moved under Xcode 27: macOS from 10.13 to 12.0 and iOS from 12.0 to 15.0.
+        // The Catalyst slice carries its own IPHONEOS_DEPLOYMENT_TARGET, so raising the iOS app
+        // target alone would leave this one under the floor. See AppleSdkFloor.
+        String macSdkFloor = owner.sdkMinimumDeploymentTarget("macosx");
+        String raisedMac = AppleSdkFloor.raiseTo(minDeploymentTarget, macSdkFloor);
+        if (!raisedMac.equals(minDeploymentTarget)) {
+            owner.log("macNative.minDeploymentTarget is " + minDeploymentTarget
+                    + ", but this Xcode's macOS SDK accepts nothing below " + macSdkFloor
+                    + "; building against " + raisedMac + " instead.");
+            minDeploymentTarget = raisedMac;
+        }
+        String catalystSdkFloor = owner.sdkMinimumDeploymentTarget("iphoneos");
+        String raisedCatalyst = AppleSdkFloor.raiseTo(iosMinDeploymentTarget, catalystSdkFloor);
+        if (!raisedCatalyst.equals(iosMinDeploymentTarget)) {
+            owner.log("macNative.iosMinDeploymentTarget is " + iosMinDeploymentTarget
+                    + ", but this Xcode's iOS SDK accepts nothing below " + catalystSdkFloor
+                    + "; building the Catalyst slice against " + raisedCatalyst + " instead.");
+            iosMinDeploymentTarget = raisedCatalyst;
+        }
         appCategory = request.getArg("macNative.appCategory", "public.app-category.utilities");
         String defaultCopyright = "Copyright (c) "
                 + Calendar.getInstance().get(Calendar.YEAR)

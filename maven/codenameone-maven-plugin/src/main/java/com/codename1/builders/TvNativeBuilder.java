@@ -191,6 +191,17 @@ class TvNativeBuilder {
         // tvOS 13 is a safe modern floor: Metal is fully supported and the focus
         // engine / UIKit surface the port relies on are all present.
         minDeploymentTarget = request.getArg("tvNative.minDeploymentTarget", "13.0");
+        // Xcode 27's tvOS SDK accepts nothing below 15.0, so both the default above and an
+        // explicit lower pin fail the build outright rather than warning. Raise to whatever
+        // the selected SDK will actually take; see AppleSdkFloor.
+        String tvSdkFloor = owner.sdkMinimumDeploymentTarget("appletvos");
+        String raisedTv = AppleSdkFloor.raiseTo(minDeploymentTarget, tvSdkFloor);
+        if (!raisedTv.equals(minDeploymentTarget)) {
+            owner.log("tvNative.minDeploymentTarget is " + minDeploymentTarget
+                    + ", but this Xcode's tvOS SDK accepts nothing below " + tvSdkFloor
+                    + "; building against " + raisedTv + " instead.");
+            minDeploymentTarget = raisedTv;
+        }
         teamId = request.getArg("tvNative.teamId",
                 request.getArg("ios.release.teamId",
                         request.getArg("ios.teamId",

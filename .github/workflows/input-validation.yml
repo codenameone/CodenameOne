@@ -18,6 +18,7 @@ on:
     paths:
       - '.github/workflows/input-validation.yml'
       - 'scripts/input-validation-app/**'
+      - 'scripts/lib/xcode.sh'
       - 'scripts/build-ios-app.sh'
       - 'CodenameOne/src/com/codename1/ui/Component.java'
       - 'CodenameOne/src/com/codename1/ui/Form.java'
@@ -29,6 +30,7 @@ on:
     paths:
       - '.github/workflows/input-validation.yml'
       - 'scripts/input-validation-app/**'
+      - 'scripts/lib/xcode.sh'
       - 'scripts/build-ios-app.sh'
   workflow_dispatch: {}
 

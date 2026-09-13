@@ -181,7 +181,19 @@ final class InputValidationUITests: XCTestCase {
             return
         }
         let gate = syncDir.appendingPathComponent("\(name).go")
-        let deadline = Date().addingTimeInterval(45.0)
+        // Matched to the harness. drivers/run-ios.sh release_xcui_step() waits up to 240s for
+        // CN1IV:READY:<step> before it creates this gate, and waiting only 45s for it here
+        // meant the test could give up while the harness was still willing -- which is exactly
+        // what happened on a contended runner: the suite failed, and then the log recorded
+        // "Releasing XCUITest gesture after CN1IV:READY:tap" and the same for drag, seconds
+        // into teardown. The app was slow, not stuck, and nothing was wrong with it.
+        //
+        // Whatever these two numbers are, this one must not be the smaller. A readiness gate
+        // should not decide pass or fail on machine load; an app that never signals still
+        // fails, just later, and the message says how long it waited.
+        let timeout = ProcessInfo.processInfo.environment["CN1IV_GATE_TIMEOUT"]
+            .flatMap(Double.init) ?? 240.0
+        let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if FileManager.default.fileExists(atPath: gate.path) {
                 return
@@ -191,7 +203,8 @@ final class InputValidationUITests: XCTestCase {
         throw NSError(
             domain: "CN1InputValidationUITests",
             code: 1,
-            userInfo: [NSLocalizedDescriptionKey: "Timed out waiting for \(gate.path)"]
+            userInfo: [NSLocalizedDescriptionKey:
+                "Timed out after \(timeout)s waiting for \(gate.path)"]
         )
     }
 }
