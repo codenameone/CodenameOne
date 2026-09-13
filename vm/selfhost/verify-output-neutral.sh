@@ -97,7 +97,11 @@ vs-master)
     done
     # The C runtime is copied verbatim and this branch edits it on purpose, so it is
     # not part of the codegen question.
-    RUNTIME='^(cn1_globals\\.[ch]|nativeMethods\\.c|cn1_intrinsics\\.h|java_io_File_runtime\\.c|cn1-source-manifest\\.txt)$'
+    # Single backslash: this value goes to grep -E, where \. is a literal dot. Two
+    # backslashes made it "a literal backslash followed by any character", so NOTHING
+    # matched and the four copied runtime files were counted as codegen differences --
+    # which is the 115-versus-119 gap that should have been chased when it appeared.
+    RUNTIME='^(cn1_globals\.[ch]|nativeMethods\.c|cn1_intrinsics\.h|java_io_File_runtime\.c|cn1-source-manifest\.txt)$'
     # Walk the UNION of both trees, not master's listing. A file the branch emits and
     # master does not would never be visited by a master-only loop, so a whole new
     # generated class could appear and the gate would report neutral.
