@@ -335,6 +335,22 @@ public final class StaticFiles implements HttpServer.Handler {
             return false;
         }
         long parsed = Http1Date.parse(value);
+        // EXACT MATCH, and deliberately not "the file is no later than this date".
+        //
+        // A review asked for the looser test, on the reasoning that a file older
+        // than the client's validator cannot have changed since it. That is the
+        // rule for If-Unmodified-Since, and RFC 7233 3.2 singles this out: "this
+        // comparison by exact match, including when the validator is an HTTP-date,
+        // differs from the 'earlier than or equal to' comparison used when
+        // evaluating an If-Unmodified-Since conditional". If-Range takes the
+        // STRONG comparison because of what it authorises -- splicing new bytes
+        // onto a prefix the client already holds. A file whose timestamp went
+        // BACKWARDS, restored from a backup or rolled back, is a different
+        // representation that happens to be older, and answering 206 for it staples
+        // two representations together and calls the result a complete download.
+        // The whole file is one wasted transfer; the splice is a corrupt file the
+        // client believes in.
+        //
         // Second granularity on the wire, as in isNotModified.
         return parsed >= 0 && parsed / 1000 == modified / 1000;
     }

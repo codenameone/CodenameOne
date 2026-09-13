@@ -1878,6 +1878,150 @@ public class SelfTest {
     }
 
     /**
+     * A database path that would name a different file as a C string opens
+     * nothing.
+     *
+     * <p>sqlite3_open takes the path as a C string, so a NUL inside it ends the
+     * path there: "allowed.db" followed by a NUL and "/ignored" opens allowed.db
+     * while a caller that checked the directory it was handed approved something
+     * else. That is the fifth string in this runtime that crosses to a native and
+     * is not the string the native reads.
+     */
+    private static void aTruncatingDatabasePathOpensNothing() throws Exception {
+        String dir = "/tmp/cn1-selftest-db-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        String refusal;
+        try {
+            Db wrong = Db.open(dir + "/allowed.db\u0000/ignored");
+            wrong.close();
+            refusal = "opened";
+        } catch (java.io.IOException expected) {
+            refusal = "refused";
+        }
+        // THE CONTROL: the same path without the NUL still opens, so this cannot
+        // pass by refusing everything.
+        boolean honestOpened;
+        Db honest = Db.open(dir + "/allowed.db");
+        try {
+            honest.execute("CREATE TABLE t(x)", null);
+            honestOpened = true;
+        } finally {
+            honest.close();
+        }
+        new java.io.File(dir + "/allowed.db").delete();
+        new java.io.File(dir).delete();
+        check("a database path holding a NUL opens nothing", "refused", refusal);
+        check("while the same path without one still opens", "true",
+                String.valueOf(honestOpened));
+    }
+
+    /**
+     * If-Range is an EXACT match, and a later date does not authorise a range.
+     *
+     * <p>Pinned because a review asked for the opposite, reasoning that a file
+     * older than the client's validator cannot have changed since it -- which is
+     * the rule for If-Unmodified-Since. RFC 7233 3.2 singles out the difference:
+     * the If-Range comparison is by exact match "including when the validator is
+     * an HTTP-date". The strong comparison is what stops a file whose timestamp
+     * went backwards, restored from a backup, from having fresh bytes stapled
+     * onto the prefix a client already holds.
+     */
+    private static void aLaterIfRangeDateDoesNotAuthoriseARange() throws Exception {
+        String dir = "/tmp/cn1-selftest-ifrange-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        java.io.FileOutputStream out = new java.io.FileOutputStream(dir + "/payload.txt");
+        try {
+            out.write("0123456789".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        final StaticFiles files = new StaticFiles(dir, "", null, null);
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = files.handle(request);
+                return served == null ? HttpServer.Response.text(404, "not ours") : served;
+            }
+        });
+        String matching;
+        String later;
+        try {
+            String head = httpHead(server.getPort(), "/payload.txt");
+            String lastModified = headerOf(head, "Last-Modified");
+            matching = statusOf(httpRangeRequest(server.getPort(), "/payload.txt",
+                    "bytes=0-3", lastModified));
+            // Later than the file by seventy years, so "not modified since" holds
+            // and only the exact-match rule refuses it.
+            later = statusOf(httpRangeRequest(server.getPort(), "/payload.txt",
+                    "bytes=0-3", "Wed, 21 Oct 2099 07:28:00 GMT"));
+        } finally {
+            server.stop(2000);
+            new java.io.File(dir + "/payload.txt").delete();
+            new java.io.File(dir).delete();
+        }
+        check("the validator the client was given authorises a range", "206", matching);
+        check("a later If-Range date does not", "200", later);
+    }
+
+    private static String httpHead(int port, String target) throws Exception {
+        return httpRaw(port, "HEAD " + target + " HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n");
+    }
+
+    private static String httpRangeRequest(int port, String target, String range,
+            String ifRange) throws Exception {
+        return httpRaw(port, "GET " + target + " HTTP/1.1\r\nHost: x\r\n"
+                + "Range: " + range + "\r\nIf-Range: " + ifRange + "\r\n"
+                + "Connection: close\r\n\r\n");
+    }
+
+    private static String httpRaw(int port, String request) throws Exception {
+        Tcp conn = Tcp.connect("127.0.0.1", port, 15000);
+        try {
+            byte[] bytes = request.getBytes("UTF-8");
+            conn.write(bytes, 0, bytes.length);
+            ByteArrayOutputStream all = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            while(true) {
+                int n = conn.read(chunk, 0, chunk.length);
+                if(n <= 0) {
+                    break;
+                }
+                all.write(chunk, 0, n);
+            }
+            return new String(all.toByteArray(), "UTF-8");
+        } finally {
+            conn.close();
+        }
+    }
+
+    private static String statusOf(String reply) {
+        int space = reply.indexOf(' ');
+        return space < 0 || reply.length() < space + 4 ? "unreadable: " + reply
+                : reply.substring(space + 1, space + 4);
+    }
+
+    /** Walks the head line by line: vm/JavaAPI has no String.split. */
+    private static String headerOf(String reply, String name) {
+        int at = 0;
+        while(at < reply.length()) {
+            int end = reply.indexOf("\r\n", at);
+            if(end < 0) {
+                end = reply.length();
+            }
+            String line = reply.substring(at, end);
+            if(line.length() == 0) {
+                return null;                    // the head ends at the blank line
+            }
+            int colon = line.indexOf(':');
+            if(colon > 0 && line.substring(0, colon).equalsIgnoreCase(name)) {
+                return line.substring(colon + 1).trim();
+            }
+            at = end + 2;
+        }
+        return null;
+    }
+
+    /**
      * A bind address that would name a different interface as a C string binds
      * nothing.
      *
@@ -3455,6 +3599,8 @@ public class SelfTest {
         aStaticFileComesBackWhole();
         aRefusedBodyIsNeverInvited();
         anInterimResponseIsSkipped();
+        aTruncatingDatabasePathOpensNothing();
+        aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();
         aResponseEndsAtItsDeclaredLength();
         aTruncatingPathOpensNothing();

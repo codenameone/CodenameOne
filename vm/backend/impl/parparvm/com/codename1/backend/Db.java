@@ -56,11 +56,30 @@ public final class Db {
      * for a cache.
      */
     public static Db open(String path) throws IOException {
+        // A NUL ENDS THE PATH where it becomes a C string, and sqlite3_open then
+        // names a different database: "allowed.db" followed by a NUL and
+        // "/ignored" opens allowed.db, while a caller that checked the directory
+        // or the suffix it was given approved something else. Reported as "could
+        // not open", which is what this method already says for a path that names
+        // nothing -- and what the Java SE arm answers, since the JDBC URL it
+        // builds fails on the same byte.
+        if(path != null && path.indexOf(0) >= 0) {
+            throw new IOException("Could not open database at " + describeForMessage(path));
+        }
         long h = openImpl(path);
         if(h == 0) {
             throw new IOException("Could not open database at " + path);
         }
         return new Db(h);
+    }
+
+    /**
+     * A path for a message, cut at the NUL so the part that would have been
+     * dropped silently is visible rather than invisible in whatever reads the log.
+     */
+    private static String describeForMessage(String path) {
+        int nul = path.indexOf(0);
+        return nul < 0 ? path : path.substring(0, nul) + "<NUL>...";
     }
 
     /**
