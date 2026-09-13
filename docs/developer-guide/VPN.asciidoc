@@ -35,10 +35,17 @@ image::img/vpn-three-questions.svg["Which of the three VPN questions your app is
 
 === Detecting A VPN Is A Different Question, And Already Answered
 
-If all you want to know is whether this device's traffic is going over a VPN --
-to warn about it, or to refuse to run behind one --
-`NetworkManager.isVPNActive()` has answered that for years, works on far more
-platforms than can install a profile, and needs no entitlement at all.
+If all you want to know is whether this device's traffic looks like it's going
+over a VPN, `NetworkManager.isVPNActive()` has answered that for years, works on
+far more platforms than can install a profile, and needs no entitlement at all.
+Check `isVPNDetectionSupported()` first, because not every platform implements
+it.
+
+Its own contract calls the answer advisory: the platform APIs and
+interface-name heuristics behind it miss some VPN configurations and report some
+non-VPN tunnels as VPNs. Warn on it, log it, degrade on it -- but don't build
+enforcement on it, because both kinds of mistake are available to it and neither
+is rare enough to design around.
 
 [source,java]
 ----
