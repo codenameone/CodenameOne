@@ -98,6 +98,11 @@ class MonetizationJava041Snippet {
      return;
      }
      ToastBar.showMessage("Your subscription has been extended to "+iap.getExpiryDate(PRODUCTS), FontImage.MATERIAL_THUMB_UP);
+
+     // The form the user is looking at still shows the status from before the
+     // purchase. The toast is not a substitute for repainting it.
+     showRentalStatus();
+     current.revalidate();
     }
 
     @Override
@@ -105,6 +110,11 @@ class MonetizationJava041Snippet {
      ToastBar.showErrorMessage("Failure occurred: "+errorMessage);
     }
     // end::monetization-java-041[]
+
+    Form current = new Form();
+
+    void showRentalStatus() {
+    }
     }
 
     String SKU_WORLD_1_MONTH = "com.example.world.month";
