@@ -31,6 +31,8 @@ Branch on `Vpn.isSupported()` and `Vpn.getCapabilities()` for the managed
 profile, and on `Tunnels.isSupported()` for a tunnel of your own, rather than
 on the platform. Every callback arrives on the EDT.
 
+image::img/vpn-three-questions.svg["Which of the three VPN questions your app is asking",scaledwidth=95%]
+
 === Detecting A VPN Is A Different Question, And Already Answered
 
 If all you want to know is whether this device's traffic is going over a VPN --
