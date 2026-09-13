@@ -617,6 +617,69 @@ public class SelfTest {
         check("an ordinary header is still sent", "allowed", allowed);
     }
 
+    /**
+     * A response that repeats a field keeps every value of it.
+     *
+     * <p>Both arms kept one -- the translated one overwrote as it parsed, the
+     * JavaSE one took the last of the JDK's list -- so a response setting three
+     * cookies delivered one and nothing said the others had gone. They cannot be
+     * joined back together either: an Expires attribute carries a comma of its
+     * own, so a comma-joined Set-Cookie is not one cookie or three.
+     *
+     * <p>Answered by a stub that writes the response literally, because the
+     * server in this process sends its extra headers from a Map and so cannot
+     * repeat a name.
+     */
+    private static void aRepeatedResponseHeaderKeepsEveryValue() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    byte[] scratch = new byte[4096];
+                    ServerSocket.read(client, scratch, 0, scratch.length);
+                    String response = "HTTP/1.1 200 OK\r\n"
+                            + "Content-Length: 2\r\n"
+                            + "Set-Cookie: a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT\r\n"
+                            + "Set-Cookie: b=2\r\n"
+                            + "Set-Cookie: c=3\r\n"
+                            + "Connection: close\r\n\r\nok";
+                    byte[] bytes = response.getBytes("UTF-8");
+                    ServerSocket.write(client, bytes, 0, bytes.length);
+                } catch (Exception ignored) {
+                    // The client hanging up is how this ends.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String count;
+        String first;
+        try {
+            Web.Result result = Web.request("GET", "http://127.0.0.1:" + port + "/x",
+                    null, null);
+            count = String.valueOf(result.getHeaderValues("set-cookie").size());
+            first = String.valueOf(result.getHeader("Set-Cookie"));
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("every Set-Cookie survives", "3", count);
+        // AND THE SINGLE ACCESSOR still answers, with the first of them -- a
+        // caller that wants one cookie does not have to learn a new method.
+        check("and the single accessor answers with the first", "true",
+                String.valueOf(first.startsWith("a=1")));
+    }
+
     private static void outboundHeadersCannotCarryANewline() throws Exception {
         String[] bad = new String[] {
             "Authorization: Bearer abc\nX-Admin: true",  // the finding
@@ -2604,6 +2667,7 @@ public class SelfTest {
         theOtherClientChecksItsRequestLine();
         anIpv6HostIsBracketed();
         outboundHeadersCannotCarryANewline();
+        aRepeatedResponseHeaderKeepsEveryValue();
         theTransportOwnsItsOwnFields();
         repeatedOutboundHeadersSurvive();
         anOversizedResponseIsRefusedNotAccumulated();

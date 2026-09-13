@@ -75,12 +75,28 @@ public final class Web {
         private final byte[] body;
         private final String error;
         private final Map headers;
+        private final Map values;
 
-        Result(int status, byte[] body, String error, Map headers) {
+        /**
+         * @param values name (lower case) to the List of every value the response
+         *               carried for it, in arrival order
+         */
+        Result(int status, byte[] body, String error, Map values) {
             this.status = status;
             this.body = body;
             this.error = error;
-            this.headers = headers == null ? new LinkedHashMap() : headers;
+            this.values = values == null ? new LinkedHashMap() : values;
+            // The single-valued view getHeaders() has always returned, kept so a
+            // caller that iterates it still gets a Map of Strings.
+            this.headers = new LinkedHashMap();
+            java.util.Iterator it = this.values.entrySet().iterator();
+            while(it.hasNext()) {
+                Map.Entry entry = (Map.Entry)it.next();
+                List all = (List)entry.getValue();
+                if(all != null && !all.isEmpty()) {
+                    this.headers.put(entry.getKey(), all.get(0));
+                }
+            }
         }
 
         /** The HTTP status, or -1 when the transfer itself failed. */
@@ -125,9 +141,33 @@ public final class Web {
         return headers;
     }
 
-    /** One header by name, matched case-insensitively. Null when absent. */
+    /**
+     * The FIRST value for a name, matched case-insensitively. Null when absent.
+     *
+     * <p>First rather than last, which is what this used to answer -- and the two
+     * differ only for a field the response repeated, which is the case that was
+     * losing data. Use getHeaderValues for a field that is legitimately repeated:
+     * Set-Cookie is the one every response has, and its values cannot be joined
+     * back together because an Expires attribute contains a comma of its own.
+     */
     public String getHeader(String name) {
-        return name == null ? null : (String)headers.get(asciiLower(name));
+        List all = getHeaderValues(name);
+        return all.isEmpty() ? null : (String)all.get(0);
+    }
+
+    /**
+     * Every value the response carried for a name, in arrival order.
+     *
+     * <p>Empty, never null, when the response had none. A repeated field used to
+     * collapse to one value here, so a response setting three cookies delivered
+     * one and nothing said the others had been dropped.
+     */
+    public List getHeaderValues(String name) {
+        if(name == null) {
+            return new ArrayList();
+        }
+        List all = (List)values.get(asciiLower(name));
+        return all == null ? new ArrayList() : all;
     }
     }
 
@@ -230,8 +270,15 @@ public final class Web {
             if(colon <= 0) {
                 continue;
             }
-            out.put(asciiLower(line.substring(0, colon).trim()),
-                    line.substring(colon + 1).trim());
+            // EVERY value, in arrival order. Overwriting meant a response with
+            // three Set-Cookie lines delivered one.
+            String name = asciiLower(line.substring(0, colon).trim());
+            List all = (List)out.get(name);
+            if(all == null) {
+                all = new ArrayList();
+                out.put(name, all);
+            }
+            all.add(line.substring(colon + 1).trim());
         }
         return out;
     }

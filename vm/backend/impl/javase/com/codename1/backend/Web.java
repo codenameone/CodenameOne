@@ -71,12 +71,23 @@ public final class Web {
         private final byte[] body;
         private final String error;
         private final Map headers;
+        private final Map values;
 
-        Result(int status, byte[] body, String error, Map headers) {
+        /** @param values name (lower case) to every value, as the twin takes. */
+        Result(int status, byte[] body, String error, Map values) {
             this.status = status;
             this.body = body;
             this.error = error;
-            this.headers = headers == null ? new LinkedHashMap() : headers;
+            this.values = values == null ? new LinkedHashMap() : values;
+            this.headers = new LinkedHashMap();
+            java.util.Iterator it = this.values.entrySet().iterator();
+            while(it.hasNext()) {
+                Map.Entry entry = (Map.Entry)it.next();
+                List all = (List)entry.getValue();
+                if(all != null && !all.isEmpty()) {
+                    this.headers.put(entry.getKey(), all.get(0));
+                }
+            }
         }
 
         public int getStatus() {
@@ -91,9 +102,19 @@ public final class Web {
             return headers;
         }
 
-        /** One header by name, matched case-insensitively. Null when absent. */
+        /** The FIRST value for a name; see the translated twin. */
         public String getHeader(String name) {
-            return name == null ? null : (String)headers.get(asciiLower(name));
+            List all = getHeaderValues(name);
+            return all.isEmpty() ? null : (String)all.get(0);
+        }
+
+        /** Every value for a name, in arrival order; empty when absent. */
+        public List getHeaderValues(String name) {
+            if(name == null) {
+                return new java.util.ArrayList();
+            }
+            List all = (List)values.get(asciiLower(name));
+            return all == null ? new java.util.ArrayList() : all;
         }
 
         public boolean isSuccess() {
@@ -294,21 +315,28 @@ public final class Web {
             // Lower-cased names, as the translated twin produces: a caller must
             // not have to know which case this particular server chose.
             Map responseHeaders = new LinkedHashMap();
-            Map raw = connection.getHeaderFields();
-            if(raw != null) {
-                java.util.Iterator it = raw.entrySet().iterator();
-                while(it.hasNext()) {
-                    Map.Entry entry = (Map.Entry)it.next();
-                    Object name = entry.getKey();
-                    if(name == null) {
-                        continue; // the status line, which getHeaderFields keys as null
-                    }
-                    List values = (List)entry.getValue();
-                    if(values != null && !values.isEmpty()) {
-                        responseHeaders.put(asciiLower(String.valueOf(name)),
-                                String.valueOf(values.get(values.size() - 1)));
-                    }
+            // BY INDEX, not through getHeaderFields. Every value is kept now --
+            // taking one delivered a single cookie out of a response that set
+            // three -- and the order has to be the order they arrived in, which is
+            // what the translated twin produces and what this documents. The map
+            // getHeaderFields builds is in the JDK's own order, and for a repeated
+            // field that is not arrival order; the indexed accessors are.
+            for(int iter = 0 ; ; iter++) {
+                String name = connection.getHeaderFieldKey(iter);
+                String value = connection.getHeaderField(iter);
+                if(name == null && value == null) {
+                    break;      // past the end
                 }
+                if(name == null) {
+                    continue;   // the status line, which has no key
+                }
+                String key = asciiLower(name);
+                List all = (List)responseHeaders.get(key);
+                if(all == null) {
+                    all = new java.util.ArrayList();
+                    responseHeaders.put(key, all);
+                }
+                all.add(value);
             }
             return new Result(status, buffer.toByteArray(), null, responseHeaders);
         } finally {
