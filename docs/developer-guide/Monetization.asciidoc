@@ -464,7 +464,7 @@ For this tutorial, the example uses a purpose-built library to handle receipt va
 The server project linked above shows it in use.
 
 
-As you can see from this snippet, the complexity of receipt validation has been reduced to entering three configuration strings:
+In that project the complexity of receipt validation is reduced to entering three configuration strings:
 
 1. `APPLE_SECRET` - This is a "secret" string that you will get from iTunes connect when you set up your in-app products.
 2. `GOOGLE_DEVELOPER_API_CLIENT_ID` - A client ID that you'll get from the Google developer API console when you set up your API service credentials.

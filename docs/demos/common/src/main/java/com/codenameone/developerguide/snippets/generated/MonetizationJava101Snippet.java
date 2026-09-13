@@ -61,14 +61,20 @@ class MonetizationJava101Snippet {
     String[] PRODUCTS = {"com.codename1.world.month", "com.codename1.world.year"};
 
     // tag::monetization-java-101[]
-    void syncButton() {
+    void addSyncButton() {
         Button syncReceipts = new Button("Synchronize Receipts");
 
         syncReceipts.addActionListener(e -> {
-            iap.synchronizeReceipts(0, res -> {
-                // Update the UI
+            iap.synchronizeReceipts(0, success -> {
+                if (success) {
+                    // Update the UI from the freshly loaded receipts
+                } else {
+                    ToastBar.showErrorMessage("Could not reach the receipt store");
+                }
             });
         });
+
+        hi.add(syncReceipts);
     }
     // end::monetization-java-101[]
 }

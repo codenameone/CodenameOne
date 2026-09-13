@@ -61,13 +61,20 @@ class MonetizationJava102Snippet {
     String[] PRODUCTS = {"com.codename1.world.month", "com.codename1.world.year"};
 
     // tag::monetization-java-102[]
-    void expiryLabel() {
+    void addExpiryLabel() {
         SpanLabel rentalStatus = new SpanLabel("Loading rental details...");
         Button syncReceipts = new Button("Synchronize Receipts");
 
         syncReceipts.addActionListener(e -> {
-            iap.synchronizeReceipts(0, res -> {
-                if (iap.isSubscribed(PRODUCTS)) {
+            iap.synchronizeReceipts(0, success -> {
+                // synchronizeReceipts reports true only when every pending purchase
+                // reached the receipt store AND the receipts came back. On false the
+                // receipts are still whatever the last successful sync left behind,
+                // so say so rather than presenting them as a fresh answer.
+                if (!success) {
+                    rentalStatus.setText("Could not reach the receipt store, "
+                            + "showing the last known status");
+                } else if (iap.isSubscribed(PRODUCTS)) {
                     rentalStatus.setText("World rental expires " + iap.getExpiryDate(PRODUCTS));
                 } else {
                     rentalStatus.setText("You do not currently have a subscription to the world");
@@ -75,6 +82,9 @@ class MonetizationJava102Snippet {
                 hi.revalidate();
             });
         });
+
+        hi.add(rentalStatus);
+        hi.add(syncReceipts);
     }
     // end::monetization-java-102[]
 }
