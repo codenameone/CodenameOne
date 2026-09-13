@@ -257,19 +257,26 @@ public final class Class<T> implements java.lang.reflect.Type {
         return null;
     }
 
-    /** True when any segment of a resource-relative path is "..". */
+    /**
+     * True when any segment of a resource-relative path is "..".
+     *
+     * A backslash counts as a separator as well as '/'. Resource names are
+     * '/'-separated by specification, but nothing stops a caller passing a Windows
+     * path, and there File("root", "..\\..\\x") escapes exactly as the '/' form
+     * does -- checking only '/' would leave the traversal open on the one platform
+     * whose separator it is.
+     */
     private static boolean cn1EscapesRoot(String relative) {
         int from = 0;
-        while (from <= relative.length()) {
-            int slash = relative.indexOf('/', from);
-            String segment = slash < 0 ? relative.substring(from) : relative.substring(from, slash);
-            if (segment.equals("..")) {
+        for (int i = 0; i <= relative.length(); i++) {
+            boolean atEnd = i == relative.length();
+            if (!atEnd && relative.charAt(i) != '/' && relative.charAt(i) != '\\') {
+                continue;
+            }
+            if (relative.substring(from, i).equals("..")) {
                 return true;
             }
-            if (slash < 0) {
-                return false;
-            }
-            from = slash + 1;
+            from = i + 1;
         }
         return false;
     }
