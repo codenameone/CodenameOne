@@ -38,11 +38,6 @@ ATTR_RE = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 
 # A rendered width/height is a number, optionally with a unit. Anything else in
 # that slot is alt text that spilled into it.
-#
-# Dimension-SHAPED spill is the hard case and cannot be settled from the render:
-# [Results, 2024] and [Diagram,640] both come out as alt="X" width="N", and only
-# the author knows which was meant. Those are held against a baseline instead, so
-# the ones already in the guide stay quiet and a new one has to be declared.
 DIMENSION_RE = re.compile(r"^\s*\d+(?:\.\d+)?\s*(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?\s*$", re.I)
 
 
@@ -73,7 +68,6 @@ def render(source: Path, attributes: Tuple[str, ...] = ()) -> str:
         return out.read_text(encoding="utf-8", errors="replace")
 
 
-BASELINE = Path("scripts/developer-guide/image-dimension-baseline.txt")
 
 # Named attributes an image macro takes. Used only to recognise a tail that
 # Asciidoctor swallowed as an unknown named attribute: [Plot coordinates x,
@@ -87,6 +81,22 @@ IMAGE_ATTRIBUTES = frozenset({
 })
 SOURCE_MACRO_RE = re.compile(r"image::?([^\[\]\s]+)\[([^\]]*)\]")
 FIELD_NAME_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=")
+
+
+# Asciidoctor applies typographic substitution, so the alt text in the source
+# and the alt text in the render are not the same string: ' becomes a curly
+# quote, -- becomes an em dash. Both sides are normalised before they are
+# compared, or an occurrence key derived from the source never matches the one
+# derived from the render.
+SMART = {"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"',
+         "\u2014": "--", "\u2013": "-", "\u2026": "...", "\u00a0": " ",
+         "\u2009": " ", "\u200a": " ", "\u202f": " "}
+
+
+def normalise(value: str) -> str:
+    for fancy, plain in SMART.items():
+        value = value.replace(fancy, plain)
+    return " ".join(value.split())
 
 
 def unquote(value: str) -> str:
@@ -155,44 +165,36 @@ def scan_source(guide_dir: Path):
                 fields = split_fields(attrs)
                 if len(fields) < 2:
                     continue
-                first = fields[0].strip()
-                positional_alt = True
-                named_alt = FIELD_NAME_RE.match(first)
-                if named_alt and named_alt.group(1).lower() == "alt":
-                    # The all-named form, image::x.png[alt="Diagram",width=640].
-                    # The first field is an assignment, not positional alt text.
-                    positional_alt = False
-                    first = first[named_alt.end():].strip()
-                alt = unquote(first)
-                for field in fields[1:]:
+                # Attributes are read wherever they sit: [width=640,alt="D"]
+                # is as valid as [alt="D",width=640], and the alt itself may be
+                # named. Nothing here assumes an order.
+                alt, alt_quoted, dimensions, unknown = "", False, set(), None
+                for index, field in enumerate(fields):
                     name = FIELD_NAME_RE.match(field)
-                    if not name:
-                        continue
-                    lowered = name.group(1).lower()
-                    if lowered in {"width", "height"}:
-                        # Keyed by slot: naming a height says nothing about a
-                        # positional width sitting beside it, which may be the
-                        # tail of the alt text.
-                        named.add((src, alt, lowered))
-                    elif lowered not in IMAGE_ATTRIBUTES:
-                        if positional_alt and not first.startswith(('"', "'")):
-                            tails.append((path, number, src, field.strip()))
-                        break
+                    if name:
+                        lowered = name.group(1).lower()
+                        value = field[name.end():].strip()
+                        if lowered == "alt":
+                            alt, alt_quoted = unquote(value), value[:1] in "\"'"
+                        elif lowered in {"width", "height"}:
+                            dimensions.add(lowered)
+                        elif lowered not in IMAGE_ATTRIBUTES and unknown is None:
+                            unknown = field.strip()
+                    elif index == 0:
+                        alt = unquote(field)
+                        alt_quoted = field.strip()[:1] in "\"'"
+                for slot in dimensions:
+                    named.add((src, normalise(alt), slot))
+                # An unknown named attribute swallows everything before it into
+                # the alt text, whether that alt was positional or named -- and
+                # [alt=Plot coordinates x, y=2] is cut exactly like the
+                # positional form. Only a quoted alt is safe from it.
+                if unknown is not None and not alt_quoted:
+                    tails.append((path, number, src, unknown))
     return tails, named
 
 
-def load_baseline() -> set:
-    if not BASELINE.exists():
-        return set()
-    entries = set()
-    for line in BASELINE.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            entries.add(line)
-    return entries
-
-
-def offenders(markup: str, baseline: set, named_dimensions: set) -> List[Tuple[str, str, str, bool]]:
+def offenders(markup: str, named_dimensions: set) -> List[Tuple[str, str, str, bool]]:
     """Rendered images whose width or height is not one, or is undeclared.
 
     Returns (src, alt, value, ambiguous). ambiguous marks the dimension-shaped
@@ -211,10 +213,11 @@ def offenders(markup: str, baseline: set, named_dimensions: set) -> List[Tuple[s
             if not DIMENSION_RE.match(value):
                 found.append((src, alt, html.unescape(value), False))
                 break
-            if (src, alt, slot) in named_dimensions:
-                continue
-            key = f"{src}|{slot}|{value}|{alt}"
-            if key not in baseline:
+            # A dimension the source did not name is positional, and a
+            # positional dimension is indistinguishable from the tail of an alt
+            # text that a comma cut short. The guide names every dimension it
+            # means, so an unnamed one is the spill.
+            if (src, normalise(alt), slot) not in named_dimensions:
                 found.append((src, alt, f"{slot}={value}", True))
                 break
     return found
@@ -230,7 +233,6 @@ def main() -> int:
         Path("docs/developer-guide/developer-guide.asciidoc")]
 
     guide_dir = Path("docs/developer-guide")
-    baseline = load_baseline()
     tails, named_dimensions = scan_source(guide_dir)
     total = 0
     seen = set()
@@ -239,7 +241,7 @@ def main() -> int:
             markup = render(source, attributes)
             if not markup:
                 return 1
-            for src, alt, spilled, ambiguous in offenders(markup, baseline, named_dimensions):
+            for src, alt, spilled, ambiguous in offenders(markup, named_dimensions):
                 # the same image usually appears in both renders; report it once
                 if (src, alt, spilled) in seen:
                     continue
@@ -248,10 +250,10 @@ def main() -> int:
                 where = "" if name == "html" else f" (in the {name} render)"
                 print(f"{source}: {src}{where}")
                 if ambiguous:
-                    print(f'    renders as alt="{alt}" with an undeclared {spilled}')
-                    print("    If that is a real width, add it to "
-                          f"{BASELINE}. If it is the tail of the alt")
-                    print("    text, quote the alt text instead.")
+                    print(f'    renders as alt="{alt}" with a positional {spilled}')
+                    print("    If that is a real dimension, name it "
+                          "(width=N). If it is the tail of the")
+                    print("    alt text, quote the alt text instead.")
                 else:
                     print(f'    alt text was cut to "{alt}"')
                     print(f'    and "{spilled}" landed in the width slot')

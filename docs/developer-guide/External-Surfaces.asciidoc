@@ -4,7 +4,7 @@ Home-screen widgets and live activities answer the same developer question: how 
 
 The simulator renders every surface you publish in a dedicated preview window, so the full loop runs on your desktop with no device:
 
-image::img/surfaces-widget-preview.png[The simulator Widgets preview rendering the delivery widget with a native countdown and progress bar above the mock Dynamic Island,640]
+image::img/surfaces-widget-preview.png[The simulator Widgets preview rendering the delivery widget with a native countdown and progress bar above the mock Dynamic Island,width=640]
 
 === The dead-process rule
 
@@ -52,7 +52,7 @@ Three things in this layout carry the model's weight. `SurfaceText` renders `${s
 
 A complete runnable example lives in `Samples/samples/SurfacesSample` together with its `surfaces.json`:
 
-image::img/surfaces-sample-form.png[The SurfacesSample main form with publish and live activity controls,640]
+image::img/surfaces-sample-form.png[The SurfacesSample main form with publish and live activity controls,width=640]
 
 ==== Previewing in the simulator
 
@@ -101,7 +101,7 @@ Angles use the clock convention: degrees, 0 at 12 o'clock, clockwise positive. T
 include::../demos/common/src/main/java/com/codenameone/developerguide/surfaces/SurfacesSnippets.java[tag=clockTimeline,indent=0]
 ----
 
-image::img/surfaces-clock-widget.png[The analog clock widget rendered from a SurfaceVector in the simulator preview,320]
+image::img/surfaces-clock-widget.png[The analog clock widget rendered from a SurfaceVector in the simulator preview,width=320]
 
 === Live activities
 
@@ -121,7 +121,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/surfaces/S
 
 The simulator preview renders the running activity as a mock Dynamic Island pill plus the expanded card:
 
-image::img/surfaces-dynamic-island.png[The simulator's mock Dynamic Island pill and expanded live activity card,640]
+image::img/surfaces-dynamic-island.png[The simulator's mock Dynamic Island pill and expanded live activity card,width=640]
 
 On iOS the activity appears on the lock screen and, on supported devices, inside the Dynamic Island (ActivityKit requires iOS 16.1 or newer). On Android it lowers to an ongoing notification that renders the same content; on Android 13 and newer the first `start(...)` prompts for the notification permission, which the build declares for you, and `isSupported()` reports false once the user has turned that prompt down twice or has switched notifications off for the app. On desktop it appears in the simulator preview or as a floating window.
 
