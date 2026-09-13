@@ -80,6 +80,8 @@ class MonetizationJava037Snippet {
     Button button;
     SpanLabel rentalStatus = new SpanLabel();
 
+    Form current;
+
     void showRentalStatus() {
     }
 
@@ -95,6 +97,13 @@ class MonetizationJava037Snippet {
     
     // tag::monetization-java-037[]
     public void start() {
+     // The same guard the earlier start() listing uses. Without it a resume
+     // builds a second form and hands it components the first one still owns,
+     // which Container rejects.
+     if (current != null) {
+     current.show();
+     return;
+     }
      Form hi = new Form("Hello World", BoxLayout.y());
 
      // ... the rest of the form
@@ -104,6 +113,7 @@ class MonetizationJava037Snippet {
      addExpiryLabel(hi);
      addSyncButton(hi);
 
+     current = hi;
      hi.show();
 
      // Now synchronize the receipts
