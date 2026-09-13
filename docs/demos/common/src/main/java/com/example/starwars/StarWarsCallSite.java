@@ -35,13 +35,17 @@ class StarWarsCallSite {
         StarWarsApi api = StarWarsApi.of("https://swapi.example.com/graphql");
 
         api.heroName(Episode.EMPIRE, bearerToken, response -> {
-            // isOk() reports that the errors array came back empty, which is
-            // not the same as the query having found anything: the schema
-            // declares hero as Character, not Character!, so a successful
-            // response can still carry a null selection.
-            if (!response.isOk()) {
+            // isOk() classifies the GraphQL payload, not the trip. A call that
+            // never reached the server arrives with getResponseCode() == 0, an
+            // empty errors array and null data -- so isOk() is true. Check the
+            // HTTP code before believing it.
+            boolean reachedTheServer = response.getResponseCode() >= 200
+                    && response.getResponseCode() <= 299;
+            if (!reachedTheServer || !response.isOk()) {
                 ToastBar.showErrorMessage(response.getResponseErrorMessage());
             } else if (response.getData() == null || response.getData().hero() == null) {
+                // And an error-free answer still need not have found anything:
+                // the schema declares hero as Character, not Character!.
                 ToastBar.showInfoMessage("No hero for that episode");
             } else {
                 ToastBar.showInfoMessage(response.getData().hero().name());
