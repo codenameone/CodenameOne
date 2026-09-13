@@ -300,7 +300,17 @@ public final class HttpServer {
                 }
                 int hi = hexDigit(rawByteAt(iter + 1));
                 int lo = hexDigit(rawByteAt(iter + 2));
-                if(hi >= 0 && lo >= 0 && isUnreservedByte((hi << 4) | lo)) {
+                if(hi < 0 || lo < 0) {
+                    continue;
+                }
+                // A RETAINED ESCAPE STILL NEEDS ITS CASE SETTLED. %2F and %2f are
+                // the same octet to RFC 3986 6.2.2.1, which normalises the digits
+                // to upper case for exactly this reason -- so a literal route
+                // declared with one spelling was missed by the other, and a
+                // request that changed nothing but the case of a hex digit fell
+                // past a protected route into whatever dynamic one followed it.
+                if(isUnreservedByte((hi << 4) | lo) || isLowerHex(rawByteAt(iter + 1))
+                        || isLowerHex(rawByteAt(iter + 2))) {
                     needed = true;
                     break;
                 }
@@ -323,6 +333,12 @@ public final class HttpServer {
                             pos += 3;
                             continue;
                         }
+                        // Kept encoded, and kept in ONE spelling.
+                        out[count++] = (byte)'%';
+                        out[count++] = (byte)upperHex(rawByteAt(pos + 1));
+                        out[count++] = (byte)upperHex(rawByteAt(pos + 2));
+                        pos += 3;
+                        continue;
                     }
                 }
                 out[count++] = (byte)c;
@@ -330,6 +346,14 @@ public final class HttpServer {
             }
             canonicalTarget = out;
             canonicalLength = count;
+        }
+
+        private static boolean isLowerHex(int c) {
+            return c >= 'a' && c <= 'f';
+        }
+
+        private static int upperHex(int c) {
+            return isLowerHex(c) ? c - ('a' - 'A') : c;
         }
 
         /** ALPHA / DIGIT / "-" / "." / "_" / "~", the RFC 3986 unreserved set. */
@@ -5117,6 +5141,9 @@ public final class HttpServer {
      * of "which octets are unreserved" that drift apart is the same defect in a
      * slower form.
      */
+    private static final char[] HEX = {'0', '1', '2', '3', '4', '5', '6', '7',
+            '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
     static String canonicalDeclaredPath(String value) {
         if(value == null || value.indexOf('%') < 0) {
             return value;
@@ -5128,8 +5155,13 @@ public final class HttpServer {
             if(c == '%' && at + 2 < value.length()) {
                 int hi = Request.hexDigit(value.charAt(at + 1));
                 int lo = Request.hexDigit(value.charAt(at + 2));
-                if(hi >= 0 && lo >= 0 && Request.isUnreservedByte((hi << 4) | lo)) {
-                    out.append((char)((hi << 4) | lo));
+                if(hi >= 0 && lo >= 0) {
+                    if(Request.isUnreservedByte((hi << 4) | lo)) {
+                        out.append((char)((hi << 4) | lo));
+                    } else {
+                        // The same one spelling the request side settles on.
+                        out.append('%').append(HEX[hi]).append(HEX[lo]);
+                    }
                     at += 3;
                     continue;
                 }

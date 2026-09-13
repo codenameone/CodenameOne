@@ -1963,6 +1963,60 @@ public class SelfTest {
     }
 
     /**
+     * A server that names no auth plugin still gets the default one.
+     *
+     * <p>CLIENT_SECURE_CONNECTION without CLIENT_PLUGIN_AUTH is what the older
+     * MySQL-compatible servers advertise. Their scramble ends with a NUL and no
+     * plugin name follows it, so reading whatever was left found that terminator
+     * and took it for an EMPTY plugin name -- which nothing implements, so the
+     * connection was refused as unsupported rather than proceeding with
+     * mysql_native_password.
+     */
+    private static void aServerThatNamesNoPluginStillConnects() throws Exception {
+        check("a greeting without plugin auth still connects", "connected",
+                mySqlGreetingOutcome(false));
+        // The control: the same stub that DOES name a plugin still works, so this
+        // cannot pass by ignoring the greeting.
+        check("and one that names a plugin still connects", "connected",
+                mySqlGreetingOutcome(true));
+    }
+
+    private static String mySqlGreetingOutcome(final boolean pluginAuth) throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client >= 0) {
+                        mySqlStubSession(client, pluginAuth);
+                    }
+                } catch (Exception ignored) {
+                    // The outcome below is what this check reports.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Database db = Database.open("mysql://u:pw@127.0.0.1:" + listener.getPort()
+                    + "/db?sslmode=disable");
+            db.close();
+            outcome = "connected";
+        } catch (Exception refused) {
+            outcome = "refused: " + refused.getMessage();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        return outcome;
+    }
+
+    /**
      * A percent-escape in a database URL has to spell text.
      *
      * <p>Each triplet can be valid while the run they form is not UTF-8:
@@ -3001,6 +3055,62 @@ public class SelfTest {
     }
 
     /**
+     * Two spellings of one escape are one mount.
+     *
+     * <p>%2F and %2f are the same octet, and RFC 3986 6.2.2.1 normalises the
+     * digits to upper case for exactly that reason. A retained escape was left as
+     * it arrived on both sides, so a mount or a literal route declared with one
+     * spelling was missed by the other -- and a request that changed nothing but
+     * the case of a hex digit fell past a protected literal into whatever dynamic
+     * route followed it.
+     */
+    private static void theCaseOfAnEscapeDoesNotChangeTheRoute() throws Exception {
+        String dir = "/tmp/cn1-selftest-hex-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        java.io.FileOutputStream out = new java.io.FileOutputStream(dir + "/logo.txt");
+        try {
+            out.write("logo".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        // Declared in UPPER case; both spellings of the request must reach it.
+        final StaticFiles upper = new StaticFiles(dir, "/a%2Fb", null, null);
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = upper.handle(request);
+                return served == null ? HttpServer.Response.text(404, "not ours") : served;
+            }
+        });
+        String asDeclared;
+        String otherCase;
+        try {
+            asDeclared = httpGetBody("127.0.0.1", server.getPort(), "/a%2Fb/logo.txt");
+            otherCase = httpGetBody("127.0.0.1", server.getPort(), "/a%2fb/logo.txt");
+        } finally {
+            server.stop(2000);
+        }
+        // And declared in LOWER case, which must behave identically.
+        final StaticFiles lower = new StaticFiles(dir, "/a%2fb", null, null);
+        HttpServer second = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = lower.handle(request);
+                return served == null ? HttpServer.Response.text(404, "not ours") : served;
+            }
+        });
+        String declaredLower;
+        try {
+            declaredLower = httpGetBody("127.0.0.1", second.getPort(), "/a%2Fb/logo.txt");
+        } finally {
+            second.stop(2000);
+            new java.io.File(dir + "/logo.txt").delete();
+            new java.io.File(dir).delete();
+        }
+        check("the spelling the mount was declared with reaches it", "logo", asDeclared);
+        check("and so does the other case of the same escape", "logo", otherCase);
+        check("declaring it in the other case is the same mount", "logo", declaredLower);
+    }
+
+    /**
      * The other half of the same rule: a mount DECLARED with an escape in it.
      *
      * <p>%7E is '~'. The request side resolves it before anything compares, so a
@@ -3402,8 +3512,19 @@ public class SelfTest {
         check("a MySQL row that will not decode closes the session", "closed", outcome);
     }
 
-    /** Enough of the server side to carry one prepared statement to its rows. */
     private static void mySqlStubSession(int client) throws Exception {
+        mySqlStubSession(client, true);
+    }
+
+    /**
+     * Enough of the server side to carry one prepared statement to its rows.
+     *
+     * @param pluginAuth whether the greeting advertises CLIENT_PLUGIN_AUTH and
+     *                   names a plugin after its scramble. An older
+     *                   MySQL-compatible server does neither, and ends the
+     *                   scramble with a NUL that is not a plugin name.
+     */
+    private static void mySqlStubSession(int client, boolean pluginAuth) throws Exception {
         ByteArrayOutputStream greeting = new ByteArrayOutputStream();
         greeting.write(10);                                  // protocol version
         greeting.write("8.0.0-cn1stub".getBytes("UTF-8"));
@@ -3420,18 +3541,20 @@ public class SelfTest {
         greeting.write(45);                                  // character set
         greeting.write(0);
         greeting.write(0);                                   // status flags
-        greeting.write(0x08);
-        greeting.write(0x00);                                // PLUGIN_AUTH
-        greeting.write(21);                                  // scramble length
+        greeting.write(pluginAuth ? 0x08 : 0x00);
+        greeting.write(0x00);                                // PLUGIN_AUTH, or not
+        greeting.write(pluginAuth ? 21 : 0);                 // scramble length
         for(int iter = 0 ; iter < 10 ; iter++) {
             greeting.write(0);                               // reserved
         }
         for(int iter = 0 ; iter < 12 ; iter++) {
             greeting.write('b');                             // scramble, second part
         }
-        greeting.write(0);
-        greeting.write("mysql_native_password".getBytes("UTF-8"));
-        greeting.write(0);
+        greeting.write(0);                                   // ends the scramble
+        if(pluginAuth) {
+            greeting.write("mysql_native_password".getBytes("UTF-8"));
+            greeting.write(0);
+        }
         mySqlStubSend(client, 0, greeting.toByteArray());
 
         while(true) {
@@ -4146,6 +4269,7 @@ public class SelfTest {
         anInterimResponseIsSkipped();
         aHandlerCanStopItsOwnServer();
         twoShutdownsAreOneTeardown();
+        aServerThatNamesNoPluginStillConnects();
         aMalformedEscapeInADatabaseUrlIsRefused();
         aConnectionFieldCannotHoldASecondField();
         everyNativeStringRefusesANul();
@@ -4167,6 +4291,7 @@ public class SelfTest {
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
         aMountDeclaredWithAnEscapeIsStillReachable();
+        theCaseOfAnEscapeDoesNotChangeTheRoute();
         anOutboundFailureDoesNotLogTheSecrets();
         aFieldValueIsOctetsOnEveryProtocol();
         aNestedFinallyDoesNotDefeatTheOuterCatch();

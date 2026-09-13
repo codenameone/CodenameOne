@@ -756,6 +756,9 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
      * exactly as written, which is what keeps %2F from becoming a path separator
      * the author never wrote and %7B from becoming a placeholder brace.
      */
+    private static final char[] HEX = {'0', '1', '2', '3', '4', '5', '6', '7',
+            '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
     static String canonicalPath(String pattern) {
         if (pattern == null || pattern.indexOf('%') < 0) {
             return pattern;
@@ -781,8 +784,13 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
                     || (octet >= 'A' && octet <= 'Z') || (octet >= '0' && octet <= '9')
                     || octet == '-' || octet == '.' || octet == '_' || octet == '~';
             if (!unreserved) {
-                out.append(c);
-                at++;
+                // KEPT ENCODED, in one spelling. %2F and %2f are the same octet to
+                // RFC 3986 6.2.2.1, which normalises the digits to upper case, and
+                // the server does the same to the target before it compares -- so
+                // a pattern that kept the other spelling would miss a request that
+                // differs from it in nothing but the case of a hex digit.
+                out.append('%').append(HEX[hi]).append(HEX[lo]);
+                at += 3;
                 continue;
             }
             out.append((char) octet);

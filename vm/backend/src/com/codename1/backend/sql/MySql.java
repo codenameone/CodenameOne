@@ -132,7 +132,14 @@ public final class MySql {
             }
             byte[] scrambleSecond = reader.bytes(secondLength);
             scramble = trimTrailingNul(concat(scrambleFirst, scrambleSecond));
-            if(reader.remaining() > 0) {
+            // ONLY WHEN THE SERVER SAYS IT SENT ONE. A server that offers
+            // CLIENT_SECURE_CONNECTION without CLIENT_PLUGIN_AUTH -- the older
+            // MySQL-compatible ones do -- ends its scramble with a NUL and names
+            // no plugin after it. Reading whatever is left then found that
+            // terminator and took it for an EMPTY plugin name, which nothing
+            // implements, so the connection was refused as unsupported instead of
+            // using the mysql_native_password this variable already holds.
+            if((serverCapabilities & CLIENT_PLUGIN_AUTH) != 0 && reader.remaining() > 0) {
                 plugin = reader.cString();
             }
         }

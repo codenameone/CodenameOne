@@ -1425,6 +1425,9 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("     * around. An encoded SLASH is left alone on purpose: %2F is not a segment\n");
         sb.append("     * boundary and resolving it here would invent one.\n");
         sb.append("     */\n");
+        sb.append("    private static char upperHex(char c) {\n");
+        sb.append("        return c >= 'a' && c <= 'f' ? (char)(c - ('a' - 'A')) : c;\n");
+        sb.append("    }\n\n");
         sb.append("    private static String canonical(String value) {\n");
         sb.append("        if(value == null || value.indexOf('%') < 0) return value;\n");
         sb.append("        StringBuilder out = new StringBuilder(value.length());\n");
@@ -1441,6 +1444,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("                            || decoded == '-' || decoded == '.'\n");
         sb.append("                            || decoded == '_' || decoded == '~';\n");
         sb.append("                    if(unreserved) { out.append((char)decoded); i += 2; continue; }\n");
+        // The same one spelling the server settles a retained escape on, so a
+        // route literal and the target it is compared against cannot differ by
+        // the case of a hex digit alone. RFC 3986 6.2.2.1.
+        sb.append("                    out.append('%')\n");
+        sb.append("                       .append(upperHex(value.charAt(i + 1)))\n");
+        sb.append("                       .append(upperHex(value.charAt(i + 2)));\n");
+        sb.append("                    i += 2;\n");
+        sb.append("                    continue;\n");
         sb.append("                }\n");
         sb.append("            }\n");
         sb.append("            out.append(c);\n");
