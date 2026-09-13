@@ -35,13 +35,17 @@ class StarWarsCallSite {
         StarWarsApi api = StarWarsApi.of("https://swapi.example.com/graphql");
 
         api.heroName(Episode.EMPIRE, bearerToken, response -> {
-            // isOk() classifies the GraphQL payload, not the trip. A call that
-            // never reached the server arrives with getResponseCode() == 0, an
-            // empty errors array and null data -- so isOk() is true. Check the
-            // HTTP code before believing it.
+            // isOk() classifies the GraphQL payload, not the trip: a call that
+            // never reached the server, and a 2xx whose body would not parse,
+            // both arrive with an empty errors array and null data, so isOk()
+            // answers true for them. getResponseErrorMessage() is the one
+            // thing that is null only on a clean success -- it carries the
+            // first GraphQL error, the transport failure, or the parse
+            // failure -- and the HTTP code catches an error status whose body
+            // happened to decode.
             boolean reachedTheServer = response.getResponseCode() >= 200
                     && response.getResponseCode() <= 299;
-            if (!reachedTheServer || !response.isOk()) {
+            if (!reachedTheServer || response.getResponseErrorMessage() != null) {
                 ToastBar.showErrorMessage(response.getResponseErrorMessage());
             } else if (response.getData() == null || response.getData().hero() == null) {
                 // And an error-free answer still need not have found anything:

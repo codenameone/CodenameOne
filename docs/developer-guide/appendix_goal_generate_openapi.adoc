@@ -52,7 +52,9 @@ The listings in this section are the goal's own output, generated from a
 Swagger Petstore specification cut down to the `pet`, `store` and `user`
 tags. That spec is in the repository at
 `docs/demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi-petstore.json`,
-so you can run the goal against it and get these files byte for byte.
+so you can run the goal against it and compare. The committed copies carry a
+license header and the `tag::` markers this guide includes them by; strip
+those two additions and the rest is exactly what the goal wrote.
 
 One `@RestClient` interface per tag and one model per schema land under
 `common/src/main/java`:
