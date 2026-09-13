@@ -150,12 +150,109 @@ public final class Credentials {
         if(token != null && token.length() > 0) {
             headers.add("Authorization: " + token.trim());
         }
+        requireSafeCredentialEndpoint(url);
         Web.Result result = Web.request("GET", url, headers, null);
         if(!result.isSuccess()) {
             throw new IOException("The container credential endpoint answered "
                     + result.getStatus());
         }
         return fromJson(result.getBodyAsString());
+    }
+
+    /**
+     * Refuses a container credential endpoint that would carry credentials in the
+     * clear to somewhere off this host.
+     *
+     * <p>AWS_CONTAINER_CREDENTIALS_FULL_URI is taken from the environment and used
+     * as given. Pointed at an http:// host that is not this container's, the
+     * request carries the container authorization token TO that host and brings
+     * the role's access key, secret and session token back from it -- in
+     * plaintext, for anything on the path to read. A deployment typo is enough;
+     * so is one injected environment value.
+     *
+     * <p>The rule the AWS SDKs apply, and the one applied here: https anywhere,
+     * http only to this host's loopback or to the ECS and EKS link-local
+     * addresses that ARE the container credential service.
+     *
+     * <p>The loopback test parses the address rather than matching a prefix. A
+     * host is only 127.0.0.0/8 if it is four decimal octets beginning with 127 --
+     * "127.evil.example" is a NAME, and a name resolves wherever its owner says.
+     */
+    static void requireSafeCredentialEndpoint(String url) throws IOException {
+        if(url.regionMatches(true, 0, "https://", 0, 8)) {
+            return;
+        }
+        if(!url.regionMatches(true, 0, "http://", 0, 7)) {
+            throw new IOException("A container credential endpoint must be http or "
+                    + "https and this one is neither: " + url);
+        }
+        int at = 7;
+        while(at < url.length() && url.charAt(at) != '/' && url.charAt(at) != '?'
+                && url.charAt(at) != '#') {
+            at++;
+        }
+        String authority = url.substring(7, at);
+        int userinfo = authority.lastIndexOf('@');
+        if(userinfo >= 0) {
+            authority = authority.substring(userinfo + 1);
+        }
+        String host = authority;
+        if(host.length() > 0 && host.charAt(0) == '[') {
+            int close = host.indexOf(']');
+            host = close < 0 ? host : host.substring(1, close);
+        } else {
+            int colon = host.indexOf(':');
+            if(colon >= 0) {
+                host = host.substring(0, colon);
+            }
+        }
+        // 169.254.170.2 is the ECS task metadata address and 169.254.170.23 the
+        // EKS pod identity one; both are link-local, so they are this host by
+        // definition.
+        if(isLoopbackAddress(host) || "169.254.170.2".equals(host)
+                || "169.254.170.23".equals(host)) {
+            return;
+        }
+        throw new IOException("A container credential endpoint that is not this "
+                + "host's must use https: " + url + " would send the container "
+                + "authorization token and receive the role's keys in the clear");
+    }
+
+    /** True for ::1, for localhost, and for a dotted quad in 127.0.0.0/8. */
+    private static boolean isLoopbackAddress(String host) {
+        if("::1".equals(host) || "localhost".equalsIgnoreCase(host)) {
+            return true;
+        }
+        int octets = 0;
+        int at = 0;
+        int first = -1;
+        while(at <= host.length()) {
+            int dot = host.indexOf('.', at);
+            int end = dot < 0 ? host.length() : dot;
+            if(end == at || end - at > 3) {
+                return false;
+            }
+            int value = 0;
+            for(int iter = at ; iter < end ; iter++) {
+                char c = host.charAt(iter);
+                if(c < '0' || c > '9') {
+                    return false;
+                }
+                value = value * 10 + (c - '0');
+            }
+            if(value > 255) {
+                return false;
+            }
+            if(octets == 0) {
+                first = value;
+            }
+            octets++;
+            if(dot < 0) {
+                break;
+            }
+            at = dot + 1;
+        }
+        return octets == 4 && first == 127;
     }
 
     /**

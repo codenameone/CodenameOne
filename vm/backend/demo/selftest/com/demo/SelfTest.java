@@ -48,6 +48,7 @@ import com.codename1.backend.Tls;
 import com.codename1.backend.VirtualThread;
 import com.codename1.backend.Web;
 import com.codename1.backend.aws.Aws;
+import com.codename1.backend.aws.CredentialEndpointProbe;
 import com.codename1.backend.aws.Credentials;
 import com.codename1.backend.FileCountProbe;
 import com.codename1.backend.aws.ExpiryProbe;
@@ -2288,6 +2289,42 @@ public class SelfTest {
     }
 
     /**
+     * A container credential endpoint off this host must be encrypted.
+     *
+     * <p>AWS_CONTAINER_CREDENTIALS_FULL_URI is used as the environment gives it.
+     * Pointed at an http:// host that is not this container's, the request
+     * carries the container authorization token TO that host and brings the
+     * role's access key, secret and session token back from it in the clear. The
+     * rule is the AWS SDKs': https anywhere, http only to loopback or to the ECS
+     * and EKS link-local addresses that are the credential service itself.
+     */
+    private static void aRemoteCredentialEndpointMustBeEncrypted() throws Exception {
+        check("an http endpoint off this host is refused", "refused",
+                CredentialEndpointProbe.verdictFor("http://evil.example/creds"));
+        check("the same host over https is allowed", "allowed",
+                CredentialEndpointProbe.verdictFor("https://evil.example/creds"));
+        check("the ECS address is allowed", "allowed",
+                CredentialEndpointProbe.verdictFor("http://169.254.170.2/v2/credentials"));
+        check("the EKS address is allowed", "allowed",
+                CredentialEndpointProbe.verdictFor("http://169.254.170.23/v1/credentials"));
+        check("loopback is allowed", "allowed",
+                CredentialEndpointProbe.verdictFor("http://127.0.0.1:8080/creds"));
+        check("and so is its IPv6 spelling", "allowed",
+                CredentialEndpointProbe.verdictFor("http://[::1]:8080/creds"));
+        // THE PREFIX TRAP: a NAME that begins with the loopback digits resolves
+        // wherever its owner says, so matching "127." as text hands the keys over.
+        check("a name that merely starts with 127 is refused", "refused",
+                CredentialEndpointProbe.verdictFor("http://127.evil.example/creds"));
+        check("and one that merely starts with the ECS address is refused", "refused",
+                CredentialEndpointProbe.verdictFor("http://169.254.170.2.evil.example/x"));
+        // Userinfo cannot be used to hide the real host either.
+        check("a userinfo that looks like loopback is refused", "refused",
+                CredentialEndpointProbe.verdictFor("http://127.0.0.1@evil.example/creds"));
+        check("a scheme that is neither is refused", "refused",
+                CredentialEndpointProbe.verdictFor("file:///etc/passwd"));
+    }
+
+    /**
      * A response that declares its length twice, differently, is refused.
      *
      * <p>The first Content-Length was taken and the rest ignored, so the framing
@@ -3966,6 +4003,7 @@ public class SelfTest {
         aTruncatingDatabasePathOpensNothing();
         aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();
+        aRemoteCredentialEndpointMustBeEncrypted();
         aContradictoryLengthIsRefused();
         aChunkedResponseEndsWhereItsFramingSays();
         aResponseEndsAtItsDeclaredLength();
