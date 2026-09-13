@@ -1070,4 +1070,37 @@ class ExtensionDeploymentFloorScriptTest {
                 "16.4 and 16.0 both clear the floor, so the pass must write nothing: "
                         + got.get(0));
     }
+
+    /// Candidate contexts must include COMBINATIONS of independent conditions. With
+    /// PREFIX[arch=arm64] = 1 and SUFFIX[sdk=iphoneos*] = 6.4, no single condition clears the
+    /// floor -- arch alone gives 12.0, sdk alone gives 6.4 -- while the build satisfying BOTH
+    /// resolves to 16.4. Generating each condition only on its own left every candidate low, so
+    /// the expression looked decidable and was replaced with the floor, lowering that build.
+    @Test
+    void independentConditionsAreCombined(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Combo|" + EXT + "|PREFIX[arch=arm64]->1;SUFFIX->2.0;"
+                        + "SUFFIX[sdk=iphoneos*]->6.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(PREFIX)$(SUFFIX)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=$(PREFIX)$(SUFFIX)"),
+                "the arm64 device build satisfies both qualifiers and resolves to 16.4, so the "
+                        + "expression must survive: " + got.get(0));
+    }
+
+    /// The counterpart: combining contexts must not make the pass so cautious that it stops
+    /// raising. When no combination clears the floor either, the expression is still replaced.
+    @Test
+    void combinedContextsThatAreAllLowStillRaise(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "ComboLow|" + EXT + "|PREFIX[arch=arm64]->1;SUFFIX->2.0;"
+                        + "SUFFIX[sdk=iphoneos*]->3.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(PREFIX)$(SUFFIX)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=15.0"),
+                "13.0 is the best any combination reaches, so the floor is still written: "
+                        + got.get(0));
+    }
 }

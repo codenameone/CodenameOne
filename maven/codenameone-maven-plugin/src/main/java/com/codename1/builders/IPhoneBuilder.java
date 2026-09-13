@@ -10313,7 +10313,7 @@ public class IPhoneBuilder extends Executor {
                 + "    all_keys = (own.keys + proj.keys).uniq\n"
                 + "    seen = {}\n"
                 + "    queue = value.to_s.scan(/\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/).flatten\n"
-                + "    out = []\n"
+                + "    pool = []\n"
                 + "    until queue.empty?\n"
                 + "      ref = queue.shift\n"
                 + "      next if ref == 'inherited' || seen[ref]\n"
@@ -10332,13 +10332,36 @@ public class IPhoneBuilder extends Executor {
                 + "        fresh = c.reject do |cc|\n"
                 + "          mine_keys.include?(cc[1..-2].to_s.split('=', 2).first)\n"
                 + "        end\n"
-                + "        unless fresh.empty?\n"
-                + "          widened = (mine + fresh).uniq.sort\n"
-                + "          out << widened unless out.include?(widened) || widened == mine\n"
-                + "        end\n"
+                + "        fresh.each { |cc| pool << cc unless pool.include?(cc) }\n"
                 + "        v = (own[k] || proj[k]).to_s\n"
                 + "        queue.concat(v.scan(/\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/).flatten)\n"
                 + "      end\n"
+                + "    end\n"
+                + "    # COMBINATIONS of independent conditions, not just each on its own. With\n"
+                + "    # PREFIX[arch=arm64] = 1 and SUFFIX[sdk=iphoneos*] = 6.4, the build that\n"
+                + "    # satisfies BOTH resolves to 16.4 -- and generating [arch=arm64] and\n"
+                + "    # [sdk=iphoneos*] only separately left every candidate below the floor, so\n"
+                + "    # the expression looked decidable and was replaced with it, lowering the\n"
+                + "    # arm64 device build from the 16.4 it really had.\n"
+                + "    #\n"
+                + "    # Only combinations across DISTINCT dimensions are builds: two conditions\n"
+                + "    # on one dimension are not intersected by Xcode, so such a pair describes\n"
+                + "    # nothing and is skipped. The subset count is capped because this is a\n"
+                + "    # power set; the cap is generous next to the two or three qualifiers a real\n"
+                + "    # archive carries, and reaching it only costs an unexplored context, which\n"
+                + "    # means less certainty and so no lowering.\n"
+                + "    subsets = [[]]\n"
+                + "    pool.each do |cc|\n"
+                + "      break if subsets.length >= " + MAX_ALT_CONTEXTS + "\n"
+                + "      subsets.concat(subsets.map { |sub| sub + [cc] })\n"
+                + "    end\n"
+                + "    out = []\n"
+                + "    subsets.each do |sub|\n"
+                + "      next if sub.empty?\n"
+                + "      names = sub.map { |m| m[1..-2].to_s.split('=', 2).first }\n"
+                + "      next unless names.uniq.length == names.length\n"
+                + "      widened = (mine + sub).uniq.sort\n"
+                + "      out << widened unless out.include?(widened) || widened == mine\n"
                 + "    end\n"
                 + "    out\n"
                 + "  end\n"
@@ -11972,6 +11995,17 @@ public class IPhoneBuilder extends Executor {
     /// Expansion passes before a value is called unresolvable. Settings nest a level or two in
     /// practice; the cap is what stops A = $(B), B = $(A) from spinning.
     private static final int MAX_SETTING_EXPANSIONS = 16;
+
+    /// Cap on the candidate contexts enumerated for one deployment-target expression.
+    ///
+    /// <p>The contexts are a POWER SET over the conditions the expression's helpers carry, so
+    /// this bounds an exponential. A real archive carries two or three qualifiers, well inside
+    /// it.</p>
+    ///
+    /// <p>Reaching the cap costs certainty, not safety: an unexplored context is one the pass
+    /// never learns clears the floor, and a pass that is less certain writes less, so it cannot
+    /// lower a target by running out of budget.</p>
+    private static final int MAX_ALT_CONTEXTS = 64;
 
     /// One build setting, in either of the two spellings Xcode accepts for a reference.
     ///
