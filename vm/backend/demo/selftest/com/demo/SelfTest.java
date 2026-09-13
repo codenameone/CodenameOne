@@ -1963,6 +1963,46 @@ public class SelfTest {
     }
 
     /**
+     * A percent-escape in a database URL has to spell text.
+     *
+     * <p>Each triplet can be valid while the run they form is not UTF-8:
+     * "%C3%28" is a lead byte followed by something that cannot continue it. new
+     * String does not refuse that, it substitutes U+FFFD -- so the client
+     * authenticates with a password the URL does not contain, and what the
+     * operator sees is a remote authentication failure rather than a malformed
+     * setting.
+     */
+    private static void aMalformedEscapeInADatabaseUrlIsRefused() throws Exception {
+        String refusal;
+        try {
+            Database db = Database.open("postgres://u:p%C3%28ss@127.0.0.1:1/db?sslmode=disable");
+            db.close();
+            refusal = "accepted";
+        } catch (Exception expected) {
+            String message = String.valueOf(expected.getMessage());
+            refusal = message.indexOf("not valid UTF-8") >= 0 ? "refused"
+                    : "refused for another reason: " + message;
+        }
+        // THE CONTROL: a well-formed escape of the same shape still decodes, so
+        // this cannot pass by refusing every escape. Port 1 refuses the
+        // connection, which is a different failure and says the URL was read.
+        String wellFormed;
+        try {
+            Database db = Database.open("postgres://u:p%C3%A9ss@127.0.0.1:1/db?sslmode=disable");
+            db.close();
+            wellFormed = "connected";
+        } catch (Exception expected) {
+            String message = String.valueOf(expected.getMessage());
+            wellFormed = message.indexOf("not valid UTF-8") >= 0 ? "refused as malformed"
+                    : "read the URL and failed to connect";
+        }
+        check("a malformed percent-escape in a database URL is refused",
+                "refused", refusal);
+        check("while a well-formed one is decoded",
+                "read the URL and failed to connect", wellFormed);
+    }
+
+    /**
      * A connection field cannot smuggle a second field into the handshake.
      *
      * <p>Both wire protocols end each startup field with a NUL, so a NUL inside
@@ -2469,8 +2509,57 @@ public class SelfTest {
         // THE CUT: everything above arrived, and then the peer stopped.
         check("a chunked response cut off after its last chunk is refused",
                 "refused", chunkedReply("5\r\nhello\r\n0\r\n"));
+        // A HEAD may describe the coding the GET would have used and still send
+        // nothing, and so may a 304. The decoder must not be handed those zero
+        // bytes and call them truncated: the same RFC 9110 6.4.1 rule that stops
+        // the length check stops this.
+        check("a HEAD that describes a chunked GET is not read as truncated",
+                "200/", chunkedHeadReply("HEAD", 200));
+        check("and neither is a 304 that carries the same metadata",
+                "304/", chunkedHeadReply("GET", 304));
         check("and one whose trailer is not a header field is refused",
                 "refused", chunkedReply("5\r\nhello\r\n0\r\nnot a field\r\n\r\n"));
+    }
+
+    /** A bodiless response that still declares a chunked transfer coding. */
+    private static String chunkedHeadReply(final String verb, final int status)
+            throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    byte[] request = new byte[4096];
+                    ServerSocket.read(client, request, 0, request.length);
+                    byte[] reply = ("HTTP/1.1 " + status + " Here\r\n"
+                            + "Transfer-Encoding: chunked\r\n\r\n").getBytes("UTF-8");
+                    ServerSocket.write(client, reply, 0, reply.length);
+                } catch (Exception ignored) {
+                    // The verdict below is what this check reports.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Http.Response response = Http.request("127.0.0.1", port, verb, "/x", null);
+            outcome = response.getStatus() + "/" + response.getBodyAsString();
+        } catch (Exception err) {
+            outcome = "failed: " + err.getMessage();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        return outcome;
     }
 
     /** Serves one canned chunked body and reports the client's verdict. */
@@ -4057,6 +4146,7 @@ public class SelfTest {
         anInterimResponseIsSkipped();
         aHandlerCanStopItsOwnServer();
         twoShutdownsAreOneTeardown();
+        aMalformedEscapeInADatabaseUrlIsRefused();
         aConnectionFieldCannotHoldASecondField();
         everyNativeStringRefusesANul();
         aTruncatingDatabasePathOpensNothing();

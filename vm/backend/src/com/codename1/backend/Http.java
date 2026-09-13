@@ -233,7 +233,17 @@ public final class Http {
             System.arraycopy(bodyBytes, 0, framed, 0, declared);
             bodyBytes = framed;
         }
-        return new Response(status, names, values, decodeBody(bodyBytes, names, values));
+        // AND NOTHING IS DECODED WHEN NOTHING WAS SENT. The same RFC 9110 6.4.1
+        // rule that stops the length check applies to the transfer coding: a HEAD
+        // response may carry "Transfer-Encoding: chunked" to describe how the GET
+        // would have been framed, and a 304 may carry the same metadata, while
+        // both correctly end at the blank line. Handing those zero bytes to the
+        // chunked decoder made it report a truncated message -- the strictness
+        // added for a real truncation, applied to a response that is complete.
+        byte[] framedBody = carriesBody(verb, status) ? bodyBytes : new byte[0];
+        return new Response(status, names, values,
+                carriesBody(verb, status) ? decodeBody(framedBody, names, values)
+                                          : framedBody);
     }
 
     /**

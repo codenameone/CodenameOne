@@ -227,6 +227,31 @@ JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_lon
     return (JAVA_LONG)fd + 1;
 }
 
+/*
+ * WHY THERE IS NO KEEPALIVE AROUND THE YIELD BELOW, though a review asked for one.
+ *
+ * The concern is the right shape: this takes `data` out of the array, parks over
+ * a blocking recv(), and from there only the C locals refer to the Java object --
+ * so on a VM whose collector scans only its own object stack, the array could be
+ * collected while the kernel is still writing into it.
+ *
+ * This VM does not have that gap. cn1_globals.h declares conservative
+ * native-stack scanning DEFAULT ON ("PHASE 3b DEFAULT ON: conservative
+ * native-stack GC as a real root source"), for exactly this case -- its own words
+ * are that frameless methods hold "object roots ... in native C locals ... rather
+ * than threadObjectStack". CN1_YIELD_THREAD runs CN1_GC_PARK_CAPTURE as it parks,
+ * which is what publishes this frame's stack and registers to the collector, and
+ * a thread the collector cannot park cooperatively is stopped by signal and
+ * captured the same way. The one build that turns this off,
+ * -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS, is documented in vm/CLAUDE.md as a GC
+ * ablation arm and REQUIRES the translator to be run with the frameless codegen
+ * off as well -- which puts the roots back on threadObjectStack. Both halves move
+ * together, so neither configuration leaves the array unrooted.
+ *
+ * The iOS port's nativeMethods.m does keep its file buffers alive by hand, and
+ * that is a different runtime: a keepalive here would be cargo from a VM with
+ * different roots.
+ */
 JAVA_INT com_codename1_backend_Tcp_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
     int fd = cn1BackendFd(handle);
     JAVA_ARRAY_BYTE* data;

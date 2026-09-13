@@ -481,7 +481,7 @@ public final class Database {
             return host;
         }
 
-        private static String decode(String value) {
+        private static String decode(String value) throws IOException {
             if(value.indexOf('%') < 0) {
                 return value;
             }
@@ -515,6 +515,21 @@ public final class Database {
                 }
                 flushLiteral(literal, out);
                 byte[] bytes = out.toByteArray();
+                // AND THE RESULT HAS TO BE TEXT. Each escape can be a valid
+                // triplet while the run they form is not valid UTF-8 -- "%C3%28"
+                // is a lead byte followed by something that cannot continue it --
+                // and new String does not refuse that, it SUBSTITUTES U+FFFD. The
+                // same silent change of credential, database name or CA path the
+                // comment above describes, arriving by the other road: the client
+                // then authenticates with a password the URL does not contain and
+                // the operator reads a remote authentication failure instead of a
+                // malformed setting.
+                if(!Utf8.isValid(bytes, 0, bytes.length)) {
+                    throw new IOException("A percent-escape in the database URL is "
+                            + "not valid UTF-8, so the value it names cannot be "
+                            + "read; check the escaping of the user, password, "
+                            + "database name or file path");
+                }
                 return new String(bytes, 0, bytes.length, "UTF-8");
             } catch (UnsupportedEncodingException err) {
                 return value;
