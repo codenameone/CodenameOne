@@ -1,12 +1,8 @@
 # Prose that promises a code block where none follows.
 # A ratchet: entries may be removed as holes are filled, never added.
 # Regenerate with check-missing-code-blocks.py --write-baseline.
-Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
-Advertising.asciidoc	method that registers its provider with `AdManager`:
 Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
 Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
-Deep-Links-Routing.asciidoc	`AssetLinksBuilder` produces the payload:
-Deep-Links-Routing.asciidoc	without redirects. The plugin's `AasaBuilder` produces the payload:
 Maven-Creating-CN1Libs.adoc	Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
 Maven-Creating-CN1Libs.adoc	The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
 Miscellaneous-Features.asciidoc	To solve this sort of used case you have two APIs in `Display`:

@@ -74,8 +74,11 @@ include::../demos/common/src/main/snippets/developer-guide/advertising.xml[tag=a
 
 === Enabling a provider
 
-Enable a provider once at startup. Each library exposes a static `install()`
-method that registers its provider with `AdManager`:
+Enable a provider once at startup, from your app's `init(Object)`, by calling
+the static `install()` method on the provider class named in the table above --
+`AdMobProvider.install()`, `AppLovinProvider.install()`,
+`LevelPlayProvider.install()` or `MockAdProvider.install()`. Each one registers
+its provider with `AdManager` and takes no arguments.
 
 
 That single call binds the provider; the rest of your code uses only the
@@ -91,6 +94,11 @@ ads can be served: in the EEA/UK the GDPR consent form must be shown (providers
 wrap Google's User Messaging Platform or an equivalent), and on iOS the App
 Tracking Transparency prompt must be presented to access the advertising
 identifier. The recommended order is to initialize, gather consent, then load:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AdvertisingJava009Snippet.java[tag=advertising-java-009,indent=0]
+----
 
 
 `AdConfig` also carries the global compliance flags every network requires:

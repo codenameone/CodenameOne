@@ -85,6 +85,11 @@ Host an `apple-app-site-association` JSON file at
 `https://your.domain/.well-known/apple-app-site-association` over HTTPS
 without redirects. The plugin's `AasaBuilder` produces the payload:
 
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.json[tag=deep-links-routing-json-001,indent=0]
+----
+
 
 Tell iOS which domains your app claims by setting the
 `ios.associatedDomains` build hint -- a comma-separated list of
@@ -102,6 +107,11 @@ include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.pr
 Host an `assetlinks.json` file at
 `https://your.domain/.well-known/assetlinks.json`. The plugin's
 `AssetLinksBuilder` produces the payload:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.json[tag=deep-links-routing-json-002,indent=0]
+----
 
 
 Tell Android which URLs to intercept by setting the
