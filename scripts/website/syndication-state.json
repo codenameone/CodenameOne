@@ -2066,6 +2066,18 @@
         "url": "https://dev.to/codenameone/a-dialog-can-now-be-a-native-desktop-window-1jgk",
         "syndicated_at": "2026-09-12T16:17:44+00:00"
       }
+    },
+    "native-appkit-mac-port": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-mac-app-not-an-ios-app-on-a-mac",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa5e7e861e38f5a7ca3ee46",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-13T00:02:39+00:00"
+      }
     }
   }
 }
