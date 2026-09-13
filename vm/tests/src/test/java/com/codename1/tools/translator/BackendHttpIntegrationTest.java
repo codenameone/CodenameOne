@@ -2158,6 +2158,36 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("connection-specific headers never reach an HTTP/2 peer")
+    void http2DropsConnectionSpecificHeaders() throws Exception {
+        // RFC 9113 8.2.2 forbids five of them, and the writer listed four:
+        // Proxy-Connection went out. A handler forwarding response metadata
+        // therefore produced a response the peer may reset, and only when h2 was
+        // negotiated -- the same handler answering fine over HTTP/1.1. One
+        // server, two answers, decided by ALPN.
+        assertEquals(200, h2StatusFor(port, "/hopbyhop"),
+                "a response carrying the forbidden fields must still be sent");
+        // AND THEY MUST ACTUALLY BE GONE. This harness cannot decode a Huffman
+        // coded header NAME, and its own client does not enforce 8.2.2 -- so
+        // asking only for a 200 passes whether or not the field went out. The
+        // block's structure is walkable though, so the assertion is a COUNT
+        // against the same response without the forbidden five: one field that
+        // should have been dropped is one entry too many.
+        int withForbidden = h2HeaderCountFor(port, "/hopbyhop");
+        int withoutThem = h2HeaderCountFor(port, "/hopbyhopcontrol");
+        assertTrue(withForbidden > 0 && withoutThem > 0,
+                "the header blocks must be readable: " + withForbidden + " and "
+                        + withoutThem);
+        assertEquals(withoutThem, withForbidden,
+                "a handler's connection-specific fields must not add entries to the "
+                        + "h2 header block");
+        // The control: the SAME route over HTTP/1.1, where these fields are
+        // ordinary, so a 200 above cannot come from the route being broken.
+        assertEquals(200, statusOf(request("GET", "/hopbyhop", null, null)),
+                "and the HTTP/1.1 answer is unchanged");
+    }
+
+    @Test
     @DisplayName("an HTTP/2 trailer is not a request header")
     void http2TrailersAreNotRequestHeaders() throws Exception {
         // A request may end with a trailer section, and those fields were being
@@ -3219,6 +3249,104 @@ class BackendHttpIntegrationTest {
             }
         }
         return -1;
+    }
+
+    /**
+     * How many entries a response header block holds.
+     *
+     * <p>Counting rather than decoding: the names may be Huffman coded and this
+     * harness has no decoder for them, but the BLOCK STRUCTURE is walkable with
+     * the same primitives hpackStatus uses. A field the writer should have
+     * dropped shows up as one more entry, which is all the assertion needs.
+     */
+    private static int hpackEntryCount(byte[] block) {
+        int at = 0;
+        int entries = 0;
+        while (at < block.length) {
+            int b = block[at] & 0xff;
+            int prefixBits;
+            boolean hasValue;
+            if ((b & 0x80) != 0) {
+                prefixBits = 7;
+                hasValue = false;
+            } else if ((b & 0xC0) == 0x40) {
+                prefixBits = 6;
+                hasValue = true;
+            } else if ((b & 0xE0) == 0x20) {
+                prefixBits = 5;                       // a dynamic table size update
+                hasValue = false;
+            } else {
+                prefixBits = 4;
+                hasValue = true;
+            }
+            boolean sizeUpdate = (b & 0xE0) == 0x20 && (b & 0x80) == 0;
+            int[] cursor = { at };
+            int index = hpackInteger(block, cursor, prefixBits);
+            if (index < 0) {
+                return -1;
+            }
+            at = cursor[0];
+            if (index == 0 && hasValue) {
+                at = hpackSkipString(block, at);       // a literal name
+                if (at < 0) {
+                    return -1;
+                }
+            }
+            if (hasValue) {
+                at = hpackSkipString(block, at);
+                if (at < 0) {
+                    return -1;
+                }
+            }
+            if (!sizeUpdate) {
+                entries++;
+            }
+        }
+        return entries;
+    }
+
+    /** The number of header fields the server sent on one h2 response. */
+    private int h2HeaderCountFor(int onPort, String path) throws Exception {
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
+        socket.setSoTimeout(20000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "GET");
+            hpackLiteral(block, ":path", path);
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            out.write(frame(1, 0x05, 1, block.toByteArray()));
+            out.flush();
+            long deadline = System.currentTimeMillis() + 20000;
+            InputStream in = socket.getInputStream();
+            while (System.currentTimeMillis() < deadline) {
+                byte[] header = readExactly(in, 9);
+                if (header == null) {
+                    return -1;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8)
+                        | (header[2] & 0xff);
+                int type = header[3] & 0xff;
+                byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                if (payload == null) {
+                    return -1;
+                }
+                if (type == 1) {
+                    return hpackEntryCount(payload);
+                }
+                if (type == 7) {
+                    fail("the server sent GOAWAY: "
+                            + new String(payload, StandardCharsets.UTF_8));
+                }
+            }
+            return -1;
+        } finally {
+            socket.close();
+        }
     }
 
     /** A length-prefixed string of digits, raw or Huffman, as a number. */

@@ -188,6 +188,32 @@ public class PetServer {
                             "text/plain",
                             (seen == null ? "absent" : "present:" + seen).getBytes("UTF-8"));
                 }
+                // The five fields RFC 9113 8.2.2 forbids in HTTP/2, all set by a
+                // HANDLER -- which is how they really arrive: response metadata
+                // forwarded from somewhere else. Over HTTP/1.1 they are ordinary;
+                // over h2 the writer has to drop them, or the peer resets a
+                // response that was otherwise fine and the same handler works on
+                // one protocol and not the other.
+                if("/hopbyhop".equals(stripQuery(target))) {
+                    Map extra = new LinkedHashMap();
+                    extra.put("Connection", "close");
+                    extra.put("Keep-Alive", "timeout=5");
+                    extra.put("Proxy-Connection", "keep-alive");
+                    extra.put("Transfer-Encoding", "chunked");
+                    extra.put("Upgrade", "h2c");
+                    extra.put("X-Kept", "yes");
+                    return new HttpServer.Response(200, "text/plain",
+                            "hop".getBytes("UTF-8"), extra);
+                }
+                // The same response WITHOUT the forbidden five, so a test can
+                // compare header counts instead of decoding names: the two blocks
+                // must come out the same size once the writer has done its job.
+                if("/hopbyhopcontrol".equals(stripQuery(target))) {
+                    Map extra = new LinkedHashMap();
+                    extra.put("X-Kept", "yes");
+                    return new HttpServer.Response(200, "text/plain",
+                            "hop".getBytes("UTF-8"), extra);
+                }
                 if("/reset".equals(stripQuery(target))) {
                     return new HttpServer.Response(205, "text/plain",
                             "junk".getBytes("UTF-8"));

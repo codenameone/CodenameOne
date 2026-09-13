@@ -1345,8 +1345,14 @@ static long cn1H2BuildHeaders(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT status,
                         c++;
                     }
                 }
-                /* Connection-specific headers are forbidden in HTTP/2. */
+                /* Connection-specific headers are forbidden in HTTP/2, and RFC
+                   9113 8.2.2 names FIVE of them. Proxy-Connection was the one
+                   missing, so a handler that forwarded response metadata sent a
+                   field the peer may reset the stream over -- and only when h2
+                   was negotiated, while the same handler answered fine over
+                   HTTP/1.1. One server, two answers, decided by ALPN. */
                 if(strcmp(line, "connection") != 0 && strcmp(line, "keep-alive") != 0
+                        && strcmp(line, "proxy-connection") != 0
                         && strcmp(line, "transfer-encoding") != 0 && strcmp(line, "upgrade") != 0) {
                     nva[count].name = (uint8_t*)line;
                     nva[count].namelen = strlen(line);
