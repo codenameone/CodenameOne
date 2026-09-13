@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NdefRecord.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nfc</a> &gt; <span class="el_source">NdefRecord.java</span></div><h1>NdefRecord.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nfc;
+
+/// A single NDEF (NFC Data Exchange Format) record. An NDEF tag carries one
+/// [NdefMessage] which contains one or more `NdefRecord`s.
+///
+/// Most apps construct records via the typed factories:
+/// [#createText(String, String)] for human-readable text,
+/// [#createUri(String)] for URIs (the most common payload -- launches the
+/// associated app on the device), [#createMime(String, byte[])] for binary
+/// MIME payloads, and [#createApplicationRecord(String)] for the special
+/// Android Application Record (AAR) that pins a tag to a specific package.
+///
+/// The low-level constructor [#NdefRecord(byte, byte[], byte[], byte[])] is
+/// available for vendor / external-type records.
+///
+/// Records are immutable -- modify them by building a new instance.
+public final class NdefRecord {
+
+    /// TNF (Type Name Format) -- record contains no payload.
+    public static final byte TNF_EMPTY = 0x00;
+    /// TNF -- type is one of the NFC Forum well-known types (e.g. `T`, `U`,
+    /// `Sp`). See [#rtdText()], [#rtdUri()].
+    public static final byte TNF_WELL_KNOWN = 0x01;
+    /// TNF -- type is a MIME media type (RFC 2046).
+    public static final byte TNF_MIME_MEDIA = 0x02;
+    /// TNF -- type is an absolute URI.
+    public static final byte TNF_ABSOLUTE_URI = 0x03;
+    /// TNF -- external type, namespaced as `domain:type` (e.g.
+    /// `android.com:pkg`).
+    public static final byte TNF_EXTERNAL_TYPE = 0x04;
+    /// TNF -- record is unknown / unparsed.
+    public static final byte TNF_UNKNOWN = 0x05;
+    /// TNF -- continuation of a chunked record (rare).
+    public static final byte TNF_UNCHANGED = 0x06;
+
+    // RTD bytes are kept as private fields so external callers can't
+    // mutate the shared instance (SpotBugs MS_PKGPROTECT); the public
+    // accessor methods below each return a fresh defensive copy.
+<span class="fc" id="L61">    private static final byte[] RTD_TEXT = new byte[] { 'T' };</span>
+<span class="fc" id="L62">    private static final byte[] RTD_URI = new byte[] { 'U' };</span>
+<span class="fc" id="L63">    private static final byte[] RTD_SMART_POSTER = new byte[] { 'S', 'p' };</span>
+<span class="fc" id="L64">    private static final byte[] RTD_ANDROID_APP = new byte[] { 'a', 'n', 'd',</span>
+            'r', 'o', 'i', 'd', '.', 'c', 'o', 'm', ':', 'p', 'k', 'g' };
+
+    /// Record Type Definition (RTD) for well-known text records. Returns
+    /// a defensive copy so callers cannot mutate the shared constant.
+    public static byte[] rtdText() {
+<span class="fc" id="L70">        return clone(RTD_TEXT);</span>
+    }
+
+    /// RTD for well-known URI records.
+    public static byte[] rtdUri() {
+<span class="fc" id="L75">        return clone(RTD_URI);</span>
+    }
+
+    /// RTD for SmartPoster (URI + title).
+    public static byte[] rtdSmartPoster() {
+<span class="fc" id="L80">        return clone(RTD_SMART_POSTER);</span>
+    }
+
+    /// RTD for Android Application Record (external type
+    /// `android.com:pkg`).
+    public static byte[] rtdAndroidApp() {
+<span class="fc" id="L86">        return clone(RTD_ANDROID_APP);</span>
+    }
+
+    private final byte tnf;
+    private final byte[] type;
+    private final byte[] id;
+    private final byte[] payload;
+
+    /// Constructs a record from its raw NDEF fields. Most callers should
+    /// prefer one of the typed factories below.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tnf`: one of the `TNF_*` constants
+    /// - `type`: type field; meaning depends on `tnf` (RTD value, MIME type
+    ///   string bytes, ...). Must not be `null` -- pass an empty array
+    ///   for [#TNF_EMPTY] / [#TNF_UNKNOWN]
+    /// - `id`: optional record id; pass an empty array if unused
+    /// - `payload`: record payload; must not be `null`
+<span class="fc" id="L105">    public NdefRecord(byte tnf, byte[] type, byte[] id, byte[] payload) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (type == null) {</span>
+<span class="fc" id="L107">            type = new byte[0];</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L110">            id = new byte[0];</span>
+        }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (payload == null) {</span>
+<span class="fc" id="L113">            payload = new byte[0];</span>
+        }
+<span class="fc" id="L115">        this.tnf = tnf;</span>
+<span class="fc" id="L116">        this.type = clone(type);</span>
+<span class="fc" id="L117">        this.id = clone(id);</span>
+<span class="fc" id="L118">        this.payload = clone(payload);</span>
+<span class="fc" id="L119">    }</span>
+
+    /// One of the `TNF_*` constants.
+    public byte getTnf() {
+<span class="fc" id="L123">        return tnf;</span>
+    }
+
+    /// Raw type field. Defensively copied -- mutating the returned array
+    /// does not affect the record.
+    public byte[] getType() {
+<span class="fc" id="L129">        return clone(type);</span>
+    }
+
+    /// Raw record id. Empty when no id was assigned.
+    public byte[] getId() {
+<span class="fc" id="L134">        return clone(id);</span>
+    }
+
+    /// Raw payload bytes. Defensively copied.
+    public byte[] getPayload() {
+<span class="fc" id="L139">        return clone(payload);</span>
+    }
+
+    /// Builds a well-known TEXT (`T`) record per NFC Forum RTD-Text 1.0.
+    /// The text is UTF-8 encoded; the BCP-47 language tag (e.g. `&quot;en&quot;`,
+    /// `&quot;ja&quot;`) goes in the leading status byte block.
+    ///
+    /// #### Parameters
+    ///
+    /// - `languageCode`: BCP-47 language tag, `null` defaults to `&quot;en&quot;`.
+    ///   Must be ASCII and at most 63 bytes long
+    /// - `text`: the text payload, UTF-8 (the spec also allows UTF-16; this
+    ///   factory always writes UTF-8)
+    public static NdefRecord createText(String languageCode, String text) {
+<span class="fc bfc" id="L153" title="All 4 branches covered.">        if (languageCode == null || languageCode.length() == 0) {</span>
+<span class="fc" id="L154">            languageCode = &quot;en&quot;;</span>
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (text == null) {</span>
+<span class="fc" id="L157">            text = &quot;&quot;;</span>
+        }
+<span class="fc" id="L159">        byte[] langBytes = toUtf8(languageCode);</span>
+<span class="fc" id="L160">        byte[] textBytes = toUtf8(text);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (langBytes.length &gt; 63) {</span>
+<span class="fc" id="L162">            throw new IllegalArgumentException(&quot;language code too long&quot;);</span>
+        }
+<span class="fc" id="L164">        byte[] payload = new byte[1 + langBytes.length + textBytes.length];</span>
+<span class="fc" id="L165">        payload[0] = (byte) (langBytes.length &amp; 0x3F);</span>
+<span class="fc" id="L166">        System.arraycopy(langBytes, 0, payload, 1, langBytes.length);</span>
+<span class="fc" id="L167">        System.arraycopy(textBytes, 0, payload, 1 + langBytes.length,</span>
+                textBytes.length);
+<span class="fc" id="L169">        return new NdefRecord(TNF_WELL_KNOWN, RTD_TEXT, null, payload);</span>
+    }
+
+    /// Builds a well-known URI (`U`) record. Common URI prefixes
+    /// (`http://www.`, `https://www.`, `tel:`, `mailto:`, ...) are replaced
+    /// with the one-byte abbreviation codes defined in NFC Forum RTD-URI
+    /// 1.0 to save tag space.
+    public static NdefRecord createUri(String uri) {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (uri == null) {</span>
+<span class="fc" id="L178">            throw new IllegalArgumentException(&quot;uri must not be null&quot;);</span>
+        }
+<span class="fc" id="L180">        byte prefix = 0;</span>
+<span class="fc" id="L181">        String tail = uri;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int i = 1; i &lt; URI_PREFIXES.length; i++) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (uri.startsWith(URI_PREFIXES[i])) {</span>
+<span class="fc" id="L184">                prefix = (byte) i;</span>
+<span class="fc" id="L185">                tail = uri.substring(URI_PREFIXES[i].length());</span>
+<span class="fc" id="L186">                break;</span>
+            }
+        }
+<span class="fc" id="L189">        byte[] tailBytes = toUtf8(tail);</span>
+<span class="fc" id="L190">        byte[] payload = new byte[1 + tailBytes.length];</span>
+<span class="fc" id="L191">        payload[0] = prefix;</span>
+<span class="fc" id="L192">        System.arraycopy(tailBytes, 0, payload, 1, tailBytes.length);</span>
+<span class="fc" id="L193">        return new NdefRecord(TNF_WELL_KNOWN, RTD_URI, null, payload);</span>
+    }
+
+    /// Builds a MIME media record (TNF = [#TNF_MIME_MEDIA]). Use for binary
+    /// payloads -- images, small structured data, application/vnd.*.
+    public static NdefRecord createMime(String mimeType, byte[] payload) {
+<span class="fc bfc" id="L199" title="All 4 branches covered.">        if (mimeType == null || mimeType.length() == 0) {</span>
+<span class="fc" id="L200">            throw new IllegalArgumentException(&quot;mimeType must not be empty&quot;);</span>
+        }
+<span class="fc" id="L202">        return new NdefRecord(TNF_MIME_MEDIA, toAscii(mimeType), null,</span>
+                payload);
+    }
+
+    /// Builds an external-type record (TNF = [#TNF_EXTERNAL_TYPE]). The
+    /// `domain:type` string is encoded as ASCII and stored in the type
+    /// field; the payload is passed through verbatim.
+    ///
+    /// External types are the recommended way to ship custom data on a tag
+    /// without colliding with NFC Forum well-known types.
+    public static NdefRecord createExternal(String domain, String type,
+            byte[] payload) {
+<span class="fc bfc" id="L214" title="All 4 branches covered.">        if (domain == null || type == null) {</span>
+<span class="fc" id="L215">            throw new IllegalArgumentException(&quot;domain/type required&quot;);</span>
+        }
+<span class="fc" id="L217">        String composed = domain.toLowerCase() + &quot;:&quot; + type.toLowerCase();</span>
+<span class="fc" id="L218">        return new NdefRecord(TNF_EXTERNAL_TYPE, toAscii(composed), null,</span>
+                payload);
+    }
+
+    /// Builds an Android Application Record (AAR). When a tag carrying an
+    /// AAR is tapped on Android, the OS launches the named package
+    /// instead of offering the user a chooser. Honoured only on Android --
+    /// iOS ignores AARs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `packageName`: e.g. `&quot;com.example.app&quot;`
+    public static NdefRecord createApplicationRecord(String packageName) {
+<span class="fc bfc" id="L231" title="All 4 branches covered.">        if (packageName == null || packageName.length() == 0) {</span>
+<span class="fc" id="L232">            throw new IllegalArgumentException(&quot;packageName required&quot;);</span>
+        }
+<span class="fc" id="L234">        return new NdefRecord(TNF_EXTERNAL_TYPE, RTD_ANDROID_APP, null,</span>
+<span class="fc" id="L235">                toAscii(packageName));</span>
+    }
+
+    /// Convenience: decodes a [#createText(String, String)] payload back to
+    /// its text content. Returns `null` if the record is not a well-known
+    /// text record.
+    public String getTextPayload() {
+<span class="fc bfc" id="L242" title="All 4 branches covered.">        if (tnf != TNF_WELL_KNOWN || !equalsBytes(type, RTD_TEXT)) {</span>
+<span class="fc" id="L243">            return null;</span>
+        }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (payload.length &lt; 1) {</span>
+<span class="fc" id="L246">            return null;</span>
+        }
+<span class="fc" id="L248">        int langLen = payload[0] &amp; 0x3F;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (langLen + 1 &gt; payload.length) {</span>
+<span class="fc" id="L250">            return null;</span>
+        }
+<span class="fc" id="L252">        return fromUtf8(payload, 1 + langLen, payload.length - 1 - langLen);</span>
+    }
+
+    /// Convenience: decodes a [#createUri(String)] payload back to its full
+    /// URI (re-expanding the leading prefix code). Returns `null` if the
+    /// record is not a recognised URI record.
+    public String getUriPayload() {
+        // Absolute-URI records carry the URI in the type field and may have
+        // an empty payload, so this branch must run before the payload-length
+        // guard below (which only the well-known URI form needs -- its prefix
+        // code lives in payload[0]).
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (tnf == TNF_ABSOLUTE_URI) {</span>
+<span class="fc" id="L264">            return fromUtf8(type, 0, type.length);</span>
+        }
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (payload.length &lt; 1) {</span>
+<span class="fc" id="L267">            return null;</span>
+        }
+<span class="fc" id="L269">        int prefix = payload[0] &amp; 0xFF;</span>
+<span class="pc bpc" id="L270" title="1 of 4 branches missed.">        if (tnf == TNF_WELL_KNOWN &amp;&amp; equalsBytes(type, RTD_URI)) {</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            String p = prefix &lt; URI_PREFIXES.length ? URI_PREFIXES[prefix]</span>
+                    : &quot;&quot;;
+<span class="fc" id="L273">            return p + fromUtf8(payload, 1, payload.length - 1);</span>
+        }
+<span class="fc" id="L275">        return null;</span>
+    }
+
+    private static byte[] clone(byte[] in) {
+<span class="fc" id="L279">        byte[] out = new byte[in.length];</span>
+<span class="fc" id="L280">        System.arraycopy(in, 0, out, 0, in.length);</span>
+<span class="fc" id="L281">        return out;</span>
+    }
+
+    private static boolean equalsBytes(byte[] a, byte[] b) {
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (a.length != b.length) {</span>
+<span class="nc" id="L286">            return false;</span>
+        }
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            if (a[i] != b[i]) {</span>
+<span class="fc" id="L290">                return false;</span>
+            }
+        }
+<span class="fc" id="L293">        return true;</span>
+    }
+
+    private static byte[] toUtf8(String s) {
+        try {
+<span class="fc" id="L298">            return s.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L299">        } catch (java.io.UnsupportedEncodingException e) {</span>
+            // UTF-8 is required by JLS to be present on every JVM, so this
+            // branch is unreachable. Throw rather than fall back to the
+            // platform default encoding (SpotBugs DM_DEFAULT_ENCODING).
+<span class="nc" id="L303">            throw new RuntimeException(e.toString(), e);</span>
+        }
+    }
+
+    private static byte[] toAscii(String s) {
+        try {
+<span class="fc" id="L309">            return s.getBytes(&quot;US-ASCII&quot;);</span>
+<span class="nc" id="L310">        } catch (java.io.UnsupportedEncodingException e) {</span>
+            // US-ASCII is required by JLS to be present on every JVM.
+<span class="nc" id="L312">            throw new RuntimeException(e.toString(), e);</span>
+        }
+    }
+
+    private static String fromUtf8(byte[] data, int offset, int length) {
+        try {
+<span class="fc" id="L318">            return new String(data, offset, length, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L319">        } catch (java.io.UnsupportedEncodingException e) {</span>
+            // UTF-8 is required by JLS to be present on every JVM.
+<span class="nc" id="L321">            throw new RuntimeException(e.toString(), e);</span>
+        }
+    }
+
+<span class="fc" id="L325">    static final String[] URI_PREFIXES = new String[] {</span>
+            &quot;&quot;,
+            &quot;http://www.&quot;,
+            &quot;https://www.&quot;,
+            &quot;http://&quot;,
+            &quot;https://&quot;,
+            &quot;tel:&quot;,
+            &quot;mailto:&quot;,
+            &quot;ftp://anonymous:anonymous@&quot;,
+            &quot;ftp://ftp.&quot;,
+            &quot;ftps://&quot;,
+            &quot;sftp://&quot;,
+            &quot;smb://&quot;,
+            &quot;nfs://&quot;,
+            &quot;ftp://&quot;,
+            &quot;dav://&quot;,
+            &quot;news:&quot;,
+            &quot;telnet://&quot;,
+            &quot;imap:&quot;,
+            &quot;rtsp://&quot;,
+            &quot;urn:&quot;,
+            &quot;pop:&quot;,
+            &quot;sip:&quot;,
+            &quot;sips:&quot;,
+            &quot;tftp:&quot;,
+            &quot;btspp://&quot;,
+            &quot;btl2cap://&quot;,
+            &quot;btgoep://&quot;,
+            &quot;tcpobex://&quot;,
+            &quot;irdaobex://&quot;,
+            &quot;file://&quot;,
+            &quot;urn:epc:id:&quot;,
+            &quot;urn:epc:tag:&quot;,
+            &quot;urn:epc:pat:&quot;,
+            &quot;urn:epc:raw:&quot;,
+            &quot;urn:epc:&quot;,
+            &quot;urn:nfc:&quot;
+    };
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

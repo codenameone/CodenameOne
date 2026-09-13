@@ -1,0 +1,1345 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Desktop.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Desktop.java</span></div><h1>Desktop.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.impl.WindowManager;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+
+/// The desktop a windowed application runs on: the monitors attached to it and the
+/// `Window` instances open on them.
+///
+/// This sits alongside `Display` rather than replacing any of it. `Display` answers
+/// &quot;how big is the application's main surface&quot;, which is the only question a phone
+/// has; `Desktop` answers &quot;what screens exist and what windows are open&quot;, which only
+/// a windowing system can answer.
+///
+/// Every method degrades safely on a platform with no windowing system:
+/// `#getWindows()` returns an empty array, `#getMonitors()` returns a single monitor
+/// describing the main display, and `#getFocusedWindow()` returns null. Only
+/// constructing a `Window` throws.
+///
+/// @author Shai Almog
+public final class Desktop {
+
+<span class="fc" id="L50">    private static final Desktop INSTANCE = new Desktop();</span>
+
+    /// Dots per inch of the medium-density baseline, used when there is no
+    /// implementation to ask.
+    private static final int MEDIUM_DENSITY_DPI = 160;
+<span class="fc" id="L55">    private static final int[] BOUNDS_SCRATCH = new int[4];</span>
+
+<span class="fc" id="L57">    private final ArrayList&lt;Window&gt; windows = new ArrayList&lt;Window&gt;();</span>
+<span class="fc" id="L58">    private final EventDispatcher monitorListeners = new EventDispatcher();</span>
+<span class="fc" id="L59">    private final EventDispatcher windowListeners = new EventDispatcher();</span>
+    private Window focusedWindow;
+<span class="fc" id="L61">    private int nextWindowId = 1;</span>
+
+<span class="fc" id="L63">    private Desktop() {</span>
+<span class="fc" id="L64">    }</span>
+
+    /// Returns the singleton instance.
+    ///
+    /// #### Returns
+    ///
+    /// the desktop instance
+    public static Desktop getInstance() {
+<span class="fc" id="L72">        return INSTANCE;</span>
+    }
+
+    /// Indicates whether this platform has a windowing system, and therefore whether
+    /// `Window` can be used at all.
+    ///
+    /// #### Returns
+    ///
+    /// true if additional native windows can be opened
+    public static boolean isSupported() {
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        return Display.impl != null &amp;&amp; Display.impl.getWindowManager() != null;</span>
+    }
+
+    private static WindowManager manager() {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (Display.impl == null) {</span>
+<span class="fc" id="L87">            return null;</span>
+        }
+<span class="fc" id="L89">        return Display.impl.getWindowManager();</span>
+    }
+
+    // ---- monitors --------------------------------------------------------------
+
+    /// Returns every monitor attached to the desktop.
+    ///
+    /// On a platform with no windowing system this reports a single monitor covering
+    /// the main display, so layout code that positions against a monitor works
+    /// everywhere.
+    ///
+    /// #### Returns
+    ///
+    /// the monitors, never empty and never null
+    public Monitor[] getMonitors() {
+<span class="fc" id="L104">        WindowManager wm = manager();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (wm == null) {</span>
+<span class="fc" id="L106">            return new Monitor[]{fallbackMonitor()};</span>
+        }
+<span class="fc" id="L108">        int count = wm.getMonitorCount();</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (count &lt;= 0) {</span>
+<span class="nc" id="L110">            return new Monitor[]{fallbackMonitor()};</span>
+        }
+<span class="fc" id="L112">        int primary = wm.getPrimaryMonitor();</span>
+<span class="fc" id="L113">        Monitor[] out = new Monitor[count];</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L115">            out[iter] = readMonitor(wm, iter, primary);</span>
+        }
+<span class="fc" id="L117">        return out;</span>
+    }
+
+    /// Returns the monitor the platform treats as the origin of the desktop.
+    ///
+    /// #### Returns
+    ///
+    /// the primary monitor
+    public Monitor getPrimaryMonitor() {
+<span class="fc" id="L126">        WindowManager wm = manager();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (wm == null) {</span>
+<span class="fc" id="L128">            return fallbackMonitor();</span>
+        }
+<span class="fc" id="L130">        return readMonitor(wm, wm.getPrimaryMonitor(), wm.getPrimaryMonitor());</span>
+    }
+
+    /// Returns the monitor containing the given desktop coordinate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x coordinate in desktop space
+    ///
+    /// - `y`: the y coordinate in desktop space
+    ///
+    /// #### Returns
+    ///
+    /// the monitor containing that point, or the primary monitor when none does
+    public Monitor getMonitorAt(int x, int y) {
+<span class="fc" id="L145">        Monitor[] all = getMonitors();</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        for (Monitor m : all) {</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (m.getBounds().contains(x, y)) {</span>
+<span class="fc" id="L148">                return m;</span>
+            }
+        }
+<span class="nc" id="L151">        return getPrimaryMonitor();</span>
+    }
+
+    /// Returns the monitor a top level is currently displayed on.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topLevel`: the form or window to locate
+    ///
+    /// #### Returns
+    ///
+    /// the monitor it sits on, or the primary monitor when that cannot be determined
+    public Monitor getMonitorFor(TopLevelContainer topLevel) {
+<span class="fc" id="L164">        WindowManager wm = manager();</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (wm != null) {</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            Container c = topLevel == null ? null : topLevel.asContainer();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            Object peer = c == null ? null : c.topLevelNativePeer();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (peer != null) {</span>
+<span class="fc" id="L169">                return readMonitor(wm, wm.getMonitorForWindow(peer), wm.getPrimaryMonitor());</span>
+            }
+            // A window that has not been shown yet has no peer and so no monitor; it
+            // falls through to the primary rather than borrowing the main window's.
+<span class="pc bpc" id="L173" title="2 of 4 branches missed.">            if (c != null &amp;&amp; !c.isNativeWindow()) {</span>
+                // A Form lives in the application's main window, which has no peer to
+                // ask about. Reporting the primary monitor was wrong as soon as the
+                // application had been dragged to a second display: everything
+                // positioned against the main form got another monitor's work area,
+                // scale and density.
+<span class="fc" id="L179">                return readMonitor(wm, wm.getMonitorForMainWindow(), wm.getPrimaryMonitor());</span>
+            }
+        }
+<span class="nc" id="L182">        return getPrimaryMonitor();</span>
+    }
+
+    /// Returns the union of every monitor's bounds.
+    ///
+    /// #### Returns
+    ///
+    /// the whole desktop area
+    public Rectangle getDesktopBounds() {
+<span class="fc" id="L191">        Monitor[] all = getMonitors();</span>
+<span class="fc" id="L192">        Rectangle out = all[0].getBounds();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (int iter = 1; iter &lt; all.length; iter++) {</span>
+<span class="fc" id="L194">            Rectangle b = all[iter].getBounds();</span>
+<span class="fc" id="L195">            int x = Math.min(out.getX(), b.getX());</span>
+<span class="fc" id="L196">            int y = Math.min(out.getY(), b.getY());</span>
+<span class="fc" id="L197">            int right = Math.max(out.getX() + out.getWidth(), b.getX() + b.getWidth());</span>
+<span class="fc" id="L198">            int bottom = Math.max(out.getY() + out.getHeight(), b.getY() + b.getHeight());</span>
+<span class="fc" id="L199">            out = new Rectangle(x, y, right - x, bottom - y);</span>
+        }
+<span class="fc" id="L201">        return out;</span>
+    }
+
+    private Monitor readMonitor(WindowManager wm, int index, int primary) {
+        int[] b;
+        int[] w;
+<span class="fc" id="L207">        synchronized (BOUNDS_SCRATCH) {</span>
+<span class="fc" id="L208">            b = copyOf(wm.getMonitorBounds(index, BOUNDS_SCRATCH));</span>
+<span class="fc" id="L209">            w = copyOf(wm.getMonitorWorkArea(index, BOUNDS_SCRATCH));</span>
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">        return new Monitor(index,</span>
+                new Rectangle(b[0], b[1], b[2], b[3]),
+                new Rectangle(w[0], w[1], w[2], w[3]),
+<span class="fc" id="L214">                wm.getMonitorDensity(index),</span>
+<span class="fc" id="L215">                wm.getMonitorScale(index),</span>
+<span class="fc" id="L216">                wm.getMonitorDotsPerInch(index),</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                wm.getMonitorName(index),</span>
+                index == primary);
+    }
+
+    private static int[] copyOf(int[] src) {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (src == null) {</span>
+<span class="nc" id="L223">            return new int[4];</span>
+        }
+<span class="fc" id="L225">        return new int[]{src[0], src[1], src[2], src[3]};</span>
+    }
+
+    private Monitor fallbackMonitor() {
+        // Every value here has to survive Display having no implementation yet. This
+        // method is the documented answer during startup, so guarding the size and then
+        // asking the same missing implementation for the density and the dots per inch
+        // -- which is what getDeviceDensity() and convertToPixels() do -- threw exactly
+        // when the fallback was supposed to be returned.
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        boolean uninitialized = Display.impl == null;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        int w = uninitialized ? 0 : Display.impl.getDisplayWidth();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        int h = uninitialized ? 0 : Display.impl.getDisplayHeight();</span>
+<span class="fc" id="L237">        Rectangle r = new Rectangle(0, 0, w, h);</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        int density = uninitialized</span>
+<span class="fc" id="L239">                ? Display.DENSITY_MEDIUM : Display.getInstance().getDeviceDensity();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        int dotsPerInch = uninitialized</span>
+<span class="fc" id="L241">                ? MEDIUM_DENSITY_DPI : Display.getInstance().convertToPixels(254, true) / 10;</span>
+<span class="fc" id="L242">        return new Monitor(0, r, new Rectangle(r), density, 1.0, dotsPerInch, &quot;main&quot;, true);</span>
+    }
+
+    // ---- windows ----------------------------------------------------------------
+
+    /// Returns every window currently open, not counting the application's main form.
+    ///
+    /// #### Returns
+    ///
+    /// the open windows, empty when there are none or the platform has no windows
+    public Window[] getWindows() {
+<span class="fc" id="L253">        synchronized (windows) {</span>
+<span class="fc" id="L254">            return windows.toArray(new Window[windows.size()]);</span>
+        }
+    }
+
+    /// Returns the window that currently holds keyboard focus.
+    ///
+    /// #### Returns
+    ///
+    /// the focused window, or null when the main form has focus or none is open
+    public Window getFocusedWindow() {
+<span class="fc" id="L264">        return focusedWindow;</span>
+    }
+
+    /// Adds a listener notified when a monitor is attached, removed or reconfigured.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public void addMonitorListener(ActionListener l) {
+<span class="fc" id="L273">        monitorListeners.addListener(l);</span>
+        // Touching the manager is what makes a port start watching for display
+        // changes; without it a listener registered before anything else looked at
+        // the windowing system would never hear about one.
+        //
+        // Registering a listener before Codename One is initialized is a reasonable
+        // thing to do -- it is the point at which an application knows it wants to hear
+        // about monitors -- and it used to throw. Guarding alone was not enough either:
+        // the ports start watching when their window manager is first created, so a
+        // listener registered early and never followed by anything that touches the
+        // desktop would simply never hear about a change. Display.init() calls
+        // startMonitorWatchingIfListening() once an implementation exists.
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (Display.impl != null) {</span>
+<span class="fc" id="L286">            Display.impl.getWindowManager();</span>
+        }
+<span class="fc" id="L288">    }</span>
+
+    /// Starts the port watching for display changes if anything is listening for them.
+    ///
+    /// Called from `Display#init(java.lang.Object)`, because a listener registered
+    /// before there was an implementation could not start the watch itself.
+    static void startMonitorWatchingIfListening() {
+<span class="pc bpc" id="L295" title="1 of 4 branches missed.">        if (Display.impl != null &amp;&amp; INSTANCE.monitorListeners.hasListeners()) {</span>
+<span class="fc" id="L296">            Display.impl.getWindowManager();</span>
+        }
+<span class="fc" id="L298">    }</span>
+
+    /// Removes a previously added monitor listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public void removeMonitorListener(ActionListener l) {
+<span class="nc" id="L306">        monitorListeners.removeListener(l);</span>
+<span class="nc" id="L307">    }</span>
+
+    /// Adds a listener notified when any window is shown, hidden, moved or resized.
+    ///
+    /// This is the multi-window counterpart of
+    /// `Display#addWindowListener(com.codename1.ui.events.ActionListener)`, which
+    /// continues to report only the application's main window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public void addWindowListener(ActionListener l) {
+<span class="nc" id="L319">        windowListeners.addListener(l);</span>
+<span class="nc" id="L320">    }</span>
+
+    /// Removes a previously added window listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public void removeWindowListener(ActionListener l) {
+<span class="nc" id="L328">        windowListeners.removeListener(l);</span>
+<span class="nc" id="L329">    }</span>
+
+    // ---- framework internals -------------------------------------------------------
+
+    /// Hands out the next window id.
+    ///
+    /// Synchronized on the same monitor as the registry. A window is constructed on
+    /// whatever thread calls `new Window(...)` -- a constructor cannot be marshalled,
+    /// since it has to return the object -- so two background threads creating
+    /// windows at once could take the same id from an unsynchronized post-increment.
+    /// Both native windows would then answer to one id, and `#windowById(int)`
+    /// returns the first match, so every input and lifecycle callback meant for the
+    /// second would have been delivered to the first.
+    ///
+    /// #### Returns
+    ///
+    /// an id no other window has been given
+    int nextWindowId() {
+<span class="fc" id="L347">        synchronized (windows) {</span>
+<span class="fc" id="L348">            return nextWindowId++;</span>
+        }
+    }
+
+    void registerWindow(Window w) {
+<span class="fc" id="L353">        synchronized (windows) {</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            if (!windows.contains(w)) {</span>
+<span class="fc" id="L355">                windows.add(w);</span>
+            }
+<span class="fc" id="L357">        }</span>
+<span class="fc" id="L358">    }</span>
+
+    void deregisterWindow(Window w) {
+<span class="fc" id="L361">        synchronized (windows) {</span>
+<span class="fc" id="L362">            windows.remove(w);</span>
+<span class="fc" id="L363">        }</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (focusedWindow == w) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L365">            focusedWindow = null;</span>
+        }
+<span class="fc" id="L367">    }</span>
+
+    void setFocusedWindow(Window w) {
+<span class="fc" id="L370">        focusedWindow = w;</span>
+<span class="fc" id="L371">    }</span>
+
+    /// Returns the window carrying the given framework assigned id, which is how an
+    /// event that arrived off the event dispatch thread is routed back to its tree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id from `Window#getWindowId()`
+    ///
+    /// #### Returns
+    ///
+    /// the matching window, or null when none is open with that id
+    public Window windowById(int windowId) {
+<span class="fc" id="L384">        synchronized (windows) {</span>
+<span class="fc" id="L385">            int len = windows.size();</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            for (int iter = 0; iter &lt; len; iter++) {</span>
+<span class="fc" id="L387">                Window w = windows.get(iter);</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">                if (w.getWindowId() == windowId) {</span>
+<span class="fc" id="L389">                    return w;</span>
+                }
+            }
+<span class="fc" id="L392">        }</span>
+<span class="fc" id="L393">        return null;</span>
+    }
+
+    boolean hasOpenWindows() {
+<span class="fc" id="L397">        synchronized (windows) {</span>
+<span class="fc bfc" id="L398" title="All 2 branches covered.">            return !windows.isEmpty();</span>
+        }
+    }
+
+    boolean hasVisibleWindows() {
+<span class="fc" id="L403">        synchronized (windows) {</span>
+<span class="fc" id="L404">            int len = windows.size();</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            for (int iter = 0; iter &lt; len; iter++) {</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                if (windows.get(iter).isWindowShowing()) {</span>
+<span class="nc" id="L407">                    return true;</span>
+                }
+            }
+<span class="fc" id="L410">        }</span>
+<span class="fc" id="L411">        return false;</span>
+    }
+
+    /// Snapshot used by the paint pass. Callers iterate by index because a nested
+    /// event loop can dispose a window mid iteration.
+    ArrayList&lt;Window&gt; windowList() {
+<span class="fc" id="L417">        return windows;</span>
+    }
+
+    void fireMonitorChanged() {
+<span class="fc" id="L421">        monitorListeners.fireActionEvent(new ActionEvent(this));</span>
+<span class="fc" id="L422">    }</span>
+
+    void fireWindowEvent(ActionEvent evt) {
+<span class="fc" id="L425">        windowListeners.fireActionEvent(evt);</span>
+<span class="fc" id="L426">    }</span>
+
+    /// Disposes every open window. Invoked as the application shuts down so a window
+    /// cannot outlive the event dispatch thread that paints it.
+    void disposeAll() {
+<span class="fc" id="L431">        Window[] all = getWindows();</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        for (Window w : all) {</span>
+<span class="fc" id="L433">            w.dispose();</span>
+        }
+<span class="fc" id="L435">    }</span>
+    // ---- modality ----------------------------------------------------------------
+    //
+    // Modality lives here rather than in Display because it is a question about
+    // windows, and the window registry is here. Display asks whether input for a
+    // window is blocked; it does not need to know what a modal is.
+
+<span class="fc" id="L442">    private final ArrayList&lt;Window&gt; modalWindows = new ArrayList&lt;Window&gt;();</span>
+
+    /// Drops a disposed window's modal registration and re-syncs what the ports
+    /// block, so a window that went away stops blocking.
+    void forgetModal(Window w) {
+<span class="fc" id="L447">        modalWindows.remove(w);</span>
+<span class="fc" id="L448">        syncNativeModalBlocking();</span>
+<span class="fc" id="L449">    }</span>
+
+    void pushModalWindow(Window w) {
+<span class="fc" id="L452">        modalWindows.add(w);</span>
+<span class="fc" id="L453">        syncNativeModalBlocking();</span>
+<span class="fc" id="L454">    }</span>
+
+    void popModalWindow(Window w) {
+<span class="fc" id="L457">        modalWindows.remove(w);</span>
+<span class="fc" id="L458">        syncNativeModalBlocking();</span>
+<span class="fc" id="L459">    }</span>
+
+    /// Tells every native window whether input to it is currently blocked.
+    ///
+    /// The framework already decides this, in `#isBlockedByModal(int)`, and it is the
+    /// only place that can: the answer depends on the whole modal stack, on each
+    /// window's scope and on who owns it. A port that tried to derive it from a single
+    /// &quot;this window became modal&quot; call has to reinvent nesting and ownership, and gets
+    /// them wrong -- releasing an inner modal re-enabled everything the outer one was
+    /// still blocking, application modality left the other secondary windows enabled,
+    /// and an unowned window modal disabled a main window it never claimed.
+    ///
+    /// This matters beyond appearances, because a blocked window's own title bar is
+    /// outside the framework's input filter: its close button still reaches the
+    /// application.
+    void syncNativeModalBlocking() {
+<span class="fc" id="L475">        WindowManager wm = Display.impl.getWindowManager();</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (wm == null) {</span>
+<span class="nc" id="L477">            return;</span>
+        }
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        wm.setMainWindowInputEnabled(!isBlockedByModal(0));</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        for (Window each : getWindows()) {</span>
+<span class="fc" id="L481">            Object peer = each.getNativePeer();</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">            if (peer != null) {</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">                wm.setInputEnabled(peer, !isBlockedByModal(each.getWindowId()));</span>
+            }
+        }
+<span class="fc" id="L486">    }</span>
+
+    /// Whether input aimed at the given window is currently blocked by a modal.
+    ///
+    /// Public because the implementation needs it: a wheel gesture is played as four
+    /// steps queued on the event dispatch thread, and a listener can show a modal
+    /// between the first check and the last step.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// #### Returns
+    ///
+    /// true when input to that window is currently blocked
+    public boolean isWindowInputBlocked(int windowId) {
+<span class="fc" id="L502">        return isBlockedByModal(windowId);</span>
+    }
+
+    private boolean isBlockedByModal(int windowId) {
+        // Every registered blocker is consulted rather than only the newest one.
+        // Modal windows nest: a window modal opened from inside an application modal
+        // blocks only its own owner, and stopping at the top of the stack would let
+        // input back into the main form and every unrelated window for as long as the
+        // narrower one was up.
+<span class="fc bfc" id="L511" title="All 2 branches covered.">        Window self = windowId &gt; 0 ? windowById(windowId) : null;</span>
+<span class="fc" id="L512">        int len = modalWindows.size();</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">        for (int iter = len - 1; iter &gt;= 0; iter--) {</span>
+<span class="fc" id="L514">            Window modal = modalWindows.get(iter);</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">            if (modal.getWindowId() == windowId) {</span>
+                // Never blocked by itself -- but keep looking at the outer blockers.
+                // Returning here exempted a modal window from *every* other modal,
+                // so an unrelated modal shown while an application modal was up
+                // accepted input that application modality is meant to stop.
+<span class="fc" id="L520">                continue;</span>
+            }
+<span class="fc bfc" id="L522" title="All 4 branches covered.">            if (self != null &amp;&amp; ownedBy(self, modal)) {</span>
+                // A modal opened from inside another is not blocked by the one it was
+                // opened from. That is the exemption the self check was reaching for,
+                // and it applies to the owner chain rather than to any modal at all.
+<span class="fc" id="L526">                continue;</span>
+            }
+<span class="fc bfc" id="L528" title="All 2 branches covered.">            if (isModalOutOfReach(modal)) {</span>
+                // Hidden along with an owner the application hid. The registration is
+                // kept on purpose -- hideNotify() cannot tell an owner cascade from a
+                // minimize, and a minimized modal is still open and still modal -- but a
+                // modal nobody can see or dismiss must not go on blocking. Left in, the
+                // owner's hide froze the main surface and every unrelated window with no
+                // window on screen to release them, until the owner was shown again.
+<span class="fc" id="L535">                continue;</span>
+            }
+<span class="fc bfc" id="L537" title="All 2 branches covered.">            if (blocks(modal, windowId)) {</span>
+<span class="fc" id="L538">                return true;</span>
+            }
+        }
+<span class="fc" id="L541">        return false;</span>
+    }
+
+    /// Whether `w` sits inside `candidateOwner`'s ownership chain.
+    private static boolean ownedBy(Window w, Window candidateOwner) {
+<span class="fc" id="L546">        TopLevelContainer owner = w.getOwnerWindow();</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        while (owner instanceof Window) {</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">            if (owner == candidateOwner) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L549">                return true;</span>
+            }
+<span class="nc" id="L551">            owner = ((Window) owner).getOwnerWindow();</span>
+        }
+<span class="fc" id="L553">        return false;</span>
+    }
+
+    /// Whether one modal window blocks input to the window with the given id.
+    /// Whether a registered modal is currently unreachable because an owner above it
+    /// is off screen.
+    ///
+    /// Only the owner chain is consulted, never the modal's own visibility: a modal the
+    /// user minimized is still open and still blocks, which is what keeps a minimized
+    /// modal from quietly releasing the application. An owner that is not showing is a
+    /// different situation -- its children went with it and cannot be restored
+    /// independently, so nothing on screen can dismiss them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modal`: the registered modal window
+    ///
+    /// #### Returns
+    ///
+    /// true when an owner of this modal is not showing
+    private static boolean isModalOutOfReach(Window modal) {
+<span class="fc" id="L574">        TopLevelContainer owner = modal.getOwnerWindow();</span>
+<span class="fc bfc" id="L575" title="All 2 branches covered.">        while (owner instanceof Window) {</span>
+<span class="fc" id="L576">            Window w = (Window) owner;</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">            if (!w.isWindowShowing()) {</span>
+<span class="fc" id="L578">                return true;</span>
+            }
+<span class="fc" id="L580">            owner = w.getOwnerWindow();</span>
+<span class="fc" id="L581">        }</span>
+<span class="fc" id="L582">        return false;</span>
+    }
+
+    private boolean blocks(Window modal, int windowId) {
+<span class="fc bfc" id="L586" title="All 2 branches covered.">        if (modal.getModalityType() == Window.MODALITY_APPLICATION) {</span>
+<span class="fc" id="L587">            return true;</span>
+        }
+        // window modal: only the owner is blocked
+<span class="fc" id="L590">        TopLevelContainer owner = modal.getOwnerWindow();</span>
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        if (owner instanceof Window) {</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">            return ((Window) owner).getWindowId() == windowId;</span>
+        }
+<span class="fc bfc" id="L594" title="All 2 branches covered.">        if (owner != null) {</span>
+            // owned by the main form
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">            return windowId == 0;</span>
+        }
+        // No owner at all. Window modality blocks the owning window, and there is
+        // none, so it blocks nothing -- treating this as main-form ownership would
+        // block the main form on a window that never claimed it.
+<span class="fc" id="L601">        return false;</span>
+    }
+
+    // ---- window lifecycle --------------------------------------------------------
+    //
+    // The platform reports a window shown, hidden, moved, resized, focused or closed,
+    // and these turn that into framework state. They live here rather than in Display
+    // because every one of them is about a window, and the registry that resolves an
+    // id to a window is here.
+
+<span class="fc" id="L611">    private final Hashtable pendingWindowSizes = new Hashtable();</span>
+
+    /// Guards `#monitorsChangedPending`, which is set from the port's native event
+    /// thread and cleared on the event dispatch thread.
+<span class="fc" id="L615">    private final Object monitorsChangedLock = new Object();</span>
+
+    /// Whether a monitor-topology notification is already queued. See
+    /// `#monitorsChanged()`.
+    private boolean monitorsChangedPending;
+
+
+    /// Notifies Codename One that a native window became visible.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowShowNotify(int windowId) {
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+            // Deliberately not the packed input queue. That queue drops events when it
+            // is full and while invokeAndBlock is running in drop mode, and nothing
+            // reconciles a lost one afterwards: a dropped show leaves a visible window
+            // the framework believes is iconified and never paints again, and a
+            // dropped hide leaves a hidden window painting and keeping the event
+            // dispatch thread awake. Lifecycle notifications are not droppable.
+<span class="fc" id="L635">            Display.getInstance().callSerially(new WindowCallback(windowId, WindowCallback.SHOWN));</span>
+        }
+<span class="fc" id="L637">    }</span>
+
+    /// Notifies Codename One that a native window stopped being visible.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowHideNotify(int windowId) {
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+            // See windowShowNotify: not droppable.
+<span class="fc" id="L647">            Display.getInstance().callSerially(new WindowCallback(windowId, WindowCallback.HIDDEN));</span>
+        }
+<span class="fc" id="L649">    }</span>
+
+    /// Notifies Codename One that a native window gained or lost keyboard focus.
+    /// Marshalled onto the event dispatch thread, since it runs application code.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `gained`: true when the window gained focus
+    public void windowFocusChanged(int windowId, boolean gained) {
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        Display.getInstance().callSerially(new WindowCallback(windowId,</span>
+                gained ? WindowCallback.FOCUS_GAINED : WindowCallback.FOCUS_LOST));
+<span class="fc" id="L662">    }</span>
+
+    /// Notifies Codename One that the user activated a native window's close control.
+    /// Marshalled onto the event dispatch thread, since it runs application code and
+    /// may dispose the window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowCloseRequested(int windowId) {
+        // Queued first, and the modality check made on the event dispatch thread inside
+        // the callback. The modal stack is mutated there by show, hide and dispose, so
+        // testing it from the port's callback thread raced: isBlockedByModal takes the
+        // stack's size and then indexes it, which a concurrent removal turns into an
+        // exception, and a stale read could let a blocked window's close through.
+<span class="fc" id="L677">        Display.getInstance().callSerially(new WindowCallback(windowId, WindowCallback.CLOSE_REQUESTED));</span>
+<span class="fc" id="L678">    }</span>
+
+    /// Notifies Codename One that the platform has already destroyed a window's
+    /// native surface, so the window is gone whatever the application would prefer.
+    ///
+    /// Distinct from `#windowCloseRequested(int)`, which asks. Some platforms do not
+    /// offer the close control as a question: a Mac Catalyst scene is disconnected
+    /// after the fact, with nothing left to veto. Reporting that as a request would
+    /// let `DO_NOTHING_ON_CLOSE` leave a registered window painting into a surface
+    /// that no longer exists, so it is reported as what it is and the window is
+    /// disposed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowClosedNatively(int windowId) {
+<span class="nc" id="L694">        Display.getInstance().callSerially(new WindowCallback(windowId, WindowCallback.CLOSED_NATIVELY));</span>
+<span class="nc" id="L695">    }</span>
+
+    /// Notifies Codename One that the platform refused to create a window's native
+    /// surface, so the window will never appear.
+    ///
+    /// Separate from `#windowHideNotify(int)` because that one means &quot;minimized&quot;,
+    /// which keeps a modal window's registration: a modal that never appeared would
+    /// otherwise block input to every other window while `showModal()` waited for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window whose native surface could not be created
+    public void windowActivationFailed(int windowId) {
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="fc" id="L709">            WindowCallback failure = new WindowCallback(windowId,</span>
+                    WindowCallback.ACTIVATION_FAILED);
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            if (Display.getInstance().isEdt()) {</span>
+                // Applied in the caller's own turn when it is already on the event
+                // dispatch thread. A port validates this failure against the request
+                // token it belongs to and then reports it, and queueing again splits
+                // those two steps across turns: a retrying show() can run in between,
+                // start a new request, and be marked hidden and stripped of its
+                // modality by a failure that no longer applies to it. Running here
+                // keeps the check and its consequence in one unit, which is what the
+                // check is for.
+<span class="fc" id="L720">                failure.run();</span>
+<span class="fc" id="L721">                return;</span>
+            }
+            // Not droppable, for the same reason as the other lifecycle notifications.
+<span class="nc" id="L724">            Display.getInstance().callSerially(failure);</span>
+        }
+<span class="nc" id="L726">    }</span>
+
+    /// Notifies Codename One that the user moved a native window.
+    ///
+    /// Separate from `#windowMonitorChanged(int)`, which is only for a move that
+    /// carried the window onto a different display: an ordinary move within one
+    /// monitor still has to reach the listeners, or nothing can persist a window's
+    /// position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowMoved(int windowId) {
+<span class="pc bpc" id="L739" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="fc" id="L740">            Display.getInstance().callSerially(new WindowCallback(windowId, WindowCallback.MOVED));</span>
+        }
+<span class="fc" id="L742">    }</span>
+
+    /// Notifies Codename One that a native window moved to a monitor with different
+    /// characteristics, so that its scale and layout are recomputed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowMonitorChanged(int windowId) {
+<span class="fc" id="L751">        Display.getInstance().callSerially(new WindowCallback(windowId, WindowCallback.MONITOR_CHANGED));</span>
+<span class="fc" id="L752">    }</span>
+
+    /// Notifies Codename One that a native window changed size. Invoked by the
+    /// implementation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `w`: the new drawable width
+    ///
+    /// - `h`: the new drawable height
+    public void windowSizeChanged(int windowId, int w, int h) {
+<span class="pc bpc" id="L765" title="1 of 2 branches missed.">        if (windowId &lt;= 0) {</span>
+<span class="nc" id="L766">            return;</span>
+        }
+        // Coalesced onto the event dispatch thread rather than queued as a packet.
+        // The packed stack drops when it is full, which live resizing does easily, and
+        // the dropped packet can be the *final* size -- the native surface has already
+        // adopted it, so the hierarchy stays laid out for an earlier one with nothing
+        // guaranteed to correct it, leaving painting and hit testing misaligned.
+        //
+        // Coalescing is what makes a non-droppable path affordable here: only one
+        // notification per window is ever outstanding, and it carries whatever the
+        // latest dimensions are when it runs, so a drag that produces hundreds of
+        // resizes still costs one queued runnable at a time.
+<span class="fc" id="L778">        final Integer key = Integer.valueOf(windowId);</span>
+        boolean queue;
+<span class="fc" id="L780">        synchronized (pendingWindowSizes) {</span>
+<span class="fc" id="L781">            int[] latest = (int[]) pendingWindowSizes.get(key);</span>
+<span class="fc bfc" id="L782" title="All 2 branches covered.">            if (latest == null) {</span>
+<span class="fc" id="L783">                latest = new int[2];</span>
+<span class="fc" id="L784">                pendingWindowSizes.put(key, latest);</span>
+<span class="fc" id="L785">                queue = true;</span>
+            } else {
+<span class="fc" id="L787">                queue = false;</span>
+            }
+<span class="fc" id="L789">            latest[0] = w;</span>
+<span class="fc" id="L790">            latest[1] = h;</span>
+<span class="fc" id="L791">        }</span>
+<span class="fc bfc" id="L792" title="All 2 branches covered.">        if (!queue) {</span>
+<span class="fc" id="L793">            return;</span>
+        }
+<span class="fc" id="L795">        final int id = windowId;</span>
+<span class="fc" id="L796">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+                int width;
+                int height;
+<span class="fc" id="L801">                synchronized (pendingWindowSizes) {</span>
+<span class="fc" id="L802">                    int[] latest = (int[]) pendingWindowSizes.remove(key);</span>
+<span class="pc bpc" id="L803" title="1 of 2 branches missed.">                    if (latest == null) {</span>
+<span class="nc" id="L804">                        return;</span>
+                    }
+<span class="fc" id="L806">                    width = latest[0];</span>
+<span class="fc" id="L807">                    height = latest[1];</span>
+<span class="fc" id="L808">                }</span>
+<span class="fc" id="L809">                Window w = windowById(id);</span>
+<span class="pc bpc" id="L810" title="1 of 2 branches missed.">                if (w != null) {</span>
+<span class="fc" id="L811">                    w.sizeChangedInternal(width, height);</span>
+                }
+<span class="fc" id="L813">            }</span>
+        });
+<span class="fc" id="L815">    }</span>
+
+    /// Notifies Codename One that the set of attached monitors changed.
+    public void monitorsChanged() {
+<span class="fc" id="L819">        synchronized (monitorsChangedLock) {</span>
+            // Genuinely coalesced rather than merely documented as such. One physical
+            // display change is reported many times over: Windows broadcasts
+            // WM_DISPLAYCHANGE to every top level window, and GTK fires geometry,
+            // work-area and scale-factor notifications separately for each monitor.
+            // Each notification relays out every open window and fires every monitor
+            // listener, so without this a single resolution change did that work N
+            // times. A change arriving while one is queued is already covered by it.
+<span class="fc bfc" id="L827" title="All 2 branches covered.">            if (monitorsChangedPending) {</span>
+<span class="fc" id="L828">                return;</span>
+            }
+<span class="fc" id="L830">            monitorsChangedPending = true;</span>
+<span class="fc" id="L831">        }</span>
+<span class="fc" id="L832">        Display.getInstance().callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));</span>
+<span class="fc" id="L833">    }</span>
+
+    /// Lets the queued notification re-arm the coalescing guard. See
+    /// `#monitorsChanged()`.
+    void clearMonitorsChangedPending() {
+<span class="fc" id="L838">        synchronized (monitorsChangedLock) {</span>
+<span class="fc" id="L839">            monitorsChangedPending = false;</span>
+<span class="fc" id="L840">        }</span>
+<span class="fc" id="L841">    }</span>
+
+    /// Marshals a window notification that arrived on the platform's own thread onto
+    /// the event dispatch thread. A named static class rather than an anonymous one so
+    /// it does not retain the `Display` it was created from.
+    private static final class WindowCallback implements Runnable {
+        private static final int FOCUS_GAINED = 0;
+        private static final int FOCUS_LOST = 1;
+        private static final int CLOSE_REQUESTED = 2;
+        private static final int MONITOR_CHANGED = 3;
+        private static final int MONITORS_CHANGED = 4;
+        private static final int MOVED = 5;
+        private static final int CLOSED_NATIVELY = 6;
+        private static final int SHOWN = 7;
+        private static final int HIDDEN = 8;
+        private static final int ACTIVATION_FAILED = 9;
+
+        private final int windowId;
+        private final int kind;
+
+<span class="fc" id="L861">        WindowCallback(int windowId, int kind) {</span>
+<span class="fc" id="L862">            this.windowId = windowId;</span>
+<span class="fc" id="L863">            this.kind = kind;</span>
+<span class="fc" id="L864">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L868">            Desktop desktop = Desktop.getInstance();</span>
+<span class="fc" id="L869">            Window w = desktop.windowById(windowId);</span>
+<span class="pc bpc" id="L870" title="2 of 11 branches missed.">            switch (kind) {</span>
+                case FOCUS_GAINED:
+<span class="fc" id="L872">                    desktop.setFocusedWindow(w);</span>
+<span class="fc" id="L873">                    break;</span>
+                case FOCUS_LOST:
+<span class="fc bfc" id="L875" title="All 2 branches covered.">                    if (desktop.getFocusedWindow() == w) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L876">                        desktop.setFocusedWindow(null);</span>
+                    }
+<span class="fc bfc" id="L878" title="All 2 branches covered.">                    if (w != null) {</span>
+                        // The fifth way a window stops being reachable, after hide,
+                        // minimize, dispose and modal blocking. The physical key-up
+                        // goes to whatever has focus now, so without this a held key
+                        // repeats into this window for as long as it stays open and
+                        // a pressed component stays latched.
+<span class="fc" id="L884">                        w.cancelPendingInput();</span>
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">                    } else if (windowId == 0) {</span>
+                        // Window zero is the application's main surface, which
+                        // windowById() cannot answer for: it is not a registered
+                        // Window. Its held keys are armed in Display's own fields, so
+                        // the guard above skipped them -- and activating a secondary
+                        // window reports only that window's focus gain, so nothing else
+                        // told the main surface it had lost the keyboard. A key-up
+                        // delivered to another application then left the main form
+                        // repeating for as long as it stayed open.
+<span class="fc" id="L894">                        Display.getInstance().mainSurfaceInputCancelled();</span>
+                    }
+                    break;
+                case CLOSE_REQUESTED:
+                    // A close arrives outside the packed input queue, so it bypasses the
+                    // modality filter that guards every other event. A port that cannot
+                    // disable a blocked window natively -- Catalyst has no such control
+                    // -- would otherwise let the user close a window an application
+                    // modal is supposed to be blocking. Checked here rather than at the
+                    // callback, so the modal stack is only ever read on this thread.
+<span class="pc bpc" id="L904" title="1 of 4 branches missed.">                    if (w != null &amp;&amp; !Desktop.getInstance().isWindowInputBlocked(windowId)) {</span>
+<span class="fc" id="L905">                        w.closeRequested();</span>
+                    }
+                    break;
+                case MONITOR_CHANGED:
+                    // One window moved to another display. Deliberately not
+                    // desktop.fireMonitorChanged(): Desktop.addMonitorListener is
+                    // documented for a monitor being attached, removed or
+                    // reconfigured, and firing it for every drag across a mixed-DPI
+                    // desktop turned an ordinary window move into a topology event --
+                    // repeatedly re-running whatever display reconfiguration work the
+                    // application does there. The window itself re-reads its scale and
+                    // lays out below, and an application that wants to follow one
+                    // window across displays sees it through that window's Moved
+                    // event plus getMonitor().
+<span class="pc bpc" id="L919" title="1 of 2 branches missed.">                    if (w != null) {</span>
+<span class="fc" id="L920">                        w.monitorChanged();</span>
+                    }
+                    break;
+                case MONITORS_CHANGED:
+                    // Cleared before the work, not after: a display change that
+                    // happens while this runs describes a topology this pass has not
+                    // read yet, so it has to queue another one rather than be
+                    // swallowed as a duplicate.
+<span class="fc" id="L928">                    desktop.clearMonitorsChangedPending();</span>
+<span class="fc bfc" id="L929" title="All 2 branches covered.">                    for (Window each : desktop.getWindows()) {</span>
+<span class="fc" id="L930">                        each.monitorChanged();</span>
+                    }
+<span class="fc" id="L932">                    desktop.fireMonitorChanged();</span>
+<span class="fc" id="L933">                    break;</span>
+                case MOVED:
+<span class="pc bpc" id="L935" title="1 of 2 branches missed.">                    if (w != null) {</span>
+<span class="fc" id="L936">                        w.moved();</span>
+                    }
+                    break;
+                case SHOWN:
+<span class="pc bpc" id="L940" title="1 of 2 branches missed.">                    if (w != null) {</span>
+<span class="fc" id="L941">                        w.showNotify();</span>
+                        // A visibility change can change what is blocked: a modal whose
+                        // owner went away stops blocking, and blocks again when the
+                        // owner returns. Only push, pop and dispose re-synced the native
+                        // flags, so the framework and the platform disagreed for as long
+                        // as the window stayed hidden -- the platform kept the main
+                        // surface disabled with no modal on screen to release it.
+<span class="fc" id="L948">                        Desktop.getInstance().syncNativeModalBlocking();</span>
+                    }
+                    break;
+                case HIDDEN:
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">                    if (w != null) {</span>
+<span class="fc" id="L953">                        w.hideNotify();</span>
+<span class="fc" id="L954">                        Desktop.getInstance().syncNativeModalBlocking();</span>
+                    }
+                    break;
+                case ACTIVATION_FAILED:
+<span class="pc bpc" id="L958" title="1 of 2 branches missed.">                    if (w != null) {</span>
+<span class="fc" id="L959">                        w.activationFailed();</span>
+                    }
+                    break;
+                case CLOSED_NATIVELY:
+<span class="nc bnc" id="L963" title="All 2 branches missed.">                    if (w != null) {</span>
+                        // A window a modal is blocking must not be closable. Where the
+                        // platform's close control cannot be disabled the close has
+                        // already happened, so the only way to honour the contract is
+                        // to put the window back; a port that cannot returns false and
+                        // the window is disposed, because the surface is genuinely gone.
+<span class="nc bnc" id="L969" title="All 2 branches missed.">                        if (!Desktop.getInstance().isWindowInputBlocked(windowId)</span>
+<span class="nc bnc" id="L970" title="All 2 branches missed.">                                || !w.reopenNativeSurface()) {</span>
+<span class="nc" id="L971">                            w.dispose();</span>
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+<span class="fc" id="L978">        }</span>
+    }
+
+    // ---- window geometry queried by the ports ------------------------------------
+
+    /// Indicates whether input aimed at the given window is currently blocked by a
+    /// modal window above it.
+    /// The drag-region status at a point inside one of the additional native windows,
+    /// used by the implementation's drag activation filter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window to ask
+    ///
+    /// - `x`: x in the window's coordinates
+    ///
+    /// - `y`: y in the window's coordinates
+    ///
+    /// #### Returns
+    ///
+    /// the drag region status, or `Component#DRAG_REGION_NOT_DRAGGABLE` when there is
+    /// no such window
+    public int windowDragRegionStatus(int windowId, int x, int y) {
+<span class="fc" id="L1001">        Window w = windowById(windowId);</span>
+<span class="pc bpc" id="L1002" title="1 of 2 branches missed.">        return w == null ? Component.DRAG_REGION_NOT_DRAGGABLE : w.getDragRegionStatus(x, y);</span>
+    }
+
+    /// The width of one of the additional native windows, or 0 when there is no such
+    /// window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window to ask
+    ///
+    /// #### Returns
+    ///
+    /// the window's width in Codename One coordinates
+    public int windowWidth(int windowId) {
+<span class="fc" id="L1016">        Window w = windowById(windowId);</span>
+<span class="pc bpc" id="L1017" title="1 of 2 branches missed.">        return w == null ? 0 : w.getWidth();</span>
+    }
+
+    /// The height of one of the additional native windows, or 0 when there is no such
+    /// window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window to ask
+    ///
+    /// #### Returns
+    ///
+    /// the window's height in Codename One coordinates
+    public int windowHeight(int windowId) {
+<span class="fc" id="L1031">        Window w = windowById(windowId);</span>
+<span class="pc bpc" id="L1032" title="1 of 2 branches missed.">        return w == null ? 0 : w.getHeight();</span>
+    }
+
+    // ---- input reported by the ports ---------------------------------------------
+    //
+    // A port calls these when something happens in one of its windows. They hand the
+    // event to Display's input queue, which is the one thing about a window event that
+    // is genuinely Display's: there is a single queue and a single event dispatch
+    // thread, shared with the main surface.
+
+
+    /// Pushes a key press event aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `keyCode`: keycode of the key event
+    public void windowKeyPressed(int windowId, int keyCode) {
+<span class="pc bpc" id="L1052" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="fc" id="L1053">            Display.getInstance().keyPressedImpl(windowId, keyCode);</span>
+        }
+<span class="fc" id="L1055">    }</span>
+
+    /// Pushes a key release aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `keyCode`: keycode of the key event
+    public void windowKeyReleased(int windowId, int keyCode) {
+<span class="pc bpc" id="L1066" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="fc" id="L1067">            Display.getInstance().keyReleasedImpl(windowId, keyCode);</span>
+        }
+<span class="fc" id="L1069">    }</span>
+
+    /// Pushes a hover press aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverPressed(int windowId, int[] x, int[] y) {
+<span class="nc bnc" id="L1082" title="All 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="nc" id="L1083">            Display.getInstance().pointerHoverPressedImpl(windowId, x, y);</span>
+        }
+<span class="nc" id="L1085">    }</span>
+
+    /// Pushes a hover release aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverReleased(int windowId, int[] x, int[] y) {
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="nc" id="L1099">            Display.getInstance().pointerHoverReleasedImpl(windowId, x, y);</span>
+        }
+<span class="nc" id="L1101">    }</span>
+
+    /// Dispatches a wheel event that arrived over a native window.
+    ///
+    /// A port with desktop windows has to route the wheel explicitly: the main
+    /// surface version resolves the component from the current form, so a wheel over
+    /// a second window would either do nothing or scroll the main form instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    /// the application's main surface
+    ///
+    /// - `x`: the pointer x position in window pixels
+    ///
+    /// - `y`: the pointer y position in window pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a
+    /// trackpad
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    ///
+    /// #### Returns
+    ///
+    /// true if the wheel was acted on -- a listener consumed it, a component handled it, or
+    /// something scrolled. False means nothing under the cursor could move, which is the
+    /// answer a port needs to pass the gesture to whatever hosts the app; it is NOT an
+    /// invitation to emulate the wheel with pointer events.
+    public boolean windowMouseWheelEvent(int windowId, int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
+<span class="fc" id="L1135">        return Display.getInstance().windowMouseWheelEventImpl(windowId, x, y, scrollX, scrollY,</span>
+                precise, modifiers);
+    }
+
+    /// Dispatches a magnify (pinch) gesture that arrived over a native window. Window
+    /// 0 is the application's main surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1
+    /// zooms out
+    public void windowMagnifyGesture(int windowId, int x, int y, float scale) {
+<span class="fc" id="L1153">        Display.getInstance().windowMagnifyGestureImpl(windowId, x, y, scale);</span>
+<span class="fc" id="L1154">    }</span>
+
+    /// Dispatches a rotation (twist) gesture that arrived over a native window. Window
+    /// 0 is the application's main surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `radians`: the incremental rotation in radians, positive is clockwise
+    public void windowRotationGesture(int windowId, int x, int y, float radians) {
+<span class="nc" id="L1169">        Display.getInstance().windowRotationGestureImpl(windowId, x, y, radians);</span>
+<span class="nc" id="L1170">    }</span>
+
+    /// The drag-activation filter belonging to one window, which the implementation
+    /// applies to that window's pointer moves.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// #### Returns
+    ///
+    /// the window's filter, or null when no window holds that id
+    public com.codename1.impl.PointerDragActivation windowDragActivation(int windowId) {
+<span class="fc" id="L1183">        Window w = windowById(windowId);</span>
+<span class="fc bfc" id="L1184" title="All 2 branches covered.">        return w == null ? null : w.getDragActivation();</span>
+    }
+
+    /// Returns the native window peer owning the given component, or null when it
+    /// belongs to the application's main surface. Ports use this to place native peers
+    /// and native text editors into the correct window.
+    ///
+    /// It lives here rather than on `Display` because this class owns the windows;
+    /// `Display` answers for the application's single main surface and knowing which
+    /// window a component is in is not a question about that surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to locate
+    ///
+    /// #### Returns
+    ///
+    /// the owning window's native peer, or null for the main surface
+    public Object getWindowPeerForComponent(Component cmp) {
+<span class="nc bnc" id="L1203" title="All 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L1204">            return null;</span>
+        }
+<span class="nc" id="L1206">        TopLevelContainer top = cmp.getTopLevelContainer();</span>
+<span class="nc bnc" id="L1207" title="All 2 branches missed.">        return top == null ? null : top.asContainer().topLevelNativePeer();</span>
+    }
+
+    /// Pushes a pointer drag aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x positions of the pointer
+    ///
+    /// - `y`: the y positions of the pointer
+    public void windowPointerDragged(int windowId, int[] x, int[] y) {
+<span class="pc bpc" id="L1221" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="fc" id="L1222">            Display.getInstance().pointerDraggedImpl(windowId, x, y);</span>
+        }
+<span class="fc" id="L1224">    }</span>
+
+    /// Pushes a pointer hover event that arrived over a specific native window.
+    ///
+    /// A port with desktop windows has to say which window the pointer was over, or
+    /// hovering a second window sends the event to whatever the main form has at the
+    /// same coordinates -- so the window gets no tooltips and the main form gets
+    /// spurious ones.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHover(int windowId, final int[] x, final int[] y) {
+<span class="nc bnc" id="L1241" title="All 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="nc" id="L1242">            Display.getInstance().pointerHoverImpl(windowId, x, y);</span>
+        }
+<span class="nc" id="L1244">    }</span>
+
+    /// Pushes a pointer press aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x positions of the pointer
+    ///
+    /// - `y`: the y positions of the pointer
+    public void windowPointerPressed(int windowId, int[] x, int[] y) {
+<span class="pc bpc" id="L1257" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="fc" id="L1258">            Display.getInstance().pointerPressedImpl(windowId, x, y);</span>
+        }
+<span class="fc" id="L1260">    }</span>
+
+    /// Pushes a pointer release aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x positions of the pointer
+    ///
+    /// - `y`: the y positions of the pointer
+    public void windowPointerReleased(int windowId, int[] x, int[] y) {
+<span class="pc bpc" id="L1273" title="1 of 2 branches missed.">        if (windowId &gt; 0) {</span>
+<span class="fc" id="L1274">            Display.getInstance().pointerReleasedImpl(windowId, x, y);</span>
+        }
+<span class="fc" id="L1276">    }</span>
+
+    // ---- painting the open windows -----------------------------------------------
+    //
+    // Called once per pass from Display's event loop. The loop is Display's; walking
+    // the windows it has to paint is not.
+
+    /// Creates the `Graphics` a window paints through and hands it to the
+    /// implementation. `Graphics` cannot be constructed outside this package, which
+    /// is why this lives here rather than on the window or the implementation --
+    /// exactly as `#init(java.lang.Object)` does for the main surface.
+    Graphics createWindowGraphics(Window w) {
+<span class="fc" id="L1288">        Graphics g = new Graphics(Display.impl.getWindowManager().getNativeGraphics(w.getNativePeer()));</span>
+<span class="fc" id="L1289">        g.paintPeersBehind = Display.impl.paintNativePeersBehind();</span>
+<span class="fc" id="L1290">        w.getPaintSurface().setGraphics(g);</span>
+<span class="fc" id="L1291">        return g;</span>
+    }
+
+    void paintWindows() {
+<span class="fc" id="L1295">        ArrayList&lt;Window&gt; open = windowList();</span>
+<span class="fc bfc" id="L1296" title="All 2 branches covered.">        for (int iter = 0; iter &lt; open.size(); iter++) { // NOPMD ForLoopCanBeForeach</span>
+<span class="fc" id="L1297">            Window w = open.get(iter);</span>
+<span class="fc bfc" id="L1298" title="All 2 branches covered.">            if (!w.isWindowShowing()) {</span>
+<span class="fc" id="L1299">                continue;</span>
+            }
+<span class="fc" id="L1301">            Graphics g = w.getWindowGraphics();</span>
+<span class="fc" id="L1302">            Object peer = w.getNativePeer();</span>
+            // The manager as well as the graphics and the peer. A window stays
+            // registered until it is disposed, so one can outlive the platform's
+            // window manager -- and dereferencing it here throws on the event dispatch
+            // thread, which catches the exception, comes straight back round the loop
+            // and throws again. That spins forever rather than losing a frame, so the
+            // one thing this must not do is assume the manager is still there.
+<span class="fc" id="L1309">            WindowManager wm = Display.impl.getWindowManager();</span>
+<span class="pc bpc" id="L1310" title="3 of 6 branches missed.">            if (g == null || peer == null || wm == null) {</span>
+<span class="nc" id="L1311">                continue;</span>
+            }
+<span class="fc" id="L1313">            g.setGraphics(wm.getNativeGraphics(peer));</span>
+<span class="fc" id="L1314">            w.flushRevalidateQueue();</span>
+<span class="fc" id="L1315">            w.getPaintSurface().paintDirty(w.getWidth(), w.getHeight());</span>
+<span class="fc" id="L1316">            w.repaintAnimations();</span>
+            // The window's raster exists from the moment it is shown, so a capture
+            // before this point returns a blank frame of the right size. Recording
+            // that a cycle completed is what lets a caller wait for real content.
+<span class="fc" id="L1320">            w.markPainted();</span>
+        }
+<span class="fc" id="L1322">    }</span>
+
+    boolean anyWindowHasAnimations() {
+<span class="fc" id="L1325">        ArrayList&lt;Window&gt; open = windowList();</span>
+<span class="fc bfc" id="L1326" title="All 2 branches covered.">        for (int iter = 0; iter &lt; open.size(); iter++) { // NOPMD ForLoopCanBeForeach</span>
+<span class="fc" id="L1327">            Window w = open.get(iter);</span>
+<span class="pc bpc" id="L1328" title="1 of 4 branches missed.">            if (w.isWindowShowing() &amp;&amp; w.hasAnimations()) {</span>
+<span class="fc" id="L1329">                return true;</span>
+            }
+        }
+<span class="fc" id="L1332">        return false;</span>
+    }
+
+    /// Repaints every window that is on screen. The main surface is the caller's
+    /// business; this is the window half of it.
+    void repaintWindows() {
+<span class="nc" id="L1338">        ArrayList&lt;Window&gt; open = windowList();</span>
+<span class="nc bnc" id="L1339" title="All 2 branches missed.">        for (int iter = 0; iter &lt; open.size(); iter++) { // NOPMD ForLoopCanBeForeach</span>
+<span class="nc" id="L1340">            open.get(iter).repaint();</span>
+        }
+<span class="nc" id="L1342">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

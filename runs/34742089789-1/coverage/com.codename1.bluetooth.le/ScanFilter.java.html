@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScanFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth.le</a> &gt; <span class="el_source">ScanFilter.java</span></div><h1>ScanFilter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth.le;
+
+import com.codename1.bluetooth.BluetoothUuid;
+
+/// A single scan filter -- all criteria set on one filter are AND-combined;
+/// multiple filters added to a [ScanSettings] are OR-combined. Fluent
+/// setters return `this` for chaining:
+///
+/// ```java
+/// new ScanFilter()
+///     .setServiceUuid(BluetoothUuid.fromShort(0x180D))
+///     .setNamePrefix(&quot;Polar&quot;);
+/// ```
+<span class="fc" id="L36">public class ScanFilter {</span>
+
+    private BluetoothUuid serviceUuid;
+    private String name;
+    private String namePrefix;
+    private String address;
+<span class="fc" id="L42">    private int manufacturerId = -1;</span>
+    private byte[] manufacturerData;
+    private byte[] manufacturerDataMask;
+
+    /// Matches devices advertising the given service UUID.
+    public ScanFilter setServiceUuid(BluetoothUuid uuid) {
+<span class="fc" id="L48">        this.serviceUuid = uuid;</span>
+<span class="fc" id="L49">        return this;</span>
+    }
+
+    /// Matches devices advertising exactly this local name.
+    public ScanFilter setName(String exactName) {
+<span class="fc" id="L54">        this.name = exactName;</span>
+<span class="fc" id="L55">        return this;</span>
+    }
+
+    /// Matches devices whose advertised local name starts with the given
+    /// prefix.
+    public ScanFilter setNamePrefix(String prefix) {
+<span class="fc" id="L61">        this.namePrefix = prefix;</span>
+<span class="fc" id="L62">        return this;</span>
+    }
+
+    /// Matches the device with the given address (see
+    /// [com.codename1.bluetooth.BluetoothDevice#getAddress()] for the
+    /// per-platform address semantics).
+    public ScanFilter setAddress(String address) {
+<span class="fc" id="L69">        this.address = address;</span>
+<span class="fc" id="L70">        return this;</span>
+    }
+
+    /// Matches devices whose advertisement carries manufacturer data for
+    /// `companyId` whose leading bytes equal `data` under `mask` (a `null`
+    /// mask compares all of `data` exactly). Pass `null` data to match any
+    /// payload for the company.
+    public ScanFilter setManufacturerData(int companyId, byte[] data,
+            byte[] mask) {
+<span class="fc" id="L79">        this.manufacturerId = companyId;</span>
+<span class="fc" id="L80">        this.manufacturerData = data;</span>
+<span class="fc" id="L81">        this.manufacturerDataMask = mask;</span>
+<span class="fc" id="L82">        return this;</span>
+    }
+
+    /// The service UUID criterion, or `null` when unset. Ports use the
+    /// getters to push filters down to the platform scanner -- required
+    /// for background scanning on iOS.
+    public BluetoothUuid getServiceUuid() {
+<span class="nc" id="L89">        return serviceUuid;</span>
+    }
+
+    /// The exact-name criterion, or `null` when unset.
+    public String getName() {
+<span class="nc" id="L94">        return name;</span>
+    }
+
+    /// The name-prefix criterion, or `null` when unset.
+    public String getNamePrefix() {
+<span class="nc" id="L99">        return namePrefix;</span>
+    }
+
+    /// The address criterion, or `null` when unset.
+    public String getAddress() {
+<span class="nc" id="L104">        return address;</span>
+    }
+
+    /// The manufacturer-data company identifier criterion, or `-1` when
+    /// unset.
+    public int getManufacturerId() {
+<span class="nc" id="L110">        return manufacturerId;</span>
+    }
+
+    /// The manufacturer-data payload criterion, or `null`.
+    public byte[] getManufacturerData() {
+<span class="nc" id="L115">        return manufacturerData;</span>
+    }
+
+    /// The manufacturer-data mask, or `null` (exact comparison).
+    public byte[] getManufacturerDataMask() {
+<span class="nc" id="L120">        return manufacturerDataMask;</span>
+    }
+
+    /// `true` when the given scan result satisfies every criterion of this
+    /// filter. Used by the core scan demultiplexer; ports may also use it
+    /// to pre-filter.
+    public boolean matches(ScanResult result) {
+<span class="fc" id="L127">        AdvertisementData ad = result.getAdvertisementData();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (address != null) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (!address.equals(result.getPeripheral().getAddress())) {</span>
+<span class="fc" id="L130">                return false;</span>
+            }
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (name != null) {</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            String n = ad == null ? null : ad.getLocalName();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (n == null) {</span>
+<span class="fc" id="L136">                n = result.getPeripheral().getName();</span>
+            }
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (!name.equals(n)) {</span>
+<span class="fc" id="L139">                return false;</span>
+            }
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (namePrefix != null) {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            String n = ad == null ? null : ad.getLocalName();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (n == null) {</span>
+<span class="fc" id="L145">                n = result.getPeripheral().getName();</span>
+            }
+<span class="fc bfc" id="L147" title="All 4 branches covered.">            if (n == null || !n.startsWith(namePrefix)) {</span>
+<span class="fc" id="L148">                return false;</span>
+            }
+        }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (serviceUuid != null) {</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">            if (ad == null || !ad.getServiceUuids().contains(serviceUuid)) {</span>
+<span class="fc" id="L153">                return false;</span>
+            }
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (manufacturerId &gt;= 0) {</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            byte[] payload = ad == null</span>
+<span class="fc" id="L158">                    ? null : ad.getManufacturerData(manufacturerId);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (payload == null) {</span>
+<span class="fc" id="L160">                return false;</span>
+            }
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (manufacturerData != null) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (payload.length &lt; manufacturerData.length) {</span>
+<span class="fc" id="L164">                    return false;</span>
+                }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                for (int i = 0; i &lt; manufacturerData.length; i++) {</span>
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">                    byte m = manufacturerDataMask == null</span>
+                            || i &gt;= manufacturerDataMask.length
+                            ? (byte) 0xFF : manufacturerDataMask[i];
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                    if ((payload[i] &amp; m) != (manufacturerData[i] &amp; m)) {</span>
+<span class="fc" id="L171">                        return false;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L176">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

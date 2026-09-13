@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameElement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">GameElement.java</span></div><h1>GameElement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// A single placed thing in a `GameLevel` -- pure authoring data, deliberately *not*
+/// a `com.codename1.gaming.Sprite`.
+///
+/// An element only describes *what* (an `#getAssetId()` resolved through an
+/// `AssetCatalog`), *where* (a position / rotation / scale transform), which `Layer`
+/// it belongs to, and a bag of typed authoring `#properties()` (a coin's `value`, a
+/// patrolling enemy's `speed`, a player's `lives`). What it *becomes* at runtime
+/// depends on the level's `GameLevel#getMode()`: a `LevelRealizer` turns a 2D / board
+/// element into a `com.codename1.gaming.Sprite` and a 3D element into a
+/// `com.codename1.gaming.Model`. The realized object keeps a reference back to its
+/// element through `setUserData`, so an editor can map a picked sprite/model to the
+/// data it came from.
+///
+/// The property bag stores values as they survive JSON: `Double` for numbers, `String`
+/// for text, `Boolean` for flags. The typed getters coerce defensively so callers do
+/// not care whether a number arrived as a `Double`, a `Long` or a numeric `String`.
+public class GameElement {
+    private String id;
+    private String name;
+    private String assetId;
+    private String layer;
+
+    private double x;
+    private double y;
+    private double z;
+    private float rotation;
+<span class="pc" id="L54">    private float scaleX = 1f;</span>
+<span class="pc" id="L55">    private float scaleY = 1f;</span>
+<span class="pc" id="L56">    private float scaleZ = 1f;</span>
+
+<span class="pc" id="L58">    private final Map&lt;String, Object&gt; properties = new HashMap&lt;String, Object&gt;();</span>
+
+    /// Lazily-cached resolution of `#getAssetId()` through an `AssetCatalog` (see
+    /// `#resolveDef(AssetCatalog)`). Transient: it never serializes, and `#setAssetId` clears
+    /// it. The stored data stays the catalog-independent id; this is only a per-element cache so
+    /// per-frame code does not re-hit the catalog's map.
+    private transient AssetDef resolvedDef;
+
+<span class="nc" id="L66">    public GameElement() {</span>
+<span class="nc" id="L67">    }</span>
+
+<span class="fc" id="L69">    public GameElement(String id, String assetId) {</span>
+<span class="fc" id="L70">        this.id = id;</span>
+<span class="fc" id="L71">        this.assetId = assetId;</span>
+<span class="fc" id="L72">    }</span>
+
+    public String getId() {
+<span class="fc" id="L75">        return id;</span>
+    }
+
+    /// Sets this element's stable id (unique within a level; the editor assigns one).
+    public GameElement setId(String id) {
+<span class="nc" id="L80">        this.id = id;</span>
+<span class="nc" id="L81">        return this;</span>
+    }
+
+    /// The optional display name typed in the editor's Inspector. A *named* element becomes a
+    /// generated field in the companion class; may be `null`.
+    public String getName() {
+<span class="fc" id="L87">        return name;</span>
+    }
+
+    /// Sets the display name (see `#getName()`).
+    public GameElement setName(String name) {
+<span class="fc" id="L92">        this.name = name;</span>
+<span class="fc" id="L93">        return this;</span>
+    }
+
+    /// The catalog id of the asset this element draws (e.g. `&quot;player&quot;`, `&quot;coin&quot;`).
+    public String getAssetId() {
+<span class="fc" id="L98">        return assetId;</span>
+    }
+
+    /// Points this element at a different catalog asset (and clears the cached `#resolveDef`).
+    public GameElement setAssetId(String assetId) {
+<span class="nc" id="L103">        this.assetId = assetId;</span>
+<span class="nc" id="L104">        this.resolvedDef = null;   // invalidate the cached resolution</span>
+<span class="nc" id="L105">        return this;</span>
+    }
+
+    /// The `AssetDef` this element's `#getAssetId()` resolves to in the given catalog, cached
+    /// after the first lookup. The element stays pure, catalog-independent data (only the id is
+    /// stored and serialized); this just spares per-frame callers a repeated catalog-map lookup.
+    /// Returns `null` for a null catalog or an unknown id. The cache is cleared by `#setAssetId`;
+    /// if you re-register an asset under the same id, build a fresh element or set the id again.
+    public AssetDef resolveDef(AssetCatalog catalog) {
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (resolvedDef == null &amp;&amp; catalog != null) {</span>
+<span class="nc" id="L115">            resolvedDef = catalog.def(assetId);</span>
+        }
+<span class="nc" id="L117">        return resolvedDef;</span>
+    }
+
+    /// The name of the `Layer` this element belongs to.
+    public String getLayer() {
+<span class="fc" id="L122">        return layer;</span>
+    }
+
+    /// Moves this element to the named `Layer`.
+    public GameElement setLayer(String layer) {
+<span class="fc" id="L127">        this.layer = layer;</span>
+<span class="fc" id="L128">        return this;</span>
+    }
+
+    /// The x position -- pixels in a 2D / board level, a world-space coordinate in 3D.
+    public double getX() {
+<span class="fc" id="L133">        return x;</span>
+    }
+
+    /// The y position -- pixels in a 2D / board level, a world-space coordinate in 3D.
+    public double getY() {
+<span class="fc" id="L138">        return y;</span>
+    }
+
+    /// The world-space depth, meaningful only in `GameLevel.Mode#THREE_D`.
+    public double getZ() {
+<span class="fc" id="L143">        return z;</span>
+    }
+
+    /// Sets the x and y position (see `#getX()`).
+    public GameElement setPosition(double x, double y) {
+<span class="fc" id="L148">        this.x = x;</span>
+<span class="fc" id="L149">        this.y = y;</span>
+<span class="fc" id="L150">        return this;</span>
+    }
+
+    /// Sets the x, y and z position (z is the 3D depth).
+    public GameElement setPosition(double x, double y, double z) {
+<span class="fc" id="L155">        this.x = x;</span>
+<span class="fc" id="L156">        this.y = y;</span>
+<span class="fc" id="L157">        this.z = z;</span>
+<span class="fc" id="L158">        return this;</span>
+    }
+
+    /// Sets the x position.
+    public GameElement setX(double x) {
+<span class="nc" id="L163">        this.x = x;</span>
+<span class="nc" id="L164">        return this;</span>
+    }
+
+    /// Sets the y position.
+    public GameElement setY(double y) {
+<span class="nc" id="L169">        this.y = y;</span>
+<span class="nc" id="L170">        return this;</span>
+    }
+
+    /// Sets the z (3D) depth.
+    public GameElement setZ(double z) {
+<span class="nc" id="L175">        this.z = z;</span>
+<span class="nc" id="L176">        return this;</span>
+    }
+
+    /// The rotation in degrees (clockwise in 2D, applied about the model's axes in 3D).
+    public float getRotation() {
+<span class="fc" id="L181">        return rotation;</span>
+    }
+
+    /// Sets the rotation in degrees (see `#getRotation()`).
+    public GameElement setRotation(float rotation) {
+<span class="fc" id="L186">        this.rotation = rotation;</span>
+<span class="fc" id="L187">        return this;</span>
+    }
+
+    /// The per-instance x scale (`1` = the asset's natural size).
+    public float getScaleX() {
+<span class="fc" id="L192">        return scaleX;</span>
+    }
+
+    /// The per-instance y scale (`1` = the asset's natural size).
+    public float getScaleY() {
+<span class="fc" id="L197">        return scaleY;</span>
+    }
+
+    /// The per-instance z scale, used in 3D (`1` = the asset's natural size).
+    public float getScaleZ() {
+<span class="fc" id="L202">        return scaleZ;</span>
+    }
+
+    /// Sets a uniform scale on all three axes.
+    public GameElement setScale(float scale) {
+<span class="nc" id="L207">        this.scaleX = scale;</span>
+<span class="nc" id="L208">        this.scaleY = scale;</span>
+<span class="nc" id="L209">        this.scaleZ = scale;</span>
+<span class="nc" id="L210">        return this;</span>
+    }
+
+    /// Sets the per-axis scale (z applies in 3D).
+    public GameElement setScale(float scaleX, float scaleY, float scaleZ) {
+<span class="fc" id="L215">        this.scaleX = scaleX;</span>
+<span class="fc" id="L216">        this.scaleY = scaleY;</span>
+<span class="fc" id="L217">        this.scaleZ = scaleZ;</span>
+<span class="fc" id="L218">        return this;</span>
+    }
+
+    /// The mutable authoring property bag. Values are `Double` / `String` / `Boolean`
+    /// (or nested `Map` / `List` if you store structured data). Prefer the typed
+    /// getters for reading.
+    public Map&lt;String, Object&gt; properties() {
+<span class="fc" id="L225">        return properties;</span>
+    }
+
+    /// Writes this element as a JSON object (same shape `GameLevel` uses) into `sb`. Package
+    /// visible so `Region`/`GameLevel` share one element format.
+    void write(StringBuilder sb) {
+<span class="fc" id="L231">        sb.append(&quot;{\&quot;id\&quot;:&quot;);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        Json.writeString(sb, getId() == null ? &quot;&quot; : getId());</span>
+<span class="fc" id="L233">        sb.append(&quot;,\&quot;assetId\&quot;:&quot;);</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        Json.writeString(sb, getAssetId() == null ? &quot;&quot; : getAssetId());</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (getName() != null) {</span>
+<span class="fc" id="L236">            sb.append(&quot;,\&quot;name\&quot;:&quot;);</span>
+<span class="fc" id="L237">            Json.writeString(sb, getName());</span>
+        }
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (getLayer() != null) {</span>
+<span class="nc" id="L240">            sb.append(&quot;,\&quot;layer\&quot;:&quot;);</span>
+<span class="nc" id="L241">            Json.writeString(sb, getLayer());</span>
+        }
+<span class="fc" id="L243">        sb.append(&quot;,\&quot;x\&quot;:&quot;);</span>
+<span class="fc" id="L244">        Json.writeNumber(sb, getX());</span>
+<span class="fc" id="L245">        sb.append(&quot;,\&quot;y\&quot;:&quot;);</span>
+<span class="fc" id="L246">        Json.writeNumber(sb, getY());</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (getZ() != 0) {</span>
+<span class="fc" id="L248">            sb.append(&quot;,\&quot;z\&quot;:&quot;);</span>
+<span class="fc" id="L249">            Json.writeNumber(sb, getZ());</span>
+        }
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (getRotation() != 0) {</span>
+<span class="nc" id="L252">            sb.append(&quot;,\&quot;rotation\&quot;:&quot;);</span>
+<span class="nc" id="L253">            Json.writeNumber(sb, getRotation());</span>
+        }
+<span class="pc bpc" id="L255" title="3 of 6 branches missed.">        if (getScaleX() != 1 || getScaleY() != 1 || getScaleZ() != 1) {</span>
+<span class="nc" id="L256">            sb.append(&quot;,\&quot;scaleX\&quot;:&quot;);</span>
+<span class="nc" id="L257">            Json.writeNumber(sb, getScaleX());</span>
+<span class="nc" id="L258">            sb.append(&quot;,\&quot;scaleY\&quot;:&quot;);</span>
+<span class="nc" id="L259">            Json.writeNumber(sb, getScaleY());</span>
+<span class="nc" id="L260">            sb.append(&quot;,\&quot;scaleZ\&quot;:&quot;);</span>
+<span class="nc" id="L261">            Json.writeNumber(sb, getScaleZ());</span>
+        }
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (!properties().isEmpty()) {</span>
+<span class="nc" id="L264">            sb.append(&quot;,\&quot;props\&quot;:&quot;);</span>
+<span class="nc" id="L265">            Json.writeValue(sb, properties());</span>
+        }
+<span class="fc" id="L267">        sb.append('}');</span>
+<span class="fc" id="L268">    }</span>
+
+    /// Reconstructs an element from a parsed JSON object (the shape `#write(StringBuilder)`
+    /// emits).
+    static GameElement read(Map&lt;String, Object&gt; em) {
+<span class="fc" id="L273">        GameElement el = new GameElement(Json.str(em.get(&quot;id&quot;), null), Json.str(em.get(&quot;assetId&quot;), null));</span>
+<span class="fc" id="L274">        el.setName(Json.str(em.get(&quot;name&quot;), null));</span>
+<span class="fc" id="L275">        el.setLayer(Json.str(em.get(&quot;layer&quot;), null));</span>
+<span class="fc" id="L276">        el.setPosition(Json.num(em.get(&quot;x&quot;), 0), Json.num(em.get(&quot;y&quot;), 0), Json.num(em.get(&quot;z&quot;), 0));</span>
+<span class="fc" id="L277">        el.setRotation((float) Json.num(em.get(&quot;rotation&quot;), 0));</span>
+<span class="fc" id="L278">        el.setScale((float) Json.num(em.get(&quot;scaleX&quot;), 1),</span>
+<span class="fc" id="L279">                (float) Json.num(em.get(&quot;scaleY&quot;), 1),</span>
+<span class="fc" id="L280">                (float) Json.num(em.get(&quot;scaleZ&quot;), 1));</span>
+<span class="fc" id="L281">        Map&lt;String, Object&gt; ep = Json.asMap(em.get(&quot;props&quot;));</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (ep != null) {</span>
+<span class="nc" id="L283">            el.properties().putAll(ep);</span>
+        }
+<span class="fc" id="L285">        return el;</span>
+    }
+
+    /// Whether an authoring property with the given key is set.
+    public boolean hasProperty(String key) {
+<span class="nc" id="L290">        return properties.containsKey(key);</span>
+    }
+
+    /// Sets an authoring property (a coin's `value`, an enemy's `speed`, ...). Store
+    /// `Double` / `String` / `Boolean` so the value survives a JSON round-trip.
+    public GameElement setProperty(String key, Object value) {
+<span class="fc" id="L296">        properties.put(key, value);</span>
+<span class="fc" id="L297">        return this;</span>
+    }
+
+    /// The raw value of an authoring property, or `null` if unset. Prefer the typed getters.
+    public Object getProperty(String key) {
+<span class="nc" id="L302">        return properties.get(key);</span>
+    }
+
+    /// Reads a property as an int, coercing `Number` and numeric `String` values and
+    /// falling back to `defaultValue` when the key is missing or not numeric.
+    public int getInt(String key, int defaultValue) {
+<span class="fc" id="L308">        return (int) Math.round(getDouble(key, defaultValue));</span>
+    }
+
+    /// Reads a property as a double, coercing `Number` and numeric `String` values.
+    public double getDouble(String key, double defaultValue) {
+<span class="fc" id="L313">        Object v = properties.get(key);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (v instanceof Number) {</span>
+<span class="fc" id="L315">            return ((Number) v).doubleValue();</span>
+        }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (v instanceof String) {</span>
+            try {
+<span class="fc" id="L319">                return Double.parseDouble((String) v);</span>
+<span class="nc" id="L320">            } catch (NumberFormatException ignore) {</span>
+<span class="nc" id="L321">                return defaultValue;</span>
+            }
+        }
+<span class="fc" id="L324">        return defaultValue;</span>
+    }
+
+    /// Reads a property as a String (any value's `toString()`), or `defaultValue` if absent.
+    public String getString(String key, String defaultValue) {
+<span class="fc" id="L329">        Object v = properties.get(key);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        return v == null ? defaultValue : v.toString();</span>
+    }
+
+    /// Reads a property as a boolean. Accepts a `Boolean` or the strings `&quot;true&quot;`/`&quot;1&quot;`.
+    public boolean getBoolean(String key, boolean defaultValue) {
+<span class="fc" id="L335">        Object v = properties.get(key);</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if (v instanceof Boolean) {</span>
+<span class="fc" id="L337">            return ((Boolean) v).booleanValue();</span>
+        }
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (v instanceof String) {</span>
+<span class="fc" id="L340">            String s = ((String) v).trim();</span>
+<span class="pc bpc" id="L341" title="3 of 4 branches missed.">            if (&quot;true&quot;.equalsIgnoreCase(s) || &quot;1&quot;.equals(s)) {</span>
+<span class="fc" id="L342">                return true;</span>
+            }
+<span class="nc bnc" id="L344" title="All 4 branches missed.">            if (&quot;false&quot;.equalsIgnoreCase(s) || &quot;0&quot;.equals(s)) {</span>
+<span class="nc" id="L345">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if (v instanceof Number) {</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">            return ((Number) v).doubleValue() != 0;</span>
+        }
+<span class="fc" id="L351">        return defaultValue;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

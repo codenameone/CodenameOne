@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Ranging.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.ranging</a> &gt; <span class="el_source">Ranging.java</span></div><h1>Ranging.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.ranging;
+
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.async.PendingMap;
+import com.codename1.impl.nearby.NearbyRequests;
+import com.codename1.nearby.NearbyAvailability;
+import com.codename1.nearby.NearbyError;
+import com.codename1.nearby.NearbyException;
+import com.codename1.nearby.NearbyPermission;
+import com.codename1.nearby.spi.NearbyBridge;
+import com.codename1.util.AsyncResource;
+
+/// Precision ranging: how far away another device is, and in which
+/// direction.
+///
+/// This is ultra-wideband ranging -- Apple's Nearby Interaction on iOS and
+/// Jetpack UWB on Android -- which measures distance by timing a radio
+/// round trip rather than by guessing from signal strength. Where an RSSI
+/// estimate off a Bluetooth advertisement is worth a few meters on a good
+/// day, UWB is worth about ten centimeters, and on hardware with multiple
+/// antennas it also reports which way the peer is.
+///
+/// #### The shape of a session
+///
+/// Both platforms need the two devices to exchange a token over some
+/// channel they already share before any radio ranging can begin, so the
+/// API is in two steps and there is no way to collapse them:
+///
+/// ```java
+/// if (!Ranging.isSupported()) {
+///     return;                       // no UWB radio on this device
+/// }
+/// Ranging.prepareSession(RangingRole.CONTROLLER).onResult((session, err) -&gt; {
+///     if (err != null) {
+///         return;
+///     }
+///     // 1. publish our token however the two apps already talk --
+///     //    a GATT characteristic from com.codename1.bluetooth is typical
+///     characteristic.writeValue(session.getLocalToken().toByteArray());
+///
+///     // 2. when theirs arrives, start ranging
+///     session.addRangingListener(new RangingAdapter() {
+///         public void updated(RangingUpdate u) {
+///             if (u.hasDistance()) {
+///                 label.setText(Math.round(u.getDistance(RangingUnit.CENTIMETERS)) + &quot; cm&quot;);
+///             }
+///         }
+///     });
+///     session.start(RangingToken.fromByteArray(theirToken));
+/// });
+/// ```
+///
+/// A session ranges exactly one peer. That is a hard limit of Apple's
+/// `NINearbyPeerConfiguration` rather than a simplification, so an app that
+/// tracks several peers prepares several sessions -- which is also what the
+/// Android port does under the hood.
+///
+/// #### Threading
+///
+/// Every callback here -- `AsyncResource` results and every
+/// [RangingListener] method -- is delivered on the EDT.
+///
+/// #### Platform support
+///
+/// - **iOS** -- Nearby Interaction on devices with a U1 or newer chip
+///   (iPhone 11 and later). Peer and accessory ranging, direction where the
+///   hardware provides it. Not available on tvOS, watchOS or Mac Catalyst.
+/// - **Android** -- Jetpack UWB on devices that report the UWB hardware
+///   feature. Peer ranging natively; an accessory is ranged by building a
+///   token with [RangingToken#forUwbAddress].
+/// - **Simulator, desktop and JavaScript** -- a simulated implementation
+///   with peers that really move, so ranging UI is developable without
+///   hardware. Reports [NearbyAvailability#LOCAL_ONLY].
+/// - **Every other port** -- [#isSupported()] is `false` and every call
+///   fails with [NearbyError#NOT_SUPPORTED].
+public final class Ranging {
+
+<span class="fc" id="L100">    private static final PendingMap&lt;RangingSession&gt; PENDING_SESSIONS =</span>
+            new PendingMap&lt;RangingSession&gt;();
+<span class="fc" id="L102">    private static final PendingMap&lt;byte[]&gt; PENDING_ACCESSORY =</span>
+            new PendingMap&lt;byte[]&gt;();
+<span class="fc" id="L104">    private static final java.util.Map&lt;Integer, RangingSession&gt; STARTING =</span>
+            new java.util.HashMap&lt;Integer, RangingSession&gt;();
+
+    private Ranging() {
+    }
+
+    /// `true` when this port and this device can range at all.
+    ///
+    /// This answers for the hardware, not for whether a peer is nearby. It
+    /// is the query to hide a feature on; use [#getAvailability()] to tell
+    /// a user why a supported feature is not working right now.
+    public static boolean isSupported() {
+<span class="fc" id="L116">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="fc bfc" id="L117" title="All 4 branches covered.">        return b != null &amp;&amp; b.isRangingSupported();</span>
+    }
+
+    /// How usable ranging is at this moment, which is a different question
+    /// from [#isSupported()]: a phone with a U1 chip whose owner denied the
+    /// permission is supported and unavailable.
+    ///
+    /// #### Returns
+    ///
+    /// the current availability, never null
+    public static NearbyAvailability getAvailability() {
+<span class="fc" id="L128">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        if (b == null || !b.isRangingSupported()) {</span>
+<span class="fc" id="L130">            return NearbyAvailability.NOT_SUPPORTED;</span>
+        }
+<span class="fc" id="L132">        return fromOrdinal(b.getRangingAvailability());</span>
+    }
+
+    /// What this device can actually measure. Never null: where ranging is
+    /// absent this is [RangingCapabilities#UNSUPPORTED], whose every query
+    /// is `false`.
+    ///
+    /// #### Returns
+    ///
+    /// the capabilities of the local device
+    public static RangingCapabilities getCapabilities() {
+<span class="fc" id="L143">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">        if (b == null || !b.isRangingSupported()) {</span>
+<span class="fc" id="L145">            return RangingCapabilities.UNSUPPORTED;</span>
+        }
+<span class="fc" id="L147">        int bits = b.getRangingCapabilities();</span>
+<span class="pc bpc" id="L148" title="6 of 12 branches missed.">        return new RangingCapabilities(</span>
+                (bits &amp; NearbyBridge.CAPABILITY_DISTANCE) != 0,
+                (bits &amp; NearbyBridge.CAPABILITY_DIRECTION) != 0,
+                (bits &amp; NearbyBridge.CAPABILITY_ELEVATION) != 0,
+                (bits &amp; NearbyBridge.CAPABILITY_CAMERA_ASSISTANCE) != 0,
+                (bits &amp; NearbyBridge.CAPABILITY_ACCESSORY) != 0,
+                (bits &amp; NearbyBridge.CAPABILITY_BACKGROUND) != 0);
+    }
+
+    /// Asks for the runtime permissions ranging needs.
+    ///
+    /// Safe to call on every platform: a port with nothing to ask for
+    /// resolves `true` without showing anything.
+    ///
+    /// #### Parameters
+    ///
+    /// - `permissions`: what the app intends to do
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` when every requested permission is granted
+    public static AsyncResource&lt;Boolean&gt; requestPermissions(
+            NearbyPermission... permissions) {
+<span class="fc" id="L171">        NearbyBridge b = NearbyRequests.bridge();</span>
+        // Supported, not merely present. Every other entry point here asks
+        // both questions, and NearbyTransport.requestPermissions asks its own
+        // -- this one asked only whether a bridge existed, so an Android
+        // device without UWB went on to request UWB_RANGING, or answered
+        // true, for a capability isSupported() reports it does not have.
+        // A permission prompt for a radio the phone lacks is the worst of it.
+<span class="fc bfc" id="L178" title="All 4 branches covered.">        if (b == null || !b.isRangingSupported()) {</span>
+<span class="fc" id="L179">            return failedBoolean();</span>
+        }
+<span class="fc" id="L181">        int bits = 0;</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (permissions != null) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            for (NearbyPermission permission : permissions) {</span>
+<span class="fc" id="L184">                bits |= permissionBit(permission);</span>
+            }
+        }
+<span class="fc" id="L187">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L188">        EdtResult&lt;Boolean&gt; out = NearbyRequests.openPermissionRequest(id);</span>
+<span class="fc" id="L189">        b.requestPermissions(id, bits);</span>
+<span class="fc" id="L190">        return out;</span>
+    }
+
+    /// Allocates a ranging session and, with it, the local token to publish
+    /// to the peer. The session is not ranging yet -- call
+    /// [RangingSession#start] once the peer's token arrives.
+    ///
+    /// #### Parameters
+    ///
+    /// - `role`: which end of the session this device is. Ignored on
+    ///   platforms that negotiate roles themselves, but pick one anyway:
+    ///   Android needs exactly one controller.
+    ///
+    /// #### Returns
+    ///
+    /// resolves with the prepared session, or fails with a
+    /// [NearbyException]
+    public static AsyncResource&lt;RangingSession&gt; prepareSession(
+            RangingRole role) {
+<span class="fc" id="L209">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        if (b == null || !b.isRangingSupported()) {</span>
+<span class="fc" id="L211">            EdtResult&lt;RangingSession&gt; out = new EdtResult&lt;RangingSession&gt;();</span>
+<span class="fc" id="L212">            out.error(new NearbyException(NearbyError.NOT_SUPPORTED,</span>
+                    &quot;this platform does not support precision ranging&quot;));
+<span class="fc" id="L214">            return out;</span>
+        }
+<span class="fc" id="L216">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L217">        int handle = RangingSession.nextHandle();</span>
+<span class="fc" id="L218">        EdtResult&lt;RangingSession&gt; out = PENDING_SESSIONS.open(id);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        b.prepareRangingSession(id, handle, role != RangingRole.CONTROLEE);</span>
+<span class="fc" id="L220">        return out;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // Port entry points
+    // ------------------------------------------------------------------
+
+    /// Answers a permission request from ANY entry point in this family --
+    /// ranging or transport. Ports report every permission outcome here, and
+    /// the pending map it reads is shared for that reason.
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `granted`: whether every requested permission was granted
+    public static void deliverPermissionResult(int requestId,
+            boolean granted) {
+<span class="fc" id="L239">        EdtResult&lt;Boolean&gt; r = NearbyRequests.takePermissionRequest(requestId);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (r != null) {</span>
+<span class="fc" id="L241">            r.complete(Boolean.valueOf(granted));</span>
+        }
+<span class="fc" id="L243">    }</span>
+
+    /// Answers [#prepareSession].
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `sessionHandle`: the handle passed to
+    ///   `NearbyBridge#prepareRangingSession`
+    /// - `role`: true when this session is the controller
+    /// - `tokenPlatform`: one of the `RangingToken.PLATFORM_` constants
+    /// - `tokenPayload`: the native token bytes
+    public static void deliverSessionPrepared(int requestId,
+            int sessionHandle, boolean role, int tokenPlatform,
+            byte[] tokenPayload) {
+<span class="fc" id="L260">        EdtResult&lt;RangingSession&gt; r = PENDING_SESSIONS.take(requestId);</span>
+        // Cancelled counts as nobody waiting. take() hands back a cancelled
+        // resource just the same, and completing one is a no-op -- so building
+        // the session here registered it in two places and handed the caller
+        // nothing, leaving a radio session alive that no one could stop.
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">        if (r == null || r.isCancelled()) {</span>
+<span class="nc" id="L266">            NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            if (b != null) {</span>
+<span class="nc" id="L268">                b.stopRangingSession(sessionHandle);</span>
+            }
+<span class="nc" id="L270">            return;</span>
+        }
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        RangingSession session = RangingSession.create(sessionHandle,</span>
+                role ? RangingRole.CONTROLLER : RangingRole.CONTROLEE,
+<span class="fc" id="L274">                RangingToken.forPayload(tokenPlatform, tokenPayload));</span>
+<span class="fc" id="L275">        r.complete(session);</span>
+<span class="fc" id="L276">    }</span>
+
+    /// Answers [RangingSession#start].
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `sessionHandle`: the session that started
+    public static void deliverSessionStarted(int requestId,
+            int sessionHandle) {
+<span class="fc" id="L288">        untrackStarting(requestId);</span>
+<span class="fc" id="L289">        EdtResult&lt;RangingSession&gt; r = PENDING_SESSIONS.take(requestId);</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (r != null) {</span>
+<span class="fc" id="L291">            RangingSession s = RangingSession.lookup(sessionHandle);</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (s == null) {</span>
+<span class="nc" id="L293">                r.error(new NearbyException(NearbyError.SESSION_INVALIDATED,</span>
+                        &quot;the session was closed before it started&quot;));
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            } else if (r.isCancelled()) {</span>
+                // Cancelled counts as nobody waiting, the same way
+                // deliverSessionPrepared treats it: completing a cancelled
+                // resource is a no-op, so marking the session running left a
+                // radio session alive that the caller had already walked away
+                // from -- and its listeners still receiving updates.
+<span class="fc" id="L301">                s.stop();</span>
+            } else {
+<span class="fc" id="L303">                s.markRunning();</span>
+<span class="fc" id="L304">                r.complete(s);</span>
+            }
+        }
+<span class="fc" id="L307">    }</span>
+
+    /// Answers [RangingSession#startAccessory].
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `sessionHandle`: the session that started
+    /// - `shareableConfiguration`: the bytes to send back to the accessory,
+    ///   empty where the platform needs no handshake
+    public static void deliverAccessoryConfiguration(int requestId,
+            int sessionHandle, byte[] shareableConfiguration) {
+<span class="fc" id="L321">        untrackStarting(requestId);</span>
+<span class="fc" id="L322">        EdtResult&lt;byte[]&gt; r = PENDING_ACCESSORY.take(requestId);</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">        if (r != null) {</span>
+<span class="fc" id="L324">            RangingSession s = RangingSession.lookup(sessionHandle);</span>
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">            if (s != null &amp;&amp; r.isCancelled()) {</span>
+                // As deliverSessionStarted: the caller walked away, so the
+                // handshake bytes have nowhere to go and the session must not
+                // be left holding the radio.
+<span class="nc" id="L329">                s.stop();</span>
+<span class="nc" id="L330">                return;</span>
+            }
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (s == null) {</span>
+                // Mirrors deliverSessionStarted. A stop() that lands while the
+                // start is in flight deregisters the session, and completing
+                // anyway handed the caller handshake bytes for a session that
+                // is not running -- bytes it would then send to an accessory
+                // that has nothing to talk to.
+<span class="nc" id="L338">                r.error(new NearbyException(NearbyError.SESSION_INVALIDATED,</span>
+                        &quot;the session was closed before it started&quot;));
+<span class="nc" id="L340">                return;</span>
+            }
+<span class="fc" id="L342">            s.markRunning();</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            r.complete(shareableConfiguration == null</span>
+                    ? new byte[0] : shareableConfiguration);
+        }
+<span class="fc" id="L346">    }</span>
+
+    /// Fails whichever ranging request carries this id.
+    ///
+    /// The id is looked up in each of the pending maps in turn; because ids
+    /// come from one counter it can be in at most one of them.
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `errorOrdinal`: the ordinal of a
+    ///   `com.codename1.nearby.NearbyError` constant
+    /// - `message`: a human-readable detail, may be null
+    public static void deliverRequestFailed(int requestId, int errorOrdinal,
+            String message) {
+<span class="fc" id="L363">        NearbyException ex = toException(errorOrdinal, message);</span>
+<span class="fc" id="L364">        EdtResult&lt;RangingSession&gt; s = PENDING_SESSIONS.take(requestId);</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        if (s != null) {</span>
+            // A start that failed leaves the session prepared but idle, and
+            // it has to be told so: the flag that makes a concurrent start
+            // answer BUSY is set before the bridge call and cleared only on
+            // success, so without this the session answers BUSY to every
+            // retry forever.
+<span class="fc" id="L371">            releaseStarting(requestId);</span>
+<span class="fc" id="L372">            s.error(ex);</span>
+<span class="fc" id="L373">            return;</span>
+        }
+<span class="fc" id="L375">        EdtResult&lt;byte[]&gt; a = PENDING_ACCESSORY.take(requestId);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        if (a != null) {</span>
+<span class="nc" id="L377">            releaseStarting(requestId);</span>
+<span class="nc" id="L378">            a.error(ex);</span>
+<span class="nc" id="L379">            return;</span>
+        }
+<span class="fc" id="L381">        EdtResult&lt;Boolean&gt; p = NearbyRequests.takePermissionRequest(requestId);</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L383">            p.error(ex);</span>
+        }
+<span class="fc" id="L385">    }</span>
+
+
+    /// Clears every in-flight request, so one test cannot see the requests of
+    /// the test that ran before it. Reached through
+    /// `com.codename1.impl.nearby.NearbyRequests#resetForTest`.
+    ///
+    /// In-flight requests are failed rather than dropped: a resource that
+    /// never settles is worse than one that fails, and a test holding one
+    /// would hang rather than report.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public static void resetForTest() {
+<span class="fc" id="L398">        NearbyException reset = new NearbyException(NearbyError.UNKNOWN,</span>
+                &quot;the nearby framework was reset&quot;);
+<span class="fc" id="L400">        NearbyRequests.failPermissionRequests(reset);</span>
+<span class="fc" id="L401">        PENDING_SESSIONS.failAll(reset);</span>
+<span class="fc" id="L402">        PENDING_ACCESSORY.failAll(reset);</span>
+<span class="fc" id="L403">        synchronized (STARTING) {</span>
+<span class="fc" id="L404">            STARTING.clear();</span>
+<span class="fc" id="L405">        }</span>
+<span class="fc" id="L406">    }</span>
+
+    // ------------------------------------------------------------------
+    // Internals shared with RangingSession
+    // ------------------------------------------------------------------
+
+    /// Clears the in-progress flag of whichever session issued this request.
+    ///
+    /// Tracked by request id rather than by handle because the failure path
+    /// only ever learns the id: `NearbyBridge` answers a failed start through
+    /// `deliverRequestFailed(requestId, ...)`, which names no session.
+    private static void releaseStarting(int requestId) {
+        RangingSession s;
+<span class="fc" id="L419">        synchronized (STARTING) {</span>
+<span class="fc" id="L420">            s = STARTING.remove(Integer.valueOf(requestId));</span>
+<span class="fc" id="L421">        }</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (s != null) {</span>
+<span class="fc" id="L423">            s.markStartFailed();</span>
+        }
+<span class="fc" id="L425">    }</span>
+
+    /// The session behind each in-flight start, so a failure can find it.
+    ///
+    /// @hidden not part of the public API.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id of the start being issued
+    /// - `session`: the session issuing it
+    static void trackStarting(int requestId, RangingSession session) {
+<span class="fc" id="L436">        synchronized (STARTING) {</span>
+<span class="fc" id="L437">            STARTING.put(Integer.valueOf(requestId), session);</span>
+<span class="fc" id="L438">        }</span>
+<span class="fc" id="L439">    }</span>
+
+    /// Forgets a start that has settled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id of the start that finished
+    static void untrackStarting(int requestId) {
+<span class="fc" id="L447">        synchronized (STARTING) {</span>
+<span class="fc" id="L448">            STARTING.remove(Integer.valueOf(requestId));</span>
+<span class="fc" id="L449">        }</span>
+<span class="fc" id="L450">    }</span>
+
+    static PendingMap&lt;RangingSession&gt; pendingSessions() {
+<span class="fc" id="L453">        return PENDING_SESSIONS;</span>
+    }
+
+    static PendingMap&lt;byte[]&gt; pendingAccessory() {
+<span class="fc" id="L457">        return PENDING_ACCESSORY;</span>
+    }
+
+    static NearbyException toException(int errorOrdinal, String message) {
+<span class="fc" id="L461">        NearbyError[] all = NearbyError.values();</span>
+<span class="pc bpc" id="L462" title="2 of 4 branches missed.">        NearbyError e = errorOrdinal &gt;= 0 &amp;&amp; errorOrdinal &lt; all.length</span>
+                ? all[errorOrdinal] : NearbyError.UNKNOWN;
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">        return new NearbyException(e,</span>
+<span class="pc" id="L465">                message == null ? e.name() : message);</span>
+    }
+
+    private static NearbyAvailability fromOrdinal(int ordinal) {
+<span class="fc" id="L469">        NearbyAvailability[] all = NearbyAvailability.values();</span>
+<span class="pc bpc" id="L470" title="2 of 4 branches missed.">        if (ordinal &lt; 0 || ordinal &gt;= all.length) {</span>
+<span class="nc" id="L471">            return NearbyAvailability.NOT_SUPPORTED;</span>
+        }
+<span class="fc" id="L473">        return all[ordinal];</span>
+    }
+
+    private static int permissionBit(NearbyPermission p) {
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">        if (p == NearbyPermission.RANGING) {</span>
+<span class="fc" id="L478">            return NearbyBridge.PERMISSION_RANGING;</span>
+        }
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        if (p == NearbyPermission.DISCOVERY) {</span>
+<span class="nc" id="L481">            return NearbyBridge.PERMISSION_DISCOVERY;</span>
+        }
+<span class="nc bnc" id="L483" title="All 2 branches missed.">        if (p == NearbyPermission.ADVERTISE) {</span>
+<span class="nc" id="L484">            return NearbyBridge.PERMISSION_ADVERTISE;</span>
+        }
+<span class="nc bnc" id="L486" title="All 2 branches missed.">        if (p == NearbyPermission.CONNECT) {</span>
+<span class="nc" id="L487">            return NearbyBridge.PERMISSION_CONNECT;</span>
+        }
+<span class="nc" id="L489">        return 0;</span>
+    }
+
+    private static AsyncResource&lt;Boolean&gt; failedBoolean() {
+<span class="fc" id="L493">        EdtResult&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L494">        out.error(new NearbyException(NearbyError.NOT_SUPPORTED,</span>
+                &quot;this platform does not support precision ranging&quot;));
+<span class="fc" id="L496">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

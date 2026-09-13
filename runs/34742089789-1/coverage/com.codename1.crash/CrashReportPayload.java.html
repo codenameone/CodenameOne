@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrashReportPayload.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crash</a> &gt; <span class="el_source">CrashReportPayload.java</span></div><h1>CrashReportPayload.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crash;
+
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/// Package-private DTO for a single crash report. Carries the structured
+/// payload sent to the cloud and is serialised to JSON via
+/// {@link #toJson()} (a hand-rolled writer avoids a Jackson / parser
+/// dependency on the device).
+final class CrashReportPayload {
+
+    static final int MAX_FRAMES = 32;
+    static final int MAX_MESSAGE_LEN = 8192;
+    /// Hard cap on the attached native-log snapshot. Logcat dumps on
+    /// Android and stderr ring buffers on iOS can be huge; the server
+    /// rejects anything larger and we'd rather truncate client-side
+    /// than have the upload silently dropped.
+    static final int MAX_NATIVE_LOG_LEN = 32 * 1024;
+    /// Hard cap on the native-stack string. Native backtraces from
+    /// signal handlers are usually compact (~64 frames * ~120 chars),
+    /// but a corrupt stack can produce arbitrarily long output.
+    static final int MAX_NATIVE_STACK_LEN = 16 * 1024;
+    /// Hard cap on the raw (pre-rendered) Java stack string captured via
+    /// `printStackTrace` -- the verbatim platform rendering plus the cause
+    /// chain. It complements the structured {@link #frames} (populated on
+    /// every port), and on the JS port, where there are no structured
+    /// frames, it carries the JavaScript engine stack. Mirrors
+    /// {@link #MAX_NATIVE_STACK_LEN}.
+    static final int MAX_RAW_STACK_LEN = 16 * 1024;
+
+    /// Trace-format discriminator values. Tells the server how to parse
+    /// {@link #rawStack} for this build.
+    static final String TRACE_STRUCTURED = &quot;structured&quot;;
+    static final String TRACE_PARPARVM = &quot;parparvm-text&quot;;
+    static final String TRACE_JS = &quot;js-error&quot;;
+    static final String TRACE_NONE = &quot;none&quot;;
+
+    final String eventId;
+    final String buildKey;
+    final String packageName;
+    final String appName;
+    final String appVersion;
+    final String platform;
+    final String osVersion;
+    final String exceptionClass;
+    final String messageScrubbed;
+    final List&lt;Frame&gt; frames;
+    /// The pre-rendered Java stack captured via `printStackTrace`, which
+    /// works identically on every port. On the ParparVM C targets this is
+    /// the only readable Java trace once obfuscated; the server parses it
+    /// with the mapping. `null` when no stack was available.
+    final String rawStack;
+    /// One of {@link #TRACE_STRUCTURED}, {@link #TRACE_PARPARVM},
+    /// {@link #TRACE_JS} or {@link #TRACE_NONE}: how the server should read
+    /// {@link #rawStack}. Derived, never guessed.
+    final String traceFormat;
+    /// SHA-256 of the obfuscation mapping this build was hardened with,
+    /// stamped into the app so a report can be tied to the exact mapping.
+    /// Empty for unhardened builds.
+    final String mappingId;
+    /// The hardening level the build shipped with (`off` / `standard` /
+    /// `aggressive` / `paranoid`); lets the server answer &quot;why can't I
+    /// retrace this?&quot; with the honest reason.
+    final String hardenLevel;
+    /// Recent platform-log output captured at crash time. Provides
+    /// context the Java stack frame alone can't (NSLog/os_log on iOS,
+    /// logcat on Android). `null` if the platform has no readable log
+    /// or the snapshot failed.
+    final String nativeLog;
+    /// Raw native backtrace string for crashes captured by the
+    /// platform native crash handler (signal/Mach exception/uncaught
+    /// Objective-C). `null` for pure-Java crashes -- their stack lives
+    /// in {@link #frames}.
+    final String nativeStack;
+    final String locale;
+    final long clientTs;
+
+    CrashReportPayload(String eventId, String exceptionClass,
+            String messageScrubbed, List&lt;Frame&gt; frames,
+<span class="nc" id="L105">            String nativeLog, String nativeStack, String rawStack) {</span>
+<span class="nc" id="L106">        this.eventId = eventId;</span>
+<span class="nc" id="L107">        this.exceptionClass = exceptionClass;</span>
+<span class="nc" id="L108">        this.messageScrubbed = trim(messageScrubbed, MAX_MESSAGE_LEN);</span>
+<span class="nc" id="L109">        this.frames = capFrames(frames);</span>
+<span class="nc" id="L110">        this.nativeLog = trim(nativeLog, MAX_NATIVE_LOG_LEN);</span>
+<span class="nc" id="L111">        this.nativeStack = trim(nativeStack, MAX_NATIVE_STACK_LEN);</span>
+<span class="nc" id="L112">        this.rawStack = trim(rawStack, MAX_RAW_STACK_LEN);</span>
+<span class="nc" id="L113">        Display d = Display.getInstance();</span>
+<span class="nc" id="L114">        this.platform = d.getPlatformName();</span>
+<span class="nc" id="L115">        this.traceFormat = deriveTraceFormat(this.frames, this.rawStack, this.platform);</span>
+<span class="nc" id="L116">        this.buildKey = d.getProperty(&quot;build_key&quot;, &quot;&quot;);</span>
+<span class="nc" id="L117">        this.packageName = d.getProperty(&quot;package_name&quot;, &quot;&quot;);</span>
+<span class="nc" id="L118">        this.appName = d.getProperty(&quot;AppName&quot;, &quot;&quot;);</span>
+<span class="nc" id="L119">        this.appVersion = d.getProperty(&quot;AppVersion&quot;, &quot;&quot;);</span>
+<span class="nc" id="L120">        this.osVersion = d.getProperty(&quot;OSVer&quot;, &quot;&quot;);</span>
+<span class="nc" id="L121">        this.mappingId = d.getProperty(&quot;cn1.mappingId&quot;, &quot;&quot;);</span>
+<span class="nc" id="L122">        this.hardenLevel = d.getProperty(&quot;cn1.hardenLevel&quot;, &quot;&quot;);</span>
+<span class="nc" id="L123">        Locale loc = Locale.getDefault();</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        this.locale = loc == null ? &quot;&quot; : loc.toString();</span>
+<span class="nc" id="L125">        this.clientTs = System.currentTimeMillis();</span>
+<span class="nc" id="L126">    }</span>
+
+    /// Derives the trace format from what we actually have, so the server picks the right parser --
+    /// never a guess. Structured frames win. Otherwise: the JavaScript port's raw stack is a JS engine
+    /// stack; a ParparVM C target's is the &quot;    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;&quot; text; a JVM target
+    /// (Android/desktop) reaching here has an ordinary JVM printStackTrace (e.g. a stackless throwable
+    /// whose only frames are in its cause) that the JS parser must NOT touch. The old heuristic looked
+    /// only for the 4-space ParparVM shape and labeled everything else -- including the tab-indented
+    /// JVM trace -- as JavaScript; derive from the platform so that never happens.
+    static String deriveTraceFormat(List&lt;Frame&gt; frames, String rawStack, String platform) {
+        // A real JVM sets java.vm.name; ParparVM's System.getProperty always returns null. This is the
+        // only reliable way to tell a native ParparVM-C target from a JavaSE desktop app or the simulator,
+        // because JavaSEPort.getPlatformName() returns the SAME mac/win names a native build reports.
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        return deriveTraceFormat(frames, rawStack, platform, System.getProperty(&quot;java.vm.name&quot;) != null);</span>
+    }
+
+    /// The testable core of {@link #deriveTraceFormat(List, String, String)}: {@code runningOnJvm} is
+    /// supplied explicitly (production derives it from {@code java.vm.name}) so a JVM-hosted unit test can
+    /// exercise both the native ParparVM-C path and the JavaSE-on-mac/win path.
+    static String deriveTraceFormat(List&lt;Frame&gt; frames, String rawStack, String platform,
+            boolean runningOnJvm) {
+<span class="pc bpc" id="L147" title="3 of 4 branches missed.">        if (frames != null &amp;&amp; !frames.isEmpty()) {</span>
+<span class="nc" id="L148">            return TRACE_STRUCTURED;</span>
+        }
+<span class="fc bfc" id="L150" title="All 4 branches covered.">        if (rawStack == null || rawStack.length() == 0) {</span>
+<span class="fc" id="L151">            return TRACE_NONE;</span>
+        }
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (isJavaScriptPlatform(platform)) {</span>
+<span class="fc" id="L154">            return TRACE_JS;</span>
+        }
+        // The &quot;    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;&quot; text is only produced by ParparVM's own printStackTrace on a
+        // native C target. Gate on the runtime: an Android/desktop/simulator (real-JVM) throwable whose
+        // MESSAGE happens to contain such a line -- the message is echoed into the raw stack by
+        // printStackTrace -- must NOT be labeled parparvm-text, or the server would fabricate a frame from
+        // message text or drop a real cause trace. The shape check still guards an unexpected stack on a
+        // ParparVM-C target.
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (isParparVmTextPlatform(platform, runningOnJvm)) {</span>
+            // A ParparVM frame line is exactly &quot;    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;&quot; -- no '(', URL or '@'.
+<span class="fc" id="L164">            int at = rawStack.indexOf(&quot;    at &quot;);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (at &gt;= 0) {</span>
+<span class="fc" id="L166">                int lineEnd = rawStack.indexOf('\n', at);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                String body = lineEnd &lt; 0 ? rawStack.substring(at + 7) : rawStack.substring(at + 7, lineEnd);</span>
+<span class="pc bpc" id="L168" title="3 of 6 branches missed.">                if (body.indexOf('(') &lt; 0 &amp;&amp; body.indexOf('/') &lt; 0 &amp;&amp; body.indexOf('@') &lt; 0) {</span>
+<span class="fc" id="L169">                    return TRACE_PARPARVM;</span>
+                }
+            }
+        }
+        // Not JavaScript and not a native ParparVM-C target's text shape: an ordinary JVM printStackTrace
+        // body. There is no JVM raw parser, so report NONE and let the server keep the text verbatim rather
+        // than misparsing it.
+<span class="fc" id="L176">        return TRACE_NONE;</span>
+    }
+
+    /// True only on a native ParparVM-to-C runtime, whose {@code printStackTrace} emits the
+    /// &quot;    at &amp;lt;fqcn&amp;gt;.&amp;lt;method&amp;gt;:&amp;lt;line&amp;gt;&quot; text. The displayed platform name is NOT enough:
+    /// a skinless JavaSE desktop app returns {@code mac}/{@code win} (Linux falls through to {@code win})
+    /// and the simulator can return {@code ios}, all colliding with the native names. So anything running
+    /// on a real JVM ({@code runningOnJvm}: JavaSE desktop, the simulator, or Android) is excluded, and of
+    /// the remaining native runtimes only the C-target names qualify.
+    private static boolean isParparVmTextPlatform(String platform, boolean runningOnJvm) {
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">        if (runningOnJvm || platform == null) {</span>
+<span class="fc" id="L187">            return false;</span>
+        }
+<span class="fc" id="L189">        String p = platform.toLowerCase();</span>
+<span class="pc bpc" id="L190" title="3 of 8 branches missed.">        return &quot;ios&quot;.equals(p) || &quot;mac&quot;.equals(p) || &quot;linux&quot;.equals(p) || &quot;win&quot;.equals(p);</span>
+    }
+
+    /// The JavaScript port's platform name; its raw stack is a JS engine {@code Error().stack}.
+    private static boolean isJavaScriptPlatform(String platform) {
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (platform == null) {</span>
+<span class="nc" id="L196">            return false;</span>
+        }
+<span class="fc" id="L198">        String p = platform.toLowerCase();</span>
+<span class="pc bpc" id="L199" title="2 of 6 branches missed.">        return p.indexOf(&quot;html&quot;) &gt;= 0 || p.indexOf(&quot;javascript&quot;) &gt;= 0 || &quot;js&quot;.equals(p);</span>
+    }
+
+    static final class Frame {
+        final String className;
+        final String methodName;
+        final String fileName;
+        final int lineNumber;
+        final boolean nativeFrame;
+
+        Frame(String className, String methodName, String fileName,
+<span class="nc" id="L210">                int lineNumber, boolean nativeFrame) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            this.className = className == null ? &quot;&quot; : className;</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            this.methodName = methodName == null ? &quot;&quot; : methodName;</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            this.fileName = fileName == null ? &quot;&quot; : fileName;</span>
+<span class="nc" id="L214">            this.lineNumber = lineNumber;</span>
+<span class="nc" id="L215">            this.nativeFrame = nativeFrame;</span>
+<span class="nc" id="L216">        }</span>
+    }
+
+    /// Renders the payload as a JSON object string suitable for posting
+    /// in the HTTP request body. Conforms to RFC 8259.
+    String toJson() {
+<span class="nc" id="L222">        StringBuilder b = new StringBuilder(1024);</span>
+<span class="nc" id="L223">        b.append('{');</span>
+<span class="nc" id="L224">        appendString(b, &quot;eventId&quot;, eventId, true);</span>
+<span class="nc" id="L225">        appendString(b, &quot;buildKey&quot;, buildKey, false);</span>
+<span class="nc" id="L226">        appendString(b, &quot;packageName&quot;, packageName, false);</span>
+<span class="nc" id="L227">        appendString(b, &quot;appName&quot;, appName, false);</span>
+<span class="nc" id="L228">        appendString(b, &quot;appVersion&quot;, appVersion, false);</span>
+<span class="nc" id="L229">        appendString(b, &quot;platform&quot;, platform, false);</span>
+<span class="nc" id="L230">        appendString(b, &quot;osVersion&quot;, osVersion, false);</span>
+<span class="nc" id="L231">        appendString(b, &quot;exceptionClass&quot;, exceptionClass, false);</span>
+<span class="nc" id="L232">        appendString(b, &quot;message&quot;, messageScrubbed, false);</span>
+<span class="nc" id="L233">        appendString(b, &quot;locale&quot;, locale, false);</span>
+<span class="nc" id="L234">        appendString(b, &quot;nativeLog&quot;, nativeLog, false);</span>
+<span class="nc" id="L235">        appendString(b, &quot;nativeStack&quot;, nativeStack, false);</span>
+<span class="nc" id="L236">        appendString(b, &quot;rawStack&quot;, rawStack, false);</span>
+<span class="nc" id="L237">        appendString(b, &quot;traceFormat&quot;, traceFormat, false);</span>
+<span class="nc" id="L238">        appendString(b, &quot;mappingId&quot;, mappingId, false);</span>
+<span class="nc" id="L239">        appendString(b, &quot;hardenLevel&quot;, hardenLevel, false);</span>
+<span class="nc" id="L240">        b.append(&quot;,\&quot;clientTs\&quot;:&quot;).append(clientTs);</span>
+<span class="nc" id="L241">        b.append(&quot;,\&quot;frames\&quot;:[&quot;);</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        for (int i = 0; i &lt; frames.size(); i++) {</span>
+<span class="nc" id="L243">            Frame f = frames.get(i);</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L245">                b.append(',');</span>
+            }
+<span class="nc" id="L247">            b.append('{');</span>
+<span class="nc" id="L248">            appendString(b, &quot;cls&quot;, f.className, true);</span>
+<span class="nc" id="L249">            appendString(b, &quot;method&quot;, f.methodName, false);</span>
+<span class="nc" id="L250">            appendString(b, &quot;file&quot;, f.fileName, false);</span>
+<span class="nc" id="L251">            b.append(&quot;,\&quot;line\&quot;:&quot;).append(f.lineNumber);</span>
+<span class="nc" id="L252">            b.append(&quot;,\&quot;native\&quot;:&quot;).append(f.nativeFrame);</span>
+<span class="nc" id="L253">            b.append('}');</span>
+        }
+<span class="nc" id="L255">        b.append(&quot;]}&quot;);</span>
+<span class="nc" id="L256">        return b.toString();</span>
+    }
+
+    private static void appendString(StringBuilder b, String key, String value, boolean first) {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (!first) {</span>
+<span class="nc" id="L261">            b.append(',');</span>
+        }
+<span class="nc" id="L263">        b.append('&quot;').append(key).append(&quot;\&quot;:&quot;);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L265">            b.append(&quot;null&quot;);</span>
+<span class="nc" id="L266">            return;</span>
+        }
+<span class="nc" id="L268">        b.append('&quot;');</span>
+<span class="nc" id="L269">        int len = value.length();</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L271">            char c = value.charAt(i);</span>
+<span class="nc bnc" id="L272" title="All 8 branches missed.">            switch (c) {</span>
+<span class="nc" id="L273">                case '&quot;': b.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L274">                case '\\': b.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L275">                case '\b': b.append(&quot;\\b&quot;); break;</span>
+<span class="nc" id="L276">                case '\f': b.append(&quot;\\f&quot;); break;</span>
+<span class="nc" id="L277">                case '\n': b.append(&quot;\\n&quot;); break;</span>
+<span class="nc" id="L278">                case '\r': b.append(&quot;\\r&quot;); break;</span>
+<span class="nc" id="L279">                case '\t': b.append(&quot;\\t&quot;); break;</span>
+                default:
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L282">                        b.append(&quot;\\u&quot;);</span>
+<span class="nc" id="L283">                        String hex = Integer.toHexString(c);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                        for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="nc" id="L285">                            b.append('0');</span>
+                        }
+<span class="nc" id="L287">                        b.append(hex);</span>
+<span class="nc" id="L288">                    } else {</span>
+<span class="nc" id="L289">                        b.append(c);</span>
+                    }
+            }
+        }
+<span class="nc" id="L293">        b.append('&quot;');</span>
+<span class="nc" id="L294">    }</span>
+
+    private static String trim(String s, int max) {
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L298">            return null;</span>
+        }
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (s.length() &lt;= max) {</span>
+<span class="nc" id="L301">            return s;</span>
+        }
+<span class="nc" id="L303">        return s.substring(0, max);</span>
+    }
+
+    private static List&lt;Frame&gt; capFrames(List&lt;Frame&gt; in) {
+<span class="nc bnc" id="L307" title="All 2 branches missed.">        if (in == null) {</span>
+<span class="nc" id="L308">            return new ArrayList&lt;Frame&gt;(0);</span>
+        }
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (in.size() &lt;= MAX_FRAMES) {</span>
+<span class="nc" id="L311">            return in;</span>
+        }
+<span class="nc" id="L313">        return new ArrayList&lt;Frame&gt;(in.subList(0, MAX_FRAMES));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

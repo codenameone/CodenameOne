@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BiometricType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">BiometricType.java</span></div><h1>BiometricType.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// Enumerates the biometric authentication modalities that may be available
+/// on a device. Returned from
+/// [Biometrics#getAvailableBiometrics()].
+///
+/// The set returned at runtime depends on the platform and the user's
+/// enrolled credentials -- e.g. an iPhone with Face ID enrolled returns
+/// `[FACE]`; an Android Pixel with a fingerprint and a face enrolled
+/// returns `[FINGERPRINT, FACE]`. Use the list to drive UI affordances
+/// (icon, prompt copy) but never to gate the actual `authenticate()` call:
+/// always rely on [Biometrics#canAuthenticate()] for that decision.
+<span class="nc" id="L35">public enum BiometricType {</span>
+
+    /// Fingerprint sensor (iOS Touch ID, Android `FEATURE_FINGERPRINT`).
+    /// Populated on both platforms when the device has fingerprint hardware
+    /// AND at least one fingerprint is enrolled.
+<span class="nc" id="L40">    FINGERPRINT,</span>
+
+    /// Face recognition (iOS Face ID, Android `FEATURE_FACE`). Populated on
+    /// both platforms; on Android 9-10 the OS does not expose face
+    /// enrolment via the BiometricPrompt API even on devices that have it,
+    /// so this value only appears on Android API 29+.
+<span class="nc" id="L46">    FACE,</span>
+
+    /// Iris recognition (Android `FEATURE_IRIS`). Used by a handful of
+    /// Samsung devices and is not exposed on iOS. Practically rare in 2026
+    /// -- code that targets it should still treat the absence as the
+    /// expected case.
+<span class="nc" id="L52">    IRIS,</span>
+
+    /// Android **class-3 / &quot;strong&quot;** authenticator tier. Indicates the
+    /// device's available biometric meets Android's stricter cryptographic
+    /// requirements (false-acceptance rate &lt; 1/100,000) and can therefore
+    /// gate Keystore-backed keys created with `setUserAuthenticationRequired`
+    /// + a strong-only authenticator policy. Populated only on Android API
+    /// 30+; iOS has no analogous concept and this value is never returned
+    /// there. Combine with [AuthenticationOptions#setSensitiveTransaction(boolean)]
+    /// to require this tier when guarding sensitive operations.
+<span class="nc" id="L62">    STRONG,</span>
+
+    /// Android **class-2 / &quot;weak&quot;** authenticator tier. Indicates a
+    /// biometric whose false-acceptance rate is between 1/10,000 and
+    /// 1/100,000 (typically older fingerprint sensors). It can authenticate
+    /// the user for UI flows but is NOT permitted to unlock Keystore-bound
+    /// keys, so weak-only devices cannot use [SecureStorage]. Populated
+    /// only on Android API 30+; not returned on iOS.
+<span class="nc" id="L70">    WEAK</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NumericSpinner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">NumericSpinner.java</span></div><h1>NumericSpinner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.layouts.BorderLayout;
+
+/// A spinner class that allows picking a number
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
+public class NumericSpinner extends BaseSpinner {
+    private Spinner spin;
+<span class="fc" id="L36">    private double min = 0;</span>
+<span class="fc" id="L37">    private double max = 1000;</span>
+<span class="fc" id="L38">    private double value = 0;</span>
+<span class="fc" id="L39">    private double step = 1;</span>
+
+    /// Default constructor
+<span class="fc" id="L42">    public NumericSpinner() {</span>
+<span class="fc" id="L43">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L44">    }</span>
+
+    /// Default constructor
+    @Override
+    void initSpinner() {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (spin == null) {</span>
+<span class="fc" id="L50">            spin = createSpinner();</span>
+<span class="fc" id="L51">            addComponent(BorderLayout.CENTER, spin);</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    Spinner createSpinner() {
+<span class="fc" id="L56">        return Spinner.create(min, max, value, step);</span>
+    }
+
+    /// The minimum value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the min
+    public double getMin() {
+<span class="fc" id="L65">        return min;</span>
+    }
+
+    /// The minimum value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: the min to set
+    public void setMin(double min) {
+<span class="fc" id="L74">        this.min = min;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (min &gt; value) {</span>
+<span class="fc" id="L76">            value = min;</span>
+        }
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (spin != null) {</span>
+<span class="fc" id="L79">            spin.setModel(new SpinnerNumberModel(min, max, value, step));</span>
+        }
+<span class="fc" id="L81">    }</span>
+
+    /// The maximum value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the max
+    public double getMax() {
+<span class="fc" id="L89">        return max;</span>
+    }
+
+    /// The maximum value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `max`: the max to set
+    public void setMax(double max) {
+<span class="fc" id="L98">        this.max = max;</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (max &lt; value) {</span>
+<span class="nc" id="L100">            value = max;</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (spin != null) {</span>
+<span class="fc" id="L103">            spin.setModel(new SpinnerNumberModel(min, max, value, step));</span>
+        }
+<span class="fc" id="L105">    }</span>
+
+    /// The value for the spinner
+    ///
+    /// #### Returns
+    ///
+    /// the value
+    public double getValue() {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (spin != null) {</span>
+<span class="fc" id="L114">            return ((Double) ((SpinnerNumberModel) spin.getModel()).getValue()).doubleValue();</span>
+        }
+<span class="nc" id="L116">        return value;</span>
+    }
+
+    /// The value for the spinner
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to set
+    public void setValue(double value) {
+<span class="fc" id="L125">        this.value = value;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (spin != null) {</span>
+<span class="fc" id="L127">            ((SpinnerNumberModel) spin.getModel()).setValue(Double.valueOf(value));</span>
+        }
+<span class="fc" id="L129">    }</span>
+
+    /// Step for spinner gap
+    ///
+    /// #### Returns
+    ///
+    /// the step
+    public double getStep() {
+<span class="fc" id="L137">        return step;</span>
+    }
+
+    /// Step for spinner gap
+    ///
+    /// #### Parameters
+    ///
+    /// - `step`: the step to set
+    public void setStep(double step) {
+<span class="fc" id="L146">        this.step = step;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (spin != null) {</span>
+<span class="fc" id="L148">            spin.setModel(new SpinnerNumberModel(min, max, value, step));</span>
+        }
+<span class="fc" id="L150">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L155">        return new String[]{&quot;min&quot;, &quot;max&quot;, &quot;value&quot;, &quot;step&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L161">        return new Class[]{Double.class, Double.class, Double.class, Double.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L167">        return new String[]{&quot;double&quot;, &quot;double&quot;, &quot;double&quot;, &quot;double&quot;, &quot;double&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (&quot;min&quot;.equals(name)) {</span>
+<span class="fc" id="L174">            return Double.valueOf(min);</span>
+        }
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (&quot;max&quot;.equals(name)) {</span>
+<span class="fc" id="L177">            return Double.valueOf(max);</span>
+        }
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (&quot;value&quot;.equals(name)) {</span>
+<span class="fc" id="L180">            return Double.valueOf(getValue());</span>
+        }
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (&quot;step&quot;.equals(name)) {</span>
+<span class="fc" id="L183">            return Double.valueOf(step);</span>
+        }
+<span class="nc" id="L185">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (&quot;min&quot;.equals(name)) {</span>
+<span class="fc" id="L192">            setMin(Double.parseDouble(value.toString()));</span>
+<span class="fc" id="L193">            return null;</span>
+        }
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (&quot;max&quot;.equals(name)) {</span>
+<span class="fc" id="L196">            setMax(Double.parseDouble(value.toString()));</span>
+<span class="fc" id="L197">            return null;</span>
+        }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (&quot;value&quot;.equals(name)) {</span>
+<span class="fc" id="L200">            setValue(Double.parseDouble(value.toString()));</span>
+<span class="fc" id="L201">            return null;</span>
+        }
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (&quot;step&quot;.equals(name)) {</span>
+<span class="fc" id="L204">            setStep(Double.parseDouble(value.toString()));</span>
+<span class="fc" id="L205">            return null;</span>
+        }
+<span class="nc" id="L207">        return super.setPropertyValue(name, value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

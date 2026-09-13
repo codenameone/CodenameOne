@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Surfaces.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">Surfaces.java</span></div><h1>Surfaces.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import com.codename1.io.Log;
+import com.codename1.surfaces.spi.SurfaceBridge;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The static entry point for external surfaces: home-screen widgets and live activities -- the
+/// two faces of one concept, a live source of information that resides outside your app. Declare
+/// your widget kinds and register an action handler in `init()`, then publish content whenever
+/// your data changes:
+///
+/// ```java
+/// Surfaces.registerWidgetKind(new WidgetKind(&quot;delivery_status&quot;)
+///         .setDisplayName(&quot;Delivery&quot;).setDescription(&quot;Track your order&quot;));
+/// Surfaces.setActionHandler(evt -&gt; showOrder(evt.getParams()));
+/// ...
+/// Surfaces.publish(&quot;delivery_status&quot;, new WidgetTimeline()
+///         .setContent(layout).addEntry(new Date(), state));
+/// ```
+///
+/// #### How surfaces render
+///
+/// Surfaces render while your app process may be dead: the published timeline is serialized (a
+/// JSON descriptor plus PNG blobs) and persisted where the platform renderer can reach it -- the
+/// iOS widget extension, the Android widget provider or a desktop surface window. Layouts embed
+/// `${key}` placeholders resolved from each timeline entry's state map, and `SurfaceDynamicText`
+/// countdowns tick natively on the OS clock with no app wakeups. To refresh content periodically
+/// implement `com.codename1.background.BackgroundFetch` and re-publish there.
+///
+/// Widget kinds must also be declared at build time in the project's `surfaces.json` resource --
+/// the platform widget galleries are compiled into the native app. See the package documentation.
+///
+/// #### Zero cost when unused
+///
+/// Merely referencing this package makes the build inject the native plumbing (the WidgetKit
+/// extension and app group on iOS, the widget receivers on Android). Apps that never touch
+/// `com.codename1.surfaces` get none of it. On the simulator the Widgets preview window renders
+/// published surfaces; on unsupported ports the API is an inert no-op.
+public final class Surfaces {
+    private static SurfaceBridge bridge;
+    private static boolean bridgeOverridden;
+    private static SurfaceActionHandler actionHandler;
+<span class="fc" id="L72">    private static final List&lt;SurfaceActionEvent&gt; pendingActions =</span>
+            new ArrayList&lt;SurfaceActionEvent&gt;();
+<span class="fc" id="L74">    private static final List&lt;WidgetKind&gt; registeredKinds = new ArrayList&lt;WidgetKind&gt;();</span>
+
+    private Surfaces() {
+    }
+
+    /// Returns true when this platform can render home-screen (or desktop) widgets.
+    ///
+    /// #### Returns
+    ///
+    /// true when widgets are supported
+    public static boolean areWidgetsSupported() {
+<span class="nc" id="L85">        SurfaceBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L86" title="All 4 branches missed.">        return b != null &amp;&amp; b.areWidgetsSupported();</span>
+    }
+
+    /// Declares a widget kind at runtime. Call once per kind, typically from `init()`. The id must
+    /// match a kind declared in the project's `surfaces.json` build-time manifest; a mismatch logs
+    /// a prominent warning on supporting platforms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: the kind declaration
+    public static void registerWidgetKind(WidgetKind kind) {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (kind == null) {</span>
+<span class="nc" id="L98">            return;</span>
+        }
+        // The whole API is callable from any thread, so a registration racing a publish (or
+        // another registration) must not leave a reader walking a list that is being mutated
+        // underneath it. Every touch of registeredKinds holds this lock, and readers copy out
+        // rather than iterate the live list.
+<span class="fc" id="L104">        synchronized (registeredKinds) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (WidgetKind k : registeredKinds) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                if (k.getId().equals(kind.getId())) {</span>
+<span class="fc" id="L107">                    registeredKinds.remove(k);</span>
+<span class="fc" id="L108">                    break;</span>
+                }
+<span class="fc" id="L110">            }</span>
+<span class="fc" id="L111">            registeredKinds.add(kind);</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">        SurfaceBridge b = bridgeInternal();</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="fc" id="L115">            b.registerWidgetKind(SurfaceSerializer.serializeKind(kind));</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    /// Returns the widget kinds registered so far.
+    public static List&lt;WidgetKind&gt; getRegisteredKinds() {
+<span class="fc" id="L121">        synchronized (registeredKinds) {</span>
+<span class="fc" id="L122">            return new ArrayList&lt;WidgetKind&gt;(registeredKinds);</span>
+        }
+    }
+
+    static boolean isKindRegistered(String kindId) {
+<span class="fc" id="L127">        synchronized (registeredKinds) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (WidgetKind k : registeredKinds) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                if (k.getId().equals(kindId)) {</span>
+<span class="fc" id="L130">                    return true;</span>
+                }
+<span class="fc" id="L132">            }</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return false;</span>
+    }
+
+    /// Overrides whether the simulator-only surface diagnostics run. They are on in the simulator
+    /// and off everywhere else, which is almost always what you want: they catch usage that works
+    /// in the simulator but stalls or silently does nothing on a device (rasterizing a surface
+    /// image on the EDT, publishing to a kind that was never registered, republishing far past the
+    /// platform's reload budget), and they cost nothing in a shipped build because they never run
+    /// there. Diagnostics that are certain to misbehave on a device throw `IllegalStateException`;
+    /// the rest log a one-time warning.
+    ///
+    /// Pass null to restore the default behaviour. Turning them off is a last resort for a case a
+    /// check gets wrong -- please report it if you hit one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to force diagnostics on, false to force them off, null for the default
+    public static void setDiagnosticsEnabled(Boolean enabled) {
+<span class="fc" id="L152">        SurfaceDiagnostics.setEnabled(enabled);</span>
+<span class="fc" id="L153">    }</span>
+
+    /// Returns true when the simulator-only surface diagnostics are currently active.
+    ///
+    /// #### Returns
+    ///
+    /// true when diagnostics run for this process
+    public static boolean isDiagnosticsEnabled() {
+<span class="fc" id="L161">        return SurfaceDiagnostics.enabled();</span>
+    }
+
+    /// Publishes a widget kind's content, atomically replacing any previously published timeline
+    /// and asking the platform to re-render the kind's widget instances. A no-op on platforms
+    /// without widget support.
+    ///
+    /// #### Threading
+    ///
+    /// Callable from any thread -- including
+    /// `com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback)`
+    /// callbacks while the app UI is not running (on Android the fetch runs in a background
+    /// service with no Activity at all). Publishing is data-only: the timeline is serialized,
+    /// persisted where the platform renderer can reach it and the renderer is poked
+    /// asynchronously. Implementing background fetch and re-publishing there is the intended way
+    /// to keep widgets fresh; see the `com.codename1.surfaces.spi` package documentation for the
+    /// per-platform background update story.
+    ///
+    /// A background thread is the RIGHT thread, not merely a permitted one. On a device this
+    /// writes the payload into the shared container and makes a synchronous native call, and any
+    /// `SurfaceImage` holding an `Image` that is not an `EncodedImage` is rasterized here -- on
+    /// iOS that encode blocks the caller on the platform UI thread while the pixels are read back
+    /// off the GPU. Publishing on the EDT therefore stalls the UI on hardware while looking
+    /// instantaneous in the simulator. Pass `EncodedImage`s and publish off the EDT; the simulator
+    /// diagnostics flag both mistakes (see [#setDiagnosticsEnabled(Boolean)]).
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the widget kind id
+    /// - `timeline`: the content to publish
+    public static void publish(String kindId, WidgetTimeline timeline) {
+<span class="fc" id="L192">        SurfaceDiagnostics.requireRegisteredKind(kindId);</span>
+<span class="fc" id="L193">        SurfaceDiagnostics.offEdtPreferred(&quot;Surfaces.publish&quot;);</span>
+<span class="fc" id="L194">        SurfaceDiagnostics.noteRepublish(&quot;kind:&quot; + kindId, &quot;widget kind \&quot;&quot; + kindId + &quot;\&quot;&quot;);</span>
+<span class="fc" id="L195">        SurfaceBridge b = bridgeInternal();</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">        if (b == null || !b.areWidgetsSupported()) {</span>
+<span class="fc" id="L197">            return;</span>
+        }
+<span class="fc" id="L199">        Map&lt;String, byte[]&gt; images = new LinkedHashMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L200">        String json = SurfaceSerializer.serializeTimeline(kindId, timeline, images);</span>
+<span class="fc" id="L201">        synchronized (publishLock(kindId)) {</span>
+<span class="fc" id="L202">            b.publishWidgetTimeline(kindId, json, images);</span>
+<span class="fc" id="L203">        }</span>
+<span class="fc" id="L204">    }</span>
+
+    /// One monitor per kind, created on demand and never removed. Kind ids come from
+    /// surfaces.json, so the set is bounded by the app's own declaration.
+<span class="fc" id="L208">    private static final Map&lt;String, Object&gt; PUBLISH_LOCKS = new HashMap&lt;String, Object&gt;();</span>
+
+    /// The monitor that serializes publishes of a single kind.
+    ///
+    /// A publish is a WRITE FOLLOWED BY A HAND-OFF, and the two are only meaningful as a pair:
+    /// the platform replaces the timeline in its container and then gives the same descriptor to
+    /// the watch. Let two publishes of one kind interleave and the later write can be paired with
+    /// the earlier hand-off, so the watch is left holding a descriptor the phone has already
+    /// replaced -- and left holding it for good, because nothing publishes again to correct it.
+    /// The imagery is worse than stale rather than merely old: both platforms read the blobs back
+    /// off disk at hand-off time, so the descriptor of one publish can be sent with the artwork of
+    /// another, which is a pairing neither publish ever produced.
+    ///
+    /// publish() documents itself as callable from any thread, so two threads publishing one kind
+    /// is a supported way to call this rather than an abuse of it.
+    ///
+    /// Per KIND rather than one global monitor: a publish is file I/O plus a synchronous native
+    /// call, and two different kinds have nothing to say to each other.
+    private static Object publishLock(String kindId) {
+<span class="fc" id="L227">        synchronized (PUBLISH_LOCKS) {</span>
+<span class="fc" id="L228">            Object lock = PUBLISH_LOCKS.get(kindId);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (lock == null) {</span>
+<span class="fc" id="L230">                lock = new Object();</span>
+<span class="fc" id="L231">                PUBLISH_LOCKS.put(kindId, lock);</span>
+            }
+<span class="fc" id="L233">            return lock;</span>
+        }
+    }
+
+    /// Push-framework entry point for a server-rendered timeline descriptor. The descriptor uses
+    /// the same wire format as `publish()`. The descriptor is persisted directly once the
+    /// Codename One runtime receives it. A platform that doesn't run application code for a
+    /// background push applies it when the application next starts or resumes.
+    ///
+    /// Equivalent to [#publishRemote(String,String,Map)] with no imagery. A descriptor that
+    /// references an image by name renders a gap where it should be, so prefer the overload
+    /// whenever the artwork travelled with the descriptor.
+    public static void publishRemote(String kindId, String timelineJson) {
+<span class="fc" id="L246">        publishRemote(kindId, timelineJson, Collections.&lt;String, byte[]&gt;emptyMap());</span>
+<span class="fc" id="L247">    }</span>
+
+    /// As [#publishRemote(String,String)], with the imagery the descriptor references.
+    ///
+    /// A timeline's node tree names its images rather than embedding them -- `SurfaceSerializer`
+    /// hashes the bytes and puts the hash on the wire -- so a descriptor that arrived from
+    /// somewhere else is only complete if its side-map arrived too. Without this overload
+    /// `publishRemote` discarded the imagery unconditionally and every referenced image rendered
+    /// as a gap.
+    ///
+    /// The two callers are a server push and the phone-to-watch mirror, which forwards a
+    /// phone-side `publish()` of a watch-bearing kind to the watch. Both are the same operation:
+    /// a descriptor produced elsewhere, applied here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the widget kind id
+    /// - `timelineJson`: the serialized timeline, in the same wire format `publish()` produces
+    /// - `images`: the referenced images by name, or an empty map when the descriptor names none
+    public static void publishRemote(String kindId, String timelineJson,
+            Map&lt;String, byte[]&gt; images) {
+<span class="fc" id="L268">        SurfaceBridge b = bridgeInternal();</span>
+<span class="pc bpc" id="L269" title="3 of 8 branches missed.">        if (b == null || !b.areWidgetsSupported() || kindId == null || timelineJson == null) {</span>
+<span class="fc" id="L270">            return;</span>
+        }
+        // The KIND is input here too, and a worse one to get wrong than an image name: every
+        // platform composes it into a directory path -- iOS as container + &quot;/cn1surfaces/&quot; +
+        // kindId -- so &quot;../activities/foo&quot; writes the timeline AND its imagery outside the kind
+        // directory, over whatever is there. publish() cannot produce such an id because
+        // WidgetKind refuses it at construction; a descriptor that arrived from a server or from
+        // the watch mirror never passed through that check, so it gets it here. The same
+        // validator, not a second copy of the grammar.
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (!WidgetKind.isValidId(kindId)) {</span>
+<span class="nc" id="L280">            Log.p(&quot;Surfaces: refusing a remote publish for a kind id that is not [a-z][a-z0-9_]*: &quot;</span>
+                    + kindId);
+<span class="nc" id="L282">            return;</span>
+        }
+        // The same monitor publish() uses: a remote descriptor and a local one race exactly the
+        // same way, and a push landing while the app publishes is the ordinary way it happens.
+<span class="fc" id="L286">        synchronized (publishLock(kindId)) {</span>
+<span class="fc" id="L287">            b.publishWidgetTimeline(kindId, timelineJson, safeImageNames(images));</span>
+<span class="fc" id="L288">        }</span>
+<span class="fc" id="L289">    }</span>
+
+    /// The image side-map with anything that is not a plain blob name removed.
+    ///
+    /// A name here is a content hash produced by `SurfaceSerializer`, and every platform turns it
+    /// into a file inside the kind's own directory. This descriptor did NOT come from this
+    /// process, though -- a server push and the watch mirror both arrive from outside -- so the
+    /// names are input, not something the app computed. A name carrying a separator or a parent
+    /// segment escapes that directory: on iOS the path is composed as `dir + &quot;/&quot; + key + &quot;.png&quot;`
+    /// with no sanitizing of its own, so `../other_kind/hash` plants a blob under a different
+    /// kind, where a later legitimate publish will not replace it -- content-hash names are
+    /// assumed to already hold the right bytes.
+    ///
+    /// Dropped rather than rejected wholesale: a descriptor referencing an image that did not
+    /// arrive renders a gap, which every renderer already tolerates, and refusing the whole
+    /// publish would let one bad name suppress a timeline that is otherwise fine.
+    /// The prefix `SurfaceSerializer.registerImageBytes` puts in front of a content hash.
+    private static final String CONTENT_HASH_PREFIX = &quot;img&quot;;
+
+    /// Whether a name has the shape SurfaceSerializer gives a content hash: the `img` prefix and
+    /// sixteen lowercase hex digits. The prefix is the point -- checking for bare hex matched
+    /// nothing the framework produces, so the integrity check below never ran on a real payload
+    /// at all, and would have compared a prefixed name against an unprefixed hash if it had.
+    ///
+    /// Only names of this shape are verified, so one that was never a hash -- a registered image
+    /// the app named itself -- is passed through rather than refused for failing a test that does
+    /// not apply to it.
+    private static boolean looksLikeContentHash(String name) {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (name.length() != CONTENT_HASH_PREFIX.length() + 16</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                || !name.startsWith(CONTENT_HASH_PREFIX)) {</span>
+<span class="fc" id="L319">            return false;</span>
+        }
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        for (int i = CONTENT_HASH_PREFIX.length(); i &lt; name.length(); i++) {</span>
+<span class="nc" id="L322">            char c = name.charAt(i);</span>
+<span class="nc bnc" id="L323" title="All 8 branches missed.">            if ((c &lt; '0' || c &gt; '9') &amp;&amp; (c &lt; 'a' || c &gt; 'f')) {</span>
+<span class="nc" id="L324">                return false;</span>
+            }
+        }
+<span class="nc" id="L327">        return true;</span>
+    }
+
+    private static Map&lt;String, byte[]&gt; safeImageNames(Map&lt;String, byte[]&gt; images) {
+<span class="fc bfc" id="L331" title="All 4 branches covered.">        if (images == null || images.isEmpty()) {</span>
+<span class="fc" id="L332">            return Collections.&lt;String, byte[]&gt;emptyMap();</span>
+        }
+<span class="fc" id="L334">        Map&lt;String, byte[]&gt; safe = new LinkedHashMap&lt;String, byte[]&gt;();</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        for (Map.Entry&lt;String, byte[]&gt; e : images.entrySet()) {</span>
+<span class="fc" id="L336">            String name = e.getKey();</span>
+<span class="pc bpc" id="L337" title="3 of 6 branches missed.">            if (name == null || name.length() == 0 || name.indexOf('/') &gt;= 0</span>
+<span class="pc bpc" id="L338" title="2 of 4 branches missed.">                    || name.indexOf('\\') &gt;= 0 || name.indexOf(':') &gt;= 0</span>
+<span class="pc bpc" id="L339" title="3 of 6 branches missed.">                    || name.indexOf('\0') &gt;= 0 || &quot;.&quot;.equals(name) || &quot;..&quot;.equals(name)) {</span>
+<span class="nc" id="L340">                Log.p(&quot;Surfaces: dropping a remote image whose name is not a plain blob name: &quot;</span>
+                        + name);
+<span class="nc" id="L342">                continue;</span>
+            }
+<span class="pc bpc" id="L344" title="3 of 4 branches missed.">            if (looksLikeContentHash(name) &amp;&amp; e.getValue() != null</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">                    &amp;&amp; !name.equals(CONTENT_HASH_PREFIX + SurfaceSerializer.fnv1a(e.getValue()))) {</span>
+                // The name is a CLAIM about the bytes, and this descriptor came from outside the
+                // process. iOS skips writing a blob whose file already exists, on the strength of
+                // that claim -- so bad bytes landing first cannot be repaired by any later
+                // legitimate publish, and the surface shows wrong artwork for good. Checking the
+                // claim costs one pass over bytes that are about to be written anyway.
+<span class="nc" id="L351">                Log.p(&quot;Surfaces: dropping a remote image whose bytes do not match its name: &quot;</span>
+                        + name);
+<span class="nc" id="L353">                continue;</span>
+            }
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            if (e.getValue() == null) {</span>
+                // A name with no bytes -- one attachment of several failing to decode is the
+                // ordinary way to get one. Android skips a null value; the iOS bridge writes it
+                // straight to an OutputStream and the NullPointerException escapes its IOException
+                // catch, so one missing blob aborted a publish whose timeline was otherwise fine.
+<span class="nc" id="L360">                Log.p(&quot;Surfaces: dropping a remote image with no bytes: &quot; + name);</span>
+<span class="nc" id="L361">                continue;</span>
+            }
+<span class="fc" id="L363">            safe.put(name, e.getValue());</span>
+<span class="fc" id="L364">        }</span>
+<span class="fc" id="L365">        return safe;</span>
+    }
+
+    /// Asks the platform to re-render widgets from their already-published timelines.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the kind to reload, or null for all kinds
+    public static void reloadWidgets(String kindId) {
+<span class="fc" id="L374">        SurfaceBridge b = bridgeInternal();</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="fc" id="L376">            b.reloadWidgets(kindId);</span>
+        }
+<span class="fc" id="L378">    }</span>
+
+    /// Returns the number of widget instances of a kind the user placed on the platform surface,
+    /// or 0 when none exist or the platform cannot tell. Useful to skip publishing work when no
+    /// widget is installed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the widget kind id
+    ///
+    /// #### Returns
+    ///
+    /// the installed instance count, or 0
+    public static int getInstalledWidgetCount(String kindId) {
+<span class="fc" id="L392">        SurfaceBridge b = bridgeInternal();</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        return b == null ? 0 : b.getInstalledWidgetCount(kindId);</span>
+    }
+
+    /// Registers the single handler receiving surface action events on the EDT. Registration
+    /// flushes any actions queued before it (e.g. the tap that cold-started the app), in arrival
+    /// order, with their cold-start flag set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handler`: the handler, or null to clear
+    public static void setActionHandler(SurfaceActionHandler handler) {
+        // Install the handler and drain the cold-start queue atomically under the same lock
+        // dispatchAction() uses, so an in-flight dispatch cannot observe a null handler and then
+        // enqueue an event after this method already flushed an empty queue (which would strand
+        // it forever). Either dispatch's read-and-enqueue happens entirely before this install
+        // (the event is drained here) or entirely after (dispatch sees the handler and delivers).
+<span class="fc" id="L409">        List&lt;SurfaceActionEvent&gt; queued = null;</span>
+<span class="fc" id="L410">        synchronized (pendingActions) {</span>
+<span class="fc" id="L411">            actionHandler = handler;</span>
+<span class="pc bpc" id="L412" title="1 of 4 branches missed.">            if (handler != null &amp;&amp; !pendingActions.isEmpty()) {</span>
+<span class="fc" id="L413">                queued = new ArrayList&lt;SurfaceActionEvent&gt;(pendingActions);</span>
+<span class="fc" id="L414">                pendingActions.clear();</span>
+            }
+<span class="fc" id="L416">        }</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (queued != null) {</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            for (SurfaceActionEvent evt : queued) {</span>
+<span class="fc" id="L419">                deliver(handler, evt);</span>
+<span class="fc" id="L420">            }</span>
+        }
+<span class="fc" id="L422">    }</span>
+
+    // --- framework/port entry points -----------------------------------------
+
+    /// Framework/port entry point: delivers a surface action to the app. Ports call this after
+    /// decoding their platform payload (deep link, intent extras, window click). Handles EDT
+    /// marshaling; when no handler is registered yet the event is queued and flagged cold start.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the widget kind id or live activity type
+    /// - `actionId`: the action id of the tapped node
+    /// - `params`: the action parameters, may be null
+    public static void dispatchAction(String source, String actionId, Map&lt;String, Object&gt; params) {
+<span class="fc" id="L436">        SurfaceActionEvent evt = new SurfaceActionEvent(source, actionId, params);</span>
+        SurfaceActionHandler h;
+        // Read the handler and decide queue-vs-deliver atomically under the same lock
+        // setActionHandler() installs it and drains under -- see the note there.
+<span class="fc" id="L440">        synchronized (pendingActions) {</span>
+<span class="fc" id="L441">            h = actionHandler;</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">            if (h == null) {</span>
+<span class="fc" id="L443">                evt.setColdStart(true);</span>
+<span class="fc" id="L444">                pendingActions.add(evt);</span>
+<span class="fc" id="L445">                return;</span>
+            }
+<span class="fc" id="L447">        }</span>
+<span class="fc" id="L448">        deliver(h, evt);</span>
+<span class="fc" id="L449">    }</span>
+
+    /// Framework/port/test entry point: overrides the bridge resolved from the platform port.
+    /// Passing null restores platform resolution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bridge, or null to resolve from the platform again
+    public static void setBridge(SurfaceBridge b) {
+<span class="fc" id="L458">        bridge = b;</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        bridgeOverridden = b != null;</span>
+<span class="fc" id="L460">    }</span>
+
+    static SurfaceBridge bridgeInternal() {
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (bridgeOverridden) {</span>
+<span class="fc" id="L464">            return bridge;</span>
+        }
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">        if (!Display.isInitialized()) {</span>
+<span class="fc" id="L467">            return null;</span>
+        }
+        try {
+<span class="nc" id="L470">            return Display.getInstance().getSurfaceBridge();</span>
+<span class="nc" id="L471">        } catch (Throwable t) {</span>
+<span class="nc" id="L472">            Log.e(t);</span>
+<span class="nc" id="L473">            return null;</span>
+        }
+    }
+
+    /// Test seam: clears the bridge override, handler, queued actions and registered kinds.
+    static void reset() {
+<span class="fc" id="L479">        bridge = null;</span>
+<span class="fc" id="L480">        bridgeOverridden = false;</span>
+<span class="fc" id="L481">        synchronized (pendingActions) {</span>
+<span class="fc" id="L482">            actionHandler = null;</span>
+<span class="fc" id="L483">            pendingActions.clear();</span>
+<span class="fc" id="L484">        }</span>
+<span class="fc" id="L485">        synchronized (registeredKinds) {</span>
+<span class="fc" id="L486">            registeredKinds.clear();</span>
+<span class="fc" id="L487">        }</span>
+<span class="fc" id="L488">        SurfaceDiagnostics.reset();</span>
+<span class="fc" id="L489">    }</span>
+
+    private static void deliver(final SurfaceActionHandler h, final SurfaceActionEvent evt) {
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (h == null) {</span>
+<span class="nc" id="L493">            return;</span>
+        }
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">        if (Display.isInitialized()) {</span>
+<span class="nc" id="L496">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L499">                    h.onSurfaceAction(evt);</span>
+<span class="nc" id="L500">                }</span>
+            });
+        } else {
+<span class="fc" id="L503">            h.onSurfaceAction(evt);</span>
+        }
+<span class="fc" id="L505">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

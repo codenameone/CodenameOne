@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EdgeAndCircleContact.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.contacts</a> &gt; <span class="el_source">EdgeAndCircleContact.java</span></div><h1>EdgeAndCircleContact.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics.contacts;
+
+import com.codename1.gaming.physics.box2d.collision.Manifold;
+import com.codename1.gaming.physics.box2d.collision.shapes.CircleShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.EdgeShape;
+import com.codename1.gaming.physics.box2d.collision.shapes.ShapeType;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.dynamics.Fixture;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">public class EdgeAndCircleContact extends Contact {</span>
+
+  public EdgeAndCircleContact(IWorldPool argPool) {
+<span class="fc" id="L37">    super(argPool);</span>
+<span class="fc" id="L38">  }</span>
+
+  public void init(Fixture fA, int indexA, Fixture fB, int indexB) {
+<span class="fc" id="L41">    super.init(fA, indexA, fB, indexB);</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">    assert (m_fixtureA.getType() == ShapeType.EDGE);</span>
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">    assert (m_fixtureB.getType() == ShapeType.CIRCLE);</span>
+<span class="fc" id="L44">  }</span>
+
+  public void evaluate(Manifold manifold, Transform xfA, Transform xfB) {
+<span class="fc" id="L47">    pool.getCollision().collideEdgeAndCircle(manifold, (EdgeShape) m_fixtureA.getShape(), xfA,</span>
+<span class="fc" id="L48">        (CircleShape) m_fixtureB.getShape(), xfB);</span>
+<span class="fc" id="L49">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

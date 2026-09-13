@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlucoseMeasurement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">GlucoseMeasurement.java</span></div><h1>GlucoseMeasurement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+/// A decoded Glucose Measurement, characteristic `0x2A18`.
+///
+/// #### Wire format
+///
+/// A flags byte, a `uint16` sequence number, a 7-byte base time, then the
+/// optional fields the flags select:
+///
+/// | Bit | Meaning |
+/// |-----|---------|
+/// | 0 | time offset present (`sint16` minutes) |
+/// | 1 | concentration, type and location present |
+/// | 2 | concentration units: 0 = kg/L, 1 = mol/L |
+/// | 3 | sensor status annunciation present |
+/// | 4 | context information will follow on `0x2A34` |
+///
+/// #### The units bit selects a different quantity, not a different scale
+///
+/// A meter reporting kg/L transmits a mass concentration; one reporting
+/// mol/L transmits a molar concentration. Converting between them divides
+/// by the molar mass of glucose, 18.0182 -- it is not a generic unit
+/// conversion, and applying it to any other analyte would be wrong. This
+/// parser normalizes to mmol/L, the SI clinical unit, and exposes
+/// [#getMilligramsPerDeciliter()] for the convention used in the United
+/// States.
+///
+/// #### Sequence numbers and stored records
+///
+/// Meters store readings and upload them in a burst, so the sequence
+/// number rather than the arrival order is what identifies a measurement.
+/// Retrieving stored records means driving the Record Access Control Point
+/// -- see [GlucoseRecordFilter] and
+/// [SensorSession#requestStoredRecords(GlucoseRecordFilter)].
+public final class GlucoseMeasurement {
+
+    private static final int FLAG_TIME_OFFSET = 0x01;
+
+    /// The value the profile reserves for &quot;the offset is not known&quot;. Every
+    /// other `sint16` is a real number of minutes, which is why nothing
+    /// narrower is rejected: a meter that stores a base time once and
+    /// offsets every record from it legitimately reports offsets months
+    /// wide.
+    private static final int TIME_OFFSET_UNKNOWN = -32768;
+
+    /// How far ahead of now a decoded measurement time may land before
+    /// the offset that produced it is treated as junk.
+    ///
+    /// A day, which is slack for a meter whose clock disagrees with the
+    /// phone's rather than a licence to stamp readings in the future.
+    private static final long MAX_SKEW_MILLIS = 24L * 60 * 60 * 1000;
+    private static final int FLAG_CONCENTRATION = 0x02;
+    private static final int FLAG_UNITS_MOL_PER_L = 0x04;
+    private static final int FLAG_STATUS = 0x08;
+    private static final int FLAG_CONTEXT_FOLLOWS = 0x10;
+
+    /// Molar mass of glucose, used to convert mg/dL to mmol/L. Specific to
+    /// glucose -- see the class documentation.
+    private static final double MG_PER_DL_PER_MMOL_PER_L = 18.0182;
+
+    /// The sample came from somewhere this profile does not name.
+    public static final int SAMPLE_LOCATION_UNKNOWN = 0;
+    /// Fingertip.
+    public static final int SAMPLE_LOCATION_FINGER = 1;
+    /// Alternate site test, such as the forearm.
+    public static final int SAMPLE_LOCATION_ALTERNATE_SITE = 2;
+    /// Earlobe.
+    public static final int SAMPLE_LOCATION_EARLOBE = 3;
+    /// Control solution rather than blood -- a calibration check, and
+    /// **not** a reading to store as the user's glucose.
+    public static final int SAMPLE_LOCATION_CONTROL_SOLUTION = 4;
+
+    private final int sequenceNumber;
+    private final long timestampMillis;
+    private final double mmolPerLiter;
+    /// The fluid-type code the profile assigns to control solution.
+    ///
+    /// A meter can say &quot;this is not blood&quot; through either nibble of the
+    /// type-and-location byte, and they are independent: some report the
+    /// type and leave the location unknown.
+    public static final int TYPE_CONTROL_SOLUTION = 10;
+
+    private final int sampleLocation;
+    private final int sampleType;
+    private final boolean contextFollows;
+    private final boolean hasConcentration;
+
+    private GlucoseMeasurement(int sequenceNumber, long timestampMillis,
+            double mmolPerLiter, int sampleLocation, int sampleType,
+<span class="fc" id="L112">            boolean contextFollows, boolean hasConcentration) {</span>
+<span class="fc" id="L113">        this.sequenceNumber = sequenceNumber;</span>
+<span class="fc" id="L114">        this.timestampMillis = timestampMillis;</span>
+<span class="fc" id="L115">        this.mmolPerLiter = mmolPerLiter;</span>
+<span class="fc" id="L116">        this.sampleLocation = sampleLocation;</span>
+<span class="fc" id="L117">        this.sampleType = sampleType;</span>
+<span class="fc" id="L118">        this.contextFollows = contextFollows;</span>
+<span class="fc" id="L119">        this.hasConcentration = hasConcentration;</span>
+<span class="fc" id="L120">    }</span>
+
+    /// Decodes a `0x2A18` value. Returns `null` for a malformed or
+    /// truncated payload; never throws.
+    public static GlucoseMeasurement parse(byte[] value) {
+<span class="fc bfc" id="L125" title="All 4 branches covered.">        if (value == null || value.length &lt; 10) {</span>
+<span class="fc" id="L126">            return null;</span>
+        }
+<span class="fc" id="L128">        GattReader r = new GattReader(value);</span>
+<span class="fc" id="L129">        int flags = r.uint8();</span>
+<span class="fc" id="L130">        int sequence = r.uint16();</span>
+<span class="fc" id="L131">        long baseTime = GattDateTime.read(r);</span>
+
+<span class="fc" id="L133">        long timestamp = baseTime;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if ((flags &amp; FLAG_TIME_OFFSET) != 0) {</span>
+<span class="fc" id="L135">            int offsetMinutes = r.sint16();</span>
+            // 0x8000 is the profile's &quot;time offset unknown&quot; value, not an
+            // offset of -32768 minutes. Applied as a number it moved the
+            // reading back about 22.8 days, and the session then published
+            // -- and on some paths stored -- a real glucose value under a
+            // date the meter never claimed. Unknown means the base time is
+            // the best answer available, so that is what is used.
+            //
+            // An offset that lands in the future is refused for a
+            // narrower reason: the measurement already happened, so a
+            // time after now is not a time it can have been taken at. A
+            // junk offset from a meter with a recent base time -- 32767
+            // moves it three weeks ahead -- otherwise produced a reading
+            // that getLatest() reported as the freshest there was,
+            // because its age came out negative.
+            //
+            // Deliberately *not* a bound on the offset itself. The
+            // Glucose Service recommends that a device restrict what a
+            // user can enter to a day either way, and says in the same
+            // breath that the field carries the full signed range, so a
+            // large offset is not by itself wrong -- only one that
+            // arrives at an impossible time is.
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            if (baseTime &gt;= 0 &amp;&amp; offsetMinutes != TIME_OFFSET_UNKNOWN) {</span>
+<span class="fc" id="L158">                long shifted = baseTime + offsetMinutes * 60000L;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                if (shifted - System.currentTimeMillis() &lt;= MAX_SKEW_MILLIS) {</span>
+<span class="fc" id="L160">                    timestamp = shifted;</span>
+                }
+            }
+        }
+
+<span class="fc" id="L165">        double mmol = Double.NaN;</span>
+<span class="fc" id="L166">        int location = SAMPLE_LOCATION_UNKNOWN;</span>
+<span class="fc" id="L167">        int type = 0;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        boolean hasConcentration = (flags &amp; FLAG_CONCENTRATION) != 0;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (hasConcentration) {</span>
+<span class="fc" id="L170">            double raw = Ieee11073.sfloat(r.uint16());</span>
+<span class="fc" id="L171">            int typeAndLocation = r.uint8();</span>
+<span class="fc" id="L172">            type = typeAndLocation &amp; 0x0F;</span>
+<span class="fc" id="L173">            int reportedLocation = (typeAndLocation &gt;&gt; 4) &amp; 0x0F;</span>
+            // The profile defines 1 to 4 and reserves 5 to 14; 15 means
+            // &quot;not available&quot;, which is what unknown already says.
+            // getSampleLocation() promises a SAMPLE_LOCATION_ constant,
+            // so a meter sending a reserved nibble would otherwise hand
+            // the app a location nothing in the profile means.
+<span class="fc bfc" id="L179" title="All 4 branches covered.">            location = reportedLocation &gt;= SAMPLE_LOCATION_FINGER</span>
+                    &amp;&amp; reportedLocation &lt;= SAMPLE_LOCATION_CONTROL_SOLUTION
+                    ? reportedLocation : SAMPLE_LOCATION_UNKNOWN;
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">            if ((flags &amp; FLAG_UNITS_MOL_PER_L) != 0) {</span>
+                // Transmitted in mol/L; 1 mol/L is 1000 mmol/L.
+<span class="nc" id="L184">                mmol = raw * 1000.0;</span>
+            } else {
+                // Transmitted in kg/L. 1 kg/L is 100000 mg/dL.
+<span class="fc" id="L187">                double mgPerDl = raw * 100000.0;</span>
+<span class="fc" id="L188">                mmol = mgPerDl / MG_PER_DL_PER_MMOL_PER_L;</span>
+            }
+        }
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_STATUS) != 0) {</span>
+<span class="nc" id="L192">            r.skip(2);</span>
+        }
+
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (!r.isValid()) {</span>
+<span class="nc" id="L196">            return null;</span>
+        }
+<span class="pc bpc" id="L198" title="1 of 4 branches missed.">        if (hasConcentration &amp;&amp; Double.isNaN(mmol)) {</span>
+            // The meter signalled that it could not obtain a reading.
+<span class="nc" id="L200">            return null;</span>
+        }
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        return new GlucoseMeasurement(sequence, timestamp, mmol, location,</span>
+                type, (flags &amp; FLAG_CONTEXT_FOLLOWS) != 0, hasConcentration);
+    }
+
+    /// The meter's sequence number for this reading. Stable across
+    /// re-transmission, and the right key for de-duplicating a burst of
+    /// stored records.
+    public int getSequenceNumber() {
+<span class="fc" id="L210">        return sequenceNumber;</span>
+    }
+
+    /// When the reading was taken, epoch millis, or `-1` when the meter's
+    /// clock was unset. Prefer this over the time of receipt -- stored
+    /// records arrive long after the fact.
+    public long getTimestampMillis() {
+<span class="fc" id="L217">        return timestampMillis;</span>
+    }
+
+    /// The concentration in mmol/L, or `Double.NaN` when this record
+    /// carried none.
+    public double getMillimolesPerLiter() {
+<span class="fc" id="L223">        return mmolPerLiter;</span>
+    }
+
+    /// The concentration in mg/dL, the unit used clinically in the United
+    /// States, or `Double.NaN` when absent.
+    public double getMilligramsPerDeciliter() {
+<span class="fc" id="L229">        return mmolPerLiter * MG_PER_DL_PER_MMOL_PER_L;</span>
+    }
+
+    /// `true` when this record carried a concentration. A record without
+    /// one is a placeholder the meter kept for a failed test.
+    public boolean hasConcentration() {
+<span class="fc" id="L235">        return hasConcentration;</span>
+    }
+
+    /// Where the sample was taken, as a `SAMPLE_LOCATION_` constant.
+    ///
+    /// Check for [#SAMPLE_LOCATION_CONTROL_SOLUTION] before storing a
+    /// reading as the user's glucose: that value means the meter was being
+    /// calibrated against a test fluid, and recording it as a blood
+    /// measurement puts a fictitious reading into their medical history.
+    public int getSampleLocation() {
+<span class="fc" id="L245">        return sampleLocation;</span>
+    }
+
+    /// The fluid type code the meter reported -- capillary whole blood,
+    /// venous plasma, interstitial fluid and so on.
+    public int getSampleType() {
+<span class="nc" id="L251">        return sampleType;</span>
+    }
+
+    /// `true` when the meter will follow this record with a context
+    /// notification on `0x2A34` carrying meal, exercise and medication
+    /// annotations.
+    public boolean isContextFollowing() {
+<span class="nc" id="L258">        return contextFollows;</span>
+    }
+
+    /// `true` when this reading came from control solution rather than
+    /// blood and must not be stored as a glucose measurement.
+    ///
+    /// Either nibble settles it. The profile carries control solution as
+    /// a fluid type *and* as a sample location, and they are independent
+    /// -- a meter that reports type 10 while leaving the location
+    /// unknown is stating plainly that this is calibration fluid, and
+    /// reading only the location published it as the user's blood
+    /// glucose.
+    public boolean isControlSolution() {
+<span class="fc bfc" id="L271" title="All 4 branches covered.">        return sampleLocation == SAMPLE_LOCATION_CONTROL_SOLUTION</span>
+                || sampleType == TYPE_CONTROL_SOLUTION;
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L277">        return &quot;GlucoseMeasurement[#&quot; + sequenceNumber + &quot; &quot; + mmolPerLiter</span>
+                + &quot; mmol/L]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

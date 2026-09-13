@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>File.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">File.java</span></div><h1>File.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.ui.Display;
+import com.codename1.util.StringUtil;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+
+/// This class provides a similar API to `java.io.File` making it almost into a &quot;drop in&quot; replacement.
+/// It is placed in a different package because it is incompatible to `java.io.File` by definition.  It is useful
+/// in getting some simple code to work without too many changes
+///
+/// @author Shai Almog
+public class File {
+    public static final char separatorChar = '/';
+    public static final String separator = &quot;/&quot;;
+    private final String path;
+
+    /// Creates a new File object from the given URI
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`
+    public File(URI uri) {
+<span class="fc" id="L51">        this(&quot;file:/&quot; + uri.getPath());</span>
+<span class="fc" id="L52">    }</span>
+
+    /// Creates a new file object with given path. Paths that do not begin with the &quot;file:&quot; prefix
+    /// will automatically be prefixed with the app home path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: The path of the file.  Relative or absolute.
+<span class="fc" id="L60">    public File(String path) {</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (!path.startsWith(&quot;file:&quot;)) {</span>
+<span class="fc" id="L62">            this.path = FileSystemStorage.getInstance().getAppHomePath() + path;</span>
+        } else {
+<span class="fc" id="L64">            this.path = path;</span>
+        }
+<span class="fc" id="L66">    }</span>
+
+    /// Creates a new file object in a given directory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dir`: The parent directory path.
+    ///
+    /// - `file`: The file name
+<span class="nc" id="L75">    public File(String dir, String file) {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (!dir.startsWith(&quot;file:&quot;)) {</span>
+<span class="nc" id="L77">            dir = FileSystemStorage.getInstance().getAppHomePath() + dir;</span>
+        }
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (!dir.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L80">            this.path = dir + &quot;/&quot; + file;</span>
+        } else {
+<span class="nc" id="L82">            this.path = dir + file;</span>
+        }
+<span class="nc" id="L84">    }</span>
+
+    /// Creates a new file in the given parent directory, and subpath.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent directory.
+    ///
+    /// - `path`: The subpath, beginning with the parent directory.
+<span class="fc" id="L93">    public File(File parent, String path) {</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (!parent.path.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L95">            this.path = parent.path + &quot;/&quot; + path;</span>
+        } else {
+<span class="fc" id="L97">            this.path = parent.path + path;</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    /// List the file system roots.
+    public static File[] listRoots() {
+<span class="nc" id="L103">        return new File[]{</span>
+<span class="nc" id="L104">                new File(FileSystemStorage.getInstance().getAppHomePath())</span>
+        };
+    }
+
+    /// Creates a temporary file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `prefix`: The file name prefix.
+    ///
+    /// - `suffix`: The file name suffix
+    ///
+    /// #### Returns
+    ///
+    /// The resulting temporary file.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    public static File createTempFile(String prefix, String suffix) throws IOException {
+<span class="nc" id="L124">        String p = FileSystemStorage.getInstance().getAppHomePath() + &quot;/temp/&quot;;</span>
+<span class="nc" id="L125">        FileSystemStorage.getInstance().mkdir(p);</span>
+<span class="nc" id="L126">        return new File(p + prefix + System.currentTimeMillis() + suffix);</span>
+
+    }
+
+    /// Returns the file name.
+    ///
+    /// #### Returns
+    ///
+    /// The file name.
+    public String getName() {
+<span class="fc" id="L136">        return path.substring(path.lastIndexOf('/') + 1);</span>
+    }
+
+    /// Gets the parent directory path.
+    ///
+    /// #### Returns
+    ///
+    /// The parent directory path.
+    public String getParent() {
+
+<span class="nc bnc" id="L146" title="All 6 branches missed.">        if (&quot;file://&quot;.equals(path) || &quot;file:///&quot;.equals(path) || path.length() == 0) {</span>
+<span class="nc" id="L147">            return null;</span>
+        }
+
+<span class="nc" id="L150">        String out = path;</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (out.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L152">            out = out.substring(0, out.length() - 1);</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (out.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L154">                return null;</span>
+            }
+        }
+<span class="nc" id="L157">        return out.substring(0, out.lastIndexOf('/'));</span>
+
+
+    }
+
+    /// Returns the file object for the parent directory.
+    public File getParentFile() {
+<span class="nc" id="L164">        String parentPath = getParent();</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (parentPath == null) {</span>
+<span class="nc" id="L166">            return null;</span>
+        }
+<span class="nc" id="L168">        return new File(parentPath);</span>
+    }
+
+    /// Gets the path to the file.
+    public String getPath() {
+<span class="fc" id="L173">        return path;</span>
+    }
+
+    /// Checks if the path is absolute.  This always returns true as all File objects
+    /// use absolute paths - even if they were created with relative paths.  Relative paths are automatically
+    /// prefixed with the app home directory path.
+    public boolean isAbsolute() {
+<span class="nc" id="L180">        return true;</span>
+    }
+
+    /// Gets the absolute path of the file as a string,
+    public String getAbsolutePath() {
+<span class="fc" id="L185">        return path;</span>
+    }
+
+    /// Gets the absolute file - which is always itself, since `#isAbsolute()` always returns true.
+    ///
+    /// #### Returns
+    ///
+    /// The same file object.
+    public File getAbsoluteFile() {
+<span class="nc" id="L194">        return this;</span>
+    }
+
+    /// Checks if the file described by this object exists on the file system.
+    public boolean exists() {
+<span class="fc" id="L199">        return FileSystemStorage.getInstance().exists(path);</span>
+    }
+
+    /// Checks if this file is a directory.
+    public boolean isDirectory() {
+<span class="fc" id="L204">        return FileSystemStorage.getInstance().isDirectory(path);</span>
+    }
+
+    /// Checks if this file object represents a regular file.
+    public boolean isFile() {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        return !isDirectory();</span>
+    }
+
+    /// Checks if this is a hidden file.
+    public boolean isHidden() {
+<span class="nc" id="L214">        return FileSystemStorage.getInstance().isHidden(path);</span>
+    }
+
+    /// Gets the last modified time as a unix timestamp in milliseconds.
+    public long lastModified() {
+<span class="nc" id="L219">        return FileSystemStorage.getInstance().getLastModified(path);</span>
+    }
+
+    /// Gets the file size in bytes.
+    ///
+    /// #### Returns
+    ///
+    /// The file size in bytes.
+    public long length() {
+<span class="fc" id="L228">        return FileSystemStorage.getInstance().getLength(path);</span>
+    }
+
+    /// Creates this file as a new blank file in the file system.
+    ///
+    /// #### Returns
+    ///
+    /// True if it succeeds.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    public boolean createNewFile() throws IOException {
+<span class="nc" id="L241">        OutputStream os = null; //NOPMD CloseResource</span>
+        try {
+<span class="nc" id="L243">            os = FileSystemStorage.getInstance().openOutputStream(path);</span>
+        } finally {
+<span class="nc" id="L245">            Util.cleanup(os);</span>
+        }
+<span class="nc" id="L247">        return exists();</span>
+    }
+
+    /// Deletes the file described by this object on the file system.
+    ///
+    /// #### Returns
+    ///
+    /// True if delete succeeds.
+    public boolean delete() {
+<span class="nc" id="L256">        FileSystemStorage.getInstance().delete(path);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        return !FileSystemStorage.getInstance().exists(path);</span>
+    }
+
+    /// Returns the list of child files of this directory.
+    public String[] list() {
+        try {
+<span class="fc" id="L263">            String[] result = FileSystemStorage.getInstance().listFiles(path);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            for (int iter = 0; iter &lt; result.length; iter++) {</span>
+<span class="fc" id="L265">                int len = result[iter].length();</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                if (result[iter].endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L267">                    result[iter] = result[iter].substring(0, len - 1);</span>
+                }
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (result[iter].indexOf(&quot;/&quot;) != -1) {</span>
+<span class="fc" id="L270">                    result[iter] = result[iter].substring(result[iter].lastIndexOf(&quot;/&quot;) + 1, len);</span>
+                }
+            }
+<span class="fc" id="L273">            return result;</span>
+<span class="nc" id="L274">        } catch (IOException err) {</span>
+<span class="nc" id="L275">            return null;</span>
+        }
+    }
+
+    /// Returns list of child files of this directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `filter`
+    public String[] list(FilenameFilter filter) {
+<span class="nc" id="L285">        String[] arr = list();</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">        if (arr.length &gt; 0) {</span>
+<span class="nc" id="L287">            ArrayList&lt;String&gt; result = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            for (String s : arr) {</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                if (filter.accept(this, s)) {</span>
+<span class="nc" id="L290">                    result.add(s);</span>
+                }
+            }
+<span class="nc" id="L293">            String[] res = new String[result.size()];</span>
+<span class="nc" id="L294">            result.toArray(res);</span>
+<span class="nc" id="L295">            return res;</span>
+        }
+<span class="nc" id="L297">        return arr;</span>
+    }
+
+    /// Gets a list of child files of this directory.
+    public File[] listFiles() {
+<span class="fc" id="L302">        String[] r = list();</span>
+<span class="fc" id="L303">        File[] files = new File[r.length];</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (int iter = 0; iter &lt; r.length; iter++) {</span>
+<span class="fc" id="L305">            files[iter] = new File(this, r[iter]);</span>
+        }
+<span class="fc" id="L307">        return files;</span>
+    }
+
+    /// Gets a list of child files of this directory, filtered using the provided filter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ff`: The filter to use.
+    public File[] listFiles(FilenameFilter ff) {
+<span class="nc" id="L316">        String[] r = list(ff);</span>
+<span class="nc" id="L317">        File[] files = new File[r.length];</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        for (int iter = 0; iter &lt; r.length; iter++) {</span>
+<span class="nc" id="L319">            files[iter] = new File(this, r[iter]);</span>
+        }
+<span class="nc" id="L321">        return files;</span>
+    }
+
+    /// Gets a list of child files of this directory, filtering them using the provided filter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ff`: The filter to use to filter output.
+    public File[] listFiles(FileFilter ff) {
+<span class="nc" id="L330">        File[] arr = listFiles();</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        if (arr.length &gt; 0) {</span>
+<span class="nc" id="L332">            ArrayList&lt;File&gt; result = new ArrayList&lt;File&gt;();</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            for (File s : arr) {</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                if (ff.accept(s)) {</span>
+<span class="nc" id="L335">                    result.add(s);</span>
+                }
+            }
+<span class="nc" id="L338">            File[] res = new File[result.size()];</span>
+<span class="nc" id="L339">            result.toArray(res);</span>
+<span class="nc" id="L340">            return res;</span>
+        }
+<span class="nc" id="L342">        return arr;</span>
+    }
+
+    /// Attempts to make the directory described by this object.
+    ///
+    /// #### Returns
+    ///
+    /// True on success.
+    public boolean mkdir() {
+<span class="fc" id="L351">        FileSystemStorage.getInstance().mkdir(path);</span>
+<span class="pc bpc" id="L352" title="2 of 4 branches missed.">        return exists() &amp;&amp; isDirectory();</span>
+    }
+
+    /// Attempts to make the directory (and all parent directories) of this object.
+    ///
+    /// #### Returns
+    ///
+    /// True on success.
+    public boolean mkdirs() {
+<span class="nc" id="L361">        File parentFile = getParentFile();</span>
+<span class="nc bnc" id="L362" title="All 4 branches missed.">        if (parentFile != null &amp;&amp; !parentFile.exists()) {</span>
+<span class="nc" id="L363">            boolean res = getParentFile().mkdirs();</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">            if (!res) {</span>
+<span class="nc" id="L365">                return res;</span>
+            }
+        }
+<span class="nc" id="L368">        return mkdir();</span>
+    }
+
+    /// Renames the file to the provided file object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: The file object that we are renaming the file to.
+    ///
+    /// #### Returns
+    ///
+    /// True on success.
+    public boolean renameTo(File f) {
+<span class="nc" id="L381">        FileSystemStorage.getInstance().rename(path, f.getName());</span>
+<span class="nc" id="L382">        return f.exists();</span>
+    }
+
+    /// Checks if this file is executable.
+    public boolean canExecute() {
+<span class="nc" id="L387">        return Display.getInstance().canExecute(path);</span>
+    }
+
+    /// Returns the total space on the root file system.
+    public long getTotalSpace() {
+<span class="nc" id="L392">        return FileSystemStorage.getInstance().getRootSizeBytes(FileSystemStorage.getInstance().getRoots()[0]);</span>
+    }
+
+    /// Gets the free space on the root file system.
+    public long getFreeSpace() {
+<span class="nc" id="L397">        return FileSystemStorage.getInstance().getRootAvailableSpace(FileSystemStorage.getInstance().getRoots()[0]);</span>
+    }
+
+    /// Gets the usable space on this file system.
+    public long getUsableSpace() {
+<span class="nc" id="L402">        return getFreeSpace();</span>
+    }
+
+    /// Checks if the given object refers to the same file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L412" title="All 4 branches missed.">        return o instanceof File &amp;&amp; ((File) o).path.equals(path);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L417">        return path.hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L422">        return path;</span>
+    }
+
+    /// Converts this file to a URL.
+    ///
+    /// #### Throws
+    ///
+    /// - `MalformedURLException`
+    public URL toURL() throws MalformedURLException {
+        try {
+<span class="nc" id="L432">            return new URL(toURI());</span>
+<span class="nc" id="L433">        } catch (URISyntaxException ex) {</span>
+<span class="nc" id="L434">            MalformedURLException err = new MalformedURLException(&quot;Invalid URL format: &quot; + ex.getMessage());</span>
+<span class="nc" id="L435">            err.initCause(ex);</span>
+<span class="nc" id="L436">            throw err;</span>
+        }
+    }
+
+    /// Converts this file to a URI.
+    ///
+    /// #### Throws
+    ///
+    /// - `URISyntaxException`
+    public URI toURI() throws URISyntaxException {
+<span class="nc" id="L446">        String path = getAbsolutePath();</span>
+<span class="nc" id="L447">        path = path.substring(6);</span>
+<span class="nc" id="L448">        path = StringUtil.replaceAll(path, &quot;\\&quot;, &quot;/&quot;);</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">        while (path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L450">            path = path.substring(1);</span>
+        }
+<span class="nc" id="L452">        path = &quot;/&quot; + path;</span>
+<span class="nc" id="L453">        return new URI(&quot;file&quot;, null, path, null, null);</span>
+
+
+    }
+
+    /// Interface to filter filenames.
+    public interface FilenameFilter {
+        /// Checks if the given file should be included in results.
+        ///
+        /// #### Parameters
+        ///
+        /// - `f`: The parent directory of the file to check.
+        ///
+        /// - `name`: The file name.
+        ///
+        /// #### Returns
+        ///
+        /// True if the file should be included in results.
+        boolean accept(File f, String name);
+    }
+
+    /// Interface for filtering files.
+    public interface FileFilter {
+        /// Returns true if the file should be included in results.
+        ///
+        /// #### Parameters
+        ///
+        /// - `f`: The file to check
+        ///
+        /// #### Returns
+        ///
+        /// True to include.  False to not include in results.
+        boolean accept(File f);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

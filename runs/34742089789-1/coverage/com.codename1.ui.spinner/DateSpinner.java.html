@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateSpinner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">DateSpinner.java</span></div><h1>DateSpinner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.List;
+
+import java.util.Calendar;
+import java.util.Map;
+
+/// A date spinner allows selecting a date value within the given date range
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// use Picker instead
+public class DateSpinner extends BaseSpinner {
+    private Spinner month;
+    private Spinner day;
+    private Spinner year;
+
+
+<span class="fc" id="L44">    private int startYear = 1970;</span>
+<span class="fc" id="L45">    private int endYear = 2100;</span>
+    private int currentYear;
+    private int currentDay;
+    private int currentMonth;
+
+<span class="fc" id="L50">    private boolean monthDayYear = true;</span>
+<span class="fc" id="L51">    private boolean numericMonths = false;</span>
+
+<span class="fc" id="L53">    private String monthRenderingPrototype = &quot;WWW&quot;;</span>
+
+    /// Default constructor
+<span class="fc" id="L56">    public DateSpinner() {</span>
+<span class="fc" id="L57">        Calendar c = Calendar.getInstance();</span>
+<span class="fc" id="L58">        currentDay = c.get(Calendar.DAY_OF_MONTH);</span>
+<span class="fc" id="L59">        currentMonth = c.get(Calendar.MONTH) + 1;</span>
+<span class="fc" id="L60">        currentYear = c.get(Calendar.YEAR);</span>
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    void initSpinner() {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (month == null) {</span>
+<span class="fc" id="L66">            day = Spinner.create(1, 32, currentDay, 1);</span>
+<span class="fc" id="L67">            month = Spinner.create(1, 13, currentMonth, 1);</span>
+<span class="fc" id="L68">            SpinnerRenderer&lt;Object&gt; render = new SpinnerRenderer&lt;Object&gt;() {</span>
+                @Override
+                public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                    if (value instanceof Integer) {</span>
+                        // round the number in the spinner to two digits
+<span class="fc" id="L73">                        int d = ((Integer) value).intValue();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                        if (numericMonths) {</span>
+<span class="nc" id="L75">                            value = &quot;&quot; + d;</span>
+                        } else {
+<span class="fc" id="L77">                            Map&lt;String, String&gt; t = getUIManager().getBundle();</span>
+<span class="fc" id="L78">                            String text = DateTimeRenderer.MONTHS[Math.max(0, Math.min(d - 1, DateTimeRenderer.MONTHS.length - 1))];</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                            if (t != null) {</span>
+<span class="fc" id="L80">                                Object o = t.get(&quot;Calendar.&quot; + text);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                                if (o != null) {</span>
+<span class="nc" id="L82">                                    text = (String) o;</span>
+                                }
+                            }
+<span class="fc" id="L85">                            value = text;</span>
+                        }
+                    }
+<span class="fc" id="L88">                    return super.getListCellRendererComponent(list, value, index, isSelected);</span>
+                }
+            };
+<span class="fc" id="L91">            month.setRenderer(render);</span>
+<span class="fc" id="L92">            month.initSpinnerRenderer();</span>
+<span class="fc" id="L93">            month.setRenderingPrototype(monthRenderingPrototype);</span>
+
+<span class="fc" id="L95">            year = Spinner.create(startYear, endYear, currentYear, 1);</span>
+<span class="fc" id="L96">            addComponents();</span>
+        }
+<span class="fc" id="L98">    }</span>
+
+    private void addComponents() {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (year != null) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (monthDayYear) {</span>
+<span class="fc" id="L103">                addComponent(month);</span>
+<span class="fc" id="L104">                addComponent(createSeparator());</span>
+<span class="fc" id="L105">                addComponent(day);</span>
+<span class="fc" id="L106">                addComponent(createSeparator());</span>
+<span class="fc" id="L107">                addComponent(year);</span>
+            } else {
+<span class="fc" id="L109">                addComponent(day);</span>
+<span class="fc" id="L110">                addComponent(createSeparator());</span>
+<span class="fc" id="L111">                addComponent(month);</span>
+<span class="fc" id="L112">                addComponent(createSeparator());</span>
+<span class="fc" id="L113">                addComponent(year);</span>
+            }
+        }
+<span class="fc" id="L116">    }</span>
+
+    /// #### Returns
+    ///
+    /// the startYear
+    public int getStartYear() {
+<span class="nc" id="L122">        return startYear;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `startYear`: the startYear to set
+    public void setStartYear(int startYear) {
+<span class="fc" id="L129">        this.startYear = startYear;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (year != null) {</span>
+<span class="nc" id="L131">            year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));</span>
+        }
+<span class="fc" id="L133">    }</span>
+
+    /// #### Returns
+    ///
+    /// the endYear
+    public int getEndYear() {
+<span class="nc" id="L139">        return endYear;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `endYear`: the endYear to set
+    public void setEndYear(int endYear) {
+<span class="fc" id="L146">        this.endYear = endYear;</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (year != null) {</span>
+<span class="nc" id="L148">            year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));</span>
+        }
+<span class="fc" id="L150">    }</span>
+
+    /// #### Returns
+    ///
+    /// the currentYear
+    public int getCurrentYear() {
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (year != null) {</span>
+<span class="nc" id="L157">            return ((Integer) year.getValue()).intValue();</span>
+        }
+<span class="nc" id="L159">        return currentYear;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `currentYear`: the currentYear to set
+    public void setCurrentYear(int currentYear) {
+<span class="fc" id="L166">        this.currentYear = currentYear;</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (year != null) {</span>
+<span class="nc" id="L168">            year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));</span>
+        }
+<span class="fc" id="L170">    }</span>
+
+    /// #### Returns
+    ///
+    /// the currentDay
+    public int getCurrentDay() {
+<span class="nc bnc" id="L176" title="All 4 branches missed.">        if (day == null || day.getValue() == null) {</span>
+<span class="nc" id="L177">            return 1;</span>
+        }
+<span class="nc" id="L179">        return ((Integer) day.getValue()).intValue();</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `currentDay`: the currentDay to set
+    public void setCurrentDay(int currentDay) {
+<span class="fc" id="L186">        this.currentDay = currentDay;</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (day != null) {</span>
+<span class="nc" id="L188">            day.setModel(new SpinnerNumberModel(1, 32, currentDay, 1));</span>
+        }
+<span class="fc" id="L190">    }</span>
+
+    /// #### Returns
+    ///
+    /// the currentMonth
+    public int getCurrentMonth() {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (month != null) {</span>
+<span class="nc" id="L197">            return ((Integer) month.getValue()).intValue();</span>
+        }
+<span class="nc" id="L199">        return currentMonth;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `currentMonth`: the currentMonth to set
+    public void setCurrentMonth(int currentMonth) {
+<span class="fc" id="L206">        this.currentMonth = currentMonth;</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (month != null) {</span>
+<span class="nc" id="L208">            month.setModel(new SpinnerNumberModel(1, 13, currentMonth, 1));</span>
+        }
+<span class="fc" id="L210">    }</span>
+
+    /// #### Returns
+    ///
+    /// the monthDayYear
+    public boolean isMonthDayYear() {
+<span class="nc" id="L216">        return monthDayYear;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `monthDayYear`: the monthDayYear to set
+    public void setMonthDayYear(boolean monthDayYear) {
+<span class="fc" id="L223">        this.monthDayYear = monthDayYear;</span>
+<span class="fc" id="L224">        removeAll();</span>
+<span class="fc" id="L225">        addComponents();</span>
+<span class="fc" id="L226">    }</span>
+
+    /// #### Returns
+    ///
+    /// the numericMonths
+    public boolean isNumericMonths() {
+<span class="nc" id="L232">        return numericMonths;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `numericMonths`: the numericMonths to set
+    public void setNumericMonths(boolean numericMonths) {
+<span class="nc" id="L239">        this.numericMonths = numericMonths;</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (month != null) {</span>
+<span class="nc" id="L241">            month.repaint();</span>
+        }
+<span class="nc" id="L243">    }</span>
+
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L249">        return new String[]{&quot;startYear&quot;, &quot;endYear&quot;, &quot;currentYear&quot;, &quot;currentDay&quot;, &quot;currentMonth&quot;, &quot;monthDayYear&quot;, &quot;numericMonths&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L255">        return new Class[]{Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (&quot;startYear&quot;.equals(name)) {</span>
+<span class="nc" id="L262">            return Integer.valueOf(startYear);</span>
+        }
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (&quot;endYear&quot;.equals(name)) {</span>
+<span class="nc" id="L265">            return Integer.valueOf(endYear);</span>
+        }
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (&quot;currentYear&quot;.equals(name)) {</span>
+<span class="nc" id="L268">            return Integer.valueOf(currentYear);</span>
+        }
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (&quot;currentDay&quot;.equals(name)) {</span>
+<span class="nc" id="L271">            return Integer.valueOf(currentDay);</span>
+        }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (&quot;currentMonth&quot;.equals(name)) {</span>
+<span class="nc" id="L274">            return Integer.valueOf(currentMonth);</span>
+        }
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (&quot;monthDayYear&quot;.equals(name)) {</span>
+<span class="fc" id="L277">            return Boolean.valueOf(monthDayYear);</span>
+        }
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (&quot;numericMonths&quot;.equals(name)) {</span>
+<span class="nc" id="L280">            return Boolean.valueOf(numericMonths);</span>
+        }
+<span class="nc" id="L282">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (&quot;startYear&quot;.equals(name)) {</span>
+<span class="nc" id="L289">            setStartYear(Integer.parseInt(value.toString()));</span>
+<span class="nc" id="L290">            return null;</span>
+        }
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (&quot;endYear&quot;.equals(name)) {</span>
+<span class="nc" id="L293">            setEndYear(Integer.parseInt(value.toString()));</span>
+<span class="nc" id="L294">            return null;</span>
+        }
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (&quot;currentYear&quot;.equals(name)) {</span>
+<span class="nc" id="L297">            setCurrentYear(Integer.parseInt(value.toString()));</span>
+<span class="nc" id="L298">            return null;</span>
+        }
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (&quot;currentDay&quot;.equals(name)) {</span>
+<span class="nc" id="L301">            setCurrentDay(Integer.parseInt(value.toString()));</span>
+<span class="nc" id="L302">            return null;</span>
+        }
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (&quot;currentMonth&quot;.equals(name)) {</span>
+<span class="nc" id="L305">            setCurrentMonth(Integer.parseInt(value.toString()));</span>
+<span class="nc" id="L306">            return null;</span>
+        }
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if (&quot;monthDayYear&quot;.equals(name)) {</span>
+<span class="nc" id="L309">            setMonthDayYear(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L310">            return null;</span>
+        }
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (&quot;numericMonths&quot;.equals(name)) {</span>
+<span class="nc" id="L313">            setNumericMonths(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L314">            return null;</span>
+        }
+
+<span class="nc" id="L317">        return super.setPropertyValue(name, value);</span>
+    }
+
+
+    /// Sets the Month Rendering Prototype to be used, useful when the language
+    /// is changed and you need the month spinner to be wider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `monthPrototype`: a prototype to be used to calc the month cell size
+    public void setMonthRenderingPrototype(String monthPrototype) {
+<span class="nc" id="L328">        this.monthRenderingPrototype = monthPrototype;</span>
+<span class="nc" id="L329">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

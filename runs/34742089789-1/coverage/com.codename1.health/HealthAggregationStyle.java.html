@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthAggregationStyle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthAggregationStyle.java</span></div><h1>HealthAggregationStyle.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+/// How a [HealthDataType] combines over a time bucket. Determines which
+/// [AggregateMetric] values are meaningful for the type.
+<span class="fc" id="L27">public enum HealthAggregationStyle {</span>
+
+    /// Values accumulate over an interval and are summed -- steps,
+    /// distance, energy burned. [AggregateMetric#TOTAL] is meaningful;
+    /// averaging raw samples is not.
+    ///
+    /// Cumulative types are always interval samples: a step count belongs
+    /// to a span of time, never to an instant. See
+    /// [HealthDataType#isIntervalOnly()].
+<span class="fc" id="L36">    CUMULATIVE,</span>
+
+    /// Values are point-in-time observations that are averaged or reduced
+    /// -- heart rate, body mass, blood glucose. [AggregateMetric#AVERAGE],
+    /// [AggregateMetric#MINIMUM], [AggregateMetric#MAXIMUM] and
+    /// [AggregateMetric#LATEST] are meaningful; totalling them is not.
+<span class="fc" id="L42">    DISCRETE,</span>
+
+    /// The type does not aggregate numerically at all -- sleep sessions,
+    /// workouts, category observations. Only [AggregateMetric#COUNT] and
+    /// [AggregateMetric#DURATION] apply.
+<span class="fc" id="L47">    NONE</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

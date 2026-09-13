@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppState.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.continuity</a> &gt; <span class="el_source">AppState.java</span></div><h1>AppState.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.continuity;
+
+import com.codename1.io.Externalizable;
+import com.codename1.io.Util;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A snapshot of where the user was and what they were doing: the route stack, plus whatever your
+/// `StateProvider` chose to add.
+///
+/// The same value serves three purposes, which is why it carries more than the two halves above.
+/// It is written to storage so the app can come back after its process dies; it is advertised to
+/// the user's other devices so one of them can continue the work; and it travels through a
+/// `StateRelay` to devices the platform cannot reach on its own. The `deviceId`, `sequence` and
+/// `timestamp` are what let the receiving side tell a state it has already seen -- or its own echo
+/// -- from one worth acting on.
+///
+/// #### The routes
+///
+/// `getRoutes()` is the `com.codename1.router.Navigation` stack as a list of paths, oldest first.
+/// Restoring it re-runs each path through the route table, which is why an app that navigates with
+/// `@Route` gets its screens back for free and one that calls `new MyForm().show()` does not: those
+/// navigations are not URL-addressable, so there is nothing to write down. Such an app restores
+/// from the payload instead.
+///
+/// #### The payload
+///
+/// `getPayload()` is yours. It has to survive being written to disk, handed to an operating system
+/// and delivered to a *different device running a possibly different build of your app*, so it is
+/// restricted to values that mean the same thing everywhere: `String`, `Integer`, `Long`, `Double`,
+/// `Boolean`, and `List` and `Map` of those. Anything else is refused when the state is built,
+/// with a message naming the offending key, rather than being dropped somewhere the failure cannot
+/// be traced back here.
+<span class="fc" id="L63">public final class AppState implements Externalizable {</span>
+    /// The `Util.register` id. Changing it orphans every state already on a device.
+    static final String OBJECT_ID = &quot;CN1AppState&quot;;
+
+<span class="fc" id="L67">    private List&lt;String&gt; routes = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L68">    private Map&lt;String, Object&gt; payload = new HashMap&lt;String, Object&gt;();</span>
+    /// The lifecycle generation this state was DELIVERED in, or -1 for one the application
+    /// built or read back from storage.
+    ///
+    /// Not part of the wire form and not part of the stored form: it describes a session of this
+    /// process, not the state, and a state that outlived the session it arrived in is exactly
+    /// what it exists to catch.
+<span class="fc" id="L75">    private int deliveredGeneration = -1;</span>
+
+<span class="fc" id="L77">    private String deviceId = &quot;&quot;;</span>
+    private String title;
+    private long sequence;
+    private long timestamp;
+
+    /// The navigation stack as route paths, oldest first. Never null, possibly empty.
+    ///
+    /// #### Returns
+    ///
+    /// an unmodifiable view of the route paths
+    public List&lt;String&gt; getRoutes() {
+<span class="fc" id="L88">        return Collections.unmodifiableList(routes);</span>
+    }
+
+    /// Replaces the route paths.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the paths, oldest first; null is treated as empty
+    ///
+    /// #### Returns
+    ///
+    /// this state, for chaining
+    public AppState setRoutes(List&lt;String&gt; r) {
+<span class="fc" id="L101">        routes = new ArrayList&lt;String&gt;();</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (r != null) {</span>
+<span class="fc" id="L103">            int index = 0;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            for (String path : r) {</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">                if (path != null &amp;&amp; path.length() &gt; 0) {</span>
+                    // Every string this class writes goes through Util.writeUTF, and a route is
+                    // not obviously short: a deep link carrying a query value reaches the limit
+                    // as easily as a payload does. Validating only the payload left externalize()
+                    // able to throw on a route, which persist() logs and carries on from -- so
+                    // the checkpoint was published to the other device and silently absent from
+                    // local storage, and restoration after process death did nothing.
+<span class="fc" id="L112">                    StateCodec.requireWritable(path, &quot;route[&quot; + index + &quot;]&quot;);</span>
+<span class="fc" id="L113">                    routes.add(path);</span>
+                }
+<span class="fc" id="L115">                index++;</span>
+<span class="fc" id="L116">            }</span>
+        }
+<span class="fc" id="L118">        return this;</span>
+    }
+
+    /// The generation this state was delivered in, or -1 when this framework never delivered it.
+    int deliveredGeneration() {
+<span class="fc" id="L123">        return deliveredGeneration;</span>
+    }
+
+    /// Stamped by dispatch(), the one place a state is handed to the application.
+    void deliveredGeneration(int generation) {
+<span class="fc" id="L128">        deliveredGeneration = generation;</span>
+<span class="fc" id="L129">    }</span>
+
+    /// The application payload. Never null, possibly empty.
+    ///
+    /// The view is unmodifiable ALL THE WAY DOWN. Wrapping only the outer map left every nested
+    /// List and Map mutable, which matters most for an arrival: the same AppState handed to a
+    /// listener or a provider is afterwards parked, persisted, acknowledged and published, so a
+    /// caller that consumed a nested list -- removing items as it applied them, which is an
+    /// ordinary way to write that loop -- changed the framework's own snapshot of what arrived.
+    /// setPayload() deep-copies on the way in for exactly this reason; the way out needed to
+    /// match.
+    ///
+    /// #### Returns
+    ///
+    /// an unmodifiable view of the payload
+    public Map&lt;String, Object&gt; getPayload() {
+<span class="fc" id="L145">        return unmodifiableValues(payload);</span>
+    }
+
+    /// The payload itself, for framework code that only reads it. Wrapping is not free and the
+    /// callers inside this package are not the ones the wrapping protects against.
+    Map&lt;String, Object&gt; payloadRef() {
+<span class="fc" id="L151">        return payload;</span>
+    }
+
+    /// `value`, with every List and Map inside it wrapped as unmodifiable.
+    private static Object unmodifiableValue(Object value) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L157">            List&lt;?&gt; in = (List&lt;?&gt;) value;</span>
+<span class="fc" id="L158">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            for (Object element : in) {</span>
+<span class="fc" id="L160">                out.add(unmodifiableValue(element));</span>
+<span class="fc" id="L161">            }</span>
+<span class="fc" id="L162">            return Collections.unmodifiableList(out);</span>
+        }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (value instanceof Map) {</span>
+            // Never a cast to Map&lt;String, Object&gt;: on the iOS virtual machine a failed cast does
+            // not throw, so the guarded instanceof above is the only portable way to ask, and the
+            // wildcard read below is what the compiler can actually check.
+<span class="fc" id="L168">            return unmodifiableValues(castValues((Map&lt;?, ?&gt;) value));</span>
+        }
+        // Everything else a payload may hold -- String, Integer, Long, Double, Boolean -- is
+        // immutable already.
+<span class="fc" id="L172">        return value;</span>
+    }
+
+    private static Map&lt;String, Object&gt; unmodifiableValues(Map&lt;String, Object&gt; in) {
+<span class="fc" id="L176">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; e : in.entrySet()) {</span>
+<span class="fc" id="L178">            out.put(e.getKey(), unmodifiableValue(e.getValue()));</span>
+<span class="fc" id="L179">        }</span>
+<span class="fc" id="L180">        return Collections.unmodifiableMap(out);</span>
+    }
+
+    private static Map&lt;String, Object&gt; castValues(Map&lt;?, ?&gt; in) {
+<span class="fc" id="L184">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (Map.Entry&lt;?, ?&gt; e : in.entrySet()) {</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (e.getKey() instanceof String) {</span>
+<span class="fc" id="L187">                out.put((String) e.getKey(), e.getValue());</span>
+            }
+<span class="fc" id="L189">        }</span>
+<span class="fc" id="L190">        return out;</span>
+    }
+
+    /// Replaces the application payload.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the payload; null is treated as empty
+    ///
+    /// #### Returns
+    ///
+    /// this state, for chaining
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when a value cannot cross to another device
+    public AppState setPayload(Map&lt;String, Object&gt; p) {
+<span class="fc" id="L207">        StateCodec.requireRepresentable(p);</span>
+<span class="fc" id="L208">        payload = deepCopy(p);</span>
+<span class="fc" id="L209">        return this;</span>
+    }
+
+    /// Replaces the payload without validating it. Used only for a payload that arrived from
+    /// another device: it was already validated where it was produced, and refusing it here would
+    /// turn a remote mistake into an exception on this device at a moment the user cannot connect
+    /// to anything they did.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the payload; null is treated as empty
+    void setPayloadUnchecked(Map&lt;String, Object&gt; p) {
+<span class="fc" id="L221">        payload = deepCopy(p);</span>
+<span class="fc" id="L222">    }</span>
+
+    /// The other three fields a REMOTE document supplies, set without the local size validation.
+    ///
+    /// Same reason as the payload beside them, and they were simply missed: a document from
+    /// another device goes through the validating setters, so one route longer than this device's
+    /// stored-string limit threw IllegalArgumentException out of StateCodec.fromJson -- which
+    /// fromJson does not document and the relay reads as a FAILED fetch. The document never
+    /// changes, so every retry fails identically and this device stops publishing for good.
+    ///
+    /// Carried rather than refused, because the limit is about writing: a state that cannot be
+    /// stored here can still be restored here, and persist() already reports its own failure to
+    /// the one caller that must not act on it.
+    void setRoutesUnchecked(List&lt;String&gt; r) {
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        routes = r == null ? new ArrayList&lt;String&gt;() : new ArrayList&lt;String&gt;(r);</span>
+<span class="fc" id="L237">    }</span>
+
+    void setDeviceIdUnchecked(String id) {
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        deviceId = id == null ? &quot;&quot; : id;</span>
+<span class="fc" id="L241">    }</span>
+
+    void setTitleUnchecked(String t) {
+<span class="fc" id="L244">        title = t;</span>
+<span class="fc" id="L245">    }</span>
+
+    /// Copies a payload all the way down, not just its outer map.
+    ///
+    /// A shallow copy left the snapshot sharing the application's own lists and maps. That is a
+    /// race with a silent result, because a state outlives the call that produced it: the relay
+    /// serializes it later on a background thread, so an edit the application makes in between
+    /// could publish newer contents under an older sequence number, or throw a
+    /// ConcurrentModificationException in the middle of a checkpoint. A snapshot has to be a
+    /// snapshot.
+    ///
+    /// Only the container types are rebuilt. Everything else a payload may hold -- String,
+    /// Integer, Long, Double, Boolean -- is immutable, so copying it would buy nothing.
+    private static Map&lt;String, Object&gt; deepCopy(Map&lt;String, Object&gt; p) {
+<span class="fc" id="L259">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        if (p == null) {</span>
+<span class="nc" id="L261">            return out;</span>
+        }
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; e : p.entrySet()) {</span>
+<span class="fc" id="L264">            out.put(e.getKey(), copyValue(e.getValue()));</span>
+<span class="fc" id="L265">        }</span>
+<span class="fc" id="L266">        return out;</span>
+    }
+
+    private static Object copyValue(Object value) {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L271">            List&lt;?&gt; in = (List&lt;?&gt;) value;</span>
+<span class="fc" id="L272">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (Object element : in) {</span>
+<span class="fc" id="L274">                out.add(copyValue(element));</span>
+<span class="fc" id="L275">            }</span>
+<span class="fc" id="L276">            return out;</span>
+        }
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (value instanceof Map) {</span>
+<span class="fc" id="L279">            Map&lt;?, ?&gt; in = (Map&lt;?, ?&gt;) value;</span>
+<span class="fc" id="L280">            Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; e : in.entrySet()) {</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                if (e.getKey() instanceof String) {</span>
+<span class="fc" id="L283">                    out.put((String) e.getKey(), copyValue(e.getValue()));</span>
+                }
+<span class="fc" id="L285">            }</span>
+<span class="fc" id="L286">            return out;</span>
+        }
+<span class="fc" id="L288">        return value;</span>
+    }
+
+    /// The device this state was produced on. Used to drop a state's own echo when it comes back
+    /// through a relay. Never null.
+    ///
+    /// #### Returns
+    ///
+    /// the originating device id
+    public String getDeviceId() {
+<span class="fc" id="L298">        return deviceId;</span>
+    }
+
+    /// Sets the originating device id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the id; null is treated as the empty string
+    ///
+    /// #### Returns
+    ///
+    /// this state, for chaining
+    public AppState setDeviceId(String id) {
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (id != null) {</span>
+            // Framework-generated in every path we own, and validated anyway: a port supplying its
+            // own id writes it through the same writeUTF as everything else here.
+<span class="fc" id="L314">            StateCodec.requireWritable(id, &quot;deviceId&quot;);</span>
+        }
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        deviceId = id == null ? &quot;&quot; : id;</span>
+<span class="fc" id="L317">        return this;</span>
+    }
+
+    /// A human readable label for what the user is doing, which a receiving device may show
+    /// before they accept the continuation. Null when the app did not set one.
+    ///
+    /// #### Returns
+    ///
+    /// the title, or null
+    public String getTitle() {
+<span class="fc" id="L327">        return title;</span>
+    }
+
+    /// Sets the human readable label.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the title, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// this state, for chaining
+    public AppState setTitle(String t) {
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (t != null) {</span>
+            // Application-supplied, so this is the one of the three most likely to be long.
+<span class="fc" id="L342">            StateCodec.requireWritable(t, &quot;title&quot;);</span>
+        }
+<span class="fc" id="L344">        title = t;</span>
+<span class="fc" id="L345">        return this;</span>
+    }
+
+    /// A counter that increases with every state this device publishes. Together with the device
+    /// id it identifies a state exactly, which is how a receiver recognizes one it has already
+    /// acted on -- two states can share a timestamp, because clocks are coarse.
+    ///
+    /// #### Returns
+    ///
+    /// the sequence number
+    public long getSequence() {
+<span class="fc" id="L356">        return sequence;</span>
+    }
+
+    /// Sets the sequence number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the sequence number
+    ///
+    /// #### Returns
+    ///
+    /// this state, for chaining
+    public AppState setSequence(long s) {
+<span class="fc" id="L369">        sequence = s;</span>
+<span class="fc" id="L370">        return this;</span>
+    }
+
+    /// When this state was produced, as milliseconds since the epoch on the producing device.
+    ///
+    /// Treat it as advisory. It comes from another device's clock, so it is only as trustworthy as
+    /// that clock: it can be behind, ahead, or -- across a daylight saving change or a manual
+    /// correction -- both within one session.
+    ///
+    /// #### Returns
+    ///
+    /// the timestamp
+    public long getTimestamp() {
+<span class="fc" id="L383">        return timestamp;</span>
+    }
+
+    /// Sets the production timestamp.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: milliseconds since the epoch
+    ///
+    /// #### Returns
+    ///
+    /// this state, for chaining
+    public AppState setTimestamp(long t) {
+<span class="fc" id="L396">        timestamp = t;</span>
+<span class="fc" id="L397">        return this;</span>
+    }
+
+    /// True when there is nothing here worth restoring or sending.
+    ///
+    /// #### Returns
+    ///
+    /// true when both the routes and the payload are empty
+    public boolean isEmpty() {
+<span class="fc bfc" id="L406" title="All 4 branches covered.">        return routes.isEmpty() &amp;&amp; payload.isEmpty();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L411">        return &quot;AppState{routes=&quot; + routes.size() + &quot;, payload=&quot; + payload.size()</span>
+                + &quot;, device=&quot; + deviceId + &quot;, seq=&quot; + sequence + &quot;}&quot;;
+    }
+
+    // ------------------------------------------------------------------
+    // Externalizable -- the on-device format
+    // ------------------------------------------------------------------
+
+    @Override
+    public int getVersion() {
+<span class="fc" id="L421">        return 1;</span>
+    }
+
+    @Override
+    public String getObjectId() {
+<span class="fc" id="L426">        return OBJECT_ID;</span>
+    }
+
+    @Override
+    public void externalize(DataOutputStream out) throws IOException {
+<span class="fc" id="L431">        Util.writeUTF(deviceId, out);</span>
+<span class="fc" id="L432">        Util.writeUTF(title, out);</span>
+<span class="fc" id="L433">        out.writeLong(sequence);</span>
+<span class="fc" id="L434">        out.writeLong(timestamp);</span>
+<span class="fc" id="L435">        out.writeInt(routes.size());</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        for (String path : routes) {</span>
+<span class="fc" id="L437">            Util.writeUTF(path, out);</span>
+<span class="fc" id="L438">        }</span>
+        // The payload goes through the framework's own object writer rather than a hand-rolled
+        // encoding: it already knows every type requireRepresentable admits, including nested
+        // lists and maps, and it is the same writer Storage uses for everything else.
+<span class="fc" id="L442">        Util.writeObject(payload, out);</span>
+<span class="fc" id="L443">    }</span>
+
+    @Override
+    public void internalize(int version, DataInputStream in) throws IOException {
+<span class="fc" id="L447">        deviceId = Util.readUTF(in);</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        if (deviceId == null) {</span>
+<span class="nc" id="L449">            deviceId = &quot;&quot;;</span>
+        }
+<span class="fc" id="L451">        title = Util.readUTF(in);</span>
+<span class="fc" id="L452">        sequence = in.readLong();</span>
+<span class="fc" id="L453">        timestamp = in.readLong();</span>
+<span class="fc" id="L454">        int count = in.readInt();</span>
+<span class="fc" id="L455">        routes = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L457">            String path = Util.readUTF(in);</span>
+<span class="pc bpc" id="L458" title="2 of 4 branches missed.">            if (path != null &amp;&amp; path.length() &gt; 0) {</span>
+<span class="fc" id="L459">                routes.add(path);</span>
+            }
+        }
+<span class="fc" id="L462">        Object p = Util.readObject(in);</span>
+<span class="fc" id="L463">        payload = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">        if (p instanceof Map) {</span>
+<span class="fc" id="L465">            Map&lt;?, ?&gt; read = (Map&lt;?, ?&gt;) p;</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; entry : read.entrySet()) {</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                if (entry.getKey() instanceof String) {</span>
+<span class="fc" id="L468">                    payload.put((String) entry.getKey(), entry.getValue());</span>
+                }
+<span class="fc" id="L470">            }</span>
+        }
+<span class="fc" id="L472">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

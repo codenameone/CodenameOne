@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameSceneView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">GameSceneView.java</span></div><h1>GameSceneView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import com.codename1.gaming.GameView;
+import com.codename1.gaming.Model;
+import com.codename1.gaming.Scene;
+import com.codename1.gaming.Sprite;
+import com.codename1.gpu.GltfLoader;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Light;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Mesh;
+import com.codename1.gpu.Primitives;
+import com.codename1.ui.Display;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// A turnkey `GameView` that plays a `GameLevel`: it wires the whole lifecycle so a
+/// generated game scene can be a thin subclass that only adds behavior.
+///
+/// - **2D** levels are realized into the scene immediately.
+/// - **board** levels are realized on the first sized frame, once an `IsoProjection`
+///   can be fitted to the view.
+/// - **3D** levels set up the perspective camera and the primary light, and build a
+///   `Model` per element in `GameView#onSetup(com.codename1.gpu.GraphicsDevice)` (the
+///   only place the GPU device exists); override `#buildModels(GraphicsDevice)` to
+///   supply real meshes instead of the default per-element cube.
+///
+/// Game logic goes in `#onUpdate(double)` (a no-op by default) -- the scene's sprite
+/// animations are advanced by the renderer, so do not call `Scene#update(double)`.
+public class GameSceneView extends GameView {
+    private final GameLevel level;
+    private final AssetCatalog catalog;
+<span class="nc" id="L56">    private final IsoProjection projection = new IsoProjection();</span>
+    private boolean boardRealized;
+    private int score;
+<span class="nc" id="L59">    private int lives = -1;</span>
+
+    // ---- opt-in 2D arcade behavior (off by default) ----
+    private boolean arcadeBehavior;
+<span class="nc" id="L63">    private boolean followCamera = true;</span>
+    private Sprite arcadePlayer;
+    private double playerStartX;
+    private double playerStartY;
+    private boolean playerStartCaptured;
+    private double pvy;
+    private boolean grounded;
+    private boolean jumpHeld;
+<span class="nc" id="L71">    private final Map&lt;String, Double&gt; enemyDir = new HashMap&lt;String, Double&gt;();</span>
+
+<span class="nc" id="L73">    public GameSceneView(GameLevel level, AssetCatalog catalog) {</span>
+<span class="nc" id="L74">        this.level = level;</span>
+<span class="nc" id="L75">        this.catalog = catalog;</span>
+<span class="nc" id="L76">        setClearColor(level.getInt(&quot;clearColor&quot;, 0xff101018));</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (level.getMode() == GameLevel.Mode.TWO_D) {</span>
+<span class="nc" id="L78">            level.realizeSprites(getScene(), catalog);</span>
+        }
+<span class="nc" id="L80">    }</span>
+
+    public GameLevel getLevel() {
+<span class="nc" id="L83">        return level;</span>
+    }
+
+    public AssetCatalog getCatalog() {
+<span class="nc" id="L87">        return catalog;</span>
+    }
+
+    /// {@inheritDoc} Realizes a board level lazily once the view has a size, then
+    /// defers to `#onUpdate(double)`.
+    @Override
+    protected void update(double deltaSeconds) {
+<span class="nc bnc" id="L94" title="All 8 branches missed.">        if (level.getMode() == GameLevel.Mode.BOARD &amp;&amp; !boardRealized &amp;&amp; getWidth() &gt; 0 &amp;&amp; getHeight() &gt; 0) {</span>
+<span class="nc" id="L95">            int n = Math.max(level.getCols(), level.getRows());</span>
+<span class="nc" id="L96">            projection.fit(n, getWidth(), getHeight());</span>
+<span class="nc" id="L97">            level.realizeSprites(getScene(), catalog, projection);</span>
+<span class="nc" id="L98">            boardRealized = true;</span>
+        }
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        if (arcadeBehavior &amp;&amp; level.getMode() == GameLevel.Mode.TWO_D) {</span>
+<span class="nc" id="L101">            updateArcade(deltaSeconds);</span>
+        }
+<span class="nc" id="L103">        onUpdate(deltaSeconds);</span>
+<span class="nc" id="L104">    }</span>
+
+    /// Override to advance game logic each frame. The default does nothing.
+    protected void onUpdate(double deltaSeconds) {
+<span class="nc" id="L108">    }</span>
+
+    /// The isometric projection used to place a board level (valid after the first
+    /// sized frame).
+    public IsoProjection getProjection() {
+<span class="nc" id="L113">        return projection;</span>
+    }
+
+    // ---- scene queries + game state -------------------------------------
+    // So a generated scene (and your onUpdate) needs no hand-rolled boilerplate:
+    // the editor wires named elements to fields and your logic uses these helpers.
+
+    /// The `GameElement` a sprite was realized from -- its `Sprite#getUserData()` --
+    /// or `null` if the sprite did not come from a level element. This is the bridge
+    /// back to the typed `lives`/`value`/`speed` numbers you set in the editor.
+    protected GameElement elementOf(Sprite sprite) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (sprite == null) {</span>
+<span class="nc" id="L125">            return null;</span>
+        }
+<span class="nc" id="L127">        Object data = sprite.getUserData();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        return data instanceof GameElement ? (GameElement) data : null;</span>
+    }
+
+    /// The first sprite in the scene whose source element has the given `name` (the
+    /// name typed in the Inspector), or `null`. The generated scene initializes a
+    /// field per named element with this.
+    protected Sprite findByName(String name) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L136">            return null;</span>
+        }
+<span class="nc" id="L138">        Scene scene = getScene();</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        for (int i = 0; i &lt; scene.size(); i++) {</span>
+<span class="nc" id="L140">            GameElement el = elementOf(scene.get(i));</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">            if (el != null &amp;&amp; name.equals(el.getName())) {</span>
+<span class="nc" id="L142">                return scene.get(i);</span>
+            }
+        }
+<span class="nc" id="L145">        return null;</span>
+    }
+
+    /// The first sprite stamped from the given asset id (e.g. `&quot;player&quot;`, `&quot;coin&quot;`),
+    /// or `null`.
+    protected Sprite findByAsset(String assetId) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (assetId == null) {</span>
+<span class="nc" id="L152">            return null;</span>
+        }
+<span class="nc" id="L154">        Scene scene = getScene();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        for (int i = 0; i &lt; scene.size(); i++) {</span>
+<span class="nc" id="L156">            GameElement el = elementOf(scene.get(i));</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">            if (el != null &amp;&amp; assetId.equals(el.getAssetId())) {</span>
+<span class="nc" id="L158">                return scene.get(i);</span>
+            }
+        }
+<span class="nc" id="L161">        return null;</span>
+    }
+
+    /// Every sprite stamped from the given asset id, in z-order -- handy for a
+    /// &quot;collect all the coins&quot; loop. Never `null` (empty when none match).
+    protected java.util.List&lt;Sprite&gt; findAllByAsset(String assetId) {
+<span class="nc" id="L167">        java.util.List&lt;Sprite&gt; matches = new java.util.ArrayList&lt;Sprite&gt;();</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (assetId == null) {</span>
+<span class="nc" id="L169">            return matches;</span>
+        }
+<span class="nc" id="L171">        Scene scene = getScene();</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        for (int i = 0; i &lt; scene.size(); i++) {</span>
+<span class="nc" id="L173">            GameElement el = elementOf(scene.get(i));</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">            if (el != null &amp;&amp; assetId.equals(el.getAssetId())) {</span>
+<span class="nc" id="L175">                matches.add(scene.get(i));</span>
+            }
+        }
+<span class="nc" id="L178">        return matches;</span>
+    }
+
+    /// Whether two sprites' bounding boxes overlap -- a null-safe shorthand for
+    /// `Sprite#intersects(Sprite)`, the usual &quot;did they touch?&quot; collision test.
+    protected boolean overlaps(Sprite a, Sprite b) {
+<span class="nc bnc" id="L184" title="All 6 branches missed.">        return a != null &amp;&amp; b != null &amp;&amp; a.intersects(b);</span>
+    }
+
+    /// The running score (starts at zero). Add to it with `#addScore(int)`.
+    public int getScore() {
+<span class="nc" id="L189">        return score;</span>
+    }
+
+    public void setScore(int score) {
+<span class="nc" id="L193">        this.score = score;</span>
+<span class="nc" id="L194">    }</span>
+
+    /// Adds `delta` to the score and returns the new total.
+    public int addScore(int delta) {
+<span class="nc" id="L198">        score += delta;</span>
+<span class="nc" id="L199">        return score;</span>
+    }
+
+    /// Remaining lives, or `-1` until `#setLives(int)` is called. The generated scene
+    /// seeds this from the player's `lives` property.
+    public int getLives() {
+<span class="nc" id="L205">        return lives;</span>
+    }
+
+    public void setLives(int lives) {
+<span class="nc" id="L209">        this.lives = lives;</span>
+<span class="nc" id="L210">    }</span>
+
+    /// Decrements the life count (never below zero) and returns what remains.
+    public int loseLife() {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (lives &gt; 0) {</span>
+<span class="nc" id="L215">            lives--;</span>
+        }
+<span class="nc" id="L217">        return lives;</span>
+    }
+
+    /// True once `#setLives(int)` has been given a count that has since reached zero --
+    /// the standard &quot;game over&quot; test (false while lives are uninitialized).
+    public boolean isGameOver() {
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        return lives == 0;</span>
+    }
+
+    // ---- opt-in 2D arcade behavior ---------------------------------------
+    // The editor's Live preview play-tests a level with built-in arcade behavior
+    // (gravity, run/jump, tile collision, enemy patrol, pickups). That same
+    // behavior is OFF by default at runtime so board/3D/your-own games are not
+    // affected -- turn it on with setArcadeBehavior(true) and &quot;what you preview is
+    // what ships&quot;. Each piece is a protected hook you can override (or ignore the
+    // lot and drive everything from onUpdate).
+
+    /// Enables (or disables) the built-in 2D arcade behavior -- gravity, run/jump,
+    /// tile collision, enemy patrol and pickups -- that the editor preview shows.
+    /// Off by default. Has no effect on board or 3D levels.
+    public GameSceneView setArcadeBehavior(boolean on) {
+<span class="nc" id="L238">        this.arcadeBehavior = on;</span>
+<span class="nc" id="L239">        return this;</span>
+    }
+
+    public boolean isArcadeBehavior() {
+<span class="nc" id="L243">        return arcadeBehavior;</span>
+    }
+
+    /// Whether the arcade behavior scrolls the scene camera to follow the player
+    /// (on by default) -- this is what makes a parallax background scroll.
+    public GameSceneView setFollowCamera(boolean on) {
+<span class="nc" id="L249">        this.followCamera = on;</span>
+<span class="nc" id="L250">        return this;</span>
+    }
+
+    /// Runs one arcade frame: player physics, enemy patrol, pickups, and the
+    /// follow camera. Called automatically before `#onUpdate(double)` when
+    /// `#setArcadeBehavior(boolean)` is on and the level is 2D.
+    protected void updateArcade(double deltaSeconds) {
+<span class="nc" id="L257">        Sprite player = arcadePlayer();</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (player != null) {</span>
+<span class="nc" id="L259">            updatePlayer(player, deltaSeconds);</span>
+<span class="nc" id="L260">            checkPickups(player);</span>
+        }
+<span class="nc" id="L262">        updateEnemies(deltaSeconds);</span>
+<span class="nc bnc" id="L263" title="All 4 branches missed.">        if (player != null &amp;&amp; followCamera) {</span>
+<span class="nc" id="L264">            int ts = Math.max(4, level.getTileSize());</span>
+<span class="nc" id="L265">            int camX = (int) Math.round(player.getX() - getWidth() / 2.0);</span>
+<span class="nc" id="L266">            int maxX = level.getCols() * ts - getWidth();</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            if (camX &lt; 0) {</span>
+<span class="nc" id="L268">                camX = 0;</span>
+            }
+<span class="nc bnc" id="L270" title="All 4 branches missed.">            if (maxX &gt; 0 &amp;&amp; camX &gt; maxX) {</span>
+<span class="nc" id="L271">                camX = maxX;</span>
+            }
+<span class="nc" id="L273">            getScene().setCamera(camX, 0);</span>
+        }
+<span class="nc" id="L275">    }</span>
+
+    /// The player sprite the arcade behavior drives: an element flagged
+    /// `player = true` wins, else the first `player`/`hero` asset. Cached; also
+    /// seeds `#setLives(int)` from the player's `lives` property on first resolve.
+    protected Sprite arcadePlayer() {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (arcadePlayer != null) {</span>
+<span class="nc" id="L282">            return arcadePlayer;</span>
+        }
+<span class="nc" id="L284">        Scene scene = getScene();</span>
+<span class="nc" id="L285">        Sprite found = null;</span>
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        for (int i = 0; i &lt; scene.size() &amp;&amp; found == null; i++) {</span>
+<span class="nc" id="L287">            GameElement el = elementOf(scene.get(i));</span>
+<span class="nc bnc" id="L288" title="All 4 branches missed.">            if (el != null &amp;&amp; el.getBoolean(&quot;player&quot;, false)) {</span>
+<span class="nc" id="L289">                found = scene.get(i);</span>
+            }
+        }
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (found == null) {</span>
+<span class="nc" id="L293">            found = findByAsset(&quot;player&quot;);</span>
+        }
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        if (found == null) {</span>
+<span class="nc" id="L296">            found = findByAsset(&quot;hero&quot;);</span>
+        }
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (found != null) {</span>
+<span class="nc" id="L299">            arcadePlayer = found;</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">            if (!playerStartCaptured) {</span>
+<span class="nc" id="L301">                playerStartX = found.getX();</span>
+<span class="nc" id="L302">                playerStartY = found.getY();</span>
+<span class="nc" id="L303">                playerStartCaptured = true;</span>
+            }
+<span class="nc bnc" id="L305" title="All 2 branches missed.">            if (lives &lt; 0) {</span>
+<span class="nc" id="L306">                GameElement el = elementOf(found);</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                setLives(el == null ? 3 : el.getInt(&quot;lives&quot;, 3));</span>
+            }
+        }
+<span class="nc" id="L310">        return arcadePlayer;</span>
+    }
+
+    /// Default player physics: run with Left/Right, jump on Up/Fire (edge-triggered),
+    /// gravity from the level's `gravity` property, jump height from the player's
+    /// `jumpHeight` property, stopped by solid tiles, respawning if it falls out.
+    /// Override to change movement, or `#setArcadeBehavior(boolean)` off to opt out.
+    protected void updatePlayer(Sprite player, double deltaSeconds) {
+<span class="nc" id="L318">        int ts = Math.max(4, level.getTileSize());</span>
+<span class="nc" id="L319">        GameElement el = elementOf(player);</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        AssetDef def = el == null ? null : el.resolveDef(catalog);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        double hw = (def == null ? ts : def.getWidth()) / 2.0;</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        double hh = (def == null ? ts : def.getHeight()) / 2.0;</span>
+<span class="nc" id="L323">        double grav = level.getDouble(&quot;gravity&quot;, 9.8) * 132;</span>
+<span class="nc" id="L324">        double speed = level.getDouble(&quot;walkSpeed&quot;, 170);</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        double jump = (el == null ? 110 : el.getInt(&quot;jumpHeight&quot;, 110)) * 4;</span>
+
+<span class="nc" id="L327">        boolean left = getInput().isGameKeyDown(Display.GAME_LEFT);</span>
+<span class="nc" id="L328">        boolean right = getInput().isGameKeyDown(Display.GAME_RIGHT);</span>
+<span class="nc bnc" id="L329" title="All 4 branches missed.">        boolean up = getInput().isGameKeyDown(Display.GAME_UP) || getInput().isGameKeyDown(Display.GAME_FIRE);</span>
+<span class="nc bnc" id="L330" title="All 4 branches missed.">        double pvx = ((right ? 1 : 0) - (left ? 1 : 0)) * speed;</span>
+<span class="nc bnc" id="L331" title="All 6 branches missed.">        if (up &amp;&amp; !jumpHeld &amp;&amp; grounded) {</span>
+<span class="nc" id="L332">            pvy = -jump;</span>
+<span class="nc" id="L333">            grounded = false;</span>
+        }
+<span class="nc" id="L335">        jumpHeld = up;</span>
+<span class="nc" id="L336">        pvy += grav * deltaSeconds;</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (pvy &gt; 1000) {</span>
+<span class="nc" id="L338">            pvy = 1000;</span>
+        }
+
+<span class="nc" id="L341">        double nx = player.getX() + pvx * deltaSeconds;</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">        if (!isSolidAt(nx, player.getY(), hw, hh)) {</span>
+<span class="nc" id="L343">            player.setX(nx);</span>
+        }
+<span class="nc" id="L345">        double ny = player.getY() + pvy * deltaSeconds;</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if (!isSolidAt(player.getX(), ny, hw, hh)) {</span>
+<span class="nc" id="L347">            player.setY(ny);</span>
+<span class="nc" id="L348">            grounded = false;</span>
+        } else {
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            if (pvy &gt; 0) {</span>
+<span class="nc" id="L351">                grounded = true;</span>
+            }
+<span class="nc" id="L353">            pvy = 0;</span>
+        }
+<span class="nc" id="L355">        double maxX = level.getCols() * ts - hw;</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (player.getX() &lt; hw) {</span>
+<span class="nc" id="L357">            player.setX(hw);</span>
+        }
+<span class="nc bnc" id="L359" title="All 2 branches missed.">        if (player.getX() &gt; maxX) {</span>
+<span class="nc" id="L360">            player.setX(maxX);</span>
+        }
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (player.getY() &gt; level.getRows() * ts + hh * 3) {</span>
+<span class="nc" id="L363">            player.setPosition(playerStartX, playerStartY);</span>
+<span class="nc" id="L364">            pvy = 0;</span>
+        }
+<span class="nc" id="L366">    }</span>
+
+    /// Default enemy behavior: every `#isEnemy(String)` sprite patrols horizontally
+    /// at its `speed` property, turning at walls and level edges.
+    protected void updateEnemies(double deltaSeconds) {
+<span class="nc" id="L371">        int ts = Math.max(4, level.getTileSize());</span>
+<span class="nc" id="L372">        Scene scene = getScene();</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        for (int i = 0; i &lt; scene.size(); i++) {</span>
+<span class="nc" id="L374">            Sprite s = scene.get(i);</span>
+<span class="nc" id="L375">            GameElement el = elementOf(s);</span>
+<span class="nc bnc" id="L376" title="All 4 branches missed.">            if (el == null || !isEnemy(el.getAssetId())) {</span>
+<span class="nc" id="L377">                continue;</span>
+            }
+<span class="nc" id="L379">            Double d = enemyDir.get(el.getId());</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">            double dir = d == null ? 1.0 : d.doubleValue();</span>
+<span class="nc" id="L381">            AssetDef def = el.resolveDef(catalog);</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">            double hw = (def == null ? ts : def.getWidth()) / 2.0;</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">            double hh = (def == null ? ts : def.getHeight()) / 2.0;</span>
+<span class="nc" id="L384">            double spd = el.getDouble(&quot;speed&quot;, 60);</span>
+<span class="nc" id="L385">            double nx = s.getX() + dir * spd * deltaSeconds;</span>
+<span class="nc bnc" id="L386" title="All 6 branches missed.">            if (isSolidAt(nx, s.getY(), hw, hh) || nx &lt; hw || nx &gt; level.getCols() * ts - hw) {</span>
+<span class="nc" id="L387">                dir = -dir;</span>
+            } else {
+<span class="nc" id="L389">                s.setX(nx);</span>
+            }
+<span class="nc" id="L391">            enemyDir.put(el.getId(), Double.valueOf(dir));</span>
+        }
+<span class="nc" id="L393">    }</span>
+
+    /// Default pickups: when the player overlaps a `#isCollectible(String)` sprite,
+    /// `#onPickup(Sprite)` fires (scores and consumes it); when it overlaps an
+    /// `#isEnemy(String)` sprite, `#onPlayerHit(Sprite)` fires (costs a life).
+    protected void checkPickups(Sprite player) {
+<span class="nc" id="L399">        int ts = Math.max(4, level.getTileSize());</span>
+<span class="nc" id="L400">        GameElement pel = elementOf(player);</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        AssetDef pd = pel == null ? null : pel.resolveDef(catalog);</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">        double phw = (pd == null ? ts : pd.getWidth()) / 2.0;</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        double phh = (pd == null ? ts : pd.getHeight()) / 2.0;</span>
+<span class="nc" id="L404">        Scene scene = getScene();</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">        for (int i = scene.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L406">            Sprite s = scene.get(i);</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            if (s == player) {   //NOPMD CompareObjectsWithEquals - sprite identity is intended</span>
+<span class="nc" id="L408">                continue;</span>
+            }
+<span class="nc" id="L410">            GameElement el = elementOf(s);</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">            if (el == null) {</span>
+<span class="nc" id="L412">                continue;</span>
+            }
+<span class="nc" id="L414">            String id = el.getAssetId();</span>
+<span class="nc" id="L415">            boolean coll = isCollectible(id);</span>
+<span class="nc bnc" id="L416" title="All 4 branches missed.">            if (!coll &amp;&amp; !isEnemy(id)) {</span>
+<span class="nc" id="L417">                continue;</span>
+            }
+<span class="nc" id="L419">            AssetDef def = el.resolveDef(catalog);</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">            double hw = (def == null ? ts : def.getWidth()) / 2.0;</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">            double hh = (def == null ? ts : def.getHeight()) / 2.0;</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">            boolean hit = Math.abs(player.getX() - s.getX()) &lt; phw + hw</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                    &amp;&amp; Math.abs(player.getY() - s.getY()) &lt; phh + hh;</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">            if (!hit) {</span>
+<span class="nc" id="L425">                continue;</span>
+            }
+<span class="nc bnc" id="L427" title="All 2 branches missed.">            if (coll) {</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                if (onPickup(s)) {</span>
+<span class="nc" id="L429">                    scene.remove(s);</span>
+                }
+            } else {
+<span class="nc" id="L432">                onPlayerHit(s);</span>
+            }
+        }
+<span class="nc" id="L435">    }</span>
+
+    /// Called when the player touches a collectible. The default adds the item's
+    /// `value` property to the score and returns `true` to consume it. Override for
+    /// power-ups: read the asset id / properties, change state, and return whether
+    /// to remove the item.
+    protected boolean onPickup(Sprite item) {
+<span class="nc" id="L442">        GameElement el = elementOf(item);</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        addScore(el == null ? 0 : el.getInt(&quot;value&quot;, 10));</span>
+<span class="nc" id="L444">        return true;</span>
+    }
+
+    /// Called when the player touches an enemy. The default costs a life and
+    /// respawns the player at its start. Override for HP, knockback, invulnerability
+    /// frames, checkpoints or a death screen.
+    protected void onPlayerHit(Sprite enemy) {
+<span class="nc" id="L451">        loseLife();</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">        if (arcadePlayer != null) {</span>
+<span class="nc" id="L453">            arcadePlayer.setPosition(playerStartX, playerStartY);</span>
+<span class="nc" id="L454">            pvy = 0;</span>
+        }
+<span class="nc" id="L456">    }</span>
+
+    /// Whether an asset id is a collectible (the default arcade behavior scores and
+    /// removes it). Defaults to `coin`/`gem`/`star`/`token`; override to add yours.
+    protected boolean isCollectible(String assetId) {
+<span class="nc bnc" id="L461" title="All 6 branches missed.">        return assetId != null &amp;&amp; (assetId.equals(&quot;coin&quot;) || assetId.equals(&quot;gem&quot;)</span>
+<span class="nc bnc" id="L462" title="All 6 branches missed.">                || assetId.equals(&quot;star&quot;) || assetId.equals(&quot;token&quot;) || assetId.equals(&quot;coffee&quot;));</span>
+    }
+
+    /// Whether an asset id is an enemy (the default arcade behavior patrols it and
+    /// costs a life on contact). Defaults to `slime`/`enemy*`/`npc*`; override yours.
+    protected boolean isEnemy(String assetId) {
+<span class="nc bnc" id="L468" title="All 6 branches missed.">        return assetId != null &amp;&amp; (assetId.equals(&quot;slime&quot;) || assetId.equals(&quot;enemy&quot;)</span>
+<span class="nc bnc" id="L469" title="All 4 branches missed.">                || assetId.startsWith(&quot;enemy&quot;) || assetId.startsWith(&quot;npc&quot;)</span>
+<span class="nc bnc" id="L470" title="All 4 branches missed.">                || assetId.equals(&quot;exception&quot;) || assetId.equals(&quot;bug&quot;));</span>
+    }
+
+    /// Whether a box centered at `(cx, cy)` with half-size `(hw, hh)` overlaps any
+    /// solid tile (a non-empty cell of a visible tile layer). The collision query
+    /// the default player/enemy physics uses; override for one-way platforms etc.
+    protected boolean isSolidAt(double cx, double cy, double hw, double hh) {
+<span class="nc" id="L477">        int ts = Math.max(4, level.getTileSize());</span>
+<span class="nc" id="L478">        int c0 = (int) Math.floor((cx - hw + 1) / ts);</span>
+<span class="nc" id="L479">        int c1 = (int) Math.floor((cx + hw - 1) / ts);</span>
+<span class="nc" id="L480">        int r0 = (int) Math.floor((cy - hh + 1) / ts);</span>
+<span class="nc" id="L481">        int r1 = (int) Math.floor((cy + hh - 1) / ts);</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        for (int r = r0; r &lt;= r1; r++) {</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">            for (int c = c0; c &lt;= c1; c++) {</span>
+<span class="nc bnc" id="L484" title="All 2 branches missed.">                for (Layer l : level.layers()) {</span>
+                    // only tile layers in the play plane collide; a parallax background
+                    // (clouds, mountains) is decoration, not a wall.
+<span class="nc bnc" id="L487" title="All 4 branches missed.">                    if (l.getKind() == Layer.Kind.TILE &amp;&amp; l.isVisible()</span>
+<span class="nc bnc" id="L488" title="All 6 branches missed.">                            &amp;&amp; l.getParallaxX() == 1f &amp;&amp; l.getParallaxY() == 1f &amp;&amp; l.getTile(c, r) != null) {</span>
+<span class="nc" id="L489">                        return true;</span>
+                    }
+<span class="nc" id="L491">                }</span>
+            }
+        }
+<span class="nc" id="L494">        return false;</span>
+    }
+
+    /// {@inheritDoc} For a 3D level, configures the camera + light and builds the models.
+    @Override
+    protected void onSetup(GraphicsDevice device) {
+<span class="nc bnc" id="L500" title="All 2 branches missed.">        if (level.getMode() != GameLevel.Mode.THREE_D) {</span>
+<span class="nc" id="L501">            return;</span>
+        }
+<span class="nc" id="L503">        getCamera()</span>
+<span class="nc" id="L504">                .setPerspective(level.getFov(), level.getNear(), level.getFar())</span>
+<span class="nc" id="L505">                .setPosition(level.getEyeX(), level.getEyeY(), level.getEyeZ())</span>
+<span class="nc" id="L506">                .setTarget(level.getTargetX(), level.getTargetY(), level.getTargetZ());</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">        if (!level.lights().isEmpty()) {</span>
+<span class="nc" id="L508">            LevelLight l = level.lights().get(0);</span>
+<span class="nc" id="L509">            Light light = getLight();</span>
+<span class="nc" id="L510">            light.setDirection(l.getDirectionX(), l.getDirectionY(), l.getDirectionZ());</span>
+<span class="nc" id="L511">            light.setColor(l.getColor());</span>
+<span class="nc" id="L512">            light.setAmbientColor(l.getAmbientColor());</span>
+        }
+<span class="nc" id="L514">        buildModels(device);</span>
+<span class="nc" id="L515">    }</span>
+
+    /// Builds the 3D models for the level. The default gives every element a unit cube
+    /// (`com.codename1.gpu.Primitives#cube`) shaded with its asset's base color and
+    /// placed/scaled from the element transform. Override to load real meshes (e.g. with
+    /// `com.codename1.gpu.GltfLoader`) keyed off the element's asset id.
+    protected void buildModels(GraphicsDevice device) {
+<span class="nc" id="L522">        Mesh cube = Primitives.cube(device, 1f);</span>
+<span class="nc" id="L523">        Map&lt;String, Mesh&gt; meshCache = new HashMap&lt;String, Mesh&gt;();</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">        for (int i = 0; i &lt; level.elements().size(); i++) {</span>
+<span class="nc" id="L525">            GameElement el = level.elements().get(i);</span>
+<span class="nc" id="L526">            int color = 0xffcccccc;</span>
+<span class="nc" id="L527">            AssetDef def = el.resolveDef(catalog);</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">            if (def != null) {</span>
+<span class="nc" id="L529">                color = def.getColor();</span>
+            }
+<span class="nc" id="L531">            Mesh mesh = meshFor(device, el.getAssetId(), cube, meshCache);</span>
+<span class="nc" id="L532">            Material mat = new Material(Material.Type.LAMBERT).setColor(color);</span>
+<span class="nc" id="L533">            Model model = new Model(mesh, mat);</span>
+<span class="nc" id="L534">            model.setPosition((float) el.getX(), (float) el.getY(), (float) el.getZ());</span>
+<span class="nc" id="L535">            model.setScale(el.getScaleX(), el.getScaleY(), el.getScaleZ());</span>
+<span class="nc" id="L536">            model.setRotation(0, el.getRotation(), 0);</span>
+<span class="nc" id="L537">            model.setUserData(el);</span>
+<span class="nc" id="L538">            addModel(model);</span>
+        }
+<span class="nc" id="L540">    }</span>
+
+    /// The mesh for an asset: a real glTF/glb mesh (`AssetDef.Type#MESH`) loaded from the
+    /// catalog and cached per asset id, falling back to the shared unit cube when the
+    /// asset has no mesh or it fails to load.
+    private Mesh meshFor(GraphicsDevice device, String assetId, Mesh cube, Map&lt;String, Mesh&gt; cache) {
+<span class="nc bnc" id="L546" title="All 2 branches missed.">        byte[] glb = catalog == null ? null : catalog.meshData(assetId);</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">        if (glb == null) {</span>
+<span class="nc" id="L548">            return cube;</span>
+        }
+<span class="nc" id="L550">        Mesh m = cache.get(assetId);</span>
+<span class="nc bnc" id="L551" title="All 2 branches missed.">        if (m == null) {</span>
+            try {
+<span class="nc" id="L553">                m = GltfLoader.load(device, glb);</span>
+<span class="nc" id="L554">            } catch (Exception ex) { //NOPMD - a bad mesh falls back to the cube</span>
+<span class="nc" id="L555">                m = cube;</span>
+<span class="nc" id="L556">            }</span>
+<span class="nc" id="L557">            cache.put(assetId, m);</span>
+        }
+<span class="nc" id="L559">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

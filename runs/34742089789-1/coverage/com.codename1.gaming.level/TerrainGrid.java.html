@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TerrainGrid.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">TerrainGrid.java</span></div><h1>TerrainGrid.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+/// A height grid for a 3D `GameLevel`: a `#getCols()` x `#getRows()` array of vertex
+/// heights spaced `#getCellSize()` world units apart. It is plain authoring data --
+/// turning it into a renderable mesh is the realizer's job and needs the GPU device,
+/// so that happens at runtime, not here.
+public class TerrainGrid {
+    /// Sentinel height meaning &quot;no ground in this cell&quot; (an open hole / sky gap). Lets a
+    /// level have a partial floor -- e.g. a flight level with only a few ground patches.
+    public static final float NO_GROUND = -1024f;
+
+    private int cols;
+    private int rows;
+<span class="pc" id="L36">    private float cellSize = 1f;</span>
+    private float[] heights;
+    /// Per-cell wall height above the ground (0 = no wall); used by dungeon-style levels.
+    private float[] walls;
+    /// Per-cell surface material id from `MaterialRegistry` (the same pluggable, String-keyed
+    /// materials the streaming terrain uses); `null`/`MaterialRegistry#GRASS` by default.
+    private String[] materials;
+
+<span class="nc" id="L44">    public TerrainGrid() {</span>
+<span class="nc" id="L45">    }</span>
+
+<span class="fc" id="L47">    public TerrainGrid(int cols, int rows, float cellSize) {</span>
+<span class="fc" id="L48">        this.cols = cols;</span>
+<span class="fc" id="L49">        this.rows = rows;</span>
+<span class="fc" id="L50">        this.cellSize = cellSize;</span>
+<span class="fc" id="L51">        this.heights = new float[Math.max(0, cols * rows)];</span>
+<span class="fc" id="L52">        this.walls = new float[Math.max(0, cols * rows)];</span>
+<span class="fc" id="L53">        this.materials = new String[Math.max(0, cols * rows)];</span>
+<span class="fc" id="L54">    }</span>
+
+    public int getCols() {
+<span class="fc" id="L57">        return cols;</span>
+    }
+
+    public int getRows() {
+<span class="fc" id="L61">        return rows;</span>
+    }
+
+    public float getCellSize() {
+<span class="fc" id="L65">        return cellSize;</span>
+    }
+
+    public TerrainGrid setCellSize(float cellSize) {
+<span class="nc" id="L69">        this.cellSize = cellSize;</span>
+<span class="nc" id="L70">        return this;</span>
+    }
+
+    /// The raw row-major heights array (length `cols * rows`).
+    public float[] heights() {
+<span class="fc" id="L75">        return heights;</span>
+    }
+
+    /// The raw row-major wall-height array (length `cols * rows`); 0 = no wall.
+    public float[] walls() {
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        if (walls == null || walls.length != cols * rows) {</span>
+<span class="nc" id="L81">            walls = new float[Math.max(0, cols * rows)];</span>
+        }
+<span class="fc" id="L83">        return walls;</span>
+    }
+
+    /// The raw row-major surface-material array (length `cols * rows`) of `MaterialRegistry`
+    /// ids; a `null` entry means the default `MaterialRegistry#GRASS`.
+    public String[] materials() {
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">        if (materials == null || materials.length != cols * rows) {</span>
+<span class="nc" id="L90">            materials = new String[Math.max(0, cols * rows)];</span>
+        }
+<span class="fc" id="L92">        return materials;</span>
+    }
+
+    void setDimensions(int cols, int rows) {
+<span class="nc" id="L96">        this.cols = cols;</span>
+<span class="nc" id="L97">        this.rows = rows;</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">        if (heights == null || heights.length != cols * rows) {</span>
+<span class="nc" id="L99">            heights = new float[Math.max(0, cols * rows)];</span>
+        }
+<span class="nc bnc" id="L101" title="All 4 branches missed.">        if (walls == null || walls.length != cols * rows) {</span>
+<span class="nc" id="L102">            walls = new float[Math.max(0, cols * rows)];</span>
+        }
+<span class="nc bnc" id="L104" title="All 4 branches missed.">        if (materials == null || materials.length != cols * rows) {</span>
+<span class="nc" id="L105">            materials = new String[Math.max(0, cols * rows)];</span>
+        }
+<span class="nc" id="L107">    }</span>
+
+    /// The surface material id at a cell (a `MaterialRegistry` id); never null -- an unpainted
+    /// cell reads as `MaterialRegistry#GRASS`.
+    public String getMaterial(int col, int row) {
+<span class="nc" id="L112">        String[] m = materials();</span>
+<span class="nc bnc" id="L113" title="All 8 branches missed.">        if (col &lt; 0 || row &lt; 0 || col &gt;= cols || row &gt;= rows) {</span>
+<span class="nc" id="L114">            return MaterialRegistry.GRASS;</span>
+        }
+<span class="nc" id="L116">        String v = m[row * cols + col];</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return v == null ? MaterialRegistry.GRASS : v;</span>
+    }
+
+    public TerrainGrid setMaterial(int col, int row, String material) {
+<span class="nc" id="L121">        String[] m = materials();</span>
+<span class="nc bnc" id="L122" title="All 8 branches missed.">        if (col &gt;= 0 &amp;&amp; row &gt;= 0 &amp;&amp; col &lt; cols &amp;&amp; row &lt; rows) {</span>
+<span class="nc" id="L123">            m[row * cols + col] = material;</span>
+        }
+<span class="nc" id="L125">        return this;</span>
+    }
+
+    public float getHeight(int col, int row) {
+<span class="pc bpc" id="L129" title="5 of 10 branches missed.">        if (heights == null || col &lt; 0 || row &lt; 0 || col &gt;= cols || row &gt;= rows) {</span>
+<span class="nc" id="L130">            return 0f;</span>
+        }
+<span class="fc" id="L132">        return heights[row * cols + col];</span>
+    }
+
+    public TerrainGrid setHeight(int col, int row, float height) {
+<span class="pc bpc" id="L136" title="5 of 10 branches missed.">        if (heights != null &amp;&amp; col &gt;= 0 &amp;&amp; row &gt;= 0 &amp;&amp; col &lt; cols &amp;&amp; row &lt; rows) {</span>
+<span class="fc" id="L137">            heights[row * cols + col] = height;</span>
+        }
+<span class="fc" id="L139">        return this;</span>
+    }
+
+    /// Whether the given cell has a floor (true) or is an open hole / sky gap (false).
+    public boolean hasGround(int col, int row) {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        return getHeight(col, row) != NO_GROUND;</span>
+    }
+
+    public TerrainGrid setGround(int col, int row, boolean present) {
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        return setHeight(col, row, present ? 0f : NO_GROUND);</span>
+    }
+
+    /// Wall height stacked on top of the ground in this cell (0 = none).
+    public float getWall(int col, int row) {
+<span class="nc" id="L153">        float[] w = walls();</span>
+<span class="nc bnc" id="L154" title="All 8 branches missed.">        if (col &lt; 0 || row &lt; 0 || col &gt;= cols || row &gt;= rows) {</span>
+<span class="nc" id="L155">            return 0f;</span>
+        }
+<span class="nc" id="L157">        return w[row * cols + col];</span>
+    }
+
+    public TerrainGrid setWall(int col, int row, float height) {
+<span class="nc" id="L161">        float[] w = walls();</span>
+<span class="nc bnc" id="L162" title="All 8 branches missed.">        if (col &gt;= 0 &amp;&amp; row &gt;= 0 &amp;&amp; col &lt; cols &amp;&amp; row &lt; rows) {</span>
+<span class="nc" id="L163">            w[row * cols + col] = Math.max(0f, height);</span>
+        }
+<span class="nc" id="L165">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

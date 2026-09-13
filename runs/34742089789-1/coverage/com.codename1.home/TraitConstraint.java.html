@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraitConstraint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">TraitConstraint.java</span></div><h1>TraitConstraint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// What one particular accessory will actually accept for one particular
+/// [Trait]: whether it can be read or written, the range it works over, the
+/// step it moves in, and for an enum trait, which constants it can produce.
+///
+/// [Trait] documents the *nominal* range -- brightness is a percentage, so it
+/// is 0 to 100. This carries the real one, from HomeKit's
+/// `HMCharacteristicMetadata` or the Matter attribute's own min and max
+/// attributes. A dimmer whose floor is 10 percent and that steps in fives says
+/// so here, and a slider built from these numbers will not offer the user a
+/// value the accessory is going to reject.
+///
+/// #### Writes are refused, not clamped
+///
+/// A write outside [#getMinimum()] to [#getMaximum()] fails with
+/// [HomeError#VALUE_OUT_OF_RANGE]. Clamping was the obvious alternative and it
+/// is worse: an app that asked for 40 degrees and silently got 38 never learns
+/// it was wrong, so the bug reaches the user as a thermostat that &quot;does not go
+/// high enough&quot; rather than as a failure at the call site where it can be
+/// fixed.
+public final class TraitConstraint {
+
+    private final Trait trait;
+    private final boolean readable;
+    private final boolean writable;
+    private final boolean notifies;
+    private final double minimum;
+    private final double maximum;
+    private final double step;
+    private final boolean ranged;
+    private final List&lt;Integer&gt; validOrdinals;
+
+    private TraitConstraint(Trait trait, boolean readable, boolean writable,
+            boolean notifies, double minimum, double maximum, double step,
+<span class="fc" id="L62">            boolean ranged, List&lt;Integer&gt; validOrdinals) {</span>
+<span class="fc" id="L63">        this.trait = trait;</span>
+<span class="fc" id="L64">        this.readable = readable;</span>
+<span class="fc" id="L65">        this.writable = writable;</span>
+<span class="fc" id="L66">        this.notifies = notifies;</span>
+<span class="fc" id="L67">        this.minimum = minimum;</span>
+<span class="fc" id="L68">        this.maximum = maximum;</span>
+<span class="fc" id="L69">        this.step = step;</span>
+<span class="fc" id="L70">        this.ranged = ranged;</span>
+<span class="fc" id="L71">        this.validOrdinals = validOrdinals;</span>
+<span class="fc" id="L72">    }</span>
+
+    /// A constraint for a trait whose accessory declared no range -- a
+    /// boolean, or a numeric trait the platform did not describe.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait this describes
+    ///
+    /// - `readable`: whether the accessory will answer a read
+    ///
+    /// - `writable`: whether the accessory will accept a write
+    ///
+    /// - `notifies`: whether the accessory pushes changes, so a subscription
+    ///   on it can do better than polling
+    ///
+    /// #### Returns
+    ///
+    /// the constraint
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `trait` is `null`
+    public static TraitConstraint of(Trait trait, boolean readable,
+            boolean writable, boolean notifies) {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (trait == null) {</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(&quot;trait is required&quot;);</span>
+        }
+<span class="fc" id="L100">        return new TraitConstraint(trait, readable, writable, notifies, 0, 0,</span>
+<span class="fc" id="L101">                0, false, Collections.&lt;Integer&gt;emptyList());</span>
+    }
+
+    /// A constraint for a numeric trait whose accessory declared its range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait this describes
+    ///
+    /// - `readable`: whether the accessory will answer a read
+    ///
+    /// - `writable`: whether the accessory will accept a write
+    ///
+    /// - `notifies`: whether the accessory pushes changes
+    ///
+    /// - `minimum`: the smallest accepted value, in [Trait#getUnit()]
+    ///
+    /// - `maximum`: the largest accepted value, in [Trait#getUnit()]
+    ///
+    /// - `step`: the increment the accessory moves in, or zero when it did
+    ///   not say
+    ///
+    /// #### Returns
+    ///
+    /// the constraint
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `trait` is `null`, or `maximum` is
+    ///   below `minimum`
+    public static TraitConstraint ranged(Trait trait, boolean readable,
+            boolean writable, boolean notifies, double minimum, double maximum,
+            double step) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (trait == null) {</span>
+<span class="nc" id="L135">            throw new IllegalArgumentException(&quot;trait is required&quot;);</span>
+        }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (maximum &lt; minimum) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;maximum &quot; + maximum</span>
+<span class="nc" id="L139">                    + &quot; is below minimum &quot; + minimum + &quot; for &quot; + trait.getId());</span>
+        }
+<span class="fc" id="L141">        return new TraitConstraint(trait, readable, writable, notifies,</span>
+<span class="fc" id="L142">                minimum, maximum, step, true, Collections.&lt;Integer&gt;emptyList());</span>
+    }
+
+    /// A constraint for an enum trait whose accessory declared which values it
+    /// can produce.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait this describes
+    ///
+    /// - `readable`: whether the accessory will answer a read
+    ///
+    /// - `writable`: whether the accessory will accept a write
+    ///
+    /// - `notifies`: whether the accessory pushes changes
+    ///
+    /// - `validOrdinals`: the ordinals of the constants this accessory can
+    ///   produce or accept, in the domain enum for this trait; `null` or empty
+    ///   means it did not say, which is not the same as &quot;none&quot;
+    ///
+    /// #### Returns
+    ///
+    /// the constraint
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `trait` is `null`
+    public static TraitConstraint choices(Trait trait, boolean readable,
+            boolean writable, boolean notifies, int[] validOrdinals) {
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (trait == null) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(&quot;trait is required&quot;);</span>
+        }
+        List&lt;Integer&gt; ordinals;
+<span class="pc bpc" id="L175" title="2 of 4 branches missed.">        if (validOrdinals == null || validOrdinals.length == 0) {</span>
+<span class="nc" id="L176">            ordinals = Collections.&lt;Integer&gt;emptyList();</span>
+        } else {
+<span class="fc" id="L178">            List&lt;Integer&gt; copy = new ArrayList&lt;Integer&gt;(validOrdinals.length);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            for (int ordinal : validOrdinals) {</span>
+<span class="fc" id="L180">                copy.add(Integer.valueOf(ordinal));</span>
+            }
+<span class="fc" id="L182">            ordinals = Collections.unmodifiableList(copy);</span>
+        }
+<span class="fc" id="L184">        return new TraitConstraint(trait, readable, writable, notifies, 0, 0, 0,</span>
+                false, ordinals);
+    }
+
+    /// The trait this describes.
+    ///
+    /// #### Returns
+    ///
+    /// the trait, never `null`
+    public Trait getTrait() {
+<span class="fc" id="L194">        return trait;</span>
+    }
+
+    /// Whether this accessory will answer a read of this trait.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the trait is readable here
+    public boolean isReadable() {
+<span class="fc" id="L203">        return readable;</span>
+    }
+
+    /// Whether this accessory will accept a write of this trait.
+    ///
+    /// Narrower than [Trait#isReadOnly()], which says whether writing the
+    /// trait could ever mean anything at all. A writable trait can still be
+    /// read-only on a particular accessory -- a thermostat you have been given
+    /// view-only access to, a covering with its motor disabled.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the trait is writable here
+    public boolean isWritable() {
+<span class="fc" id="L217">        return writable;</span>
+    }
+
+    /// Whether this accessory pushes changes to this trait.
+    ///
+    /// Where this is `false`, a subscription still works but has nothing
+    /// better than polling behind it, so changes arrive late or only when you
+    /// call [SmartHome#drainChanges()]. Independent of
+    /// [TraitSubscription#isPushDelivery()], which is about whether the
+    /// *platform* can deliver at all; this is about whether the *accessory*
+    /// bothers to say.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the accessory reports changes on its own
+    public boolean notifiesOnChange() {
+<span class="fc" id="L233">        return notifies;</span>
+    }
+
+    /// Whether [#getMinimum()], [#getMaximum()] and [#getStep()] mean
+    /// anything.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the accessory declared a range
+    public boolean hasRange() {
+<span class="fc" id="L243">        return ranged;</span>
+    }
+
+    /// The smallest value this accessory accepts, in [Trait#getUnit()].
+    ///
+    /// #### Returns
+    ///
+    /// the minimum, or zero when [#hasRange()] is `false`
+    public double getMinimum() {
+<span class="fc" id="L252">        return minimum;</span>
+    }
+
+    /// The largest value this accessory accepts, in [Trait#getUnit()].
+    ///
+    /// #### Returns
+    ///
+    /// the maximum, or zero when [#hasRange()] is `false`
+    public double getMaximum() {
+<span class="fc" id="L261">        return maximum;</span>
+    }
+
+    /// The increment this accessory moves in, in [Trait#getUnit()].
+    ///
+    /// Zero means it did not say, which is not the same as continuous --
+    /// treat it as unknown rather than as a step of nothing.
+    ///
+    /// #### Returns
+    ///
+    /// the step, or zero
+    public double getStep() {
+<span class="fc" id="L273">        return step;</span>
+    }
+
+    /// The ordinals of the domain-enum constants this accessory can produce or
+    /// accept.
+    ///
+    /// An empty list means the accessory did not say, **not** that it accepts
+    /// nothing. Most do not say.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list of ordinals, possibly empty
+    public List&lt;Integer&gt; getValidOrdinals() {
+<span class="fc" id="L286">        return validOrdinals;</span>
+    }
+
+    /// Whether a value falls inside what this accessory will accept.
+    ///
+    /// Checks the range for a numeric trait and the ordinal list for an enum
+    /// one, and answers `true` for anything the accessory did not constrain --
+    /// this is what the write path tests, and refusing values on the strength
+    /// of information an accessory never gave would fail writes that work.
+    ///
+    /// The step is deliberately **not** enforced. Accessories declare steps
+    /// they then round to happily, and refusing 33 percent on a dimmer that
+    /// declares fives would reject a value the hardware accepts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to test, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the value is acceptable, or when the accessory declared no
+    /// constraint to test it against; `false` for a `null` value or one whose
+    /// kind does not match the trait
+    public boolean accepts(TraitValue value) {
+<span class="pc bpc" id="L310" title="2 of 4 branches missed.">        if (value == null || value.getKind() != trait.getValueKind()) {</span>
+<span class="nc" id="L311">            return false;</span>
+        }
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (value.getKind() == TraitValueKind.ENUM) {</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (validOrdinals.isEmpty()) {</span>
+<span class="fc" id="L315">                return true;</span>
+            }
+<span class="fc" id="L317">            Integer ordinal = Integer.valueOf(value.getEnumOrdinal());</span>
+<span class="fc" id="L318">            return validOrdinals.contains(ordinal);</span>
+        }
+<span class="pc bpc" id="L320" title="1 of 4 branches missed.">        if (!ranged || value.getKind() != TraitValueKind.DOUBLE) {</span>
+<span class="fc" id="L321">            return true;</span>
+        }
+<span class="fc" id="L323">        double v = value.getDouble(trait.getUnit());</span>
+<span class="pc bpc" id="L324" title="1 of 4 branches missed.">        return v &gt;= minimum &amp;&amp; v &lt;= maximum;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L329">        StringBuilder b = new StringBuilder(trait.getId());</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        b.append(readable ? &quot; r&quot; : &quot; -&quot;);</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        b.append(writable ? &quot;w&quot; : &quot;-&quot;);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        b.append(notifies ? &quot;n&quot; : &quot;-&quot;);</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        if (ranged) {</span>
+<span class="nc" id="L334">            b.append(' ').append(minimum).append(&quot;..&quot;).append(maximum);</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            if (step != 0) {</span>
+<span class="nc" id="L336">                b.append(&quot; step &quot;).append(step);</span>
+            }
+        }
+<span class="nc" id="L339">        return b.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

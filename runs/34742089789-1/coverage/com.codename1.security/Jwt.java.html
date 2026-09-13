@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Jwt.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Jwt.java</span></div><h1>Jwt.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.io.JSONParser;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// JSON Web Token (RFC 7519) signing and verification.
+///
+/// Supported algorithms:
+///
+/// - `HS256`, `HS384`, `HS512` -- HMAC with SHA-2. Pure Java, available on
+///   every platform.
+/// - `RS256`, `RS384`, `RS512` -- RSA-PKCS1-v1_5 with SHA-2. Backed by the
+///   platform's native crypto via [Signature].
+/// - `ES256`, `ES384`, `ES512` -- ECDSA with SHA-2. Backed by the platform's
+///   native crypto via [Signature].
+/// - `none` -- unsigned tokens. Accepted on the signing side only when caller
+///   explicitly passes it; rejected on verification unless caller opts in via
+///   [#verifyAllowNoneAlgorithm].
+///
+/// #### Sign a token
+///
+/// ```java
+/// Map&lt;String, Object&gt; claims = new HashMap&lt;String, Object&gt;();
+/// claims.put(&quot;sub&quot;, &quot;user-123&quot;);
+/// claims.put(&quot;exp&quot;, System.currentTimeMillis() / 1000 + 3600);
+///
+/// String token = Jwt.signHs256(claims, &quot;secret&quot;.getBytes(&quot;UTF-8&quot;));
+/// ```
+///
+/// #### Verify and read claims
+///
+/// ```java
+/// Jwt parsed = Jwt.parse(token);
+/// if (!parsed.verifyHs256(&quot;secret&quot;.getBytes(&quot;UTF-8&quot;))) {
+///     throw new SecurityException(&quot;bad signature&quot;);
+/// }
+/// String sub = (String) parsed.getClaim(&quot;sub&quot;);
+/// ```
+public final class Jwt {
+
+    /// HMAC-SHA-256 (&quot;HS256&quot;)
+    public static final String HS256 = &quot;HS256&quot;;
+    /// HMAC-SHA-384 (&quot;HS384&quot;)
+    public static final String HS384 = &quot;HS384&quot;;
+    /// HMAC-SHA-512 (&quot;HS512&quot;)
+    public static final String HS512 = &quot;HS512&quot;;
+    /// RSA PKCS#1 v1.5 with SHA-256 (&quot;RS256&quot;)
+    public static final String RS256 = &quot;RS256&quot;;
+    /// RSA PKCS#1 v1.5 with SHA-384 (&quot;RS384&quot;)
+    public static final String RS384 = &quot;RS384&quot;;
+    /// RSA PKCS#1 v1.5 with SHA-512 (&quot;RS512&quot;)
+    public static final String RS512 = &quot;RS512&quot;;
+    /// ECDSA with SHA-256 (&quot;ES256&quot;)
+    public static final String ES256 = &quot;ES256&quot;;
+    /// ECDSA with SHA-384 (&quot;ES384&quot;)
+    public static final String ES384 = &quot;ES384&quot;;
+    /// ECDSA with SHA-512 (&quot;ES512&quot;)
+    public static final String ES512 = &quot;ES512&quot;;
+    /// Unsigned token marker -- verification rejects this unless the caller
+    /// explicitly opts in.
+    public static final String NONE = &quot;none&quot;;
+
+    private final Map&lt;String, Object&gt; header;
+    private final Map&lt;String, Object&gt; claims;
+    private final byte[] signature;
+    private final String signingInput; // header.payload (no signature)
+    private boolean verifyAllowNoneAlgorithm;
+
+    private Jwt(Map&lt;String, Object&gt; header, Map&lt;String, Object&gt; claims,
+<span class="fc" id="L97">                byte[] signature, String signingInput) {</span>
+<span class="fc" id="L98">        this.header = header;</span>
+<span class="fc" id="L99">        this.claims = claims;</span>
+<span class="fc" id="L100">        this.signature = signature;</span>
+<span class="fc" id="L101">        this.signingInput = signingInput;</span>
+<span class="fc" id="L102">    }</span>
+
+    // ================================================================
+    // signing
+
+    /// Signs `claims` with HS256 and returns the encoded token.
+    public static String signHs256(Map&lt;String, Object&gt; claims, byte[] secret) {
+<span class="fc" id="L109">        return sign(claims, secret, HS256);</span>
+    }
+
+    /// Signs `claims` with HS384 and returns the encoded token.
+    public static String signHs384(Map&lt;String, Object&gt; claims, byte[] secret) {
+<span class="nc" id="L114">        return sign(claims, secret, HS384);</span>
+    }
+
+    /// Signs `claims` with HS512 and returns the encoded token.
+    public static String signHs512(Map&lt;String, Object&gt; claims, byte[] secret) {
+<span class="fc" id="L119">        return sign(claims, secret, HS512);</span>
+    }
+
+    /// Signs `claims` with the given HMAC algorithm. Use this when you want
+    /// to pass the algorithm dynamically.
+    public static String sign(Map&lt;String, Object&gt; claims, byte[] secret, String algorithm) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (claims == null) {</span>
+<span class="nc" id="L126">            throw new CryptoException(&quot;claims must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (algorithm == null) {</span>
+<span class="nc" id="L129">            throw new CryptoException(&quot;algorithm must not be null&quot;);</span>
+        }
+<span class="fc" id="L131">        String signingInput = signingInput(algorithm, claims);</span>
+<span class="fc" id="L132">        byte[] sig = computeHmac(algorithm, secret, signingInput);</span>
+<span class="fc" id="L133">        return signingInput + &quot;.&quot; + com.codename1.util.Base64.encodeUrlSafe(sig);</span>
+    }
+
+    /// Signs `claims` with the given RSA or ECDSA algorithm.
+    ///
+    /// #### Parameters
+    ///
+    /// - `claims`: token body
+    ///
+    /// - `privateKey`: signing key -- must match the algorithm family
+    ///
+    /// - `algorithm`: one of [#RS256], [#RS384], [#RS512], [#ES256], [#ES384],
+    ///   [#ES512]
+    public static String sign(Map&lt;String, Object&gt; claims, PrivateKey privateKey, String algorithm) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (claims == null) {</span>
+<span class="nc" id="L148">            throw new CryptoException(&quot;claims must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (privateKey == null) {</span>
+<span class="nc" id="L151">            throw new CryptoException(&quot;privateKey must not be null&quot;);</span>
+        }
+<span class="fc" id="L153">        String sigAlg = signatureAlgorithmFor(algorithm);</span>
+<span class="fc" id="L154">        String signingInput = signingInput(algorithm, claims);</span>
+        byte[] data;
+        try {
+<span class="fc" id="L157">            data = signingInput.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L158">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L159">            throw new CryptoException(&quot;UTF-8 not supported&quot;, e);</span>
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">        byte[] sig = Signature.sign(sigAlg, privateKey, data);</span>
+        // For ES* the JWT spec mandates a raw `r||s` concatenation rather than
+        // the platform's default DER-encoded SEQUENCE. We convert here.
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (algorithm.startsWith(&quot;ES&quot;)) {</span>
+<span class="nc" id="L165">            sig = derToJoseEcdsa(sig, ecdsaCoordinateLength(algorithm));</span>
+        }
+<span class="fc" id="L167">        return signingInput + &quot;.&quot; + com.codename1.util.Base64.encodeUrlSafe(sig);</span>
+    }
+
+    /// Builds an unsigned token (header `{&quot;alg&quot;:&quot;none&quot;}`). Accepting these on
+    /// the verify side is dangerous -- see [#verifyAllowNoneAlgorithm].
+    public static String signNone(Map&lt;String, Object&gt; claims) {
+<span class="fc" id="L173">        return signingInput(NONE, claims) + &quot;.&quot;;</span>
+    }
+
+    // ================================================================
+    // parsing
+
+    /// Parses an encoded JWT into a [Jwt] object. The signature is NOT
+    /// verified -- you must call one of the `verify*` methods afterwards.
+    public static Jwt parse(String token) {
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (token == null) {</span>
+<span class="nc" id="L183">            throw new CryptoException(&quot;token must not be null&quot;);</span>
+        }
+<span class="fc" id="L185">        int firstDot = token.indexOf('.');</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (firstDot &lt; 0) {</span>
+<span class="fc" id="L187">            throw new CryptoException(&quot;malformed JWT: no '.'&quot;);</span>
+        }
+<span class="fc" id="L189">        int secondDot = token.indexOf('.', firstDot + 1);</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (secondDot &lt; 0) {</span>
+<span class="fc" id="L191">            throw new CryptoException(&quot;malformed JWT: only one '.'&quot;);</span>
+        }
+<span class="fc" id="L193">        String headerB64 = token.substring(0, firstDot);</span>
+<span class="fc" id="L194">        String payloadB64 = token.substring(firstDot + 1, secondDot);</span>
+<span class="fc" id="L195">        String sigB64 = token.substring(secondDot + 1);</span>
+<span class="fc" id="L196">        Map&lt;String, Object&gt; header = readJson(com.codename1.util.Base64.decodeUrlSafe(headerB64));</span>
+<span class="fc" id="L197">        Map&lt;String, Object&gt; claims = readJson(com.codename1.util.Base64.decodeUrlSafe(payloadB64));</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        byte[] sig = sigB64.length() == 0 ? new byte[0] : com.codename1.util.Base64.decodeUrlSafe(sigB64);</span>
+<span class="fc" id="L199">        return new Jwt(header, claims, sig, headerB64 + &quot;.&quot; + payloadB64);</span>
+    }
+
+    // ================================================================
+    // verification
+
+    /// When set to true, [#verify] will accept tokens whose `alg` header is
+    /// `none` (i.e. unsigned). The default is false because in most JWT
+    /// deployments accepting unsigned tokens is a critical security bug.
+    /// Only enable this if you have very deliberately decided that you trust
+    /// the transport.
+    public void setVerifyAllowNoneAlgorithm(boolean allow) {
+<span class="fc" id="L211">        this.verifyAllowNoneAlgorithm = allow;</span>
+<span class="fc" id="L212">    }</span>
+
+    /// Verifies with a shared HMAC secret. The token's `alg` header is read
+    /// and must be one of the HS family.
+    public boolean verifyHs256(byte[] secret) {
+<span class="fc" id="L217">        return verifyHmac(HS256, secret);</span>
+    }
+
+    /// HMAC verification with HS384.
+    public boolean verifyHs384(byte[] secret) {
+<span class="nc" id="L222">        return verifyHmac(HS384, secret);</span>
+    }
+
+    /// HMAC verification with HS512.
+    public boolean verifyHs512(byte[] secret) {
+<span class="fc" id="L227">        return verifyHmac(HS512, secret);</span>
+    }
+
+    private boolean verifyHmac(String expectedAlg, byte[] secret) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (!expectedAlg.equals(getAlgorithm())) {</span>
+<span class="nc" id="L232">            return false;</span>
+        }
+<span class="fc" id="L234">        byte[] expected = computeHmac(expectedAlg, secret, signingInput);</span>
+<span class="fc" id="L235">        return Hmac.constantTimeEquals(expected, signature);</span>
+    }
+
+    /// Verifies an RSA or ECDSA signature using the given public key. The
+    /// algorithm must match the token's `alg` header (RS256/384/512 or
+    /// ES256/384/512).
+    public boolean verify(PublicKey publicKey) {
+<span class="fc" id="L242">        String alg = getAlgorithm();</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (NONE.equals(alg)) {</span>
+<span class="pc bpc" id="L244" title="2 of 6 branches missed.">            return verifyAllowNoneAlgorithm &amp;&amp; (signature == null || signature.length == 0);</span>
+        }
+<span class="fc" id="L246">        String sigAlg = signatureAlgorithmFor(alg);</span>
+        byte[] data;
+        try {
+<span class="fc" id="L249">            data = signingInput.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L250">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L251">            throw new CryptoException(&quot;UTF-8 not supported&quot;, e);</span>
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">        byte[] sig = signature;</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (alg.startsWith(&quot;ES&quot;)) {</span>
+<span class="nc" id="L255">            sig = joseToDerEcdsa(sig, ecdsaCoordinateLength(alg));</span>
+        }
+<span class="fc" id="L257">        return Signature.verify(sigAlg, publicKey, data, sig);</span>
+    }
+
+    // ================================================================
+    // accessors
+
+    /// Returns the `alg` field from the JWT header (e.g. &quot;HS256&quot;).
+    public String getAlgorithm() {
+<span class="fc" id="L265">        Object v = header.get(&quot;alg&quot;);</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        return v == null ? null : v.toString();</span>
+    }
+
+    /// Returns the parsed header as an unmodifiable view into the original
+    /// map. Mutating it has undefined behaviour.
+    public Map&lt;String, Object&gt; getHeader() {
+<span class="nc" id="L272">        return header;</span>
+    }
+
+    /// Returns the parsed claims (token payload) as an unmodifiable view into
+    /// the original map. Mutating it has undefined behaviour.
+    public Map&lt;String, Object&gt; getClaims() {
+<span class="nc" id="L278">        return claims;</span>
+    }
+
+    /// Returns the value of a single claim, or null if the claim is absent.
+    public Object getClaim(String name) {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        return claims == null ? null : claims.get(name);</span>
+    }
+
+    /// Returns the raw bytes of the signature segment as decoded from
+    /// URL-safe base64. May be empty for unsigned tokens.
+    public byte[] getSignature() {
+<span class="nc" id="L289">        return signature;</span>
+    }
+
+    // ================================================================
+    // internals
+
+    private static String signingInput(String algorithm, Map&lt;String, Object&gt; claims) {
+<span class="fc" id="L296">        Map&lt;String, Object&gt; hdr = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L297">        hdr.put(&quot;alg&quot;, algorithm);</span>
+<span class="fc" id="L298">        hdr.put(&quot;typ&quot;, &quot;JWT&quot;);</span>
+<span class="fc" id="L299">        String headerJson = JSONParser.mapToJson(hdr);</span>
+<span class="fc" id="L300">        String claimsJson = JSONParser.mapToJson(claims);</span>
+        try {
+<span class="fc" id="L302">            return com.codename1.util.Base64.encodeUrlSafe(headerJson.getBytes(&quot;UTF-8&quot;)) + &quot;.&quot;</span>
+<span class="fc" id="L303">                 + com.codename1.util.Base64.encodeUrlSafe(claimsJson.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L304">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L305">            throw new CryptoException(&quot;UTF-8 not supported&quot;, e);</span>
+        }
+    }
+
+    private static byte[] computeHmac(String algorithm, byte[] secret, String signingInput) {
+        String hashAlg;
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (HS256.equals(algorithm)) {</span>
+<span class="fc" id="L312">            hashAlg = Hash.SHA256;</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        } else if (HS384.equals(algorithm)) {</span>
+<span class="nc" id="L314">            hashAlg = Hash.SHA384;</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        } else if (HS512.equals(algorithm)) {</span>
+<span class="fc" id="L316">            hashAlg = Hash.SHA512;</span>
+        } else {
+<span class="nc" id="L318">            throw new CryptoException(&quot;unsupported HMAC algorithm: &quot; + algorithm);</span>
+        }
+        try {
+<span class="fc" id="L321">            return Hmac.create(hashAlg, secret).doFinal(signingInput.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L322">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L323">            throw new CryptoException(&quot;UTF-8 not supported&quot;, e);</span>
+        }
+    }
+
+    private static String signatureAlgorithmFor(String jwtAlg) {
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (RS256.equals(jwtAlg)) {</span>
+<span class="fc" id="L329">            return Signature.SHA256_WITH_RSA;</span>
+        }
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        if (RS384.equals(jwtAlg)) {</span>
+<span class="nc" id="L332">            return Signature.SHA384_WITH_RSA;</span>
+        }
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (RS512.equals(jwtAlg)) {</span>
+<span class="nc" id="L335">            return Signature.SHA512_WITH_RSA;</span>
+        }
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (ES256.equals(jwtAlg)) {</span>
+<span class="nc" id="L338">            return Signature.SHA256_WITH_ECDSA;</span>
+        }
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        if (ES384.equals(jwtAlg)) {</span>
+<span class="nc" id="L341">            return Signature.SHA384_WITH_ECDSA;</span>
+        }
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (ES512.equals(jwtAlg)) {</span>
+<span class="nc" id="L344">            return Signature.SHA512_WITH_ECDSA;</span>
+        }
+<span class="nc" id="L346">        throw new CryptoException(&quot;unsupported JWT algorithm: &quot; + jwtAlg);</span>
+    }
+
+    private static int ecdsaCoordinateLength(String jwtAlg) {
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        if (ES256.equals(jwtAlg)) {</span>
+<span class="nc" id="L351">            return 32;   // P-256</span>
+        }
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (ES384.equals(jwtAlg)) {</span>
+<span class="nc" id="L354">            return 48;   // P-384</span>
+        }
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (ES512.equals(jwtAlg)) {</span>
+<span class="nc" id="L357">            return 66;   // P-521</span>
+        }
+<span class="nc" id="L359">        throw new CryptoException(&quot;not an ECDSA algorithm: &quot; + jwtAlg);</span>
+    }
+
+    private static Map&lt;String, Object&gt; readJson(byte[] data) {
+        try {
+<span class="fc" id="L364">            JSONParser parser = new JSONParser();</span>
+<span class="fc" id="L365">            return parser.parseJSON(new InputStreamReader(new ByteArrayInputStream(data), &quot;UTF-8&quot;));</span>
+<span class="nc" id="L366">        } catch (Exception e) {</span>
+<span class="nc" id="L367">            throw new CryptoException(&quot;invalid JSON in JWT&quot;, e);</span>
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // ECDSA signatures: platform sign() returns ASN.1 DER (SEQUENCE { r, s }),
+    // JWT requires raw r||s. Tiny converters here keep ES* support compact.
+    private static byte[] derToJoseEcdsa(byte[] der, int coordLen) {
+        // SEQUENCE (0x30) length ...
+        // INTEGER  (0x02) lenR rBytes
+        // INTEGER  (0x02) lenS sBytes
+<span class="nc bnc" id="L378" title="All 4 branches missed.">        if (der.length &lt; 8 || (der[0] &amp; 0xff) != 0x30) {</span>
+<span class="nc" id="L379">            throw new CryptoException(&quot;bad ECDSA DER signature&quot;);</span>
+        }
+<span class="nc" id="L381">        int p = 2;</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        if ((der[1] &amp; 0x80) != 0) {</span>
+<span class="nc" id="L383">            int n = der[1] &amp; 0x7f;</span>
+<span class="nc" id="L384">            p = 2 + n;</span>
+        }
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if ((der[p] &amp; 0xff) != 0x02) {</span>
+<span class="nc" id="L387">            throw new CryptoException(&quot;bad ECDSA DER signature&quot;);</span>
+        }
+<span class="nc" id="L389">        int rLen = der[p + 1] &amp; 0xff;</span>
+<span class="nc" id="L390">        int rOff = p + 2;</span>
+<span class="nc" id="L391">        int sStart = rOff + rLen;</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        if ((der[sStart] &amp; 0xff) != 0x02) {</span>
+<span class="nc" id="L393">            throw new CryptoException(&quot;bad ECDSA DER signature&quot;);</span>
+        }
+<span class="nc" id="L395">        int sLen = der[sStart + 1] &amp; 0xff;</span>
+<span class="nc" id="L396">        int sOff = sStart + 2;</span>
+<span class="nc" id="L397">        byte[] out = new byte[coordLen * 2];</span>
+<span class="nc" id="L398">        copyAndPad(der, rOff, rLen, out, 0, coordLen);</span>
+<span class="nc" id="L399">        copyAndPad(der, sOff, sLen, out, coordLen, coordLen);</span>
+<span class="nc" id="L400">        return out;</span>
+    }
+
+    private static void copyAndPad(byte[] src, int srcOff, int srcLen,
+                                   byte[] dst, int dstOff, int dstLen) {
+        // Strip leading zero pad if any
+<span class="nc bnc" id="L406" title="All 4 branches missed.">        while (srcLen &gt; 0 &amp;&amp; src[srcOff] == 0) {</span>
+<span class="nc" id="L407">            srcOff++;</span>
+<span class="nc" id="L408">            srcLen--;</span>
+        }
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        if (srcLen &gt; dstLen) {</span>
+<span class="nc" id="L411">            throw new CryptoException(&quot;ECDSA coordinate too large&quot;);</span>
+        }
+<span class="nc" id="L413">        int pad = dstLen - srcLen;</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        for (int i = 0; i &lt; pad; i++) {</span>
+<span class="nc" id="L415">            dst[dstOff + i] = 0;</span>
+        }
+<span class="nc" id="L417">        System.arraycopy(src, srcOff, dst, dstOff + pad, srcLen);</span>
+<span class="nc" id="L418">    }</span>
+
+    private static byte[] joseToDerEcdsa(byte[] jose, int coordLen) {
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (jose.length != coordLen * 2) {</span>
+<span class="nc" id="L422">            throw new CryptoException(&quot;bad ECDSA JOSE signature length&quot;);</span>
+        }
+<span class="nc" id="L424">        byte[] r = trimAndAddSignByte(jose, 0, coordLen);</span>
+<span class="nc" id="L425">        byte[] s = trimAndAddSignByte(jose, coordLen, coordLen);</span>
+<span class="nc" id="L426">        int seqLen = 2 + r.length + 2 + s.length;</span>
+        byte[] out;
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (seqLen &lt; 128) {</span>
+<span class="nc" id="L429">            out = new byte[2 + seqLen];</span>
+<span class="nc" id="L430">            out[0] = 0x30;</span>
+<span class="nc" id="L431">            out[1] = (byte) seqLen;</span>
+<span class="nc" id="L432">            int p = 2;</span>
+<span class="nc" id="L433">            out[p++] = 0x02; out[p++] = (byte) r.length;</span>
+<span class="nc" id="L434">            System.arraycopy(r, 0, out, p, r.length); p += r.length;</span>
+<span class="nc" id="L435">            out[p++] = 0x02; out[p++] = (byte) s.length;</span>
+<span class="nc" id="L436">            System.arraycopy(s, 0, out, p, s.length);</span>
+<span class="nc" id="L437">        } else {</span>
+            // 0x81 length form
+<span class="nc" id="L439">            out = new byte[3 + seqLen];</span>
+<span class="nc" id="L440">            out[0] = 0x30;</span>
+<span class="nc" id="L441">            out[1] = (byte) 0x81;</span>
+<span class="nc" id="L442">            out[2] = (byte) seqLen;</span>
+<span class="nc" id="L443">            int p = 3;</span>
+<span class="nc" id="L444">            out[p++] = 0x02; out[p++] = (byte) r.length;</span>
+<span class="nc" id="L445">            System.arraycopy(r, 0, out, p, r.length); p += r.length;</span>
+<span class="nc" id="L446">            out[p++] = 0x02; out[p++] = (byte) s.length;</span>
+<span class="nc" id="L447">            System.arraycopy(s, 0, out, p, s.length);</span>
+        }
+<span class="nc" id="L449">        return out;</span>
+    }
+
+    private static byte[] trimAndAddSignByte(byte[] src, int off, int len) {
+<span class="nc" id="L453">        int start = off;</span>
+<span class="nc" id="L454">        int end = off + len;</span>
+<span class="nc bnc" id="L455" title="All 4 branches missed.">        while (start &lt; end - 1 &amp;&amp; src[start] == 0) {</span>
+<span class="nc" id="L456">            start++;</span>
+        }
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        boolean needPad = (src[start] &amp; 0x80) != 0;</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        int outLen = (end - start) + (needPad ? 1 : 0);</span>
+<span class="nc" id="L460">        byte[] out = new byte[outLen];</span>
+<span class="nc" id="L461">        int p = 0;</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        if (needPad) {</span>
+<span class="nc" id="L463">            out[p++] = 0;</span>
+        }
+<span class="nc" id="L465">        System.arraycopy(src, start, out, p, end - start);</span>
+<span class="nc" id="L466">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

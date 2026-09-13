@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InfiniteContainer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">InfiniteContainer.java</span></div><h1>InfiniteContainer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.components.InfiniteScrollAdapter;
+import com.codename1.ui.layouts.BoxLayout;
+
+/// This abstract Container can scroll indefinitely (or at least until
+/// we run out of data).
+/// This class uses the `com.codename1.components.InfiniteScrollAdapter` to bring more data and the pull to
+/// refresh feature to refresh current displayed data.
+///
+/// The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
+///
+/// ```java
+/// public void showForm() {
+///     Form hi = new Form(&quot;InfiniteContainer&quot;, new BorderLayout());
+///
+///     Style s = UIManager.getInstance().getComponentStyle(&quot;MultiLine1&quot;);
+///     FontImage p = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, s);
+///     EncodedImage placeholder = EncodedImage.createFromImage(p.scaled(p.getWidth() * 3, p.getHeight() * 3), false);
+///
+///     InfiniteContainer ic = new InfiniteContainer() {
+/// @Override
+///         public Component[] fetchComponents(int index, int amount) {
+///             java.util.List&gt; data = fetchPropertyData(&quot;Leeds&quot;);
+///             MultiButton[] cmps = new MultiButton[data.size()];
+///             for(int iter = 0 ; iter  currentListing = data.get(iter);
+///                 if(currentListing == null) {
+///                     return null;
+///                 }
+///                 String thumb_url = (String)currentListing.get(&quot;thumb_url&quot;);
+///                 String guid = (String)currentListing.get(&quot;guid&quot;);
+///                 String summary = (String)currentListing.get(&quot;summary&quot;);
+///                 cmps[iter] = new MultiButton(summary);
+///                 cmps[iter].setIcon(URLImage.createToStorage(placeholder, guid, thumb_url));
+///             }
+///             return cmps;
+///         }
+///     };
+///     hi.add(BorderLayout.CENTER, ic);
+///     hi.show();
+/// }
+/// int pageNumber = 1;
+/// java.util.List&lt;Map&lt;String, Object&gt;&gt; fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl(&quot;http://api.nestoria.co.uk/api&quot;);
+///         r.addArgument(&quot;pretty&quot;, &quot;0&quot;);
+///         r.addArgument(&quot;action&quot;, &quot;search_listings&quot;);
+///         r.addArgument(&quot;encoding&quot;, &quot;json&quot;);
+///         r.addArgument(&quot;listing_type&quot;, &quot;buy&quot;);
+///         r.addArgument(&quot;page&quot;, &quot;&quot; + pageNumber);
+///         pageNumber++;
+///         r.addArgument(&quot;country&quot;, &quot;uk&quot;);
+///         r.addArgument(&quot;place_name&quot;, text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), &quot;UTF-8&quot;));
+///         Map response = (Map)result.get(&quot;response&quot;);
+///         return (java.util.List&lt;Map&lt;String, Object&gt;&gt;)response.get(&quot;listings&quot;);
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+///
+/// ```java
+/// int pageNumber = 1;
+/// java.util.List&lt;Map&lt;String, Object&gt;&gt; fetchPropertyData(String text) {
+///     try {
+///         ConnectionRequest r = new ConnectionRequest();
+///         r.setPost(false);
+///         r.setUrl(&quot;http://api.nestoria.co.uk/api&quot;);
+///         r.addArgument(&quot;pretty&quot;, &quot;0&quot;);
+///         r.addArgument(&quot;action&quot;, &quot;search_listings&quot;);
+///         r.addArgument(&quot;encoding&quot;, &quot;json&quot;);
+///         r.addArgument(&quot;listing_type&quot;, &quot;buy&quot;);
+///         r.addArgument(&quot;page&quot;, &quot;&quot; + pageNumber);
+///         pageNumber++;
+///         r.addArgument(&quot;country&quot;, &quot;uk&quot;);
+///         r.addArgument(&quot;place_name&quot;, text);
+///         NetworkManager.getInstance().addToQueueAndWait(r);
+///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), &quot;UTF-8&quot;));
+///         Map response = (Map)result.get(&quot;response&quot;);
+///         return (java.util.List&lt;Map&lt;String, Object&gt;&gt;)response.get(&quot;listings&quot;);
+///     } catch(Exception err) {
+///         Log.e(err);
+///         return null;
+///     }
+/// }
+/// ```
+/// @author Chen
+public abstract class InfiniteContainer extends Container {
+
+<span class="fc" id="L118">    private int amount = 10;</span>
+    private boolean amountSet;
+
+    private boolean requestingResults;
+
+    private InfiniteScrollAdapter adapter;
+    private boolean initialized;
+
+    /// Creates the InfiniteContainer.
+    /// The InfiniteContainer is created with BoxLayout Y layout.
+<span class="fc" id="L128">    public InfiniteContainer() {</span>
+<span class="fc" id="L129">        setLayout(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L130">        setScrollableY(true);</span>
+<span class="fc" id="L131">    }</span>
+
+    /// Creates the InfiniteContainer.
+    /// The InfiniteContainer is created with BoxLayout Y layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the number of items to fetch in each call to fetchComponents
+    public InfiniteContainer(int amount) {
+<span class="fc" id="L140">        this();</span>
+<span class="fc" id="L141">        this.amount = amount;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (amount &lt;= 0) {</span>
+<span class="fc" id="L143">            throw new IllegalArgumentException(&quot;amount must be greater then zero&quot;);</span>
+        }
+<span class="fc" id="L145">        amountSet = true;</span>
+<span class="fc" id="L146">    }</span>
+
+    @Override
+    void resetScroll() {
+<span class="fc" id="L150">    }</span>
+
+    boolean shouldContinue(Component[] cmps) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (amountSet) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            return cmps.length == amount;</span>
+        } else {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">            return cmps != null &amp;&amp; cmps.length &gt; 0;</span>
+        }
+    }
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L162">        super.initComponent();</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (initialized) {</span>
+<span class="nc" id="L164">            return;</span>
+        }
+<span class="fc" id="L166">        initialized = true;</span>
+<span class="fc" id="L167">        createInfiniteScroll();</span>
+<span class="fc" id="L168">        addPullToRefresh(new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="nc" id="L172">                refresh();</span>
+<span class="nc" id="L173">            }</span>
+        });
+<span class="fc" id="L175">    }</span>
+
+    /// This refreshes the UI in a similar way to the &quot;pull to refresh&quot; functionality
+    public void refresh() {
+        // prevent exception when refresh() is invoked too soon
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (!isInitialized()) {</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (getClientProperty(&quot;cn1$infinite&quot;) == null) {</span>
+<span class="fc" id="L182">                return;</span>
+            }
+        }
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (isAsync()) {</span>
+<span class="nc" id="L186">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L189">                    refreshImpl();</span>
+<span class="nc" id="L190">                }</span>
+            });
+<span class="nc" id="L192">            return;</span>
+        }
+<span class="fc" id="L194">        refreshImpl();</span>
+<span class="fc" id="L195">    }</span>
+
+    void refreshImpl() {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (requestingResults) {</span>
+<span class="nc" id="L199">            return;</span>
+        }
+<span class="fc" id="L201">        requestingResults = true;</span>
+        Component[] components;
+        try {
+<span class="fc" id="L204">            components = fetchComponents(0, amount);</span>
+<span class="nc" id="L205">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L206">            requestingResults = false;</span>
+<span class="nc" id="L207">            throw err;</span>
+<span class="fc" id="L208">        }</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (components == null) {</span>
+<span class="fc" id="L210">            components = new Component[0];</span>
+        }
+<span class="fc" id="L212">        final Component[] cmps = components;</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L214">            Display.getInstance().callSerially(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="nc" id="L218">                    removeAll();</span>
+<span class="nc" id="L219">                    InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));</span>
+<span class="nc" id="L220">                    requestingResults = false;</span>
+<span class="nc" id="L221">                }</span>
+            });
+        } else {
+<span class="fc" id="L224">            removeAll();</span>
+<span class="fc" id="L225">            InfiniteScrollAdapter.addMoreComponents(this, cmps, shouldContinue(cmps));</span>
+<span class="fc" id="L226">            requestingResults = false;</span>
+        }
+<span class="fc" id="L228">    }</span>
+
+    /// If we previously added returned null when fetching components this
+    /// method can continue the process of fetching. This is useful in case of
+    /// a networking error. You can end fetching and then restart it based on
+    /// user interaction see https://github.com/codenameone/CodenameOne/issues/2721
+    public void continueFetching() {
+<span class="fc" id="L235">        InfiniteScrollAdapter.continueFetching(this);</span>
+<span class="fc" id="L236">    }</span>
+
+    void fetchMore() {
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (requestingResults) {</span>
+<span class="nc" id="L240">            return;</span>
+        }
+<span class="fc" id="L242">        requestingResults = true;</span>
+<span class="fc" id="L243">        Component[] components = fetchComponents(getComponentCount() - 1, amount);</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (components == null) {</span>
+<span class="fc" id="L245">            components = new Component[0];</span>
+        }
+<span class="fc" id="L247">        final Component[] cmps = components;</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L249">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L252">                    InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));</span>
+<span class="nc" id="L253">                    requestingResults = false;</span>
+<span class="nc" id="L254">                }</span>
+            });
+        } else {
+<span class="fc" id="L257">            InfiniteScrollAdapter.addMoreComponents(this, cmps, shouldContinue(cmps));</span>
+<span class="fc" id="L258">            requestingResults = false;</span>
+        }
+<span class="fc" id="L260">    }</span>
+
+    private void createInfiniteScroll() {
+<span class="fc" id="L263">        adapter = InfiniteScrollAdapter.createInfiniteScroll(this, new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                if (isAsync()) {</span>
+<span class="nc" id="L268">                    Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L271">                            fetchMore();</span>
+<span class="nc" id="L272">                        }</span>
+                    });
+                } else {
+<span class="fc" id="L275">                    fetchMore();</span>
+                }
+<span class="fc" id="L277">            }</span>
+        });
+
+<span class="fc" id="L280">    }</span>
+
+    /// Indicates whether `int)` should be invoked asynchronously off the EDT
+    ///
+    /// #### Returns
+    ///
+    /// this is set to true for compatibility with older versions of the infinite container
+    protected boolean isAsync() {
+<span class="fc" id="L288">        return false;</span>
+    }
+
+    /// This is an abstract method that should be implemented by the sub classes
+    /// to fetch the data.
+    ///
+    /// **When `#isAsync()` is overriden to return true this method is invoked on a background thread**.
+    /// Notice that in this case the method might cause EDT violations warnings, since the
+    /// subclasses will need to create the Components off the EDT. While these are EDT violations they
+    /// probably won't cause problems for more code.
+    ///
+    /// Sub classes should preform their networking/data fetching here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index from which to bring data
+    ///
+    /// - `amount`: the size of components to bring
+    ///
+    /// #### Returns
+    ///
+    /// @return Components array of the returned data, size of the array can be the
+    /// size of the amount or smaller, if there is no more data to fetch the method should return null.
+    public abstract Component[] fetchComponents(int index, int amount);
+
+
+    /// Lets us manipulate the infinite progress object e.g. set the animation image etc.
+    ///
+    /// #### Returns
+    ///
+    /// the infinite progress component underlying this container
+    public InfiniteProgress getInfiniteProgress() {
+<span class="fc" id="L320">        return adapter.getInfiniteProgress();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

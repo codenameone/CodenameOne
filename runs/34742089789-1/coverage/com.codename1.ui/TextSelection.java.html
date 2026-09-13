@@ -1,0 +1,1563 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextSelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TextSelection.java</span></div><h1>TextSelection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.ComponentSelector.ComponentClosure;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionEvent.Type;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.RoundRectBorder;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.TreeSet;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/// Text selection support for Codename One applications.  The class provides a light-weight text selection
+/// implementation, allowing users to select and copy text from a form.
+///
+/// Enabling Text Selection
+///
+/// Text selection needs to be enabled on a per-form basis.
+///
+/// ```java
+/// `myForm.getTextSelection().setEnabled(true);`
+/// ```
+///
+/// If text selection is enabled on a form, then non-editable text fields and text areas will allow text
+/// selection by default.  Labels and SpanLabels have text selection disabled by default, but can be enabled using
+/// `Label#setTextSelectionEnabled(boolean)`, and `SpanLabel#setTextSelectionEnabled(boolean)` respectively.
+/// Similarly, text selection can be disabled on TextFields and TextAreas using `TextArea#setTextSelectionEnabled(boolean)`.
+///
+/// @author shannah
+///
+public class TextSelection {
+
+    /// Comparator used for ordering components in left-to-right mode.
+
+    /// Revalidates the surface a component lives in, whether that is a form or a
+    /// window. Resolving the form directly is null inside a Window, and text selection
+    /// is supported there.
+    private static void revalidateTopLevel(Component c) {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (top != null) {</span>
+<span class="nc" id="L70">            top.asContainer().revalidate();</span>
+        }
+<span class="nc" id="L72">    }</span>
+
+    /// The deferred counterpart to `#revalidateTopLevel(Component)`.
+    private static void revalidateLaterTopLevel(Component c) {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (top != null) {</span>
+<span class="fc" id="L78">            top.asContainer().revalidateLater();</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+<span class="fc" id="L82">    private static final Comparator&lt;Component&gt; LTRComparator = new Comparator&lt;Component&gt;() {</span>
+
+        /// We can't just use component's AbsoluteY coordinates for ordering because of scrolling,
+        /// so we create a scaled coorindate that will order components properly.
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: the component
+        ///
+        /// #### Returns
+        ///
+        /// the Y scale
+        private double getScaledY(Component cmp) {
+<span class="fc" id="L95">            double y = 0;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            while (cmp != null) {</span>
+<span class="fc" id="L97">                double ratio = cmp.getHeight() / (double) Math.max(cmp.getScrollDimension().getHeight(), cmp.getHeight());</span>
+<span class="fc" id="L98">                y = ratio * y;</span>
+<span class="fc" id="L99">                y += cmp.getY() + cmp.getScrollY();</span>
+<span class="fc" id="L100">                cmp = cmp.getParent();</span>
+<span class="fc" id="L101">            }</span>
+<span class="fc" id="L102">            return y;</span>
+        }
+
+        @Override
+        public int compare(Component o1, Component o2) {
+<span class="fc" id="L107">            int x1 = o1.getAbsoluteX();</span>
+<span class="fc" id="L108">            int x2 = o2.getAbsoluteX();</span>
+<span class="fc" id="L109">            double y1 = getScaledY(o1);</span>
+<span class="fc" id="L110">            double y2 = getScaledY(o2);</span>
+
+<span class="fc" id="L112">            int compareY = Double.compare(y1, y2);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (compareY != 0) {</span>
+<span class="nc" id="L114">                return compareY;</span>
+            }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (x1 &lt; x2) {</span>
+<span class="nc" id="L117">                return -1;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            } else if (x1 &gt; x2) {</span>
+<span class="nc" id="L119">                return 1;</span>
+            }
+<span class="fc" id="L121">            int w1 = o1.getWidth();</span>
+<span class="fc" id="L122">            int w2 = o2.getWidth();</span>
+<span class="fc" id="L123">            int h1 = o1.getHeight();</span>
+<span class="fc" id="L124">            int h2 = o2.getHeight();</span>
+
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (h1 != h2) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                return h1 &gt; h2 ? -1 : 1;</span>
+            }
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (w1 != w2) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                return w1 &gt; w2 ? -1 : 1;</span>
+            }
+<span class="fc" id="L132">            return 0;</span>
+        }
+
+    };
+    /// Comparator used for ordering components in left-to-right mode.
+<span class="fc" id="L137">    private static final Comparator&lt;Component&gt; RTLComparator = new Comparator&lt;Component&gt;() {</span>
+        /// We can't just use component's AbsoluteY coordinates for ordering because of scrolling,
+        /// so we create a scaled coorindate that will order components properly.
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`
+        private double getScaledY(Component cmp) {
+<span class="nc" id="L145">            double y = 0;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            while (cmp != null) {</span>
+<span class="nc" id="L147">                double ratio = cmp.getHeight() / (double) Math.max(cmp.getScrollDimension().getHeight(), cmp.getHeight());</span>
+<span class="nc" id="L148">                y = ratio * y;</span>
+<span class="nc" id="L149">                y += cmp.getY() + cmp.getScrollY();</span>
+<span class="nc" id="L150">                cmp = cmp.getParent();</span>
+<span class="nc" id="L151">            }</span>
+<span class="nc" id="L152">            return y;</span>
+        }
+
+        @Override
+        public int compare(Component o1, Component o2) {
+<span class="nc" id="L157">            int x1 = o1.getAbsoluteX();</span>
+<span class="nc" id="L158">            int x2 = o2.getAbsoluteX();</span>
+<span class="nc" id="L159">            double y1 = getScaledY(o1);</span>
+<span class="nc" id="L160">            double y2 = getScaledY(o2);</span>
+
+<span class="nc" id="L162">            int compareY = Double.compare(y1, y2);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (compareY != 0) {</span>
+<span class="nc" id="L164">                return compareY;</span>
+            }
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (x1 &lt; x2) {</span>
+<span class="nc" id="L167">                return 1;</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            } else if (x1 &gt; x2) {</span>
+<span class="nc" id="L169">                return -1;</span>
+            }
+<span class="nc" id="L171">            int w1 = o1.getWidth();</span>
+<span class="nc" id="L172">            int w2 = o2.getWidth();</span>
+<span class="nc" id="L173">            int h1 = o1.getHeight();</span>
+<span class="nc" id="L174">            int h2 = o2.getHeight();</span>
+
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (h1 != h2) {</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                return h1 &gt; h2 ? -1 : 1;</span>
+            }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (w1 != w2) {</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                return w1 &gt; w2 ? -1 : 1;</span>
+            }
+<span class="nc" id="L182">            return 0;</span>
+        }
+
+    };
+<span class="fc" id="L186">    private final Rectangle snappedSelectedBounds = new Rectangle();</span>
+<span class="fc" id="L187">    private final Rectangle selectedBounds = new Rectangle();</span>
+<span class="fc" id="L188">    private final Spans selectedSpans = new Spans();</span>
+<span class="fc" id="L189">    private final EventDispatcher textSelectionListeners = new EventDispatcher();</span>
+<span class="fc" id="L190">    private final Rectangle tmpRect = new Rectangle();</span>
+    private final Component root;
+    private boolean rtl;
+<span class="fc" id="L193">    private final TextSelectionTrigger trigger = getDefaultTextSelectionTrigger();</span>
+    private SelectionMask selectionMask;
+    private boolean enabled;
+    // The nearest scrollable parent of the component that triggered a text
+    // selection event.
+    private Component selectionRoot;
+    private boolean ignoreEvents;
+    /// The listener that handles all of the pointer events to update the selections.
+<span class="fc" id="L201">    private final ActionListener pressListener = new ActionListener() {</span>
+<span class="fc" id="L202">        final Rectangle startSelectedBounds = new Rectangle();</span>
+<span class="fc" id="L203">        private final int ONE_MM = CN.convertToPixels(1);</span>
+        int startX;
+        int startY;
+        boolean inSelectionDrag;
+
+        @Override
+        public void actionPerformed(final ActionEvent evt) {
+<span class="nc bnc" id="L210" title="All 4 branches missed.">            if (ignoreEvents || Display.getInstance().isRightMouseButtonDown()) {</span>
+<span class="nc" id="L211">                return;</span>
+            }
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            if (trigger == TextSelectionTrigger.Press) {</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                if (evt.getEventType() == ActionEvent.Type.PointerPressed) {</span>
+<span class="nc" id="L215">                    selectedBounds.setBounds(-1, -1, 0, 0);</span>
+<span class="nc" id="L216">                    update();</span>
+<span class="nc" id="L217">                    textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                    if (selectionMask != null) {</span>
+<span class="nc" id="L219">                        selectionMask.remove();</span>
+<span class="nc" id="L220">                        getLayeredPane().remove();</span>
+<span class="nc" id="L221">                        selectionMask = null;</span>
+<span class="nc" id="L222">                        revalidateTopLevel(root);</span>
+                    }
+<span class="nc" id="L224">                    startX = evt.getX();</span>
+<span class="nc" id="L225">                    startY = evt.getY();</span>
+<span class="nc" id="L226">                    inSelectionDrag = false;</span>
+<span class="nc" id="L227">                    Component cmp = ((Container) root).getComponentAt(startX, startY);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                    if (cmp == null) {</span>
+<span class="nc" id="L229">                        return;</span>
+                    }
+<span class="nc" id="L231">                    selectionRoot = findSelectionRoot(cmp);</span>
+                    //System.out.println(&quot;SelectionRoot =&quot;+selectionRoot);
+<span class="nc" id="L233">                    startX = startX - selectionRoot.getAbsoluteX();</span>
+<span class="nc" id="L234">                    startY = startY - selectionRoot.getAbsoluteY();</span>
+<span class="nc" id="L235">                    TextSelectionSupport ts = cmp.getTextSelectionSupport();</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                    if (ts != null) {</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">                        if (ts.isTextSelectionEnabled(TextSelection.this) &amp;&amp; ts.isTextSelectionTriggerEnabled(TextSelection.this)) {</span>
+<span class="nc" id="L238">                            evt.consume();</span>
+<span class="nc" id="L239">                            inSelectionDrag = true;</span>
+                        }
+                    }
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                } else if (evt.getEventType() == ActionEvent.Type.PointerDrag) {</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                    if (!inSelectionDrag) {</span>
+<span class="nc" id="L244">                        return;</span>
+                    }
+<span class="nc" id="L246">                    evt.consume();</span>
+
+
+<span class="nc" id="L249">                    int x = evt.getX() - selectionRoot.getAbsoluteX();</span>
+<span class="nc" id="L250">                    int y = evt.getY() - selectionRoot.getAbsoluteY();</span>
+<span class="nc" id="L251">                    selectedBounds.setBounds(</span>
+<span class="nc" id="L252">                            Math.min(startX, x),</span>
+<span class="nc" id="L253">                            Math.min(startY, y),</span>
+<span class="nc" id="L254">                            Math.abs(startX - x),</span>
+<span class="nc" id="L255">                            Math.abs(startY - y)</span>
+                    );
+<span class="nc" id="L257">                    update();</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                    if (selectionMask == null) {</span>
+<span class="nc" id="L259">                        selectionMask = new SelectionMask();</span>
+
+<span class="nc" id="L261">                        getLayeredPane().add(selectionMask);</span>
+
+                    }
+<span class="nc" id="L264">                    revalidateTopLevel(root);</span>
+<span class="nc bnc" id="L265" title="All 4 branches missed.">                    if (selectionRoot.isScrollableX() &amp;&amp; evt.getX() &gt; selectionRoot.getAbsoluteX() + selectionRoot.getScrollX() + selectionRoot.getWidth() - ONE_MM * 5) {</span>
+<span class="nc" id="L266">                        Component.setDisableSmoothScrolling(true);</span>
+<span class="nc" id="L267">                        int scrollX = selectionRoot.getScrollX();</span>
+<span class="nc" id="L268">                        selectionRoot.setScrollX(selectionRoot.getScrollX() + ONE_MM);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                        if (scrollX != selectionRoot.getScrollX()) {</span>
+<span class="nc" id="L270">                            selectionRoot.repaint();</span>
+<span class="nc" id="L271">                            CN.callSerially(new Runnable() {</span>
+                                @Override
+                                public void run() {
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+<span class="nc" id="L278">                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                                    if (f != null) {</span>
+<span class="nc" id="L280">                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());</span>
+                                    }
+<span class="nc" id="L282">                                }</span>
+                            });
+                        }
+<span class="nc" id="L285">                        Component.setDisableSmoothScrolling(false);</span>
+<span class="nc bnc" id="L286" title="All 4 branches missed.">                    } else if (selectionRoot.isScrollableX() &amp;&amp; evt.getX() &lt; selectionRoot.getAbsoluteX() + selectionRoot.getScrollX() + ONE_MM * 5) {</span>
+<span class="nc" id="L287">                        Component.setDisableSmoothScrolling(true);</span>
+<span class="nc" id="L288">                        int scrollX = selectionRoot.getScrollX();</span>
+<span class="nc" id="L289">                        selectionRoot.setScrollX(selectionRoot.getScrollX() - ONE_MM);</span>
+<span class="nc bnc" id="L290" title="All 2 branches missed.">                        if (scrollX != selectionRoot.getScrollX()) {</span>
+<span class="nc" id="L291">                            selectionRoot.repaint();</span>
+<span class="nc" id="L292">                            CN.callSerially(new Runnable() {</span>
+                                @Override
+                                public void run() {
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+<span class="nc" id="L299">                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                                    if (f != null) {</span>
+<span class="nc" id="L301">                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());</span>
+                                    }
+<span class="nc" id="L303">                                }</span>
+                            });
+                        }
+<span class="nc" id="L306">                        Component.setDisableSmoothScrolling(false);</span>
+<span class="nc bnc" id="L307" title="All 4 branches missed.">                    } else if (selectionRoot.isScrollableY() &amp;&amp; evt.getY() &lt; selectionRoot.getAbsoluteY() + selectionRoot.getScrollY() + ONE_MM * 5) {</span>
+<span class="nc" id="L308">                        Component.setDisableSmoothScrolling(true);</span>
+<span class="nc" id="L309">                        int scrollY = selectionRoot.getScrollY();</span>
+<span class="nc" id="L310">                        selectionRoot.setScrollY(selectionRoot.getScrollY() - ONE_MM);</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                        if (scrollY != selectionRoot.getScrollY()) {</span>
+<span class="nc" id="L312">                            selectionRoot.repaint();</span>
+<span class="nc" id="L313">                            CN.callSerially(new Runnable() {</span>
+                                @Override
+                                public void run() {
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+<span class="nc" id="L320">                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                                    if (f != null) {</span>
+<span class="nc" id="L322">                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());</span>
+                                    }
+<span class="nc" id="L324">                                }</span>
+                            });
+                        }
+<span class="nc" id="L327">                        Component.setDisableSmoothScrolling(false);</span>
+<span class="nc bnc" id="L328" title="All 4 branches missed.">                    } else if (selectionRoot.isScrollableY() &amp;&amp; evt.getY() &gt; selectionRoot.getAbsoluteY() + selectionRoot.getScrollY() + selectionRoot.getHeight() - ONE_MM * 5) {</span>
+<span class="nc" id="L329">                        Component.setDisableSmoothScrolling(true);</span>
+<span class="nc" id="L330">                        int scrollY = selectionRoot.getScrollY();</span>
+<span class="nc" id="L331">                        selectionRoot.setScrollY(selectionRoot.getScrollY() + ONE_MM);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">                        if (scrollY != selectionRoot.getScrollY()) {</span>
+<span class="nc" id="L333">                            selectionRoot.repaint();</span>
+<span class="nc" id="L334">                            CN.callSerially(new Runnable() {</span>
+                                @Override
+                                public void run() {
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+<span class="nc" id="L341">                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                                    if (f != null) {</span>
+<span class="nc" id="L343">                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());</span>
+                                    }
+<span class="nc" id="L345">                                }</span>
+                            });
+                        }
+<span class="nc" id="L348">                        Component.setDisableSmoothScrolling(false);</span>
+                    }
+<span class="nc bnc" id="L350" title="All 4 branches missed.">                } else if (evt.getEventType() == ActionEvent.Type.PointerReleased || evt.getEventType() == ActionEvent.Type.DragFinished) {</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                    if (inSelectionDrag) {</span>
+<span class="nc" id="L352">                        textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));</span>
+<span class="nc" id="L353">                        evt.consume();</span>
+                    }
+                }
+            } else {
+                // Long press trigger
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                if (evt.getSource() instanceof DragHandle) {</span>
+<span class="nc" id="L359">                    DragHandle dh = (DragHandle) evt.getSource();</span>
+
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                    if (evt.getEventType() == ActionEvent.Type.PointerPressed) {</span>
+<span class="nc" id="L362">                        startX = evt.getX();</span>
+<span class="nc" id="L363">                        startY = evt.getY();</span>
+<span class="nc" id="L364">                        startSelectedBounds.setBounds(selectedBounds);</span>
+<span class="nc" id="L365">                        inSelectionDrag = true;</span>
+<span class="nc" id="L366">                        evt.consume();</span>
+<span class="nc" id="L367">                        dh.pointerDragged(evt.getX(), evt.getY());</span>
+
+<span class="nc bnc" id="L369" title="All 4 branches missed.">                    } else if (inSelectionDrag &amp;&amp; evt.getEventType() == ActionEvent.Type.PointerDrag) {</span>
+<span class="nc" id="L370">                        evt.consume();</span>
+<span class="nc" id="L371">                        int offX = evt.getX() - startX;</span>
+<span class="nc" id="L372">                        int offY = evt.getY() - startY;</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                        if (dh.start) {</span>
+<span class="nc" id="L374">                            selectedBounds.setX(startSelectedBounds.getX() + offX);</span>
+<span class="nc" id="L375">                            selectedBounds.setWidth(startSelectedBounds.getWidth() - offX);</span>
+<span class="nc" id="L376">                            selectedBounds.setY(startSelectedBounds.getY() + offY);</span>
+<span class="nc" id="L377">                            selectedBounds.setHeight(startSelectedBounds.getHeight() - offY);</span>
+                        } else {
+<span class="nc" id="L379">                            selectedBounds.setWidth(startSelectedBounds.getWidth() + offX);</span>
+<span class="nc" id="L380">                            selectedBounds.setHeight(startSelectedBounds.getHeight() + offY);</span>
+                        }
+<span class="nc" id="L382">                        update();</span>
+<span class="nc" id="L383">                        revalidateTopLevel(root);</span>
+<span class="nc bnc" id="L384" title="All 6 branches missed.">                    } else if (inSelectionDrag &amp;&amp; evt.getEventType() == ActionEvent.Type.PointerReleased || evt.getEventType() == ActionEvent.Type.DragFinished) {</span>
+<span class="nc" id="L385">                        evt.consume();</span>
+<span class="nc" id="L386">                        inSelectionDrag = false;</span>
+<span class="nc" id="L387">                        update();</span>
+<span class="nc" id="L388">                        revalidateTopLevel(root);</span>
+<span class="nc" id="L389">                        textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));</span>
+                    }
+<span class="nc" id="L391">                } else {</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                    if (evt.getEventType() == ActionEvent.Type.LongPointerPress) {</span>
+                        //System.out.println(&quot;In long press&quot;);
+<span class="nc" id="L394">                        Component cmp = ((Container) root).getComponentAt(evt.getX(), evt.getY());</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                        if (cmp == null) {</span>
+<span class="nc" id="L396">                            return;</span>
+                        }
+<span class="nc" id="L398">                        TextSelectionSupport st = cmp.getTextSelectionSupport();</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                        if (st != null) {</span>
+
+<span class="nc bnc" id="L401" title="All 4 branches missed.">                            if (!st.isTextSelectionEnabled(TextSelection.this) || !st.isTextSelectionTriggerEnabled(TextSelection.this)) {</span>
+<span class="nc" id="L402">                                return;</span>
+                            }
+<span class="nc" id="L404">                            selectionRoot = findSelectionRoot(cmp);</span>
+<span class="nc" id="L405">                            int x = evt.getX() - selectionRoot.getAbsoluteX();</span>
+
+<span class="nc" id="L407">                            int y = evt.getY() - selectionRoot.getAbsoluteY();</span>
+<span class="nc" id="L408">                            Span selSpan = st.triggerSelectionAt(TextSelection.this, x, y);</span>
+                            //System.out.println(selSpan);
+<span class="nc bnc" id="L410" title="All 2 branches missed.">                            if (selSpan == null) {</span>
+<span class="nc" id="L411">                                return;</span>
+                            }
+<span class="nc" id="L413">                            evt.consume();</span>
+<span class="nc" id="L414">                            Rectangle sel = selSpan.getBounds();</span>
+<span class="nc" id="L415">                            selectedBounds.setBounds(sel.getX(), sel.getY(), sel.getWidth(), sel.getHeight());</span>
+<span class="nc" id="L416">                            update();</span>
+<span class="nc" id="L417">                            textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                            if (selectionMask == null) {</span>
+<span class="nc" id="L419">                                selectionMask = new SelectionMask();</span>
+<span class="nc" id="L420">                                Container layeredPane = getLayeredPane();</span>
+<span class="nc" id="L421">                                layeredPane.add(selectionMask);</span>
+
+                            }
+<span class="nc" id="L424">                            revalidateTopLevel(root);</span>
+
+
+                        }
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                    } else if (evt.getEventType() == ActionEvent.Type.PointerPressed) {</span>
+<span class="nc" id="L429">                        Component cmp = ((Container) root).getComponentAt(evt.getX(), evt.getY());</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                        if (cmp instanceof DragHandle) {</span>
+<span class="nc" id="L431">                            return;</span>
+                        }
+<span class="nc bnc" id="L433" title="All 2 branches missed.">                        if (selectionMask != null) {</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                            if (selectionMask.startHandle.contains(evt.getX(), evt.getY())) {</span>
+<span class="nc" id="L435">                                return;</span>
+                            }
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                            if (selectionMask.endHandle.contains(evt.getX(), evt.getY())) {</span>
+<span class="nc" id="L438">                                return;</span>
+                            }
+<span class="nc bnc" id="L440" title="All 2 branches missed.">                            if (selectionMask.selectionMenu.contains(evt.getX(), evt.getY())) {</span>
+<span class="nc" id="L441">                                return;</span>
+                            }
+                        }
+<span class="nc" id="L444">                        selectedBounds.setBounds(-1, -1, 0, 0);</span>
+<span class="nc" id="L445">                        update();</span>
+<span class="nc" id="L446">                        textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">                        if (selectionMask != null) {</span>
+<span class="nc" id="L448">                            selectionMask.remove();</span>
+<span class="nc" id="L449">                            getLayeredPane().remove();</span>
+<span class="nc" id="L450">                            selectionMask = null;</span>
+<span class="nc" id="L451">                            revalidateTopLevel(root);</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L456">        }</span>
+
+    };
+
+    /// Creates a new TextSelection handler with the given root component.  Package private.  Use `Form#getTextSelection()` to obtain
+    /// an instance of the Form's TextSelection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`
+<span class="fc" id="L466">    TextSelection(Component root) {</span>
+<span class="fc" id="L467">        this.root = root;</span>
+<span class="fc" id="L468">    }</span>
+
+    /// Gets the default trigger type for text selection.  This will vary by platform.
+    /// On mobile/touch devices, it will return `TextSelectionTrigger#LongPress`,
+    /// and on desktop environments with a mouse, it will return `TextSelectionTrigger#Press`.
+    ///
+    /// #### Returns
+    ///
+    /// The default trigger type for text selection.
+    public static TextSelectionTrigger getDefaultTextSelectionTrigger() {
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">        return Display.impl.isDesktop() ? TextSelectionTrigger.Press : TextSelectionTrigger.LongPress;</span>
+    }
+
+    private static int getX(Component cmp, Component relativeTo) {
+<span class="fc" id="L482">        return cmp.getAbsoluteX() - relativeTo.getAbsoluteX();</span>
+    }
+
+    private static int getY(Component cmp, Component relativeTo) {
+<span class="fc" id="L486">        return cmp.getAbsoluteY() - relativeTo.getAbsoluteY();</span>
+    }
+
+    /// Finds the selection root for a component.  This is generally just the first
+    /// scrollable component discovered with crawling up the component hierarchy
+    /// from the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component we start with.
+    ///
+    /// #### Returns
+    ///
+    /// The selection root for a given component.
+    public static Component findSelectionRoot(Component cmp) {
+<span class="pc bpc" id="L501" title="1 of 4 branches missed.">        if (cmp.scrollableYFlag() || cmp.scrollableXFlag()) {</span>
+<span class="fc" id="L502">            return cmp;</span>
+        }
+<span class="fc" id="L504">        Container parent = cmp.getParent();</span>
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">        if (parent == null) {</span>
+<span class="nc" id="L506">            return cmp;</span>
+        }
+<span class="fc" id="L508">        return findSelectionRoot(parent);</span>
+    }
+
+    /// Returns true if text selection is enabled.  Default is false.
+    public boolean isEnabled() {
+<span class="fc" id="L513">        return enabled;</span>
+    }
+
+    /// Enables or disables text selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`
+    public void setEnabled(boolean enabled) {
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        if (enabled != this.enabled) {</span>
+            // The top level rather than the form. getComponentForm() is null by design
+            // inside a Window, and this dereferenced it immediately -- so enabling text
+            // selection, which TopLevelContainer exposes on every top level, threw in
+            // every secondary window.
+<span class="fc" id="L527">            TopLevelContainer top = root.getTopLevelContainer();</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (top == null) {</span>
+                // Not in a hierarchy: nothing to wire to, and the flag stays as it was
+                // rather than claiming a setup that did not happen.
+<span class="nc" id="L531">                return;</span>
+            }
+<span class="fc" id="L533">            this.enabled = enabled;</span>
+<span class="fc" id="L534">            Component f = top.asContainer();</span>
+<span class="fc bfc" id="L535" title="All 2 branches covered.">            if (enabled) {</span>
+<span class="fc" id="L536">                top.setEnableCursors(true);</span>
+<span class="fc" id="L537">                f.addPointerPressedListener(pressListener);</span>
+<span class="fc" id="L538">                f.addPointerDraggedListener(pressListener);</span>
+<span class="fc" id="L539">                f.addPointerReleasedListener(pressListener);</span>
+<span class="fc" id="L540">                f.addDragFinishedListener(pressListener);</span>
+<span class="fc" id="L541">                f.addLongPressListener(pressListener);</span>
+<span class="fc" id="L542">                Display.impl.initializeTextSelection(this);</span>
+            } else {
+<span class="fc" id="L544">                f.removePointerPressedListener(pressListener);</span>
+<span class="fc" id="L545">                f.removePointerDraggedListener(pressListener);</span>
+<span class="fc" id="L546">                f.removePointerReleasedListener(pressListener);</span>
+<span class="fc" id="L547">                f.removeDragFinishedListener(pressListener);</span>
+<span class="fc" id="L548">                f.addLongPressListener(pressListener);</span>
+<span class="fc" id="L549">                Display.impl.deinitializeTextSelection(this);</span>
+            }
+        }
+<span class="fc" id="L552">    }</span>
+
+    /// Gets the selection root for the current text selection.  The selection root will be
+    /// the nearest scrollable parent of the component that triggered the text selection.
+    ///
+    /// Note:  All Span coordinates are relative to the selection root
+    public Component getSelectionRoot() {
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        if (selectionRoot == null) {</span>
+<span class="fc" id="L560">            selectionRoot = root;</span>
+        }
+<span class="fc" id="L562">        return selectionRoot;</span>
+    }
+
+    /// Creates a new Char box.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: The position of the character that this is referencing within its text component.
+    ///
+    /// - `x`: The x coordinate of the box, relative to `#getSelectionRoot()`
+    ///
+    /// - `y`: The y coordinate of the box, relative to `#getSelectionRoot()`
+    ///
+    /// - `w`: The width of the box.
+    ///
+    /// - `h`: The height of the box.
+    public Char newChar(int pos, int x, int y, int w, int h) {
+<span class="fc" id="L579">        return new Char(pos, x, y, w, h);</span>
+    }
+
+    /// Creates a new Char box
+    ///
+    /// #### Parameters
+    ///
+    /// - `pos`: The position of the character that this is referencing within its text component.
+    ///
+    /// - `bounds`: The bounds of the box, relative to `#getSelectionRoot()`
+    public Char newChar(int pos, Rectangle bounds) {
+<span class="nc" id="L590">        return newChar(pos, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());</span>
+    }
+
+    /// Creates a new Span based on content in the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `component`
+    ///
+    /// #### Returns
+    ///
+    /// A new span
+    public Span newSpan(Component component) {
+<span class="fc" id="L603">        return new Span(component);</span>
+    }
+
+    /// Creates a new Spans (a collection of Spans).
+    public Spans newSpans() {
+<span class="fc" id="L608">        return new Spans();</span>
+    }
+
+    /// Gets the selected text as a string.
+    public String getSelectionAsText() {
+<span class="fc" id="L613">        return selectedSpans.getText();</span>
+    }
+
+    /// Updates the text selected spans based on the selected bounds.
+    public void update() {
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">        if (selectionRoot == null) {</span>
+<span class="nc" id="L619">            selectionRoot = root;</span>
+
+        }
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">        final TreeSet&lt;Component&gt; selectedComponents = new TreeSet&lt;Component&gt;(rtl ? RTLComparator : LTRComparator);</span>
+<span class="fc" id="L623">        $(&quot;*&quot;, selectionRoot).each(new ComponentClosure() {</span>
+            @Override
+            public void call(Component c) {
+<span class="fc" id="L626">                TextSelectionSupport ts = c.getTextSelectionSupport();</span>
+<span class="pc bpc" id="L627" title="1 of 4 branches missed.">                if (ts != null &amp;&amp; ts.isTextSelectionEnabled(TextSelection.this)) {</span>
+<span class="fc" id="L628">                    selectedComponents.add(c);</span>
+                }
+<span class="fc" id="L630">            }</span>
+
+        });
+
+
+<span class="fc" id="L635">        Spans spans = selectedSpans;</span>
+<span class="fc" id="L636">        spans.clear();</span>
+<span class="fc" id="L637">        tmpRect.setBounds(selectedBounds);</span>
+<span class="fc bfc" id="L638" title="All 2 branches covered.">        for (Component cmp : selectedComponents) {</span>
+<span class="fc" id="L639">            TextSelectionSupport st = cmp.getTextSelectionSupport();</span>
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">            if (st == null) {</span>
+<span class="nc" id="L641">                continue;</span>
+            }
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">            if (isVerticallyCoveredByBounds(cmp, selectedBounds)) {</span>
+                // When selecting scrollable components, we need to adjust the bounds
+                // so that we get the entire contents - not just the visible viewport
+<span class="fc" id="L646">                selectedBounds.setX(getX(cmp, selectionRoot));</span>
+<span class="fc" id="L647">                selectedBounds.setY(getY(cmp, selectionRoot));</span>
+<span class="fc" id="L648">                selectedBounds.setWidth(Math.max(cmp.getScrollDimension().getWidth(), cmp.getWidth()));</span>
+<span class="fc" id="L649">                selectedBounds.setHeight(Math.max(cmp.getScrollDimension().getHeight(), cmp.getHeight()));</span>
+
+            }
+<span class="fc" id="L652">            spans.add(st.getTextSelectionForBounds(this, selectedBounds));</span>
+            // In case selectedBounds was changed we reset
+<span class="fc" id="L654">            selectedBounds.setBounds(tmpRect);</span>
+<span class="fc" id="L655">        }</span>
+
+<span class="fc" id="L657">    }</span>
+
+    private boolean isVerticallyCoveredByBounds(Component cmp, Rectangle bounds) {
+<span class="fc" id="L660">        int cmpY = getY(cmp, selectionRoot) + cmp.getScrollY();</span>
+<span class="pc bpc" id="L661" title="2 of 4 branches missed.">        boolean isVerticallyCovered = cmpY &gt;= bounds.getY() &amp;&amp; cmpY + cmp.getHeight() &lt;= bounds.getY() + bounds.getHeight();</span>
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">        if (isVerticallyCovered) {</span>
+<span class="fc" id="L663">            return true;</span>
+        }
+<span class="nc bnc" id="L665" title="All 2 branches missed.">        if (cmp == selectionRoot) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L666">            return false;</span>
+        }
+<span class="nc" id="L668">        Container parent = cmp.getParent();</span>
+<span class="nc bnc" id="L669" title="All 2 branches missed.">        if (parent != null) {</span>
+<span class="nc" id="L670">            return isVerticallyCoveredByBounds(parent, bounds);</span>
+        }
+<span class="nc" id="L672">        return false;</span>
+    }
+
+    /// Indicates if selection is operating in RTL (Right to left, bidi) mode.
+    ///
+    /// #### Returns
+    ///
+    /// true if the selection is in RTL mode
+    public boolean isRtl() {
+<span class="nc" id="L681">        return rtl;</span>
+    }
+
+    /// Toggles selection RTL (Right to left, bidi) mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: true to activate the right to left mode
+    public void setRtl(boolean rtl) {
+<span class="nc" id="L690">        this.rtl = rtl;</span>
+<span class="nc" id="L691">    }</span>
+
+    private void updateSnappedSelectedBounds() {
+<span class="fc" id="L694">        snappedSelectedBounds.setBounds(selectedBounds.getX(), selectedBounds.getY(), selectedBounds.getWidth(), selectedBounds.getHeight());</span>
+<span class="fc bfc" id="L695" title="All 2 branches covered.">        for (Span span : selectedSpans) {</span>
+<span class="fc" id="L696">            int x = Math.min(span.getBounds().getX(), snappedSelectedBounds.getX());</span>
+<span class="fc" id="L697">            int y = Math.min(span.getBounds().getY(), snappedSelectedBounds.getY());</span>
+<span class="fc" id="L698">            int w = Math.max(span.getBounds().getX() + span.getBounds().getWidth(), selectedBounds.getX() + selectedBounds.getWidth()) - x;</span>
+<span class="fc" id="L699">            int h = Math.max(span.getBounds().getY() + span.getBounds().getHeight(), selectedBounds.getY() + selectedBounds.getHeight()) - y;</span>
+<span class="fc" id="L700">            snappedSelectedBounds.setBounds(x, y, w, h);</span>
+<span class="fc" id="L701">        }</span>
+<span class="fc" id="L702">    }</span>
+
+    /// Adds a listener to be notified when the text selection changes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    public void addTextSelectionListener(ActionListener l) {
+<span class="fc" id="L710">        textSelectionListeners.addListener(l);</span>
+<span class="fc" id="L711">    }</span>
+
+    /// Removes a listener so it no longer is notified when text selection changes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`
+    public void removeTextSelectionListener(ActionListener l) {
+<span class="nc" id="L719">        textSelectionListeners.removeListener(l);</span>
+<span class="nc" id="L720">    }</span>
+
+    private Container getLayeredPane() {
+        //return root.getComponentForm().getLayeredPane(TextSelection.class, true);
+<span class="fc" id="L724">        TopLevelContainer top = root.getTopLevelContainer();</span>
+<span class="pc bpc" id="L725" title="1 of 2 branches missed.">        return top == null ? null : top.getFormLayeredPane(TextSelection.class, true);</span>
+    }
+
+    /// Copies the current selection to the system clipboard.
+    public void copy() {
+        //Display.impl.copyToClipboard(getSelectionAsText());
+<span class="fc" id="L731">        Display.impl.copySelectionToClipboard(this);</span>
+<span class="fc" id="L732">    }</span>
+
+    /// Selects all of the selectable text in the TextSelection (generally on the current form).
+    public void selectAll() {
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">        if (selectionMask == null) {</span>
+<span class="fc" id="L737">            selectionMask = new SelectionMask();</span>
+
+<span class="fc" id="L739">            getLayeredPane().add(selectionMask);</span>
+
+        }
+<span class="fc" id="L742">        selectionRoot = root;</span>
+<span class="fc" id="L743">        selectedBounds.setBounds(0, 0, selectionRoot.getWidth(), selectionRoot.getHeight());</span>
+<span class="fc" id="L744">        update();</span>
+<span class="fc" id="L745">        revalidateLaterTopLevel(selectionRoot);</span>
+<span class="fc" id="L746">        textSelectionListeners.fireActionEvent(new ActionEvent(this, Type.Change));</span>
+<span class="fc" id="L747">    }</span>
+
+    /// This flag can be set to cause text selection to ignore pointer events which might cause
+    /// the selection to get lost or changed.  This is used internally when a context menu is displayed
+    /// so that clicking on the context menu doesn't cause the current text selection to be lost.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ignore`
+    public void setIgnoreEvents(boolean ignore) {
+<span class="fc" id="L757">        ignoreEvents = ignore;</span>
+<span class="fc" id="L758">    }</span>
+
+    /// Trigger types for text selection.
+<span class="fc" id="L761">    public enum TextSelectionTrigger {</span>
+        /// TextSelection is triggered by a pointer press and drag.  This is
+        /// consistent with desktop mouse text selection behaviour.
+<span class="fc" id="L764">        Press,</span>
+
+        /// Text selection is triggered by a long press on some text.
+<span class="fc" id="L767">        LongPress</span>
+    }
+
+    /// An interface that can be returned from any Component's `Component#getTextSelectionSupport()` method to provide
+    /// text selection support on that component.
+    public interface TextSelectionSupport {
+
+        /// Gets the spans that should be selected for the given bounds.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sel`: The TextSelection instance.
+        ///
+        /// - `bounds`: The bounds to check.  Relative to `#getSelectionRoot()`
+        ///
+        /// #### Returns
+        ///
+        /// Spans of text that should be selected.
+        Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds);
+
+        /// Checks if text selection is enabled for this component.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sel`: The TextSelection instance.
+        ///
+        /// #### Returns
+        ///
+        /// True if text selection is enabled.
+        boolean isTextSelectionEnabled(TextSelection sel);
+
+        /// Checks if this component can be used to trigger a text selection.  On mobile devices
+        /// text selection is triggered with a long press over a component.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sel`: The TextSelection instance.
+        ///
+        /// #### Returns
+        ///
+        /// True if text selection can be triggered on this component.
+        boolean isTextSelectionTriggerEnabled(TextSelection sel);
+
+        /// Trigger a text selection at a given point.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sel`: The TextSelection instance
+        ///
+        /// - `x`: The x coordinate of the event.  Relative to `#getSelectionRoot()`
+        ///
+        /// - `y`: The y coordinate of the event.  Relative to `#getSelectionRoot()`
+        ///
+        /// #### Returns
+        ///
+        /// The span that should be selected by a long press at this point.
+        Span triggerSelectionAt(TextSelection sel, int x, int y);
+
+        /// Returns the text for a given span.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sel`: The TextSelection instance.
+        ///
+        /// - `span`: The span describing the range of text that should be returned.
+        ///
+        /// #### Returns
+        ///
+        /// The text that is contained.
+        String getTextForSpan(TextSelection sel, Span span);
+
+    }
+
+    /// Encapsulates a box around a single character/glyph in the UI, storing the component
+    /// that it belongs to, the position of its corresponding character in the component's text,
+    /// and the bounds of the box, relative to `#getSelectionRoot()`.
+    public class Char {
+
+        /// The bounds of the box, relative to `#getSelectionRoot()`
+<span class="fc" id="L846">        private final Rectangle bounds = new Rectangle();</span>
+
+        /// The position of the character in the text model.
+        private final int pos;
+
+        /// Creates a new Char
+        ///
+        /// #### Parameters
+        ///
+        /// - `pos`: The position of the character.
+        ///
+        /// - `bounds`: The bounds of the box, relative to `#getSelectionRoot()`
+<span class="fc" id="L858">        public Char(int pos, Rectangle bounds) {</span>
+<span class="fc" id="L859">            this.pos = pos;</span>
+<span class="fc" id="L860">            this.bounds.setBounds(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());</span>
+<span class="fc" id="L861">        }</span>
+
+        /// Creates a new Char
+        ///
+        /// #### Parameters
+        ///
+        /// - `pos`: THe position of the character.
+        ///
+        /// - `x`: The x-coord of the box, relative to `#getSelectionRoot()`
+        ///
+        /// - `y`: The y-coord of the box, relative to `#getSelectionRoot()`
+        ///
+        /// - `w`: The width of the box.
+        ///
+        /// - `h`: The height of the box.
+<span class="fc" id="L876">        public Char(int pos, int x, int y, int w, int h) {</span>
+<span class="fc" id="L877">            this.pos = pos;</span>
+<span class="fc" id="L878">            this.bounds.setBounds(x, y, w, h);</span>
+
+<span class="fc" id="L880">        }</span>
+
+        /// Gets the character position.  This can be used by the Component that contains
+        /// the text to map it back to its model.
+        ///
+        /// #### Returns
+        ///
+        /// The position of the character.
+        public int getPosition() {
+<span class="fc" id="L889">            return pos;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L894">            return &quot;Char{pos:&quot; + pos + &quot;, bounds:&quot; + bounds + &quot;}&quot;;</span>
+        }
+
+        /// Translates the Char box.
+        ///
+        /// #### Parameters
+        ///
+        /// - `tx`: Translate x pixels.
+        ///
+        /// - `ty`: Translate y pixels
+        ///
+        /// #### Returns
+        ///
+        /// A new Char translated.
+        public Char translate(int tx, int ty) {
+<span class="fc" id="L909">            Char out = new Char(pos, bounds);</span>
+<span class="fc" id="L910">            out.bounds.setX(out.bounds.getX() + tx);</span>
+<span class="fc" id="L911">            out.bounds.setY(out.bounds.getY() + ty);</span>
+<span class="fc" id="L912">            return out;</span>
+        }
+    }
+
+    /// Encapsulates a span of text on the screen.  This can only represent
+    /// a contiguous, single row of characters.
+    public class Span implements Iterable&lt;Char&gt; {
+
+
+<span class="fc" id="L921">        private final Rectangle bounds = new Rectangle();</span>
+<span class="fc" id="L922">        private final List&lt;Char&gt; chars = new ArrayList&lt;Char&gt;();</span>
+        private Component component;
+        private int startPos;
+        private int endPos;
+<span class="fc" id="L926">        private boolean boundsDirty = true;</span>
+
+
+        /// Creates a new span for the given component.
+        ///
+        /// #### Parameters
+        ///
+        /// - `c`
+<span class="fc" id="L934">        public Span(Component c) {</span>
+<span class="fc" id="L935">            component = c;</span>
+<span class="fc" id="L936">        }</span>
+
+        /// Gets the start position of the text.
+        public int getStartPos() {
+<span class="fc" id="L940">            return startPos;</span>
+        }
+
+        /// Gets th end position of the text.  (exclusive).
+        public int getEndPos() {
+<span class="fc" id="L945">            return endPos;</span>
+        }
+
+        @Override
+        public Iterator&lt;Char&gt; iterator() {
+<span class="nc" id="L950">            return chars.iterator();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L955">            return &quot;Span{&quot; + chars + &quot;; Bounds: &quot; + getBounds() + &quot;}&quot;;</span>
+        }
+
+        /// Calculates the bounds of the span based on the characters in the span
+        private void calculateBounds() {
+<span class="fc" id="L960">            Char first = first();</span>
+<span class="pc bpc" id="L961" title="1 of 2 branches missed.">            if (first != null) {</span>
+
+<span class="fc" id="L963">                bounds.setBounds(first.bounds.getX(), first.bounds.getY(), first.bounds.getWidth(), first.bounds.getHeight());</span>
+<span class="fc bfc" id="L964" title="All 2 branches covered.">                for (Char c : chars) {</span>
+<span class="fc" id="L965">                    bounds.setWidth(c.bounds.getX() + c.bounds.getWidth() - bounds.getX());</span>
+
+<span class="fc" id="L967">                }</span>
+
+            } else {
+<span class="nc" id="L970">                bounds.setBounds(0, 0, 0, 0);</span>
+            }
+<span class="fc" id="L972">            boundsDirty = false;</span>
+
+<span class="fc" id="L974">        }</span>
+
+        /// Adds a character to the span, updating the bounds.
+        ///
+        /// #### Parameters
+        ///
+        /// - `character`
+        public void add(Char character) {
+<span class="fc" id="L982">            boundsDirty = true;</span>
+<span class="fc bfc" id="L983" title="All 2 branches covered.">            if (chars.isEmpty()) {</span>
+<span class="fc" id="L984">                startPos = character.pos;</span>
+<span class="fc" id="L985">                endPos = character.pos + 1;</span>
+            } else {
+<span class="fc" id="L987">                startPos = Math.min(startPos, character.pos);</span>
+<span class="fc" id="L988">                endPos = Math.max(endPos - 1, character.pos) + 1;</span>
+            }
+<span class="fc" id="L990">            chars.add(character);</span>
+<span class="fc" id="L991">        }</span>
+
+        /// Obtains an intersection span including only the characters that intersect the given rectangle.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`: The x-coord of the intersection box, relative to `#getSelectionRoot()`
+        ///
+        /// - `y`: The y-coord of the intersection box to `#getSelectionRoot()`
+        ///
+        /// - `w`: The width of the intersection box.
+        ///
+        /// - `h`: The height of the intersection box.
+        ///
+        /// #### Returns
+        ///
+        /// A new span containing only characters that intersect the given bounds.
+        public Span getIntersection(int x, int y, int w, int h) {
+<span class="nc" id="L1009">            return getIntersection(x, y, w, h, false);</span>
+        }
+
+        /// Obtains an intersection span including only the characters that intersect the given rectangle.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`: The x-coord of the intersection box, relative to `#getSelectionRoot()`
+        ///
+        /// - `y`: The y-coord of the intersection box to `#getSelectionRoot()`
+        ///
+        /// - `w`: The width of the intersection box.
+        ///
+        /// - `h`: The height of the intersection box.
+        ///
+        /// - `withFlow`: @param withFlow If true, this will also include any characters that should logically be selected if the
+        /// user dragged over the given rectangle.  E.g. If the selection began above the span, and stretches below it,
+        /// the entire span should be selected (included in the intersection).
+        ///
+        /// #### Returns
+        ///
+        /// A new span with the intersection.
+        public Span getIntersection(int x, int y, int w, int h, boolean withFlow) {
+<span class="fc" id="L1032">            Span out = new Span(component);</span>
+<span class="fc bfc" id="L1033" title="All 2 branches covered.">            if (withFlow) {</span>
+<span class="pc bpc" id="L1034" title="1 of 4 branches missed.">                if (y &lt; getBounds().getY() &amp;&amp; y + h &gt; getBounds().getY() + getBounds().getHeight() / 2) {</span>
+                    // Selection starts above and covers full height of the span
+                    // In this case select the whole line
+<span class="fc" id="L1037">                    int newX = getBounds().getX();</span>
+<span class="fc" id="L1038">                    int newW = Math.max(0, getBounds().getWidth());</span>
+<span class="fc" id="L1039">                    x = newX;</span>
+<span class="fc" id="L1040">                    w = newW;</span>
+<span class="pc bpc" id="L1041" title="5 of 6 branches missed.">                } else if (y &lt; getBounds().getY() &amp;&amp; y + h &gt; getBounds().getY() &amp;&amp; y + h &lt;= getBounds().getY() + getBounds().getHeight()) {</span>
+                    // Selection starts above the span, and vertically ends somewhere in the span.
+                    // In this case, we select from the beginning of the line to the span box
+<span class="nc" id="L1044">                    int newX = getBounds().getX();</span>
+<span class="nc" id="L1045">                    int newW = Math.max(0, x + w - newX);</span>
+<span class="nc" id="L1046">                    x = newX;</span>
+<span class="nc" id="L1047">                    w = newW;</span>
+
+<span class="pc bpc" id="L1049" title="2 of 4 branches missed.">                } else if (y &lt; getBounds().getY() + getBounds().getHeight() &amp;&amp; y + h &gt; getBounds().getY() + getBounds().getHeight() + CN.convertToPixels(2)) {</span>
+                    // Selection starts inside vertically inside the span, and covers below.
+                    // In this case select from selection start to end of line.
+<span class="nc" id="L1052">                    w = Math.max(0, getBounds().getX() + getBounds().getWidth() - x);</span>
+                }
+            }
+<span class="fc bfc" id="L1055" title="All 2 branches covered.">            for (Char c : chars) {</span>
+<span class="fc bfc" id="L1056" title="All 2 branches covered.">                if (c.bounds.intersects(x, y, w, h)) {</span>
+<span class="fc" id="L1057">                    out.add(c);</span>
+                }
+<span class="fc" id="L1059">            }</span>
+<span class="fc" id="L1060">            return out;</span>
+        }
+
+        /// Obtains an intersection span including only the characters that intersect the given rectangle.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bounds`: The bounds of the intersection box, relative to `#getSelectionRoot()`
+        ///
+        /// - `withFlow`: @param withFlow If true, this will also include any characters that should logically be selected if the
+        /// user dragged over the given rectangle.  E.g. If the selection began above the span, and stretches below it,
+        /// the entire span should be selected (included in the intersection).
+        ///
+        /// #### Returns
+        ///
+        /// A new span with the intersection.
+        public Span getIntersection(Rectangle bounds, boolean withFlow) {
+<span class="fc" id="L1077">            int x = bounds.getX();</span>
+<span class="fc" id="L1078">            int y = bounds.getY();</span>
+<span class="fc" id="L1079">            int w = bounds.getWidth();</span>
+<span class="fc" id="L1080">            int h = bounds.getHeight();</span>
+<span class="fc" id="L1081">            return getIntersection(x, y, w, h, withFlow);</span>
+
+        }
+
+        /// Obtains an intersection span including only the characters that intersect the given rectangle.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bounds`: The bounds of the intersection box, relative to `#getSelectionRoot()`
+        ///
+        /// #### Returns
+        ///
+        /// A new span with the intersection.
+        public Span getIntersection(Rectangle bounds) {
+<span class="fc" id="L1095">            return getIntersection(bounds, false);</span>
+        }
+
+        /// Gets the char at the given coordinate or null if there isn't a char there.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`: x-coordinate relative to `#getSelectionRoot()`
+        ///
+        /// - `y`: y-coordinate relative to `#getSelectionRoot()`
+        public Char charAt(int x, int y) {
+<span class="pc bpc" id="L1106" title="1 of 2 branches missed.">            for (Char c : chars) {</span>
+<span class="fc bfc" id="L1107" title="All 2 branches covered.">                if (c.bounds.contains(x, y)) {</span>
+<span class="fc" id="L1108">                    return c;</span>
+                }
+<span class="fc" id="L1110">            }</span>
+<span class="nc" id="L1111">            return null;</span>
+        }
+
+        /// Gets the first Char in the span, or null if span is empty.
+        ///
+        /// #### Returns
+        ///
+        /// The first Char, or null.
+        public Char first() {
+<span class="pc bpc" id="L1120" title="1 of 2 branches missed.">            if (chars.isEmpty()) {</span>
+<span class="nc" id="L1121">                return null;</span>
+            }
+<span class="fc" id="L1123">            return chars.get(0);</span>
+        }
+
+        /// Gets the last Char in the span, or null if the span is empty.
+        ///
+        /// #### Returns
+        ///
+        /// The last Char or null.
+        public Char last() {
+<span class="pc bpc" id="L1132" title="1 of 2 branches missed.">            if (chars.isEmpty()) {</span>
+<span class="nc" id="L1133">                return null;</span>
+            }
+<span class="fc" id="L1135">            return chars.get(chars.size() - 1);</span>
+        }
+
+        /// Gets the number of Chars in the span.
+        public int size() {
+<span class="fc" id="L1140">            return chars.size();</span>
+        }
+
+        /// Gets a subspan containing the Chars between start (inclusive), and end (exclusive).
+        ///
+        /// #### Parameters
+        ///
+        /// - `start`: The start position of the Char to retrieve.
+        ///
+        /// - `end`: The end position of the Char to retrieve.
+        ///
+        /// #### Returns
+        ///
+        /// A new span including only the Chars at the given positions.
+        public Span subspan(int start, int end) {
+<span class="fc" id="L1155">            Span out = new Span(component);</span>
+<span class="fc bfc" id="L1156" title="All 2 branches covered.">            for (Char c : chars) {</span>
+<span class="fc bfc" id="L1157" title="All 4 branches covered.">                if (c.pos &gt;= start &amp;&amp; c.pos &lt; end) {</span>
+
+<span class="fc" id="L1159">                    out.add(c);</span>
+                }
+<span class="fc" id="L1161">            }</span>
+<span class="fc" id="L1162">            return out;</span>
+        }
+
+        /// Gets the bounds of the span.
+        ///
+        /// #### Returns
+        ///
+        /// the bounds
+        public Rectangle getBounds() {
+<span class="fc bfc" id="L1171" title="All 2 branches covered.">            if (boundsDirty) {</span>
+<span class="fc" id="L1172">                calculateBounds();</span>
+            }
+<span class="fc" id="L1174">            return bounds;</span>
+        }
+
+        /// Creates a translated span based on this one.
+        ///
+        /// #### Parameters
+        ///
+        /// - `tx`: x translation in pixels.
+        ///
+        /// - `ty`: y translation in pixels.
+        ///
+        /// #### Returns
+        ///
+        /// A new span translated.
+        public Span translate(int tx, int ty) {
+<span class="fc" id="L1189">            Span out = new Span(component);</span>
+<span class="fc" id="L1190">            out.component = component;</span>
+<span class="fc bfc" id="L1191" title="All 2 branches covered.">            for (Char c : chars) {</span>
+<span class="fc" id="L1192">                out.add(c.translate(tx, ty));</span>
+<span class="fc" id="L1193">            }</span>
+<span class="fc" id="L1194">            return out;</span>
+        }
+
+        /// Returns true if the span is empty.
+        public boolean isEmpty() {
+<span class="fc" id="L1199">            return chars.isEmpty();</span>
+        }
+
+    }
+
+    /// Encapsulates a collection of Spans.
+<span class="fc" id="L1205">    public class Spans implements Iterable&lt;Span&gt; {</span>
+<span class="fc" id="L1206">        private final List&lt;Span&gt; spans = new ArrayList&lt;Span&gt;();</span>
+
+        @Override
+        public Iterator&lt;Span&gt; iterator() {
+<span class="fc" id="L1210">            return spans.iterator();</span>
+        }
+
+        /// Adds all of the non-empty spans in the given spans collection to the current
+        /// spans collection.
+        ///
+        /// #### Parameters
+        ///
+        /// - `spans`
+        public void add(Spans spans) {
+<span class="fc bfc" id="L1220" title="All 2 branches covered.">            for (Span span : spans) {</span>
+<span class="pc bpc" id="L1221" title="1 of 2 branches missed.">                if (span.isEmpty()) {</span>
+<span class="nc" id="L1222">                    continue;</span>
+                }
+<span class="fc" id="L1224">                this.spans.add(span);</span>
+<span class="fc" id="L1225">            }</span>
+<span class="fc" id="L1226">        }</span>
+
+        /// Removes all spans.
+        public void clear() {
+<span class="fc" id="L1230">            spans.clear();</span>
+<span class="fc" id="L1231">        }</span>
+
+        /// Adds the given span to the collection, if it is non-empty.
+        ///
+        /// #### Parameters
+        ///
+        /// - `span`
+        public void add(Span span) {
+<span class="pc bpc" id="L1239" title="1 of 2 branches missed.">            if (!span.isEmpty()) {</span>
+<span class="fc" id="L1240">                this.spans.add(span);</span>
+            }
+<span class="fc" id="L1242">        }</span>
+
+        /// Gets the first span in the collection.
+        public Span first() {
+<span class="fc bfc" id="L1246" title="All 2 branches covered.">            if (!spans.isEmpty()) {</span>
+<span class="fc" id="L1247">                return spans.get(0);</span>
+            }
+<span class="fc" id="L1249">            return null;</span>
+        }
+
+        /// Gets the last span in the collection.
+        public Span last() {
+<span class="fc bfc" id="L1254" title="All 2 branches covered.">            if (!spans.isEmpty()) {</span>
+<span class="fc" id="L1255">                return spans.get(spans.size() - 1);</span>
+            }
+<span class="fc" id="L1257">            return null;</span>
+        }
+
+        /// Gets the text contained in this spans collection.
+        public String getText() {
+<span class="fc" id="L1262">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1263">            Component currCmp = null;</span>
+<span class="fc" id="L1264">            String lineSep = Display.getInstance().getLineSeparator();</span>
+            //int originX = selectionRoot.getAbsoluteX();
+<span class="fc" id="L1266">            int originY = selectionRoot.getAbsoluteY();</span>
+<span class="fc bfc" id="L1267" title="All 2 branches covered.">            for (Span span : spans) {</span>
+<span class="pc bpc" id="L1268" title="1 of 2 branches missed.">                if (currCmp != span.component) {</span>
+<span class="pc bpc" id="L1269" title="1 of 2 branches missed.">                    if (currCmp != null) {</span>
+<span class="nc bnc" id="L1270" title="All 2 branches missed.">                        if (span.getBounds().getY() &gt; currCmp.getAbsoluteY() + currCmp.getHeight() - originY) {</span>
+<span class="nc" id="L1271">                            sb.append(lineSep);</span>
+                        } else {
+<span class="nc" id="L1273">                            sb.append(&quot;\t&quot;);</span>
+                        }
+                    }
+                }
+<span class="fc" id="L1277">                currCmp = span.component;</span>
+<span class="fc" id="L1278">                TextSelectionSupport ts = span.component.getTextSelectionSupport();</span>
+<span class="pc bpc" id="L1279" title="1 of 2 branches missed.">                if (ts != null) {</span>
+<span class="fc" id="L1280">                    sb.append(ts.getTextForSpan(TextSelection.this, span));</span>
+                }
+<span class="fc" id="L1282">            }</span>
+<span class="fc" id="L1283">            return sb.toString();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L1288">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L1289">            sb.append(&quot;Spans{&quot;);</span>
+<span class="nc bnc" id="L1290" title="All 2 branches missed.">            for (Span span : spans) {</span>
+<span class="nc" id="L1291">                sb.append(span.toString());</span>
+<span class="nc" id="L1292">            }</span>
+<span class="nc" id="L1293">            sb.append(&quot;}&quot;);</span>
+<span class="nc" id="L1294">            return sb.toString();</span>
+        }
+
+        public Spans getIntersection(Rectangle bounds, boolean b) {
+<span class="fc" id="L1298">            Spans out = new Spans();</span>
+<span class="fc bfc" id="L1299" title="All 2 branches covered.">            for (Span span : spans) {</span>
+<span class="fc" id="L1300">                out.add(span.getIntersection(bounds, b));</span>
+<span class="fc" id="L1301">            }</span>
+<span class="fc" id="L1302">            return out;</span>
+        }
+
+        public boolean isEmpty() {
+<span class="pc bpc" id="L1306" title="1 of 2 branches missed.">            for (Span span : spans) {</span>
+<span class="pc bpc" id="L1307" title="1 of 2 branches missed.">                if (!span.isEmpty()) {</span>
+<span class="fc" id="L1308">                    return false;</span>
+                }
+<span class="nc" id="L1310">            }</span>
+<span class="nc" id="L1311">            return true;</span>
+        }
+
+        public Char charAt(int x, int y) {
+<span class="pc bpc" id="L1315" title="1 of 2 branches missed.">            for (Span span : spans) {</span>
+<span class="fc" id="L1316">                Char c = span.charAt(x, y);</span>
+<span class="pc bpc" id="L1317" title="1 of 2 branches missed.">                if (c != null) {</span>
+<span class="fc" id="L1318">                    return c;</span>
+                }
+<span class="nc" id="L1320">            }</span>
+<span class="nc" id="L1321">            return null;</span>
+        }
+
+
+        public Span spanOfCharAt(int x, int y) {
+<span class="pc bpc" id="L1326" title="1 of 2 branches missed.">            for (Span span : spans) {</span>
+<span class="fc" id="L1327">                Char c = span.charAt(x, y);</span>
+<span class="pc bpc" id="L1328" title="1 of 2 branches missed.">                if (c != null) {</span>
+<span class="fc" id="L1329">                    return span;</span>
+                }
+<span class="nc" id="L1331">            }</span>
+<span class="nc" id="L1332">            return null;</span>
+        }
+
+
+    }
+
+    private class SelectionMask extends Container {
+<span class="fc" id="L1339">        private final DragHandle startHandle = new DragHandle(true);</span>
+<span class="fc" id="L1340">        private final DragHandle endHandle = new DragHandle(false);</span>
+<span class="fc" id="L1341">        private final SelectionMenu selectionMenu = new SelectionMenu();</span>
+
+<span class="fc" id="L1343">        SelectionMask() {</span>
+<span class="pc bpc" id="L1344" title="1 of 2 branches missed.">            if (trigger == TextSelectionTrigger.LongPress) {</span>
+<span class="fc" id="L1345">                addAll(startHandle, endHandle, selectionMenu);</span>
+            }
+<span class="fc" id="L1347">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L1351">            return new Dimension(CN.getDisplayWidth(), CN.getDisplayHeight());</span>
+        }
+
+
+        @Override
+        public void paint(Graphics g) {
+<span class="fc" id="L1357">            super.paint(g);</span>
+<span class="fc" id="L1358">            g.setColor(0x0000ff);</span>
+<span class="fc" id="L1359">            int alph = g.getAlpha();</span>
+<span class="fc" id="L1360">            g.setAlpha(50);</span>
+<span class="fc" id="L1361">            int tx = g.getTranslateX();</span>
+<span class="fc" id="L1362">            int ty = g.getTranslateY();</span>
+<span class="fc" id="L1363">            g.translate(-tx, -ty);</span>
+<span class="fc" id="L1364">            int originX = selectionRoot.getAbsoluteX();</span>
+<span class="fc" id="L1365">            int originY = selectionRoot.getAbsoluteY();</span>
+<span class="fc" id="L1366">            g.translate(originX, originY);</span>
+<span class="fc" id="L1367">            int clipX = g.getClipX();</span>
+<span class="fc" id="L1368">            int clipY = g.getClipY();</span>
+<span class="fc" id="L1369">            int clipW = g.getClipWidth();</span>
+<span class="fc" id="L1370">            int clipH = g.getClipHeight();</span>
+<span class="fc" id="L1371">            g.clipRect(selectionRoot.getScrollX(), selectionRoot.getScrollY(), selectionRoot.getWidth(), selectionRoot.getHeight());</span>
+
+<span class="fc bfc" id="L1373" title="All 2 branches covered.">            for (Span span : selectedSpans) {</span>
+<span class="fc" id="L1374">                int innerClipX = g.getClipX();</span>
+<span class="fc" id="L1375">                int innerClipY = g.getClipY();</span>
+<span class="fc" id="L1376">                int innerClipW = g.getClipWidth();</span>
+<span class="fc" id="L1377">                int innerClipH = g.getClipHeight();</span>
+<span class="fc" id="L1378">                clipTo(g, span.component, originX, originY);</span>
+                //g.translate(span.component.getAbsoluteX(), span.component.getAbsoluteY());
+<span class="fc" id="L1380">                g.fillRect(span.getBounds().getX(), span.getBounds().getY(), span.getBounds().getWidth(), span.getBounds().getHeight());</span>
+                //g.translate(-span.component.getAbsoluteX(), -span.component.getAbsoluteY());
+<span class="fc" id="L1382">                g.setClip(innerClipX, innerClipY, innerClipW, innerClipH);</span>
+<span class="fc" id="L1383">            }</span>
+<span class="fc" id="L1384">            updateSnappedSelectedBounds();</span>
+            //g.drawRect(snappedSelectedBounds.getX(), snappedSelectedBounds.getY(), snappedSelectedBounds.getWidth(), snappedSelectedBounds.getHeight());
+            //g.drawRect(selectedBounds.getX(), selectedBounds.getY(), selectedBounds.getWidth(), selectedBounds.getHeight());
+<span class="fc" id="L1387">            g.setClip(clipX, clipY, clipW, clipH);</span>
+<span class="fc" id="L1388">            g.translate(-originX, -originY);</span>
+<span class="fc" id="L1389">            g.translate(tx, ty);</span>
+<span class="fc" id="L1390">            g.setAlpha(alph);</span>
+<span class="fc" id="L1391">        }</span>
+
+        private void clipTo(Graphics g, Component cmp, int originX, int originY) {
+<span class="fc" id="L1394">            g.clipRect(cmp.getAbsoluteX() - originX + cmp.getScrollX(), cmp.getAbsoluteY() - originY + cmp.getScrollY(), cmp.getWidth(), cmp.getHeight());</span>
+<span class="fc bfc" id="L1395" title="All 2 branches covered.">            if (cmp.getParent() != null) {</span>
+<span class="fc" id="L1396">                clipTo(g, cmp.getParent(), originX, originY);</span>
+            }
+<span class="fc" id="L1398">        }</span>
+
+        @Override
+        public void layoutContainer() {
+<span class="fc" id="L1402">            super.layoutContainer();</span>
+<span class="fc" id="L1403">            Span first = selectedSpans.first();</span>
+<span class="fc" id="L1404">            Span last = selectedSpans.last();</span>
+<span class="pc bpc" id="L1405" title="2 of 6 branches missed.">            if (first == null || last == null || trigger != TextSelectionTrigger.LongPress) {</span>
+<span class="fc" id="L1406">                startHandle.setVisible(false);</span>
+<span class="fc" id="L1407">                endHandle.setVisible(false);</span>
+<span class="fc" id="L1408">                return;</span>
+            }
+<span class="fc" id="L1410">            int offX = selectionRoot.getAbsoluteX() - getAbsoluteX();</span>
+<span class="fc" id="L1411">            int offY = selectionRoot.getAbsoluteY() - getAbsoluteY();</span>
+<span class="fc" id="L1412">            startHandle.setVisible(true);</span>
+<span class="fc" id="L1413">            endHandle.setVisible(true);</span>
+<span class="fc" id="L1414">            startHandle.setX(offX + first.getBounds().getX() - startHandle.getPreferredW());</span>
+<span class="fc" id="L1415">            startHandle.setY(offY + first.getBounds().getY());</span>
+<span class="fc" id="L1416">            startHandle.setHeight(startHandle.getPreferredH() + first.getBounds().getHeight());</span>
+<span class="fc" id="L1417">            startHandle.setWidth(startHandle.getPreferredW());</span>
+
+<span class="fc" id="L1419">            endHandle.setX(offX + last.getBounds().getX() + last.getBounds().getWidth());</span>
+<span class="fc" id="L1420">            endHandle.setY(offY + last.getBounds().getY());</span>
+<span class="fc" id="L1421">            endHandle.setWidth(endHandle.getPreferredW());</span>
+<span class="fc" id="L1422">            endHandle.setHeight(endHandle.getPreferredH() + last.getBounds().getHeight());</span>
+
+<span class="fc" id="L1424">            int menuW = selectionMenu.getPreferredW();</span>
+<span class="fc" id="L1425">            int menuH = selectionMenu.getPreferredH();</span>
+<span class="fc" id="L1426">            int menuX = first.getBounds().getX() + offX;</span>
+<span class="pc bpc" id="L1427" title="1 of 2 branches missed.">            if (menuX + menuW &gt; getWidth()) {</span>
+<span class="nc" id="L1428">                menuX = getWidth() - menuW;</span>
+            }
+<span class="fc" id="L1430">            int menuY = offY + first.getBounds().getY() - menuH;</span>
+<span class="pc bpc" id="L1431" title="1 of 2 branches missed.">            if (menuY &lt; 0) {</span>
+<span class="fc" id="L1432">                menuY = offY + last.getBounds().getY() + last.getBounds().getHeight();</span>
+            }
+<span class="fc" id="L1434">            selectionMenu.setX(menuX);</span>
+<span class="fc" id="L1435">            selectionMenu.setY(menuY);</span>
+<span class="fc" id="L1436">            selectionMenu.setWidth(menuW);</span>
+<span class="fc" id="L1437">            selectionMenu.setHeight(menuH);</span>
+
+<span class="fc" id="L1439">        }</span>
+
+
+    }
+
+    private class SelectionMenu extends Container implements ActionListener {
+<span class="fc" id="L1445">        Button copy = new HeavyButton(&quot;Copy&quot;);</span>
+<span class="fc" id="L1446">        Button selectAll = new HeavyButton(&quot;Select All&quot;);</span>
+
+<span class="fc" id="L1448">        SelectionMenu() {</span>
+<span class="fc" id="L1449">            $(this).selectAllStyles()</span>
+<span class="fc" id="L1450">                    .setBgColor(0x111111)</span>
+<span class="fc" id="L1451">                    .setBgTransparency(255)</span>
+<span class="fc" id="L1452">                    .setBorder(RoundRectBorder.create().cornerRadius(1));</span>
+<span class="fc" id="L1453">            $(copy, selectAll).selectAllStyles()</span>
+<span class="fc" id="L1454">                    .setFgColor(0xffffff);</span>
+<span class="fc" id="L1455">            addAll(copy, selectAll);</span>
+<span class="fc" id="L1456">            copy.addActionListener(this);</span>
+<span class="fc" id="L1457">            selectAll.addActionListener(this);</span>
+<span class="fc" id="L1458">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+<span class="nc bnc" id="L1462" title="All 2 branches missed.">            if (e.getSource() == selectAll) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1463">                selectAll();</span>
+            } else {
+<span class="nc" id="L1465">                copy();</span>
+            }
+<span class="nc" id="L1467">        }</span>
+    }
+
+    private class DragHandle extends Button {
+        boolean start;
+<span class="fc" id="L1472">        int diameter = CN.convertToPixels(4);</span>
+
+<span class="fc" id="L1474">        DragHandle(boolean start) {</span>
+<span class="fc" id="L1475">            this.start = start;</span>
+<span class="fc" id="L1476">            this.setDraggable(true);</span>
+
+<span class="fc" id="L1478">        }</span>
+
+        @Override
+        protected Image getDragImage() {
+<span class="nc" id="L1482">            return null;</span>
+        }
+
+        @Override
+        void drawDraggedImage(Graphics g) {
+
+<span class="nc" id="L1488">        }</span>
+
+        @Override
+        protected void drawDraggedImage(Graphics g, Image img, int x, int y) {
+
+<span class="nc" id="L1493">        }</span>
+
+        @Override
+        protected int getDragRegionStatus(int x, int y) {
+<span class="nc" id="L1497">            return DRAG_REGION_IMMEDIATELY_DRAG_XY;</span>
+        }
+
+
+        public int getAbsolutePointerX() {
+<span class="nc bnc" id="L1502" title="All 2 branches missed.">            return getAbsoluteX() + (start ? getWidth() : 0);</span>
+
+        }
+
+        public int getAbsolutePointerY() {
+<span class="nc bnc" id="L1507" title="All 2 branches missed.">            return getAbsoluteY() + (start ? 0 : getHeight() - getPreferredH());</span>
+        }
+
+        @Override
+        protected void initComponent() {
+<span class="fc" id="L1512">            super.initComponent();</span>
+<span class="fc" id="L1513">            addPointerPressedListener(pressListener);</span>
+<span class="fc" id="L1514">            addPointerDraggedListener(pressListener);</span>
+<span class="fc" id="L1515">            addPointerReleasedListener(pressListener);</span>
+<span class="fc" id="L1516">            addDragFinishedListener(pressListener);</span>
+<span class="fc" id="L1517">            addLongPressListener(pressListener);</span>
+<span class="fc" id="L1518">        }</span>
+
+        @Override
+        protected void deinitialize() {
+<span class="fc" id="L1522">            removePointerPressedListener(pressListener);</span>
+<span class="fc" id="L1523">            removePointerDraggedListener(pressListener);</span>
+<span class="fc" id="L1524">            removePointerReleasedListener(pressListener);</span>
+<span class="fc" id="L1525">            removeDragFinishedListener(pressListener);</span>
+<span class="fc" id="L1526">            addLongPressListener(pressListener);</span>
+<span class="fc" id="L1527">            super.deinitialize();</span>
+<span class="fc" id="L1528">        }</span>
+
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L1533">            return new Dimension(diameter, diameter);</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="fc" id="L1538">            super.paint(g);</span>
+<span class="fc" id="L1539">            boolean antialias = g.isAntiAliased();</span>
+<span class="fc" id="L1540">            g.setAntiAliased(true);</span>
+<span class="fc" id="L1541">            g.setColor(0x0000ff);</span>
+<span class="fc" id="L1542">            int x = getX();</span>
+<span class="fc" id="L1543">            int y = getY() + getHeight() - getPreferredH();</span>
+<span class="fc" id="L1544">            int w = getWidth();</span>
+<span class="fc" id="L1545">            int h = getPreferredH();</span>
+<span class="fc bfc" id="L1546" title="All 2 branches covered.">            if (start) {</span>
+<span class="fc" id="L1547">                g.fillArc(x, y, w, h, 0, 360);</span>
+<span class="fc" id="L1548">                g.fillRect(x + w / 2, y, w / 2, h / 2);</span>
+<span class="fc" id="L1549">                g.drawRect(x + w / 2, y, w / 2, h / 2);</span>
+            } else {
+<span class="fc" id="L1551">                g.fillArc(x, y, w, h, 0, 360);</span>
+<span class="fc" id="L1552">                g.fillRect(x, y, w / 2, h / 2);</span>
+<span class="fc" id="L1553">                g.drawRect(x, y, w / 2, h / 2);</span>
+            }
+<span class="fc" id="L1555">            g.setAntiAliased(antialias);</span>
+<span class="fc" id="L1556">        }</span>
+
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

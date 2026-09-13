@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShieldStatus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield</a> &gt; <span class="el_source">ShieldStatus.java</span></div><h1>ShieldStatus.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+/// Outcome of a shield operation.
+///
+/// The single most important distinction in this class is between *&quot;I could not reach the
+/// attestation service&quot;* ([#NO_NETWORK], [#POOR_NETWORK], [#SERVICE_DOWN], [#RATE_LIMITED]) and
+/// *&quot;the attestation service looked at this device and said no&quot;* ([#REJECTED]). An app should
+/// almost always treat the first group as a transient condition to retry through, and only the
+/// second as evidence that something is actually wrong with the device it is running on.
+/// Collapsing the two into a single &quot;attestation failed&quot; boolean is the most common way to build
+/// an app that either locks out users on a train or trusts a rooted phone.
+///
+/// This is a class of constants rather than an enum because the vocabulary is wire-visible: the
+/// attestation engine may report a status that this build of the framework predates, and
+/// [#getId()] round-trips it rather than failing to resolve.
+public final class ShieldStatus {
+
+    /// The operation succeeded and any token returned is usable.
+<span class="fc" id="L41">    public static final ShieldStatus OK = new ShieldStatus(&quot;ok&quot;, true);</span>
+
+    /// The app was built without the enterprise attestation engine. Everything degrades to a
+    /// no-op: no token is issued, no pin is enforced, and no request is blocked.
+<span class="fc" id="L45">    public static final ShieldStatus UNPROTECTED = new ShieldStatus(&quot;unprotected&quot;, false);</span>
+
+    /// [AppShield#init(ShieldConfig)] has not been called yet.
+<span class="fc" id="L48">    public static final ShieldStatus NOT_INITIALIZED = new ShieldStatus(&quot;notInitialized&quot;, false);</span>
+
+    /// The device has no connectivity. Transient.
+<span class="fc" id="L51">    public static final ShieldStatus NO_NETWORK = new ShieldStatus(&quot;noNetwork&quot;, false);</span>
+
+    /// The request timed out or DNS failed. Transient.
+<span class="fc" id="L54">    public static final ShieldStatus POOR_NETWORK = new ShieldStatus(&quot;poorNetwork&quot;, false);</span>
+
+    /// The attestation service answered with a server error. Transient.
+<span class="fc" id="L57">    public static final ShieldStatus SERVICE_DOWN = new ShieldStatus(&quot;serviceUnavailable&quot;, false);</span>
+
+    /// This device is asking too often and is being throttled. Transient, but back off before
+    /// retrying rather than looping.
+<span class="fc" id="L61">    public static final ShieldStatus RATE_LIMITED = new ShieldStatus(&quot;rateLimited&quot;, false);</span>
+
+    /// The service evaluated this device and declined to issue a token. **Not** transient: the
+    /// device itself is what failed the policy. Retrying will not help.
+<span class="fc" id="L65">    public static final ShieldStatus REJECTED = new ShieldStatus(&quot;rejected&quot;, false);</span>
+
+    /// The certificate chain presented by a protected host matched no configured pin. The request
+    /// was refused before any request body was sent.
+<span class="fc" id="L69">    public static final ShieldStatus PIN_MISMATCH = new ShieldStatus(&quot;pinMismatch&quot;, false);</span>
+
+<span class="fc" id="L71">    private static final ShieldStatus[] KNOWN = {</span>
+        OK, UNPROTECTED, NOT_INITIALIZED, NO_NETWORK, POOR_NETWORK,
+        SERVICE_DOWN, RATE_LIMITED, REJECTED, PIN_MISMATCH
+    };
+
+    private final String id;
+    private final boolean success;
+
+<span class="fc" id="L79">    private ShieldStatus(String id, boolean success) {</span>
+<span class="fc" id="L80">        this.id = id;</span>
+<span class="fc" id="L81">        this.success = success;</span>
+<span class="fc" id="L82">    }</span>
+
+    /// The stable wire identifier, e.g. `rateLimited`.
+    public String getId() {
+<span class="fc" id="L86">        return id;</span>
+    }
+
+    /// True only for [#OK]. Every other status means no usable token was produced.
+    public boolean isSuccess() {
+<span class="fc" id="L91">        return success;</span>
+    }
+
+    /// True when the failure is about reaching the service rather than about this device. Retrying
+    /// later may succeed. False for [#REJECTED] and [#PIN_MISMATCH], which describe the device and
+    /// the connection respectively.
+    public boolean isTransient() {
+<span class="fc bfc" id="L98" title="All 8 branches covered.">        return this == NO_NETWORK || this == POOR_NETWORK</span>
+                || this == SERVICE_DOWN || this == RATE_LIMITED;
+    }
+
+    /// Resolves a wire identifier to a constant, or synthesises a non-success status for an
+    /// identifier this build does not know about. Never returns null.
+    public static ShieldStatus forId(String id) {
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L106">            return NOT_INITIALIZED;</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (ShieldStatus known : KNOWN) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (known.id.equals(id)) {</span>
+<span class="fc" id="L110">                return known;</span>
+            }
+        }
+<span class="fc" id="L113">        return new ShieldStatus(id, false);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L118">        return id;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L124">            return true;</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!(o instanceof ShieldStatus)) {</span>
+<span class="nc" id="L127">            return false;</span>
+        }
+<span class="fc" id="L129">        return id.equals(((ShieldStatus) o).id);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L134">        return id.hashCode();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PointerEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.events</a> &gt; <span class="el_source">PointerEvent.java</span></div><h1>PointerEvent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.events;
+
+/// Immutable snapshot describing the rich detail of a pointer interaction that goes
+/// beyond the simple x/y coordinates carried by the legacy pointer callbacks.
+///
+/// A `PointerEvent` exposes which mouse button triggered the interaction, the kind of
+/// pointing device used (finger, mouse, stylus or eraser), the pressure applied, stylus
+/// tilt, the size of the contact area and the keyboard modifiers that were held down.
+///
+/// The snapshot is available in two ways:
+///
+/// - From an `ActionEvent` fired by a pointer listener via `ActionEvent#getPointerEvent()`.
+/// - By polling `com.codename1.ui.Display#getCurrentPointerEvent()` (or the matching `com.codename1.ui.CN`
+///   convenience method) while a pointer event is being dispatched.
+///
+/// Every value carries a safe default so code written against the rich API behaves predictably
+/// on devices and ports that do not supply the extra detail. On such ports the button defaults to
+/// `BUTTON_PRIMARY`, the pressure to `1.0`, the type to `TYPE_UNKNOWN` and tilt/contact size to `0`.
+public final class PointerEvent {
+
+    /// The pointing device could not be determined.
+    public static final int TYPE_UNKNOWN = 0;
+
+    /// The interaction came from a finger on a touch screen.
+    public static final int TYPE_TOUCH = 1;
+
+    /// The interaction came from a mouse or trackpad.
+    public static final int TYPE_MOUSE = 2;
+
+    /// The interaction came from a stylus or pen (Apple Pencil, S-Pen, Surface Pen and similar).
+    public static final int TYPE_STYLUS = 3;
+
+    /// The interaction came from the eraser end of a stylus.
+    public static final int TYPE_ERASER = 4;
+
+    /// No button is associated with this event (for example a hover or a plain touch).
+    public static final int BUTTON_NONE = -1;
+
+    /// The primary (usually left) mouse button, or a plain touch/stylus contact.
+    public static final int BUTTON_PRIMARY = 0;
+
+    /// The secondary (usually right) mouse button or stylus barrel button.
+    public static final int BUTTON_SECONDARY = 1;
+
+    /// The middle mouse button (often the scroll wheel click).
+    public static final int BUTTON_MIDDLE = 2;
+
+    /// The back (fourth) mouse button.
+    public static final int BUTTON_BACK = 3;
+
+    /// The forward (fifth) mouse button.
+    public static final int BUTTON_FORWARD = 4;
+
+    /// Button mask bit for the primary button.
+    public static final int MASK_PRIMARY = 1;
+
+    /// Button mask bit for the secondary button.
+    public static final int MASK_SECONDARY = 1 &lt;&lt; 1;
+
+    /// Button mask bit for the middle button.
+    public static final int MASK_MIDDLE = 1 &lt;&lt; 2;
+
+    /// Button mask bit for the back button.
+    public static final int MASK_BACK = 1 &lt;&lt; 3;
+
+    /// Button mask bit for the forward button.
+    public static final int MASK_FORWARD = 1 &lt;&lt; 4;
+
+    /// Modifier mask bit indicating the shift key was held.
+    public static final int MODIFIER_SHIFT = 1;
+
+    /// Modifier mask bit indicating the control key was held.
+    public static final int MODIFIER_CONTROL = 1 &lt;&lt; 1;
+
+    /// Modifier mask bit indicating the alt/option key was held.
+    public static final int MODIFIER_ALT = 1 &lt;&lt; 2;
+
+    /// Modifier mask bit indicating the meta/command/windows key was held.
+    public static final int MODIFIER_META = 1 &lt;&lt; 3;
+
+    private final int x;
+    private final int y;
+    private final int button;
+    private final int buttonMask;
+    private final int pointerType;
+    private final float pressure;
+    private final float tiltX;
+    private final float tiltY;
+    private final float contactSize;
+    private final int modifiers;
+    private final boolean hovering;
+
+    /// Creates a new immutable pointer event snapshot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x position of the pointer in display pixels
+    ///
+    /// - `y`: the y position of the pointer in display pixels
+    ///
+    /// - `button`: one of the `BUTTON_*` constants describing the triggering button
+    ///
+    /// - `buttonMask`: bitmask of the `MASK_*` constants describing all currently held buttons
+    ///
+    /// - `pointerType`: one of the `TYPE_*` constants describing the pointing device
+    ///
+    /// - `pressure`: normalized pressure between `0.0` and `1.0`, defaulting to `1.0`
+    ///
+    /// - `tiltX`: stylus tilt across the x axis in degrees, `0` when not available
+    ///
+    /// - `tiltY`: stylus tilt across the y axis in degrees, `0` when not available
+    ///
+    /// - `contactSize`: normalized size of the contact area between `0.0` and `1.0`
+    ///
+    /// - `modifiers`: bitmask of the `MODIFIER_*` constants describing held keyboard modifiers
+    ///
+    /// - `hovering`: true if the pointer is hovering above the surface without contact
+    public PointerEvent(int x, int y, int button, int buttonMask, int pointerType,
+<span class="fc" id="L142">            float pressure, float tiltX, float tiltY, float contactSize, int modifiers, boolean hovering) {</span>
+<span class="fc" id="L143">        this.x = x;</span>
+<span class="fc" id="L144">        this.y = y;</span>
+<span class="fc" id="L145">        this.button = button;</span>
+<span class="fc" id="L146">        this.buttonMask = buttonMask;</span>
+<span class="fc" id="L147">        this.pointerType = pointerType;</span>
+<span class="fc" id="L148">        this.pressure = pressure;</span>
+<span class="fc" id="L149">        this.tiltX = tiltX;</span>
+<span class="fc" id="L150">        this.tiltY = tiltY;</span>
+<span class="fc" id="L151">        this.contactSize = contactSize;</span>
+<span class="fc" id="L152">        this.modifiers = modifiers;</span>
+<span class="fc" id="L153">        this.hovering = hovering;</span>
+<span class="fc" id="L154">    }</span>
+
+    /// The x position of the pointer in display pixels.
+    public int getX() {
+<span class="fc" id="L158">        return x;</span>
+    }
+
+    /// The y position of the pointer in display pixels.
+    public int getY() {
+<span class="fc" id="L163">        return y;</span>
+    }
+
+    /// The button that triggered this event, one of the `BUTTON_*` constants. Defaults to
+    /// `BUTTON_PRIMARY` for plain touch interactions and `BUTTON_NONE` for hover events.
+    public int getButton() {
+<span class="fc" id="L169">        return button;</span>
+    }
+
+    /// A bitmask of all buttons currently held down, built from the `MASK_*` constants.
+    public int getButtonMask() {
+<span class="fc" id="L174">        return buttonMask;</span>
+    }
+
+    /// The kind of pointing device that produced this event, one of the `TYPE_*` constants.
+    public int getPointerType() {
+<span class="fc" id="L179">        return pointerType;</span>
+    }
+
+    /// The normalized pressure applied by the pointer between `0.0` and `1.0`. Ports that do not
+    /// report pressure return `1.0` so that pressure aware code keeps working.
+    public float getPressure() {
+<span class="fc" id="L185">        return pressure;</span>
+    }
+
+    /// The stylus tilt across the x axis in degrees, or `0` when not reported.
+    public float getTiltX() {
+<span class="fc" id="L190">        return tiltX;</span>
+    }
+
+    /// The stylus tilt across the y axis in degrees, or `0` when not reported.
+    public float getTiltY() {
+<span class="fc" id="L195">        return tiltY;</span>
+    }
+
+    /// The normalized size of the contact area between `0.0` and `1.0`, or `0` when not reported.
+    public float getContactSize() {
+<span class="fc" id="L200">        return contactSize;</span>
+    }
+
+    /// A bitmask of the keyboard modifiers held during this event, built from the `MODIFIER_*` constants.
+    public int getModifiers() {
+<span class="nc" id="L205">        return modifiers;</span>
+    }
+
+    /// True if the pointer is hovering above the surface without making contact.
+    public boolean isHovering() {
+<span class="fc" id="L210">        return hovering;</span>
+    }
+
+    /// True if this event came from a finger on a touch screen.
+    public boolean isTouch() {
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        return pointerType == TYPE_TOUCH;</span>
+    }
+
+    /// True if this event came from a mouse or trackpad.
+    public boolean isMouse() {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        return pointerType == TYPE_MOUSE;</span>
+    }
+
+    /// True if this event came from a stylus or the eraser end of a stylus.
+    public boolean isStylus() {
+<span class="fc bfc" id="L225" title="All 4 branches covered.">        return pointerType == TYPE_STYLUS || pointerType == TYPE_ERASER;</span>
+    }
+
+    /// True if this event came from the eraser end of a stylus.
+    public boolean isEraser() {
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        return pointerType == TYPE_ERASER;</span>
+    }
+
+    /// True if the triggering button is the primary (left) button.
+    public boolean isPrimaryButton() {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        return button == BUTTON_PRIMARY;</span>
+    }
+
+    /// True if the triggering button is the secondary (right) button or stylus barrel button.
+    public boolean isSecondaryButton() {
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        return button == BUTTON_SECONDARY;</span>
+    }
+
+    /// True if the triggering button is the middle button.
+    public boolean isMiddleButton() {
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        return button == BUTTON_MIDDLE;</span>
+    }
+
+    /// True if the shift key was held during this event.
+    public boolean isShiftDown() {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        return (modifiers &amp; MODIFIER_SHIFT) != 0;</span>
+    }
+
+    /// True if the control key was held during this event.
+    public boolean isControlDown() {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        return (modifiers &amp; MODIFIER_CONTROL) != 0;</span>
+    }
+
+    /// True if the alt/option key was held during this event.
+    public boolean isAltDown() {
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        return (modifiers &amp; MODIFIER_ALT) != 0;</span>
+    }
+
+    /// True if the meta/command/windows key was held during this event.
+    public boolean isMetaDown() {
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        return (modifiers &amp; MODIFIER_META) != 0;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L270">        return &quot;PointerEvent[x=&quot; + x + &quot;, y=&quot; + y + &quot;, button=&quot; + button + &quot;, buttonMask=&quot; + buttonMask</span>
+                + &quot;, type=&quot; + pointerType + &quot;, pressure=&quot; + pressure + &quot;, tiltX=&quot; + tiltX + &quot;, tiltY=&quot; + tiltY
+                + &quot;, contactSize=&quot; + contactSize + &quot;, modifiers=&quot; + modifiers + &quot;, hovering=&quot; + hovering + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

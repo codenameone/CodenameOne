@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Mat33.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.common</a> &gt; <span class="el_source">Mat33.java</span></div><h1>Mat33.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.common;
+
+
+/// A 3-by-3 matrix. Stored in column-major order.
+///
+/// @author Daniel Murphy
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">public class Mat33 {</span>
+
+<span class="fc" id="L32">  public static final Mat33 IDENTITY = new Mat33(new Vec3(1, 0, 0), new Vec3(0, 1, 0), new Vec3(0,</span>
+      0, 1));
+
+  public final Vec3 ex, ey, ez;
+
+<span class="fc" id="L37">  public Mat33() {</span>
+<span class="fc" id="L38">    ex = new Vec3();</span>
+<span class="fc" id="L39">    ey = new Vec3();</span>
+<span class="fc" id="L40">    ez = new Vec3();</span>
+<span class="fc" id="L41">  }</span>
+
+<span class="fc" id="L43">  public Mat33(Vec3 argCol1, Vec3 argCol2, Vec3 argCol3) {</span>
+<span class="fc" id="L44">    ex = argCol1.clone();</span>
+<span class="fc" id="L45">    ey = argCol2.clone();</span>
+<span class="fc" id="L46">    ez = argCol3.clone();</span>
+<span class="fc" id="L47">  }</span>
+
+  public void setZero() {
+<span class="fc" id="L50">    ex.setZero();</span>
+<span class="fc" id="L51">    ey.setZero();</span>
+<span class="fc" id="L52">    ez.setZero();</span>
+<span class="fc" id="L53">  }</span>
+
+  // / Multiply a matrix times a vector.
+  public static final Vec3 mul(Mat33 A, Vec3 v) {
+<span class="nc" id="L57">    return new Vec3(v.x * A.ex.x + v.y * A.ey.x + v.z + A.ez.x, v.x * A.ex.y + v.y * A.ey.y + v.z</span>
+        * A.ez.y, v.x * A.ex.z + v.y * A.ey.z + v.z * A.ez.z);
+  }
+
+  public static final Vec2 mul22(Mat33 A, Vec2 v) {
+<span class="nc" id="L62">    return new Vec2(A.ex.x * v.x + A.ey.x * v.y, A.ex.y * v.x + A.ey.y * v.y);</span>
+  }
+
+  public static final void mul22ToOut(Mat33 A, Vec2 v, Vec2 out) {
+<span class="nc" id="L66">    final float tempx = A.ex.x * v.x + A.ey.x * v.y;</span>
+<span class="nc" id="L67">    out.y = A.ex.y * v.x + A.ey.y * v.y;</span>
+<span class="nc" id="L68">    out.x = tempx;</span>
+<span class="nc" id="L69">  }</span>
+
+  public static final void mul22ToOutUnsafe(Mat33 A, Vec2 v, Vec2 out) {
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">    assert (v != out);</span>
+<span class="fc" id="L73">    out.y = A.ex.y * v.x + A.ey.y * v.y;</span>
+<span class="fc" id="L74">    out.x = A.ex.x * v.x + A.ey.x * v.y;</span>
+<span class="fc" id="L75">  }</span>
+
+  public static final void mulToOut(Mat33 A, Vec3 v, Vec3 out) {
+<span class="nc" id="L78">    final float tempy = v.x * A.ex.y + v.y * A.ey.y + v.z * A.ez.y;</span>
+<span class="nc" id="L79">    final float tempz = v.x * A.ex.z + v.y * A.ey.z + v.z * A.ez.z;</span>
+<span class="nc" id="L80">    out.x = v.x * A.ex.x + v.y * A.ey.x + v.z * A.ez.x;</span>
+<span class="nc" id="L81">    out.y = tempy;</span>
+<span class="nc" id="L82">    out.z = tempz;</span>
+<span class="nc" id="L83">  }</span>
+
+  public static final void mulToOutUnsafe(Mat33 A, Vec3 v, Vec3 out) {
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">    assert (out != v);</span>
+<span class="fc" id="L87">    out.x = v.x * A.ex.x + v.y * A.ey.x + v.z * A.ez.x;</span>
+<span class="fc" id="L88">    out.y = v.x * A.ex.y + v.y * A.ey.y + v.z * A.ez.y;</span>
+<span class="fc" id="L89">    out.z = v.x * A.ex.z + v.y * A.ey.z + v.z * A.ez.z;</span>
+<span class="fc" id="L90">  }</span>
+
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @return
+  public final Vec2 solve22(Vec2 b) {
+<span class="fc" id="L98">    Vec2 x = new Vec2();</span>
+<span class="fc" id="L99">    solve22ToOut(b, x);</span>
+<span class="fc" id="L100">    return x;</span>
+  }
+
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @return
+  public final void solve22ToOut(Vec2 b, Vec2 out) {
+<span class="fc" id="L109">    final float a11 = ex.x, a12 = ey.x, a21 = ex.y, a22 = ey.y;</span>
+<span class="fc" id="L110">    float det = a11 * a22 - a12 * a21;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">    if (det != 0.0f) {</span>
+<span class="fc" id="L112">      det = 1.0f / det;</span>
+    }
+<span class="fc" id="L114">    out.x = det * (a22 * b.x - a12 * b.y);</span>
+<span class="fc" id="L115">    out.y = det * (a11 * b.y - a21 * b.x);</span>
+<span class="fc" id="L116">  }</span>
+
+  // djm pooling from below
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @return
+  public final Vec3 solve33(Vec3 b) {
+<span class="fc" id="L125">    Vec3 x = new Vec3();</span>
+<span class="fc" id="L126">    solve33ToOut(b, x);</span>
+<span class="fc" id="L127">    return x;</span>
+  }
+
+  /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
+  /// in one-shot cases.
+  ///
+  /// @param b
+  /// @param out the result
+  public final void solve33ToOut(Vec3 b, Vec3 out) {
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">    assert (b != out);</span>
+<span class="fc" id="L137">    Vec3.crossToOutUnsafe(ey, ez, out);</span>
+<span class="fc" id="L138">    float det = Vec3.dot(ex, out);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">    if (det != 0.0f) {</span>
+<span class="fc" id="L140">      det = 1.0f / det;</span>
+    }
+<span class="fc" id="L142">    Vec3.crossToOutUnsafe(ey, ez, out);</span>
+<span class="fc" id="L143">    final float x = det * Vec3.dot(b, out);</span>
+<span class="fc" id="L144">    Vec3.crossToOutUnsafe(b, ez, out);</span>
+<span class="fc" id="L145">    final float y = det * Vec3.dot(ex, out);</span>
+<span class="fc" id="L146">    Vec3.crossToOutUnsafe(ey, b, out);</span>
+<span class="fc" id="L147">    float z = det * Vec3.dot(ex, out);</span>
+<span class="fc" id="L148">    out.x = x;</span>
+<span class="fc" id="L149">    out.y = y;</span>
+<span class="fc" id="L150">    out.z = z;</span>
+<span class="fc" id="L151">  }</span>
+
+  public void getInverse22(Mat33 M) {
+<span class="fc" id="L154">    float a = ex.x, b = ey.x, c = ex.y, d = ey.y;</span>
+<span class="fc" id="L155">    float det = a * d - b * c;</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">    if (det != 0.0f) {</span>
+<span class="fc" id="L157">      det = 1.0f / det;</span>
+    }
+
+<span class="fc" id="L160">    M.ex.x = det * d;</span>
+<span class="fc" id="L161">    M.ey.x = -det * b;</span>
+<span class="fc" id="L162">    M.ex.z = 0.0f;</span>
+<span class="fc" id="L163">    M.ex.y = -det * c;</span>
+<span class="fc" id="L164">    M.ey.y = det * a;</span>
+<span class="fc" id="L165">    M.ey.z = 0.0f;</span>
+<span class="fc" id="L166">    M.ez.x = 0.0f;</span>
+<span class="fc" id="L167">    M.ez.y = 0.0f;</span>
+<span class="fc" id="L168">    M.ez.z = 0.0f;</span>
+<span class="fc" id="L169">  }</span>
+
+  // / Returns the zero matrix if singular.
+  public void getSymInverse33(Mat33 M) {
+<span class="fc" id="L173">    float bx = ey.y * ez.z - ey.z * ez.y;</span>
+<span class="fc" id="L174">    float by = ey.z * ez.x - ey.x * ez.z;</span>
+<span class="fc" id="L175">    float bz = ey.x * ez.y - ey.y * ez.x;</span>
+<span class="fc" id="L176">    float det = ex.x * bx + ex.y * by + ex.z * bz;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">    if (det != 0.0f) {</span>
+<span class="fc" id="L178">      det = 1.0f / det;</span>
+    }
+
+<span class="fc" id="L181">    float a11 = ex.x, a12 = ey.x, a13 = ez.x;</span>
+<span class="fc" id="L182">    float a22 = ey.y, a23 = ez.y;</span>
+<span class="fc" id="L183">    float a33 = ez.z;</span>
+
+<span class="fc" id="L185">    M.ex.x = det * (a22 * a33 - a23 * a23);</span>
+<span class="fc" id="L186">    M.ex.y = det * (a13 * a23 - a12 * a33);</span>
+<span class="fc" id="L187">    M.ex.z = det * (a12 * a23 - a13 * a22);</span>
+
+<span class="fc" id="L189">    M.ey.x = M.ex.y;</span>
+<span class="fc" id="L190">    M.ey.y = det * (a11 * a33 - a13 * a13);</span>
+<span class="fc" id="L191">    M.ey.z = det * (a13 * a12 - a11 * a23);</span>
+
+<span class="fc" id="L193">    M.ez.x = M.ex.z;</span>
+<span class="fc" id="L194">    M.ez.y = M.ey.z;</span>
+<span class="fc" id="L195">    M.ez.z = det * (a11 * a22 - a12 * a12);</span>
+<span class="fc" id="L196">  }</span>
+
+  public int hashCode() {
+<span class="nc" id="L199">    final int prime = 31;</span>
+<span class="nc" id="L200">    int result = 1;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">    result = prime * result + ((ex == null) ? 0 : ex.hashCode());</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">    result = prime * result + ((ey == null) ? 0 : ey.hashCode());</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">    result = prime * result + ((ez == null) ? 0 : ez.hashCode());</span>
+<span class="nc" id="L204">    return result;</span>
+  }
+
+  public boolean equals(Object obj) {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">    if (this == obj) return true;</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">    if (obj == null) return false;</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">    if (getClass() != obj.getClass()) return false;</span>
+<span class="nc" id="L211">    Mat33 other = (Mat33) obj;</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">    if (ex == null) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">      if (other.ex != null) return false;</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">    } else if (!ex.equals(other.ex)) return false;</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">    if (ey == null) {</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">      if (other.ey != null) return false;</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">    } else if (!ey.equals(other.ey)) return false;</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">    if (ez == null) {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">      if (other.ez != null) return false;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">    } else if (!ez.equals(other.ez)) return false;</span>
+<span class="nc" id="L221">    return true;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

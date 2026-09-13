@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessibilityNodeSnapshot.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.accessibility</a> &gt; <span class="el_source">AccessibilityNodeSnapshot.java</span></div><h1>AccessibilityNodeSnapshot.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.accessibility;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.geom.Rectangle;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Immutable resolved node exported to platform accessibility adapters and test tooling.
+public final class AccessibilityNodeSnapshot {
+    private final long id;
+    private final long parentId;
+    private final Component component;
+    private final String virtualKey;
+    private final String identifier;
+    private final String label;
+    private final String hint;
+    private final String description;
+    private final String value;
+    private final String validationError;
+    private final String paneTitle;
+    private final String roleDescription;
+    private final AccessibilityRole role;
+    private final AccessibilityCheckedState checked;
+    private final AccessibilityLiveRegion liveRegion;
+    private final AccessibilityRange range;
+    private final AccessibilityCollectionInfo collectionInfo;
+    private final AccessibilityCollectionItemInfo collectionItemInfo;
+    private final Rectangle bounds;
+    private final Boolean selected;
+    private final Boolean expanded;
+    private final Boolean enabled;
+    private final Boolean invalid;
+    private final Boolean busy;
+    private final Boolean readOnly;
+    private final Boolean required;
+    private final Boolean multiline;
+    private final Boolean obscured;
+    private final Boolean pressed;
+    private final Boolean current;
+    private final boolean modal;
+    private final boolean focusable;
+    private final boolean focused;
+    private final int headingLevel;
+    private final List&lt;Long&gt; childIds;
+    private final List&lt;AccessibilityAction&gt; actions;
+
+<span class="fc" id="L70">    AccessibilityNodeSnapshot(Builder b) {</span>
+<span class="fc" id="L71">        id = b.id;</span>
+<span class="fc" id="L72">        parentId = b.parentId;</span>
+<span class="fc" id="L73">        component = b.component;</span>
+<span class="fc" id="L74">        virtualKey = b.virtualKey;</span>
+<span class="fc" id="L75">        identifier = b.identifier;</span>
+<span class="fc" id="L76">        label = b.label;</span>
+<span class="fc" id="L77">        hint = b.hint;</span>
+<span class="fc" id="L78">        description = b.description;</span>
+<span class="fc" id="L79">        value = b.value;</span>
+<span class="fc" id="L80">        validationError = b.validationError;</span>
+<span class="fc" id="L81">        paneTitle = b.paneTitle;</span>
+<span class="fc" id="L82">        roleDescription = b.roleDescription;</span>
+<span class="fc" id="L83">        role = b.role;</span>
+<span class="fc" id="L84">        checked = b.checked;</span>
+<span class="fc" id="L85">        liveRegion = b.liveRegion;</span>
+<span class="fc" id="L86">        range = b.range;</span>
+<span class="fc" id="L87">        collectionInfo = b.collectionInfo;</span>
+<span class="fc" id="L88">        collectionItemInfo = b.collectionItemInfo;</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        bounds = b.bounds == null ? new Rectangle() : new Rectangle(b.bounds);</span>
+<span class="fc" id="L90">        selected = b.selected;</span>
+<span class="fc" id="L91">        expanded = b.expanded;</span>
+<span class="fc" id="L92">        enabled = b.enabled;</span>
+<span class="fc" id="L93">        invalid = b.invalid;</span>
+<span class="fc" id="L94">        busy = b.busy;</span>
+<span class="fc" id="L95">        readOnly = b.readOnly;</span>
+<span class="fc" id="L96">        required = b.required;</span>
+<span class="fc" id="L97">        multiline = b.multiline;</span>
+<span class="fc" id="L98">        obscured = b.obscured;</span>
+<span class="fc" id="L99">        pressed = b.pressed;</span>
+<span class="fc" id="L100">        current = b.current;</span>
+<span class="fc" id="L101">        modal = b.modal;</span>
+<span class="fc" id="L102">        focusable = b.focusable;</span>
+<span class="fc" id="L103">        focused = b.focused;</span>
+<span class="fc" id="L104">        headingLevel = b.headingLevel;</span>
+<span class="fc" id="L105">        childIds = Collections.unmodifiableList(new ArrayList&lt;Long&gt;(b.childIds));</span>
+<span class="fc" id="L106">        actions = Collections.unmodifiableList(new ArrayList&lt;AccessibilityAction&gt;(b.actions));</span>
+<span class="fc" id="L107">    }</span>
+
+    public long getId() {
+<span class="fc" id="L110">        return id;</span>
+    }
+    public long getParentId() {
+<span class="fc" id="L113">        return parentId;</span>
+    }
+    public Component getComponent() {
+<span class="fc" id="L116">        return component;</span>
+    }
+    public String getVirtualKey() {
+<span class="fc" id="L119">        return virtualKey;</span>
+    }
+    public String getIdentifier() {
+<span class="fc" id="L122">        return identifier;</span>
+    }
+    public String getLabel() {
+<span class="fc" id="L125">        return label;</span>
+    }
+    public String getHint() {
+<span class="fc" id="L128">        return hint;</span>
+    }
+    public String getDescription() {
+<span class="fc" id="L131">        return description;</span>
+    }
+    public String getValue() {
+<span class="fc" id="L134">        return value;</span>
+    }
+    public String getValidationError() {
+<span class="fc" id="L137">        return validationError;</span>
+    }
+    public String getPaneTitle() {
+<span class="fc" id="L140">        return paneTitle;</span>
+    }
+    public String getRoleDescription() {
+<span class="fc" id="L143">        return roleDescription;</span>
+    }
+    public AccessibilityRole getRole() {
+<span class="fc" id="L146">        return role;</span>
+    }
+    public AccessibilityCheckedState getChecked() {
+<span class="fc" id="L149">        return checked;</span>
+    }
+    public AccessibilityLiveRegion getLiveRegion() {
+<span class="fc" id="L152">        return liveRegion;</span>
+    }
+    public AccessibilityRange getRange() {
+<span class="fc" id="L155">        return range;</span>
+    }
+    public AccessibilityCollectionInfo getCollectionInfo() {
+<span class="fc" id="L158">        return collectionInfo;</span>
+    }
+    public AccessibilityCollectionItemInfo getCollectionItemInfo() {
+<span class="fc" id="L161">        return collectionItemInfo;</span>
+    }
+    public Rectangle getBounds() {
+<span class="fc" id="L164">        return new Rectangle(bounds);</span>
+    }
+    public Boolean getSelected() {
+<span class="fc" id="L167">        return selected;</span>
+    }
+    public Boolean getExpanded() {
+<span class="fc" id="L170">        return expanded;</span>
+    }
+    public Boolean getEnabled() {
+<span class="fc" id="L173">        return enabled;</span>
+    }
+    public Boolean getInvalid() {
+<span class="fc" id="L176">        return invalid;</span>
+    }
+    public Boolean getBusy() {
+<span class="fc" id="L179">        return busy;</span>
+    }
+    public Boolean getReadOnly() {
+<span class="fc" id="L182">        return readOnly;</span>
+    }
+    public Boolean getRequired() {
+<span class="fc" id="L185">        return required;</span>
+    }
+    public Boolean getMultiline() {
+<span class="fc" id="L188">        return multiline;</span>
+    }
+    public Boolean getObscured() {
+<span class="fc" id="L191">        return obscured;</span>
+    }
+    public Boolean getPressed() {
+<span class="fc" id="L194">        return pressed;</span>
+    }
+    public Boolean getCurrent() {
+<span class="fc" id="L197">        return current;</span>
+    }
+    public boolean isModal() {
+<span class="fc" id="L200">        return modal;</span>
+    }
+    public boolean isFocusable() {
+<span class="fc" id="L203">        return focusable;</span>
+    }
+    public boolean isFocused() {
+<span class="fc" id="L206">        return focused;</span>
+    }
+    public int getHeadingLevel() {
+<span class="fc" id="L209">        return headingLevel;</span>
+    }
+    public List&lt;Long&gt; getChildIds() {
+<span class="fc" id="L212">        return childIds;</span>
+    }
+    public List&lt;AccessibilityAction&gt; getActions() {
+<span class="fc" id="L215">        return actions;</span>
+    }
+
+    public AccessibilityAction getAction(String id) {
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L220">            return null;</span>
+        }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        for (AccessibilityAction action : actions) {</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (id.equals(action.getId())) {</span>
+<span class="fc" id="L224">                return action;</span>
+            }
+<span class="fc" id="L226">        }</span>
+<span class="nc" id="L227">        return null;</span>
+    }
+
+<span class="fc" id="L230">    static final class Builder {</span>
+        long id;
+<span class="fc" id="L232">        long parentId = -1;</span>
+        Component component;
+        String virtualKey;
+        String identifier;
+        String label;
+        String hint;
+        String description;
+        String value;
+        String validationError;
+        String paneTitle;
+        String roleDescription;
+<span class="fc" id="L243">        AccessibilityRole role = AccessibilityRole.GENERIC;</span>
+<span class="fc" id="L244">        AccessibilityCheckedState checked = AccessibilityCheckedState.UNSPECIFIED;</span>
+<span class="fc" id="L245">        AccessibilityLiveRegion liveRegion = AccessibilityLiveRegion.OFF;</span>
+        AccessibilityRange range;
+        AccessibilityCollectionInfo collectionInfo;
+        AccessibilityCollectionItemInfo collectionItemInfo;
+        Rectangle bounds;
+        Boolean selected;
+        Boolean expanded;
+        Boolean enabled;
+        Boolean invalid;
+        Boolean busy;
+        Boolean readOnly;
+        Boolean required;
+        Boolean multiline;
+        Boolean obscured;
+        Boolean pressed;
+        Boolean current;
+        boolean modal;
+        boolean focusable;
+        boolean focused;
+<span class="fc" id="L264">        int headingLevel = -1;</span>
+<span class="fc" id="L265">        double sortKey = Double.NaN;</span>
+        Component traversalBefore;
+        Component traversalAfter;
+<span class="fc" id="L268">        List&lt;Long&gt; childIds = new ArrayList&lt;Long&gt;();</span>
+<span class="fc" id="L269">        List&lt;AccessibilityAction&gt; actions = new ArrayList&lt;AccessibilityAction&gt;();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

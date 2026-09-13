@@ -1,0 +1,1315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Result.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">Result.java</span></div><h1>Result.java</h1><pre class="source lang-java linenums">/*
+ Copyright (c) 2007, Sun Microsystems, Inc.
+
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+
+ * Redistributions of source code must retain the above copyright
+ notice, this list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright
+ notice, this list of conditions and the following disclaimer in
+ the documentation and/or other materials provided with the
+ distribution.
+ * Neither the name of Sun Microsystems, Inc. nor the names of its
+ contributors may be used to endorse or promote products derived
+ from this software without specific prior written permission.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ &quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ Derivative Revision History:
+
+ 2012-03 - derivative work from original Sun source, removed references
+ to Sun's JSON parser, support for any structured document that implements
+ a StructuredSource interface.  Added globbing and backtracking support
+ (backed by structured document impl), support for predicate expressions,
+ nested expressions, and various XPath style features.
+
+ */
+package com.codename1.processing;
+
+import com.codename1.xml.Element;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+/// An evaluator for a very small expression language to extract primitive types
+/// from structured information. This implementation is layered over the
+/// `com.codename1.io.JSONParser` and `com.codename1.xml.XMLParser` classes. This
+/// expression language allows applications to extract information from
+/// structured data returned by web services with minimal effort. You can read more about it `here`.
+///
+/// The expression language works a lot like a very small subset of XPath - the
+/// expression syntax uses the / character for sub-elements and square brackets
+/// for arrays.
+///
+/// Some sample expressions:
+///
+/// ```java
+/// `Simple expression, get the title of the first photo element.
+///
+///  /photos/photo[1]/title
+///
+///  Globally find the first name of a person with a last name of 'Coolman'.
+///
+///  //person[lastname='Coolman']/firstName
+///
+///  Get the latitude value of the second last result element.
+///
+///  /results[last()-1]/geometry/bounds/northeast/lat
+///
+///  Get the names of players from Germany
+///
+///  /tournament/player[@nationality='Germany']/name
+///
+///  Get the purchase order numbers of any order with a lineitem worth over $5
+///
+///  //order/lineitem[price &gt; 5]/../@ponum
+/// etc`
+/// ```
+///
+/// @author Eric Coolman (2012-03 - derivative work from original Sun source).
+public final class Result {
+
+    public static final String JSON = &quot;json&quot;;
+    public static final String XML = &quot;xml&quot;;
+    public static final char SEPARATOR = '/';
+    public static final char ARRAY_START = '[';
+    public static final char ARRAY_END = ']';
+<span class="fc" id="L98">    private static final Object SELECT_GLOB = &quot;//&quot;;</span>
+<span class="fc" id="L99">    private static final Object SELECT_PARENT = &quot;..&quot;;</span>
+
+    private StructuredContent root;
+    private Map namespaceAliases;
+
+    /// Internal method, do not use.
+    ///
+    /// Construct an evaluator object from a StructuredContent element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a parsed dom
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: thrown if null content is passed.
+<span class="fc" id="L119">    private Result(final StructuredContent obj, boolean subTree) throws IllegalArgumentException {</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L121">            throw new IllegalArgumentException(&quot;dom object cannot be null&quot;);</span>
+        }
+<span class="fc" id="L123">        this.root = obj;</span>
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        if (!subTree &amp;&amp; root.getParent() != null) {</span>
+<span class="fc" id="L125">            root = root.getParent();  // &lt;--- WHY??</span>
+        }
+<span class="fc" id="L127">    }</span>
+
+    /// Internal method, do not use.
+    ///
+    /// Create an evaluator object from a StructuredContent element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a parsed dom
+    ///
+    /// - `subTree`: If true, then this is treated as a subtree, and won't try to take the parent as the actual root.
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: thrown if null content is passed.
+    static Result fromContent(StructuredContent content, boolean subTree)
+            throws IllegalArgumentException {
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (content == null) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(&quot;content cannot be null&quot;);</span>
+        }
+<span class="fc" id="L151">        return new Result(content, subTree);</span>
+    }
+
+    // TODO: add a cache mapping subpaths to objects to improve performance
+
+    /// Internal method, do not use.
+    ///
+    /// Create an evaluator object from a StructuredContent element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a parsed dom
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: thrown if null content is passed.
+    static Result fromContent(StructuredContent content) {
+<span class="fc" id="L172">        return fromContent(content, false);</span>
+    }
+
+    /// Create an evaluator object from a structured content document (XML, JSON,
+    /// etc) as a string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: structured content document as a string.
+    ///
+    /// - `format`: @param format  an identifier for the type of content passed (ie. xml,
+    /// json, etc).
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException thrown if null content or format is
+    /// passed.
+    public static Result fromContent(String content, String format)
+            throws IllegalArgumentException {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (content == null) {</span>
+<span class="fc" id="L196">            throw new IllegalArgumentException(&quot;content cannot be null&quot;);</span>
+        }
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (format == null) {</span>
+<span class="fc" id="L199">            throw new IllegalArgumentException(&quot;format cannot be null&quot;);</span>
+        }
+        try {
+<span class="fc" id="L202">            return fromContent(new InputStreamReader(new ByteArrayInputStream(content.getBytes(&quot;UTF-8&quot;)), &quot;UTF-8&quot;),</span>
+                    format);
+<span class="nc" id="L204">        } catch (IOException e) {</span>
+            // should never get here with a string
+<span class="nc" id="L206">            throw new IllegalArgumentException(e.getMessage(), e);</span>
+        }
+    }
+
+    /// Create an evaluator object from a structured content document (XML, JSON,
+    /// etc) input stream. Normally you would use this method within a content
+    /// request implementation, for example:
+    ///
+    /// ```java
+    /// ConnectionRequest request = new ConnectionRequest() {
+    ///     protected void readResponse(InputStream input) throws IOException {
+    ///         Result evaluator = Result.fromContent(input, Result.JSON);
+    ///         // ... evaluate the result here
+    ///    }
+    ///     // ... etc
+    /// };
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: structured content document as a string.
+    ///
+    /// - `format`: @param format  an identifier for the type of content passed (ie. xml,
+    /// json, etc).
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException thrown if null content or format is
+    /// passed.
+    public static Result fromContent(InputStream content, String format)
+            throws IllegalArgumentException, IOException {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (content == null) {</span>
+<span class="nc" id="L242">            throw new IllegalArgumentException(&quot;content cannot be null&quot;);</span>
+        }
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (format == null) {</span>
+<span class="nc" id="L245">            throw new IllegalArgumentException(&quot;format cannot be null&quot;);</span>
+        }
+        StructuredContent sc;
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (&quot;xml&quot;.equals(format)) {</span>
+<span class="nc" id="L249">            sc = new XMLContent(content);</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        } else if (&quot;json&quot;.equals(format)) {</span>
+<span class="nc" id="L251">            sc = new JSONContent(content);</span>
+        } else {
+<span class="nc" id="L253">            throw new IllegalArgumentException(&quot;Unrecognized format: &quot; + format);</span>
+        }
+<span class="nc" id="L255">        return fromContent(sc);</span>
+    }
+
+    /// Create an evaluator object from a structured content document (XML, JSON,
+    /// etc) input stream. Normally you would use this method within a content
+    /// request implementation, for example:
+    ///
+    /// ```java
+    /// ConnectionRequest request = new ConnectionRequest() {
+    ///     protected void readResponse(InputStream input) throws IOException {
+    ///         Result evaluator = Result.fromContent(input, Result.JSON);
+    ///         // ... evaluate the result here
+    ///    }
+    ///     // ... etc
+    /// };
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: structured content document as a string.
+    ///
+    /// - `format`: @param format  an identifier for the type of content passed (ie. xml,
+    /// json, etc).
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException thrown if null content or format is
+    /// passed.
+    public static Result fromContent(Reader content, String format)
+            throws IllegalArgumentException, IOException {
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (content == null) {</span>
+<span class="nc" id="L290">            throw new IllegalArgumentException(&quot;content cannot be null&quot;);</span>
+        }
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (format == null) {</span>
+<span class="nc" id="L293">            throw new IllegalArgumentException(&quot;format cannot be null&quot;);</span>
+        }
+        StructuredContent sc;
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (&quot;xml&quot;.equals(format)) {</span>
+<span class="fc" id="L297">            sc = new XMLContent(content);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        } else if (&quot;json&quot;.equals(format)) {</span>
+<span class="fc" id="L299">            sc = new JSONContent(content);</span>
+        } else {
+<span class="nc" id="L301">            throw new IllegalArgumentException(&quot;Unrecognized format: &quot; + format);</span>
+        }
+<span class="fc" id="L303">        return fromContent(sc);</span>
+    }
+
+    /// Create an evaluator object from a parsed XML DOM.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a parsed XML DOM.
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: thrown if null content is passed.
+    public static Result fromContent(Element content)
+            throws IllegalArgumentException {
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        if (content == null) {</span>
+<span class="nc" id="L322">            throw new IllegalArgumentException(&quot;content cannot be null&quot;);</span>
+        }
+<span class="nc" id="L324">        return fromContent(new XMLContent(content));</span>
+    }
+
+    /// Create an evaluator object from parsed JSON content DOM.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: JSON content input stream
+    ///
+    /// #### Returns
+    ///
+    /// Result a result evaluator object
+    public static Result fromContent(Map content)
+            throws IllegalArgumentException {
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (content == null) {</span>
+<span class="nc" id="L339">            throw new IllegalArgumentException(&quot;content cannot be null&quot;);</span>
+        }
+<span class="fc" id="L341">        return fromContent(new MapContent(content));</span>
+    }
+
+    /// Returns a hashcode value for the object.
+    ///
+    /// #### See also
+    ///
+    /// - Object#hashCode()
+    @Override
+    public int hashCode() {
+<span class="nc" id="L351">        return root.hashCode();</span>
+    }
+
+    /// Indicates whether some other object is &quot;equal to&quot; this one.
+    ///
+    /// #### See also
+    ///
+    /// - Object#equals(Object)
+    @Override
+    public boolean equals(final Object other) {
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (other instanceof Result) {</span>
+<span class="nc" id="L362">            return root.equals(((Result) other).root);</span>
+        }
+<span class="nc" id="L364">        return false;</span>
+    }
+
+    /// Convert the object to a formatted structured content document. For
+    /// example, an XML or JSON document.
+    ///
+    /// #### Returns
+    ///
+    /// a structured content document as a string
+    @Override
+    public String toString() {
+<span class="fc" id="L375">        return root.toString();</span>
+    }
+
+    /// Get a boolean value from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    /// &quot;settings&quot; : [
+    /// {
+    ///     &quot;toggle&quot; : &quot;true&quot;,
+    ///     ... etc
+    /// }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// boolean value = result.getAsBoolean(&quot;/settings[0]/toggle&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public boolean getAsBoolean(final String path)
+            throws IllegalArgumentException {
+<span class="fc" id="L411">        String s = getAsString(path);</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L413">            return false;</span>
+        }
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (&quot;true&quot;.equals(s)) {</span>
+<span class="fc" id="L416">            return true;</span>
+        } else {
+<span class="nc" id="L418">            return &quot;1&quot;.equals(s);</span>
+        }
+    }
+
+    /// Get an integer value from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    /// &quot;settings&quot;
+    /// {
+    ///     &quot;connection&quot;
+    ///     {
+    ///          &quot;max_retries&quot; : &quot;20&quot;,
+    ///          ... etc
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// int value = result.getAsInteger(&quot;//connection/max_retries&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalException`: @throws IllegalException on error traversing the document, ie. traversing
+    /// into an array without using subscripts.
+    public int getAsInteger(final String path) throws IllegalArgumentException {
+<span class="fc" id="L457">        String s = getAsString(path);</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L459">            return 0;</span>
+        }
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        if (s.indexOf('.') &gt; -1) {</span>
+<span class="fc" id="L462">            return (int) Double.parseDouble(s);</span>
+        } else {
+<span class="fc" id="L464">            return Integer.parseInt(s);</span>
+        }
+    }
+
+    /// Get a long value from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    /// &quot;settings&quot;
+    /// {
+    ///     &quot;connection&quot;
+    ///     {
+    ///          &quot;timeout_milliseconds&quot; : &quot;100000&quot;,
+    ///          ... etc
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// long value = result.getAsLong(&quot;/settings/connection/timeout_milliseconds&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public long getAsLong(final String path) throws IllegalArgumentException {
+<span class="fc" id="L503">        String s = getAsString(path);</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L505">            return 0;</span>
+        }
+<span class="fc" id="L507">        return (long) Double.parseDouble(s);</span>
+    }
+
+    /// Get a double value from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    ///  &quot;geometry&quot; : {
+    ///    &quot;bounds&quot; : {
+    ///      &quot;northeast&quot; : {
+    ///        &quot;lat&quot; : 42.94959820,
+    ///        &quot;lng&quot; : -81.24873959999999
+    ///       },
+    ///       &quot;southwest&quot; : {
+    ///         &quot;lat&quot; : 42.94830,
+    ///         &quot;lng&quot; : -81.24901740000001
+    ///       }
+    ///    },
+    ///    &quot;location&quot; : {
+    ///      &quot;lat&quot; : 42.94886990,
+    ///      &quot;lng&quot; : -81.24876030
+    ///    },
+    ///    &quot;location_type&quot; : &quot;RANGE_INTERPOLATED&quot;,
+    ///    &quot;viewport&quot; : {
+    ///      &quot;northeast&quot; : {
+    ///         &quot;lat&quot; : 42.95029808029150,
+    ///         &quot;lng&quot; : -81.24752951970851
+    ///      },
+    ///      &quot;southwest&quot; : {
+    ///         &quot;lat&quot; : 42.94760011970850,
+    ///          &quot;lng&quot; : -81.25022748029151
+    ///      }
+    ///   }
+    ///   // etc
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// double neBoundsLat = result.getAsDouble(&quot;//bounds/northeast/lat&quot;);
+    /// double neBoundsLong = result.getAsDouble(&quot;//bounds/northeast/lng&quot;);
+    /// double swBoundsLat = result.getAsDouble(&quot;//bounds/southwest/lat&quot;);
+    /// double swBoundsLong = result.getAsDouble(&quot;//bounds/southwest/lng&quot;);
+    ///
+    /// double memberDiscount = result.getAsDouble(&quot;pricing.members.members&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public double getAsDouble(final String path)
+            throws IllegalArgumentException {
+<span class="fc" id="L570">        String s = getAsString(path);</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L572">            return 0;</span>
+        }
+<span class="fc" id="L574">        return Double.parseDouble(s);</span>
+    }
+
+    /// Get a string value from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    /// &quot;profile&quot;
+    /// {
+    ///     &quot;location&quot;
+    ///     {
+    ///          &quot;city&quot; : &quot;London&quot;,
+    ///          &quot;region&quot; : &quot;Ontario&quot;,
+    ///          &quot;country&quot; : &quot;Canada&quot;,
+    ///          ... etc
+    ///     },
+    /// }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// String city = result.getAsDouble(&quot;//city&quot;);
+    /// String province = result.getAsDouble(&quot;//location//region&quot;);
+    /// String country = result.getAsDouble(&quot;profile//location//country&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public String getAsString(final String path)
+            throws IllegalArgumentException {
+<span class="fc" id="L617">        Object o = internalGet(path);</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        if (o instanceof StructuredContent) {</span>
+<span class="fc" id="L619">            return ((StructuredContent) o).getText();</span>
+        }
+<span class="fc" id="L621">        return (String) o;</span>
+    }
+
+    /// Get the object value from the requested path. This method may return a
+    /// Map, List, String, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`
+    ///
+    /// #### Returns
+    ///
+    /// the object at the given path, or null.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`
+    public Object get(final String path)
+            throws IllegalArgumentException {
+<span class="nc" id="L640">        Object o = internalGet(path);</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">        if (o instanceof StructuredContent) {</span>
+<span class="nc" id="L642">            return ((StructuredContent) o).getNativeRoot();</span>
+        }
+<span class="nc" id="L644">        return o;</span>
+    }
+
+    /// Internal function, do not use. This version does not convert the
+    /// structured content nodes, so not to be called by end user.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`
+    ///
+    /// #### Returns
+    ///
+    /// a StructuredContent node, a String, or null
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`
+    private Object internalGet(final String path) throws IllegalArgumentException {
+<span class="fc" id="L662">        List v = internalGetAsArray(path);</span>
+<span class="pc bpc" id="L663" title="1 of 4 branches missed.">        if (v == null || v.isEmpty()) {</span>
+<span class="fc" id="L664">            return null;</span>
+        }
+<span class="fc" id="L666">        return v.get(0);</span>
+    }
+
+    /// Get the size of an array at the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    ///    &quot;results&quot; : [
+    ///       {
+    ///         &quot;address_components&quot; : [
+    ///           {
+    ///             &quot;long_name&quot; : &quot;921-989&quot;,
+    ///             &quot;short_name&quot; : &quot;921-989&quot;,
+    ///             &quot;types&quot; : [ &quot;street_number&quot; ]
+    ///           },
+    ///           {
+    ///             &quot;long_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;short_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;types&quot; : [ &quot;route&quot; ]
+    ///           },
+    ///           {
+    ///             &quot;long_name&quot; : &quot;Ontario&quot;,
+    ///             &quot;short_name&quot; : &quot;ON&quot;,
+    ///             &quot;types&quot; : [ &quot;administrative_area_level_1&quot;, &quot;political&quot; ]
+    ///           },
+    ///           ... etc
+    ///       }
+    ///  }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// int size = result.getSizeOfArray(&quot;/results[0]/address_components&quot;);
+    /// int size2 = result.getSizeOfArray(&quot;results&quot;);
+    /// int size3 = result.getSizeOfArray(&quot;/results[0]/address_components[2]/types&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public int getSizeOfArray(final String path)
+            throws IllegalArgumentException {
+<span class="nc" id="L720">        final List array = internalGetAsArray(path);</span>
+<span class="nc bnc" id="L721" title="All 2 branches missed.">        return array == null ? 0 : array.size();</span>
+    }
+
+
+    /// Get an array of string values from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    ///    &quot;results&quot; : [
+    ///       {
+    ///         &quot;address_components&quot; : [
+    ///           {
+    ///             &quot;long_name&quot; : &quot;921-989&quot;,
+    ///             &quot;short_name&quot; : &quot;921-989&quot;,
+    ///             &quot;types&quot; : [ &quot;street_number&quot; ]
+    ///           },
+    ///           {
+    ///             &quot;long_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;short_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;types&quot; : [ &quot;route&quot; ]
+    ///           },
+    ///           {
+    ///             &quot;long_name&quot; : &quot;Ontario&quot;,
+    ///             &quot;short_name&quot; : &quot;ON&quot;,
+    ///             &quot;types&quot; : [ &quot;administrative_area_level_1&quot;, &quot;political&quot; ]
+    ///           },
+    ///           ... etc
+    ///       }
+    ///  }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// String types[] = result
+    ///         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public String[] getAsStringArray(final String path)
+            throws IllegalArgumentException {
+<span class="fc" id="L775">        final List jarr = internalGetAsArray(path);</span>
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">        final String[] arr = new String[jarr == null ? 0 : jarr.size()];</span>
+<span class="fc" id="L777">        int alen = arr.length;</span>
+<span class="fc bfc" id="L778" title="All 2 branches covered.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="fc" id="L779">            arr[i] = getTextInternal(jarr.get(i));</span>
+        }
+<span class="fc" id="L781">        return arr;</span>
+    }
+
+    private String getTextInternal(Object o) {
+<span class="pc bpc" id="L785" title="1 of 2 branches missed.">        if (o instanceof StructuredContent) {</span>
+<span class="fc" id="L786">            return ((StructuredContent) o).getText();</span>
+        }
+<span class="nc" id="L788">        return o.toString();</span>
+    }
+
+    /// Get an array of values from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    ///    &quot;results&quot; : [
+    ///       {
+    ///         &quot;address_components&quot; : [
+    ///           {
+    ///             &quot;long_name&quot; : &quot;921-989&quot;,
+    ///             &quot;short_name&quot; : &quot;921-989&quot;,
+    ///             &quot;types&quot; : [ &quot;street_number&quot; ]
+    ///           },
+    ///           {
+    ///             &quot;long_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;short_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;types&quot; : [ &quot;route&quot; ]
+    ///           },
+    ///           {
+    ///             &quot;long_name&quot; : &quot;Ontario&quot;,
+    ///             &quot;short_name&quot; : &quot;ON&quot;,
+    ///             &quot;types&quot; : [ &quot;administrative_area_level_1&quot;, &quot;political&quot; ]
+    ///           },
+    ///           ... etc
+    ///       }
+    ///  }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// String types[] = result
+    ///         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
+    /// to an integer.
+    public int[] getAsIntegerArray(final String path)
+            throws IllegalArgumentException {
+<span class="fc" id="L844">        final List jarr = internalGetAsArray(path);</span>
+<span class="pc bpc" id="L845" title="1 of 2 branches missed.">        final int[] arr = new int[jarr == null ? 0 : jarr.size()];</span>
+<span class="fc" id="L846">        int alen = arr.length;</span>
+<span class="fc bfc" id="L847" title="All 2 branches covered.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="fc" id="L848">            String s = getTextInternal(jarr.get(i));</span>
+<span class="pc bpc" id="L849" title="1 of 2 branches missed.">            if (s.indexOf('.') &gt; -1) {</span>
+<span class="nc" id="L850">                arr[i] = (int) Double.parseDouble(s);</span>
+            } else {
+<span class="fc" id="L852">                arr[i] = Integer.parseInt(s);</span>
+            }
+        }
+<span class="fc" id="L855">        return arr;</span>
+    }
+
+    /// Get an array of values from the requested path.
+    ///
+    /// ```java
+    /// String types[] = result
+    ///         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
+    /// to a long.
+    public long[] getAsLongArray(final String path)
+            throws IllegalArgumentException {
+<span class="nc" id="L882">        final List jarr = internalGetAsArray(path);</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">        final long[] arr = new long[jarr == null ? 0 : jarr.size()];</span>
+<span class="nc" id="L884">        int alen = arr.length;</span>
+<span class="nc bnc" id="L885" title="All 2 branches missed.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="nc" id="L886">            String s = getTextInternal(jarr.get(i));</span>
+<span class="nc bnc" id="L887" title="All 2 branches missed.">            if (s.indexOf('.') &gt; -1) {</span>
+<span class="nc" id="L888">                arr[i] = (long) Double.parseDouble(s);</span>
+            } else {
+<span class="nc" id="L890">                arr[i] = Long.parseLong(s);</span>
+            }
+        }
+<span class="nc" id="L893">        return arr;</span>
+    }
+
+    /// Get an array of values from the requested path.
+    ///
+    /// ```java
+    /// String types[] = result
+    ///         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
+    /// to a double.
+    public double[] getAsDoubleArray(final String path)
+            throws IllegalArgumentException {
+<span class="nc" id="L920">        final List jarr = internalGetAsArray(path);</span>
+<span class="nc bnc" id="L921" title="All 2 branches missed.">        final double[] arr = new double[jarr == null ? 0 : jarr.size()];</span>
+<span class="nc" id="L922">        int alen = arr.length;</span>
+<span class="nc bnc" id="L923" title="All 2 branches missed.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="nc" id="L924">            String s = getTextInternal(jarr.get(i));</span>
+<span class="nc" id="L925">            arr[i] = Double.parseDouble(s);</span>
+        }
+<span class="nc" id="L927">        return arr;</span>
+    }
+
+    /// Get an array of values from the requested path.
+    ///
+    /// ```java
+    /// String types[] = result
+    ///         .getAsStringArray(&quot;/results[0]/address_components[2]/types&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public boolean[] getAsBooleanArray(final String path)
+            throws IllegalArgumentException {
+<span class="fc" id="L951">        final List jarr = internalGetAsArray(path);</span>
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">        final boolean[] arr = new boolean[jarr == null ? 0 : jarr.size()];</span>
+<span class="fc" id="L953">        int alen = arr.length;</span>
+<span class="fc bfc" id="L954" title="All 2 branches covered.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="fc" id="L955">            String s = getTextInternal(jarr.get(i));</span>
+<span class="fc" id="L956">            boolean b = false;</span>
+<span class="fc bfc" id="L957" title="All 2 branches covered.">            if (&quot;true&quot;.equals(s)) {</span>
+<span class="fc" id="L958">                b = true;</span>
+<span class="pc bpc" id="L959" title="1 of 2 branches missed.">            } else if (&quot;1&quot;.equals(s)) {</span>
+<span class="nc" id="L960">                b = true;</span>
+            }
+<span class="fc" id="L962">            arr[i] = b;</span>
+        }
+<span class="fc" id="L964">        return arr;</span>
+    }
+
+    /// Get an array of short values from the requested path.
+    ///
+    /// ```java
+    /// short values[] = result.getAsShortArray(&quot;//values&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
+    /// to a short.
+    public short[] getAsShortArray(final String path)
+            throws IllegalArgumentException {
+<span class="nc" id="L990">        final List jarr = internalGetAsArray(path);</span>
+<span class="nc bnc" id="L991" title="All 2 branches missed.">        final short[] arr = new short[jarr == null ? 0 : jarr.size()];</span>
+<span class="nc" id="L992">        int alen = arr.length;</span>
+<span class="nc bnc" id="L993" title="All 2 branches missed.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="nc" id="L994">            String s = getTextInternal(jarr.get(i));</span>
+<span class="nc bnc" id="L995" title="All 2 branches missed.">            if (s.indexOf('.') &gt; -1) {</span>
+<span class="nc" id="L996">                arr[i] = (short) Double.parseDouble(s);</span>
+            } else {
+<span class="nc" id="L998">                arr[i] = Short.parseShort(s);</span>
+            }
+        }
+<span class="nc" id="L1001">        return arr;</span>
+    }
+
+    /// Get an array of float values from the requested path.
+    ///
+    /// ```java
+    /// float values[] = result.getAsFloatArray(&quot;//values&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
+    /// to a float.
+    public float[] getAsFloatArray(final String path)
+            throws IllegalArgumentException {
+<span class="nc" id="L1027">        final List jarr = internalGetAsArray(path);</span>
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">        final float[] arr = new float[jarr == null ? 0 : jarr.size()];</span>
+<span class="nc" id="L1029">        int alen = arr.length;</span>
+<span class="nc bnc" id="L1030" title="All 2 branches missed.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="nc" id="L1031">            String s = getTextInternal(jarr.get(i));</span>
+<span class="nc" id="L1032">            arr[i] = Float.parseFloat(s);</span>
+        }
+<span class="nc" id="L1034">        return arr;</span>
+    }
+
+    /// Get an array of byte values from the requested path.
+    ///
+    /// ```java
+    /// byte values[] = result.getAsByteArray(&quot;//values&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    ///
+    /// - `NumberFormatException`: @throws NumberFormatException    if the value at path can not be converted
+    /// to a byte.
+    public byte[] getAsByteArray(final String path)
+            throws IllegalArgumentException {
+<span class="nc" id="L1060">        final List jarr = internalGetAsArray(path);</span>
+<span class="nc bnc" id="L1061" title="All 2 branches missed.">        final byte[] arr = new byte[jarr == null ? 0 : jarr.size()];</span>
+<span class="nc" id="L1062">        int alen = arr.length;</span>
+<span class="nc bnc" id="L1063" title="All 2 branches missed.">        for (int i = 0; i &lt; alen; i++) {</span>
+<span class="nc" id="L1064">            String s = getTextInternal(jarr.get(i));</span>
+<span class="nc bnc" id="L1065" title="All 2 branches missed.">            if (s.indexOf('.') &gt; -1) {</span>
+<span class="nc" id="L1066">                arr[i] = (byte) Double.parseDouble(s);</span>
+            } else {
+<span class="nc" id="L1068">                arr[i] = Byte.parseByte(s);</span>
+            }
+        }
+<span class="nc" id="L1071">        return arr;</span>
+    }
+
+    /// Get a List of values from the requested path.
+    ///
+    /// For example: **JSON**
+    ///
+    /// ```json
+    /// {
+    ///    &quot;results&quot; : [
+    ///       {
+    ///         &quot;address_components&quot; : [
+    ///           {
+    ///             &quot;long_name&quot; : &quot;921-989&quot;,
+    ///             &quot;short_name&quot; : &quot;921-989&quot;,
+    ///             &quot;types&quot; : [ &quot;street_number&quot; ]
+    ///           },
+    ///           {
+    ///             &quot;long_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;short_name&quot; : &quot;Country Club Crescent&quot;,
+    ///             &quot;types&quot; : [ &quot;route&quot; ]
+    ///           },
+    ///           ... etc
+    ///       }
+    ///  }
+    /// ```
+    ///
+    /// **Expression**
+    ///
+    /// ```java
+    /// List addressComponents = result.getAsList(&quot;/results[0]/address_components&quot;);
+    /// result = Result.fromContent(addressComponents);
+    /// String longName = result.getAsString(&quot;[1]/long_name&quot;);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: Path expression to evaluate
+    ///
+    /// #### Returns
+    ///
+    /// the value at the requested path
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException on error traversing the document, ie.
+    /// traversing into an array without using subscripts.
+    public List getAsArray(final String path) throws IllegalArgumentException {
+<span class="fc" id="L1119">        List array = internalGetAsArray(path);</span>
+<span class="fc bfc" id="L1120" title="All 2 branches covered.">        for (int i = 0; i &lt; array.size(); i++) {</span>
+<span class="fc" id="L1121">            array.set(i, ((StructuredContent) array.get(i)).getNativeRoot());</span>
+        }
+<span class="fc" id="L1123">        return array;</span>
+    }
+
+    /// Internal function, do not use. This version does not convert the
+    /// structured content nodes in the array, so not to be called by end user.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`
+    private List internalGetAsArray(final String path)
+            throws IllegalArgumentException {
+<span class="fc" id="L1138">        final List tokens = new ResultTokenizer(path).tokenize(namespaceAliases);</span>
+<span class="pc bpc" id="L1139" title="1 of 2 branches missed.">        if (tokens.isEmpty()) {</span>
+<span class="nc" id="L1140">            return tokens;</span>
+        }
+<span class="fc" id="L1142">        final StructuredContent obj = apply(root, tokens, 0);</span>
+<span class="pc bpc" id="L1143" title="1 of 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L1144">            return new Vector();</span>
+        }
+<span class="fc" id="L1146">        String key = (String) tokens.get(tokens.size() - 1);</span>
+        // if the last element of expression is a glob, handle it here
+<span class="fc bfc" id="L1148" title="All 2 branches covered.">        if ((tokens.size() &gt; 1)</span>
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">                &amp;&amp; SELECT_GLOB.equals(tokens.get(tokens.size() - 2))) {</span>
+<span class="fc" id="L1150">            return obj.getDescendants(key);</span>
+        }
+        // if the last element of expression is an attribute, handle it here
+<span class="fc bfc" id="L1153" title="All 2 branches covered.">        if (key.startsWith(&quot;@&quot;)) {</span>
+<span class="fc" id="L1154">            key = key.substring(1);</span>
+<span class="fc" id="L1155">            String v = obj.getAttribute(key);</span>
+<span class="fc" id="L1156">            List array = new Vector();</span>
+<span class="pc bpc" id="L1157" title="1 of 2 branches missed.">            if (v != null) {</span>
+                // this will allow caller to get parent of an attribute if
+                // needed
+<span class="fc" id="L1160">                array.add(new MapContent(v, obj));</span>
+            }
+<span class="fc" id="L1162">            return array;</span>
+<span class="pc bpc" id="L1163" title="1 of 4 branches missed.">        } else if (key.charAt(0) == Result.ARRAY_END &amp;&amp; tokens.size() &gt;= 4) {</span>
+            // Handle path ending with a predicate instead of a key
+            //key = (String)tokens.get(tokens.size() - 4);
+<span class="fc" id="L1166">            List array = new Vector();</span>
+            //array.add(new MapContent(key, obj));
+<span class="fc" id="L1168">            array.add(obj);</span>
+<span class="fc" id="L1169">            return array;</span>
+        }
+        // otherwise, last element of expression selects a child node.
+<span class="fc" id="L1172">        return obj.getChildren(key);</span>
+    }
+
+    /// Internal worker utility method, traverses dom based on path tokens
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`
+    ///
+    /// - `tokens`
+    ///
+    /// - `firstToken`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`
+    @SuppressWarnings(&quot;PMD.SwitchStmtsShouldHaveDefault&quot;)
+    private StructuredContent apply(final StructuredContent start,
+                                    final List tokens, final int firstToken)
+            throws IllegalArgumentException {
+
+<span class="pc bpc" id="L1193" title="1 of 2 branches missed.">        if (start == null) {</span>
+<span class="nc" id="L1194">            return null;</span>
+        }
+
+<span class="fc" id="L1197">        final int nTokens = tokens.size();</span>
+<span class="fc bfc" id="L1198" title="All 2 branches covered.">        if (firstToken &gt;= nTokens) {</span>
+<span class="fc" id="L1199">            return start;</span>
+        }
+<span class="fc" id="L1201">        boolean glob = false;</span>
+<span class="pc bpc" id="L1202" title="1 of 2 branches missed.">        for (int i = firstToken; i &lt; nTokens; i++) {</span>
+<span class="fc" id="L1203">            final String tok1 = (String) tokens.get(i);</span>
+<span class="fc bfc" id="L1204" title="All 2 branches covered.">            if (tok1.length() == 1</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">                    &amp;&amp; ResultTokenizer.isDelimiter(tok1.charAt(0))) {</span>
+<span class="fc" id="L1206">                continue;</span>
+            }
+<span class="fc bfc" id="L1208" title="All 2 branches covered.">            if (tok1.length() == 2) {</span>
+<span class="fc bfc" id="L1209" title="All 2 branches covered.">                if (tok1.equals(SELECT_GLOB)) {</span>
+<span class="fc" id="L1210">                    glob = true;</span>
+<span class="fc" id="L1211">                    continue;</span>
+<span class="pc bpc" id="L1212" title="1 of 2 branches missed.">                } else if (tok1.equals(SELECT_PARENT)) {</span>
+<span class="nc" id="L1213">                    return apply(start.getParent(), tokens, i + 1);</span>
+                }
+            }
+
+<span class="fc bfc" id="L1217" title="All 2 branches covered.">            if (i + 1 &gt;= nTokens) {</span>
+<span class="fc" id="L1218">                return start;</span>
+            }
+<span class="fc" id="L1220">            final String tok2 = (String) tokens.get(i + 1);</span>
+<span class="fc" id="L1221">            final char t2 = tok2.charAt(0);</span>
+<span class="pc bpc" id="L1222" title="1 of 3 branches missed.">            switch (t2) {</span>
+                case SEPARATOR:
+                    List children;
+<span class="pc bpc" id="L1225" title="1 of 2 branches missed.">                    if (glob) {</span>
+<span class="nc" id="L1226">                        children = start.getDescendants(tok1);</span>
+                    } else {
+<span class="fc" id="L1228">                        children = start.getChildren(tok1);</span>
+                    }
+<span class="pc bpc" id="L1230" title="1 of 2 branches missed.">                    if (!children.isEmpty()) {</span>
+<span class="fc" id="L1231">                        return apply(new SubContent(children, start),</span>
+                                tokens, i + 2);
+                    }
+<span class="nc" id="L1234">                    return null;</span>
+                case ARRAY_START:
+<span class="pc bpc" id="L1236" title="1 of 2 branches missed.">                    if (i + 2 &gt;= nTokens) {</span>
+<span class="nc" id="L1237">                        throw new IllegalArgumentException(</span>
+                                &quot;Syntax error: array must be followed by a dimension: &quot;
+                                        + tok1);
+                    }
+<span class="fc" id="L1241">                    final String tok3 = (String) tokens.get(i + 2);</span>
+
+<span class="fc" id="L1243">                    Evaluator evaluator = EvaluatorFactory</span>
+<span class="fc" id="L1244">                            .createEvaluator(tok3);</span>
+
+<span class="pc bpc" id="L1246" title="1 of 2 branches missed.">                    if (i + 3 &gt;= nTokens) {</span>
+<span class="nc" id="L1247">                        throw new IllegalArgumentException(</span>
+                                &quot;Syntax error: array dimension must be closed: &quot;
+                                        + tok3);
+                    }
+<span class="fc" id="L1251">                    final String tok4 = (String) tokens.get(i + 3);</span>
+<span class="pc bpc" id="L1252" title="3 of 4 branches missed.">                    if (tok4.length() != 1 &amp;&amp; tok4.charAt(0) != ARRAY_END) {</span>
+<span class="nc" id="L1253">                        throw new IllegalArgumentException(</span>
+                                &quot;Syntax error: illegal close of array dimension: &quot;
+                                        + tok4);
+                    }
+<span class="fc" id="L1257">                    i += 4;</span>
+<span class="fc bfc" id="L1258" title="All 2 branches covered.">                    if (i &lt; nTokens) {</span>
+<span class="fc" id="L1259">                        final String tok5 = (String) tokens.get(i);</span>
+<span class="pc bpc" id="L1260" title="3 of 4 branches missed.">                        if (tok5.length() != 1 &amp;&amp; tok5.charAt(0) != SEPARATOR) {</span>
+<span class="nc" id="L1261">                            throw new IllegalArgumentException(</span>
+                                    &quot;Syntax error: illegal separator after array: &quot;
+                                            + tok4);
+                        }
+                    }
+                    final List array;
+<span class="pc bpc" id="L1267" title="1 of 2 branches missed.">                    if (glob) {</span>
+<span class="nc" id="L1268">                        array = start.getDescendants(tok1);</span>
+                    } else {
+<span class="fc" id="L1270">                        array = start.getChildren(tok1);</span>
+                    }
+
+<span class="fc" id="L1273">                    Object selected = evaluator.evaluate(array);</span>
+
+<span class="fc bfc" id="L1275" title="All 2 branches covered.">                    if (selected instanceof StructuredContent) {</span>
+<span class="fc" id="L1276">                        return apply((StructuredContent) selected, tokens,</span>
+                                i + 1);
+                    } else {
+<span class="pc bpc" id="L1279" title="2 of 4 branches missed.">                        if (selected != null &amp;&amp; !((List) selected).isEmpty()) {</span>
+<span class="fc" id="L1280">                            List v = new Vector();</span>
+<span class="fc bfc" id="L1281" title="All 2 branches covered.">                            for (Object o : (List) selected) {</span>
+<span class="fc" id="L1282">                                StructuredContent sc = apply((StructuredContent) o, tokens, i + 1);</span>
+<span class="fc" id="L1283">                                v.add(sc);</span>
+<span class="fc" id="L1284">                            }</span>
+<span class="fc" id="L1285">                            return new SubContent(v, start);</span>
+                        }
+                    }
+            }
+        }
+
+<span class="nc" id="L1291">        return start;</span>
+    }
+
+    public void mapNamespaceAlias(String namespaceURI, String alias) {
+<span class="fc" id="L1295">        Map attributes = root.getChild(0).getAttributes();</span>
+<span class="pc bpc" id="L1296" title="1 of 2 branches missed.">        if (attributes == null) {</span>
+<span class="nc" id="L1297">            return;</span>
+        }
+<span class="pc bpc" id="L1299" title="1 of 2 branches missed.">        for (Object entryObj : ((Map) attributes).entrySet()) {</span>
+<span class="fc" id="L1300">            Map.Entry entry = (Map.Entry) entryObj;</span>
+<span class="fc" id="L1301">            String key = (String) entry.getKey();</span>
+<span class="pc bpc" id="L1302" title="1 of 2 branches missed.">            if (!key.startsWith(&quot;xmlns:&quot;)) {</span>
+<span class="nc" id="L1303">                continue;</span>
+            }
+<span class="pc bpc" id="L1305" title="1 of 2 branches missed.">            if (namespaceURI.equals(entry.getValue())) {</span>
+<span class="pc bpc" id="L1306" title="1 of 2 branches missed.">                if (namespaceAliases == null) {</span>
+<span class="fc" id="L1307">                    namespaceAliases = new Hashtable();</span>
+                }
+<span class="fc" id="L1309">                namespaceAliases.put(alias, key.substring(6));</span>
+<span class="fc" id="L1310">                break;</span>
+            }
+<span class="nc" id="L1312">        }</span>
+<span class="fc" id="L1313">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

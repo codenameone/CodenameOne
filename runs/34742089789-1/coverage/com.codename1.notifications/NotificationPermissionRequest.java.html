@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationPermissionRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.notifications</a> &gt; <span class="el_source">NotificationPermissionRequest.java</span></div><h1>NotificationPermissionRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.notifications;
+
+/// Describes which notification capabilities an app wants to request when calling
+/// `com.codename1.ui.Display#requestNotificationPermission(NotificationPermissionRequest, NotificationPermissionCallback)`.
+///
+/// By default `alert`, `sound` and `badge` are requested. Additional options such as
+/// `provisional`, `critical`, `timeSensitive`, `carPlay` and `announcement` map to iOS
+/// `UNAuthorizationOptions`. On Android only the existence of any requested capability
+/// matters; the granular options that have no Android equivalent are ignored.
+///
+/// Usage
+/// ```java
+/// NotificationPermissionRequest req = new NotificationPermissionRequest()
+///         .provisional(true)
+///         .timeSensitive(true);
+/// Display.getInstance().requestNotificationPermission(req, result -&gt; {
+///     if (result.isGranted()) {
+///         // schedule notifications
+///     }
+/// });
+/// ```
+///
+/// #### See also
+///
+/// - NotificationPermissionCallback
+///
+/// - NotificationPermissionResult
+<span class="fc" id="L50">public class NotificationPermissionRequest {</span>
+
+    // Bit values match iOS UNAuthorizationOption constants.
+    private static final int OPTION_BADGE = 1;
+    private static final int OPTION_SOUND = 2;
+    private static final int OPTION_ALERT = 4;
+    private static final int OPTION_CAR_PLAY = 8;
+    private static final int OPTION_CRITICAL_ALERT = 16;
+    private static final int OPTION_PROVIDES_SETTINGS = 32;
+    private static final int OPTION_PROVISIONAL = 64;
+    private static final int OPTION_ANNOUNCEMENT = 128;
+
+<span class="fc" id="L62">    private boolean alert = true;</span>
+<span class="fc" id="L63">    private boolean sound = true;</span>
+<span class="fc" id="L64">    private boolean badge = true;</span>
+    private boolean provisional;
+    private boolean critical;
+    private boolean timeSensitive;
+    private boolean carPlay;
+    private boolean announcement;
+    private boolean providesAppSettings;
+
+    /// Requests permission to display alerts. Enabled by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request alert permission
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest alert(boolean b) {
+<span class="fc" id="L82">        this.alert = b;</span>
+<span class="fc" id="L83">        return this;</span>
+    }
+
+    /// Requests permission to play notification sounds. Enabled by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request sound permission
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest sound(boolean b) {
+<span class="fc" id="L96">        this.sound = b;</span>
+<span class="fc" id="L97">        return this;</span>
+    }
+
+    /// Requests permission to update the app icon badge. Enabled by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request badge permission
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest badge(boolean b) {
+<span class="fc" id="L110">        this.badge = b;</span>
+<span class="fc" id="L111">        return this;</span>
+    }
+
+    /// Requests provisional authorization (iOS). Provisional notifications are delivered
+    /// quietly to the notification center without an explicit prompt. Ignored on platforms
+    /// that do not support it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request provisional authorization
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest provisional(boolean b) {
+<span class="fc" id="L126">        this.provisional = b;</span>
+<span class="fc" id="L127">        return this;</span>
+    }
+
+    /// Requests permission to send critical alerts (iOS). Critical alerts bypass Do Not
+    /// Disturb and the mute switch and require a special Apple entitlement. Without the
+    /// entitlement the request is silently downgraded. Ignored on platforms that do not
+    /// support it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request critical alert permission
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest critical(boolean b) {
+<span class="fc" id="L143">        this.critical = b;</span>
+<span class="fc" id="L144">        return this;</span>
+    }
+
+    /// Requests the ability to mark notifications as time sensitive (iOS). Ignored on
+    /// platforms that do not support it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request the time sensitive interruption level
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest timeSensitive(boolean b) {
+<span class="nc" id="L158">        this.timeSensitive = b;</span>
+<span class="nc" id="L159">        return this;</span>
+    }
+
+    /// Requests permission to display notifications in CarPlay (iOS). Ignored elsewhere.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request CarPlay permission
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest carPlay(boolean b) {
+<span class="nc" id="L172">        this.carPlay = b;</span>
+<span class="nc" id="L173">        return this;</span>
+    }
+
+    /// Requests permission for Siri to read out notifications (iOS). Ignored elsewhere.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to request announcement permission
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest announcement(boolean b) {
+<span class="nc" id="L186">        this.announcement = b;</span>
+<span class="nc" id="L187">        return this;</span>
+    }
+
+    /// Requests that the app provide its own in-app notification settings (iOS). Ignored
+    /// elsewhere.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to advertise in-app notification settings
+    ///
+    /// #### Returns
+    ///
+    /// this request for chaining
+    public NotificationPermissionRequest providesAppSettings(boolean b) {
+<span class="nc" id="L201">        this.providesAppSettings = b;</span>
+<span class="nc" id="L202">        return this;</span>
+    }
+
+    /// Returns true if alert permission is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if alerts are requested
+    public boolean isAlert() {
+<span class="fc" id="L211">        return alert;</span>
+    }
+
+    /// Returns true if sound permission is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if sound is requested
+    public boolean isSound() {
+<span class="fc" id="L220">        return sound;</span>
+    }
+
+    /// Returns true if badge permission is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if badge is requested
+    public boolean isBadge() {
+<span class="fc" id="L229">        return badge;</span>
+    }
+
+    /// Returns true if provisional authorization is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if provisional authorization is requested
+    public boolean isProvisional() {
+<span class="fc" id="L238">        return provisional;</span>
+    }
+
+    /// Returns true if critical alert permission is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if critical alerts are requested
+    public boolean isCritical() {
+<span class="nc" id="L247">        return critical;</span>
+    }
+
+    /// Returns true if the time sensitive interruption level is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if time sensitive notifications are requested
+    public boolean isTimeSensitive() {
+<span class="nc" id="L256">        return timeSensitive;</span>
+    }
+
+    /// Returns true if CarPlay permission is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if CarPlay is requested
+    public boolean isCarPlay() {
+<span class="nc" id="L265">        return carPlay;</span>
+    }
+
+    /// Returns true if announcement permission is requested.
+    ///
+    /// #### Returns
+    ///
+    /// true if announcement is requested
+    public boolean isAnnouncement() {
+<span class="nc" id="L274">        return announcement;</span>
+    }
+
+    /// Returns true if the app advertises in-app notification settings.
+    ///
+    /// #### Returns
+    ///
+    /// true if the app provides its own settings
+    public boolean isProvidesAppSettings() {
+<span class="nc" id="L283">        return providesAppSettings;</span>
+    }
+
+    /// Converts this request into the bitmask consumed by the iOS native layer. The bit
+    /// values match the iOS `UNAuthorizationOption` constants.
+    ///
+    /// #### Returns
+    ///
+    /// the authorization options bitmask
+    public int toAuthorizationOptionsMask() {
+<span class="fc" id="L293">        int mask = 0;</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (alert) {</span>
+<span class="fc" id="L295">            mask |= OPTION_ALERT;</span>
+        }
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (sound) {</span>
+<span class="fc" id="L298">            mask |= OPTION_SOUND;</span>
+        }
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (badge) {</span>
+<span class="fc" id="L301">            mask |= OPTION_BADGE;</span>
+        }
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (provisional) {</span>
+<span class="fc" id="L304">            mask |= OPTION_PROVISIONAL;</span>
+        }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (critical) {</span>
+<span class="fc" id="L307">            mask |= OPTION_CRITICAL_ALERT;</span>
+        }
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (carPlay) {</span>
+<span class="nc" id="L310">            mask |= OPTION_CAR_PLAY;</span>
+        }
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (announcement) {</span>
+<span class="nc" id="L313">            mask |= OPTION_ANNOUNCEMENT;</span>
+        }
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (providesAppSettings) {</span>
+<span class="nc" id="L316">            mask |= OPTION_PROVIDES_SETTINGS;</span>
+        }
+<span class="fc" id="L318">        return mask;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

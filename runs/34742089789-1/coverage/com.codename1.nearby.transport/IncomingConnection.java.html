@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IncomingConnection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.transport</a> &gt; <span class="el_source">IncomingConnection.java</span></div><h1>IncomingConnection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.transport;
+
+import com.codename1.impl.nearby.NearbyRequests;
+import com.codename1.nearby.spi.NearbyBridge;
+
+/// An incoming request from another device that wants to connect, delivered
+/// to [TransportListener#connectionRequested].
+///
+/// Named `IncomingConnection` rather than the obvious `ConnectionRequest`
+/// because `com.codename1.io.ConnectionRequest` is one of the most widely used
+/// classes in the framework, and an app doing both networking and nearby
+/// transport -- which is most of them -- would have had to qualify one of the
+/// two at every mention.
+///
+/// Answer it with [#accept()] or [#reject()]. A request that is never
+/// answered times out on the far side, so answer every one -- and answer it
+/// promptly, because both platforms hold radio resources open meanwhile.
+///
+/// #### Show the token
+///
+/// [#getAuthenticationToken()] is a short string both devices compute from
+/// the connection, and it is the only defense against a device in the middle
+/// pretending to be the one the user meant. Showing it on both screens and
+/// asking &quot;do these match?&quot; is what makes the pairing trustworthy; skipping
+/// that step is a choice to trust whoever answered first.
+public final class IncomingConnection {
+
+    private final Endpoint endpoint;
+    private final String authenticationToken;
+    private boolean answered;
+
+    /// Ports construct these.
+    ///
+    /// @hidden not part of the public API.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endpoint`: who is asking
+    /// - `authenticationToken`: the short comparison string, never null
+<span class="fc" id="L62">    public IncomingConnection(Endpoint endpoint, String authenticationToken) {</span>
+<span class="fc" id="L63">        this.endpoint = endpoint;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        this.authenticationToken =</span>
+                authenticationToken == null ? &quot;&quot; : authenticationToken;
+<span class="fc" id="L66">    }</span>
+
+    /// Who is asking.
+    public Endpoint getEndpoint() {
+<span class="nc" id="L70">        return endpoint;</span>
+    }
+
+    /// The short string both devices derive from this connection's key
+    /// exchange. Identical on both sides when nothing is in the middle.
+    ///
+    /// Never null, and **empty on iOS**: MultipeerConnectivity offers no
+    /// material to bind a token to, and inventing one from the service name
+    /// and display names would produce matching digits at both ends of a
+    /// relay. Treat empty as &quot;this platform cannot answer the question&quot;.
+    public String getAuthenticationToken() {
+<span class="nc" id="L81">        return authenticationToken;</span>
+    }
+
+    /// Whether [#accept()] or [#reject()] has already been called.
+    public boolean isAnswered() {
+<span class="fc" id="L86">        synchronized (this) {</span>
+<span class="fc" id="L87">            return answered;</span>
+        }
+    }
+
+    /// Claims the right to answer this request, once.
+    ///
+    /// The test and the assignment are ONE operation. As two, an app that
+    /// verifies its peer asynchronously -- which is what the authentication
+    /// token is FOR, so it is the expected shape rather than an exotic one --
+    /// could have two threads both read &quot;unanswered&quot; before either wrote,
+    /// and both go on to answer. On Android that races an acceptConnection
+    /// against a rejectConnection for one endpoint, and the connection
+    /// outcome then has nothing to do with which call the app believes won.
+    ///
+    /// #### Returns
+    ///
+    /// true for the one caller that may answer; false for every other
+    private boolean claim() {
+<span class="fc" id="L105">        synchronized (this) {</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (answered) {</span>
+<span class="nc" id="L107">                return false;</span>
+            }
+<span class="fc" id="L109">            answered = true;</span>
+<span class="fc" id="L110">            return true;</span>
+        }
+    }
+
+    /// Accepts the connection. The result arrives as
+    /// [TransportListener#connected] or
+    /// [TransportListener#connectionFailed], because the far side has to
+    /// accept too. Calling this twice, or after [#reject()], does nothing.
+    public void accept() {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (!claim()) {</span>
+<span class="nc" id="L120">            return;</span>
+        }
+<span class="fc" id="L122">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (b != null) {</span>
+            // Recorded before the call, so a port that refuses the acceptance
+            // synchronously still finds the endpoint to report it against.
+<span class="fc" id="L126">            int requestId = NearbyRequests.nextId();</span>
+<span class="fc" id="L127">            NearbyTransport.trackAcceptance(requestId, endpoint);</span>
+<span class="fc" id="L128">            b.acceptConnection(requestId, endpoint.getId());</span>
+        }
+<span class="fc" id="L130">    }</span>
+
+    /// Rejects the connection. Calling this twice, or after [#accept()],
+    /// does nothing.
+    public void reject() {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (!claim()) {</span>
+<span class="nc" id="L136">            return;</span>
+        }
+<span class="fc" id="L138">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="fc" id="L140">            b.rejectConnection(endpoint.getId());</span>
+        }
+<span class="fc" id="L142">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L146">        return &quot;IncomingConnection[&quot; + endpoint + &quot;, token=&quot;</span>
+                + authenticationToken + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

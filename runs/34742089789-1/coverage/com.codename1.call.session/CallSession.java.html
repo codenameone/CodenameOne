@@ -1,0 +1,632 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CallSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.call.session</a> &gt; <span class="el_source">CallSession.java</span></div><h1>CallSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.call.session;
+
+import com.codename1.call.CallDirection;
+import com.codename1.call.CallError;
+import com.codename1.call.CallException;
+import com.codename1.call.CallEndReason;
+import com.codename1.call.CallHandle;
+import com.codename1.call.CallState;
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.call.CallRequests;
+import com.codename1.impl.call.CallWire;
+import com.codename1.util.AsyncResource;
+
+/// One call, from the system's point of view.
+///
+/// Obtained from [Calls#reportIncoming] or [Calls#reportOutgoing], or handed
+/// over already ringing by
+/// `com.codename1.call.voip.PushedCall#getSession()`. A session is a handle
+/// on a call the operating system knows about; it does not carry audio.
+///
+/// Every method here is a request to the **system**, and every one of them is
+/// asynchronous because the system can refuse. Acting on a call that has
+/// already ended fails with [CallError#INVALID_ID] rather than doing nothing,
+/// so a bug in the app's own bookkeeping shows up instead of hiding.
+public final class CallSession {
+    private final String callId;
+    private final CallDirection direction;
+    private CallHandle handle;
+    private String displayName;
+    private CallState state;
+    private boolean muted;
+
+    CallSession(String callId, CallDirection direction, CallHandle handle,
+<span class="fc" id="L57">            String displayName, CallState state) {</span>
+<span class="fc" id="L58">        this.callId = callId;</span>
+<span class="fc" id="L59">        this.direction = direction;</span>
+<span class="fc" id="L60">        this.handle = handle;</span>
+<span class="fc" id="L61">        this.displayName = displayName;</span>
+<span class="fc" id="L62">        this.state = state;</span>
+<span class="fc" id="L63">    }</span>
+
+    /// The identifier naming this call everywhere -- here, in the system, and
+    /// in whatever signalling the app uses.
+    public String getCallId() {
+<span class="fc" id="L68">        return callId;</span>
+    }
+
+    /// Which way the call was placed.
+    public CallDirection getDirection() {
+<span class="fc" id="L73">        return direction;</span>
+    }
+
+    /// Who is on the other end.
+    public CallHandle getHandle() {
+<span class="nc" id="L78">        synchronized (this) {</span>
+<span class="nc" id="L79">            return handle;</span>
+        }
+    }
+
+    /// The name shown for the far end, or null.
+    public String getDisplayName() {
+<span class="nc" id="L85">        synchronized (this) {</span>
+<span class="nc" id="L86">            return displayName;</span>
+        }
+    }
+
+    /// Where the call is in its life.
+    public CallState getState() {
+<span class="fc" id="L92">        synchronized (this) {</span>
+<span class="fc" id="L93">            return state;</span>
+        }
+    }
+
+    /// Whether the call is muted, as far as the system is concerned.
+    public boolean isMuted() {
+        // Under the monitor, like the state beside it. Telecom and CallKit
+        // both deliver a mute change on the EDT while a media worker reads
+        // this to decide whether to keep transmitting, and a plain field
+        // gives that worker no reason ever to see the new value -- so it
+        // could go on sending audio after the system UI showed the call
+        // muted. Not volatile: PMD's forbidden list rules it out in core, and
+        // the monitor this class already has answers the same question.
+<span class="fc" id="L106">        synchronized (this) {</span>
+<span class="fc" id="L107">            return muted;</span>
+        }
+    }
+
+    /// Tells the system the outgoing call has begun connecting -- the far end
+    /// is being rung. Ignored for an incoming call, and ignored once the call
+    /// has connected.
+    public void reportStartedConnecting() {
+<span class="fc" id="L115">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        if (b == null || direction != CallDirection.OUTGOING) {</span>
+<span class="fc" id="L117">            return;</span>
+        }
+        // STILL DIALING, rather than &quot;not over&quot;. This was
+        // moveUnlessOver(DIALING), which guards ENDED and nothing else, so
+        // reordered signalling -- reportConnected() followed by a
+        // reportStartedConnecting() that was already in flight -- moved an
+        // ACTIVE or HELD session back to DIALING. The platform half is worse
+        // than the Java half: AndroidCallBridge turns this into
+        // Connection.setDialing(), so the SYSTEM call UI went back to dialing
+        // for a call that was already up, and the user saw a connected call
+        // start ringing out again.
+        //
+        // The transition it was making could never be anything else. An
+        // outgoing session is constructed DIALING by Calls' report, and
+        // nothing else in core moves a session to DIALING, so
+        // moveUnlessOver(DIALING) was either a no-op or that regression --
+        // there was no case it existed to serve.
+        //
+        // The test and the report are ONE step, under `reporting`. Guarding
+        // the state alone was not enough, and the reason I first gave for
+        // leaving that window open was wrong: I said a connect landing in it
+        // was a report ordering the platform resolves. The platform does not
+        // resolve anything -- it applies the last report it is given. So
+        // signalling on two threads could run this check while the call was
+        // still dialing, let reportConnected move the session to ACTIVE and
+        // call Telecom's setActive, and only then arrive here with
+        // setDialing. Telecom regresses to dialing and the Java session stays
+        // ACTIVE: not a race about which correct state wins, but the two
+        // halves of this API disagreeing, with the system showing the wrong
+        // one to the user.
+        //
+        // A SEPARATE lock, not the session monitor, and that is the whole
+        // trick: the monitor cannot be held across a bridge call because the
+        // ports call back into Java, so holding it here is a deadlock. This
+        // one is held only for the length of a report and only by reports, so
+        // it orders them against each other without standing between a port
+        // callback and the state it needs. TunnelHost's `lifecycle` lock
+        // orders start, stop and delivery for the same reason.
+        // HANDOFF OUTSIDE `reporting`, and that order is the whole of what
+        // makes two locks safe: every path in this class takes HANDOFF
+        // first, then `reporting`, then the session monitor. Calls.report
+        // takes HANDOFF then the registry. Nothing takes them the other way
+        // round, so there is no cycle to deadlock on.
+        //
+        // Both are needed and they answer different questions. `reporting`
+        // orders this report against the connect that may overtake it;
+        // HANDOFF orders the ownership test against the handoff it
+        // authorises, because the ownership test used to sit in the guard
+        // above where a replacement could claim the id before this line ran.
+<span class="fc" id="L166">        synchronized (Calls.HANDOFF) {</span>
+<span class="fc" id="L167">            synchronized (reporting) {</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">                if (!Calls.owns(callId, this) || !stillDialing()) {</span>
+<span class="fc" id="L169">                    return;</span>
+                }
+<span class="fc" id="L171">                b.reportOutgoingStartedConnecting(callId,</span>
+<span class="fc" id="L172">                        System.currentTimeMillis());</span>
+<span class="fc" id="L173">            }</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">    }</span>
+
+    /// Orders a state test against the native report that follows it.
+    ///
+    /// Two reports that both move a live call and both tell the platform have
+    /// to reach the platform in the order they took effect in Java, or the
+    /// system shows a state the session denies. `end` needs no part of this:
+    /// ENDED is terminal, so a report racing it fails moveUnlessOver and
+    /// never reaches its bridge call at all.
+<span class="fc" id="L184">    private final Object reporting = new Object();</span>
+
+    /// Whether this call has not connected yet.
+    ///
+    /// Read under the monitor the state is written under, for the reason
+    /// isMuted() is: signalling reads this off the EDT while the ports
+    /// deliver a connect on it.
+    private boolean stillDialing() {
+<span class="fc" id="L192">        synchronized (this) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            return state == CallState.DIALING;</span>
+        }
+    }
+
+    /// Moves to `next` unless the call is already over, as ONE step.
+    ///
+    /// Package-private because Calls' deferred-action hooks need the same
+    /// step: they were restating the check and then assigning, which is the
+    /// same two-step this exists to replace.
+    ///
+    /// ENDED is terminal in [CallState], and signalling is asynchronous: a
+    /// media-connected callback that was already in flight when the call
+    /// ended used to move the session back to ACTIVE. The ports drop the
+    /// report -- the platform call is gone -- so the Java object was left
+    /// contradicting both the system and its own contract, and anything
+    /// watching it could render or restart media for a call that is over.
+    ///
+    /// The check and the assignment used to straddle a window an end event
+    /// fits through: signalling calls reportConnected off the EDT while an
+    /// end or a provider reset is being delivered ON it, so the end could
+    /// land after the check and this would then move the retained session
+    /// back to ACTIVE -- reporting a connection for a native call that was
+    /// already gone, and contradicting the terminal-state guarantee ENDED is
+    /// documented to give. A separate terminal-state test before the
+    /// assignment only narrows that window; it cannot close it, which is why
+    /// the predicate it used to call is gone rather than merely unused.
+    /// Moves to ACTIVE, but only from a call that has not connected yet.
+    ///
+    /// moveUnlessOver rejects ENDED and nothing else, which is right for the
+    /// transitions that may happen at any point in a call and wrong for this
+    /// one. A delayed or duplicate connected callback on a HELD call moved it
+    /// back to ACTIVE and had the Android bridge call Connection.setActive --
+    /// undoing a hold the USER asked for, from a signalling event that says
+    /// nothing about hold at all.
+    ///
+    /// RINGING and DIALING are the whole of the legitimate source: hold is
+    /// left by unholding, which is its own operation, and a call already
+    /// ACTIVE has nothing to gain from being told so twice -- the platform
+    /// starts the duration the user sees from that report.
+    boolean moveToConnected() {
+<span class="fc" id="L233">        synchronized (this) {</span>
+<span class="fc bfc" id="L234" title="All 4 branches covered.">            if (state != CallState.RINGING &amp;&amp; state != CallState.DIALING) {</span>
+<span class="fc" id="L235">                return false;</span>
+            }
+<span class="fc" id="L237">            state = CallState.ACTIVE;</span>
+<span class="fc" id="L238">            return true;</span>
+        }
+    }
+
+    boolean moveUnlessOver(CallState next) {
+<span class="fc" id="L243">        synchronized (this) {</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if (state == CallState.ENDED) {</span>
+<span class="nc" id="L245">                return false;</span>
+            }
+<span class="fc" id="L247">            state = next;</span>
+<span class="fc" id="L248">            return true;</span>
+        }
+    }
+
+    /// Tells the system the call is connected. Call this when media is
+    /// actually flowing, because it starts the duration the user sees.
+    public void reportConnected() {
+<span class="fc" id="L255">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L257">            return;</span>
+        }
+        // Inside `reporting` with the transition, so a started-connecting
+        // report cannot pass its own state test before this one and then
+        // reach the platform after it. See the note there.
+        // HANDOFF then `reporting`, the same order as everywhere else in
+        // this class; see reportStartedConnecting for why both locks exist.
+<span class="fc" id="L264">        synchronized (Calls.HANDOFF) {</span>
+<span class="fc" id="L265">            synchronized (reporting) {</span>
+<span class="fc bfc" id="L266" title="All 4 branches covered.">                if (!Calls.owns(callId, this) || !moveToConnected()) {</span>
+<span class="fc" id="L267">                    return;</span>
+                }
+<span class="fc" id="L269">                long now = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                if (direction == CallDirection.OUTGOING) {</span>
+<span class="fc" id="L271">                    b.reportOutgoingConnected(callId, now);</span>
+                } else {
+<span class="fc" id="L273">                    b.reportIncomingConnected(callId, now);</span>
+                }
+<span class="fc" id="L275">            }</span>
+<span class="fc" id="L276">        }</span>
+<span class="fc" id="L277">    }</span>
+
+    /// Changes what the system shows for this call. Arguments left null are
+    /// left alone.
+    ///
+    /// The two fields are written under the session monitor, like the state
+    /// and the mute flag: a signalling worker calls this while the EDT reads
+    /// the same session to refresh the in-app call UI, and plain writes gave
+    /// that reader no reason ever to see them -- so the system UI could show
+    /// the new identity while Java went on displaying the old one, or a
+    /// mixed pair of the two.
+    public void update(CallHandle newHandle, String newDisplayName) {
+<span class="fc" id="L289">        CallBridge b = CallRequests.bridge();</span>
+        // Under HANDOFF for the reason end() is, and named by review only for
+        // its siblings: updateCall reaches the port by call id too, so an
+        // unordered check let a rename land on whichever call held the id --
+        // relabelling somebody else's live call in the system UI, which is
+        // the one place the user is looking.
+<span class="fc" id="L295">        synchronized (Calls.HANDOFF) {</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            if (!Calls.owns(callId, this)) {</span>
+                // The local fields are left alone too: this object no longer
+                // describes anything the system knows about.
+<span class="nc" id="L299">                return;</span>
+            }
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            if (newHandle != null) {</span>
+<span class="fc" id="L302">                synchronized (this) {</span>
+<span class="fc" id="L303">                    handle = newHandle;</span>
+<span class="fc" id="L304">                }</span>
+            }
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (newDisplayName != null) {</span>
+<span class="fc" id="L307">                synchronized (this) {</span>
+<span class="fc" id="L308">                    displayName = newDisplayName;</span>
+<span class="fc" id="L309">                }</span>
+            }
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (b != null) {</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                b.updateCall(callId, newHandle == null ? null</span>
+<span class="fc" id="L313">                        : CallWire.encodeHandle(newHandle), newDisplayName, -1,</span>
+                        false);
+            }
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">    }</span>
+
+    /// Hangs up, and writes `reason` into the system call log.
+    ///
+    /// Do **not** call this from
+    /// [CallActionListener#providerReset()] -- by then the call no longer
+    /// exists.
+    public AsyncResource&lt;Boolean&gt; end(CallEndReason reason) {
+<span class="fc" id="L325">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L327">            return Calls.unsupported();</span>
+        }
+        // The ownership test and the handoff as ONE step against the
+        // registry. Checked and then handed off, an end authorised while THIS
+        // session held the id could reach the port after a replacement had
+        // claimed it -- and the SPI carries no session identity, so
+        // AndroidCallBridge.endCall looks up the id alone and would finish
+        // the replacement, acknowledge success, and leave that live call
+        // registered in Java with nothing to say it had been hung up.
+        //
+        // reportEndedRemotely never had this hole: its check is an
+        // identity-checked forget() under the registry monitor, and it
+        // reports only when that said this session owned the id. This path
+        // asked a weaker question and acted on it later.
+        //
+        // See Calls.HANDOFF for why it is not the SESSIONS monitor.
+<span class="fc" id="L343">        synchronized (Calls.HANDOFF) {</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            if (!Calls.owns(callId, this)) {</span>
+<span class="fc" id="L345">                return staleSession();</span>
+            }
+<span class="fc" id="L347">            int id = CallRequests.nextId();</span>
+<span class="fc" id="L348">            EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+            // The state moves and the session is forgotten only if the system
+            // agreed. Setting ENDED up front left an app whose end request was
+            // refused holding a session that said ended over a call that was
+            // still up.
+<span class="fc" id="L353">            r.onResult(new EndOutcome(this));</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            b.endCall(id, callId, reason == null</span>
+<span class="pc" id="L355">                    ? CallEndReason.LOCAL_ENDED.ordinal() : reason.ordinal());</span>
+<span class="fc" id="L356">            return r;</span>
+        }
+    }
+
+    /// Tells the system the **far end** ended the call. Use this rather than
+    /// [#end] when the hang-up came down the app's own signalling, so the
+    /// call log says what happened.
+    public void reportEndedRemotely(CallEndReason reason) {
+<span class="fc" id="L364">        CallBridge b = CallRequests.bridge();</span>
+<span class="fc" id="L365">        synchronized (this) {</span>
+<span class="fc" id="L366">            state = CallState.ENDED;</span>
+<span class="fc" id="L367">        }</span>
+        // The registry entry is released and the port told immediately
+        // after, not atomically. Review asked for a tombstone held across
+        // the native call, or native identity by generation. Neither is
+        // written here on purpose: the window is two adjacent statements on
+        // one thread, and to lose it another thread would have to complete a
+        // whole reportIncoming for the same id in between -- which the ports
+        // themselves refuse while the call is still live natively, because
+        // that is a duplicate. A tombstone buys that sliver and adds a way
+        // for an id to become permanently unusable when a native report
+        // throws; generation-tagged native identity is a much larger change
+        // to both ports for the same sliver. Reporting only when this
+        // session OWNED the entry is the part that was actually reachable.
+        //
+        // The native report is made only if THIS session still owned the id.
+        // forget() is identity-checked, so a stale session leaves the
+        // replacement registered -- but the report went out regardless, and
+        // both ports resolve it by call id alone, so a late signalling
+        // callback on a retained old session ended the new live call that
+        // had reused the id after a provider reset.
+<span class="fc" id="L387">        boolean owned = Calls.forget(callId, this);</span>
+<span class="pc bpc" id="L388" title="1 of 4 branches missed.">        if (b != null &amp;&amp; owned) {</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">            b.reportCallEnded(callId, reason == null</span>
+<span class="pc" id="L390">                    ? CallEndReason.REMOTE_ENDED.ordinal() : reason.ordinal(),</span>
+<span class="fc" id="L391">                    System.currentTimeMillis());</span>
+        }
+<span class="fc" id="L393">    }</span>
+
+    /// A resource already failed because this session lost its id.
+    ///
+    /// Every operation here reaches the port with nothing but the call id,
+    /// and the ports resolve by that alone -- so an object the app still
+    /// holds after a provider reset, or a detached one describing a call
+    /// that is already over, would otherwise act on whatever owns the id
+    /// now. end() was gated first; this is the same question for the rest of
+    /// them, which is where it should have been asked in the first place.
+    private static EdtResult&lt;Boolean&gt; staleSession() {
+<span class="fc" id="L404">        EdtResult&lt;Boolean&gt; stale = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L405">        stale.error(new CallException(CallError.INVALID_ID,</span>
+                &quot;This session no longer names a live call&quot;));
+<span class="fc" id="L407">        return stale;</span>
+    }
+
+    /// Holds or resumes the call.
+    public AsyncResource&lt;Boolean&gt; setHeld(boolean held) {
+<span class="fc" id="L412">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L414">            return Calls.unsupported();</span>
+        }
+        // Under HANDOFF, like end(). The bridge identifies its target by
+        // call id alone, so an ownership check that is not ordered against
+        // the registry authorises an operation the port then applies to
+        // whatever holds the id when it arrives -- and the acknowledgement
+        // comes back to THIS session, so the two halves describe different
+        // calls. See Calls.HANDOFF.
+<span class="fc" id="L422">        synchronized (Calls.HANDOFF) {</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            if (!Calls.owns(callId, this)) {</span>
+<span class="nc" id="L424">                return staleSession();</span>
+            }
+<span class="fc" id="L426">            int id = CallRequests.nextId();</span>
+<span class="fc" id="L427">            EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+            // Applied from the acknowledgement, as end() does. Setting it up
+            // front left the session claiming HELD after a transaction the system
+            // had rejected -- for instance because the call ended while the
+            // request was in flight -- with nothing to roll it back.
+<span class="fc bfc" id="L432" title="All 2 branches covered.">            r.onResult(new StateOutcome(this,</span>
+                    held ? CallState.HELD : CallState.ACTIVE));
+<span class="fc" id="L434">            b.setHeld(id, callId, held);</span>
+<span class="fc" id="L435">            return r;</span>
+        }
+    }
+
+    /// Mutes or unmutes the call in the system UI.
+    ///
+    /// This tells the operating system what the mute button should look like.
+    /// It does **not** stop the app sending audio -- nothing here touches
+    /// media -- so an app that only calls this is still transmitting.
+    ///
+    /// Gated by `CallBridge.CAPABILITY_MUTE`, which Android does not offer: a
+    /// self-managed call there cannot tell Telecom its mute state, so this
+    /// answers `NOT_SUPPORTED` and [#isMuted()] stays where the system left
+    /// it. Hearing what the user does with the system's own mute control is a
+    /// separate thing and works everywhere; see
+    /// [CallActionListener#muteRequested].
+    public AsyncResource&lt;Boolean&gt; setMuted(boolean value) {
+<span class="fc" id="L452">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L454">            return Calls.unsupported();</span>
+        }
+        // Under HANDOFF, like end(). The bridge identifies its target by
+        // call id alone, so an ownership check that is not ordered against
+        // the registry authorises an operation the port then applies to
+        // whatever holds the id when it arrives -- and the acknowledgement
+        // comes back to THIS session, so the two halves describe different
+        // calls. See Calls.HANDOFF.
+<span class="fc" id="L462">        synchronized (Calls.HANDOFF) {</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            if (!Calls.owns(callId, this)) {</span>
+<span class="nc" id="L464">                return staleSession();</span>
+            }
+<span class="fc" id="L466">            int id = CallRequests.nextId();</span>
+<span class="fc" id="L467">            EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+            // Applied from the acknowledgement for the same reason as setHeld.
+<span class="fc" id="L469">            r.onResult(new MuteOutcome(this, value));</span>
+<span class="fc" id="L470">            b.setMuted(id, callId, value);</span>
+<span class="fc" id="L471">            return r;</span>
+        }
+    }
+
+    /// Sends DTMF digits through the system.
+    public AsyncResource&lt;Boolean&gt; sendDigits(String digits) {
+<span class="fc" id="L477">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L479">            return Calls.unsupported();</span>
+        }
+        // Under HANDOFF, like end(). The bridge identifies its target by
+        // call id alone, so an ownership check that is not ordered against
+        // the registry authorises an operation the port then applies to
+        // whatever holds the id when it arrives -- and the acknowledgement
+        // comes back to THIS session, so the two halves describe different
+        // calls. See Calls.HANDOFF.
+<span class="fc" id="L487">        synchronized (Calls.HANDOFF) {</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">            if (!Calls.owns(callId, this)) {</span>
+<span class="nc" id="L489">                return staleSession();</span>
+            }
+<span class="fc" id="L491">            int id = CallRequests.nextId();</span>
+<span class="fc" id="L492">            EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+<span class="fc" id="L493">            b.sendDtmf(id, callId, digits);</span>
+<span class="fc" id="L494">            return r;</span>
+        }
+    }
+
+    /// Puts this call in a conference with `other`, or takes it out of one
+    /// when `other` is null.
+    ///
+    /// **Answers NOT_SUPPORTED on every platform today**, which is why
+    /// [com.codename1.call.spi.CallBridge#CAPABILITY_GROUPING] is set by no
+    /// port: CallKit's group action travels system to app with no
+    /// app-initiated counterpart, and Telecom conferences self-managed calls
+    /// only through a `ConnectionService` conference this framework does not
+    /// build. It stays here because the system may still ask an app to group
+    /// calls, and because a conference an app mixes itself needs no
+    /// permission from either platform.
+    public AsyncResource&lt;Boolean&gt; groupWith(CallSession other) {
+<span class="fc" id="L510">        CallBridge b = CallRequests.bridge();</span>
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L512">            return Calls.unsupported();</span>
+        }
+        // Ownership is checked HERE for the first time. Every port answers
+        // this NOT_SUPPORTED today, so nothing could reach a live call
+        // through it -- but &quot;the ports all refuse it&quot; is a property of the
+        // ports, not of this method, and the first one to implement grouping
+        // would have inherited an unguarded handoff by call id. Guarded on
+        // the same terms as its siblings rather than left as the exception
+        // nobody remembered.
+<span class="fc" id="L521">        synchronized (Calls.HANDOFF) {</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (!Calls.owns(callId, this)) {</span>
+<span class="nc" id="L523">                return staleSession();</span>
+            }
+<span class="fc" id="L525">            int id = CallRequests.nextId();</span>
+<span class="fc" id="L526">            EdtResult&lt;Boolean&gt; r = CallRequests.openAck(id);</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">            b.setCallGroup(id, callId,</span>
+<span class="fc" id="L528">                    other == null ? null : other.getCallId());</span>
+<span class="fc" id="L529">            return r;</span>
+        }
+    }
+
+    /// Moves the session to ENDED and forgets it, but only once the system
+    /// has accepted the end request.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class EndOutcome
+            implements com.codename1.util.AsyncResult&lt;Boolean&gt; {
+        private final CallSession session;
+
+<span class="fc" id="L542">        EndOutcome(CallSession session) {</span>
+<span class="fc" id="L543">            this.session = session;</span>
+<span class="fc" id="L544">        }</span>
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+<span class="fc bfc" id="L548" title="All 2 branches covered.">            if (error != null) {</span>
+                // Still up as far as the system is concerned, so it stays
+                // addressable through Calls.getSession.
+<span class="fc" id="L551">                return;</span>
+            }
+<span class="fc" id="L553">            synchronized (session) {</span>
+<span class="fc" id="L554">                session.state = CallState.ENDED;</span>
+<span class="fc" id="L555">            }</span>
+<span class="fc" id="L556">            Calls.forget(session.getCallId(), session);</span>
+<span class="fc" id="L557">        }</span>
+    }
+
+    /// Moves the session's state, but only once the system has accepted the
+    /// request that asked for it.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class StateOutcome
+            implements com.codename1.util.AsyncResult&lt;Boolean&gt; {
+        private final CallSession session;
+        private final CallState target;
+
+<span class="fc" id="L570">        StateOutcome(CallSession session, CallState target) {</span>
+<span class="fc" id="L571">            this.session = session;</span>
+<span class="fc" id="L572">            this.target = target;</span>
+<span class="fc" id="L573">        }</span>
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+            // Never out of ENDED. Every transition here is an acknowledgement
+            // that was in flight, so a hold or resume the system accepted
+            // just as the call was ending would otherwise move a terminal
+            // session back to HELD or ACTIVE -- the same defect as a late
+            // reportConnected, and reachable by the same route.
+            //
+            // Guarded by inspection rather than by a test: LocalCallBridge
+            // settles an acknowledgement before end() can run, so the
+            // simulation cannot produce the ordering this defends against.
+            // The late-reportConnected half IS covered, in LocalCallTest.
+<span class="fc bfc" id="L587" title="All 2 branches covered.">            if (error == null) {</span>
+<span class="fc" id="L588">                session.moveUnlessOver(target);</span>
+            }
+<span class="fc" id="L590">        }</span>
+    }
+
+    /// Records the mute flag once the system has accepted it.
+    private static final class MuteOutcome
+            implements com.codename1.util.AsyncResult&lt;Boolean&gt; {
+        private final CallSession session;
+        private final boolean target;
+
+<span class="fc" id="L599">        MuteOutcome(CallSession session, boolean target) {</span>
+<span class="fc" id="L600">            this.session = session;</span>
+<span class="fc" id="L601">            this.target = target;</span>
+<span class="fc" id="L602">        }</span>
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+<span class="fc bfc" id="L606" title="All 2 branches covered.">            if (error == null) {</span>
+<span class="fc" id="L607">                synchronized (session) {</span>
+<span class="fc" id="L608">                    session.muted = target;</span>
+<span class="fc" id="L609">                }</span>
+            }
+<span class="fc" id="L611">        }</span>
+    }
+
+    /// Sets the state without telling the system, for events coming the other
+    /// way.
+    void setStateInternal(CallState value) {
+        // Under the monitor every other transition uses. This is how the
+        // PORT reports a change, including the end that moveUnlessOver has
+        // to see, so it cannot be the one write that races.
+<span class="fc" id="L620">        synchronized (this) {</span>
+<span class="fc" id="L621">            state = value;</span>
+<span class="fc" id="L622">        }</span>
+<span class="fc" id="L623">    }</span>
+
+    /// Sets the mute flag without telling the system.
+    void setMutedInternal(boolean value) {
+<span class="fc" id="L627">        synchronized (this) {</span>
+<span class="fc" id="L628">            muted = value;</span>
+<span class="fc" id="L629">        }</span>
+<span class="fc" id="L630">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

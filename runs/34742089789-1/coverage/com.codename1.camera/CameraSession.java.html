@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CameraSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.camera</a> &gt; <span class="el_source">CameraSession.java</span></div><h1>CameraSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.camera;
+
+import com.codename1.impl.CameraImpl;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+
+/// Active camera session. Obtained from `Camera#open(CameraInfo, CameraSessionOptions)`.
+///
+/// Only one `CameraSession` may be open at a time; opening a second throws
+/// `IllegalStateException`. Closing the session releases the camera hardware
+/// and invalidates any `CameraView` returned by `#createView()`.
+///
+/// Sessions may be paused (releasing hardware while keeping the session object)
+/// and resumed; this is the right pattern when the app temporarily uses the
+/// classic `com.codename1.capture.Capture` API while a session is open, since
+/// the OS-level camera device is single-tenant.
+public final class CameraSession implements AutoCloseable {
+    private final CameraImpl impl;
+    private final CameraInfo info;
+    private final CameraSessionOptions options;
+    private FrameListener frameListener;
+    private CameraView view;
+    private boolean closed;
+    /// Whether pause() has released the hardware and resume() has not taken it
+    /// back. Read by Camera.open, which must let a modal Capture through while
+    /// a session is holding nothing.
+    private boolean paused;
+
+<span class="fc" id="L52">    CameraSession(CameraImpl impl, CameraInfo info, CameraSessionOptions options) {</span>
+<span class="fc" id="L53">        this.impl = impl;</span>
+<span class="fc" id="L54">        this.info = info;</span>
+<span class="fc" id="L55">        this.options = options;</span>
+<span class="fc" id="L56">    }</span>
+
+    /// Create the live preview component. Each session owns one view; subsequent
+    /// calls return the same instance.
+    public CameraView createView() {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (view == null) {</span>
+<span class="fc" id="L62">            view = new CameraView(this, impl.createPreviewPeer());</span>
+        }
+<span class="fc" id="L64">        return view;</span>
+    }
+
+    /// Capture a still photo with default options.
+    public AsyncResource&lt;CapturedPhoto&gt; takePhoto() {
+<span class="fc" id="L69">        return takePhoto(new PhotoCaptureOptions());</span>
+    }
+
+    /// Capture a still photo using the given options (size, quality, file
+    /// path). The returned `AsyncResource` resolves on the EDT with the
+    /// captured photo, or fires its error callback if capture fails.
+    public AsyncResource&lt;CapturedPhoto&gt; takePhoto(PhotoCaptureOptions opts) {
+<span class="fc" id="L76">        AsyncResource&lt;CapturedPhoto&gt; out = new AsyncResource&lt;CapturedPhoto&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        impl.takePhoto(opts == null ? new PhotoCaptureOptions() : opts, out);</span>
+<span class="fc" id="L78">        return out;</span>
+    }
+
+    /// Begin recording video to the given FileSystemStorage path. The returned
+    /// `VideoRecording` is the handle used to stop the recording.
+    public VideoRecording startVideoRecording(String filePath) {
+        try {
+<span class="fc" id="L85">            impl.startVideoRecording(filePath, options.isCaptureAudio());</span>
+<span class="nc" id="L86">        } catch (IOException e) {</span>
+<span class="nc" id="L87">            throw new RuntimeException(&quot;Could not start video recording&quot;, e);</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc" id="L89">        return new VideoRecording(impl, filePath);</span>
+    }
+
+    /// Install a frame listener. At most one frame listener may be active per
+    /// session; installing a second replaces the first. Pass `null` to remove.
+    public void setFrameListener(FrameListener l) {
+<span class="fc" id="L95">        this.frameListener = l;</span>
+<span class="fc" id="L96">        impl.setFrameListener(l, options.getFrameFormat(), options.getFrameMaxFps());</span>
+<span class="fc" id="L97">    }</span>
+
+    /// Backwards-compatible alias for `#setFrameListener(FrameListener)`.
+    public void addFrameListener(FrameListener l) {
+<span class="fc" id="L101">        setFrameListener(l);</span>
+<span class="fc" id="L102">    }</span>
+
+    // Identity comparison is intentional: addFrameListener stores the
+    // exact callback reference, removeFrameListener only removes the same
+    // instance.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    public void removeFrameListener(FrameListener l) {
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (this.frameListener == l) {</span>
+<span class="fc" id="L110">            setFrameListener(null);</span>
+        }
+<span class="fc" id="L112">    }</span>
+
+    /// Set the flash / torch behavior. No-op on cameras whose
+    /// `CameraInfo#hasFlash()` is false.
+    public void setFlashMode(FlashMode m) {
+<span class="fc" id="L117">        impl.setFlashMode(m);</span>
+<span class="fc" id="L118">    }</span>
+
+    /// Set the zoom ratio where `1.0` is no zoom and values above `1.0`
+    /// zoom in. The platform implementation clamps to the supported range.
+    public void setZoom(float ratio) {
+<span class="fc" id="L123">        impl.setZoom(ratio);</span>
+<span class="fc" id="L124">    }</span>
+
+    /// Request a focus operation at the normalized preview coordinate
+    /// (`0.0` top-left, `1.0` bottom-right).
+    public void focus(float xNorm, float yNorm) {
+<span class="fc" id="L129">        impl.focus(xNorm, yNorm);</span>
+<span class="fc" id="L130">    }</span>
+
+    /// The `CameraInfo` for the physical camera this session is attached to.
+    public CameraInfo getInfo() {
+<span class="fc" id="L134">        return info;</span>
+    }
+
+    /// The options the session was opened with. Read-only snapshot; mutating
+    /// it after `Camera#open(CameraInfo, CameraSessionOptions)` has no effect.
+    public CameraSessionOptions getOptions() {
+<span class="fc" id="L140">        return options;</span>
+    }
+
+    /// Release the hardware but keep this session object alive. Pair with
+    /// `#resume()`.
+    public void pause() {
+<span class="fc" id="L146">        Camera.pauseSession(this);</span>
+<span class="fc" id="L147">    }</span>
+
+    /// The pause itself, run by Camera while it holds ACTIVE_LOCK.
+    ///
+    /// Package private and lock-bound on purpose: open() decides whether to let
+    /// a capture past by reading isPaused(), so the release of the hardware and
+    /// the flag that advertises it have to become visible together. Setting the
+    /// flag outside the lock let an opener miss it and refuse the very handoff
+    /// the application had just paused for.
+    void pauseUnderLock() {
+<span class="fc" id="L157">        impl.pause();</span>
+<span class="fc" id="L158">        paused = true;</span>
+<span class="fc" id="L159">    }</span>
+
+    /// Whether the hardware is currently released by `#pause()`.
+    ///
+    /// Package private on purpose. Camera.open is the only caller that needs
+    /// it -- to let a modal Capture past a paused session -- and a new public
+    /// method is easy to add later and impossible to take back.
+    boolean isPaused() {
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        return paused &amp;&amp; !closed;</span>
+    }
+
+    /// Re-acquire the hardware after `#pause()`. No-op if the session is
+    /// already running.
+    public void resume() {
+<span class="fc" id="L173">        Camera.resumeSession(this);</span>
+<span class="fc" id="L174">    }</span>
+
+    /// The resume itself, run by Camera while it holds ACTIVE_LOCK.
+    ///
+    /// The check and the reacquisition have to be ONE step. Checking under the
+    /// lock and then resuming outside it left a window where an opener saw this
+    /// session still paused, installed a successor and started it, while this
+    /// thread went on to take the hardware back anyway -- two consumers, and on
+    /// the Apple backend the successor's frame-callback target replaced. That
+    /// is the check-then-act open() already refuses to ship, which is why it
+    /// holds this same lock across its own native call.
+    void resumeUnderLock() {
+<span class="fc" id="L186">        impl.resume();</span>
+<span class="fc" id="L187">        paused = false;</span>
+<span class="fc" id="L188">    }</span>
+
+    /// Release the session. Idempotent.
+    @Override
+    public void close() {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L194">            return;</span>
+        }
+<span class="fc" id="L196">        closed = true;</span>
+        try {
+<span class="fc" id="L198">            impl.close();</span>
+        } finally {
+<span class="fc" id="L200">            Camera.clearActive(this);</span>
+        }
+<span class="fc" id="L202">    }</span>
+
+    /// True once `#close()` has been called on this session.
+    public boolean isClosed() {
+<span class="fc" id="L206">        return closed;</span>
+    }
+
+    CameraImpl getImpl() {
+<span class="fc" id="L210">        return impl;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthInterval.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthInterval.java</span></div><h1>HealthInterval.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.time.Duration;
+import java.time.ZoneId;
+
+/// The bucket width of an [AggregateQuery] -- &quot;per hour&quot;, &quot;per calendar
+/// day&quot;, &quot;per calendar month&quot;.
+///
+/// #### Fixed durations and calendar periods are not the same thing
+///
+/// A calendar day is 23 or 25 hours across a daylight-saving transition,
+/// and a month is 28 to 31 days. Bucketing by a fixed `86400000` therefore
+/// drifts against the dates a user sees in your UI, silently, twice a
+/// year. Both platforms model the distinction natively -- Health Connect
+/// splits `aggregateGroupByDuration` from `aggregateGroupByPeriod`, and
+/// HealthKit takes `DateComponents` -- so this API keeps it too.
+///
+/// Calendar-based intervals require an explicit [java.time.ZoneId]. Nothing
+/// here reads the JVM default, because a server-side default of UTC would put
+/// a user's evening walk into the wrong day.
+public final class HealthInterval {
+
+    private final long fixedMillis;
+    private final int calendarField;
+    private final int calendarAmount;
+    private final ZoneId zone;
+    private final int firstDayOfWeek;
+
+    private HealthInterval(long fixedMillis, int calendarField,
+<span class="fc" id="L54">            int calendarAmount, ZoneId zone, int firstDayOfWeek) {</span>
+<span class="fc" id="L55">        this.fixedMillis = fixedMillis;</span>
+<span class="fc" id="L56">        this.calendarField = calendarField;</span>
+<span class="fc" id="L57">        this.calendarAmount = calendarAmount;</span>
+<span class="fc" id="L58">        this.zone = zone;</span>
+<span class="fc" id="L59">        this.firstDayOfWeek = firstDayOfWeek;</span>
+<span class="fc" id="L60">    }</span>
+
+    private static void requirePositive(long amount, String what) {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (amount &lt; 1) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+                    what + &quot; must be positive, got &quot; + amount);
+        }
+<span class="fc" id="L67">    }</span>
+
+    /// A fixed number of milliseconds.
+    public static HealthInterval millis(long millis) {
+<span class="fc" id="L71">        requirePositive(millis, &quot;interval&quot;);</span>
+<span class="fc" id="L72">        return new HealthInterval(millis, -1, 0, null, 0);</span>
+    }
+
+    /// A fixed number of minutes.
+    public static HealthInterval minutes(int minutes) {
+<span class="nc" id="L77">        requirePositive(minutes, &quot;minutes&quot;);</span>
+<span class="nc" id="L78">        return millis(minutes * 60000L);</span>
+    }
+
+    /// A fixed number of hours.
+    public static HealthInterval hours(int hours) {
+<span class="fc" id="L83">        requirePositive(hours, &quot;hours&quot;);</span>
+<span class="fc" id="L84">        return millis(hours * 3600000L);</span>
+    }
+
+    /// Calendar days in `zone`, aligned to local midnight. Correct across
+    /// daylight-saving transitions.
+    public static HealthInterval calendarDays(int days, ZoneId zone) {
+<span class="fc" id="L90">        requirePositive(days, &quot;days&quot;);</span>
+<span class="fc" id="L91">        requireZone(zone);</span>
+<span class="fc" id="L92">        return new HealthInterval(0, Calendar.DAY_OF_MONTH, days, zone, 0);</span>
+    }
+
+    /// Calendar weeks in `zone`, aligned to `firstDayOfWeek` (a
+    /// `java.util.Calendar` day constant such as `Calendar.MONDAY`).
+    /// The first day of the week is explicit because it differs by locale
+    /// and silently guessing it shifts every bucket boundary.
+    public static HealthInterval calendarWeeks(int weeks, ZoneId zone,
+            int firstDayOfWeek) {
+<span class="nc" id="L101">        requirePositive(weeks, &quot;weeks&quot;);</span>
+<span class="nc" id="L102">        requireZone(zone);</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">        if (firstDayOfWeek &lt; Calendar.SUNDAY</span>
+                || firstDayOfWeek &gt; Calendar.SATURDAY) {
+<span class="nc" id="L105">            throw new IllegalArgumentException(</span>
+                    &quot;firstDayOfWeek must be a java.util.Calendar day&quot;
+                            + &quot; constant, got &quot; + firstDayOfWeek);
+        }
+<span class="nc" id="L109">        return new HealthInterval(0, Calendar.WEEK_OF_YEAR, weeks, zone,</span>
+                firstDayOfWeek);
+    }
+
+    /// Calendar months in `zone`, aligned to local midnight on the first of
+    /// the month.
+    public static HealthInterval calendarMonths(int months, ZoneId zone) {
+<span class="nc" id="L116">        requirePositive(months, &quot;months&quot;);</span>
+<span class="nc" id="L117">        requireZone(zone);</span>
+<span class="nc" id="L118">        return new HealthInterval(0, Calendar.MONTH, months, zone, 0);</span>
+    }
+
+    private static void requireZone(ZoneId zone) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (zone == null) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(</span>
+                    &quot;a calendar-based interval requires an explicit ZoneId&quot;);
+        }
+<span class="fc" id="L126">    }</span>
+
+    /// `true` when this interval follows the calendar rather than a fixed
+    /// number of milliseconds.
+    public boolean isCalendarBased() {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        return calendarField &gt;= 0;</span>
+    }
+
+    /// The fixed width in milliseconds, or 0 when [#isCalendarBased()].
+    public long getFixedMillis() {
+<span class="nc" id="L136">        return fixedMillis;</span>
+    }
+
+    /// The zone calendar boundaries are computed in, or null for a
+    /// fixed-duration interval.
+    ///
+    /// A [java.time.ZoneId] rather than a `java.util.TimeZone`, and immutable,
+    /// so it can be handed out as-is. The mutable type needed a caveat instead
+    /// of an answer: an interval built from a `SimpleTimeZone` that was later
+    /// reconfigured moved its bucket boundaries, putting the same samples in
+    /// different days, and the compile target could not defend against it --
+    /// the CLDC 1.1 subset exposes no public `TimeZone.clone()`, and
+    /// `getTimeZone(getID())` answers GMT for an unrecognised id, which would
+    /// have silently discarded the rules of the very zone being protected.
+    public ZoneId getZone() {
+<span class="fc" id="L151">        return zone;</span>
+    }
+
+    /// This interval as a [Duration], or **null** when it is calendar-based.
+    ///
+    /// A calendar day is 23, 24 or 25 hours depending on the transition it
+    /// spans, so a calendar interval has no fixed length and saying otherwise
+    /// would be the drift this API takes an explicit zone to avoid.
+    public Duration getDuration() {
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        return isCalendarBased() ? null : Duration.ofMillis(fixedMillis);</span>
+    }
+
+    /// An interval of `length`.
+    public static HealthInterval of(Duration length) {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (length == null) {</span>
+<span class="nc" id="L166">            throw new IllegalArgumentException(&quot;a length is required&quot;);</span>
+        }
+<span class="fc" id="L168">        return millis(length.toMillis());</span>
+    }
+
+    /// The start of the bucket that contains `millis`. For a fixed
+    /// interval this is anchored on `anchorMillis`; for a calendar
+    /// interval it snaps to the local period boundary and `anchorMillis`
+    /// is ignored.
+    public long bucketStart(long millis, long anchorMillis) {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (!isCalendarBased()) {</span>
+<span class="fc" id="L177">            long delta = millis - anchorMillis;</span>
+<span class="fc" id="L178">            long floored = delta - floorMod(delta, fixedMillis);</span>
+<span class="fc" id="L179">            return anchorMillis + floored;</span>
+        }
+<span class="fc" id="L181">        Calendar c = HealthTimeRange.calendarIn(zone);</span>
+<span class="fc" id="L182">        c.setTime(new Date(millis));</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (calendarField == Calendar.MONTH) {</span>
+<span class="nc" id="L184">            c.set(Calendar.DAY_OF_MONTH, 1);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        } else if (calendarField == Calendar.WEEK_OF_YEAR) {</span>
+            // Walk back to the configured first day. This is done by hand
+            // rather than with setFirstDayOfWeek + set(DAY_OF_WEEK, ...):
+            // the CLDC Calendar has no setFirstDayOfWeek, and set(DAY_OF_WEEK)
+            // can jump forward rather than back.
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            while (c.get(Calendar.DAY_OF_WEEK) != firstDayOfWeek) {</span>
+<span class="nc" id="L191">                c.add(Calendar.DAY_OF_MONTH, -1);</span>
+            }
+        }
+<span class="fc" id="L194">        c.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L195">        c.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L196">        c.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L197">        c.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L198">        return c.getTime().getTime();</span>
+    }
+
+    /// The start of the bucket after the one starting at
+    /// `bucketStartMillis`. Bucket `n`'s exclusive end is bucket `n+1`'s
+    /// inclusive start, so buckets tile with no gap and no overlap even
+    /// when their widths differ.
+    public long nextBoundary(long bucketStartMillis) {
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (!isCalendarBased()) {</span>
+<span class="fc" id="L207">            return bucketStartMillis + fixedMillis;</span>
+        }
+<span class="fc" id="L209">        Calendar c = HealthTimeRange.calendarIn(zone);</span>
+<span class="fc" id="L210">        c.setTime(new Date(bucketStartMillis));</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (calendarField == Calendar.WEEK_OF_YEAR) {</span>
+<span class="nc" id="L212">            c.add(Calendar.DAY_OF_MONTH, 7 * calendarAmount);</span>
+        } else {
+<span class="fc" id="L214">            c.add(calendarField, calendarAmount);</span>
+        }
+<span class="fc" id="L216">        return c.getTime().getTime();</span>
+    }
+
+    private static long floorMod(long x, long y) {
+<span class="fc" id="L220">        long r = x % y;</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        return r &lt; 0 ? r + y : r;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (!isCalendarBased()) {</span>
+<span class="nc" id="L227">            return fixedMillis + &quot;ms&quot;;</span>
+        }
+<span class="nc bnc" id="L229" title="All 4 branches missed.">        String field = calendarField == Calendar.MONTH ? &quot;month&quot;</span>
+                : calendarField == Calendar.WEEK_OF_YEAR ? &quot;week&quot; : &quot;day&quot;;
+<span class="nc" id="L231">        return calendarAmount + &quot; &quot; + field + &quot;(s) in &quot; + zone.getId();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

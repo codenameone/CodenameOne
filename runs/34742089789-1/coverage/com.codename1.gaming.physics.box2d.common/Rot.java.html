@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Rot.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.common</a> &gt; <span class="el_source">Rot.java</span></div><h1>Rot.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.common;
+
+
+/// Represents a rotation
+///
+/// @author Daniel
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">public class Rot {</span>
+
+  public float s, c; // sin and cos
+
+<span class="fc" id="L34">  public Rot() {</span>
+<span class="fc" id="L35">    setIdentity();</span>
+<span class="fc" id="L36">  }</span>
+
+<span class="fc" id="L38">  public Rot(float angle) {</span>
+<span class="fc" id="L39">    set(angle);</span>
+<span class="fc" id="L40">  }</span>
+
+  public float getSin() {
+<span class="fc" id="L43">    return s;</span>
+  }
+
+  public String toString() {
+<span class="nc" id="L47">    return &quot;Rot(s:&quot; + s + &quot;, c:&quot; + c + &quot;)&quot;;</span>
+  }
+
+  public float getCos() {
+<span class="fc" id="L51">    return c;</span>
+  }
+
+  public Rot set(float angle) {
+<span class="fc" id="L55">    s = MathUtils.sin(angle);</span>
+<span class="fc" id="L56">    c = MathUtils.cos(angle);</span>
+<span class="fc" id="L57">    return this;</span>
+  }
+
+  public Rot set(Rot other) {
+<span class="fc" id="L61">    s = other.s;</span>
+<span class="fc" id="L62">    c = other.c;</span>
+<span class="fc" id="L63">    return this;</span>
+  }
+
+  public Rot setIdentity() {
+<span class="fc" id="L67">    s = 0;</span>
+<span class="fc" id="L68">    c = 1;</span>
+<span class="fc" id="L69">    return this;</span>
+  }
+
+  public float getAngle() {
+<span class="fc" id="L73">    return MathUtils.atan2(s, c);</span>
+  }
+
+  public void getXAxis(Vec2 xAxis) {
+<span class="fc" id="L77">    xAxis.set(c, s);</span>
+<span class="fc" id="L78">  }</span>
+
+  public void getYAxis(Vec2 yAxis) {
+<span class="nc" id="L81">    yAxis.set(-s, c);</span>
+<span class="nc" id="L82">  }</span>
+
+  // @Override // annotation omitted for GWT-compatibility
+  public Rot clone() {
+<span class="nc" id="L86">    Rot copy = new Rot();</span>
+<span class="nc" id="L87">    copy.s = s;</span>
+<span class="nc" id="L88">    copy.c = c;</span>
+<span class="nc" id="L89">    return copy;</span>
+  }
+
+  public static final void mul(Rot q, Rot r, Rot out) {
+<span class="nc" id="L93">    float tempc = q.c * r.c - q.s * r.s;</span>
+<span class="nc" id="L94">    out.s = q.s * r.c + q.c * r.s;</span>
+<span class="nc" id="L95">    out.c = tempc;</span>
+<span class="nc" id="L96">  }</span>
+
+  public static final void mulUnsafe(Rot q, Rot r, Rot out) {
+<span class="nc bnc" id="L99" title="All 4 branches missed.">    assert (r != out);</span>
+<span class="nc bnc" id="L100" title="All 4 branches missed.">    assert (q != out);</span>
+    // [qc -qs] * [rc -rs] = [qc*rc-qs*rs -qc*rs-qs*rc]
+    // [qs qc] [rs rc] [qs*rc+qc*rs -qs*rs+qc*rc]
+    // s = qs * rc + qc * rs
+    // c = qc * rc - qs * rs
+<span class="nc" id="L105">    out.s = q.s * r.c + q.c * r.s;</span>
+<span class="nc" id="L106">    out.c = q.c * r.c - q.s * r.s;</span>
+<span class="nc" id="L107">  }</span>
+
+  public static final void mulTrans(Rot q, Rot r, Rot out) {
+<span class="nc" id="L110">    final float tempc = q.c * r.c + q.s * r.s;</span>
+<span class="nc" id="L111">    out.s = q.c * r.s - q.s * r.c;</span>
+<span class="nc" id="L112">    out.c = tempc;</span>
+<span class="nc" id="L113">  }</span>
+
+  public static final void mulTransUnsafe(Rot q, Rot r, Rot out) {
+    // [ qc qs] * [rc -rs] = [qc*rc+qs*rs -qc*rs+qs*rc]
+    // [-qs qc] [rs rc] [-qs*rc+qc*rs qs*rs+qc*rc]
+    // s = qc * rs - qs * rc
+    // c = qc * rc + qs * rs
+<span class="fc" id="L120">    out.s = q.c * r.s - q.s * r.c;</span>
+<span class="fc" id="L121">    out.c = q.c * r.c + q.s * r.s;</span>
+<span class="fc" id="L122">  }</span>
+
+  public static final void mulToOut(Rot q, Vec2 v, Vec2 out) {
+<span class="fc" id="L125">    float tempy = q.s * v.x + q.c * v.y;</span>
+<span class="fc" id="L126">    out.x = q.c * v.x - q.s * v.y;</span>
+<span class="fc" id="L127">    out.y = tempy;</span>
+<span class="fc" id="L128">  }</span>
+
+  public static final void mulToOutUnsafe(Rot q, Vec2 v, Vec2 out) {
+<span class="fc" id="L131">    out.x = q.c * v.x - q.s * v.y;</span>
+<span class="fc" id="L132">    out.y = q.s * v.x + q.c * v.y;</span>
+<span class="fc" id="L133">  }</span>
+
+  public static final void mulTrans(Rot q, Vec2 v, Vec2 out) {
+<span class="fc" id="L136">    final float tempy = -q.s * v.x + q.c * v.y;</span>
+<span class="fc" id="L137">    out.x = q.c * v.x + q.s * v.y;</span>
+<span class="fc" id="L138">    out.y = tempy;</span>
+<span class="fc" id="L139">  }</span>
+
+  public static final void mulTransUnsafe(Rot q, Vec2 v, Vec2 out) {
+<span class="fc" id="L142">    out.x = q.c * v.x + q.s * v.y;</span>
+<span class="fc" id="L143">    out.y = -q.s * v.x + q.c * v.y;</span>
+<span class="fc" id="L144">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

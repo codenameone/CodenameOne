@@ -1,0 +1,621 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GltfLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">GltfLoader.java</span></div><h1>GltfLoader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.Util;
+import com.codename1.ui.Image;
+import com.codename1.util.Base64;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.List;
+import java.util.Map;
+
+/// Loads a `Mesh` from a glTF 2.0 model so applications can render real authored
+/// geometry rather than only the built in `Primitives`. Both the binary
+/// container (`.glb`) and the JSON form (`.gltf`) are supported; for the JSON
+/// form, buffers must be embedded as `data:` URIs (external `.bin` side files are
+/// not fetched). The first triangle primitive of the first mesh is read.
+///
+/// The loader produces the engine's standard
+/// `VertexFormat.POSITION_NORMAL_TEXCOORD` layout so the result drops straight
+/// into any built in `Material`:
+///
+/// - `POSITION` (required) is read as the vertex position.
+/// - `NORMAL` is read when present; otherwise flat per-triangle normals are
+///   computed so lit materials still shade correctly.
+/// - `TEXCOORD_0` is read when present; otherwise zero texture coordinates are
+///   written.
+///
+/// Materials, textures, skinning and animation in the glTF are ignored -- this
+/// is a geometry loader. Apply a `Material` (and a `Texture` loaded via the
+/// device) to the returned mesh as usual.
+///
+/// Example:
+///
+/// ```java
+/// byte[] glb = ...; // bytes of a .glb model
+/// Mesh mesh = GltfLoader.load(device, glb);
+/// Material material = new Material(Material.Type.PHONG).setTexture(texture);
+/// device.draw(mesh, material, modelMatrix);
+/// ```
+public final class GltfLoader {
+    private static final int GLB_MAGIC = 0x46546C67; // &quot;glTF&quot; little-endian
+    private static final int CHUNK_JSON = 0x4E4F534A; // &quot;JSON&quot;
+    private static final int CHUNK_BIN = 0x004E4942;  // &quot;BIN\0&quot;
+
+    private static final int FLOAT = 5126;
+    private static final int UNSIGNED_INT = 5125;
+    private static final int UNSIGNED_SHORT = 5123;
+    private static final int UNSIGNED_BYTE = 5121;
+
+    private static final int FLOATS_PER_VERTEX = 8; // pos(3) + normal(3) + uv(2)
+
+    private GltfLoader() {
+    }
+
+    /// Reads all bytes from the stream and loads the model. The stream is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that allocates the mesh buffers
+    ///
+    /// - `in`: a stream over `.glb` or `.gltf` bytes
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh
+    public static Mesh load(GraphicsDevice device, InputStream in) throws IOException {
+        try {
+<span class="fc" id="L80">            return load(device, readFully(in));</span>
+        } finally {
+<span class="fc" id="L82">            Util.cleanup(in);</span>
+        }
+    }
+
+    /// Loads a model from in-memory `.glb` or `.gltf` bytes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that allocates the mesh buffers
+    ///
+    /// - `data`: the raw model bytes (binary `.glb` or JSON `.gltf`)
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh
+    public static Mesh load(GraphicsDevice device, byte[] data) {
+<span class="fc" id="L98">        return load(data);</span>
+    }
+
+    /// Loads a model from in-memory `.glb` or `.gltf` bytes without a
+    /// `GraphicsDevice`, allocating the buffers directly. Behaves exactly like
+    /// `load(GraphicsDevice, byte[])`; useful for parsing geometry off the
+    /// render thread or handing meshes to non GPU consumers such as the AR
+    /// content pipeline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the raw model bytes (binary `.glb` or JSON `.gltf`)
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh
+    public static Mesh load(byte[] data) {
+<span class="fc" id="L115">        Object[] parsed = parse(data);</span>
+<span class="fc" id="L116">        return build((Map) parsed[0], (byte[]) parsed[1]);</span>
+    }
+
+    /// Reads all bytes from the stream and loads the model without a
+    /// `GraphicsDevice`. The stream is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: a stream over `.glb` or `.gltf` bytes
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh
+    public static Mesh load(InputStream in) throws IOException {
+        try {
+<span class="fc" id="L131">            return load(readFully(in));</span>
+        } finally {
+<span class="fc" id="L133">            Util.cleanup(in);</span>
+        }
+    }
+
+    /// Loads a model together with its base-color texture from in-memory `.glb`
+    /// or `.gltf` bytes. Use this (rather than `load`) when the model carries its
+    /// own texture and you want it applied automatically.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that allocates the mesh buffers and texture
+    ///
+    /// - `data`: the raw model bytes
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh plus its base-color texture (null texture if the model
+    /// has none)
+    public static GltfModel loadModel(GraphicsDevice device, byte[] data) {
+<span class="nc" id="L152">        Object[] parsed = parse(data);</span>
+<span class="nc" id="L153">        Map root = (Map) parsed[0];</span>
+<span class="nc" id="L154">        byte[] binChunk = (byte[]) parsed[1];</span>
+<span class="nc" id="L155">        Mesh mesh = build(root, binChunk);</span>
+<span class="nc" id="L156">        Texture baseColor = loadBaseColorTexture(device, root, binChunk);</span>
+<span class="nc" id="L157">        return new GltfModel(mesh, baseColor);</span>
+    }
+
+    /// Reads all bytes from the stream and loads the model with its base-color
+    /// texture. The stream is closed.
+    public static GltfModel loadModel(GraphicsDevice device, InputStream in) throws IOException {
+        try {
+<span class="nc" id="L164">            return loadModel(device, readFully(in));</span>
+        } finally {
+<span class="nc" id="L166">            Util.cleanup(in);</span>
+        }
+    }
+
+    /// Loads a model together with its base-color image from in-memory `.glb`
+    /// or `.gltf` bytes without a `GraphicsDevice`. The image is decoded but not
+    /// uploaded to the GPU, so this works off the render thread and on non GPU
+    /// consumers such as the AR content pipeline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the raw model bytes
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh plus its decoded base-color image (null image if the
+    /// model has none)
+    public static GltfImageModel loadImageModel(byte[] data) {
+<span class="fc" id="L184">        Object[] parsed = parse(data);</span>
+<span class="fc" id="L185">        Map root = (Map) parsed[0];</span>
+<span class="fc" id="L186">        byte[] binChunk = (byte[]) parsed[1];</span>
+<span class="fc" id="L187">        Mesh mesh = build(root, binChunk);</span>
+<span class="fc" id="L188">        Image baseColor = readBaseColorImage(root, binChunk);</span>
+<span class="fc" id="L189">        return new GltfImageModel(mesh, baseColor);</span>
+    }
+
+    /// Reads all bytes from the stream and loads the model with its base-color
+    /// image without a `GraphicsDevice`. The stream is closed.
+    public static GltfImageModel loadImageModel(InputStream in) throws IOException {
+        try {
+<span class="nc" id="L196">            return loadImageModel(readFully(in));</span>
+        } finally {
+<span class="nc" id="L198">            Util.cleanup(in);</span>
+        }
+    }
+
+    private static Object[] parse(byte[] data) {
+<span class="fc bfc" id="L203" title="All 4 branches covered.">        if (data == null || data.length &lt; 4) {</span>
+<span class="fc" id="L204">            throw new IllegalArgumentException(&quot;empty glTF data&quot;);</span>
+        }
+        String json;
+        byte[] binChunk;
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (readUInt32(data, 0) == GLB_MAGIC) {</span>
+            // Binary glTF: 12 byte header then length-prefixed chunks.
+<span class="fc" id="L210">            String[] jsonHolder = new String[1];</span>
+<span class="fc" id="L211">            binChunk = parseGlb(data, jsonHolder);</span>
+<span class="fc" id="L212">            json = jsonHolder[0];</span>
+<span class="fc" id="L213">        } else {</span>
+<span class="fc" id="L214">            json = utf8(data, 0, data.length);</span>
+<span class="fc" id="L215">            binChunk = null;</span>
+        }
+        try {
+<span class="fc" id="L218">            Map root = new JSONParser().parseJSON(</span>
+<span class="fc" id="L219">                    new InputStreamReader(new ByteArrayInputStream(utf8Bytes(json)), &quot;UTF-8&quot;));</span>
+<span class="fc" id="L220">            return new Object[] { root, binChunk };</span>
+<span class="nc" id="L221">        } catch (IOException ex) {</span>
+<span class="nc" id="L222">            throw new RuntimeException(&quot;Failed to parse glTF JSON: &quot; + ex.getMessage(), ex);</span>
+        }
+    }
+
+    private static byte[] parseGlb(byte[] data, String[] jsonHolder) {
+<span class="fc" id="L227">        long totalLength = readUInt32(data, 8);</span>
+<span class="fc" id="L228">        int pos = 12;</span>
+<span class="fc" id="L229">        byte[] bin = null;</span>
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">        while (pos + 8 &lt;= data.length &amp;&amp; pos &lt; totalLength) {</span>
+<span class="fc" id="L231">            long chunkLength = readUInt32(data, pos);</span>
+<span class="fc" id="L232">            int chunkType = readUInt32(data, pos + 4);</span>
+<span class="fc" id="L233">            int chunkStart = pos + 8;</span>
+<span class="fc" id="L234">            int len = (int) chunkLength;</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (chunkStart + len &gt; data.length) {</span>
+<span class="nc" id="L236">                len = data.length - chunkStart;</span>
+            }
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (chunkType == CHUNK_JSON) {</span>
+<span class="fc" id="L239">                jsonHolder[0] = utf8(data, chunkStart, len);</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            } else if (chunkType == CHUNK_BIN) {</span>
+<span class="nc" id="L241">                bin = new byte[len];</span>
+<span class="nc" id="L242">                System.arraycopy(data, chunkStart, bin, 0, len);</span>
+            }
+<span class="fc" id="L244">            pos = chunkStart + len;</span>
+<span class="fc" id="L245">        }</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (jsonHolder[0] == null) {</span>
+<span class="fc" id="L247">            throw new IllegalArgumentException(&quot;glb has no JSON chunk&quot;);</span>
+        }
+<span class="fc" id="L249">        return bin;</span>
+    }
+
+    private static Mesh build(Map root, byte[] binChunk) {
+<span class="fc" id="L253">        List meshes = (List) root.get(&quot;meshes&quot;);</span>
+<span class="pc bpc" id="L254" title="1 of 4 branches missed.">        if (meshes == null || meshes.isEmpty()) {</span>
+<span class="fc" id="L255">            throw new IllegalArgumentException(&quot;glTF has no meshes&quot;);</span>
+        }
+<span class="fc" id="L257">        Map mesh = (Map) meshes.get(0);</span>
+<span class="fc" id="L258">        List primitives = (List) mesh.get(&quot;primitives&quot;);</span>
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        if (primitives == null || primitives.isEmpty()) {</span>
+<span class="nc" id="L260">            throw new IllegalArgumentException(&quot;glTF mesh has no primitives&quot;);</span>
+        }
+<span class="fc" id="L262">        Map primitive = (Map) primitives.get(0);</span>
+        // Mode 4 (TRIANGLES) is the default and the only mode this loader builds.
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        int mode = primitive.containsKey(&quot;mode&quot;) ? asInt(primitive.get(&quot;mode&quot;)) : 4;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (mode != 4) {</span>
+<span class="fc" id="L266">            throw new IllegalArgumentException(&quot;glTF primitive mode &quot; + mode + &quot; is not supported (TRIANGLES only)&quot;);</span>
+        }
+<span class="fc" id="L268">        Map attributes = (Map) primitive.get(&quot;attributes&quot;);</span>
+<span class="pc bpc" id="L269" title="1 of 4 branches missed.">        if (attributes == null || !attributes.containsKey(&quot;POSITION&quot;)) {</span>
+<span class="fc" id="L270">            throw new IllegalArgumentException(&quot;glTF primitive has no POSITION attribute&quot;);</span>
+        }
+
+<span class="fc" id="L273">        List accessors = (List) root.get(&quot;accessors&quot;);</span>
+<span class="fc" id="L274">        List bufferViews = (List) root.get(&quot;bufferViews&quot;);</span>
+<span class="fc" id="L275">        List buffers = (List) root.get(&quot;buffers&quot;);</span>
+
+<span class="fc" id="L277">        float[] positions = readFloatAccessor(asInt(attributes.get(&quot;POSITION&quot;)), 3,</span>
+                accessors, bufferViews, buffers, binChunk);
+<span class="fc" id="L279">        int vertexCount = positions.length / 3;</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        float[] normals = attributes.containsKey(&quot;NORMAL&quot;)</span>
+<span class="pc" id="L281">                ? readFloatAccessor(asInt(attributes.get(&quot;NORMAL&quot;)), 3, accessors, bufferViews, buffers, binChunk)</span>
+                : null;
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        float[] texcoords = attributes.containsKey(&quot;TEXCOORD_0&quot;)</span>
+<span class="pc" id="L284">                ? readFloatAccessor(asInt(attributes.get(&quot;TEXCOORD_0&quot;)), 2, accessors, bufferViews, buffers, binChunk)</span>
+                : null;
+
+        int[] indices;
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (primitive.containsKey(&quot;indices&quot;)) {</span>
+<span class="fc" id="L289">            indices = readIntAccessor(asInt(primitive.get(&quot;indices&quot;)), accessors, bufferViews, buffers, binChunk);</span>
+        } else {
+<span class="fc" id="L291">            indices = new int[vertexCount];</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            for (int i = 0; i &lt; vertexCount; i++) {</span>
+<span class="fc" id="L293">                indices[i] = i;</span>
+            }
+        }
+
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (normals == null) {</span>
+<span class="fc" id="L298">            normals = computeFlatNormals(positions, indices);</span>
+        }
+
+<span class="fc" id="L301">        float[] interleaved = new float[vertexCount * FLOATS_PER_VERTEX];</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        for (int i = 0; i &lt; vertexCount; i++) {</span>
+<span class="fc" id="L303">            int o = i * FLOATS_PER_VERTEX;</span>
+<span class="fc" id="L304">            interleaved[o] = positions[i * 3];</span>
+<span class="fc" id="L305">            interleaved[o + 1] = positions[i * 3 + 1];</span>
+<span class="fc" id="L306">            interleaved[o + 2] = positions[i * 3 + 2];</span>
+<span class="fc" id="L307">            interleaved[o + 3] = normals[i * 3];</span>
+<span class="fc" id="L308">            interleaved[o + 4] = normals[i * 3 + 1];</span>
+<span class="fc" id="L309">            interleaved[o + 5] = normals[i * 3 + 2];</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">            if (texcoords != null) {</span>
+<span class="nc" id="L311">                interleaved[o + 6] = texcoords[i * 2];</span>
+<span class="nc" id="L312">                interleaved[o + 7] = texcoords[i * 2 + 1];</span>
+            }
+        }
+
+<span class="fc" id="L316">        VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, vertexCount);</span>
+<span class="fc" id="L317">        vb.setData(interleaved);</span>
+<span class="fc" id="L318">        IndexBuffer ib = new IndexBuffer(indices.length);</span>
+<span class="fc" id="L319">        ib.setData(indices);</span>
+<span class="fc" id="L320">        return new Mesh(vb, ib, PrimitiveType.TRIANGLES);</span>
+    }
+
+    /// Computes one flat normal per triangle and assigns it to that triangle's
+    /// three vertices, so a model that ships without normals still lights up.
+    private static float[] computeFlatNormals(float[] positions, int[] indices) {
+<span class="fc" id="L326">        float[] normals = new float[positions.length];</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        for (int t = 0; t + 2 &lt; indices.length; t += 3) {</span>
+<span class="fc" id="L328">            int a = indices[t] * 3;</span>
+<span class="fc" id="L329">            int b = indices[t + 1] * 3;</span>
+<span class="fc" id="L330">            int c = indices[t + 2] * 3;</span>
+<span class="fc" id="L331">            float ux = positions[b] - positions[a];</span>
+<span class="fc" id="L332">            float uy = positions[b + 1] - positions[a + 1];</span>
+<span class="fc" id="L333">            float uz = positions[b + 2] - positions[a + 2];</span>
+<span class="fc" id="L334">            float vx = positions[c] - positions[a];</span>
+<span class="fc" id="L335">            float vy = positions[c + 1] - positions[a + 1];</span>
+<span class="fc" id="L336">            float vz = positions[c + 2] - positions[a + 2];</span>
+<span class="fc" id="L337">            float nx = uy * vz - uz * vy;</span>
+<span class="fc" id="L338">            float ny = uz * vx - ux * vz;</span>
+<span class="fc" id="L339">            float nz = ux * vy - uy * vx;</span>
+<span class="fc" id="L340">            float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (len &gt; 0f) {</span>
+<span class="fc" id="L342">                nx /= len;</span>
+<span class="fc" id="L343">                ny /= len;</span>
+<span class="fc" id="L344">                nz /= len;</span>
+            }
+<span class="fc" id="L346">            normals[a] = nx; normals[a + 1] = ny; normals[a + 2] = nz;</span>
+<span class="fc" id="L347">            normals[b] = nx; normals[b + 1] = ny; normals[b + 2] = nz;</span>
+<span class="fc" id="L348">            normals[c] = nx; normals[c + 1] = ny; normals[c + 2] = nz;</span>
+        }
+<span class="fc" id="L350">        return normals;</span>
+    }
+
+    private static float[] readFloatAccessor(int accessorIndex, int components, List accessors,
+                                             List bufferViews, List buffers, byte[] binChunk) {
+<span class="fc" id="L355">        Map accessor = (Map) accessors.get(accessorIndex);</span>
+<span class="fc" id="L356">        int count = asInt(accessor.get(&quot;count&quot;));</span>
+<span class="fc" id="L357">        int componentType = asInt(accessor.get(&quot;componentType&quot;));</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        int accessorOffset = accessor.containsKey(&quot;byteOffset&quot;) ? asInt(accessor.get(&quot;byteOffset&quot;)) : 0;</span>
+<span class="pc bpc" id="L359" title="3 of 4 branches missed.">        boolean normalized = accessor.containsKey(&quot;normalized&quot;) &amp;&amp; Boolean.TRUE.equals(accessor.get(&quot;normalized&quot;));</span>
+<span class="fc" id="L360">        Map view = (Map) bufferViews.get(asInt(accessor.get(&quot;bufferView&quot;)));</span>
+<span class="fc" id="L361">        byte[] buffer = resolveBuffer(view, buffers, binChunk);</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        int viewOffset = view.containsKey(&quot;byteOffset&quot;) ? asInt(view.get(&quot;byteOffset&quot;)) : 0;</span>
+<span class="fc" id="L363">        int componentSize = componentSize(componentType);</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        int stride = view.containsKey(&quot;byteStride&quot;) ? asInt(view.get(&quot;byteStride&quot;)) : components * componentSize;</span>
+
+<span class="fc" id="L366">        float[] out = new float[count * components];</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L368">            int base = viewOffset + accessorOffset + i * stride;</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            for (int c = 0; c &lt; components; c++) {</span>
+<span class="fc" id="L370">                int p = base + c * componentSize;</span>
+<span class="fc" id="L371">                out[i * components + c] = readComponentAsFloat(buffer, p, componentType, normalized);</span>
+            }
+        }
+<span class="fc" id="L374">        return out;</span>
+    }
+
+    private static int[] readIntAccessor(int accessorIndex, List accessors, List bufferViews,
+                                         List buffers, byte[] binChunk) {
+<span class="fc" id="L379">        Map accessor = (Map) accessors.get(accessorIndex);</span>
+<span class="fc" id="L380">        int count = asInt(accessor.get(&quot;count&quot;));</span>
+<span class="fc" id="L381">        int componentType = asInt(accessor.get(&quot;componentType&quot;));</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        int accessorOffset = accessor.containsKey(&quot;byteOffset&quot;) ? asInt(accessor.get(&quot;byteOffset&quot;)) : 0;</span>
+<span class="fc" id="L383">        Map view = (Map) bufferViews.get(asInt(accessor.get(&quot;bufferView&quot;)));</span>
+<span class="fc" id="L384">        byte[] buffer = resolveBuffer(view, buffers, binChunk);</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        int viewOffset = view.containsKey(&quot;byteOffset&quot;) ? asInt(view.get(&quot;byteOffset&quot;)) : 0;</span>
+<span class="fc" id="L386">        int componentSize = componentSize(componentType);</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        int stride = view.containsKey(&quot;byteStride&quot;) ? asInt(view.get(&quot;byteStride&quot;)) : componentSize;</span>
+
+<span class="fc" id="L389">        int[] out = new int[count];</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L391">            int p = viewOffset + accessorOffset + i * stride;</span>
+<span class="pc bpc" id="L392" title="3 of 4 branches missed.">            switch (componentType) {</span>
+                case UNSIGNED_BYTE:
+<span class="nc" id="L394">                    out[i] = buffer[p] &amp; 0xff;</span>
+<span class="nc" id="L395">                    break;</span>
+                case UNSIGNED_SHORT:
+<span class="fc" id="L397">                    out[i] = readUInt16(buffer, p);</span>
+<span class="fc" id="L398">                    break;</span>
+                case UNSIGNED_INT:
+<span class="nc" id="L400">                    out[i] = (int) readUInt32(buffer, p);</span>
+<span class="nc" id="L401">                    break;</span>
+                default:
+<span class="nc" id="L403">                    throw new IllegalArgumentException(&quot;Unsupported index componentType &quot; + componentType);</span>
+            }
+        }
+<span class="fc" id="L406">        return out;</span>
+    }
+
+    private static float readComponentAsFloat(byte[] buffer, int p, int componentType, boolean normalized) {
+<span class="pc bpc" id="L410" title="3 of 4 branches missed.">        switch (componentType) {</span>
+            case FLOAT:
+<span class="fc" id="L412">                return Float.intBitsToFloat((int) readUInt32(buffer, p));</span>
+            case UNSIGNED_BYTE: {
+<span class="nc" id="L414">                int v = buffer[p] &amp; 0xff;</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">                return normalized ? v / 255f : v;</span>
+            }
+            case UNSIGNED_SHORT: {
+<span class="nc" id="L418">                int v = readUInt16(buffer, p);</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">                return normalized ? v / 65535f : v;</span>
+            }
+            default:
+<span class="nc" id="L422">                throw new IllegalArgumentException(&quot;Unsupported attribute componentType &quot; + componentType);</span>
+        }
+    }
+
+    private static byte[] resolveBuffer(Map view, List buffers, byte[] binChunk) {
+<span class="fc" id="L427">        int bufferIndex = asInt(view.get(&quot;buffer&quot;));</span>
+<span class="fc" id="L428">        Map buffer = (Map) buffers.get(bufferIndex);</span>
+<span class="fc" id="L429">        Object uri = buffer.get(&quot;uri&quot;);</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">        if (uri == null) {</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">            if (binChunk == null) {</span>
+<span class="nc" id="L432">                throw new IllegalArgumentException(&quot;glTF buffer has no uri and no binary chunk&quot;);</span>
+            }
+<span class="nc" id="L434">            return binChunk;</span>
+        }
+<span class="fc" id="L436">        String u = uri.toString();</span>
+<span class="fc" id="L437">        int comma = u.indexOf(',');</span>
+<span class="pc bpc" id="L438" title="1 of 4 branches missed.">        if (u.startsWith(&quot;data:&quot;) &amp;&amp; comma &gt;= 0) {</span>
+<span class="fc" id="L439">            return Base64.decode(utf8Bytes(u.substring(comma + 1)));</span>
+        }
+<span class="fc" id="L441">        throw new IllegalArgumentException(&quot;External glTF buffers are not supported: &quot; + u);</span>
+    }
+
+    private static int componentSize(int componentType) {
+<span class="pc bpc" id="L445" title="2 of 4 branches missed.">        switch (componentType) {</span>
+            case UNSIGNED_BYTE:
+<span class="nc" id="L447">                return 1;</span>
+            case UNSIGNED_SHORT:
+<span class="fc" id="L449">                return 2;</span>
+            case FLOAT:
+            case UNSIGNED_INT:
+<span class="fc" id="L452">                return 4;</span>
+            default:
+<span class="nc" id="L454">                throw new IllegalArgumentException(&quot;Unsupported componentType &quot; + componentType);</span>
+        }
+    }
+
+    /// Reads the base-color texture of the first primitive's material and uploads
+    /// it through the device. Returns null when the model carries no base-color
+    /// texture. Only embedded images (a glTF `bufferView` or a `data:` URI) are
+    /// supported; external image files are not fetched.
+    private static Texture loadBaseColorTexture(GraphicsDevice device, Map root, byte[] binChunk) {
+<span class="nc" id="L463">        Image img = readBaseColorImage(root, binChunk);</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        if (img == null) {</span>
+<span class="nc" id="L465">            return null;</span>
+        }
+<span class="nc" id="L467">        Texture result = device.createTexture(img);</span>
+<span class="nc" id="L468">        result.setFilter(Texture.Filter.LINEAR);</span>
+<span class="nc" id="L469">        return result;</span>
+    }
+
+    /// Decodes the base-color image of the first primitive's material. Returns
+    /// null when the model carries no base-color texture. Only embedded images
+    /// (a glTF `bufferView` or a `data:` URI) are supported; external image
+    /// files are not fetched.
+    private static Image readBaseColorImage(Map root, byte[] binChunk) {
+<span class="fc" id="L477">        List materials = (List) root.get(&quot;materials&quot;);</span>
+<span class="pc bpc" id="L478" title="3 of 4 branches missed.">        if (materials == null || materials.isEmpty()) {</span>
+<span class="fc" id="L479">            return null;</span>
+        }
+<span class="nc" id="L481">        Map primitive = (Map) ((List) ((Map) ((List) root.get(&quot;meshes&quot;)).get(0)).get(&quot;primitives&quot;)).get(0);</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        int materialIndex = primitive.containsKey(&quot;material&quot;) ? asInt(primitive.get(&quot;material&quot;)) : 0;</span>
+<span class="nc bnc" id="L483" title="All 4 branches missed.">        if (materialIndex &lt; 0 || materialIndex &gt;= materials.size()) {</span>
+<span class="nc" id="L484">            return null;</span>
+        }
+<span class="nc" id="L486">        Map pbr = (Map) ((Map) materials.get(materialIndex)).get(&quot;pbrMetallicRoughness&quot;);</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        if (pbr == null) {</span>
+<span class="nc" id="L488">            return null;</span>
+        }
+<span class="nc" id="L490">        Map baseColorTexture = (Map) pbr.get(&quot;baseColorTexture&quot;);</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        if (baseColorTexture == null) {</span>
+<span class="nc" id="L492">            return null;</span>
+        }
+<span class="nc" id="L494">        List textures = (List) root.get(&quot;textures&quot;);</span>
+<span class="nc" id="L495">        List images = (List) root.get(&quot;images&quot;);</span>
+<span class="nc bnc" id="L496" title="All 4 branches missed.">        if (textures == null || images == null) {</span>
+<span class="nc" id="L497">            return null;</span>
+        }
+<span class="nc" id="L499">        Map texture = (Map) textures.get(asInt(baseColorTexture.get(&quot;index&quot;)));</span>
+<span class="nc" id="L500">        Map image = (Map) images.get(asInt(texture.get(&quot;source&quot;)));</span>
+<span class="nc" id="L501">        byte[] imageBytes = readImageBytes(image, root, binChunk);</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">        if (imageBytes == null) {</span>
+<span class="nc" id="L503">            return null;</span>
+        }
+<span class="nc" id="L505">        return Image.createImage(imageBytes, 0, imageBytes.length);</span>
+    }
+
+    private static byte[] readImageBytes(Map image, Map root, byte[] binChunk) {
+<span class="nc" id="L509">        Object uri = image.get(&quot;uri&quot;);</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (uri != null) {</span>
+<span class="nc" id="L511">            String u = uri.toString();</span>
+<span class="nc" id="L512">            int comma = u.indexOf(',');</span>
+<span class="nc bnc" id="L513" title="All 4 branches missed.">            if (u.startsWith(&quot;data:&quot;) &amp;&amp; comma &gt;= 0) {</span>
+<span class="nc" id="L514">                return Base64.decode(utf8Bytes(u.substring(comma + 1)));</span>
+            }
+<span class="nc" id="L516">            return null; // external image files are not fetched</span>
+        }
+<span class="nc bnc" id="L518" title="All 2 branches missed.">        if (!image.containsKey(&quot;bufferView&quot;)) {</span>
+<span class="nc" id="L519">            return null;</span>
+        }
+<span class="nc" id="L521">        List bufferViews = (List) root.get(&quot;bufferViews&quot;);</span>
+<span class="nc" id="L522">        List buffers = (List) root.get(&quot;buffers&quot;);</span>
+<span class="nc" id="L523">        Map view = (Map) bufferViews.get(asInt(image.get(&quot;bufferView&quot;)));</span>
+<span class="nc" id="L524">        byte[] buffer = resolveBuffer(view, buffers, binChunk);</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">        int offset = view.containsKey(&quot;byteOffset&quot;) ? asInt(view.get(&quot;byteOffset&quot;)) : 0;</span>
+<span class="nc" id="L526">        int length = asInt(view.get(&quot;byteLength&quot;));</span>
+<span class="nc" id="L527">        byte[] out = new byte[length];</span>
+<span class="nc" id="L528">        System.arraycopy(buffer, offset, out, 0, length);</span>
+<span class="nc" id="L529">        return out;</span>
+    }
+
+    private static int asInt(Object o) {
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">        if (o instanceof Number) {</span>
+<span class="fc" id="L534">            return ((Number) o).intValue();</span>
+        }
+<span class="nc" id="L536">        return Integer.parseInt(o.toString());</span>
+    }
+
+    private static int readUInt16(byte[] b, int p) {
+<span class="fc" id="L540">        return (b[p] &amp; 0xff) | ((b[p + 1] &amp; 0xff) &lt;&lt; 8);</span>
+    }
+
+    private static int readUInt32(byte[] b, int p) {
+<span class="fc" id="L544">        return (b[p] &amp; 0xff) | ((b[p + 1] &amp; 0xff) &lt;&lt; 8)</span>
+                | ((b[p + 2] &amp; 0xff) &lt;&lt; 16) | ((b[p + 3] &amp; 0xff) &lt;&lt; 24);
+    }
+
+    private static String utf8(byte[] b, int off, int len) {
+        try {
+<span class="fc" id="L550">            return new String(b, off, len, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L551">        } catch (java.io.UnsupportedEncodingException ex) {</span>
+            // UTF-8 is required to be present on every JVM/CN1 runtime, so this
+            // never happens; rethrow rather than fall back to the platform default.
+<span class="nc" id="L554">            throw new RuntimeException(ex);</span>
+        }
+    }
+
+    private static byte[] utf8Bytes(String s) {
+        try {
+<span class="fc" id="L560">            return s.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L561">        } catch (java.io.UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L562">            throw new RuntimeException(ex);</span>
+        }
+    }
+
+    private static byte[] readFully(InputStream in) throws IOException {
+<span class="fc" id="L567">        byte[] buf = new byte[8192];</span>
+<span class="fc" id="L568">        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();</span>
+        int r;
+<span class="fc bfc" id="L570" title="All 2 branches covered.">        while ((r = in.read(buf)) &gt;= 0) {</span>
+<span class="fc" id="L571">            out.write(buf, 0, r);</span>
+        }
+<span class="fc" id="L573">        return out.toByteArray();</span>
+    }
+
+    /// A loaded glTF model: its geometry plus the base-color texture extracted
+    /// from the model's first material, if any. Returned by `loadModel`.
+    public static final class GltfModel {
+        private final Mesh mesh;
+        private final Texture baseColorTexture;
+
+<span class="nc" id="L582">        GltfModel(Mesh mesh, Texture baseColorTexture) {</span>
+<span class="nc" id="L583">            this.mesh = mesh;</span>
+<span class="nc" id="L584">            this.baseColorTexture = baseColorTexture;</span>
+<span class="nc" id="L585">        }</span>
+
+        /// The model geometry.
+        public Mesh getMesh() {
+<span class="nc" id="L589">            return mesh;</span>
+        }
+
+        /// The base-color texture, or null when the model has none.
+        public Texture getBaseColorTexture() {
+<span class="nc" id="L594">            return baseColorTexture;</span>
+        }
+    }
+
+    /// A loaded glTF model in device-free form: its geometry plus the decoded
+    /// base-color image extracted from the model's first material, if any.
+    /// Returned by `loadImageModel`.
+    public static final class GltfImageModel {
+        private final Mesh mesh;
+        private final Image baseColorImage;
+
+<span class="fc" id="L605">        GltfImageModel(Mesh mesh, Image baseColorImage) {</span>
+<span class="fc" id="L606">            this.mesh = mesh;</span>
+<span class="fc" id="L607">            this.baseColorImage = baseColorImage;</span>
+<span class="fc" id="L608">        }</span>
+
+        /// The model geometry.
+        public Mesh getMesh() {
+<span class="fc" id="L612">            return mesh;</span>
+        }
+
+        /// The decoded base-color image, or null when the model has none.
+        public Image getBaseColorImage() {
+<span class="fc" id="L617">            return baseColorImage;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

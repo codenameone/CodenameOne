@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthSubscription.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthSubscription.java</span></div><h1>HealthSubscription.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A live handle on a registered subscription.
+public final class HealthSubscription {
+
+    private final String id;
+    private final List&lt;HealthDataType&gt; types;
+    private final HealthStore store;
+    private final boolean pushDelivery;
+    private final boolean deliverSamples;
+    private final boolean includeDeletions;
+    private final int maxSamplesPerBatch;
+    /// Guards the three mutable fields below, which cross threads: the
+    /// cursor is written on the EDT -- by a delivery, or by a port
+    /// seeding a starting cursor -- and read by `drainChanges()` on
+    /// whatever thread the app called it from.
+    ///
+    /// A stale read here is not a stale number, it is lost data: the
+    /// Android drain reads this anchor and takes a fresh baseline token
+    /// when it finds null, so a cursor that had been seeded but not yet
+    /// published meant a second token, and every change between the two
+    /// permanently unreported. The synchronization the store does around
+    /// its registry does not help -- the anchor is read before any of it,
+    /// and a later monitor cannot make an earlier read current.
+    ///
+    /// A lock rather than `volatile`, which this codebase does not use.
+<span class="fc" id="L53">    private final Object lock = new Object();</span>
+    /// Guarded by [#lock].
+    private HealthAnchor anchor;
+    /// Guarded by [#lock].
+    private long lastDeliveryMillis;
+    /// Guarded by [#lock].
+<span class="fc" id="L59">    private boolean active = true;</span>
+
+    /// Creates a handle. Called by [HealthStore].
+    HealthSubscription(HealthStore store, String id,
+            List&lt;HealthDataType&gt; types, boolean pushDelivery) {
+<span class="nc" id="L64">        this(store, id, types, pushDelivery, true, true, 0);</span>
+<span class="nc" id="L65">    }</span>
+
+    /// Creates a handle carrying the request's delivery options.
+    HealthSubscription(HealthStore store, String id,
+            List&lt;HealthDataType&gt; types, boolean pushDelivery,
+            boolean deliverSamples, boolean includeDeletions,
+<span class="fc" id="L71">            int maxSamplesPerBatch) {</span>
+<span class="fc" id="L72">        this.deliverSamples = deliverSamples;</span>
+<span class="fc" id="L73">        this.includeDeletions = includeDeletions;</span>
+<span class="fc" id="L74">        this.maxSamplesPerBatch = maxSamplesPerBatch;</span>
+<span class="fc" id="L75">        this.store = store;</span>
+<span class="fc" id="L76">        this.id = id;</span>
+<span class="fc" id="L77">        this.pushDelivery = pushDelivery;</span>
+<span class="fc" id="L78">        List&lt;HealthDataType&gt; copy = new ArrayList&lt;HealthDataType&gt;();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (types != null) {</span>
+<span class="fc" id="L80">            copy.addAll(types);</span>
+        }
+<span class="fc" id="L82">        this.types = copy;</span>
+<span class="fc" id="L83">    }</span>
+
+    /// Seeds the cursor a previous launch persisted.
+    ///
+    /// Restoration without this leaves the handle with a null anchor, and
+    /// both drain implementations read the handle rather than the store's
+    /// preference, so Android would discard the persisted change token and
+    /// start a fresh baseline -- losing everything that accumulated while
+    /// the process was dead -- and iOS would resume with no window at all.
+    void seedAnchor(HealthAnchor restored) {
+<span class="fc" id="L93">        synchronized (lock) {</span>
+<span class="fc" id="L94">            this.anchor = restored;</span>
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">    }</span>
+
+    /// Whether batches carry sample payloads, from the request.
+    boolean isDeliverSamples() {
+<span class="fc" id="L100">        return deliverSamples;</span>
+    }
+
+    /// Whether batches carry deleted ids, from the request.
+    boolean isIncludeDeletions() {
+<span class="fc" id="L105">        return includeDeletions;</span>
+    }
+
+    /// The request's per-batch sample cap, or 0 for no cap.
+    int getMaxSamplesPerBatch() {
+<span class="fc" id="L110">        return maxSamplesPerBatch;</span>
+    }
+
+    /// The identifier this subscription was registered under.
+    public String getId() {
+<span class="fc" id="L115">        return id;</span>
+    }
+
+    /// The types being watched.
+    public List&lt;HealthDataType&gt; getTypes() {
+<span class="fc" id="L120">        return Collections.unmodifiableList(types);</span>
+    }
+
+    /// `true` until [#stop()] is called.
+    public boolean isActive() {
+<span class="fc" id="L125">        synchronized (lock) {</span>
+<span class="fc" id="L126">            return active;</span>
+        }
+    }
+
+    /// Whether the operating system wakes the app when new data arrives.
+    ///
+    /// **`false` on every platform in this release.** Health Connect has
+    /// no push mechanism at all -- Google's own guidance is to poll -- and
+    /// while HealthKit does offer `HKObserverQuery`, this release registers
+    /// none. Nothing here hooks the application lifecycle either, so
+    /// changes arrive exactly when you call [HealthStore#drainChanges()]
+    /// and at no other time: call it when you come to the foreground and
+    /// from your background-fetch handler.
+    ///
+    /// This is exposed as a queryable fact rather than hidden, because an
+    /// app that assumes push will silently miss data for days and its
+    /// authors will never know why -- no changes and no new data look
+    /// identical from the outside.
+    public boolean isPushDelivery() {
+<span class="nc" id="L145">        return pushDelivery;</span>
+    }
+
+    /// The cursor reached by the most recent delivery, or null before the
+    /// first one.
+    public HealthAnchor getAnchor() {
+<span class="fc" id="L151">        synchronized (lock) {</span>
+<span class="fc" id="L152">            return anchor;</span>
+        }
+    }
+
+    /// When the last batch was delivered, epoch millis, or 0 if never.
+    public long getLastDeliveryMillis() {
+<span class="nc" id="L158">        synchronized (lock) {</span>
+<span class="nc" id="L159">            return lastDeliveryMillis;</span>
+        }
+    }
+
+    /// Cancels the subscription and discards its persisted cursor.
+    /// Idempotent.
+    ///
+    /// Restarting later under the same id resynchronizes from scratch,
+    /// because the cursor is gone. To pause without losing your place,
+    /// simply stop calling [HealthStore#drainChanges()].
+    public void stop() {
+        boolean wasActive;
+<span class="nc" id="L171">        synchronized (lock) {</span>
+<span class="nc" id="L172">            wasActive = active;</span>
+<span class="nc" id="L173">            active = false;</span>
+<span class="nc" id="L174">        }</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (wasActive) {</span>
+            // Outside the lock. unsubscribe() takes the store's registry
+            // monitor and then reaches back here through markInactive();
+            // holding this one across the call would take the two in the
+            // opposite order from every other path, which is a deadlock.
+            // This handle, not merely this id: stopped after the id had
+            // been re-registered, cancelling by id alone removed and tore
+            // down the replacement instead of the handle being stopped.
+<span class="nc" id="L183">            store.unsubscribe(id, this);</span>
+        }
+<span class="nc" id="L185">    }</span>
+
+    /// Records progress. Called by [HealthStore] after a delivery.
+    void noteDelivery(HealthAnchor anchor, long whenMillis) {
+<span class="fc" id="L189">        synchronized (lock) {</span>
+<span class="fc" id="L190">            this.anchor = anchor;</span>
+<span class="fc" id="L191">            this.lastDeliveryMillis = whenMillis;</span>
+<span class="fc" id="L192">        }</span>
+<span class="fc" id="L193">    }</span>
+
+    /// Marks this handle inactive without re-entering
+    /// [HealthStore#unsubscribe(String)]. Called by the store when it
+    /// tears the subscription down itself.
+    void markInactive() {
+<span class="fc" id="L199">        synchronized (lock) {</span>
+<span class="fc" id="L200">            active = false;</span>
+<span class="fc" id="L201">        }</span>
+<span class="fc" id="L202">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        return &quot;HealthSubscription[&quot; + id + &quot; &quot; + types.size() + &quot; types&quot;</span>
+                + (pushDelivery ? &quot;, push&quot; : &quot;, poll&quot;)
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                + (isActive() ? &quot;&quot; : &quot;, stopped&quot;) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

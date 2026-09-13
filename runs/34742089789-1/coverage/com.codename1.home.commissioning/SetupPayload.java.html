@@ -1,0 +1,629 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SetupPayload.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home.commissioning</a> &gt; <span class="el_source">SetupPayload.java</span></div><h1>SetupPayload.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home.commissioning;
+
+/// A Matter onboarding payload: the `MT:` string behind the QR code on an
+/// accessory, or the 11 or 21 digit code printed under it.
+///
+/// #### Why this is parsed here rather than handed straight to the platform
+///
+/// Commissioning opens an operating-system sheet, and if the payload is
+/// garbage that sheet fails with the OS's own wording -- which tells a user
+/// nothing about the fact that they scanned the barcode on the box instead of
+/// the one on the device. Parsing first means a wrong code is caught in your
+/// app, in your words, before anything is opened.
+///
+/// It also makes a scanner screen possible: [#getVendorId()] and
+/// [#getProductId()] identify the accessory before it has joined anything, so
+/// a UI can say what it is about to add.
+///
+/// #### What is deliberately not here
+///
+/// There is no way to **generate** a payload, and [#getPasscode()] exists
+/// because the format contains it, not because anything in this API wants it.
+/// Treat the passcode the way you would any pairing secret: do not log it and
+/// do not persist it.
+///
+/// Only the standard compact encoding is understood. A vendor-extended TLV
+/// payload -- the long form some accessories use to carry extra data -- is
+/// rejected by [#parse(java.lang.String)] rather than half-read; the platform
+/// commissioning UI understands those, so pass the raw string through with
+/// [CommissioningRequest#setRawSetupPayload(java.lang.String)] when this
+/// refuses one.
+public final class SetupPayload {
+
+    /// The base-38 alphabet the Matter QR payload uses.
+    private static final String BASE38 =
+            &quot;0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-.&quot;;
+
+    /// The QR payload prefix.
+    private static final String QR_PREFIX = &quot;MT:&quot;;
+
+    /// Bit widths of the compact QR encoding, in order.
+    private static final int VERSION_BITS = 3;
+    private static final int VENDOR_BITS = 16;
+    private static final int PRODUCT_BITS = 16;
+    private static final int CUSTOM_FLOW_BITS = 2;
+    private static final int DISCOVERY_BITS = 8;
+    private static final int DISCRIMINATOR_BITS = 12;
+    private static final int PASSCODE_BITS = 27;
+
+    /// The compact encoding is 88 bits, so 11 bytes, so 18 base-38 characters
+    /// (three groups of three bytes at five characters each, plus two bytes at
+    /// four).
+    private static final int QR_PAYLOAD_BYTES = 11;
+    private static final int QR_PAYLOAD_CHARS = 19;
+
+    /// Verhoeff multiplication table, used by the manual code's check digit.
+<span class="fc" id="L78">    private static final int[][] VERHOEFF_D = {</span>
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+        {1, 2, 3, 4, 0, 6, 7, 8, 9, 5},
+        {2, 3, 4, 0, 1, 7, 8, 9, 5, 6},
+        {3, 4, 0, 1, 2, 8, 9, 5, 6, 7},
+        {4, 0, 1, 2, 3, 9, 5, 6, 7, 8},
+        {5, 9, 8, 7, 6, 0, 4, 3, 2, 1},
+        {6, 5, 9, 8, 7, 1, 0, 4, 3, 2},
+        {7, 6, 5, 9, 8, 2, 1, 0, 4, 3},
+        {8, 7, 6, 5, 9, 3, 2, 1, 0, 4},
+        {9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
+    };
+
+    /// Verhoeff permutation table.
+<span class="fc" id="L92">    private static final int[][] VERHOEFF_P = {</span>
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+        {1, 5, 7, 6, 2, 8, 3, 0, 9, 4},
+        {5, 8, 0, 3, 7, 9, 6, 1, 4, 2},
+        {8, 9, 1, 6, 0, 4, 3, 5, 2, 7},
+        {9, 4, 5, 3, 1, 2, 6, 8, 7, 0},
+        {4, 2, 8, 6, 5, 7, 3, 9, 0, 1},
+        {2, 7, 9, 3, 8, 0, 6, 4, 1, 5},
+        {7, 0, 4, 6, 9, 1, 3, 2, 5, 8}
+    };
+
+    /// Wi-Fi discovery bit of [#getDiscoveryCapabilities()].
+    public static final int DISCOVERY_SOFT_AP = 0x01;
+
+    /// Bluetooth Low Energy discovery bit of [#getDiscoveryCapabilities()].
+    public static final int DISCOVERY_BLE = 0x02;
+
+    /// On-network discovery bit of [#getDiscoveryCapabilities()] -- the
+    /// accessory is already on the IP network and is discoverable over mDNS.
+    public static final int DISCOVERY_ON_NETWORK = 0x04;
+
+    private final String raw;
+    private final int version;
+    private final int vendorId;
+    private final int productId;
+    private final int customFlow;
+    private final int discoveryCapabilities;
+    private final int discriminator;
+    private final int passcode;
+    private final boolean fromQrCode;
+    private final boolean shortDiscriminator;
+
+    private SetupPayload(String raw, int version, int vendorId, int productId,
+            int customFlow, int discoveryCapabilities, int discriminator,
+<span class="fc" id="L126">            int passcode, boolean fromQrCode, boolean shortDiscriminator) {</span>
+<span class="fc" id="L127">        this.raw = raw;</span>
+<span class="fc" id="L128">        this.version = version;</span>
+<span class="fc" id="L129">        this.vendorId = vendorId;</span>
+<span class="fc" id="L130">        this.productId = productId;</span>
+<span class="fc" id="L131">        this.customFlow = customFlow;</span>
+<span class="fc" id="L132">        this.discoveryCapabilities = discoveryCapabilities;</span>
+<span class="fc" id="L133">        this.discriminator = discriminator;</span>
+<span class="fc" id="L134">        this.passcode = passcode;</span>
+<span class="fc" id="L135">        this.fromQrCode = fromQrCode;</span>
+<span class="fc" id="L136">        this.shortDiscriminator = shortDiscriminator;</span>
+<span class="fc" id="L137">    }</span>
+
+    /// Parses a scanned QR payload or a typed manual code.
+    ///
+    /// Accepts the `MT:` QR form and the 11 and 21 digit manual forms, and
+    /// tolerates the separators people type into a manual code -- spaces and
+    /// hyphens are stripped before the digits are read.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the scanned or typed code
+    ///
+    /// #### Returns
+    ///
+    /// the parsed payload
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the text is not a Matter setup
+    ///   payload, when its check digit does not match, or when it is a
+    ///   vendor-extended payload this parser does not read. The message says
+    ///   which, because it is written to be shown to whoever is holding the
+    ///   accessory.
+    public static SetupPayload parse(String text) {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (text == null) {</span>
+<span class="fc" id="L162">            throw new IllegalArgumentException(</span>
+                    &quot;no setup code was supplied&quot;);
+        }
+<span class="fc" id="L165">        String trimmed = text.trim();</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (trimmed.length() == 0) {</span>
+<span class="fc" id="L167">            throw new IllegalArgumentException(</span>
+                    &quot;no setup code was supplied&quot;);
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (startsWithIgnoreCase(trimmed, QR_PREFIX)) {</span>
+<span class="fc" id="L171">            return parseQr(trimmed);</span>
+        }
+<span class="fc" id="L173">        return parseManual(trimmed);</span>
+    }
+
+    /// Whether a string looks like something [#parse(java.lang.String)] would
+    /// accept, without throwing when it is not.
+    ///
+    /// For a scanner that is looking at every barcode in view and needs to
+    /// ignore the ones that are not setup codes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the candidate, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// `true` when parsing would succeed
+    public static boolean isValid(String text) {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (text == null) {</span>
+<span class="fc" id="L191">            return false;</span>
+        }
+        try {
+<span class="fc" id="L194">            parse(text);</span>
+<span class="fc" id="L195">            return true;</span>
+<span class="fc" id="L196">        } catch (IllegalArgumentException notAPayload) {</span>
+            // Asked as a question, so a &quot;no&quot; is the answer rather than a
+            // failure. The exception carries the wording for a user who
+            // scanned the wrong thing on purpose; a scanner sweeping every
+            // barcode in the frame does not want it.
+<span class="fc" id="L201">            return false;</span>
+        }
+    }
+
+    private static boolean startsWithIgnoreCase(String s, String prefix) {
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (s.length() &lt; prefix.length()) {</span>
+<span class="nc" id="L207">            return false;</span>
+        }
+<span class="fc" id="L209">        return upperAscii(s.substring(0, prefix.length()))</span>
+<span class="fc" id="L210">                .equals(upperAscii(prefix));</span>
+    }
+
+    /// Uppercases the ASCII letters and leaves everything else alone.
+    ///
+    /// Not `String.toUpperCase()`, which uses the device's locale: in Turkish
+    /// a lowercase `i` becomes a dotted capital `I` that is not in base 38,
+    /// so a sticker that scans everywhere else was rejected as malformed on a
+    /// phone set to Turkish. The alphabet here is ASCII by specification, and
+    /// `toUpperCase(Locale)` is not in the profile this code targets.
+    private static String upperAscii(String s) {
+<span class="fc" id="L221">        char[] out = s.toCharArray();</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">            if (out[i] &gt;= 'a' &amp;&amp; out[i] &lt;= 'z') {</span>
+<span class="fc" id="L224">                out[i] = (char) (out[i] - ('a' - 'A'));</span>
+            }
+        }
+<span class="fc" id="L227">        return new String(out);</span>
+    }
+
+    private static SetupPayload parseQr(String text) {
+<span class="fc" id="L231">        String body = upperAscii(text.substring(QR_PREFIX.length()));</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (body.length() != QR_PAYLOAD_CHARS) {</span>
+<span class="fc" id="L233">            throw new IllegalArgumentException(</span>
+                    &quot;this is not a standard Matter QR payload: expected &quot;
+                            + QR_PAYLOAD_CHARS + &quot; characters after \&quot;MT:\&quot;&quot;
+<span class="fc" id="L236">                            + &quot; and found &quot; + body.length()</span>
+                            + &quot;. Vendor-extended payloads are not read here;&quot;
+                            + &quot; pass the code through unparsed instead.&quot;);
+        }
+<span class="fc" id="L240">        byte[] bytes = decodeBase38(body);</span>
+<span class="fc" id="L241">        int offset = 0;</span>
+<span class="fc" id="L242">        int version = (int) readBits(bytes, offset, VERSION_BITS);</span>
+<span class="fc" id="L243">        offset += VERSION_BITS;</span>
+        // Only version zero has the layout read below. A future version need
+        // not, so reading its bits as though it did would hand the platform a
+        // discriminator and a passcode invented out of a field boundary that
+        // moved -- and report the code as valid on the way.
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (version != 0) {</span>
+<span class="nc" id="L249">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code declares Matter payload version &quot;
+                            + version + &quot;, which this build does not know how&quot;
+                            + &quot; to read; pass the code through unparsed with&quot;
+                            + &quot; CommissioningRequest.setRawSetupPayload&quot;
+                            + &quot; instead&quot;);
+        }
+<span class="fc" id="L256">        int vendorId = (int) readBits(bytes, offset, VENDOR_BITS);</span>
+<span class="fc" id="L257">        offset += VENDOR_BITS;</span>
+<span class="fc" id="L258">        int productId = (int) readBits(bytes, offset, PRODUCT_BITS);</span>
+<span class="fc" id="L259">        offset += PRODUCT_BITS;</span>
+<span class="fc" id="L260">        int customFlow = (int) readBits(bytes, offset, CUSTOM_FLOW_BITS);</span>
+<span class="fc" id="L261">        offset += CUSTOM_FLOW_BITS;</span>
+<span class="fc" id="L262">        int discovery = (int) readBits(bytes, offset, DISCOVERY_BITS);</span>
+<span class="fc" id="L263">        offset += DISCOVERY_BITS;</span>
+<span class="fc" id="L264">        int discriminator = (int) readBits(bytes, offset, DISCRIMINATOR_BITS);</span>
+<span class="fc" id="L265">        offset += DISCRIMINATOR_BITS;</span>
+<span class="fc" id="L266">        int passcode = (int) readBits(bytes, offset, PASSCODE_BITS);</span>
+<span class="fc" id="L267">        offset += PASSCODE_BITS;</span>
+<span class="fc" id="L268">        validatePasscode(passcode);</span>
+        // The declared fields fill 84 of the payload's 88 bits and the
+        // specification requires the remaining four to be zero. Reading them
+        // is what makes the parser's answer mean something: without it two
+        // codes that differ only up there are both accepted, and the one that
+        // is malformed is accepted here and rejected by the platform sheet.
+<span class="fc" id="L274">        int bits = QR_PAYLOAD_BYTES * 8;</span>
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">        if (offset &lt; bits &amp;&amp; readBits(bytes, offset, bits - offset) != 0) {</span>
+<span class="fc" id="L276">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code is malformed: the &quot; + (bits - offset)
+                            + &quot; padding bits at the end of a Matter payload&quot;
+                            + &quot; must be zero&quot;);
+        }
+<span class="fc" id="L281">        return new SetupPayload(text, version, vendorId, productId, customFlow,</span>
+                discovery, discriminator, passcode, true, false);
+    }
+
+    private static byte[] decodeBase38(String body) {
+<span class="fc" id="L286">        byte[] out = new byte[QR_PAYLOAD_BYTES];</span>
+<span class="fc" id="L287">        int outPos = 0;</span>
+<span class="fc" id="L288">        int pos = 0;</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        while (pos &lt; body.length()) {</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            int chars = body.length() - pos &gt;= 5 ? 5 : body.length() - pos;</span>
+            int bytesOut;
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (chars == 5) {</span>
+<span class="fc" id="L293">                bytesOut = 3;</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            } else if (chars == 4) {</span>
+<span class="fc" id="L295">                bytesOut = 2;</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            } else if (chars == 2) {</span>
+<span class="nc" id="L297">                bytesOut = 1;</span>
+            } else {
+<span class="nc" id="L299">                throw new IllegalArgumentException(</span>
+                        &quot;this setup code is not valid base-38: it has a&quot;
+                                + &quot; trailing group of &quot; + chars
+                                + &quot; characters, which encodes nothing&quot;);
+            }
+<span class="fc" id="L304">            long value = 0;</span>
+<span class="fc" id="L305">            long multiplier = 1;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            for (int i = 0; i &lt; chars; i++) {</span>
+<span class="fc" id="L307">                char c = body.charAt(pos + i);</span>
+<span class="fc" id="L308">                int index = BASE38.indexOf(c);</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">                if (index &lt; 0) {</span>
+<span class="fc" id="L310">                    throw new IllegalArgumentException(&quot;'&quot; + c</span>
+                            + &quot;' cannot appear in a Matter setup code&quot;);
+                }
+<span class="fc" id="L313">                value += index * multiplier;</span>
+<span class="fc" id="L314">                multiplier *= 38;</span>
+            }
+            // A five-character group can hold 38^5, which is more than the
+            // three bytes it stands for; the four- and two-character groups
+            // overflow the same way. Without this, the high bits are dropped
+            // and several different malformed codes decode to one payload --
+            // so a mis-scanned sticker would be accepted here and rejected by
+            // the platform, which is the whole thing this parser exists to
+            // prevent.
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            if (value &gt;= (1L &lt;&lt; (8 * bytesOut))) {</span>
+<span class="fc" id="L324">                throw new IllegalArgumentException(</span>
+                        &quot;this setup code is not valid base-38: a group of &quot;
+                                + chars + &quot; characters encodes a value too&quot;
+                                + &quot; large for the &quot; + bytesOut
+                                + &quot; bytes it stands for&quot;);
+            }
+<span class="fc bfc" id="L330" title="All 2 branches covered.">            for (int i = 0; i &lt; bytesOut; i++) {</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                if (outPos &gt;= out.length) {</span>
+<span class="nc" id="L332">                    throw new IllegalArgumentException(</span>
+                            &quot;this setup code decodes to more data than a&quot;
+                                    + &quot; standard Matter payload holds&quot;);
+                }
+<span class="fc" id="L336">                out[outPos++] = (byte) ((value &gt;&gt; (8 * i)) &amp; 0xFF);</span>
+            }
+<span class="fc" id="L338">            pos += chars;</span>
+<span class="fc" id="L339">        }</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (outPos != QR_PAYLOAD_BYTES) {</span>
+<span class="nc" id="L341">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code decodes to &quot; + outPos
+                            + &quot; bytes rather than the &quot; + QR_PAYLOAD_BYTES
+                            + &quot; a standard Matter payload holds&quot;);
+        }
+<span class="fc" id="L346">        return out;</span>
+    }
+
+    /// Reads `count` bits starting at `offset`, least significant bit first
+    /// within each byte and least significant byte first -- the order the
+    /// Matter compact encoding packs them in.
+    private static long readBits(byte[] bytes, int offset, int count) {
+<span class="fc" id="L353">        long value = 0;</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L355">            int bit = offset + i;</span>
+<span class="fc" id="L356">            int b = (bytes[bit &gt;&gt; 3] &gt;&gt; (bit &amp; 7)) &amp; 1;</span>
+<span class="fc" id="L357">            value |= ((long) b) &lt;&lt; i;</span>
+        }
+<span class="fc" id="L359">        return value;</span>
+    }
+
+    private static SetupPayload parseManual(String text) {
+<span class="fc" id="L363">        StringBuilder digitsOnly = new StringBuilder();</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L365">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L366" title="All 4 branches covered.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L367">                digitsOnly.append(c);</span>
+<span class="fc bfc" id="L368" title="All 4 branches covered.">            } else if (c != '-' &amp;&amp; c != ' ') {</span>
+<span class="fc" id="L369">                throw new IllegalArgumentException(</span>
+                        &quot;a Matter setup code is either a scanned code&quot;
+                                + &quot; starting \&quot;MT:\&quot; or 11 or 21 digits;&quot;
+                                + &quot; '&quot; + c + &quot;' is neither&quot;);
+            }
+        }
+<span class="fc" id="L375">        String digits = digitsOnly.toString();</span>
+        boolean hasVendorProduct;
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (digits.length() == 11) {</span>
+<span class="fc" id="L378">            hasVendorProduct = false;</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        } else if (digits.length() == 21) {</span>
+<span class="nc" id="L380">            hasVendorProduct = true;</span>
+        } else {
+<span class="fc" id="L382">            throw new IllegalArgumentException(</span>
+                    &quot;a typed Matter setup code is 11 or 21 digits; this one&quot;
+<span class="fc" id="L384">                            + &quot; has &quot; + digits.length());</span>
+        }
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (!verhoeffValid(digits)) {</span>
+<span class="fc" id="L387">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code's check digit does not match, so a digit&quot;
+                            + &quot; was mistyped or misread&quot;);
+        }
+        // Each decimal chunk of a manual code stands for a fixed number of
+        // bits, and a decimal digit run can hold more than its field does.
+        // Masking the excess away silently accepts a mistyped code as a
+        // different, valid-looking one -- checksum-valid 87000000002 would
+        // read as passcode 4464 -- which is exactly the failure this parser
+        // is here to catch, so each chunk is checked against its own width.
+<span class="fc" id="L397">        int first = digits.charAt(0) - '0';</span>
+<span class="fc" id="L398">        requireWidth(first, 3, &quot;the first digit&quot;);</span>
+<span class="fc" id="L399">        int vidPidPresent = (first &gt;&gt; 2) &amp; 0x01;</span>
+<span class="pc bpc" id="L400" title="2 of 4 branches missed.">        if ((vidPidPresent == 1) != hasVendorProduct) {</span>
+<span class="nc" id="L401">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code's length and its own header disagree&quot;
+                            + &quot; about whether it carries a vendor and product&quot;
+                            + &quot; id&quot;);
+        }
+<span class="fc" id="L406">        int discriminatorHigh = first &amp; 0x03;</span>
+<span class="fc" id="L407">        int group2 = parseDigits(digits, 1, 5);</span>
+<span class="fc" id="L408">        requireWidth(group2, 16, &quot;digits 2 to 6&quot;);</span>
+<span class="fc" id="L409">        int group3 = parseDigits(digits, 6, 4);</span>
+<span class="fc" id="L410">        requireWidth(group3, 13, &quot;digits 7 to 10&quot;);</span>
+<span class="fc" id="L411">        int discriminatorMid = (group2 &gt;&gt; 14) &amp; 0x03;</span>
+<span class="fc" id="L412">        int passcode = (group2 &amp; 0x3FFF) | (group3 &lt;&lt; 14);</span>
+<span class="fc" id="L413">        validatePasscode(passcode);</span>
+        // The manual code carries four discriminator bits where the QR
+        // carries twelve, so it identifies a smaller set of accessories.
+        // Shifted into the same 12-bit field the QR uses, with the missing
+        // low bits zero, and flagged so nothing downstream mistakes it for a
+        // full one.
+<span class="fc" id="L419">        int discriminator = ((discriminatorHigh &lt;&lt; 2) | discriminatorMid) &lt;&lt; 8;</span>
+<span class="fc" id="L420">        int vendorId = 0;</span>
+<span class="fc" id="L421">        int productId = 0;</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (hasVendorProduct) {</span>
+<span class="nc" id="L423">            vendorId = parseDigits(digits, 10, 5);</span>
+<span class="nc" id="L424">            requireWidth(vendorId, 16, &quot;the vendor id digits&quot;);</span>
+<span class="nc" id="L425">            productId = parseDigits(digits, 15, 5);</span>
+<span class="nc" id="L426">            requireWidth(productId, 16, &quot;the product id digits&quot;);</span>
+        }
+<span class="fc" id="L428">        return new SetupPayload(text, 0, vendorId, productId, 0,</span>
+                DISCOVERY_BLE | DISCOVERY_ON_NETWORK, discriminator, passcode,
+                false, true);
+    }
+
+    /// Refuses a decimal chunk too large for the field it fills.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the chunk
+    ///
+    /// - `bits`: how many bits the format gives it
+    ///
+    /// - `what`: the chunk's name, for the message
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when it does not fit
+    private static void requireWidth(int value, int bits, String what) {
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (value &gt;= (1 &lt;&lt; bits)) {</span>
+<span class="fc" id="L448">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code is malformed: &quot; + what + &quot; read &quot;
+                            + value + &quot;, which does not fit the &quot; + bits
+                            + &quot; bits the Matter manual format gives them&quot;);
+        }
+<span class="fc" id="L453">    }</span>
+
+    private static int parseDigits(String digits, int from, int count) {
+<span class="fc" id="L456">        int value = 0;</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L458">            value = value * 10 + (digits.charAt(from + i) - '0');</span>
+        }
+<span class="fc" id="L460">        return value;</span>
+    }
+
+    /// Rejects the passcodes the Matter specification forbids.
+    ///
+    /// These are not arbitrary: a passcode of all one digit, or an ascending
+    /// or descending run, is exactly what a vendor ships when they have not
+    /// generated one, and a commissioning attempt against it is a security
+    /// problem rather than a typo. Catching it here says so plainly instead of
+    /// letting the OS sheet fail.
+    private static void validatePasscode(int passcode) {
+<span class="pc bpc" id="L471" title="11 of 24 branches missed.">        if (passcode == 0 || passcode == 11111111 || passcode == 22222222</span>
+                || passcode == 33333333 || passcode == 44444444
+                || passcode == 55555555 || passcode == 66666666
+                || passcode == 77777777 || passcode == 88888888
+                || passcode == 99999999 || passcode == 12345678
+                || passcode == 87654321) {
+<span class="fc" id="L477">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code carries a passcode the Matter&quot;
+                            + &quot; specification forbids, which usually means the&quot;
+                            + &quot; accessory shipped without one being generated&quot;);
+        }
+<span class="pc bpc" id="L482" title="2 of 4 branches missed.">        if (passcode &lt; 0 || passcode &gt; 99999998) {</span>
+<span class="nc" id="L483">            throw new IllegalArgumentException(</span>
+                    &quot;this setup code's passcode is outside the range Matter&quot;
+                            + &quot; allows&quot;);
+        }
+<span class="fc" id="L487">    }</span>
+
+    private static boolean verhoeffValid(String digits) {
+<span class="fc" id="L490">        int c = 0;</span>
+<span class="fc" id="L491">        int length = digits.length();</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L493">            int digit = digits.charAt(length - i - 1) - '0';</span>
+<span class="fc" id="L494">            c = VERHOEFF_D[c][VERHOEFF_P[i % 8][digit]];</span>
+        }
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        return c == 0;</span>
+    }
+
+    /// The code exactly as it was supplied, for passing through to a platform
+    /// that would rather parse it itself.
+    ///
+    /// #### Returns
+    ///
+    /// the original text, never `null`
+    public String getRaw() {
+<span class="fc" id="L506">        return raw;</span>
+    }
+
+    /// The payload format version. Zero for a manual code, which does not
+    /// carry one.
+    ///
+    /// #### Returns
+    ///
+    /// the version
+    public int getVersion() {
+<span class="nc" id="L516">        return version;</span>
+    }
+
+    /// The Matter vendor id of the accessory.
+    ///
+    /// Zero when unknown -- an 11-digit manual code does not carry one.
+    ///
+    /// #### Returns
+    ///
+    /// the vendor id, or zero
+    public int getVendorId() {
+<span class="fc" id="L527">        return vendorId;</span>
+    }
+
+    /// The vendor's product id for the accessory. Zero when unknown; see
+    /// [#getVendorId()].
+    ///
+    /// #### Returns
+    ///
+    /// the product id, or zero
+    public int getProductId() {
+<span class="fc" id="L537">        return productId;</span>
+    }
+
+    /// Whether the vendor requires their own app to finish setup.
+    ///
+    /// A non-zero custom flow means the accessory's manufacturer has declared
+    /// that standard commissioning alone will not fully configure it -- so it
+    /// may join the home and still not work until the user opens the vendor's
+    /// app. Worth telling the user before they start rather than after.
+    ///
+    /// #### Returns
+    ///
+    /// the custom-flow code; zero for a standard accessory
+    public int getCustomFlow() {
+<span class="nc" id="L551">        return customFlow;</span>
+    }
+
+    /// How the accessory can be found, as a mask of [#DISCOVERY_SOFT_AP],
+    /// [#DISCOVERY_BLE] and [#DISCOVERY_ON_NETWORK].
+    ///
+    /// A manual code does not carry this, so one is reported as BLE and
+    /// on-network, which is what the platform will try anyway.
+    ///
+    /// #### Returns
+    ///
+    /// the discovery mask
+    public int getDiscoveryCapabilities() {
+<span class="nc" id="L564">        return discoveryCapabilities;</span>
+    }
+
+    /// The discriminator that picks this accessory out of several in pairing
+    /// mode at once.
+    ///
+    /// #### Returns
+    ///
+    /// the 12-bit discriminator
+    public int getDiscriminator() {
+<span class="fc" id="L574">        return discriminator;</span>
+    }
+
+    /// Whether [#getDiscriminator()] is the short four-bit form.
+    ///
+    /// A manual code carries only the top four bits, so it narrows the field
+    /// rather than identifying one accessory. Two devices in pairing mode in
+    /// the same room can both match a typed code, which is a real situation and
+    /// the reason the platform's own UI may still ask the user to choose.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when only the top four bits are meaningful
+    public boolean isShortDiscriminator() {
+<span class="fc" id="L588">        return shortDiscriminator;</span>
+    }
+
+    /// The pairing passcode.
+    ///
+    /// A secret. Do not log it, do not persist it, and do not display it
+    /// beyond echoing back what the user just typed.
+    ///
+    /// #### Returns
+    ///
+    /// the passcode
+    public int getPasscode() {
+<span class="fc" id="L600">        return passcode;</span>
+    }
+
+    /// Whether this came from a scanned QR payload rather than a typed code.
+    ///
+    /// #### Returns
+    ///
+    /// `true` for a QR payload
+    public boolean isFromQrCode() {
+<span class="fc" id="L609">        return fromQrCode;</span>
+    }
+
+    /// A description safe to log or display.
+    ///
+    /// Names the vendor and product and **omits the passcode**, which is why
+    /// it exists at all -- the obvious `toString` would have put a pairing
+    /// secret into a log the first time someone debugged a scanner.
+    ///
+    /// #### Returns
+    ///
+    /// the description, never `null`
+    @Override
+    public String toString() {
+<span class="pc bpc" id="L623" title="2 of 4 branches missed.">        return &quot;SetupPayload[vendor=&quot; + vendorId + &quot; product=&quot; + productId</span>
+                + &quot; discriminator=&quot; + discriminator
+                + (shortDiscriminator ? &quot; (short)&quot; : &quot;&quot;)
+                + (fromQrCode ? &quot; qr&quot; : &quot; manual&quot;) + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

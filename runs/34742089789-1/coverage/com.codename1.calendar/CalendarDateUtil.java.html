@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarDateUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarDateUtil.java</span></div><h1>CalendarDateUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.DateTimeException;
+import java.time.format.DateTimeFormatter;
+
+final class CalendarDateUtil {
+
+<span class="fc" id="L37">    private static final DateTimeFormatter BASIC_DATE_TIME = DateTimeFormatter.ofPattern(&quot;yyyyMMdd'T'HHmmss&quot;);</span>
+
+<span class="fc" id="L39">    private static final DateTimeFormatter ISO_DATE_TIME = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd'T'HH:mm:ss&quot;);</span>
+
+<span class="fc" id="L41">    private static final DateTimeFormatter ISO_DATE_TIME_MILLIS = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd'T'HH:mm:ss.SSS&quot;);</span>
+
+    private CalendarDateUtil() {
+    }
+
+    static String[] split(String value, char delimiter) {
+<span class="fc" id="L47">        int count = 1;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (value.charAt(i) == delimiter) {</span>
+<span class="fc" id="L50">                count++;</span>
+            }
+        }
+<span class="fc" id="L53">        String[] out = new String[count];</span>
+<span class="fc" id="L54">        int start = 0;</span>
+<span class="fc" id="L55">        int index = 0;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (int i = 0; i &lt;= value.length(); i++) {</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">            if (i == value.length() || value.charAt(i) == delimiter) {</span>
+<span class="fc" id="L58">                out[index++] = value.substring(start, i);</span>
+<span class="fc" id="L59">                start = i + 1;</span>
+            }
+        }
+<span class="fc" id="L62">        return out;</span>
+    }
+
+    static String formatBasic(Instant value, ZoneId zone) {
+<span class="fc" id="L66">        return BASIC_DATE_TIME.format(ZonedDateTime.ofInstant(value, zone));</span>
+    }
+
+    static String formatIso(Instant value, ZoneId zone, boolean milliseconds) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        return (milliseconds ? ISO_DATE_TIME_MILLIS : ISO_DATE_TIME).format(ZonedDateTime.ofInstant(value, zone));</span>
+    }
+
+    static Instant parseDateTime(String value, ZoneId defaultZone) {
+        try {
+<span class="fc" id="L75">            String normalized = normalizeDateTime(value);</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">            if (normalized.endsWith(&quot;Z&quot;) || normalized.endsWith(&quot;z&quot;)) {</span>
+<span class="nc" id="L77">                return Instant.parse(normalized.substring(0, normalized.length() - 1) + &quot;Z&quot;);</span>
+            }
+<span class="fc" id="L79">            int timeSeparator = normalized.indexOf('T');</span>
+<span class="fc" id="L80">            int plus = normalized.lastIndexOf('+');</span>
+<span class="fc" id="L81">            int minus = normalized.lastIndexOf('-');</span>
+<span class="fc bfc" id="L82" title="All 4 branches covered.">            if (plus &gt; timeSeparator || minus &gt; timeSeparator) {</span>
+<span class="fc" id="L83">                return OffsetDateTime.parse(normalized).toInstant();</span>
+            }
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            ZoneId zone = defaultZone == null ? ZoneOffset.UTC : defaultZone;</span>
+<span class="fc" id="L86">            return ZonedDateTime.of(LocalDateTime.parse(normalized), zone).toInstant();</span>
+<span class="fc" id="L87">        } catch (DateTimeException ex) {</span>
+<span class="fc" id="L88">            throw new IllegalArgumentException(&quot;Invalid date: &quot; + value, ex);</span>
+        }
+    }
+
+    static ZoneId zoneId(String value) {
+<span class="fc" id="L93">        String mapped = windowsTimeZone(value);</span>
+        try {
+<span class="fc" id="L95">            return ZoneId.of(mapped);</span>
+<span class="fc" id="L96">        } catch (DateTimeException ex) {</span>
+<span class="fc" id="L97">            throw new IllegalArgumentException(&quot;Invalid time zone: &quot; + value, ex);</span>
+        }
+    }
+
+    static LocalDate parseDate(String value) {
+        try {
+<span class="fc" id="L103">            return LocalDate.parse(value);</span>
+<span class="nc" id="L104">        } catch (DateTimeException ex) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(&quot;Invalid date: &quot; + value, ex);</span>
+        }
+    }
+
+    private static String windowsTimeZone(String value) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (&quot;Pacific Standard Time&quot;.equals(value)) {</span>
+<span class="fc" id="L111">            return &quot;America/Los_Angeles&quot;;</span>
+        }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (&quot;Mountain Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L114">            return &quot;America/Denver&quot;;</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (&quot;Central Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L117">            return &quot;America/Chicago&quot;;</span>
+        }
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (&quot;Eastern Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L120">            return &quot;America/New_York&quot;;</span>
+        }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (&quot;GMT Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L123">            return &quot;Europe/London&quot;;</span>
+        }
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (&quot;W. Europe Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L126">            return &quot;Europe/Berlin&quot;;</span>
+        }
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (&quot;Israel Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L129">            return &quot;Asia/Jerusalem&quot;;</span>
+        }
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (&quot;India Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L132">            return &quot;Asia/Kolkata&quot;;</span>
+        }
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (&quot;Tokyo Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L135">            return &quot;Asia/Tokyo&quot;;</span>
+        }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (&quot;AUS Eastern Standard Time&quot;.equals(value)) {</span>
+<span class="nc" id="L138">            return &quot;Australia/Sydney&quot;;</span>
+        }
+<span class="fc" id="L140">        return value;</span>
+    }
+
+    static Instant allDayInstant(LocalDate date) {
+<span class="nc" id="L144">        return ZonedDateTime.of(date.atTime(0, 0), ZoneOffset.UTC).toInstant();</span>
+    }
+
+    private static String normalizeDateTime(String value) {
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">        if (value == null || value.length() &lt; 15) {</span>
+<span class="nc" id="L149">            throw new IllegalArgumentException(&quot;Invalid date: &quot; + value);</span>
+        }
+<span class="fc" id="L151">        String normalized = value;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (value.charAt(4) != '-') {</span>
+<span class="fc" id="L153">            normalized = value.substring(0, 4) + &quot;-&quot; + value.substring(4, 6) + &quot;-&quot; + value.substring(6, 8) + &quot;T&quot; + value.substring(9, 11) + &quot;:&quot; + value.substring(11, 13) + &quot;:&quot; + value.substring(13);</span>
+        }
+<span class="fc" id="L155">        int timeSeparator = normalized.indexOf('T');</span>
+<span class="fc" id="L156">        int plus = normalized.lastIndexOf('+');</span>
+<span class="fc" id="L157">        int minus = normalized.lastIndexOf('-');</span>
+<span class="fc bfc" id="L158" title="All 4 branches covered.">        int offset = plus &gt; timeSeparator ? plus : minus &gt; timeSeparator ? minus : -1;</span>
+<span class="fc bfc" id="L159" title="All 4 branches covered.">        if (offset &gt;= 0 &amp;&amp; normalized.length() - offset == 5) {</span>
+<span class="fc" id="L160">            normalized = normalized.substring(0, offset + 3) + &quot;:&quot; + normalized.substring(offset + 3);</span>
+        }
+<span class="fc" id="L162">        return normalized;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

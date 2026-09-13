@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarConflict.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarConflict.java</span></div><h1>CalendarConflict.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
+/// A queued local mutation that conflicts with the provider version.
+public final class CalendarConflict {
+
+<span class="fc" id="L34">    public enum Resolution {</span>
+
+<span class="fc" id="L36">        KEEP_LOCAL, KEEP_REMOTE, MERGED</span>
+    }
+
+    private final String mutationId;
+
+    private final Map&lt;String, Object&gt; local;
+
+    private final Map&lt;String, Object&gt; remote;
+
+<span class="fc" id="L45">    CalendarConflict(String mutationId, Map&lt;String, Object&gt; local, Map&lt;String, Object&gt; remote) {</span>
+<span class="fc" id="L46">        this.mutationId = mutationId;</span>
+<span class="fc" id="L47">        this.local = immutableMap(local);</span>
+<span class="fc" id="L48">        this.remote = immutableMap(remote);</span>
+<span class="fc" id="L49">    }</span>
+
+    public String getMutationId() {
+<span class="nc" id="L52">        return mutationId;</span>
+    }
+
+    public Map&lt;String, Object&gt; getLocal() {
+<span class="nc" id="L56">        return local;</span>
+    }
+
+    public Map&lt;String, Object&gt; getRemote() {
+<span class="nc" id="L60">        return remote;</span>
+    }
+
+    private static Map&lt;String, Object&gt; immutableMap(Map source) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L65">            return null;</span>
+        }
+<span class="fc" id="L67">        Map&lt;String, Object&gt; copy = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (Object entryObject : source.entrySet()) {</span>
+<span class="fc" id="L69">            Map.Entry entry = (Map.Entry) entryObject;</span>
+<span class="fc" id="L70">            copy.put(String.valueOf(entry.getKey()), immutableValue(entry.getValue()));</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">        return Collections.unmodifiableMap(copy);</span>
+    }
+
+    private static Object immutableValue(Object value) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (value instanceof Map) {</span>
+<span class="fc" id="L77">            return immutableMap((Map) value);</span>
+        }
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L80">            List&lt;Object&gt; copy = new ArrayList&lt;Object&gt;();</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            for (Object item : (List) value) {</span>
+<span class="nc" id="L82">                copy.add(immutableValue(item));</span>
+<span class="nc" id="L83">            }</span>
+<span class="fc" id="L84">            return Collections.unmodifiableList(copy);</span>
+        }
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (value instanceof byte[]) {</span>
+<span class="nc" id="L87">            return ((byte[]) value).clone();</span>
+        }
+<span class="fc" id="L89">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

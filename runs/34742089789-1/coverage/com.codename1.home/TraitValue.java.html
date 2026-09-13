@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraitValue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">TraitValue.java</span></div><h1>TraitValue.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+/// One value of one [Trait]: immutable, typed, and carrying its unit.
+///
+/// ```java
+/// TraitValue on = TraitValue.of(true);
+/// TraitValue dim = TraitValue.of(40, TraitUnit.PERCENT);
+/// TraitValue warm = TraitValue.of(370, TraitUnit.MIRED);
+/// ```
+///
+/// #### A tagged union, not forty subclasses
+///
+/// Home values are genuinely heterogeneous -- a switch is a boolean, a dimmer
+/// is a percentage, a lock is one of a fixed set -- and both native layers
+/// hand them over as raw numbers. Something has to give them types back.
+///
+/// A class per trait would mean a cast at every read site, and this codebase
+/// has a hard rule against a cast whose failure you expect to handle: ParparVM
+/// does not check `CHECKCAST`, so on iOS a wrong cast does not throw, it hands
+/// the wrong object to the next instruction and reads the target type's fields
+/// out of it. One class with kind-checked getters turns the same mistake into
+/// an [IllegalStateException] naming both kinds, on every platform.
+///
+/// #### There is no zero-argument getDouble
+///
+/// [#getDouble(TraitUnit)] makes you name the unit you expect and converts,
+/// or throws if the dimensions disagree. That is inherited straight from
+/// `com.codename1.health.HealthQuantity`, and the reason is the same: a bare
+/// `getDouble()` is how a Celsius setpoint gets rendered as Fahrenheit and how
+/// a colour temperature in mireds gets treated as Kelvin. Neither mistake
+/// raises anything at the time.
+///
+/// [#getRawDouble()] is the escape hatch, named to be awkward enough that it
+/// is not reached for by habit.
+///
+/// #### The raw platform value
+///
+/// Some mappings in this API are judgment calls -- HomeKit has six air-quality
+/// levels and Matter has seven, and Matter has five thermostat modes HomeKit
+/// cannot express. Where the canonical answer is lossy,
+/// [#getRawPlatformValue()] carries the platform's own ordinal alongside it.
+/// Without it every lossy mapping decision would be a permanent lie; with it,
+/// an app that must be exact can be.
+public final class TraitValue {
+
+    private final TraitValueKind kind;
+    private final double numeric;
+    private final String text;
+    private final TraitUnit unit;
+    private final int rawPlatformValue;
+    private final boolean hasRawPlatformValue;
+
+    private TraitValue(TraitValueKind kind, double numeric, String text,
+            TraitUnit unit, int rawPlatformValue,
+<span class="fc" id="L77">            boolean hasRawPlatformValue) {</span>
+<span class="fc" id="L78">        this.kind = kind;</span>
+<span class="fc" id="L79">        this.numeric = numeric;</span>
+<span class="fc" id="L80">        this.text = text;</span>
+<span class="fc" id="L81">        this.unit = unit;</span>
+<span class="fc" id="L82">        this.rawPlatformValue = rawPlatformValue;</span>
+<span class="fc" id="L83">        this.hasRawPlatformValue = hasRawPlatformValue;</span>
+<span class="fc" id="L84">    }</span>
+
+    /// A boolean value -- a switch, a motion flag, a mute.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the boolean
+    ///
+    /// #### Returns
+    ///
+    /// a value of kind [TraitValueKind#BOOLEAN]
+    public static TraitValue of(boolean value) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        return new TraitValue(TraitValueKind.BOOLEAN, value ? 1 : 0, null,</span>
+                TraitUnit.NONE, 0, false);
+    }
+
+    /// A unitless whole number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the number
+    ///
+    /// #### Returns
+    ///
+    /// a value of kind [TraitValueKind#INT]
+    public static TraitValue of(int value) {
+<span class="fc" id="L110">        return new TraitValue(TraitValueKind.INT, value, null, TraitUnit.NONE,</span>
+                0, false);
+    }
+
+    /// A measured quantity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the quantity
+    ///
+    /// - `unit`: the unit it is expressed in
+    ///
+    /// #### Returns
+    ///
+    /// a value of kind [TraitValueKind#DOUBLE]
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `unit` is `null`. A quantity with
+    ///   no unit is the bug this class exists to prevent, so it is refused at
+    ///   construction rather than defaulted to something plausible.
+    ///
+    /// - `IllegalArgumentException`: when `value` is NaN or an infinity.
+    ///   Nothing downstream can carry one: the wire encodes a number as text
+    ///   and its decoder refuses these as INVALID_DATA, so a write that got
+    ///   this far was accepted, stored by the local backend, and then read
+    ///   back as a failure -- and on a device it would be a number no
+    ///   accessory could act on.
+    public static TraitValue of(double value, TraitUnit unit) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (unit == null) {</span>
+<span class="fc" id="L140">            throw new IllegalArgumentException(</span>
+                    &quot;a measured value needs a unit; use TraitUnit.NONE only&quot;
+                            + &quot; for a genuinely dimensionless quantity&quot;);
+        }
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if (Double.isNaN(value) || Double.isInfinite(value)) {</span>
+<span class="nc" id="L145">            throw new IllegalArgumentException(</span>
+                    &quot;a measured value has to be a real number, got &quot; + value);
+        }
+<span class="fc" id="L148">        return new TraitValue(TraitValueKind.DOUBLE, value, null, unit, 0,</span>
+                false);
+    }
+
+    /// Free text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the text; `null` becomes the empty string
+    ///
+    /// #### Returns
+    ///
+    /// a value of kind [TraitValueKind#STRING]
+    public static TraitValue of(String value) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        return new TraitValue(TraitValueKind.STRING, 0,</span>
+                value == null ? &quot;&quot; : value, TraitUnit.NONE, 0, false);
+    }
+
+    /// One of a fixed set, from one of this package's domain enums.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the constant
+    ///
+    /// #### Returns
+    ///
+    /// a value of kind [TraitValueKind#ENUM]
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `value` is `null`
+    public static TraitValue ofEnum(Enum&lt;?&gt; value) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L181">            throw new IllegalArgumentException(&quot;enum value is required&quot;);</span>
+        }
+<span class="fc" id="L183">        return new TraitValue(TraitValueKind.ENUM, value.ordinal(),</span>
+<span class="fc" id="L184">                value.name(), TraitUnit.NONE, 0, false);</span>
+    }
+
+    /// Builds an enum value straight from an ordinal, for the codec.
+    ///
+    /// Application code should use [#ofEnum(java.lang.Enum)]; this exists
+    /// because the wire carries an ordinal and the decoder has no constant to
+    /// hand.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ordinal`: the ordinal of a constant in this package's domain enum
+    ///   for the trait in question
+    ///
+    /// #### Returns
+    ///
+    /// a value of kind [TraitValueKind#ENUM]
+    public static TraitValue ofEnumOrdinal(int ordinal) {
+<span class="fc" id="L202">        return new TraitValue(TraitValueKind.ENUM, ordinal, null,</span>
+                TraitUnit.NONE, 0, false);
+    }
+
+    /// The same value with the constant's name attached, for
+    /// [Trait#enumValue(int)].
+    ///
+    /// The codec decodes an ordinal and the trait knows what that ordinal is
+    /// called, so a reading arrives named -- which is what makes it equal to
+    /// the value an app builds with [#ofEnum(java.lang.Enum)] for the same
+    /// constant. Unnamed, a lock that reported SECURED did not equal
+    /// `ofEnum(LockState.SECURED)`, so the obvious desired-versus-actual
+    /// comparison was false for every reading that ever came off a bridge.
+    static TraitValue ofEnumNamed(String name, int ordinal) {
+<span class="fc" id="L216">        return new TraitValue(TraitValueKind.ENUM, ordinal, name,</span>
+                TraitUnit.NONE, 0, false);
+    }
+
+    /// This value with the platform's own ordinal attached.
+    ///
+    /// Used by the ports where the canonical mapping is lossy, so an app can
+    /// see what the accessory actually said. See [#getRawPlatformValue()].
+    ///
+    /// #### Parameters
+    ///
+    /// - `raw`: the backend's own numeric value
+    ///
+    /// #### Returns
+    ///
+    /// a copy carrying the raw value; this instance is unchanged
+    public TraitValue withRawPlatformValue(int raw) {
+<span class="fc" id="L233">        return new TraitValue(kind, numeric, text, unit, raw, true);</span>
+    }
+
+    /// What sort of value this is, and therefore which getter works.
+    ///
+    /// #### Returns
+    ///
+    /// the kind, never `null`
+    public TraitValueKind getKind() {
+<span class="fc" id="L242">        return kind;</span>
+    }
+
+    /// The unit a [TraitValueKind#DOUBLE] value is expressed in.
+    /// [TraitUnit#NONE] for every other kind.
+    ///
+    /// #### Returns
+    ///
+    /// the unit, never `null`
+    public TraitUnit getUnit() {
+<span class="fc" id="L252">        return unit;</span>
+    }
+
+    /// The boolean.
+    ///
+    /// #### Returns
+    ///
+    /// the value
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not a
+    ///   [TraitValueKind#BOOLEAN]
+    public boolean getBoolean() {
+<span class="fc" id="L266">        require(TraitValueKind.BOOLEAN);</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        return numeric != 0;</span>
+    }
+
+    /// The whole number.
+    ///
+    /// #### Returns
+    ///
+    /// the value
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not an [TraitValueKind#INT]
+    public int getInt() {
+<span class="fc" id="L280">        require(TraitValueKind.INT);</span>
+<span class="fc" id="L281">        return (int) numeric;</span>
+    }
+
+    /// The text.
+    ///
+    /// #### Returns
+    ///
+    /// the value, never `null`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not a
+    ///   [TraitValueKind#STRING]
+    public String getString() {
+<span class="fc" id="L295">        require(TraitValueKind.STRING);</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        return text == null ? &quot;&quot; : text;</span>
+    }
+
+    /// The ordinal of an enum value, for the codec and for
+    /// [LockState#of(TraitValue)] and its siblings.
+    ///
+    /// Application code should go through those lookups rather than reading
+    /// the ordinal: they are total, they name the constant, and they document
+    /// which ones a given backend can never produce.
+    ///
+    /// #### Returns
+    ///
+    /// the ordinal
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not an [TraitValueKind#ENUM]
+    public int getEnumOrdinal() {
+<span class="fc" id="L314">        require(TraitValueKind.ENUM);</span>
+<span class="fc" id="L315">        return (int) numeric;</span>
+    }
+
+    /// The name of the enum constant this value was built from.
+    ///
+    /// `null` only for a value built straight from an ordinal with
+    /// [#ofEnumOrdinal(int)] and never resolved against a trait. Present for
+    /// every value an application builds and for every reading the codec
+    /// decodes -- the trait names the ordinal there -- which
+    /// is what lets [Trait#acceptsEnumValue(TraitValue)] tell one domain enum
+    /// from another -- ParparVM's `Enum.getDeclaringClass()` returns `null`,
+    /// so the type itself is not available to check.
+    ///
+    /// #### Returns
+    ///
+    /// the constant's name, or `null`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not an [TraitValueKind#ENUM]
+    public String getEnumName() {
+<span class="fc" id="L336">        require(TraitValueKind.ENUM);</span>
+<span class="fc" id="L337">        return text;</span>
+    }
+
+    /// The quantity, converted into the unit you name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the unit you want the answer in
+    ///
+    /// #### Returns
+    ///
+    /// the quantity expressed in `in`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not a
+    ///   [TraitValueKind#DOUBLE]
+    ///
+    /// - `IllegalArgumentException`: when `in` measures a different
+    ///   dimension than this value
+    public double getDouble(TraitUnit in) {
+<span class="fc" id="L358">        require(TraitValueKind.DOUBLE);</span>
+<span class="fc" id="L359">        return TraitUnit.convert(numeric, unit, in);</span>
+    }
+
+    /// The quantity in whatever unit it happens to be in, with no conversion
+    /// and no check.
+    ///
+    /// Deliberately awkward. Reach for [#getDouble(TraitUnit)] unless you
+    /// have already read [#getUnit()] and are doing something with both.
+    ///
+    /// #### Returns
+    ///
+    /// the raw numeric component
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not a
+    ///   [TraitValueKind#DOUBLE]
+    public double getRawDouble() {
+<span class="fc" id="L377">        require(TraitValueKind.DOUBLE);</span>
+<span class="fc" id="L378">        return numeric;</span>
+    }
+
+    /// A colour temperature in Kelvin.
+    ///
+    /// Separate from [#getDouble(TraitUnit)] because mireds and Kelvin are
+    /// reciprocal rather than affine and so cannot be a [TraitUnit] pair; see
+    /// [TraitUnit#miredToKelvin(double)].
+    ///
+    /// #### Returns
+    ///
+    /// the colour temperature in Kelvin
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not a
+    ///   [TraitValueKind#DOUBLE]
+    ///
+    /// - `IllegalArgumentException`: when this value is not a colour
+    ///   temperature, or is not positive
+    public double getColorTemperatureKelvin() {
+<span class="fc" id="L399">        require(TraitValueKind.DOUBLE);</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        if (unit.getDimension() != TraitUnitDimension.COLOR_TEMPERATURE) {</span>
+<span class="fc" id="L401">            throw new IllegalArgumentException(unit.name()</span>
+                    + &quot; is not a colour temperature&quot;);
+        }
+<span class="fc" id="L404">        return TraitUnit.miredToKelvin(</span>
+<span class="fc" id="L405">                TraitUnit.convert(numeric, unit, TraitUnit.MIRED));</span>
+    }
+
+    /// Whether the backend's own numeric value is available alongside the
+    /// canonical one.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when [#getRawPlatformValue()] is meaningful
+    public boolean hasRawPlatformValue() {
+<span class="fc" id="L415">        return hasRawPlatformValue;</span>
+    }
+
+    /// The backend's own numeric value, where the canonical mapping was
+    /// lossy.
+    ///
+    /// Meaningful only when [#hasRawPlatformValue()] answers `true`, and
+    /// meaningful only in terms of the backend that produced it -- read
+    /// [SmartHome#getBackend()] before interpreting it. Zero otherwise.
+    ///
+    /// Deliberately outside [#equals(java.lang.Object)]: it is metadata about
+    /// where a value came from, not part of the value. Two readings that are
+    /// equal can carry different raw ordinals, which is exactly the lossiness
+    /// this exists to expose -- compare these explicitly when that matters.
+    ///
+    /// #### Returns
+    ///
+    /// the platform's own ordinal, or zero
+    public int getRawPlatformValue() {
+<span class="fc" id="L434">        return rawPlatformValue;</span>
+    }
+
+    private void require(TraitValueKind expected) {
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        if (kind != expected) {</span>
+<span class="fc" id="L439">            throw new IllegalStateException(&quot;this is a &quot; + kind.name()</span>
+<span class="fc" id="L440">                    + &quot; value, not a &quot; + expected.name()</span>
+                    + &quot;; check getKind() first&quot;);
+        }
+<span class="fc" id="L443">    }</span>
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L448">            return true;</span>
+        }
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        if (!(o instanceof TraitValue)) {</span>
+<span class="nc" id="L451">            return false;</span>
+        }
+<span class="fc" id="L453">        TraitValue other = (TraitValue) o;</span>
+<span class="fc bfc" id="L454" title="All 4 branches covered.">        if (kind != other.kind || unit != other.unit) {</span>
+<span class="fc" id="L455">            return false;</span>
+        }
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        if (Double.compare(numeric, other.numeric) != 0) {</span>
+<span class="nc" id="L458">            return false;</span>
+        }
+        // The canonical value, and not the platform's own ordinal beside it.
+        // That ordinal is diagnostic metadata a port attaches where the
+        // mapping is lossy -- every iOS LOCK_STATE and AIR_QUALITY reading
+        // carries one and no value an app builds ever does -- so comparing it
+        // made a reading unequal to the value it plainly is. See
+        // getRawPlatformValue() for the cases where two values that are equal
+        // here still came from different platform states.
+<span class="pc bpc" id="L467" title="1 of 4 branches missed.">        return text == null ? other.text == null : text.equals(other.text);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L472">        int result = kind.hashCode();</span>
+<span class="fc" id="L473">        result = 31 * result + unit.hashCode();</span>
+<span class="fc" id="L474">        long bits = Double.doubleToLongBits(numeric);</span>
+<span class="fc" id="L475">        result = 31 * result + (int) (bits ^ (bits &gt;&gt;&gt; 32));</span>
+        // Without the raw platform ordinal, which equals() does not compare.
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        result = 31 * result + (text == null ? 0 : text.hashCode());</span>
+<span class="fc" id="L478">        return result;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="pc bpc" id="L483" title="3 of 5 branches missed.">        switch (kind) {</span>
+            case BOOLEAN:
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">                return numeric != 0 ? &quot;true&quot; : &quot;false&quot;;</span>
+            case INT:
+<span class="nc" id="L487">                return Integer.toString((int) numeric);</span>
+            case STRING:
+<span class="nc bnc" id="L489" title="All 2 branches missed.">                return text == null ? &quot;&quot; : text;</span>
+            case ENUM:
+<span class="nc bnc" id="L491" title="All 2 branches missed.">                return text != null ? text : Integer.toString((int) numeric);</span>
+            default:
+<span class="fc" id="L493">                return numeric + &quot; &quot; + unit.name();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

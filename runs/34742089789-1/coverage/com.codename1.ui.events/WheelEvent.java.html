@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WheelEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.events</a> &gt; <span class="el_source">WheelEvent.java</span></div><h1>WheelEvent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.events;
+
+/// Event delivered to mouse wheel listeners when the wheel or a trackpad scroll gesture is moved.
+///
+/// The deltas are reported in display pixels (already converted from the native notch count by the
+/// port). A positive `deltaY` reveals content above (the user scrolled the wheel down), and a
+/// positive `deltaX` reveals content to the left. Consuming this event with `#consume()` prevents
+/// the default scrolling behavior, which is useful for gestures such as control plus wheel to zoom.
+public class WheelEvent extends ActionEvent {
+
+    private final int deltaX;
+    private final int deltaY;
+    private final boolean precise;
+    private final int modifiers;
+
+    /// Creates a new wheel event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the component the wheel was moved over
+    ///
+    /// - `x`: the pointer x position in display pixels
+    ///
+    /// - `y`: the pointer y position in display pixels
+    ///
+    /// - `deltaX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `deltaY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a trackpad
+    ///
+    /// - `modifiers`: bitmask of the `PointerEvent` `MODIFIER_*` constants for held keyboard modifiers
+    public WheelEvent(Object source, int x, int y, int deltaX, int deltaY, boolean precise, int modifiers) {
+<span class="fc" id="L57">        super(source, Type.PointerWheel, x, y);</span>
+<span class="fc" id="L58">        this.deltaX = deltaX;</span>
+<span class="fc" id="L59">        this.deltaY = deltaY;</span>
+<span class="fc" id="L60">        this.precise = precise;</span>
+<span class="fc" id="L61">        this.modifiers = modifiers;</span>
+<span class="fc" id="L62">    }</span>
+
+    /// The horizontal scroll amount in display pixels. A positive value reveals content to the left.
+    public int getDeltaX() {
+<span class="fc" id="L66">        return deltaX;</span>
+    }
+
+    /// The vertical scroll amount in display pixels. A positive value reveals content above.
+    public int getDeltaY() {
+<span class="fc" id="L71">        return deltaY;</span>
+    }
+
+    /// True if the deltas come from a high resolution device such as a trackpad rather than a
+    /// notched mouse wheel.
+    public boolean isPrecise() {
+<span class="fc" id="L77">        return precise;</span>
+    }
+
+    /// A bitmask of the keyboard modifiers held during this event, built from the `PointerEvent`
+    /// `MODIFIER_*` constants.
+    public int getModifiers() {
+<span class="fc" id="L83">        return modifiers;</span>
+    }
+
+    /// True if the shift key was held during this event.
+    public boolean isShiftDown() {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        return (modifiers &amp; PointerEvent.MODIFIER_SHIFT) != 0;</span>
+    }
+
+    /// True if the control key was held during this event.
+    public boolean isControlDown() {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        return (modifiers &amp; PointerEvent.MODIFIER_CONTROL) != 0;</span>
+    }
+
+    /// True if the alt/option key was held during this event.
+    public boolean isAltDown() {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        return (modifiers &amp; PointerEvent.MODIFIER_ALT) != 0;</span>
+    }
+
+    /// True if the meta/command/windows key was held during this event.
+    public boolean isMetaDown() {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        return (modifiers &amp; PointerEvent.MODIFIER_META) != 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

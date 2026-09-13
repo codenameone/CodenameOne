@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Fixture.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics</a> &gt; <span class="el_source">Fixture.java</span></div><h1>Fixture.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics;
+
+import com.codename1.gaming.physics.box2d.collision.AABB;
+import com.codename1.gaming.physics.box2d.collision.RayCastInput;
+import com.codename1.gaming.physics.box2d.collision.RayCastOutput;
+import com.codename1.gaming.physics.box2d.collision.broadphase.BroadPhase;
+import com.codename1.gaming.physics.box2d.collision.shapes.MassData;
+import com.codename1.gaming.physics.box2d.collision.shapes.Shape;
+import com.codename1.gaming.physics.box2d.collision.shapes.ShapeType;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
+
+/// A fixture is used to attach a shape to a body for collision detection. A fixture inherits its
+/// transform from its parent. Fixtures hold additional non-geometric data such as friction,
+/// collision filters, etc. Fixtures are created via Body::CreateFixture.
+///
+/// @warning you cannot reuse fixtures.
+///
+/// @author daniel
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">public class Fixture {</span>
+
+  public float m_density;
+
+  public Fixture m_next;
+  public Body m_body;
+
+  public Shape m_shape;
+
+  public float m_friction;
+  public float m_restitution;
+
+  public FixtureProxy[] m_proxies;
+  public int m_proxyCount;
+
+  public final Filter m_filter;
+
+  public boolean m_isSensor;
+
+  public Object m_userData;
+
+<span class="fc" id="L67">  public Fixture() {</span>
+<span class="fc" id="L68">    m_userData = null;</span>
+<span class="fc" id="L69">    m_body = null;</span>
+<span class="fc" id="L70">    m_next = null;</span>
+<span class="fc" id="L71">    m_proxies = null;</span>
+<span class="fc" id="L72">    m_proxyCount = 0;</span>
+<span class="fc" id="L73">    m_shape = null;</span>
+<span class="fc" id="L74">    m_filter = new Filter();</span>
+<span class="fc" id="L75">  }</span>
+
+  /// Get the type of the child shape. You can use this to down cast to the concrete shape.
+  ///
+  /// @return the shape type.
+  public ShapeType getType() {
+<span class="fc" id="L81">    return m_shape.getType();</span>
+  }
+
+  /// Get the child shape. You can modify the child shape, however you should not change the number
+  /// of vertices because this will crash some collision caching mechanisms.
+  ///
+  /// @return
+  public Shape getShape() {
+<span class="fc" id="L89">    return m_shape;</span>
+  }
+
+  /// Is this fixture a sensor (non-solid)?
+  ///
+  /// @return the true if the shape is a sensor.
+  /// @return
+  public boolean isSensor() {
+<span class="fc" id="L97">    return m_isSensor;</span>
+  }
+
+  /// Set if this fixture is a sensor.
+  ///
+  /// @param sensor
+  public void setSensor(boolean sensor) {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">    if (sensor != m_isSensor) {</span>
+<span class="fc" id="L105">      m_body.setAwake(true);</span>
+<span class="fc" id="L106">      m_isSensor = sensor;</span>
+    }
+<span class="fc" id="L108">  }</span>
+
+  /// Set the contact filtering data. This is an expensive operation and should not be called
+  /// frequently. This will not update contacts until the next time step when either parent body is
+  /// awake. This automatically calls refilter.
+  ///
+  /// @param filter
+  public void setFilterData(final Filter filter) {
+<span class="nc" id="L116">    m_filter.set(filter);</span>
+
+<span class="nc" id="L118">    refilter();</span>
+<span class="nc" id="L119">  }</span>
+
+  /// Get the contact filtering data.
+  ///
+  /// @return
+  public Filter getFilterData() {
+<span class="fc" id="L125">    return m_filter;</span>
+  }
+
+  /// Call this if you want to establish collision that was previously disabled by
+  /// ContactFilter::ShouldCollide.
+  public void refilter() {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">    if (m_body == null) {</span>
+<span class="nc" id="L132">      return;</span>
+    }
+
+    // Flag associated contacts for filtering.
+<span class="nc" id="L136">    ContactEdge edge = m_body.getContactList();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">    while (edge != null) {</span>
+<span class="nc" id="L138">      Contact contact = edge.contact;</span>
+<span class="nc" id="L139">      Fixture fixtureA = contact.getFixtureA();</span>
+<span class="nc" id="L140">      Fixture fixtureB = contact.getFixtureB();</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">      if (fixtureA == this || fixtureB == this) {</span>
+<span class="nc" id="L142">        contact.flagForFiltering();</span>
+      }
+<span class="nc" id="L144">      edge = edge.next;</span>
+<span class="nc" id="L145">    }</span>
+
+<span class="nc" id="L147">    World world = m_body.getWorld();</span>
+
+<span class="nc bnc" id="L149" title="All 2 branches missed.">    if (world == null) {</span>
+<span class="nc" id="L150">      return;</span>
+    }
+
+    // Touch each proxy so that new pairs may be created
+<span class="nc" id="L154">    BroadPhase broadPhase = world.m_contactManager.m_broadPhase;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">    for (int i = 0; i &lt; m_proxyCount; ++i) {</span>
+<span class="nc" id="L156">      broadPhase.touchProxy(m_proxies[i].proxyId);</span>
+    }
+<span class="nc" id="L158">  }</span>
+
+  /// Get the parent body of this fixture. This is NULL if the fixture is not attached.
+  ///
+  /// @return the parent body.
+  /// @return
+  public Body getBody() {
+<span class="fc" id="L165">    return m_body;</span>
+  }
+
+  /// Get the next fixture in the parent body's fixture list.
+  ///
+  /// @return the next shape.
+  /// @return
+  public Fixture getNext() {
+<span class="fc" id="L173">    return m_next;</span>
+  }
+
+  public void setDensity(float density) {
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">    assert (density &gt;= 0f);</span>
+<span class="fc" id="L178">    m_density = density;</span>
+<span class="fc" id="L179">  }</span>
+
+  public float getDensity() {
+<span class="fc" id="L182">    return m_density;</span>
+  }
+
+  /// Get the user data that was assigned in the fixture definition. Use this to store your
+  /// application specific data.
+  ///
+  /// @return
+  public Object getUserData() {
+<span class="fc" id="L190">    return m_userData;</span>
+  }
+
+  /// Set the user data. Use this to store your application specific data.
+  ///
+  /// @param data
+  public void setUserData(Object data) {
+<span class="nc" id="L197">    m_userData = data;</span>
+<span class="nc" id="L198">  }</span>
+
+  /// Test a point for containment in this fixture. This only works for convex shapes.
+  ///
+  /// @param p a point in world coordinates.
+  /// @return
+  public boolean testPoint(final Vec2 p) {
+<span class="nc" id="L205">    return m_shape.testPoint(m_body.m_xf, p);</span>
+  }
+
+  /// Cast a ray against this shape.
+  ///
+  /// @param output the ray-cast results.
+  /// @param input the ray-cast input parameters.
+  /// @param output
+  /// @param input
+  public boolean raycast(RayCastOutput output, RayCastInput input, int childIndex) {
+<span class="fc" id="L215">    return m_shape.raycast(output, input, m_body.m_xf, childIndex);</span>
+  }
+
+  /// Get the mass data for this fixture. The mass data is based on the density and the shape. The
+  /// rotational inertia is about the shape's origin.
+  ///
+  /// @return
+  public void getMassData(MassData massData) {
+<span class="fc" id="L223">    m_shape.computeMass(massData, m_density);</span>
+<span class="fc" id="L224">  }</span>
+
+  /// Get the coefficient of friction.
+  ///
+  /// @return
+  public float getFriction() {
+<span class="fc" id="L230">    return m_friction;</span>
+  }
+
+  /// Set the coefficient of friction. This will _not_ change the friction of existing contacts.
+  ///
+  /// @param friction
+  public void setFriction(float friction) {
+<span class="fc" id="L237">    m_friction = friction;</span>
+<span class="fc" id="L238">  }</span>
+
+  /// Get the coefficient of restitution.
+  ///
+  /// @return
+  public float getRestitution() {
+<span class="fc" id="L244">    return m_restitution;</span>
+  }
+
+  /// Set the coefficient of restitution. This will _not_ change the restitution of existing
+  /// contacts.
+  ///
+  /// @param restitution
+  public void setRestitution(float restitution) {
+<span class="fc" id="L252">    m_restitution = restitution;</span>
+<span class="fc" id="L253">  }</span>
+
+  /// Get the fixture's AABB. This AABB may be enlarge and/or stale. If you need a more accurate
+  /// AABB, compute it using the shape and the body transform.
+  ///
+  /// @return
+  public AABB getAABB(int childIndex) {
+<span class="nc bnc" id="L260" title="All 6 branches missed.">    assert (childIndex &gt;= 0 &amp;&amp; childIndex &lt; m_proxyCount);</span>
+<span class="nc" id="L261">    return m_proxies[childIndex].aabb;</span>
+  }
+
+  /// Dump this fixture to the log file.
+  ///
+  /// @param bodyIndex
+  public void dump(int bodyIndex) {
+
+<span class="nc" id="L269">  }</span>
+
+
+  // We need separation create/destroy functions from the constructor/destructor because
+  // the destructor cannot access the allocator (no destructor arguments allowed by C++).
+
+  public void create(Body body, FixtureDef def) {
+<span class="fc" id="L276">    m_userData = def.userData;</span>
+<span class="fc" id="L277">    m_friction = def.friction;</span>
+<span class="fc" id="L278">    m_restitution = def.restitution;</span>
+
+<span class="fc" id="L280">    m_body = body;</span>
+<span class="fc" id="L281">    m_next = null;</span>
+
+
+<span class="fc" id="L284">    m_filter.set(def.filter);</span>
+
+<span class="fc" id="L286">    m_isSensor = def.isSensor;</span>
+
+<span class="fc" id="L288">    m_shape = def.shape.clone();</span>
+
+    // Reserve proxy space
+<span class="fc" id="L291">    int childCount = m_shape.getChildCount();</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">    if (m_proxies == null) {</span>
+<span class="fc" id="L293">      m_proxies = new FixtureProxy[childCount];</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">      for (int i = 0; i &lt; childCount; i++) {</span>
+<span class="fc" id="L295">        m_proxies[i] = new FixtureProxy();</span>
+<span class="fc" id="L296">        m_proxies[i].fixture = null;</span>
+<span class="fc" id="L297">        m_proxies[i].proxyId = BroadPhase.NULL_PROXY;</span>
+      }
+    }
+
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">    if (m_proxies.length &lt; childCount) {</span>
+<span class="nc" id="L302">      FixtureProxy[] old = m_proxies;</span>
+<span class="nc" id="L303">      int newLen = MathUtils.max(old.length * 2, childCount);</span>
+<span class="nc" id="L304">      m_proxies = new FixtureProxy[newLen];</span>
+<span class="nc" id="L305">      System.arraycopy(old, 0, m_proxies, 0, old.length);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">      for (int i = 0; i &lt; newLen; i++) {</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">        if (i &gt;= old.length) {</span>
+<span class="nc" id="L308">          m_proxies[i] = new FixtureProxy();</span>
+        }
+<span class="nc" id="L310">        m_proxies[i].fixture = null;</span>
+<span class="nc" id="L311">        m_proxies[i].proxyId = BroadPhase.NULL_PROXY;</span>
+      }
+    }
+<span class="fc" id="L314">    m_proxyCount = 0;</span>
+
+<span class="fc" id="L316">    m_density = def.density;</span>
+<span class="fc" id="L317">  }</span>
+
+  public void destroy() {
+    // The proxies must be destroyed before calling this.
+<span class="pc bpc" id="L321" title="2 of 4 branches missed.">    assert (m_proxyCount == 0);</span>
+
+    // Free the child shape.
+<span class="fc" id="L324">    m_shape = null;</span>
+<span class="fc" id="L325">    m_proxies = null;</span>
+<span class="fc" id="L326">    m_next = null;</span>
+
+    // TODO pool shapes
+    // TODO pool fixtures
+<span class="fc" id="L330">  }</span>
+
+  // These support body activation/deactivation.
+  public void createProxies(BroadPhase broadPhase, final Transform xf) {
+<span class="pc bpc" id="L334" title="2 of 4 branches missed.">    assert (m_proxyCount == 0);</span>
+
+    // Create proxies in the broad-phase.
+<span class="fc" id="L337">    m_proxyCount = m_shape.getChildCount();</span>
+
+<span class="fc bfc" id="L339" title="All 2 branches covered.">    for (int i = 0; i &lt; m_proxyCount; ++i) {</span>
+<span class="fc" id="L340">      FixtureProxy proxy = m_proxies[i];</span>
+<span class="fc" id="L341">      m_shape.computeAABB(proxy.aabb, xf, i);</span>
+<span class="fc" id="L342">      proxy.proxyId = broadPhase.createProxy(proxy.aabb, proxy);</span>
+<span class="fc" id="L343">      proxy.fixture = this;</span>
+<span class="fc" id="L344">      proxy.childIndex = i;</span>
+    }
+<span class="fc" id="L346">  }</span>
+
+  /// Internal method
+  ///
+  /// @param broadPhase
+  public void destroyProxies(BroadPhase broadPhase) {
+    // Destroy proxies in the broad-phase.
+<span class="fc bfc" id="L353" title="All 2 branches covered.">    for (int i = 0; i &lt; m_proxyCount; ++i) {</span>
+<span class="fc" id="L354">      FixtureProxy proxy = m_proxies[i];</span>
+<span class="fc" id="L355">      broadPhase.destroyProxy(proxy.proxyId);</span>
+<span class="fc" id="L356">      proxy.proxyId = BroadPhase.NULL_PROXY;</span>
+    }
+
+<span class="fc" id="L359">    m_proxyCount = 0;</span>
+<span class="fc" id="L360">  }</span>
+
+<span class="fc" id="L362">  private final AABB pool1 = new AABB();</span>
+<span class="fc" id="L363">  private final AABB pool2 = new AABB();</span>
+<span class="fc" id="L364">  private final Vec2 displacement = new Vec2();</span>
+
+  /// Internal method
+  ///
+  /// @param broadPhase
+  /// @param xf1
+  /// @param xf2
+  protected void synchronize(BroadPhase broadPhase, final Transform transform1,
+      final Transform transform2) {
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">    if (m_proxyCount == 0) {</span>
+<span class="nc" id="L374">      return;</span>
+    }
+
+<span class="fc bfc" id="L377" title="All 2 branches covered.">    for (int i = 0; i &lt; m_proxyCount; ++i) {</span>
+<span class="fc" id="L378">      FixtureProxy proxy = m_proxies[i];</span>
+
+      // Compute an AABB that covers the swept shape (may miss some rotation effect).
+<span class="fc" id="L381">      final AABB aabb1 = pool1;</span>
+<span class="fc" id="L382">      final AABB aab = pool2;</span>
+<span class="fc" id="L383">      m_shape.computeAABB(aabb1, transform1, proxy.childIndex);</span>
+<span class="fc" id="L384">      m_shape.computeAABB(aab, transform2, proxy.childIndex);</span>
+
+<span class="fc bfc" id="L386" title="All 2 branches covered.">      proxy.aabb.lowerBound.x = aabb1.lowerBound.x &lt; aab.lowerBound.x ? aabb1.lowerBound.x : aab.lowerBound.x;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">      proxy.aabb.lowerBound.y = aabb1.lowerBound.y &lt; aab.lowerBound.y ? aabb1.lowerBound.y : aab.lowerBound.y;</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">      proxy.aabb.upperBound.x = aabb1.upperBound.x &gt; aab.upperBound.x ? aabb1.upperBound.x : aab.upperBound.x;</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">      proxy.aabb.upperBound.y = aabb1.upperBound.y &gt; aab.upperBound.y ? aabb1.upperBound.y : aab.upperBound.y;</span>
+<span class="fc" id="L390">      displacement.x = transform2.p.x - transform1.p.x;</span>
+<span class="fc" id="L391">      displacement.y = transform2.p.y - transform1.p.y;</span>
+
+<span class="fc" id="L393">      broadPhase.moveProxy(proxy.proxyId, proxy.aabb, displacement);</span>
+    }
+<span class="fc" id="L395">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

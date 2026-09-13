@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NutritionSample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.nutrition</a> &gt; <span class="el_source">NutritionSample.java</span></div><h1>NutritionSample.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.nutrition;
+
+import com.codename1.health.HealthDataType;
+import com.codename1.health.HealthQuantity;
+import com.codename1.health.HealthUnit;
+import com.codename1.health.SessionSample;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A logged food or meal, carrying whichever nutrients are known about it.
+///
+/// #### Sparse by design
+///
+/// A [NutritionSample] holds only the nutrients actually set. A logged
+/// apple sets four fields; a packaged food scanned from a barcode might set
+/// thirty. Modelling this as forty nullable fields -- which is roughly what
+/// both platforms do -- would make every consumer write forty null checks,
+/// so this exposes a map instead and [#getNutrients()] returns only what is
+/// present.
+///
+/// ```java
+/// NutritionSample lunch = NutritionSample.create(start, end);
+/// lunch.setTitle(&quot;Chicken salad&quot;);
+/// lunch.setNutrient(Nutrient.ENERGY, 420);
+/// lunch.setNutrient(Nutrient.PROTEIN, 35);
+/// lunch.setNutrient(Nutrient.SODIUM, 610);
+/// ```
+///
+/// #### Meal type
+///
+/// Health Connect records which meal an entry belongs to and HealthKit
+/// does not, so [#getMealType()] round-trips through the local store and
+/// would ride in sample metadata on iOS once that mapping exists.
+///
+/// #### Local and simulator only in this release
+///
+/// Neither phone carries this shape yet -- see the package
+/// documentation. A read or write of
+/// [HealthDataType#NUTRITION] on iOS or Android is refused with
+/// [HealthError#TYPE_NOT_SUPPORTED]; everything here works against the
+/// local store.
+public final class NutritionSample extends SessionSample {
+
+    /// The entry is not attributed to a particular meal.
+    public static final int MEAL_UNKNOWN = 0;
+    /// Breakfast.
+    public static final int MEAL_BREAKFAST = 1;
+    /// Lunch.
+    public static final int MEAL_LUNCH = 2;
+    /// Dinner.
+    public static final int MEAL_DINNER = 3;
+    /// A snack between meals.
+    public static final int MEAL_SNACK = 4;
+
+<span class="fc" id="L81">    private final Map&lt;String, HealthQuantity&gt; nutrients =</span>
+            new HashMap&lt;String, HealthQuantity&gt;();
+<span class="fc" id="L83">    private int mealType = MEAL_UNKNOWN;</span>
+    private String foodName;
+
+    private NutritionSample(long startMillis, long endMillis) {
+<span class="fc" id="L87">        super(HealthDataType.NUTRITION, startMillis, endMillis);</span>
+<span class="fc" id="L88">    }</span>
+
+    /// A food or meal consumed over `[startMillis, endMillis]`.
+    public static NutritionSample create(long startMillis, long endMillis) {
+<span class="fc" id="L92">        return new NutritionSample(startMillis, endMillis);</span>
+    }
+
+    /// A food or meal logged at one moment. Nutrition is interval-only, so
+    /// this records a one-second span rather than a zero-width one.
+    public static NutritionSample create(long atMillis) {
+<span class="fc" id="L98">        return new NutritionSample(atMillis, atMillis + 1000);</span>
+    }
+
+    /// Sets a nutrient amount, expressed in that nutrient's own unit --
+    /// see [Nutrient#getUnit()].
+    public NutritionSample setNutrient(Nutrient nutrient, double amount) {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (nutrient == null) {</span>
+<span class="nc" id="L105">            return this;</span>
+        }
+<span class="fc" id="L107">        nutrients.put(nutrient.getId(),</span>
+<span class="fc" id="L108">                new HealthQuantity(amount, nutrient.getUnit()));</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+
+    /// Sets a nutrient amount in an explicit unit, converting into the
+    /// nutrient's own unit.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `unit` measures a different
+    ///   dimension than the nutrient -- protein in millilitres, say.
+    public NutritionSample setNutrient(Nutrient nutrient, double amount,
+            HealthUnit unit) {
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (nutrient == null) {</span>
+<span class="nc" id="L122">            return this;</span>
+        }
+<span class="fc" id="L124">        double converted =</span>
+<span class="fc" id="L125">                HealthUnit.convert(amount, unit, nutrient.getUnit());</span>
+<span class="fc" id="L126">        nutrients.put(nutrient.getId(),</span>
+<span class="fc" id="L127">                new HealthQuantity(converted, nutrient.getUnit()));</span>
+<span class="fc" id="L128">        return this;</span>
+    }
+
+    /// The amount of `nutrient`, or `null` when this entry does not record
+    /// it.
+    ///
+    /// Null rather than zero, for the same reason aggregate buckets return
+    /// null: &quot;this food's sodium was never measured&quot; and &quot;this food
+    /// contains no sodium&quot; are different claims, and only one of them is
+    /// safe to show someone managing their intake.
+    public HealthQuantity getNutrient(Nutrient nutrient) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        return nutrient == null ? null : nutrients.get(nutrient.getId());</span>
+    }
+
+    /// Whether `nutrient` is recorded on this entry.
+    public boolean hasNutrient(Nutrient nutrient) {
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">        return nutrient != null &amp;&amp; nutrients.containsKey(nutrient.getId());</span>
+    }
+
+    /// The nutrients actually recorded, in no particular order.
+    public List&lt;Nutrient&gt; getNutrients() {
+<span class="fc" id="L149">        List&lt;Nutrient&gt; out = new ArrayList&lt;Nutrient&gt;();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (String id : nutrients.keySet()) {</span>
+<span class="fc" id="L151">            Nutrient n = Nutrient.forId(id);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (n != null) {</span>
+<span class="fc" id="L153">                out.add(n);</span>
+            }
+<span class="fc" id="L155">        }</span>
+<span class="fc" id="L156">        return Collections.unmodifiableList(out);</span>
+    }
+
+    /// How many nutrients this entry records.
+    public int getNutrientCount() {
+<span class="fc" id="L161">        return nutrients.size();</span>
+    }
+
+    /// Which meal this belongs to, as a `MEAL_` constant.
+    public int getMealType() {
+<span class="fc" id="L166">        return mealType;</span>
+    }
+
+    /// Attributes this entry to a meal, using a `MEAL_` constant.
+    public NutritionSample setMealType(int mealType) {
+<span class="fc" id="L171">        this.mealType = mealType;</span>
+<span class="fc" id="L172">        return this;</span>
+    }
+
+    /// The food's name, or null.
+    public String getFoodName() {
+<span class="fc" id="L177">        return foodName;</span>
+    }
+
+    /// Names the food.
+    public NutritionSample setFoodName(String foodName) {
+<span class="fc" id="L182">        this.foodName = foodName;</span>
+<span class="fc" id="L183">        return this;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        return &quot;NutritionSample[&quot; + (foodName == null ? &quot;food&quot; : foodName)</span>
+<span class="nc" id="L189">                + &quot;, &quot; + nutrients.size() + &quot; nutrients]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

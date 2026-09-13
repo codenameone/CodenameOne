@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VpnProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vpn.profile</a> &gt; <span class="el_source">VpnProfile.java</span></div><h1>VpnProfile.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vpn.profile;
+
+import com.codename1.vpn.VpnProtocol;
+
+/// A VPN configuration: which server, which protocol, and how to prove who
+/// you are.
+///
+/// ```java
+/// VpnProfile p = new VpnProfile(&quot;vpn.example.com&quot;)
+///         .protocol(VpnProtocol.IKEV2)
+///         .remoteIdentifier(&quot;vpn.example.com&quot;)
+///         .localIdentifier(&quot;alice&quot;)
+///         .usernamePassword(&quot;alice&quot;, secret)
+///         .onDemand(true);
+/// ```
+///
+/// #### Credentials are handed over, not held
+///
+/// The username and password given here are passed to the platform, which
+/// stores them in its own keychain and does not hand them back. [#getPassword]
+/// therefore answers null for a profile that was loaded rather than built --
+/// a loaded profile describes the configuration, not the secret.
+public final class VpnProfile {
+    private final String serverAddress;
+<span class="fc" id="L47">    private VpnProtocol protocol = VpnProtocol.IKEV2;</span>
+    private String remoteIdentifier;
+    private String localIdentifier;
+    private String username;
+    private String password;
+    private String sharedSecret;
+    private boolean onDemand;
+    private String displayName;
+    private boolean passwordKnown;
+
+    /// Whether this description came back from [Vpn#load()], which never
+    /// carries the secrets.
+    private boolean secretsWithheld;
+
+    /// Creates a profile for a server.
+    ///
+    /// @param serverAddress the host name or address, never null or empty
+<span class="fc" id="L64">    public VpnProfile(String serverAddress) {</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (serverAddress == null || serverAddress.length() == 0) {</span>
+<span class="fc" id="L66">            throw new IllegalArgumentException(&quot;A VPN server address is required&quot;);</span>
+        }
+<span class="fc" id="L68">        this.serverAddress = serverAddress;</span>
+<span class="fc" id="L69">    }</span>
+
+    /// The tunnelling protocol. Defaults to [VpnProtocol#IKEV2].
+    public VpnProfile protocol(VpnProtocol value) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        this.protocol = value == null ? VpnProtocol.IKEV2 : value;</span>
+<span class="fc" id="L74">        return this;</span>
+    }
+
+    /// The server's identity, as it appears in its certificate. Defaults to
+    /// the server address.
+    public VpnProfile remoteIdentifier(String value) {
+<span class="fc" id="L80">        this.remoteIdentifier = value;</span>
+<span class="fc" id="L81">        return this;</span>
+    }
+
+    /// This client's identity.
+    public VpnProfile localIdentifier(String value) {
+<span class="fc" id="L86">        this.localIdentifier = value;</span>
+<span class="fc" id="L87">        return this;</span>
+    }
+
+    /// Authenticates with a username and password.
+    public VpnProfile usernamePassword(String user, String pass) {
+<span class="fc" id="L92">        this.username = user;</span>
+<span class="fc" id="L93">        this.password = pass;</span>
+        // An EMPTY password is not a password. Treated as known, it passed
+        // install()'s &quot;username but no password&quot; gate, and the iOS native
+        // then turned extended authentication on -- that branch keys off the
+        // username -- while its missing-secret check keys off the password
+        // length, so a profile with no usable credential was stored and
+        // acknowledged as a success. The failure only appeared later, as a
+        // connection that would not authenticate.
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        this.passwordKnown = pass != null &amp;&amp; pass.length() &gt; 0;</span>
+        // Supplying a credential is what makes a loaded description
+        // installable again; see markSecretsWithheld. Only a REAL credential
+        // does: clearing the marker for a null or empty one let a profile
+        // that came from load() -- which never carries its secrets -- be
+        // installed straight back with nothing behind it.
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (this.passwordKnown) {</span>
+<span class="fc" id="L108">            this.secretsWithheld = false;</span>
+        }
+<span class="fc" id="L110">        return this;</span>
+    }
+
+    /// Authenticates with a pre-shared key.
+    public VpnProfile sharedSecret(String value) {
+<span class="fc" id="L115">        this.sharedSecret = value;</span>
+        // The same rule as the password above, and it was missing here. A
+        // PSK profile from load() edited with sharedSecret(null) or (&quot;&quot;)
+        // cleared the marker and passed install(): iOS read the zero-length
+        // key as NEVPNIKEAuthenticationMethodNone, saved that configuration
+        // successfully, and retired the keychain generation holding the
+        // working secret -- so a VPN that had authenticated for months could
+        // not any more, with a successful acknowledgement to say all was
+        // well. The username/password gate in install() does not cover this,
+        // because a PSK profile has no username to notice.
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        if (value != null &amp;&amp; value.length() &gt; 0) {</span>
+<span class="fc" id="L126">            this.secretsWithheld = false;</span>
+        }
+<span class="fc" id="L128">        return this;</span>
+    }
+
+    // There is deliberately no certificate(byte[]) here, and deliberately no
+    // alwaysOn(boolean).
+    //
+    // Certificate authentication cannot be carried by a PKCS#12 blob alone:
+    // importing one needs its passphrase on both platforms -- iOS through
+    // kSecImportExportPassphrase, Android through KeyStore.load -- so a
+    // method taking only the bytes could never install the identity, and a
+    // profile built with it would save cleanly and then fail to authenticate
+    // with nothing to point at. Adding it means adding the passphrase to this
+    // class and identity import to both ports; until that happens, not having
+    // the method is the honest state.
+    //
+    // Always-on is not something an ordinary app can ask for. On iOS it needs
+    // a supervised device and an MDM payload, and on Android it is a Settings
+    // toggle or a device-owner API. The nearest thing either platform offers
+    // an app is [#onDemand], which iOS honours and Android does not -- and
+    // the Android bridge drops CAPABILITY_ON_DEMAND to say so.
+
+    /// Whether the system should bring the tunnel up when traffic needs it.
+    public VpnProfile onDemand(boolean value) {
+<span class="fc" id="L151">        this.onDemand = value;</span>
+<span class="fc" id="L152">        return this;</span>
+    }
+
+    /// The name the user sees for this configuration in system settings.
+    public VpnProfile displayName(String value) {
+<span class="fc" id="L157">        this.displayName = value;</span>
+<span class="fc" id="L158">        return this;</span>
+    }
+
+    /// The host name or address.
+    public String getServerAddress() {
+<span class="fc" id="L163">        return serverAddress;</span>
+    }
+
+    /// The tunnelling protocol.
+    public VpnProtocol getProtocol() {
+<span class="fc" id="L168">        return protocol;</span>
+    }
+
+    /// The server's identity, or null for the server address.
+    public String getRemoteIdentifier() {
+<span class="fc" id="L173">        return remoteIdentifier;</span>
+    }
+
+    /// This client's identity, or null.
+    public String getLocalIdentifier() {
+<span class="fc" id="L178">        return localIdentifier;</span>
+    }
+
+    /// The username, or null.
+    public String getUsername() {
+<span class="fc" id="L183">        return username;</span>
+    }
+
+    /// The password, or null -- always null for a loaded profile, because
+    /// the platform keeps the secret and does not return it.
+    public String getPassword() {
+<span class="fc" id="L189">        return password;</span>
+    }
+
+    /// The pre-shared key, or null.
+    public String getSharedSecret() {
+<span class="fc" id="L194">        return sharedSecret;</span>
+    }
+
+    /// Whether the tunnel comes up on demand.
+    public boolean isOnDemand() {
+<span class="fc" id="L199">        return onDemand;</span>
+    }
+
+    /// The name shown in system settings, or null.
+    public String getDisplayName() {
+<span class="fc" id="L204">        return displayName;</span>
+    }
+
+    /// Whether a secret was supplied when this profile was built.
+    ///
+    /// Distinguishes &quot;built without a password&quot; from &quot;loaded, and the
+    /// platform kept the password&quot;, which [#getPassword] alone cannot.
+    public boolean isPasswordKnown() {
+<span class="fc" id="L212">        return passwordKnown;</span>
+    }
+
+    /// Records that this description came from the platform and carries no
+    /// secrets.
+    ///
+    /// The load path never hands back a password or a pre-shared key -- the
+    /// platform holds them and does not give them out -- so a description
+    /// that came from there is not installable as it stands. Marking it lets
+    /// [Vpn#install] refuse the reinstall instead of quietly replacing a
+    /// working configuration with an unauthenticated one; supplying either
+    /// credential clears the mark.
+    ///
+    /// @hidden not part of the public API.
+    void markSecretsWithheld() {
+<span class="fc" id="L227">        this.secretsWithheld = true;</span>
+<span class="fc" id="L228">    }</span>
+
+    /// Whether this description came from the platform with its secrets
+    /// removed.
+    ///
+    /// @hidden not part of the public API.
+    boolean areSecretsWithheld() {
+<span class="fc" id="L235">        return secretsWithheld;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

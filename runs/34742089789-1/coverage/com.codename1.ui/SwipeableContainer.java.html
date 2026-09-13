@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwipeableContainer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">SwipeableContainer.java</span></div><h1>SwipeableContainer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.util.EventDispatcher;
+
+/// `SwipeableContainer` allows us to side swipe a component and expose underlying configuration
+/// within it. This is useful for editing, ranking of elements within a set of components e.g. in the
+/// sample code below we use a ranking widget and swiping to expose the elements:
+///
+/// ```java
+/// public void showForm() {
+///   Form hi = new Form(&quot;Swipe&quot;, new BoxLayout(BoxLayout.Y_AXIS));
+///   hi.add(createRankWidget(&quot;A Game of Thrones&quot;, &quot;1996&quot;)).
+///       add(createRankWidget(&quot;A Clash Of Kings&quot;, &quot;1998&quot;)).
+///       add(createRankWidget(&quot;A Storm Of Swords&quot;, &quot;2000&quot;)).
+///       add(createRankWidget(&quot;A Feast For Crows&quot;, &quot;2005&quot;)).
+///       add(createRankWidget(&quot;A Dance With Dragons&quot;, &quot;2011&quot;)).
+///       add(createRankWidget(&quot;The Winds of Winter&quot;, &quot;TBD&quot;)).
+///       add(createRankWidget(&quot;A Dream of Spring&quot;, &quot;TBD&quot;));
+///   hi.show();
+/// }
+///
+/// public SwipeableContainer createRankWidget(String title, String year) {
+///     MultiButton button = new MultiButton(title);
+///     button.setTextLine2(year);
+///     return new SwipeableContainer(FlowLayout.encloseCenterMiddle(createStarRankSlider()),
+///             button);
+/// }
+///
+/// private void initStarRankStyle(Style s, Image star) {
+///     s.setBackgroundType(Style.BACKGROUND_IMAGE_TILE_BOTH);
+///     s.setBorder(Border.createEmpty());
+///     s.setBgImage(star);
+///     s.setBgTransparency(0);
+/// }
+///
+/// private Slider createStarRankSlider() {
+///     Slider starRank = new Slider();
+///     starRank.setEditable(true);
+///     starRank.setMinValue(0);
+///     starRank.setMaxValue(10);
+///     Font fnt = Font.createTrueTypeFont(&quot;native:MainLight&quot;, &quot;native:MainLight&quot;).
+///             derive(Display.getInstance().convertToPixels(5, true), Font.STYLE_PLAIN);
+///     Style s = new Style(0xffff33, 0, fnt, (byte)0);
+///     Image fullStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     s.setOpacity(100);
+///     s.setFgColor(0);
+///     Image emptyStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, s).toImage();
+///     initStarRankStyle(starRank.getSliderEmptySelectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderEmptyUnselectedStyle(), emptyStar);
+///     initStarRankStyle(starRank.getSliderFullSelectedStyle(), fullStar);
+///     initStarRankStyle(starRank.getSliderFullUnselectedStyle(), fullStar);
+///     starRank.setPreferredSize(new Dimension(fullStar.getWidth() * 5, fullStar.getHeight()));
+///     return starRank;
+/// }
+/// ```
+///
+/// @author Chen
+public class SwipeableContainer extends Container {
+
+<span class="fc" id="L87">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+    private final Container bottomLeftWrapper;
+    private final Container bottomRightWrapper;
+    private final Container topWrapper;
+    private final SwipeListener press;
+    private final SwipeListener drag;
+    private final SwipeListener release;
+<span class="fc" id="L94">    private boolean open = false;</span>
+<span class="fc" id="L95">    private boolean openedToRight = false;</span>
+<span class="fc" id="L96">    private boolean openedToLeft = false;</span>
+    private Motion openCloseMotion;
+<span class="fc" id="L98">    private boolean swipeActivated = true;</span>
+<span class="fc" id="L99">    private int initialX = -1;</span>
+<span class="fc" id="L100">    private int initialY = -1;</span>
+<span class="fc" id="L101">    private int topX = -1;</span>
+    private boolean waitForRelease;
+    private SwipeableContainer previouslyOpened;
+
+    /// Simple Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `bottomLeft`: @param bottomLeft the Component below the top, this Component is exposed
+    /// when dragging the top to the right
+    ///
+    /// - `top`: the component on top.
+    public SwipeableContainer(Component bottomLeft, Component top) {
+<span class="fc" id="L114">        this(bottomLeft, null, top);</span>
+<span class="fc" id="L115">    }</span>
+
+    /// Simple Constructor
+    ///
+    /// #### Parameters
+    ///
+    /// - `bottomLeft`: @param bottomLeft  the Component below the top, this Component is exposed
+    /// when dragging the top to the right
+    ///
+    /// - `bottomRight`: @param bottomRight the Component below the top, this Component is exposed
+    /// when dragging the top to the Left
+    ///
+    /// - `top`: the component on top.
+<span class="fc" id="L128">    public SwipeableContainer(Component bottomLeft, Component bottomRight, Component top) {</span>
+<span class="fc" id="L129">        setLayout(new LayeredLayout());</span>
+<span class="fc" id="L130">        bottomLeftWrapper = new Container(new BorderLayout());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (bottomLeft != null) {</span>
+<span class="fc" id="L132">            bottomLeftWrapper.addComponent(BorderLayout.WEST, bottomLeft);</span>
+<span class="fc" id="L133">            bottomLeftWrapper.setVisible(false);</span>
+        }
+
+<span class="fc" id="L136">        bottomRightWrapper = new Container(new BorderLayout());</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (bottomRight != null) {</span>
+<span class="fc" id="L138">            bottomRightWrapper.addComponent(BorderLayout.EAST, bottomRight);</span>
+<span class="fc" id="L139">            bottomRightWrapper.setVisible(false);</span>
+        }
+
+<span class="fc" id="L142">        topWrapper = new Container(new BorderLayout());</span>
+<span class="fc" id="L143">        topWrapper.addComponent(BorderLayout.CENTER, top);</span>
+<span class="fc" id="L144">        addComponent(bottomRightWrapper);</span>
+<span class="fc" id="L145">        addComponent(bottomLeftWrapper);</span>
+<span class="fc" id="L146">        addComponent(topWrapper);</span>
+
+<span class="fc" id="L148">        press = new SwipeListener(SwipeListener.PRESS);</span>
+<span class="fc" id="L149">        drag = new SwipeListener(SwipeListener.DRAG);</span>
+<span class="fc" id="L150">        release = new SwipeListener(SwipeListener.RELEASE);</span>
+<span class="fc" id="L151">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L156">        waitForRelease = false;</span>
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so a swipeable there never released its listeners -- and
+        // never installed them in the first place, in initComponent below.
+<span class="fc" id="L160">        TopLevelContainer top = this.getTopLevelContainer();</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (top != null) {</span>
+<span class="fc" id="L162">            Container c = top.asContainer();</span>
+<span class="fc" id="L163">            c.removePointerPressedListener(press);</span>
+<span class="fc" id="L164">            c.removePointerReleasedListener(release);</span>
+<span class="fc" id="L165">            c.removePointerDraggedListener(drag);</span>
+        }
+<span class="fc" id="L167">        super.deinitialize();</span>
+<span class="fc" id="L168">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L173">        super.initComponent();</span>
+<span class="fc" id="L174">        TopLevelContainer top = this.getTopLevelContainer();</span>
+<span class="pc bpc" id="L175" title="2 of 4 branches missed.">        if (top != null &amp;&amp; swipeActivated) {</span>
+<span class="fc" id="L176">            Container c = top.asContainer();</span>
+<span class="fc" id="L177">            c.addPointerPressedListener(press);</span>
+<span class="fc" id="L178">            c.addPointerReleasedListener(release);</span>
+<span class="fc" id="L179">            c.addPointerDraggedListener(drag);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    /// This method will open the top Component to the right if there is a Component
+    /// to expose on the left.
+    public void openToRight() {
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">        if (open || openedToRight) {</span>
+<span class="fc" id="L187">            return;</span>
+        }
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (bottomLeftWrapper.getComponentCount() == 0) {</span>
+<span class="fc" id="L190">            return;</span>
+        }
+<span class="fc" id="L192">        Component bottom = bottomLeftWrapper.getComponentAt(0);</span>
+
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (bottomRightWrapper.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L195">            bottomRightWrapper.setVisible(false);</span>
+        }
+<span class="fc" id="L197">        bottomLeftWrapper.setVisible(true);</span>
+
+<span class="fc" id="L199">        int topX = topWrapper.getX();</span>
+<span class="fc" id="L200">        openCloseMotion = Motion.createSplineMotion(topX, bottom.getWidth(), 300);</span>
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+<span class="fc" id="L204">        TopLevelContainer topLevel = getTopLevelContainer();</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (topLevel != null) {</span>
+<span class="fc" id="L206">            topLevel.registerAnimated(this);</span>
+        }
+<span class="fc" id="L208">        openCloseMotion.start();</span>
+<span class="fc" id="L209">        openedToRight = true;</span>
+<span class="fc" id="L210">        open = true;</span>
+<span class="fc" id="L211">    }</span>
+
+    /// This method will open the top Component to the left if there is a Component
+    /// to expose on the right.
+    public void openToLeft() {
+<span class="pc bpc" id="L216" title="1 of 4 branches missed.">        if (open || openedToLeft) {</span>
+<span class="fc" id="L217">            return;</span>
+        }
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (bottomRightWrapper.getComponentCount() == 0) {</span>
+<span class="fc" id="L220">            return;</span>
+        }
+<span class="fc" id="L222">        Component bottom = bottomRightWrapper.getComponentAt(0);</span>
+
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (bottomLeftWrapper.getComponentCount() &gt; 0) {</span>
+<span class="nc" id="L225">            bottomLeftWrapper.setVisible(false);</span>
+        }
+<span class="fc" id="L227">        bottomRightWrapper.setVisible(true);</span>
+
+<span class="fc" id="L229">        int topX = topWrapper.getX();</span>
+<span class="fc" id="L230">        openCloseMotion = Motion.createSplineMotion(-topX, bottom.getWidth(), 300);</span>
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+<span class="fc" id="L234">        TopLevelContainer topLevel = getTopLevelContainer();</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (topLevel != null) {</span>
+<span class="fc" id="L236">            topLevel.registerAnimated(this);</span>
+        }
+<span class="fc" id="L238">        openCloseMotion.start();</span>
+<span class="fc" id="L239">        openedToLeft = true;</span>
+<span class="fc" id="L240">        open = true;</span>
+<span class="fc" id="L241">    }</span>
+
+    /// Close the top component if it is currently opened.
+    public void close() {
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (!open) {</span>
+<span class="fc" id="L246">            return;</span>
+        }
+<span class="fc" id="L248">        TopLevelContainer f = getTopLevelContainer();</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            if (openedToRight) {</span>
+<span class="fc" id="L251">                int topX = topWrapper.getX();</span>
+<span class="fc" id="L252">                openCloseMotion = Motion.createSplineMotion(topX, 0, 300);</span>
+<span class="fc" id="L253">            } else {</span>
+<span class="fc" id="L254">                int topX = topWrapper.getX();</span>
+<span class="fc" id="L255">                openCloseMotion = Motion.createSplineMotion(-topX, 0, 300);</span>
+            }
+<span class="fc" id="L257">            f.registerAnimated(this);</span>
+<span class="fc" id="L258">            openCloseMotion.start();</span>
+        }
+<span class="fc" id="L260">        open = false;</span>
+<span class="fc" id="L261">    }</span>
+
+    @Override
+    public Component getComponentAt(int x, int y) {
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (!open) {</span>
+<span class="fc" id="L266">            return topWrapper.getComponentAt(x, y);</span>
+        } else {
+<span class="nc" id="L268">            return super.getComponentAt(x, y);</span>
+        }
+    }
+
+    @Override
+    public boolean animate() {
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (openCloseMotion != null) {</span>
+<span class="fc" id="L275">            int val = openCloseMotion.getValue();</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (openedToRight) {</span>
+<span class="fc" id="L277">                topWrapper.setX(val);</span>
+            } else {
+<span class="fc" id="L279">                topWrapper.setX(-val);</span>
+            }
+
+<span class="fc" id="L282">            repaint();</span>
+<span class="fc" id="L283">            boolean finished = openCloseMotion.isFinished();</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            if (finished) {</span>
+                //getComponentForm().deregisterAnimated(this);
+<span class="fc" id="L286">                openCloseMotion = null;</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                if (!open) {</span>
+<span class="fc" id="L288">                    bottomRightWrapper.setVisible(false);</span>
+<span class="fc" id="L289">                    bottomLeftWrapper.setVisible(false);</span>
+<span class="fc" id="L290">                    openedToLeft = false;</span>
+<span class="fc" id="L291">                    openedToRight = false;</span>
+                } else {
+<span class="nc" id="L293">                    dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Swipe));</span>
+                }
+            }
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            return !finished;</span>
+        }
+<span class="fc" id="L298">        return false;</span>
+    }
+
+    /// Returns true if swipe is activated
+    public boolean isSwipeActivated() {
+<span class="fc" id="L303">        return swipeActivated;</span>
+    }
+
+    /// disable/enable dragging of the top Component
+    public void setSwipeActivated(boolean swipeActivated) {
+<span class="fc" id="L308">        this.swipeActivated = swipeActivated;</span>
+<span class="fc" id="L309">    }</span>
+
+    /// Returns true if the top Component is currently opened
+    public boolean isOpen() {
+<span class="pc bpc" id="L313" title="1 of 6 branches missed.">        return open &amp;&amp; (openedToRight || openedToLeft);</span>
+    }
+
+    /// Returns true if the top Component is opened to the right side
+    public boolean isOpenedToRight() {
+<span class="fc" id="L318">        return openedToRight;</span>
+    }
+
+    /// Returns true if the top Component is opened to the left side
+    public boolean isOpenedToLeft() {
+<span class="fc" id="L323">        return openedToLeft;</span>
+    }
+
+    @Override
+    void doLayout() {
+<span class="fc" id="L328">        int x = topWrapper.getX();</span>
+<span class="fc" id="L329">        super.doLayout();</span>
+<span class="fc" id="L330">        topWrapper.setX(x);</span>
+<span class="fc" id="L331">    }</span>
+
+
+    /// Adds a listener to the SwipeableContainer which will cause an event to
+    /// dispatch once the SwipeableContainer is fully opened
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
+    public void addSwipeOpenListener(ActionListener l) {
+<span class="nc" id="L341">        dispatcher.addListener(l);</span>
+<span class="nc" id="L342">    }</span>
+
+    /// Removes the given listener from the SwipeableContainer
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
+    public void removeSwipeOpenListener(ActionListener l) {
+<span class="nc" id="L350">        dispatcher.removeListener(l);</span>
+<span class="nc" id="L351">    }</span>
+
+    /// returns a previously opened SwipeableContainer that should be
+    /// automatically closed when starting to open this one. Called as soon as
+    /// this Swipeable starts opening. One approach is to override this method to
+    /// return a previously opened SwipeableContainer Can be overridden to return
+    /// a SwipeableContainer stored outside this container.
+    ///
+    /// #### Returns
+    ///
+    /// @return an already open SwipeableContainer that will be closed when
+    /// opening this one, or null if none
+    public SwipeableContainer getPreviouslyOpened() {
+<span class="fc" id="L364">        return previouslyOpened;</span>
+    }
+
+    /// set a previously open SwipeableContainer, it will be closed as soon as
+    /// the user starts swiping this one. Be aware that with a long list of
+    /// Swipeable containers it may be a better approach to store the previously
+    /// opened outside the list and simply override getPreviouslyOpened to return
+    /// it
+    ///
+    /// #### Parameters
+    ///
+    /// - `previouslyOpened`: @param previouslyOpened an already open SwipeableContainer that will be
+    /// closed if this one is opened
+    public void setPreviouslyOpened(SwipeableContainer previouslyOpened) {
+<span class="fc" id="L378">        this.previouslyOpened = previouslyOpened;</span>
+<span class="fc" id="L379">    }</span>
+
+    class SwipeListener implements ActionListener {
+
+        private final static int PRESS = 0;
+        private final static int DRAG = 1;
+        private final static int RELEASE = 2;
+        private final int type;
+
+<span class="fc" id="L388">        public SwipeListener(int type) {</span>
+<span class="fc" id="L389">            this.type = type;</span>
+<span class="fc" id="L390">        }</span>
+
+        private void dragInitiatedRecursive(Container cnt) {
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            for (Component c : cnt) {</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">                if (c instanceof Container) {</span>
+<span class="nc" id="L395">                    dragInitiatedRecursive((Container) c);</span>
+                }
+<span class="nc" id="L397">                c.dragInitiated();</span>
+<span class="nc" id="L398">            }</span>
+<span class="nc" id="L399">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L403" title="3 of 6 branches missed.">            if (getComponentCount() == 0 || !swipeActivated || animate()) {</span>
+<span class="nc" id="L404">                return;</span>
+            }
+<span class="fc" id="L406">            final int x = evt.getX();</span>
+<span class="fc" id="L407">            final int y = evt.getY();</span>
+<span class="fc" id="L408">            TopLevelContainer f = getTopLevelContainer();</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            if (f == null) {</span>
+<span class="nc" id="L410">                return;</span>
+            }
+<span class="fc" id="L412">            Component cmp = f.asContainer().getComponentAt(x, y);</span>
+<span class="fc bfc" id="L413" title="All 4 branches covered.">            if (!waitForRelease &amp;&amp; !contains(cmp)) {</span>
+<span class="fc" id="L414">                return;</span>
+            }
+<span class="pc bpc" id="L416" title="1 of 4 branches missed.">            if (!waitForRelease &amp;&amp; !topWrapper.contains(x, y)) {</span>
+<span class="nc" id="L417">                return;</span>
+            }
+            Component bottomL;
+<span class="fc" id="L420">            int bottomLeftW = 0;</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (bottomLeftWrapper.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L422">                bottomL = bottomLeftWrapper.getComponentAt(0);</span>
+<span class="fc" id="L423">                bottomLeftW = bottomL.getWidth();</span>
+            }
+
+            Component bottomR;
+<span class="fc" id="L427">            int bottomRightW = 0;</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            if (bottomRightWrapper.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L429">                bottomR = bottomRightWrapper.getComponentAt(0);</span>
+<span class="fc" id="L430">                bottomRightW = bottomR.getWidth();</span>
+            }
+
+<span class="pc bpc" id="L433" title="1 of 4 branches missed.">            switch (type) {</span>
+                case PRESS: {
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">                    if (!topWrapper.contains(x, y)) {</span>
+<span class="nc" id="L436">                        return;</span>
+                    }
+<span class="fc" id="L438">                    topX = topWrapper.getX();</span>
+<span class="fc" id="L439">                    initialX = x;</span>
+<span class="fc" id="L440">                    initialY = y;</span>
+<span class="fc" id="L441">                    waitForRelease = true;</span>
+<span class="fc" id="L442">                    break;</span>
+                }
+                case DRAG: {
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">                    if (!waitForRelease) {</span>
+<span class="fc" id="L446">                        return;</span>
+                    }
+<span class="nc bnc" id="L448" title="All 2 branches missed.">                    if (Math.abs(y - initialY) &gt; Math.abs(x - initialX)) {</span>
+<span class="nc" id="L449">                        return;</span>
+                    }
+<span class="nc bnc" id="L451" title="All 2 branches missed.">                    if (!topWrapper.contains(x, y)) {</span>
+<span class="nc" id="L452">                        return;</span>
+                    }
+<span class="nc" id="L454">                    Component top = topWrapper.getComponentAt(0);</span>
+<span class="nc" id="L455">                    top.dragInitiated();</span>
+<span class="nc bnc" id="L456" title="All 4 branches missed.">                    if (top instanceof Container &amp;&amp; top.getLeadComponent() == null) {</span>
+<span class="nc" id="L457">                        dragInitiatedRecursive((Container) top);</span>
+                    }
+
+<span class="nc bnc" id="L460" title="All 2 branches missed.">                    if (initialX != -1) {</span>
+<span class="nc bnc" id="L461" title="All 6 branches missed.">                        if (getPreviouslyOpened() != null &amp;&amp; getPreviouslyOpened() != SwipeableContainer.this &amp;&amp; getPreviouslyOpened().isOpen()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L462">                            getPreviouslyOpened().close();</span>
+                        }
+<span class="nc" id="L464">                        int diff = x - initialX;</span>
+<span class="nc" id="L465">                        int val = 0;</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                        if (!isOpen()) {</span>
+<span class="nc" id="L467">                            val = Math.min(diff, bottomLeftW);</span>
+<span class="nc" id="L468">                            val = Math.max(val, -bottomRightW);</span>
+                        }
+<span class="nc bnc" id="L470" title="All 2 branches missed.">                        if (openedToRight) {</span>
+<span class="nc" id="L471">                            val = Math.min(diff, 0);</span>
+<span class="nc" id="L472">                            val = Math.max(val, -bottomLeftW + 1);</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                        } else if (openedToLeft) {</span>
+<span class="nc" id="L474">                            val = Math.max(diff, 0);</span>
+<span class="nc" id="L475">                            val = Math.min(val, bottomRightW - 1);</span>
+                        }
+
+<span class="nc" id="L478">                        topWrapper.setX(topX + val);</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">                        if (topWrapper.getX() &gt; 0) {</span>
+<span class="nc" id="L480">                            bottomRightWrapper.setVisible(false);</span>
+<span class="nc" id="L481">                            bottomLeftWrapper.setVisible(true);</span>
+                        } else {
+<span class="nc" id="L483">                            bottomRightWrapper.setVisible(true);</span>
+<span class="nc" id="L484">                            bottomLeftWrapper.setVisible(false);</span>
+                        }
+<span class="nc" id="L486">                        repaint();</span>
+<span class="nc" id="L487">                    }</span>
+                    break;
+                }
+                case RELEASE: {
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">                    if (waitForRelease) {</span>
+<span class="fc" id="L492">                        initialX = -1;</span>
+                        //if (!isOpen()) {
+<span class="fc" id="L494">                        int topX = topWrapper.getX();</span>
+                        //it's opened to the right
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                        if (topX &gt; 0) {</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">                            if (Display.getInstance().getDragSpeed(false) &lt; 0) {</span>
+<span class="nc" id="L498">                                open = false;</span>
+<span class="nc" id="L499">                                openedToRight = false;</span>
+<span class="nc" id="L500">                                openToRight();</span>
+                            } else {
+<span class="nc" id="L502">                                open = true;</span>
+<span class="nc" id="L503">                                close();</span>
+                            }
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">                        } else if (topX &lt; 0) { //check explicitly if opened to the left</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">                            if (Display.getInstance().getDragSpeed(false) &gt; 0) {</span>
+<span class="nc" id="L507">                                open = false;</span>
+<span class="nc" id="L508">                                openedToLeft = false;</span>
+<span class="nc" id="L509">                                openToLeft();</span>
+                            } else {
+<span class="nc" id="L511">                                open = true;</span>
+<span class="nc" id="L512">                                close();</span>
+                            }
+
+                        }
+                        //}
+<span class="fc" id="L517">                        waitForRelease = false;</span>
+<span class="fc" id="L518">                    }</span>
+                    break;
+                }
+                default:
+                    break;
+            }
+<span class="fc" id="L524">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

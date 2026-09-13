@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BloodPressureMeasurement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">BloodPressureMeasurement.java</span></div><h1>BloodPressureMeasurement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+/// A decoded Blood Pressure Measurement, characteristic `0x2A35`, or the
+/// Intermediate Cuff Pressure, `0x2A36`, which shares the same layout.
+///
+/// #### Wire format
+///
+/// Byte 0 is a flags field:
+///
+/// | Bit | Meaning |
+/// |-----|---------|
+/// | 0 | units: 0 = mmHg, 1 = kPa |
+/// | 1 | timestamp present |
+/// | 2 | pulse rate present |
+/// | 3 | user id present |
+/// | 4 | measurement status present |
+///
+/// It is followed by three 16-bit IEEE-11073 SFLOAT values -- systolic,
+/// diastolic and mean arterial pressure -- then the optional fields.
+///
+/// #### Two traps
+///
+/// **This characteristic is indicated, not notified.** Its client
+/// configuration descriptor takes `0x0002`. The Bluetooth layer handles
+/// that automatically, but a hand-rolled GATT client that writes `0x0001`
+/// will subscribe successfully and then never receive anything.
+///
+/// **A cuff that fails to get a reading sends a reserved SFLOAT.** Those
+/// decode to `Double.NaN` here, and [#parse(byte[])] returns `null` when
+/// the systolic or diastolic value is one, so a failed measurement can
+/// never reach your UI as 2047 mmHg.
+public final class BloodPressureMeasurement {
+
+    private static final int FLAG_KPA = 0x01;
+    private static final int FLAG_TIMESTAMP = 0x02;
+    private static final int FLAG_PULSE = 0x04;
+    private static final int FLAG_USER_ID = 0x08;
+    private static final int FLAG_STATUS = 0x10;
+
+    /// kPa to mmHg.
+    private static final double KPA_TO_MMHG = 7.50061683;
+
+    private final double systolicMmHg;
+    private final double diastolicMmHg;
+    private final double meanArterialMmHg;
+    private final double pulseBpm;
+    private final int userId;
+    private final long timestampMillis;
+
+    private BloodPressureMeasurement(double systolicMmHg,
+            double diastolicMmHg, double meanArterialMmHg, double pulseBpm,
+<span class="fc" id="L74">            int userId, long timestampMillis) {</span>
+<span class="fc" id="L75">        this.systolicMmHg = systolicMmHg;</span>
+<span class="fc" id="L76">        this.diastolicMmHg = diastolicMmHg;</span>
+<span class="fc" id="L77">        this.meanArterialMmHg = meanArterialMmHg;</span>
+<span class="fc" id="L78">        this.pulseBpm = pulseBpm;</span>
+<span class="fc" id="L79">        this.userId = userId;</span>
+<span class="fc" id="L80">        this.timestampMillis = timestampMillis;</span>
+<span class="fc" id="L81">    }</span>
+
+    /// Decodes a `0x2A35` or `0x2A36` value.
+    ///
+    /// Returns `null` for a malformed or truncated payload, and also when
+    /// the device signalled a failed measurement through a reserved
+    /// SFLOAT. Never throws.
+    public static BloodPressureMeasurement parse(byte[] value) {
+<span class="fc bfc" id="L89" title="All 4 branches covered.">        if (value == null || value.length &lt; 7) {</span>
+<span class="fc" id="L90">            return null;</span>
+        }
+<span class="fc" id="L92">        GattReader r = new GattReader(value);</span>
+<span class="fc" id="L93">        int flags = r.uint8();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        boolean kpa = (flags &amp; FLAG_KPA) != 0;</span>
+
+<span class="fc" id="L96">        double systolic = convert(Ieee11073.sfloat(r.uint16()), kpa);</span>
+<span class="fc" id="L97">        double diastolic = convert(Ieee11073.sfloat(r.uint16()), kpa);</span>
+<span class="fc" id="L98">        double mean = convert(Ieee11073.sfloat(r.uint16()), kpa);</span>
+
+<span class="fc" id="L100">        long timestamp = -1;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_TIMESTAMP) != 0) {</span>
+<span class="nc" id="L102">            timestamp = GattDateTime.read(r);</span>
+        }
+<span class="fc" id="L104">        double pulse = Double.NaN;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_PULSE) != 0) {</span>
+<span class="nc" id="L106">            pulse = Ieee11073.sfloat(r.uint16());</span>
+        }
+<span class="fc" id="L108">        int user = -1;</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_USER_ID) != 0) {</span>
+<span class="nc" id="L110">            user = r.uint8();</span>
+        }
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_STATUS) != 0) {</span>
+<span class="nc" id="L113">            r.skip(2);</span>
+        }
+
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (!r.isValid()) {</span>
+<span class="nc" id="L117">            return null;</span>
+        }
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">        if (Double.isNaN(systolic) || Double.isNaN(diastolic)) {</span>
+            // The cuff reported that it could not obtain a reading.
+<span class="fc" id="L121">            return null;</span>
+        }
+<span class="fc" id="L123">        return new BloodPressureMeasurement(systolic, diastolic, mean, pulse,</span>
+                user, timestamp);
+    }
+
+    private static double convert(double v, boolean kpa) {
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        return kpa ? v * KPA_TO_MMHG : v;</span>
+    }
+
+    /// Systolic pressure in mmHg, converted from kPa when the device
+    /// reported those.
+    public double getSystolicMmHg() {
+<span class="fc" id="L134">        return systolicMmHg;</span>
+    }
+
+    /// Diastolic pressure in mmHg.
+    public double getDiastolicMmHg() {
+<span class="fc" id="L139">        return diastolicMmHg;</span>
+    }
+
+    /// Mean arterial pressure in mmHg, or `Double.NaN` when the device did
+    /// not compute one.
+    public double getMeanArterialMmHg() {
+<span class="fc" id="L145">        return meanArterialMmHg;</span>
+    }
+
+    /// Pulse in beats per minute, or `Double.NaN` when absent.
+    public double getPulseBpm() {
+<span class="nc" id="L150">        return pulseBpm;</span>
+    }
+
+    /// `true` when this reading carried a pulse.
+    public boolean hasPulse() {
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        return !Double.isNaN(pulseBpm);</span>
+    }
+
+    /// The device's user-profile index, or `-1` when absent. Cuffs shared
+    /// by a household use it to attribute a reading.
+    public int getUserId() {
+<span class="nc" id="L161">        return userId;</span>
+    }
+
+    /// The device's own timestamp for this reading in epoch millis, or
+    /// `-1` when absent.
+    ///
+    /// Worth preferring over the time of receipt: cuffs store readings and
+    /// upload them in a burst when they next connect, so several
+    /// measurements taken hours apart can arrive within a second.
+    public long getTimestampMillis() {
+<span class="nc" id="L171">        return timestampMillis;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L176">        return &quot;BloodPressureMeasurement[&quot; + (int) systolicMmHg + &quot;/&quot;</span>
+                + (int) diastolicMmHg + &quot; mmHg]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TabSelectionMorph.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TabSelectionMorph.java</span></div><h1>TabSelectionMorph.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+/// Pure, testable model of the iOS-26 &quot;Liquid Glass&quot; tab selection morph.
+///
+/// Given the animation time `t` (0..1), the source and target cell bounds, the
+/// resolved bar geometry and the theme tokens, {@link #compute} returns a plain data
+/// object describing the frame: the grey selection-pill rect, the glass lens (drop) rect
+/// plus its lens parameters (magnify / aberration / tint), the travel envelope, and the
+/// optional whole-bar grow rect.
+///
+/// It has no dependency on {@link Graphics}, the component tree or the theme, so it can
+/// be unit-tested at fixed progress values and reused by the fidelity animation-frame
+/// probes. `Tabs.paintSelectionCapsule` is the single production caller; it resolves
+/// the tokens + geometry from the theme/component and then paints from the returned model.
+final class TabSelectionMorph {
+
+    /// The morph's tuning tokens. Themes do not set these individually: a NAMED
+    /// PRESET ({@link #preset}) supplies the full envelope set, and the theme
+    /// exposes only high-level controls -- the preset name (tabsMorphPreset),
+    /// the lens intensity (tabsMorphLensIntensityPct, {@link #scaleLensIntensity})
+    /// and the springiness (tabsMorphSpringPct, {@link #spring}) -- so the
+    /// motion stays coherent instead of being tuned one constant at a time.
+<span class="fc" id="L45">    static final class Tokens {</span>
+        float stretch;        // horizontal elongation while moving (fraction)
+        float squashW;        // width compression at the stop (fraction)
+        float grow;           // vertical grow mid-flight (fraction)
+        float squashH;        // extra height at the stop (fraction)
+        float liftMm;         // upward content lift in mm (the caller converts to px)
+        int liftPx;           // upward content lift in px
+        int bubbleWidthPct;   // drop width vs. cell (percent)
+        int overflowPct;      // vertical bulge past the bar (percent)
+        float downBiasMm;     // downward bias in mm (the caller converts to px)
+        int downBiasPx;       // downward bias in px
+        float restMag;        // settled lens magnification (1.0 = none)
+        float peakMag;        // mid-flight lens magnification
+        float peakAb;         // mid-flight chromatic aberration (fraction)
+        float tintStrength;   // lens accent-tint strength 0..1
+        int barGrowPct;       // whole-bar grow pulse percent (0 = off)
+<span class="fc" id="L61">        float spring = 1f;    // settle-overshoot scale (1 = preset amount, 0 = none)</span>
+
+        /// The named motion presets. &quot;ios26&quot; (the default, and any unknown name)
+        /// is the measured iOS 26 Liquid Glass morph; &quot;subtle&quot; halves the
+        /// deformation and optics for a calmer selection change.
+        static Tokens preset(String name) {
+<span class="fc" id="L67">            Tokens tk = new Tokens();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (&quot;subtle&quot;.equals(name)) {</span>
+<span class="fc" id="L69">                tk.stretch = 0.16f;</span>
+<span class="fc" id="L70">                tk.squashW = 0.08f;</span>
+<span class="fc" id="L71">                tk.grow = 0.07f;</span>
+<span class="fc" id="L72">                tk.squashH = 0.09f;</span>
+<span class="fc" id="L73">                tk.liftMm = 0.25f;</span>
+<span class="fc" id="L74">                tk.bubbleWidthPct = 96;</span>
+<span class="fc" id="L75">                tk.overflowPct = 12;</span>
+<span class="fc" id="L76">                tk.downBiasMm = 0.15f;</span>
+<span class="fc" id="L77">                tk.restMag = 1.04f;</span>
+<span class="fc" id="L78">                tk.peakMag = 1.09f;</span>
+<span class="fc" id="L79">                tk.peakAb = 0.01f;</span>
+<span class="fc" id="L80">                tk.tintStrength = 1f;</span>
+<span class="fc" id="L81">                tk.barGrowPct = 0;</span>
+<span class="fc" id="L82">                return tk;</span>
+            }
+            // &quot;ios26&quot; -- the shipped iOS Modern tuning.
+<span class="fc" id="L85">            tk.stretch = 0.32f;</span>
+<span class="fc" id="L86">            tk.squashW = 0.16f;</span>
+<span class="fc" id="L87">            tk.grow = 0.14f;</span>
+<span class="fc" id="L88">            tk.squashH = 0.18f;</span>
+<span class="fc" id="L89">            tk.liftMm = 0.5f;</span>
+            // Wider than the cell: the native iOS 26 selected pill overlaps its
+            // neighbour cells (276px over a 253px cell on the @3x reference bar).
+<span class="fc" id="L92">            tk.bubbleWidthPct = 109;</span>
+<span class="fc" id="L93">            tk.overflowPct = 18;</span>
+<span class="fc" id="L94">            tk.downBiasMm = 0.3f;</span>
+<span class="fc" id="L95">            tk.restMag = 1.08f;</span>
+<span class="fc" id="L96">            tk.peakMag = 1.18f;</span>
+<span class="fc" id="L97">            tk.peakAb = 0.02f;</span>
+<span class="fc" id="L98">            tk.tintStrength = 1f;</span>
+<span class="fc" id="L99">            tk.barGrowPct = 0;</span>
+<span class="fc" id="L100">            return tk;</span>
+        }
+
+        /// Scales the lens OPTICS (magnification delta, aberration, tint)
+        /// around the preset values: 1 = as authored, 0 = an optically flat
+        /// drop, 2 = twice the optical strength. Geometry is unaffected.
+        void scaleLensIntensity(float intensity) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            float i = intensity &lt; 0 ? 0 : intensity;</span>
+<span class="fc" id="L108">            restMag = 1f + (restMag - 1f) * i;</span>
+<span class="fc" id="L109">            peakMag = 1f + (peakMag - 1f) * i;</span>
+<span class="fc" id="L110">            peakAb = peakAb * i;</span>
+<span class="fc" id="L111">            float t = tintStrength * i;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            tintStrength = t &gt; 1f ? 1f : t;</span>
+<span class="fc" id="L113">        }</span>
+    }
+
+    // ---- outputs (all in the same coordinate space as the input geometry) ----
+    // grey selection pill (bar height)
+    int capX;
+    int capY;
+    int capW;
+    int capH;
+    // glass drop lens rect + optics
+    int lensX;
+    int lensY;
+    int lensW;
+    int lensH;
+    float magnify;
+    float aberration;
+    float tintStrength;
+    float flight;         // 0 settled .. ~1 travelling (drives the pill alpha fade)
+    boolean barGrow;      // whether the whole-bar grow pass is active this frame
+    int barGrowX;
+    int barGrowY;
+    int barGrowW;
+    int barGrowH;
+    float barGrowMag;
+
+    private TabSelectionMorph() {
+    }
+
+    /// smoothstep(a,b,x): 0 below a, 1 above b, smooth between; a may be &gt; b.
+    static float smooth(float a, float b, float x) {
+<span class="fc" id="L143">        float t = (x - a) / (b - a);</span>
+<span class="fc bfc" id="L144" title="All 4 branches covered.">        t = t &lt; 0 ? 0 : (t &gt; 1 ? 1 : t);</span>
+<span class="fc" id="L145">        return t * t * (3 - 2 * t);</span>
+    }
+
+    /// Position easing: an even ease-in-out travel reaching the target ~t=0.78, then a
+    /// small damped overshoot that settles by t=1 (the &quot;stop&quot; bounce). The
+    /// springiness scales the overshoot amplitude: 1 = the preset 0.09, 0 = no
+    /// overshoot (a plain ease-in-out stop), 2 = double the bounce.
+    static float springEase(float t, float springiness) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (t &lt;= 0f) {</span>
+<span class="fc" id="L154">            return 0f;</span>
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (t &gt;= 1f) {</span>
+<span class="fc" id="L157">            return 1f;</span>
+        }
+<span class="fc" id="L159">        float travelEnd = 0.78f;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (t &lt;= travelEnd) {</span>
+<span class="fc" id="L161">            float u = t / travelEnd;</span>
+<span class="fc" id="L162">            return u * u * (3 - 2 * u);</span>
+        }
+<span class="fc" id="L164">        float u = (t - travelEnd) / (1f - travelEnd);</span>
+<span class="fc" id="L165">        return 1f + 0.09f * springiness * (float) (Math.sin(u * Math.PI) * (1f - u));</span>
+    }
+
+    /// Computes one morph frame.
+    ///
+    /// @param t         linear animation time 0..1 (1 == settled; pass 1 with from==to for the resting frame)
+    /// @param fromX     source cell x (in the bar's inner-x space)
+    /// @param fromW     source cell width
+    /// @param toX       target cell x
+    /// @param toW       target cell width
+    /// @param innerX    the tab bar's inner-left x (added to cell x to get the paint x)
+    /// @param capYBase  the settled pill top (bar-height span top)
+    /// @param capHBase  the settled pill height
+    /// @param barLeftX  whole-bar left edge (paint space) for the grow pass
+    /// @param barRightX whole-bar right edge (paint space) for the grow pass
+    /// @param tk        resolved theme tokens
+    static TabSelectionMorph compute(float t, int fromX, int fromW, int toX, int toW,
+            int innerX, int capYBase, int capHBase, int barLeftX, int barRightX, Tokens tk) {
+<span class="fc" id="L183">        TabSelectionMorph m = new TabSelectionMorph();</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        float tp = t &lt; 0 ? 0 : (t &gt; 1 ? 1 : t);</span>
+
+<span class="fc" id="L186">        float pos = springEase(tp, tk.spring);</span>
+<span class="fc" id="L187">        int x = fromX + (int) ((toX - fromX) * pos);</span>
+<span class="fc" id="L188">        int w = fromW + (int) ((toW - fromW) * pos);</span>
+
+        // travel envelopes (see the original Tabs.paintSelectionCapsule commentary)
+<span class="fc" id="L191">        m.flight = smooth(0f, 0.12f, tp) * (1f - smooth(0.64f, 0.86f, tp));</span>
+<span class="fc" id="L192">        float moving = smooth(0f, 0.08f, tp) * (1f - smooth(0.88f, 1f, tp));</span>
+<span class="fc" id="L193">        float sd = (tp - 0.80f) / 0.14f;</span>
+<span class="fc bfc" id="L194" title="All 4 branches covered.">        float squash = (sd &gt; -1f &amp;&amp; sd &lt; 1f) ? (1f - sd * sd) * (1f - sd * sd) : 0f; // settle bump</span>
+<span class="fc" id="L195">        float grow = smooth(0f, 0.10f, tp) * (1f - smooth(0.20f, 0.42f, tp));        // early whole-bar swell</span>
+
+        // horizontal elongation while moving, then width compression at the stop
+<span class="fc" id="L198">        w = (int) (w * (1f + moving * tk.stretch));</span>
+<span class="fc" id="L199">        w = (int) (w * (1f - squash * tk.squashW));</span>
+<span class="fc" id="L200">        float vScale = 1f + m.flight * tk.grow + squash * tk.squashH;</span>
+<span class="fc" id="L201">        int liftPx = (int) (m.flight * tk.liftPx);</span>
+
+<span class="fc" id="L203">        int capX = innerX + x;</span>
+        // compact the drop around the cell centre
+<span class="fc" id="L205">        int bubbleW = w * tk.bubbleWidthPct / 100;</span>
+<span class="fc" id="L206">        capX += (w - bubbleW) / 2;</span>
+<span class="fc" id="L207">        w = bubbleW;</span>
+
+        // The drop may be wider than its cell (bubbleWidthPct &gt; 100) and the
+        // spring overshoots the end cells -- but it must never leave the bar:
+        // the native pill overlaps NEIGHBOUR cells, not the backdrop.
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (capX &lt; barLeftX) {</span>
+<span class="fc" id="L213">            w -= barLeftX - capX;</span>
+<span class="fc" id="L214">            capX = barLeftX;</span>
+        }
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (capX + w &gt; barRightX) {</span>
+<span class="fc" id="L217">            w = barRightX - capX;</span>
+        }
+
+<span class="fc" id="L220">        m.capX = capX;</span>
+<span class="fc" id="L221">        m.capY = capYBase;</span>
+<span class="fc" id="L222">        m.capW = w;</span>
+<span class="fc" id="L223">        m.capH = capHBase;</span>
+
+<span class="fc" id="L225">        m.magnify = tk.restMag + (tk.peakMag - tk.restMag) * m.flight;</span>
+<span class="fc" id="L226">        m.aberration = tk.peakAb * m.flight;</span>
+<span class="fc" id="L227">        m.tintStrength = tk.tintStrength;</span>
+
+        // The vertical bulge past the bar is a FLIGHT effect: the native drop
+        // swells while travelling but its settled pill sits fully inside the
+        // bar -- a constant overflow left a tinted crescent past the bar's
+        // rounded ends at rest.
+<span class="fc" id="L233">        int baseLensH = capHBase + (int) (capHBase * (tk.overflowPct / 100f) * m.flight);</span>
+<span class="fc" id="L234">        int lensH = (int) (baseLensH * vScale);</span>
+<span class="fc" id="L235">        int lensY = capYBase + capHBase / 2 - lensH / 2 - liftPx + tk.downBiasPx;</span>
+<span class="fc" id="L236">        m.lensX = capX;</span>
+<span class="fc" id="L237">        m.lensY = lensY;</span>
+<span class="fc" id="L238">        m.lensW = w;</span>
+<span class="fc" id="L239">        m.lensH = lensH;</span>
+
+        // brief whole-bar grow pass (uniform magnify) at the very start
+<span class="pc bpc" id="L242" title="1 of 4 branches missed.">        if (grow &gt; 0.01f &amp;&amp; tk.barGrowPct &gt; 0) {</span>
+<span class="fc" id="L243">            int barW0 = barRightX - barLeftX;</span>
+<span class="fc" id="L244">            m.barGrowMag = 1f + grow * (tk.barGrowPct / 100f);</span>
+<span class="fc" id="L245">            int mgx = (int) (barW0 * 0.18f);</span>
+<span class="fc" id="L246">            int mgy = (int) (capHBase * 0.18f);</span>
+<span class="fc" id="L247">            m.barGrowX = barLeftX - mgx;</span>
+<span class="fc" id="L248">            m.barGrowY = capYBase - mgy;</span>
+<span class="fc" id="L249">            m.barGrowW = barW0 + 2 * mgx;</span>
+<span class="fc" id="L250">            m.barGrowH = capHBase + 2 * mgy;</span>
+<span class="fc" id="L251">            m.barGrow = true;</span>
+        }
+<span class="fc" id="L253">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

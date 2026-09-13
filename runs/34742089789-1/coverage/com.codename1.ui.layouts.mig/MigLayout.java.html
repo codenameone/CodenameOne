@@ -1,0 +1,723 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MigLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">MigLayout.java</span></div><h1>MigLayout.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+/// A very flexible layout manager.
+///
+/// Read the documentation that came with this layout manager for information on
+/// usage.
+///
+/// #### Deprecated
+///
+/// @deprecated this is currently an experimental integration and has known bugs
+/// do not rely on this layout for production
+public final class MigLayout extends Layout {
+    // ******** Instance part ********
+
+    /// The component to string constraints mappings.
+<span class="pc" id="L63">    private final Map&lt;Component, Object&gt; scrConstrMap = new IdentityHashMap&lt;Component, Object&gt;(8);</span>
+<span class="pc" id="L64">    private final Map&lt;ComponentWrapper, CC&gt; ccMap = new HashMap&lt;ComponentWrapper, CC&gt;(8);</span>
+    /// Hold the serializable text representation of the constraints.
+<span class="pc" id="L66">    private Object layoutConstraints = &quot;&quot;;    // Should never be null!</span>
+<span class="pc" id="L67">    private Object colConstraints = &quot;&quot;;</span>
+<span class="pc" id="L68">    private Object rowConstraints = &quot;&quot;;</span>
+    // ******** Transient part ********
+<span class="pc" id="L70">    private ContainerWrapper cacheParentW = null;</span>
+    //private javax.swing.Timer debugTimer = null;
+<span class="pc" id="L72">    private LC lc = null;</span>
+<span class="pc" id="L73">    private AC colSpecs = null;</span>
+<span class="pc" id="L74">    private AC rowSpecs = null;</span>
+<span class="pc" id="L75">    private Grid grid = null;</span>
+<span class="pc" id="L76">    private int lastModCount = PlatformDefaults.getModCount();</span>
+<span class="pc" id="L77">    private int lastHash = -1;</span>
+<span class="pc" id="L78">    private Dimension lastInvalidSize = null;</span>
+<span class="pc" id="L79">    private boolean lastWasInvalid = false;  // Added in 3.7.1. May have regressions</span>
+<span class="pc" id="L80">    private Dimension lastParentSize = null;</span>
+
+<span class="pc" id="L82">    private ArrayList&lt;LayoutCallback&gt; callbackList = null;</span>
+
+<span class="pc" id="L84">    private boolean dirty = true;</span>
+
+    /// Constructor with no constraints.
+    public MigLayout() {
+<span class="nc" id="L88">        this(&quot;&quot;, &quot;&quot;, &quot;&quot;);</span>
+<span class="nc" id="L89">    }</span>
+
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as &quot;&quot;.
+    public MigLayout(String layoutConstraints) {
+<span class="fc" id="L98">        this(layoutConstraints, &quot;&quot;, &quot;&quot;);</span>
+<span class="fc" id="L99">    }</span>
+
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as &quot;&quot;.
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as &quot;&quot;.
+    public MigLayout(String layoutConstraints, String colConstraints) {
+<span class="nc" id="L111">        this(layoutConstraints, colConstraints, &quot;&quot;);</span>
+<span class="nc" id="L112">    }</span>
+
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as &quot;&quot;.
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as &quot;&quot;.
+    ///
+    /// - `rowConstraints`: @param rowConstraints    The constraints for the rows in the grid.
+    /// `null` will be treated as &quot;&quot;.
+<span class="fc" id="L126">    public MigLayout(String layoutConstraints, String colConstraints, String rowConstraints) {</span>
+<span class="fc" id="L127">        setLayoutConstraints(layoutConstraints);</span>
+<span class="fc" id="L128">        setColumnConstraints(colConstraints);</span>
+<span class="fc" id="L129">        setRowConstraints(rowConstraints);</span>
+<span class="fc" id="L130">    }</span>
+
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as an empty constraint.
+    public MigLayout(LC layoutConstraints) {
+<span class="nc" id="L139">        this(layoutConstraints, null, null);</span>
+<span class="nc" id="L140">    }</span>
+
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as an empty constraint.
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as an empty constraint.
+    public MigLayout(LC layoutConstraints, AC colConstraints) {
+<span class="nc" id="L152">        this(layoutConstraints, colConstraints, null);</span>
+<span class="nc" id="L153">    }</span>
+
+    /// Constructor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layoutConstraints`: @param layoutConstraints The constraints that concern the whole layout.
+    /// `null` will be treated as an empty constraint.
+    ///
+    /// - `colConstraints`: @param colConstraints    The constraints for the columns in the grid.
+    /// `null` will be treated as an empty constraint.
+    ///
+    /// - `rowConstraints`: @param rowConstraints    The constraints for the rows in the grid.
+    /// `null` will be treated as an empty constraint.
+<span class="nc" id="L167">    public MigLayout(LC layoutConstraints, AC colConstraints, AC rowConstraints) {</span>
+<span class="nc" id="L168">        setLayoutConstraints(layoutConstraints);</span>
+<span class="nc" id="L169">        setColumnConstraints(colConstraints);</span>
+<span class="nc" id="L170">        setRowConstraints(rowConstraints);</span>
+<span class="nc" id="L171">    }</span>
+
+    public static &lt;E&gt; E findType(Class&lt;E&gt; clazz, Component comp) {
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">        while (comp != null &amp;&amp; !clazz.isInstance(comp)) {</span>
+<span class="fc" id="L175">            comp = comp.getParent();</span>
+        }
+
+<span class="fc" id="L178">        return (E) comp;</span>
+    }
+
+    /// Returns layout constraints either as a `String` or
+    /// `net.miginfocom.layout.LC` depending what was sent in to the
+    /// constructor or set with `#setLayoutConstraints(Object)`.
+    ///
+    /// #### Returns
+    ///
+    /// @return The layout constraints either as a `String` or
+    /// `net.miginfocom.layout.LC` depending what was sent in to the
+    /// constructor or set with `#setLayoutConstraints(Object)`. Never
+    /// `null`.
+    public Object getLayoutConstraints() {
+<span class="fc" id="L192">        return layoutConstraints;</span>
+    }
+
+    /// Sets the layout constraints for the layout manager instance as a String.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The layout constraints as a String pr
+    /// `net.miginfocom.layout.LC` representation. `null` is
+    /// converted to `&quot;&quot;` for storage.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
+    public void setLayoutConstraints(Object constr) {
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">        if (constr == null || constr instanceof String) {</span>
+<span class="fc" id="L210">            constr = ConstraintParser.prepare((String) constr);</span>
+<span class="fc" id="L211">            lc = ConstraintParser.parseLayoutConstraint((String) constr);</span>
+        } else {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            if (constr instanceof LC) {</span>
+<span class="nc" id="L214">                lc = (LC) constr;</span>
+            } else {
+<span class="nc" id="L216">                throw new IllegalArgumentException(&quot;Illegal constraint type: &quot; + constr.getClass());</span>
+            }
+        }
+<span class="fc" id="L219">        layoutConstraints = constr;</span>
+<span class="fc" id="L220">        dirty = true;</span>
+<span class="fc" id="L221">    }</span>
+
+    /// Returns the column layout constraints either as a `String` or
+    /// `net.miginfocom.layout.AC`.
+    ///
+    /// #### Returns
+    ///
+    /// @return The column constraints either as a `String` or
+    /// `net.miginfocom.layout.AC` depending what was sent in to the
+    /// constructor or set with `#setColumnConstraints(Object)`. Never
+    /// `null`.
+    public Object getColumnConstraints() {
+<span class="fc" id="L233">        return colConstraints;</span>
+    }
+
+    /// Sets the column layout constraints for the layout manager instance as a
+    /// String.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The column layout constraints as a String or
+    /// `net.miginfocom.layout.AC` representation. `null` is
+    /// converted to `&quot;&quot;` for storage.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
+    public void setColumnConstraints(Object constr) {
+<span class="pc bpc" id="L251" title="2 of 4 branches missed.">        if (constr == null || constr instanceof String) {</span>
+<span class="fc" id="L252">            constr = ConstraintParser.prepare((String) constr);</span>
+<span class="fc" id="L253">            colSpecs = ConstraintParser.parseColumnConstraints((String) constr);</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        } else if (constr instanceof AC) {</span>
+<span class="nc" id="L255">            colSpecs = (AC) constr;</span>
+        } else {
+<span class="nc" id="L257">            throw new IllegalArgumentException(&quot;Illegal constraint type: &quot; + constr.getClass());</span>
+        }
+<span class="fc" id="L259">        colConstraints = constr;</span>
+<span class="fc" id="L260">        dirty = true;</span>
+<span class="fc" id="L261">    }</span>
+
+    /// Returns the row layout constraints either as a `String` or
+    /// `net.miginfocom.layout.AC`.
+    ///
+    /// #### Returns
+    ///
+    /// @return The row constraints either as a `String` or
+    /// `net.miginfocom.layout.AC` depending what was sent in to the
+    /// constructor or set with `#setRowConstraints(Object)`. Never
+    /// `null`.
+    public Object getRowConstraints() {
+<span class="fc" id="L273">        return rowConstraints;</span>
+    }
+
+    /// Sets the row layout constraints for the layout manager instance as a
+    /// String.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The row layout constraints as a String or
+    /// `net.miginfocom.layout.AC` representation. `null` is
+    /// converted to `&quot;&quot;` for storage.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
+    public void setRowConstraints(Object constr) {
+<span class="pc bpc" id="L291" title="2 of 4 branches missed.">        if (constr == null || constr instanceof String) {</span>
+<span class="fc" id="L292">            constr = ConstraintParser.prepare((String) constr);</span>
+<span class="fc" id="L293">            rowSpecs = ConstraintParser.parseRowConstraints((String) constr);</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        } else if (constr instanceof AC) {</span>
+<span class="nc" id="L295">            rowSpecs = (AC) constr;</span>
+        } else {
+<span class="nc" id="L297">            throw new IllegalArgumentException(&quot;Illegal constraint type: &quot; + constr.getClass());</span>
+        }
+<span class="fc" id="L299">        rowConstraints = constr;</span>
+<span class="fc" id="L300">        dirty = true;</span>
+<span class="fc" id="L301">    }</span>
+
+    /// Returns a shallow copy of the constraints map.
+    ///
+    /// #### Returns
+    ///
+    /// A shallow copy of the constraints map. Never `null`.
+    public Map&lt;Component, Object&gt; getConstraintMap() {
+<span class="nc" id="L309">        return new IdentityHashMap&lt;Component, Object&gt;(scrConstrMap);</span>
+    }
+
+    /// Sets the constraints map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: The map. Will be copied.
+    public void setConstraintMap(Map&lt;Component, Object&gt; map) {
+<span class="nc" id="L318">        scrConstrMap.clear();</span>
+<span class="nc" id="L319">        ccMap.clear();</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        for (Map.Entry&lt;Component, Object&gt; entry : map.entrySet()) {</span>
+<span class="nc" id="L321">            setComponentConstraintsImpl(entry.getKey(), entry.getValue(), true);</span>
+<span class="nc" id="L322">        }</span>
+<span class="nc" id="L323">    }</span>
+
+    /// Returns the component constraints as a String representation. This string
+    /// is the exact string as set with
+    /// `Object)` or set when
+    /// adding the component to the parent component.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `comp`: The component to return the constraints for.
+    ///
+    /// #### Returns
+    ///
+    /// @return The component constraints as a String representation or
+    /// `null` if the component is not registered with this layout
+    /// manager. The returned values is either a String or a
+    /// `net.miginfocom.layout.CC` depending on what constraint was sent in
+    /// when the component was added. May be `null`.
+    public Object getComponentConstraints(Component comp) {
+<span class="nc" id="L344">        return scrConstrMap.get(comp);</span>
+    }
+
+    /// Sets the component constraint for the component that already must be
+    /// handled by this layout manager.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr The component constraints as a String or
+    /// `net.miginfocom.layout.CC`. `null` is ok.
+    ///
+    /// - `comp`: The component to set the constraints for.
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException If the component is not handling the
+    /// component.
+    public void setComponentConstraints(Component comp, Object constr) {
+<span class="nc" id="L366">        setComponentConstraintsImpl(comp, constr, false);</span>
+<span class="nc" id="L367">    }</span>
+
+    /// Sets the component constraint for the component that already must be
+    /// handled by this layout manager.
+    ///
+    /// See the class JavaDocs for information on how this string is formatted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constr`: @param constr  The component constraints as a String or
+    /// `net.miginfocom.layout.CC`. `null` is ok.
+    ///
+    /// - `comp`: The component to set the constraints for.
+    ///
+    /// - `noCheck`: Doe not check if the component is handled if true
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if the constraint was not valid.
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException If the component is not handling the
+    /// component.
+    private void setComponentConstraintsImpl(Component comp, Object constr, boolean noCheck) {
+<span class="pc bpc" id="L390" title="3 of 4 branches missed.">        if (!noCheck &amp;&amp; !scrConstrMap.containsKey(comp)) {</span>
+<span class="nc" id="L391">            throw new IllegalArgumentException(&quot;Component must already be added to parent!&quot;);</span>
+        }
+
+<span class="fc" id="L394">        ComponentWrapper cw = new CodenameOneMiGComponentWrapper(comp);</span>
+
+<span class="pc bpc" id="L396" title="1 of 4 branches missed.">        if (constr == null || constr instanceof String) {</span>
+<span class="fc" id="L397">            String cStr = ConstraintParser.prepare((String) constr);</span>
+
+<span class="fc" id="L399">            scrConstrMap.put(comp, constr);</span>
+<span class="fc" id="L400">            ccMap.put(cw, ConstraintParser.parseComponentConstraint(cStr));</span>
+
+<span class="pc bnc" id="L402" title="All 2 branches missed.">        } else if (constr instanceof CC) {</span>
+
+<span class="nc" id="L404">            scrConstrMap.put(comp, constr);</span>
+<span class="nc" id="L405">            ccMap.put(cw, (CC) constr);</span>
+
+        } else {
+<span class="nc" id="L408">            throw new IllegalArgumentException(&quot;Constraint must be String or ComponentConstraint: &quot; + constr.getClass());</span>
+        }
+
+<span class="fc" id="L411">        dirty = true;</span>
+<span class="fc" id="L412">    }</span>
+
+    /// Returns if this layout manager is currently managing this component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: @param c The component to check. If `null` then
+    /// `false` will be returned.
+    ///
+    /// #### Returns
+    ///
+    /// If this layout manager is currently managing this component.
+    public boolean isManagingComponent(Component c) {
+<span class="nc" id="L425">        return scrConstrMap.containsKey(c);</span>
+    }
+
+    /// Adds the callback function that will be called at different stages of the
+    /// layout cylce.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The callback. Not `null`.
+    public void addLayoutCallback(LayoutCallback callback) {
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        if (callback == null) {</span>
+<span class="nc" id="L436">            throw new NullPointerException();</span>
+        }
+
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        if (callbackList == null) {</span>
+<span class="nc" id="L440">            callbackList = new ArrayList&lt;LayoutCallback&gt;(1);</span>
+        }
+
+<span class="nc" id="L443">        callbackList.add(callback);</span>
+
+<span class="nc" id="L445">        grid = null;</span>
+<span class="nc" id="L446">    }</span>
+
+    /// Removes the callback if it exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: The callback. May be `null`.
+    public void removeLayoutCallback(LayoutCallback callback) {
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        if (callbackList != null) {</span>
+<span class="nc" id="L455">            callbackList.remove(callback);</span>
+        }
+<span class="nc" id="L457">    }</span>
+
+    /// Sets the debugging state for this layout manager instance. If debug is
+    /// turned on a timer will repaint the last laid out parent with debug
+    /// information on top.
+    ///
+    /// Red fill and dashed red outline is used to indicate occupied cells in the
+    /// grid. Blue dashed outline indicate component bounds set.
+    ///
+    /// Note that debug can also be set on the layout constraints. There it will
+    /// be persisted. The value set here will not. See the class JavaDocs for
+    /// information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parentW`: The parent to set debug for.
+    ///
+    /// - `b`: `true` means debug is turned on.
+    /// Check if something has changed and if so recreate it to the cached
+    /// objects.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent that is the target for this layout manager.
+    private void checkCache(Container parent) {
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">        if (parent == null) {</span>
+<span class="nc" id="L483">            return;</span>
+        }
+
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (dirty) {</span>
+<span class="fc" id="L487">            grid = null;</span>
+        }
+
+<span class="fc" id="L490">        cleanConstraintMaps(parent);</span>
+
+        // Check if the grid is valid
+<span class="fc" id="L493">        int mc = PlatformDefaults.getModCount();</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (lastModCount != mc) {</span>
+<span class="nc" id="L495">            grid = null;</span>
+<span class="nc" id="L496">            lastModCount = mc;</span>
+        }
+
+        //if (!parent.isValid()) {
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (!lastWasInvalid) {</span>
+<span class="fc" id="L501">            lastWasInvalid = true;</span>
+
+<span class="fc" id="L503">            int hash = 0;</span>
+<span class="fc" id="L504">            boolean resetLastInvalidOnParent = false; // Added in 3.7.3 to resolve a timing regression introduced in 3.7.1</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">            for (ComponentWrapper wrapper : ccMap.keySet()) {</span>
+<span class="fc" id="L506">                Object component = wrapper.getComponent();</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">                if (component instanceof TextArea) {</span>
+<span class="nc" id="L508">                    resetLastInvalidOnParent = true;</span>
+                }
+
+<span class="fc" id="L511">                hash ^= wrapper.getLayoutHashCode();</span>
+<span class="fc" id="L512">                hash += 285134905;</span>
+<span class="fc" id="L513">            }</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            if (resetLastInvalidOnParent) {</span>
+<span class="nc" id="L515">                resetLastInvalidOnParent(parent);</span>
+            }
+
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            if (hash != lastHash) {</span>
+<span class="fc" id="L519">                grid = null;</span>
+<span class="fc" id="L520">                lastHash = hash;</span>
+            }
+
+<span class="fc" id="L523">            Dimension ps = new Dimension(parent.getWidth(), parent.getHeight());</span>
+<span class="pc bpc" id="L524" title="3 of 4 branches missed.">            if (lastInvalidSize == null || !lastInvalidSize.equals(ps)) {</span>
+<span class="fc" id="L525">                grid = null;</span>
+<span class="fc" id="L526">                lastInvalidSize = ps;</span>
+            }
+        }
+        /*} else {
+         lastWasInvalid = false;
+         }*/
+
+<span class="fc" id="L533">        ContainerWrapper par = checkParent(parent);</span>
+
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        if (grid == null) {</span>
+<span class="fc" id="L536">            grid = new Grid(par, lc, rowSpecs, colSpecs, ccMap, callbackList);</span>
+        }
+
+<span class="fc" id="L539">        dirty = false;</span>
+<span class="fc" id="L540">    }</span>
+
+    /// Checks so all components in ccMap actually exist in the parent's
+    /// collection. Removes any references that don't.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent to compare ccMap against. Never null.
+    private void cleanConstraintMaps(Container parent) {
+<span class="fc" id="L549">        HashSet&lt;Component&gt; parentCompSet = new HashSet&lt;Component&gt;();</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">        for (int iter = 0; iter &lt; parent.getComponentCount(); iter++) {</span>
+<span class="fc" id="L551">            parentCompSet.add(parent.getComponentAt(iter));</span>
+        }
+
+<span class="fc" id="L554">        Iterator&lt;Map.Entry&lt;ComponentWrapper, CC&gt;&gt; it = ccMap.entrySet().iterator();</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L556">            Component c = (Component) it.next().getKey().getComponent();</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">            if (!parentCompSet.contains(c)) {</span>
+<span class="nc" id="L558">                it.remove();</span>
+<span class="nc" id="L559">                scrConstrMap.remove(c);</span>
+            }
+<span class="fc" id="L561">        }</span>
+<span class="fc" id="L562">    }</span>
+
+    private void resetLastInvalidOnParent(Container parent) {
+<span class="nc bnc" id="L565" title="All 2 branches missed.">        while (parent != null) {</span>
+<span class="nc" id="L566">            Layout layoutManager = parent.getLayout();</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            if (layoutManager instanceof MigLayout) {</span>
+<span class="nc" id="L568">                ((MigLayout) layoutManager).lastWasInvalid = false;</span>
+            }
+<span class="nc" id="L570">            parent = parent.getParent();</span>
+<span class="nc" id="L571">        }</span>
+<span class="nc" id="L572">    }</span>
+
+    private ContainerWrapper checkParent(Container parent) {
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        if (parent == null) {</span>
+<span class="nc" id="L576">            return null;</span>
+        }
+
+<span class="pc bpc" id="L579" title="1 of 4 branches missed.">        if (cacheParentW == null || cacheParentW.getComponent() != parent) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L580">            cacheParentW = new CodenameOneMiGContainerWrapper(parent);</span>
+        }
+
+<span class="fc" id="L583">        return cacheParentW;</span>
+    }
+
+    @Override
+    public void layoutContainer(final Container parent) {
+<span class="fc" id="L588">        checkCache(parent);</span>
+
+<span class="fc" id="L590">        Style i = parent.getStyle();</span>
+<span class="fc" id="L591">        int[] b = new int[]{</span>
+<span class="fc" id="L592">                i.getMarginLeftNoRTL(),</span>
+<span class="fc" id="L593">                i.getMarginTop(),</span>
+<span class="fc" id="L594">                parent.getWidth() - i.getHorizontalMargins(),</span>
+<span class="fc" id="L595">                parent.getHeight() - i.getVerticalMargins()</span>
+        };
+
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">        if (grid.layout(b, lc.getAlignX(), lc.getAlignY(), false)) {</span>
+<span class="nc" id="L599">            grid = null;</span>
+<span class="nc" id="L600">            checkCache(parent);</span>
+<span class="nc" id="L601">            grid.layout(b, lc.getAlignX(), lc.getAlignY(), false);</span>
+        }
+
+        /*long newSize = grid.getHeight()[1] + (((long) grid.getWidth()[1]) &lt;&lt; 32);
+         if (lastSize != newSize) {
+         lastSize = newSize;
+         final ContainerWrapper containerWrapper = checkParent(parent);
+         Window win = ((Window) SwingUtilities.getAncestorOfClass(Window.class, (Component)containerWrapper.getComponent()));
+         if (win != null) {
+         if (win.isVisible()) {
+         SwingUtilities.invokeLater(new Runnable() {
+         public void run() {
+         adjustWindowSize(containerWrapper);
+         }
+         });
+         } else {
+         adjustWindowSize(containerWrapper);
+         }
+         }
+         }*/
+<span class="fc" id="L621">        lastInvalidSize = null;</span>
+<span class="fc" id="L622">    }</span>
+
+    /// Checks the parent window/popup if its size is within parameters as set by
+    /// the LC.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: The parent who's window to possibly adjust the size for.
+    public Dimension minimumLayoutSize(Container parent) {
+<span class="nc" id="L631">        return getSizeImpl(parent, LayoutUtil.MIN);</span>
+    }
+
+    public Dimension preferredLayoutSize(Container parent) {
+<span class="pc bpc" id="L635" title="5 of 6 branches missed.">        if (lastParentSize == null || parent.getWidth() != lastParentSize.getWidth() || parent.getHeight() != lastParentSize.getHeight()) {</span>
+<span class="fc bfc" id="L636" title="All 2 branches covered.">            for (ComponentWrapper wrapper : ccMap.keySet()) {</span>
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">                if (wrapper.getContentBias() != -1) {</span>
+<span class="nc" id="L638">                    layoutContainer(parent);</span>
+<span class="nc" id="L639">                    break;</span>
+                }
+<span class="fc" id="L641">            }</span>
+        }
+
+<span class="fc" id="L644">        lastParentSize = new Dimension(parent.getWidth(), parent.getHeight());</span>
+<span class="fc" id="L645">        return getSizeImpl(parent, LayoutUtil.PREF);</span>
+    }
+
+    public Dimension maximumLayoutSize(Container parent) {
+<span class="nc" id="L649">        return new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE);</span>
+    }
+
+    // Implementation method that does the job.
+    private Dimension getSizeImpl(Container parent, int sizeType) {
+<span class="fc" id="L654">        checkCache(parent);</span>
+
+<span class="fc" id="L656">        Style i = parent.getStyle();</span>
+
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">        int w = LayoutUtil.getSizeSafe(grid != null ? grid.getWidth() : null, sizeType) + i.getHorizontalPadding();</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">        int h = LayoutUtil.getSizeSafe(grid != null ? grid.getHeight() : null, sizeType) + i.getVerticalPadding();</span>
+
+<span class="fc" id="L661">        return new Dimension(w, h);</span>
+    }
+
+    public float getLayoutAlignmentX(Container parent) {
+<span class="nc bnc" id="L665" title="All 4 branches missed.">        return lc != null &amp;&amp; lc.getAlignX() != null ? lc.getAlignX().getPixels(1, checkParent(parent), null) : 0;</span>
+    }
+
+    public float getLayoutAlignmentY(Container parent) {
+<span class="nc bnc" id="L669" title="All 4 branches missed.">        return lc != null &amp;&amp; lc.getAlignY() != null ? lc.getAlignY().getPixels(1, checkParent(parent), null) : 0;</span>
+    }
+
+    @Override
+    public void addLayoutComponent(Object value, Component comp, Container c) {
+<span class="fc" id="L674">        addLayoutComponent(comp, value);</span>
+<span class="fc" id="L675">    }</span>
+
+    public void addLayoutComponent(Component comp, Object constraints) {
+<span class="fc" id="L678">        setComponentConstraintsImpl(comp, constraints, true);</span>
+<span class="fc" id="L679">    }</span>
+
+    @Override
+    public boolean isConstraintTracking() {
+<span class="nc" id="L683">        return true;</span>
+    }
+
+    @Override
+    public Object getComponentConstraint(Component comp) {
+<span class="fc" id="L688">        return scrConstrMap.get(comp);</span>
+    }
+
+    @Override
+    public void removeLayoutComponent(Component comp) {
+<span class="nc" id="L693">        scrConstrMap.remove(comp);</span>
+<span class="nc" id="L694">        ccMap.remove(new CodenameOneMiGComponentWrapper(comp));</span>
+<span class="nc" id="L695">        grid = null; // To clear references</span>
+<span class="nc" id="L696">    }</span>
+
+    public void invalidateLayout(Container target) {
+<span class="nc" id="L699">        dirty = true;</span>
+<span class="nc" id="L700">    }</span>
+
+
+    /*private class MyDebugRepaintListener implements ActionListener
+     {
+     public void actionPerformed(ActionEvent e)
+     {
+     if (grid != null) {
+     Component comp = (Component) grid.getContainer().getComponent();
+     if (comp.isShowing()) {
+     grid.paintDebug();
+     return;
+     }
+     }
+     debugTimer.stop();
+     debugTimer = null;
+     }
+     }*/
+    @Override
+    public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L720">        return preferredLayoutSize(parent);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

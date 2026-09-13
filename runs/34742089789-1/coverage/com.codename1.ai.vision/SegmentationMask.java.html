@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SegmentationMask.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">SegmentationMask.java</span></div><h1>SegmentationMask.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+import com.codename1.ui.Image;
+
+/// Dense per-pixel foreground confidence mask. The confidence array is
+/// row-major with exactly {@code width * height} values in the range 0..1.
+/// It is defensively copied on construction and access.
+///
+/// The mask's resolution is the segmentation model's, not the source image's,
+/// so it is normally smaller than the frame it describes.
+/// {@link #cutOut(Image, float)} and {@link #toMaskImage(int)} rescale it for
+/// you; when reading {@link #getConfidence()} directly, index it with
+/// {@link #getWidth()} and {@link #getHeight()} rather than the frame size.
+///
+/// ```java
+/// SelfieSegmenter segmenter = new SelfieSegmenter();
+/// segmenter.process(VisionImage.encoded(jpeg)).ready(mask -&gt; {
+///     Image person = mask.cutOut(EncodedImage.create(jpeg), 0.6f);
+///     background.getStyle().setBgImage(person);
+/// }).except(error -&gt; Log.e(error));
+/// ```
+public final class SegmentationMask {
+    private final int width;
+    private final int height;
+    private final float[] confidence;
+    private final VisionMetadata metadata;
+
+    /// Creates a row-major confidence mask without backend metadata.
+    /// @param width mask width in pixels
+    /// @param height mask height in pixels
+    /// @param confidence one foreground probability per pixel, defensively copied
+    /// @throws IllegalArgumentException if either dimension is negative, the
+    ///  pixel count exceeds the maximum Java array length, or
+    ///  {@code confidence} does not contain exactly one value per pixel
+    public SegmentationMask(int width, int height, float[] confidence) {
+<span class="fc" id="L58">        this(width, height, confidence, null);</span>
+<span class="fc" id="L59">    }</span>
+
+    /// Creates a row-major confidence mask with backend diagnostics.
+    /// @param width mask width in pixels
+    /// @param height mask height in pixels
+    /// @param confidence one foreground probability per pixel, defensively copied
+    /// @param metadata backend details, or {@code null}
+    /// @throws IllegalArgumentException if either dimension is negative, the
+    ///  pixel count exceeds the maximum Java array length, or
+    ///  {@code confidence} does not contain exactly one value per pixel
+    public SegmentationMask(int width, int height, float[] confidence,
+<span class="fc" id="L70">                            VisionMetadata metadata) {</span>
+<span class="fc" id="L71">        long pixelCount = (long) width * (long) height;</span>
+<span class="pc bpc" id="L72" title="4 of 10 branches missed.">        if (width &lt; 0 || height &lt; 0 || pixelCount &gt; Integer.MAX_VALUE</span>
+                || confidence == null || confidence.length != pixelCount) {
+<span class="fc" id="L74">            throw new IllegalArgumentException(&quot;Mask dimensions do not match its data&quot;);</span>
+        }
+<span class="fc" id="L76">        this.width = width;</span>
+<span class="fc" id="L77">        this.height = height;</span>
+<span class="fc" id="L78">        this.confidence = new float[confidence.length];</span>
+<span class="fc" id="L79">        System.arraycopy(confidence, 0, this.confidence, 0, confidence.length);</span>
+<span class="fc" id="L80">        this.metadata = metadata;</span>
+<span class="fc" id="L81">    }</span>
+
+    /// @return mask width, which may differ from source image width
+    public int getWidth() {
+<span class="nc" id="L85">        return width;</span>
+    }
+
+    /// @return mask height, which may differ from source image height
+    public int getHeight() {
+<span class="nc" id="L90">        return height;</span>
+    }
+
+    /// @return defensive copy of row-major foreground confidences
+    public float[] getConfidence() {
+<span class="nc" id="L95">        float[] out = new float[confidence.length];</span>
+<span class="nc" id="L96">        System.arraycopy(confidence, 0, out, 0, confidence.length);</span>
+<span class="nc" id="L97">        return out;</span>
+    }
+
+    /// Reads one mask pixel.
+    ///
+    /// @param x column in the range 0 to {@link #getWidth()} - 1
+    /// @param y row in the range 0 to {@link #getHeight()} - 1
+    /// @return foreground probability in the range 0..1
+    /// @throws IndexOutOfBoundsException if the position is outside the mask
+    public float getConfidenceAt(int x, int y) {
+<span class="pc bpc" id="L107" title="3 of 8 branches missed.">        if (x &lt; 0 || y &lt; 0 || x &gt;= width || y &gt;= height) {</span>
+<span class="fc" id="L108">            throw new IndexOutOfBoundsException(</span>
+                    &quot;Position &quot; + x + &quot;,&quot; + y + &quot; is outside the &quot;
+                    + width + &quot;x&quot; + height + &quot; mask&quot;);
+        }
+<span class="fc" id="L112">        return confidence[y * width + x];</span>
+    }
+
+    /// Keeps the foreground of an image and makes the rest transparent.
+    ///
+    /// The mask is sampled with nearest-neighbour scaling, so the result has
+    /// {@code source}'s dimensions no matter what resolution the segmentation
+    /// model produced. Pixels whose confidence is below {@code threshold}
+    /// become fully transparent; the rest keep their original color and alpha.
+    ///
+    /// @param source the image the mask was computed from
+    /// @param threshold minimum foreground confidence to keep, clamped to 0..1
+    /// @return a new image with the background removed
+    /// @throws NullPointerException if {@code source} is {@code null}
+    /// @throws IllegalArgumentException if this mask has no pixels
+    public Image cutOut(Image source, float threshold) {
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (source == null) {</span>
+<span class="fc" id="L129">            throw new NullPointerException(&quot;source&quot;);</span>
+        }
+<span class="fc" id="L131">        requireNonEmpty();</span>
+<span class="fc" id="L132">        int sourceWidth = source.getWidth();</span>
+<span class="fc" id="L133">        int sourceHeight = source.getHeight();</span>
+<span class="fc" id="L134">        int[] pixels = source.getRGB();</span>
+<span class="fc" id="L135">        float limit = clamp(threshold);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (int y = 0; y &lt; sourceHeight; y++) {</span>
+<span class="fc" id="L137">            int row = y * sourceWidth;</span>
+<span class="fc" id="L138">            int maskRow = sample(y, sourceHeight, height) * width;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (int x = 0; x &lt; sourceWidth; x++) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                if (confidence[maskRow + sample(x, sourceWidth, width)]</span>
+                        &lt; limit) {
+<span class="fc" id="L142">                    pixels[row + x] &amp;= 0x00ffffff;</span>
+                }
+            }
+        }
+<span class="fc" id="L146">        return Image.createImage(pixels, sourceWidth, sourceHeight);</span>
+    }
+
+    /// Renders the mask itself as a translucent tint, for drawing over the
+    /// frame it describes as a foreground highlight.
+    ///
+    /// Each pixel takes {@code rgb} as its color and the mask confidence as
+    /// its alpha, so a fully confident foreground pixel is opaque and a
+    /// background pixel is invisible. The result has the mask's own
+    /// resolution; draw it scaled to the frame's bounds.
+    ///
+    /// @param rgb tint color as {@code 0xRRGGBB}; any alpha in the value is
+    ///        ignored in favor of the mask
+    /// @return a new image at this mask's resolution
+    /// @throws IllegalArgumentException if this mask has no pixels
+    public Image toMaskImage(int rgb) {
+<span class="fc" id="L162">        requireNonEmpty();</span>
+<span class="fc" id="L163">        int color = rgb &amp; 0x00ffffff;</span>
+<span class="fc" id="L164">        int[] pixels = new int[confidence.length];</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int i = 0; i &lt; pixels.length; i++) {</span>
+<span class="fc" id="L166">            int alpha = Math.round(clamp(confidence[i]) * 255);</span>
+<span class="fc" id="L167">            pixels[i] = (alpha &lt;&lt; 24) | color;</span>
+        }
+<span class="fc" id="L169">        return Image.createImage(pixels, width, height);</span>
+    }
+
+    /// @return backend metadata, or {@code null} when manually constructed
+    public VisionMetadata getMetadata() {
+<span class="nc" id="L174">        return metadata;</span>
+    }
+
+    private void requireNonEmpty() {
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">        if (width &lt;= 0 || height &lt;= 0) {</span>
+<span class="fc" id="L179">            throw new IllegalArgumentException(&quot;Mask has no pixels&quot;);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    private static int sample(int position, int sourceSize, int maskSize) {
+<span class="fc" id="L184">        int value = position * maskSize / sourceSize;</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        return value &gt;= maskSize ? maskSize - 1 : value;</span>
+    }
+
+    private static float clamp(float value) {
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (Float.isNaN(value)) {</span>
+<span class="nc" id="L190">            return 0;</span>
+        }
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        return value &lt; 0 ? 0 : (value &gt; 1 ? 1 : value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
