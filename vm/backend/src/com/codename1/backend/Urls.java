@@ -86,6 +86,34 @@ final class Urls {
     }
 
     /**
+     * Refuses a host name that carries a control character.
+     *
+     * <p>THE SAME TRUNCATION requireHttp refuses in a URL, one layer down and
+     * reachable without one. Tcp.connect hands the name to getaddrinfo as a C
+     * string on the packaged arm -- stringToUTF8 encodes through
+     * String.getBytes("UTF-8"), so a NUL ends the name there -- and a host of
+     * "127.0.0.1", a NUL, then ".example.com" resolves to 127.0.0.1, a
+     * destination an application that checked the .example.com suffix has
+     * already approved. The JavaSE arm resolves the whole string and fails, so
+     * this is a divergence between the arms as well as a hole in one of them.
+     *
+     * <p>Called from both arms for that reason: a rule that only one of them
+     * applies is a development loop that behaves differently from production.
+     */
+    static void requireHostName(String host) throws IOException {
+        if(host == null || host.length() == 0) {
+            throw new IOException("No host");
+        }
+        for(int iter = 0 ; iter < host.length() ; iter++) {
+            char c = host.charAt(iter);
+            if(c <= 0x20 || c == 0x7f) {
+                throw new IOException("A host name cannot hold a control character "
+                        + "or a space; this one does, at index " + iter);
+            }
+        }
+    }
+
+    /**
      * A URL with everything secret taken out of it, for a message a caller will
      * log.
      *

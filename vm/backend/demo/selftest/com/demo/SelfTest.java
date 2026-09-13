@@ -1610,6 +1610,13 @@ public class SelfTest {
                 "refused", requestRefused("http://127.0.0.1/a\nb"));
         check("and a raw space", "refused",
                 requestRefused("http://127.0.0.1/a b"));
+        // AND THE SAME TRUNCATION ONE LAYER DOWN. Tcp.connect is public and hands
+        // the name to getaddrinfo, so closing it in Web alone left the hole
+        // reachable without a URL at all.
+        check("a NUL in a host name is refused", "refused",
+                connectRefused("127.0.0.1\u0000.example.com"));
+        check("and an ordinary host is still attempted", "attempted",
+                connectRefused("127.0.0.1"));
         // AND THE FRAGMENT, which is where an implicit-flow OAuth token arrives
         // and which never reaches the server at all.
         String fragment = "http://127.0.0.1:1/path#access_token=fragmentsecret";
@@ -1624,6 +1631,23 @@ public class SelfTest {
                 String.valueOf(second.indexOf("fragmentsecret") >= 0));
         check("and the host is still named there too", "true",
                 String.valueOf(second.indexOf("127.0.0.1") >= 0));
+    }
+
+    /**
+     * Whether Tcp refuses a host outright, rather than trying to resolve it.
+     *
+     * Port 1 is not listening, so an accepted name fails at the connect: that is
+     * "attempted", and it is what says the refusal above is about the name rather
+     * than about nothing happening at all.
+     */
+    private static String connectRefused(String host) {
+        try {
+            Tcp.connect(host, 1, 1000).close();
+            return "attempted";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            return message.indexOf("control character") >= 0 ? "refused" : "attempted";
+        }
     }
 
     /** Whether Web refuses a URL outright, rather than trying to fetch it. */

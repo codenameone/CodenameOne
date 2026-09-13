@@ -68,6 +68,9 @@ public final class Tcp {
     }
 
     public static Tcp connect(String host, int port, int timeoutMillis) throws IOException {
+        // The name reaches a resolver; see Urls.requireHostName for what a NUL
+        // in it does to the packaged arm, and why both arms refuse it.
+        Urls.requireHostName(host);
         Socket s = new Socket();
         try {
             s.connect(new InetSocketAddress(host, port), timeoutMillis);

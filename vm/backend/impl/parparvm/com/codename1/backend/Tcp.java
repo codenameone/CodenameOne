@@ -56,6 +56,9 @@ public final class Tcp {
             throw new IllegalArgumentException("connect timeout must not be negative: "
                     + timeoutMillis);
         }
+        // The name reaches a resolver; see Urls.requireHostName for what a NUL
+        // in it does to the packaged arm, and why both arms refuse it.
+        Urls.requireHostName(host);
         long h = connectImpl(host, port, timeoutMillis);
         if(h == 0) {
             throw new IOException("Connection to " + host + ":" + port + " failed");
