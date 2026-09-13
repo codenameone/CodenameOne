@@ -81,6 +81,8 @@ most an identifier that means nothing on its own.
 
 === Saving and restoring
 
+image::img/continuity-restore-paths.svg[What restore returns for routed and hand-shown screens,scaledwidth=95%]
+
 Two pieces. A `StateProvider` supplies the half the framework can't work out --
 the scroll position, the half-typed message, the record being edited -- and
 installing one turns the framework on:
@@ -126,6 +128,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/continuity
 ----
 
 === Continuing on another device
+
+image::img/continuity-payload-journey.svg[Where a continuity payload travels and what it may carry,scaledwidth=95%]
 
 Nothing extra is required for the Apple case. Every checkpoint advertises the
 current state, and a device the user is holding is offered it by the system. What
