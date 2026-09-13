@@ -104,12 +104,12 @@ public class BytecodeMethod implements SignatureSet {
     private int maxLocals;
     private static boolean acceptStaticOnEquals;
     private static final boolean FORCE_VOLATILE_LOCALS =
-            "true".equalsIgnoreCase(System.getProperty("CN1_FORCE_VOLATILE_LOCALS", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_FORCE_VOLATILE_LOCALS", "false"));
     // Frameless codegen gate (-Dcn1.frameless, default on). When off the
     // eligibility predicate always returns false, so every method emits the
     // legacy frame code byte-for-byte identical to before.
     private static final boolean FRAMELESS_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless", "true"));
+            "true".equalsIgnoreCase(Util.getProperty("cn1.frameless", "true"));
     // PHASE 3b: extend frameless codegen to OBJECT-BEARING methods (-Dcn1.frameless.objects,
     // default off). Such a method keeps its object operand stack + object locals in a
     // method-local C array on the native stack; the C runtime (built with
@@ -117,14 +117,14 @@ public class BytecodeMethod implements SignatureSet {
     // stopped thread's native stack. With this OFF, only primitive-only methods are
     // frameless (identical to the prior phase). Requires the conservative-GC runtime.
     private static final boolean FRAMELESS_OBJECTS_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.objects", "true"));
+            "true".equalsIgnoreCase(Util.getProperty("cn1.frameless.objects", "true"));
     // PHASE 3b: extend object-frameless to INSTANCE methods (receiver `this` becomes a
     // conservatively-scanned C parameter). Now DEFAULT ON: the intermittent multi-threaded
     // failure that previously gated this off was a pre-existing Thread.start/join visibility
     // race (alive set on the worker thread async after start() returned), fixed in
     // java_lang_Thread_start__ (993331107); with it fixed, MtStress is 50/50 deterministic.
     private static final boolean FRAMELESS_INSTANCE_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.instance", "true"));
+            "true".equalsIgnoreCase(Util.getProperty("cn1.frameless.instance", "true"));
     private int methodOffset;
     private boolean forceVirtual;
     private boolean virtualOverriden;
@@ -162,7 +162,7 @@ public class BytecodeMethod implements SignatureSet {
         optimizerOn = op == null || op.equalsIgnoreCase("on");
         //optimizerOn = false;
 
-        onDeviceDebug = "true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"));
+        onDeviceDebug = "true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"));
     }
 
     public static boolean isOnDeviceDebug() {
@@ -786,16 +786,16 @@ public class BytecodeMethod implements SignatureSet {
         if(methodName.equals("<init>")) {
             methodName = "__INIT__";
             constructor = true;
-            returnType = new ByteCodeMethodArg(Void.TYPE, 0);
+            returnType = new ByteCodeMethodArg(PrimitiveType.VOID, 0);
         } else {
             if(methodName.equals("<clinit>")) {
                 methodName = "__CLINIT__";
-                returnType = new ByteCodeMethodArg(Void.TYPE, 0);
+                returnType = new ByteCodeMethodArg(PrimitiveType.VOID, 0);
                 staticMethod = true;
             } else {            
                 String retType = desc.substring(pos + 1);
                 if(retType.equals("V")) {
-                    returnType = new ByteCodeMethodArg(Void.TYPE, 0);
+                    returnType = new ByteCodeMethodArg(PrimitiveType.VOID, 0);
                 } else {
                     int dim = 0;
                     while(retType.startsWith("[")) {
@@ -818,28 +818,28 @@ public class BytecodeMethod implements SignatureSet {
                             returnType = new ByteCodeMethodArg(objectType, dim);
                             break;
                         case 'I':
-                            returnType = new ByteCodeMethodArg(Integer.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.INT, dim);
                             break;
                         case 'J':
-                            returnType = new ByteCodeMethodArg(Long.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.LONG, dim);
                             break;
                         case 'B':
-                            returnType = new ByteCodeMethodArg(Byte.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.BYTE, dim);
                             break;
                         case 'S':
-                            returnType = new ByteCodeMethodArg(Short.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.SHORT, dim);
                             break;
                         case 'F':
-                            returnType = new ByteCodeMethodArg(Float.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.FLOAT, dim);
                             break;
                         case 'D':
-                            returnType = new ByteCodeMethodArg(Double.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.DOUBLE, dim);
                             break;
                         case 'Z':
-                            returnType = new ByteCodeMethodArg(Boolean.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.BOOLEAN, dim);
                             break;
                         case 'C':
-                            returnType = new ByteCodeMethodArg(Character.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.CHAR, dim);
                             break;
                     }
                 }
@@ -869,28 +869,28 @@ public class BytecodeMethod implements SignatureSet {
                     arguments.add(new ByteCodeMethodArg(objectType, currentArrayDim));
                     break;
                 case 'I':
-                    arguments.add(new ByteCodeMethodArg(Integer.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.INT, currentArrayDim));
                     break;
                 case 'J':
-                    arguments.add(new ByteCodeMethodArg(Long.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.LONG, currentArrayDim));
                     break;
                 case 'B':
-                    arguments.add(new ByteCodeMethodArg(Byte.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.BYTE, currentArrayDim));
                     break;
                 case 'S':
-                    arguments.add(new ByteCodeMethodArg(Short.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.SHORT, currentArrayDim));
                     break;
                 case 'F':
-                    arguments.add(new ByteCodeMethodArg(Float.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.FLOAT, currentArrayDim));
                     break;
                 case 'D':
-                    arguments.add(new ByteCodeMethodArg(Double.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.DOUBLE, currentArrayDim));
                     break;
                 case 'Z':
-                    arguments.add(new ByteCodeMethodArg(Boolean.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.BOOLEAN, currentArrayDim));
                     break;
                 case 'C':
-                    arguments.add(new ByteCodeMethodArg(Character.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.CHAR, currentArrayDim));
                     break;
             }
             currentArrayDim = 0;
@@ -1395,6 +1395,18 @@ public class BytecodeMethod implements SignatureSet {
         return rows;
     }
 
+    /**
+     * Every local, in a deterministic order, for emitting the C declarations.
+     *
+     * Unlike {@link #debugVarEntries} this drops nothing: a local whose slot lies
+     * outside the frame still needs its declaration, it just has no debug row.
+     */
+    private List<LocalVariable> declarationOrderedLocals() {
+        List<LocalVariable> ordered = new ArrayList<LocalVariable>(localVariables);
+        Collections.sort(ordered, DEBUG_VAR_ORDER);
+        return ordered;
+    }
+
     /** Slot first, then storage qualifier, so a reused slot's rows stay adjacent. */
     private static final Comparator<LocalVariable> DEBUG_VAR_ORDER = new Comparator<LocalVariable>() {
         @Override
@@ -1629,29 +1641,29 @@ public class BytecodeMethod implements SignatureSet {
                 CustomJump cj = (CustomJump)i;
                 String cmp = cj.getCustomCompareCode();
                 if (cmp != null) {
-                    cj.setCustomCompareCode(cmp.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    cj.setCustomCompareCode(Util.rewriteLocalObjectRefs(cmp));
                 }
             } else if (i instanceof CustomIntruction) {
                 CustomIntruction ci = (CustomIntruction)i;
                 String code = ci.getCode();
                 if (code != null) {
-                    ci.setCode(code.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    ci.setCode(Util.rewriteLocalObjectRefs(code));
                 }
                 String complexCode = ci.getComplexCode();
                 if (complexCode != null) {
-                    ci.setComplexCode(complexCode.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    ci.setComplexCode(Util.rewriteLocalObjectRefs(complexCode));
                 }
             } else if (i instanceof CustomInvoke) {
                 CustomInvoke ci = (CustomInvoke)i;
                 String target = ci.getTargetObjectLiteral();
                 if (target != null) {
-                    ci.setTargetObjectLiteral(target.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                    ci.setTargetObjectLiteral(Util.rewriteLocalObjectRefs(target));
                 }
                 String[] args = ci.getLiteralArgs();
                 if (args != null) {
                     for (int j=0; j<args.length; j++) {
                         if (args[j] != null) {
-                            ci.setLiteralArg(j, args[j].replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                            ci.setLiteralArg(j, Util.rewriteLocalObjectRefs(args[j]));
                         }
                     }
                 }
@@ -1749,7 +1761,14 @@ public class BytecodeMethod implements SignatureSet {
             // below; empty for the ordinary ones so nothing else changes.
             String spVariant = volatileLocals ? "_VSP" : "";
             Set<String> added = new HashSet<String>();
-            for (LocalVariable lv : localVariables) {
+            // Sorted, not in localVariables iteration order: that is a HashSet, so the
+            // order of these declarations varied between builds of the same input.
+            // debugVarEntries already had to learn this for the debug side-table; the
+            // C declarations had the same defect and it stayed invisible because
+            // HotSpot's identity hash is stable within a run. Translating the
+            // translator with itself is what surfaced it -- a different runtime, a
+            // different order, and the same input produced different C.
+            for (LocalVariable lv : declarationOrderedLocals()) {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
                 if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
@@ -2174,7 +2193,7 @@ public class BytecodeMethod implements SignatureSet {
             b.append(cls);
             b.append("(threadStateData);\n    ");
         }
-        if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+        if (Util.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             b.append("\n    if(__cn1ThisObject == JAVA_NULL) THROW_NULL_POINTER_EXCEPTION();\n    ");
         } 
         if(!returnType.isVoid()) {
@@ -2359,7 +2378,7 @@ public class BytecodeMethod implements SignatureSet {
         }
         return new NativeSignatureVerifier.Signature(symbol.toString(), clsName,
                 methodName, overloadPrefix, cReturnType.toString().trim(), params,
-                prototype.toString().trim().replaceAll("\\s+", " "));
+                Util.collapseWhitespace(prototype.toString().trim()));
     }
 
     public boolean isAbstract() {
@@ -2436,6 +2455,228 @@ public class BytecodeMethod implements SignatureSet {
         return desc;
     }
 
+    /**
+     * The type this method allocates and hands straight back -- NEW T, DUP, the
+     * constructor arguments, T.&lt;init&gt;, ARETURN -- or null for any other shape.
+     * The point of being this strict is that the caller uses the answer as a
+     * certainty about the returned object's concrete class, so a body that could
+     * return something it did not just allocate has to be rejected rather than
+     * guessed at.
+     */
+    public String allocatedReturnType() {
+        List<Instruction> real = new ArrayList<Instruction>();
+        for (Instruction i : instructions) {
+            if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof TryCatch) {
+                continue;
+            }
+            real.add(i);
+        }
+        if (real.size() < 4) {
+            return null;
+        }
+        Instruction first = real.get(0);
+        if (!(first instanceof TypeInstruction) || first.getOpcode() != Opcodes.NEW) {
+            return null;
+        }
+        String type = ((TypeInstruction) first).getTypeName();
+        if (type == null || real.get(1).getOpcode() != Opcodes.DUP) {
+            return null;
+        }
+        if (real.get(real.size() - 1).getOpcode() != Opcodes.ARETURN) {
+            return null;
+        }
+        Instruction ctor = real.get(real.size() - 2);
+        if (!(ctor instanceof Invoke) || ctor.getOpcode() != Opcodes.INVOKESPECIAL) {
+            return null;
+        }
+        Invoke ci = (Invoke) ctor;
+        if (!"<init>".equals(ci.getName()) || !type.equals(ci.getOwner())) {
+            return null;
+        }
+        // Everything between the DUP and the constructor has to be a plain local
+        // read. Anything with a side effect could leave a different object under
+        // the ARETURN, and then the type above would be a lie.
+        for (int i = 2; i < real.size() - 2; i++) {
+            Instruction a = real.get(i);
+            if (!(a instanceof VarOp) || !isLoadOpcode(a.getOpcode())) {
+                return null;
+            }
+        }
+        return type;
+    }
+
+    private static boolean isLoadOpcode(int op) {
+        return op == Opcodes.ALOAD || op == Opcodes.ILOAD || op == Opcodes.LLOAD
+                || op == Opcodes.FLOAD || op == Opcodes.DLOAD;
+    }
+
+    private int nextExecutable(int from) {
+        for (int i = from; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction || ins instanceof LineNumber || ins instanceof TryCatch) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private int prevExecutable(int from) {
+        for (int i = from; i >= 0; i--) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction || ins instanceof LineNumber || ins instanceof TryCatch) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    /// The first local slot that cannot hold an incoming argument.
+    ///
+    /// Parameters occupy locals WITHOUT an ASTORE, so a slot-write count of one
+    /// does not mean the slot holds one value over the method's lifetime -- an
+    /// Iterator parameter in that slot is a second, earlier value. Long and double
+    /// take two slots each, per the JVM numbering the instruction stream uses.
+    ///
+    /// @return the lowest slot index that is definitely not a parameter
+    private int firstNonParameterSlot() {
+        int slots = isStatic() ? 0 : 1;
+        for (ByteCodeMethodArg arg : arguments) {
+            char q = arg.getQualifier();
+            slots += (q == 'l' || q == 'd') ? 2 : 1;
+        }
+        return slots;
+    }
+
+    private int countStoresTo(int slot) {
+        int n = 0;
+        for (Instruction ins : instructions) {
+            if (ins instanceof VarOp && ins.getOpcode() == Opcodes.ASTORE
+                    && ((VarOp) ins).getIndex() == slot) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * ITERATOR LOWERING: give a for-each loop the concrete Iterator type its
+     * collection really returns, so the calls stop going through the interface.
+     *
+     * A for-each compiles to Iterator.hasNext()/next() through INVOKEINTERFACE,
+     * which is the most expensive dispatch the VM has -- a lookup in the owning
+     * class's interface map before the vtable read -- and it runs twice per
+     * element. Neither the emitter's closed-world devirtualization nor ThinLTO
+     * can touch it, because both start from a concrete owner and an interface
+     * call does not have one: java.util.Iterator has 27 implementors here.
+     *
+     * The concrete type is recoverable locally even though the translator has no
+     * general stack-type inference. If the collection's iterator() has exactly
+     * one reachable implementation, and that implementation's whole body is
+     * `return new T(...)`, then the object stored by the ASTORE that follows the
+     * call is a T -- no inference needed. Retyping the calls to INVOKEVIRTUAL on
+     * T is then enough on its own: the existing devirtualization in
+     * Invoke.appendInstruction takes any virtual call with no reachable override
+     * the rest of the way to a direct one, which ThinLTO can inline.
+     *
+     * The single-assignment requirement on the local is what makes this sound
+     * without dataflow. If a slot were written twice, a second iterator of some
+     * other class could reach the same ALOAD, and a virtual call on the wrong
+     * class reads its fields out of an object that does not have them -- silent
+     * on this VM, since ParparVM's CHECKCAST is unchecked.
+     *
+     * Like the concat fusion this must run BEFORE the unused-method cull, so the
+     * newly created edges exist while reachability is computed.
+     */
+    public void lowerIteratorCalls() {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke)) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            int op = inv.getOpcode();
+            if (op != Opcodes.INVOKEINTERFACE && op != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            if (!"iterator".equals(inv.getName()) || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
+                continue;
+            }
+            ByteCodeClass coll = Parser.getClassObject(Util.mangle(inv.getOwner()));
+            String itType = Parser.resolveConcreteIteratorType(coll);
+            if (itType == null) {
+                continue;
+            }
+            int st = nextExecutable(i + 1);
+            if (st < 0) {
+                continue;
+            }
+            Instruction store = instructions.get(st);
+            if (!(store instanceof VarOp) || store.getOpcode() != Opcodes.ASTORE) {
+                continue;
+            }
+            int slot = ((VarOp) store).getIndex();
+            // Exactly one ASTORE is not enough on its own: a parameter reaches its
+            // slot without one, so a method that takes an Iterator and later reuses
+            // that slot for this loop's iterator has TWO values in it. Rewriting the
+            // parameter's calls to the concrete type would dispatch methods that
+            // read the wrong object layout -- unchecked, on this VM.
+            if (slot < firstNonParameterSlot() || countStoresTo(slot) != 1) {
+                continue;
+            }
+            retypeIteratorUses(slot, itType, st);
+        }
+    }
+
+    /// @param storeIdx index of the ASTORE that put the concrete iterator in the
+    ///                 slot; only uses AFTER it are rewritten, since anything
+    ///                 earlier cannot be reading the value this store wrote
+    private void retypeIteratorUses(int slot, String itType, int storeIdx) {
+        ByteCodeClass itClass = Parser.getClassObject(Util.mangle(itType));
+        if (itClass == null) {
+            return;
+        }
+        for (int i = storeIdx + 1; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke) || ins.getOpcode() != Opcodes.INVOKEINTERFACE) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            if (!"java/util/Iterator".equals(inv.getOwner())) {
+                continue;
+            }
+            int r = prevExecutable(i - 1);
+            if (r < 0) {
+                continue;
+            }
+            Instruction recv = instructions.get(r);
+            if (!(recv instanceof VarOp) || recv.getOpcode() != Opcodes.ALOAD
+                    || ((VarOp) recv).getIndex() != slot) {
+                continue;
+            }
+            // The concrete class has to actually resolve the method, and resolve it
+            // monomorphically -- otherwise the retyped call has nothing to bind to.
+            if (Parser.resolveDevirtualizedOwner(itClass, inv.getName(), inv.getDesc()) == null) {
+                continue;
+            }
+            Invoke direct = new Invoke(Opcodes.INVOKEVIRTUAL, itType, inv.getName(), inv.getDesc(), false);
+            instructions.set(i, direct);
+            // Register it exactly as addInstruction() would: the list entry alone
+            // leaves the call with no owning method, no class dependency and no
+            // edge in the dependency graph, so the cull would not see the concrete
+            // iterator's methods being called.
+            direct.setMethod(this);
+            direct.addDependencies(dependentClasses);
+            if (dependencyGraph != null) {
+                String uses = direct.getMethodUsed();
+                if (uses != null) {
+                    dependencyGraph.recordMethodCall(this, uses);
+                }
+            }
+        }
+    }
+
     public Set<LocalVariable> getLocalVariables() {
         return localVariables;
     }
@@ -2448,6 +2689,10 @@ public class BytecodeMethod implements SignatureSet {
     }
     
     public void addLabel(Label l) {
+        // Named here, in bytecode order, so the generated C label is a function of the
+        // method alone. See LabelInstruction.assignLabelName.
+        com.codename1.tools.translator.bytecodes.LabelInstruction.assignLabelName(l, nextLabelIndex);
+        nextLabelIndex++;
         addInstruction(new com.codename1.tools.translator.bytecodes.LabelInstruction(l));
     }
     
@@ -2455,6 +2700,9 @@ public class BytecodeMethod implements SignatureSet {
         addInstruction(new Invoke(opcode, owner, name, desc, itf));
     }
     
+    /** Per-method label counter; see addLabel. */
+    private int nextLabelIndex;
+
     public void setMaxes(int maxStack, int maxLocals) {
         this.maxLocals = maxLocals;
         this.maxStack = maxStack;
@@ -2667,10 +2915,10 @@ public class BytecodeMethod implements SignatureSet {
      * is more specific (e.g. boolean / byte / short / char).
      */
     private String returnTypeChar() {
-        if (returnType.getPrimitiveType() == Boolean.TYPE) return "Z";
-        if (returnType.getPrimitiveType() == Byte.TYPE)    return "B";
-        if (returnType.getPrimitiveType() == Short.TYPE)   return "S";
-        if (returnType.getPrimitiveType() == Character.TYPE) return "C";
+        if (returnType.getPrimitiveType() == PrimitiveType.BOOLEAN) return "Z";
+        if (returnType.getPrimitiveType() == PrimitiveType.BYTE)    return "B";
+        if (returnType.getPrimitiveType() == PrimitiveType.SHORT)   return "S";
+        if (returnType.getPrimitiveType() == PrimitiveType.CHAR) return "C";
         return "I";
     }
 
@@ -2755,7 +3003,7 @@ public class BytecodeMethod implements SignatureSet {
     private int varCounter = 0;
     // Master off-switch: -DCN1_DISABLE_BCE=true reverts to fully-checked array access.
     private static final boolean DISABLE_BCE =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_BCE", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_BCE", "false"));
 
     /**
      * Prove-safe array-bounds-check elimination. Conservative and fail-closed:
@@ -2931,7 +3179,7 @@ public class BytecodeMethod implements SignatureSet {
     // the whole struct to registers.
     // ------------------------------------------------------------------
     private static final boolean DISABLE_SCALAR_REPLACE =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_SCALAR_REPLACE", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_SCALAR_REPLACE", "false"));
 
     private static String srMangle(String s) {
         return s.replace('.', '_').replace('/', '_').replace('$', '_');
@@ -3223,7 +3471,7 @@ public class BytecodeMethod implements SignatureSet {
     // can't dispatch to an escaping override.
     // ------------------------------------------------------------------
     private static final boolean DISABLE_SB_STACK_ALLOC =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_SB_STACK_ALLOC", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_SB_STACK_ALLOC", "false"));
     private static final String SB_OWNER = "java/lang/StringBuilder";
 
     /** Slots consumed by the argument list of a method descriptor (no receiver). */
@@ -4219,6 +4467,7 @@ public class BytecodeMethod implements SignatureSet {
             previousCast = null;
         }
     }
+
 
     boolean optimize() {
         // FUSED OBJECTS, constructor side: rewrite each planned

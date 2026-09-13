@@ -91,7 +91,7 @@ public class Invoke extends Instruction {
     public void addDependencies(List<String> dependencyList) {
         String dependencyOwner = owner;
         if (opcode == Opcodes.INVOKEVIRTUAL) {
-            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
                 dependencyOwner = resolvedConcreteOwner;
@@ -121,7 +121,7 @@ public class Invoke extends Instruction {
         if(opcode != Opcodes.INVOKEINTERFACE && opcode != Opcodes.INVOKEVIRTUAL) {
             return;
         }         
-        bld.append(owner.replace('/', '_').replace('$', '_'));
+        bld.append(Util.mangle(owner));
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");
@@ -167,7 +167,7 @@ public class Invoke extends Instruction {
         if (currentClass != null && (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_"))) {
             return null;
         }
-        ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
+        ByteCodeClass concreteClass = Parser.getClassObject(Util.mangle(ownerClass.getConcreteClass()));
         // The nearest class in the concrete type's own hierarchy that actually
         // declares the method -- which is what the runtime would dispatch to for
         // an instance of it. Resolving against concreteClass's declarations alone
@@ -227,7 +227,7 @@ public class Invoke extends Instruction {
         for (int i = 0; i < kids.size(); i++) {
             lenExprs[i] = kids.get(i).siteLengthExpr(argExprByParam);
         }
-        String cType = owner.replace('/', '_').replace('$', '_');
+        String cType = Util.mangle(owner);
         fusedPlan.appendFusedAlloc(b, cType, lenExprs, n + 1, n + 2);
     }
 
@@ -261,7 +261,7 @@ public class Invoke extends Instruction {
             // argCats == null: every argExpr here is a pure SP[-k].data.x read
             // (the args were evaluated onto the operand stack BEFORE this <init>),
             // so no temp hoisting is needed.
-            String cType = owner.replace('/', '_').replace('$', '_');
+            String cType = Util.mangle(owner);
             inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, null, n + 2, n + 1);
             return true;
         }
@@ -307,7 +307,7 @@ public class Invoke extends Instruction {
             // if it is.
             boolean isVirtual = true;
             if (opcode == Opcodes.INVOKEVIRTUAL) {
-                ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
                 if (bc == null) {
                     System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
                 } else {
@@ -340,7 +340,7 @@ public class Invoke extends Instruction {
         
         if(opcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
-            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
             invokeOwner = findActualOwner(bc);
         }
         if (invokeOwner.startsWith("[")) {
@@ -348,7 +348,7 @@ public class Invoke extends Instruction {
             // as an owner.  We'll just change this to java_lang_Object instead.
             bld.append("java_lang_Object");
         } else{
-            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
+            bld.append(Util.mangle(invokeOwner));
         }
         bld.append("_");
         if(name.equals("<init>")) {
@@ -364,7 +364,7 @@ public class Invoke extends Instruction {
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
-            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+            BytecodeMethod.addVirtualMethodsInvoked(bld.toString().substring("virtual_".length()));
         } else {
             // direct/devirtualized calls of the hottest String/StringBuilder
             // natives get the call-site-inlined fast path (cn1_intrinsics.h)
@@ -501,7 +501,7 @@ public class Invoke extends Instruction {
     
     // Master off-switch: -DCN1_DISABLE_INLINE=true disables trivial-method inlining.
     private static final boolean DISABLE_INLINE =
-            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_INLINE", "false"));
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_INLINE", "false"));
 
     /**
      * If this invoke is a direct (provably monomorphic) instance call to a trivial
@@ -523,7 +523,7 @@ public class Invoke extends Instruction {
             if (desc.length() < 3 || desc.charAt(0) != '(' || desc.charAt(1) != ')' || desc.charAt(2) == 'V') {
                 return null;
             }
-            BytecodeMethod target = findMethodUp(Parser.getClassObject(owner.replace('/', '_').replace('$', '_')));
+            BytecodeMethod target = findMethodUp(Parser.getClassObject(Util.mangle(owner)));
             if (target == null || !target.isStatic()) {
                 return null;
             }
@@ -586,10 +586,10 @@ public class Invoke extends Instruction {
      */
     private BytecodeMethod resolveDirectTarget() {
         if (opcode == Opcodes.INVOKESPECIAL) {
-            return findMethodUp(Parser.getClassObject(owner.replace('/', '_').replace('$', '_')));
+            return findMethodUp(Parser.getClassObject(Util.mangle(owner)));
         }
         // INVOKEVIRTUAL
-        ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+        ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
         if (bc == null) {
             return null;
         }
@@ -601,7 +601,7 @@ public class Invoke extends Instruction {
         if (rc == null) {
             return null; // genuinely virtual -> target not fixed -> unsafe to inline
         }
-        return findMethodUp(Parser.getClassObject(rc.replace('/', '_').replace('$', '_')));
+        return findMethodUp(Parser.getClassObject(Util.mangle(rc)));
     }
 
     /**
@@ -629,7 +629,7 @@ public class Invoke extends Instruction {
         if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
                 && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
         BytecodeMethod t = inner.findMethodUp(Parser.getClassObject(
-                inner.owner.replace('/', '_').replace('$', '_')));
+                Util.mangle(inner.owner)));
         return (t != null && t.isStatic()) ? t : null;
     }
 

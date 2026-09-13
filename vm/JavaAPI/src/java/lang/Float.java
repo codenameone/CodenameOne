@@ -28,6 +28,28 @@ package java.lang;
  * Since: JDK1.0, CLDC 1.1
  */
 public final class Float extends Number implements Comparable<Float> {
+
+    /**
+     * The class object for the primitive type this class wraps.
+     *
+     * Null on every ParparVM target, and declared only because ASM's compiled
+     * bytecode reads it: org.objectweb.asm.Type compares against Short.TYPE,
+     * Float.TYPE and Boolean.TYPE, so the self-hosted translator does not link
+     * without the three fields existing. ASM is a jar we cannot edit, which is
+     * the one case where JavaAPI grows to meet a dependency rather than the
+     * dependency being removed.
+     *
+     * It cannot be given a real value here. javac lowers a primitive class
+     * literal to a read of the boxed type's own TYPE field, so the obvious
+     * initializer compiles to "getstatic TYPE; putstatic TYPE" -- it reads the
+     * field it is initializing and stores the null straight back. The six
+     * wrappers that already declare TYPE are null for exactly that reason.
+     * Giving all nine real values needs VM-side primitive class objects; that
+     * work is not part of this change, and nothing in the translator depends on
+     * it now that the C-type tables are keyed on the PrimitiveType enum.
+     */
+    public static final Class<Float> TYPE = null;
+
     /**
      * The largest positive value of type float. It is equal to the value returned by Float.intBitsToFloat(0x7f7fffff).
      * See Also:Constant Field Values
@@ -113,6 +135,20 @@ public final class Float extends Number implements Comparable<Float> {
      * Returns the bit representation of a single-float value. The result is a representation of the floating-point argument according to the IEEE 754 floating-point "single precision" bit layout. Bit 31 (the bit that is selected by the mask 0x80000000) represents the sign of the floating-point number. Bits 30-23 (the bits that are selected by the mask 0x7f800000) represent the exponent. Bits 22-0 (the bits that are selected by the mask 0x007fffff) represent the significand (sometimes called the mantissa) of the floating-point number. If the argument is positive infinity, the result is 0x7f800000. If the argument is negative infinity, the result is 0xff800000. If the argument is NaN, the result is 0x7fc00000. In all cases, the result is an integer that, when given to the
      * method, will produce a floating-point value equal to the argument to floatToIntBits.
      */
+    /**
+     * The raw IEEE 754 bits of {@code value}, without collapsing NaN to the
+     * canonical NaN.
+     *
+     * Delegates rather than declaring a second native. ParparVM's floatToIntBits
+     * is a bare union punt that does not collapse NaN to the canonical NaN -- so it
+     * is already the raw operation, and the two differ in the spec but not here. A
+     * separate native would be one more mangled symbol to get wrong, silently, for
+     * no behavioural difference.
+     */
+    public static int floatToRawIntBits(float value) {
+        return floatToIntBits(value);
+    }
+
     public native static int floatToIntBits(float value);
 
     /**

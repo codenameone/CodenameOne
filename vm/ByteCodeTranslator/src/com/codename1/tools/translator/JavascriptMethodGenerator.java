@@ -5838,22 +5838,22 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             if (returnTypeName != null) {
                 jsReturnType = JavascriptNameUtil.sanitizeClassName(returnTypeName);
             } else {
-                Class primitiveType = returnType.getPrimitiveType();
-                if (primitiveType == Integer.TYPE) {
+                PrimitiveType primitiveType = returnType.getPrimitiveType();
+                if (primitiveType == PrimitiveType.INT) {
                     jsReturnType = "int";
-                } else if (primitiveType == Long.TYPE) {
+                } else if (primitiveType == PrimitiveType.LONG) {
                     jsReturnType = "long";
-                } else if (primitiveType == Double.TYPE) {
+                } else if (primitiveType == PrimitiveType.DOUBLE) {
                     jsReturnType = "double";
-                } else if (primitiveType == Float.TYPE) {
+                } else if (primitiveType == PrimitiveType.FLOAT) {
                     jsReturnType = "float";
-                } else if (primitiveType == Boolean.TYPE) {
+                } else if (primitiveType == PrimitiveType.BOOLEAN) {
                     jsReturnType = "boolean";
-                } else if (primitiveType == Byte.TYPE) {
+                } else if (primitiveType == PrimitiveType.BYTE) {
                     jsReturnType = "byte";
-                } else if (primitiveType == Short.TYPE) {
+                } else if (primitiveType == PrimitiveType.SHORT) {
                     jsReturnType = "short";
-                } else if (primitiveType == Character.TYPE) {
+                } else if (primitiveType == PrimitiveType.CHAR) {
                     jsReturnType = "char";
                 } else {
                     jsReturnType = "java_lang_Object";

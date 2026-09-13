@@ -1463,16 +1463,6 @@ JAVA_LONG java_lang_Double_doubleToLongBits___double_R_long(CODENAME_ONE_THREAD_
     return u.l;
 }
 
-JAVA_LONG java_lang_Double_doubleToRawLongBits___double_R_long(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE n1) {
-    union {
-        JAVA_DOUBLE d;
-        JAVA_LONG   l;
-    } u;
-    
-    u.d = n1;
-    return u.l;
-}
-
 JAVA_FLOAT java_lang_Float_intBitsToFloat___int_R_float(CODENAME_ONE_THREAD_STATE, JAVA_INT n1)
 {
     union {
@@ -1973,6 +1963,7 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
     return newStringFromCString(threadStateData, clz->clsName);
 }
 
+
 JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
     struct clazz* clz = (struct clazz*)cls;
     return clz->isArray;
@@ -1988,6 +1979,12 @@ JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA
 JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT cls2) {
     struct clazz* clz1 = (struct clazz*)cls;
     struct clazz* clz2 = (struct clazz*)cls2;
+    // A primitive class carries CN1_PRIMITIVE_CLASS_ID, which indexes no row of
+    // the instanceof tables, so it must never reach instanceofFunction. The JDK
+    // rule is also simply identity: int is assignable only from int.
+    if(clz1->primitiveType || clz2->primitiveType) {
+        return clz1 == clz2 ? JAVA_TRUE : JAVA_FALSE;
+    }
     // A.isAssignableFrom(B): target is A, the class under test is B.
     return instanceofFunction(clz1->classId, clz2->classId);
 }
@@ -1995,6 +1992,9 @@ JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENA
 JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT obj) {
     if(obj == JAVA_NULL) { return JAVA_FALSE; }
     struct clazz* clz1 = (struct clazz*)cls;
+    // No object is ever an instance of a primitive class, and its sentinel
+    // classId indexes no instanceof table row -- see isAssignableFrom above.
+    if(((struct clazz*)cls)->primitiveType) { return JAVA_FALSE; }
     struct clazz* clz2 = (struct clazz*)CN1_CLASS_OF(obj); // tag-aware: a tagged Integer has no header
     // A.isInstance(o): target is A, the class under test is o's class. These were
     // reversed, so isInstance searched the TARGET's supertype table for the

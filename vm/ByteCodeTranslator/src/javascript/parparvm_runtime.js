@@ -5755,6 +5755,16 @@ bindNative(["cn1_java_lang_Class_getComponentType_R_java_lang_Class"], function(
   }
   return classObjectForName(def.componentClass);
 });
+// A browser has no process environment, so getenv ANSWERS null rather than
+// failing. Without this the symbol falls through to the unsupported-native path,
+// which emits `throw new Error("environment variables are not available...")` --
+// and Class.getResourceAsStream consults CN1_RESOURCE_PATH, so a JavaScript
+// application asking for a resource got an exception where it previously got
+// null. Returning null is both the safe answer and the correct one: the variable
+// genuinely is not set.
+bindNative(["cn1_java_lang_System_getenvImpl_java_lang_String_R_java_lang_String"], function(name) {
+  return null;
+});
 bindNative(["cn1_java_lang_Class_isPrimitive_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isPrimitive ? 1 : 0; });
 bindNative(["cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object"], function(componentClass, length) {
   if (!componentClass || !componentClass.__classDef) {

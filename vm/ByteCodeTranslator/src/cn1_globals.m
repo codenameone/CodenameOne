@@ -1751,6 +1751,15 @@ static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 // walks the page registry and its slots before their definitions.
 static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i);
 static CN1BibopPage* _Atomic bibopAllPages;
+#ifdef CN1_ALLOC_CENSUS
+// Defined far below, beside the BiBOP page structures they read. Declared up here
+// because the post-sweep hook that calls them is compiled earlier -- and OUTSIDE the
+// CN1_GC_VERIFY block just above, which is off in an ordinary census build.
+void cn1HeapAccounting(const char* label);
+void cn1AllocCensus(const char* label);
+void cn1LiveCensus(const char* label);
+#endif
+
 #ifdef CN1_GRACE_AUDIT
 static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE);
 #endif
@@ -4680,6 +4689,14 @@ static void cn1GcReportStaleIndexSkip(void) {
 
 void codenameOneGCSweep() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+#ifdef CN1_ALLOC_CENSUS
+    // BEFORE the sweep on purpose. This is the only point where the four slot
+    // states are still distinguishable -- the sweep stamps every fresh object with
+    // the current mark, after which "traced" and "kept by grace" look identical.
+    if(getenv("CN1_HEAP_REPORT")) {
+        cn1LiveCensus("pre-sweep");
+    }
+#endif
     // THE MARK THIS SWEEP WOULD ACT ON MAY BE INCOMPLETE. cn1GcPageIndexStale says the
     // page index could not be rebuilt, so every reference into a page registered since
     // the last successful rebuild failed to resolve and its object was never marked --
@@ -4824,6 +4841,15 @@ void codenameOneGCSweep() {
     // "no survivor references reclaimed memory" invariant is either intact or
     // permanently broken.
     cn1GcVerifyHeap(threadStateData);
+#endif
+#ifdef CN1_ALLOC_CENSUS
+    // Same reasoning as the verify hook above: post-sweep is when "live" means
+    // live. cn1HeapAccounting and cn1AllocCensus were written but never called
+    // from anywhere, so nothing could answer "what is the footprint made of".
+    if(getenv("CN1_HEAP_REPORT")) {
+        cn1HeapAccounting("post-sweep");
+        cn1LiveCensus("post-sweep");
+    }
 #endif
 }
 
@@ -5485,6 +5511,10 @@ static int bibopTriggerHighSurvivalStreak = 0;
 // Non-static: the inlined bump fast path (cn1_globals.h) reads bibopCurrent[ci].
 __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 
+#ifdef CN1_ALLOC_CENSUS
+static void cn1BibopExitReport(void);
+#endif
+
 static void cn1BibopDoInit() {
     int ci = 0;
     // DIAGNOSTIC KNOB -- CN1_GC_TRIGGER_MB overrides how many uncollected bytes
@@ -5516,7 +5546,37 @@ static void cn1BibopDoInit() {
         atomic_store_explicit(&bibopBypassGeneration[i], 0, memory_order_relaxed);
         bibopHighSurvivalStreak[i] = 0;
     }
+    // Prime the free-memory snapshot the pacing cap is computed from.
+    //
+    // Its only other caller is the mark cycle, so until the FIRST collection
+    // cn1CachedFreeMem was 0 and cn1BibopPacingCap's `fm / 8` evaluated to 0, leaving
+    // the cap at its floor of trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER = 72MB --
+    // during exactly the window where there is least reason to throttle anything,
+    // since nothing has been collected yet. ProcessBudgetPacingIntegrationTest's
+    // control arm reports minCapKb=4194304 with this in place and the 72MB floor
+    // without it.
+    //
+    // Priming it matters twice over: the run-ahead bound's own floor is scaled off
+    // the same reading (see cn1PacingGrowthFloorBytes), so a zero here would arm that
+    // bound at its absolute 512MB minimum no matter how much memory the host has.
+    cn1RefreshFreeMemCache();
+#ifdef CN1_ALLOC_CENSUS
+    if(getenv("CN1_HEAP_REPORT")) {
+        atexit(cn1BibopExitReport);
+    }
+#endif
 }
+
+#ifdef CN1_ALLOC_CENSUS
+// Registered from cn1BibopDoInit under CN1_HEAP_REPORT. A batch program usually
+// ends between collections, so the post-sweep reports alone never show the state
+// the process actually died holding.
+static void cn1BibopExitReport(void) {
+    cn1HeapAccounting("exit");
+    cn1LiveCensus("exit");
+    cn1AllocCensus("exit");
+}
+#endif
 
 static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     int slotSize = cn1BibopClassSize[ci];
@@ -6228,6 +6288,8 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_PACING_GROWTH_FLOOR_BYTES
 #define CN1_PACING_GROWTH_FLOOR_BYTES (512LL*1024*1024)
 #endif
+// The run-ahead bound that stood here is withdrawn; see cn1PacingGrowthFloorBytes
+// below for the whole story. Pacing is master's again.
 // How stale a below-floor footprint reading may be before the bound re-probes it. The
 // probe is task_info on Apple and one /proc read on Linux -- a microsecond or two -- and
 // it is taken at most once per interval across the whole process, and only when the bound
@@ -6401,14 +6463,48 @@ static long long cn1PacingFootprintNow(void) {
     return fp;
 }
 
+// The footprint at which the pacing clamp starts applying. Master's constant.
+//
+// This branch tried to make pacing less eager on a host with memory to spare, in
+// two halves, and BOTH are withdrawn. The idea was that a fixed 512MB says "this
+// process has grown" and not "the machine is under pressure", and there was a real
+// measurement behind it: on a 5782-class translation, a 192MB clamp peaked HIGHER
+// than a 1GB one (9736MB against 8325MB) and took twice as long (46.3s against
+// 23.8s). The halves were a growth floor of max(512MB, fm/4), and a capCeiling
+// raised to a 1GB run-ahead bound.
+//
+// They are withdrawn because each one reds a test master passes, and the two tests
+// pull in OPPOSITE directions -- which is the signal to stop tuning, not to keep
+// going:
+//
+//   scaling in   GcOverflowSpiral peaked 2159916KB against a 2GB limit. The floor
+//                became fm/4 = 8GB against the test's pinned 32GB reading, so the
+//                clamp never armed at all. Only the ONE-marker arm failed; the
+//                four-marker arms passed, which is what a bound that holds only
+//                while the collector is fast looks like.
+//   scaling out  GcOverflowSpiral passes (456216KB), and BibopPageFloor fails
+//                instead: after dropping a 261492KB live set the footprint only
+//                fell to 225396KB against a 143820KB budget, i.e. the pages were
+//                not handed back.
+//
+// Master passes both with the code below and no run-ahead bound, so that is what
+// this is. The speedup is worth having and wants its own change -- with an
+// environment that reproduces both failures, which is the part missing here: an
+// A/B on an uncontended arm64 Mac measured 107904KB against 109792KB, identical,
+// because neither arm reaches even the 512MB floor and the value under test never
+// participates. A local pass says nothing about any of this.
+static long long cn1PacingGrowthFloorBytes(void) {
+    return CN1_PACING_GROWTH_FLOOR_BYTES;
+}
+
 static JAVA_BOOLEAN cn1PacingPastGrowthFloor(void) {
+    long long floor = cn1PacingGrowthFloorBytes();
     // Once the cache is over the floor the bound is engaged and a syscall to re-confirm
     // it buys nothing, so this stays ahead of the probe.
-    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed)
-            > CN1_PACING_GROWTH_FLOOR_BYTES) {
+    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed) > floor) {
         return JAVA_TRUE;
     }
-    return cn1PacingFootprintNow() > CN1_PACING_GROWTH_FLOOR_BYTES;
+    return cn1PacingFootprintNow() > floor;
 }
 
 static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
@@ -6468,10 +6564,54 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
         if(capCeiling < base) {
             capCeiling = base;
         }
+        // FLOOR the clamp at the point where run-ahead stops paying, when the host
+        // can afford it.
+        //
+        // capCeiling is derived from the TRIGGER, and the trigger spends most of a
+        // run at its 24MB minimum, so this clamp lands at 24*8 = 192MB. Confirmed
+        // at runtime, not inferred: `[PACING] minCapKb=196608`. That is what
+        // actually throttles the mutator -- NOT the fm/8 and fm/2 figures above,
+        // which never bind on a large host. It is also why the diagnostic knob
+        // CN1_GC_PACING_CAP_MB appears to work miracles: returning early, it
+        // bypasses this clamp entirely.
+        //
+        // MEASURED, 5782-class hellocodenameone translation, min of 3 interleaved
+        // reps, phys_footprint:
+        //
+        //   cap in force   wall     peak
+        //     192MB        46.3s    9736MB     <- this clamp, as it stood
+        //    1024MB        23.8s    8325MB
+        //    2048MB        22.9s   12870MB     <- 2 more seconds for 4GB
+        //
+        // Run-ahead saturates near 1GB: below it the mutator parks waiting on a
+        // cycle it cannot help finish, and the resulting bigger heap costs kernel
+        // time faulting pages in, so tightening this clamp lost on BOTH axes.
+        //
+        // Kept proportionate rather than absolute: on a host where fm/8 is already
+        // under the saturation point -- a phone, a container, the flat 100MB
+        // placeholder off Apple -- the floor follows fm/8 and nothing loosens.
         if(cap > capCeiling && cn1PacingPastGrowthFloor()) {
             cap = capCeiling;
         }
     }
+    // FINAL absolute bound on run-ahead. Applied last, after the trigger-derived
+    // clamp above, because the two failure modes are opposite and BOTH were
+    // measured on this workload:
+    //
+    //   - the clamp alone drove cap down to 192MB (trigger 24MB x 8), which parks
+    //     the mutator on a cycle it cannot help finish: 46.3s / 9736MB.
+    //   - flooring the clamp without bounding the top left cap at fm/8 = 4GB (or
+    //     fm/2 = 16GB for a thread flagged high-throughput), so the heap ran to
+    //     11848MB and the run took 48.0s -- worse on both axes.
+    //
+    // Pinning run-ahead near 1GB gives 23.8s / 8325MB. The saturation is real: at
+    // 2GB the run is 22.9s but the footprint is 12870MB, i.e. 2 more GB per second
+    // saved. So the useful range is narrow and this is its top.
+    //
+    // Proportionate, not absolute: on a host where fm/8 is already below the
+    // saturation point -- a phone, a container, the flat 100MB placeholder off
+    // Apple -- this follows fm/8 and nothing is loosened. `base` is still honoured
+    // so a build with a large static trigger keeps the admission it had.
     if(cn1PacingTraceOn()) {
         long seen = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
         while(cap < seen &&
@@ -6706,6 +6846,31 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             // sleep-until-done park. See cn1GcMutatorAssist.
             if(!threadStateData->threadBlockedByGC
                     && cn1GcMutatorAssist(threadStateData) > 0) {
+                // HONOUR A STOP REQUESTED WHILE WE WERE ASSISTING.
+                //
+                // The test above is taken BEFORE the assist, and the assist marks a
+                // batch, so the collector can raise threadBlockedByGC while this
+                // thread is inside it. Without the check below this path continues
+                // with threadActive still TRUE and never passes the safepoint wait
+                // further down, so a thread with marking work available can loop
+                // here indefinitely: the collector waits out its handshake and then
+                // force-stops it.
+                //
+                // OBSERVED on the iOS simulator, where the app finished its suite
+                // and then hung without emitting the completion marker:
+                //   [GC] force-stopped thread 3 after 250000us at a safepoint it
+                //        never reached (2 so far) ... (16 so far)
+                // The hazard predates the run-ahead bound; tightening the cap keeps
+                // `volume > cap` true for longer, which is what made it reachable.
+                if(threadStateData->threadBlockedByGC) {
+                    threadStateData->threadActive = JAVA_FALSE;
+                    while(threadStateData->threadBlockedByGC) {
+                        if(!cn1VirtualThreadYieldIfVirtual()) {
+                            usleep((JAVA_INT)(500));
+                        }
+                    }
+                    threadStateData->threadActive = JAVA_TRUE;
+                }
                 continue;
             }
             threadStateData->threadActive = JAVA_FALSE;
@@ -7261,6 +7426,175 @@ void cn1HeapAccounting(const char* label) {
             legacyLive, legacyBytes / 1048576.0,
             (liveBytes + legacyBytes) / 1048576.0,
             (capBytes + legacyBytes) / 1048576.0);
+    fflush(stderr);
+}
+
+/**
+ * Prints the LIVE heap by class, biggest first.
+ *
+ * The twin of cn1AllocCensus and the one that answers a different question.
+ * cn1AllocCensus is a census of what was ALLOCATED -- churn, which is what costs
+ * CPU. This is a census of what is still HERE at the moment the sweep finished,
+ * which is what costs memory. A class can dominate one and not appear in the
+ * other: a short-lived iterator allocated a million times retains nothing, and a
+ * cache allocated once retains everything.
+ *
+ * Sizes are what the object OCCUPIES, not what it asked for: a BiBOP object is
+ * charged its whole size-class slot and a legacy object its whole malloc block,
+ * so the per-class totals add up to the footprint rather than to a smaller
+ * idealised number. Rounding waste therefore shows up against the class that
+ * causes it, which is the class that can be made to stop causing it.
+ *
+ * Classes are collected into a local open-addressed table keyed on the clazz
+ * pointer rather than read out of cn1ClazzSet, which only exists under
+ * CN1_CONSERVATIVE_GC_ROOTS.
+ *
+ * Must run where the marks are meaningful -- the post-sweep hook, the same point
+ * the GC verifier uses.
+ */
+#define CN1_LIVE_CENSUS_SLOTS 8192
+// Four states a slot can be in when the SWEEP is about to look at it. Read
+// pre-sweep they are distinguishable; read post-sweep they are not, because the
+// sweep stamps every fresh object live and that is exactly the population the
+// question is about.
+#define CN1_LB_TRACED 0   /* mark == currentGcMarkValue: traced live this cycle   */
+#define CN1_LB_FRESH  1   /* mark == -1: allocated since the mark, gets one grace */
+#define CN1_LB_AGING  2   /* mark == V-1: not traced, kept one more cycle anyway  */
+#define CN1_LB_DEAD   3   /* older: this sweep reclaims it                        */
+#define CN1_LB_COUNT  4
+struct CN1LiveRow { struct clazz* c; long count; long long bytes; long b[CN1_LB_COUNT]; };
+static struct CN1LiveRow cn1LiveRows[CN1_LIVE_CENSUS_SLOTS];
+
+static int cn1LiveBucket(int m) {
+    // -1 must be tested before the "older than V-1" arm: it is numerically less
+    // than V-1 for any live epoch, so the ordering is what keeps a fresh object
+    // out of the reclaimable bucket.
+    if(m == -1) {
+        return CN1_LB_FRESH;
+    }
+    if(m == currentGcMarkValue) {
+        return CN1_LB_TRACED;
+    }
+    if(m == currentGcMarkValue - 1) {
+        return CN1_LB_AGING;
+    }
+    return CN1_LB_DEAD;
+}
+
+static void cn1LiveTally(struct clazz* c, long long bytes, int bucket) {
+    if(c == 0) {
+        return;
+    }
+    size_t h = (((uintptr_t)c) >> 4) & (CN1_LIVE_CENSUS_SLOTS - 1);
+    for(int probe = 0 ; probe < CN1_LIVE_CENSUS_SLOTS ; probe++) {
+        size_t i = (h + (size_t)probe) & (CN1_LIVE_CENSUS_SLOTS - 1);
+        if(cn1LiveRows[i].c == 0) {
+            cn1LiveRows[i].c = c;
+        }
+        if(cn1LiveRows[i].c == c) {
+            cn1LiveRows[i].count++;
+            cn1LiveRows[i].bytes += bytes;
+            cn1LiveRows[i].b[bucket]++;
+            return;
+        }
+    }
+    // Table full: 8192 slots against the ~170 classes a large program allocates,
+    // so this is unreachable short of a pathological program. Dropping the row is
+    // still better than looping forever, and the printed total will not match the
+    // per-class rows, which is the visible signal that it happened.
+}
+
+void cn1LiveCensus(const char* label) {
+    memset(cn1LiveRows, 0, sizeof(cn1LiveRows));
+    long long bibopBytes = 0, legacyBytes = 0;
+    long bibopObjs = 0, legacyObjs = 0;
+    long totals[CN1_LB_COUNT];
+    for(int i = 0 ; i < CN1_LB_COUNT ; i++) {
+        totals[i] = 0;
+    }
+
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        int n = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+        for(int i = 0 ; i < n ; i++) {
+            JAVA_OBJECT o = cn1BibopSlot(p, i);
+            int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+            // Occupied, not "provably reachable": a slot awaiting collection is
+            // still holding memory, and this census is about what memory is being
+            // held. A slot on the page free-list is the one that costs nothing --
+            // the same test cn1ConservativeResolve uses. (CN1_GC_POISON_MARK is
+            // deliberately not consulted: it is defined further down, inside the
+            // verifier's section, and exists only in a CN1_GC_VERIFY build.)
+            if(m == CN1_BIBOP_FREE_MARK) {
+                continue;
+            }
+            int bucket = cn1LiveBucket(m);
+            cn1LiveTally(o->__codenameOneParentClsReference, (long long)p->slotSize, bucket);
+            bibopBytes += (long long)p->slotSize;
+            bibopObjs++;
+            totals[bucket]++;
+        }
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+    }
+
+    int nHeap = currentSizeOfAllObjectsInHeap;
+    for(int i = 0 ; i < nHeap ; i++) {
+        JAVA_OBJECT o = allObjectsInHeap[i];
+        if(o == JAVA_NULL) {
+            continue;
+        }
+        // An adopted object lives in a BiBOP slot and was already charged by the
+        // page walk; malloc_size on it would read a block header that is not there.
+        if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+            continue;
+        }
+        long long sz = 0;
+#if defined(__APPLE__)
+        sz = (long long)malloc_size((void*)o);
+#endif
+        int lbucket = cn1LiveBucket(o->__codenameOneGcMark);
+        cn1LiveTally(o->__codenameOneParentClsReference, sz, lbucket);
+        legacyBytes += sz;
+        legacyObjs++;
+        totals[lbucket]++;
+    }
+
+    // OCCUPIED is what costs memory. The four buckets say WHY each object is still
+    // occupying a slot, and they call for different fixes: traced means the program
+    // really is holding it, fresh and aging mean the collector is holding it under
+    // the grace and aging rules, and dead means this sweep is about to return it.
+    long occupied = bibopObjs + legacyObjs;
+    fprintf(stderr, "[LIVE:%s] occupied %ld objects %.2fMB | traced %ld (%.0f%%) "
+            "fresh %ld (%.0f%%) aging %ld (%.0f%%) dead %ld (%.0f%%) | bibop %.2fMB legacy %.2fMB\n",
+            label, occupied, (bibopBytes + legacyBytes) / 1048576.0,
+            totals[CN1_LB_TRACED], 100.0 * totals[CN1_LB_TRACED] / (occupied > 0 ? occupied : 1),
+            totals[CN1_LB_FRESH],  100.0 * totals[CN1_LB_FRESH]  / (occupied > 0 ? occupied : 1),
+            totals[CN1_LB_AGING],  100.0 * totals[CN1_LB_AGING]  / (occupied > 0 ? occupied : 1),
+            totals[CN1_LB_DEAD],   100.0 * totals[CN1_LB_DEAD]   / (occupied > 0 ? occupied : 1),
+            bibopBytes / 1048576.0, legacyBytes / 1048576.0);
+    for(int shown = 0 ; shown < 30 ; shown++) {
+        int best = -1;
+        for(int i = 0 ; i < CN1_LIVE_CENSUS_SLOTS ; i++) {
+            if(cn1LiveRows[i].c != 0 && cn1LiveRows[i].bytes > 0
+                    && (best < 0 || cn1LiveRows[i].bytes > cn1LiveRows[best].bytes)) {
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        long rc = cn1LiveRows[best].count > 0 ? cn1LiveRows[best].count : 1;
+        fprintf(stderr, "[LIVE:%s]   %8.2fMB %9ld objs %4lld B/obj  traced %3.0f%% fresh %3.0f%% "
+                "aging %3.0f%% dead %3.0f%%  %s\n",
+                label, cn1LiveRows[best].bytes / 1048576.0, cn1LiveRows[best].count,
+                cn1LiveRows[best].bytes / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_TRACED] / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_FRESH] / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_AGING] / rc,
+                100.0 * cn1LiveRows[best].b[CN1_LB_DEAD] / rc,
+                cn1LiveRows[best].c->clsName ? cn1LiveRows[best].c->clsName : "?");
+        cn1LiveRows[best].bytes = 0;
+    }
     fflush(stderr);
 }
 

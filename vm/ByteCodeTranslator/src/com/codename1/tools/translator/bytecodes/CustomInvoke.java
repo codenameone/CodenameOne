@@ -102,7 +102,7 @@ public class CustomInvoke extends Instruction {
     public void addDependencies(List<String> dependencyList) {
         String dependencyOwner = owner;
         if (origOpcode == Opcodes.INVOKEVIRTUAL) {
-            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
                 dependencyOwner = resolvedConcreteOwner;
@@ -131,7 +131,7 @@ public class CustomInvoke extends Instruction {
         if(origOpcode != Opcodes.INVOKEINTERFACE && origOpcode != Opcodes.INVOKEVIRTUAL) {
             return;
         }         
-        bld.append(owner.replace('/', '_').replace('$', '_'));
+        bld.append(Util.mangle(owner));
         bld.append("_");
         if(name.equals("<init>")) {
             bld.append("__INIT__");
@@ -177,7 +177,7 @@ public class CustomInvoke extends Instruction {
         if (currentClass != null && (ownerName.equals(currentClass) || currentClass.startsWith(ownerName + "_"))) {
             return null;
         }
-        ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
+        ByteCodeClass concreteClass = Parser.getClassObject(Util.mangle(ownerClass.getConcreteClass()));
         // The nearest class in the concrete type's own hierarchy that actually
         // declares the method -- which is what the runtime would dispatch to for
         // an instance of it. Resolving against concreteClass's declarations alone
@@ -288,7 +288,7 @@ public class CustomInvoke extends Instruction {
             // so we need to check 
             boolean isVirtual = true;
             if (origOpcode == Opcodes.INVOKEVIRTUAL) {
-                ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
                 if (bc == null) {
                     System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
                 } else {
@@ -321,13 +321,13 @@ public class CustomInvoke extends Instruction {
         
         if(origOpcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
-            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
             invokeOwner = findActualOwner(bc);
         }
         if (invokeOwner.startsWith("[")) {
             bld.append("java_lang_Object");
         } else{
-            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
+            bld.append(Util.mangle(invokeOwner));
         }
         bld.append("_");
         if(name.equals("<init>")) {
@@ -343,7 +343,7 @@ public class CustomInvoke extends Instruction {
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
-            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+            BytecodeMethod.addVirtualMethodsInvoked(bld.toString().substring("virtual_".length()));
         } else {
             // keep in sync with Invoke: direct/devirtualized calls of the mapped
             // String/StringBuilder natives get the inlined fast path
@@ -442,7 +442,7 @@ public class CustomInvoke extends Instruction {
             // Memset elimination: allocate into a temp, build fully, THEN publish.
             // Literal-arg ctor with the receiver on-stack (from NEW;DUP): the
             // survivor sits one slot below the receiver (SP[-2]); pop the receiver.
-            String cType = owner.replace('/', '_').replace('$', '_');
+            String cType = Util.mangle(owner);
             inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1);
             return true;
         }
@@ -489,7 +489,7 @@ public class CustomInvoke extends Instruction {
         for (int i = 0; i < kids.size(); i++) {
             lenExprs[i] = kids.get(i).siteLengthExpr(temps);
         }
-        String cType = owner.replace('/', '_').replace('$', '_');
+        String cType = Util.mangle(owner);
         fusedPlan.appendFusedAlloc(b, cType, lenExprs, 1, 2);
         // NOTE: the enclosing brace is closed AFTER the ordinary call emission by
         // appendInstruction (the temps must stay in scope for the call).
@@ -540,7 +540,7 @@ public class CustomInvoke extends Instruction {
             // so we need to check 
             boolean isVirtual = true;
             if (origOpcode == Opcodes.INVOKEVIRTUAL) {
-                ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
                 if (bc == null) {
                     System.err.println("WARNING: Failed to find class object for owner "+owner+" when rendering virtual method "+name);
                 } else {
@@ -573,13 +573,13 @@ public class CustomInvoke extends Instruction {
         
         if(origOpcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to work around javac not defining it correctly
-            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
             invokeOwner = findActualOwner(bc);
         }
         if (invokeOwner.startsWith("[")) {
             bld.append("java_lang_Object");
         } else{
-            bld.append(invokeOwner.replace('/', '_').replace('$', '_'));
+            bld.append(Util.mangle(invokeOwner));
         }
         bld.append("_");
         if(name.equals("<init>")) {
@@ -595,7 +595,7 @@ public class CustomInvoke extends Instruction {
         ArrayList<String> args = new ArrayList<>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
-            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+            BytecodeMethod.addVirtualMethodsInvoked(bld.toString().substring("virtual_".length()));
         } else {
             // keep in sync with Invoke: direct/devirtualized calls of the mapped
             // String/StringBuilder natives get the inlined fast path

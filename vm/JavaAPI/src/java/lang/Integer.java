@@ -359,6 +359,18 @@ public final class Integer extends Number implements Comparable<Integer> {
         return (i >> 31) | (-i >>> 31); // Hacker's delight 2-7
     }
 
+    /**
+     * Rotates the two's-complement binary representation of {@code i} left by
+     * {@code distance} bits.
+     *
+     * The shift distance is used modulo 32 by the JLS shift rules, which is what
+     * makes the negation on the right half correct for every distance, including
+     * zero and multiples of 32.
+     */
+    public static int rotateLeft(int i, int distance) {
+        return (i << distance) | (i >>> -distance);
+    }
+
     public static int compare(int f1, int f2) {
         
         if (f1 > f2) return 1;

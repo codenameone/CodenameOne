@@ -23,11 +23,11 @@
 package com.codename1.tools.translator;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -259,7 +259,10 @@ public class SourceManifest {
      */
     public void write(File projectRoot) throws IOException {
         File out = new File(projectRoot, FILE_NAME);
-        try (Writer w = new OutputStreamWriter(Files.newOutputStream(out.toPath()), UTF8)) {
+        // java.io rather than java.nio.file: the translator compiles against JavaAPI
+        // when it translates itself, and JavaAPI has no java.nio.file. See
+        // vm/selfhost.
+        try (Writer w = new OutputStreamWriter(new FileOutputStream(out), "UTF-8")) {
             w.write("# Provenance of every file in the generated project's source directory.\n");
             w.write("# Written by the ParparVM translator; consumed by\n");
             w.write("# scripts/check-native-warnings.py to decide who owns a compiler warning.\n");

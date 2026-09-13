@@ -2218,7 +2218,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 // because bibopCurrent[] is shared across all classes of the same size class).
 #if !defined(CN1_DISABLE_INLINE_ALLOC) && !defined(CN1_DISABLE_BIBOP)
 #define CN1_FAST_NEW(X) ({ \
-    if(__builtin_expect(!class__##X.initialized, 0)) __STATIC_INITIALIZER_##X(threadStateData); \
+    if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
     if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
     __cn1fo; })
@@ -2226,7 +2226,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 // still fully zeroes (calloc) -- correct, just un-elided on the rare page-full
 // path.
 #define CN1_FAST_NEW_NOZERO(X) ({ \
-    if(__builtin_expect(!class__##X.initialized, 0)) __STATIC_INITIALIZER_##X(threadStateData); \
+    if(__builtin_expect(!__atomic_load_n(&class__##X.initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAllocNoZero(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \
     if(__builtin_expect(__cn1fo == (JAVA_OBJECT)0, 0)) __cn1fo = __NEW_##X(threadStateData); \
     __cn1fo; })

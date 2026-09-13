@@ -36,7 +36,7 @@ for arg in "$@"; do
   esac
 done
 
-if [[ ! -f "$TRANSLATOR/com/codename1/tools/translator/NativeSignatureVerifier.class" ]]; then
+if [[ ! -f "$TRANSLATOR/com/codename1/tools/translator/NativeSignatureVerifierCli.class" ]]; then
   echo "check-native-signatures: building the translator" >&2
   (cd "$REPO_ROOT/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
 fi
@@ -95,7 +95,7 @@ for entry in "${PORTS[@]}"; do
 
   echo "== $name"
   if ! java -cp "$TRANSLATOR:$(cat "$ASM_CP_FILE")" \
-       com.codename1.tools.translator.NativeSignatureVerifier "${args[@]}"; then
+       com.codename1.tools.translator.NativeSignatureVerifierCli "${args[@]}"; then
     status=1
   fi
   checked=$((checked + 1))
