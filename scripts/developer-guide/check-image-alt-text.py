@@ -41,14 +41,25 @@ ATTR_RE = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 DIMENSION_RE = re.compile(r"^\s*\d+(?:\.\d+)?\s*(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?\s*$", re.I)
 
 
-def render(source: Path) -> str:
+# The book has ifdef::backend-pdf[] branches and the PDF ships beside the HTML,
+# so an image that exists only in the PDF is never seen by a default render. The
+# xref checker models the PDF the same way: an HTML render with backend-pdf and
+# basebackend-pdf defined, which turns those branches on. Its documented blind
+# spot -- backend-html5 stays defined, so an ifdef::backend-html5[] branch would
+# survive into the surrogate -- applies here too, and the guide has no such
+# conditional.
+BACKENDS = (("html", ()), ("pdf-surrogate", ("backend-pdf", "basebackend-pdf")))
+
+
+def render(source: Path, attributes: Tuple[str, ...] = ()) -> str:
     """Render to HTML and return it, or an empty string if Asciidoctor refuses."""
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "out.html"
-        proc = subprocess.run(
-            ["asciidoctor", "--safe-mode=unsafe", "-a", "skip-front-matter",
-             "-o", str(out), str(source)],
-            capture_output=True, text=True)
+        command = ["asciidoctor", "--safe-mode=unsafe", "-a", "skip-front-matter"]
+        for attribute in attributes:
+            command += ["-a", attribute]
+        command += ["-o", str(out), str(source)]
+        proc = subprocess.run(command, capture_output=True, text=True)
         if proc.returncode != 0 or not out.exists():
             print(f"check-image-alt-text: could not render {source}", file=sys.stderr)
             if proc.stderr.strip():
@@ -83,22 +94,30 @@ def main() -> int:
         Path("docs/developer-guide/developer-guide.asciidoc")]
 
     total = 0
+    seen = set()
     for source in sources:
-        markup = render(source)
-        if not markup:
-            return 1
-        for src, alt, spilled in offenders(markup):
-            total += 1
-            print(f"{source}: {src}")
-            print(f'    alt text was cut to "{alt}"')
-            print(f'    and "{spilled}" landed in the width slot')
+        for name, attributes in BACKENDS:
+            markup = render(source, attributes)
+            if not markup:
+                return 1
+            for src, alt, spilled in offenders(markup):
+                # the same image usually appears in both renders; report it once
+                if (src, alt) in seen:
+                    continue
+                seen.add((src, alt))
+                total += 1
+                where = "" if name == "html" else f" (in the {name} render)"
+                print(f"{source}: {src}{where}")
+                print(f'    alt text was cut to "{alt}"')
+                print(f'    and "{spilled}" landed in the width slot')
 
     if total:
         print()
         print(f"check-image-alt-text: {total} image(s) whose alt text is cut short by a comma.")
         print('Quote the alt text: image::x.svg["a, b",scaledwidth=50%]')
         return 1
-    print(f"check-image-alt-text: {len(sources)} document(s) rendered, no truncated alt text.")
+    print(f"check-image-alt-text: {len(sources)} document(s) rendered "
+          f"in {len(BACKENDS)} backends, no truncated alt text.")
     return 0
 
 
