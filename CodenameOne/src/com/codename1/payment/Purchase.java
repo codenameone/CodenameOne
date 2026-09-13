@@ -800,6 +800,25 @@ public abstract class Purchase {
             return;
         }
         syncInProgress = false;
+        // A purchase can complete while this fetch is in flight. Its
+        // postReceipt queued the receipt but could not start a
+        // synchronization of its own -- syncInProgress was true -- and this
+        // fetch was requested before the receipt existed, so the snapshot it
+        // brought back does not contain it. Reporting success now hands every
+        // waiting caller a result that predates the purchase, and the receipt
+        // stays pending until something synchronizes again. Run once more
+        // instead; the callbacks are still registered and fire from that pass,
+        // the same way onSubmitReceiptComplete continues draining.
+        //
+        // Guarded on receiptStore: with no store, synchronizeReceipts skips
+        // the submit branch and comes straight back here with the queue still
+        // non-empty, which would never terminate.
+        if (Boolean.TRUE.equals(fetchSucceeded)
+                && receiptStore != null
+                && !getPendingPurchases().isEmpty()) {
+            synchronizeReceipts(0, null);
+            return;
+        }
         fireSynchronizeReceiptsCallbacks(Boolean.TRUE.equals(fetchSucceeded));
     }
 
