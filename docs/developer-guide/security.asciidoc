@@ -96,16 +96,16 @@ You can leverage that knowledge to change the encryption password on the encrypt
 EncryptedStorage.install(oldKey);
 Map<String, byte[]> all = new LinkedHashMap<>();
 for (String name : Storage.getInstance().listEntries()) {
-    InputStream is = Storage.getInstance().createInputStream(name);
-    all.put(name, Util.readInputStream(is));
-    Util.cleanup(is);
+    try (InputStream is = Storage.getInstance().createInputStream(name)) {
+        all.put(name, Util.readInputStream(is));
+    }
 }
 
 EncryptedStorage.install(newKey);
 for (Map.Entry<String, byte[]> e : all.entrySet()) {
-    OutputStream o = Storage.getInstance().createOutputStream(e.getKey());
-    o.write(e.getValue());
-    Util.cleanup(o);
+    try (OutputStream o = Storage.getInstance().createOutputStream(e.getKey())) {
+        o.write(e.getValue());
+    }
 }
 ----
 
@@ -113,6 +113,12 @@ That holds every entry in memory between the two loops, which is fine for the
 handful of records an app of this shape keeps and isn't fine for a storage
 full of cached images. Run it while nothing else is touching `Storage`, and do
 it once at startup rather than in response to anything a user can repeat.
+
+Note the `try`-with-resources rather than `Util.cleanup`: `cleanup` swallows a
+close failure, and on the write side a swallowed close means an entry was
+never finalized under the new key. Let it throw, and let the caller decide
+whether to retry or restore -- a migration that reports success having lost an
+entry is worse than one that stops.
 
 
 NOTE: It isn't a good idea to replace storage objects when an app is running so this is purely for this special case...

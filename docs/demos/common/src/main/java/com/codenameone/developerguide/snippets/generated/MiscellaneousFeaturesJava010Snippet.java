@@ -66,6 +66,13 @@ class MiscellaneousFeaturesJava010Snippet {
         }
 
         Map<String, String> hints = Display.getInstance().getProjectBuildHints();
+        if (hints == null) {
+            // No codename1_settings.properties beside the running project, or
+            // it could not be read. Nothing to check against, and nothing to
+            // write into.
+            return;
+        }
+
         String description = hints.get("ios.locationUsageDescription");
         if (description == null || description.length() == 0) {
             Display.getInstance().setProjectBuildHint("ios.locationUsageDescription",
