@@ -10,7 +10,9 @@ The stack is rebuilt around two new primitives:
 
 Every provider-specific class is a thin layer on top of these primitives, so once you learn the underlying client you understand the whole stack.
 
-image::img/oidc-provider-stack.svg[The provider classes sitting on OidcClient and SystemBrowser,scaledwidth=95%]
+image::img/oidc-provider-stack.svg[The OpenID Connect stack and the two paths that leave it,scaledwidth=95%]
+
+Two places step outside it, and both are deliberate. `AppleSignIn` calls the native Apple sheet whenever the platform offers one, which on iOS 13+ means neither primitive is involved; the OpenID Connect path is what it falls back to everywhere else. And `FirebaseAuth` isn't an OpenID Connect provider at all -- you reach it by handing it an ID token you already obtained, which `FacebookConnect` can't give you because Facebook's flow issues an access token and nothing else.
 
 WARNING: The legacy `com.codename1.io.Oauth2` class is **deprecated**. It opens an in-app `WebBrowser`, which modern identity providers (Google, Apple, Microsoft, Facebook) now refuse to render -- they detect the embedded view and block the page. The new `OidcClient` works the same on every supported platform without that limitation. See <<migrating-from-oauth2>> for a migration recipe.
 
