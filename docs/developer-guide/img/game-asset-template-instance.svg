@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="410" viewBox="0 0 900 410">
-  <rect x="0" y="0" width="900" height="410" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="426" viewBox="0 0 900 426">
+  <rect x="0" y="0" width="900" height="426" fill="#ffffff"/>
   <text x="450" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">One coin definition, many coins: which edit changes which</text>
   <text x="450" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">The distinction that decides what an edit does. An asset is the shared template and a placed element is one instance,</text>
   <text x="450" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">and the properties are copied at the moment you drop it, not shared from then on.</text>
@@ -33,8 +33,9 @@
   <text x="474" y="259" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">editing them redraws every instance, placed ones included.</text>
   <text x="474" y="274" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Defaults are copied at creation only: editing them changes</text>
   <text x="474" y="289" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">future placements and leaves existing elements alone.</text>
-  <rect x="16" y="318" width="868" height="76" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
-  <text x="450" y="340" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Real art arrives through setImage(id, image). Until it does, image(id) answers a cached solid-colour placeholder</text>
-  <text x="450" y="355" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">sized from the definition and tinted with its colour, so a level always realizes to something you can see rather</text>
-  <text x="450" y="370" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">than failing. A missing image is therefore not an error you will be told about; it is a coloured rectangle.</text>
+  <rect x="16" y="318" width="868" height="92" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="450" y="340" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Art arrives by type. A static image comes from setImage; a sheet asset is built by resolveArt, after which image(id)</text>
+  <text x="450" y="355" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">answers its first frame with no setImage involved; a mesh asset is bytes from meshData and never goes through image at all.</text>
+  <text x="450" y="370" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Only an image asset with nothing loaded falls back to a solid-colour placeholder sized from the definition, so a missing</text>
+  <text x="450" y="385" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">image is not an error anybody reports -- it is a coloured rectangle.</text>
 </svg>
