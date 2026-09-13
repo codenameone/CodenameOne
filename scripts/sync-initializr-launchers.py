@@ -8,8 +8,11 @@ import zipfile
 root = Path(__file__).resolve().parents[1]
 archetype = root / 'maven/cn1app-archetype/src/main/resources/archetype-resources'
 archive = root / 'scripts/initializr/common/src/main/resources/common.zip'
-expected = {name: (archetype / name).read_bytes() for name in
+# Git may check text files out as CRLF on Windows. ZIP payloads use canonical
+# LF for Unix launchers and CRLF for the hybrid Windows Maven wrapper.
+expected = {name: (archetype / name).read_bytes().replace(b'\r\n', b'\n') for name in
             ['build.sh', 'build.bat', 'run.sh', 'run.bat', 'mvnw', 'mvnw.cmd']}
+expected['mvnw.cmd'] = expected['mvnw.cmd'].replace(b'\n', b'\r\n')
 # Preserve the historical Initializr alias; the native Windows target is unchanged.
 expected['build.sh'] = expected['build.sh'].replace(b'function linux_device {', b'function uwp {\n  windows_device\n}\nfunction linux_device {')
 expected['build.bat'] = expected['build.bat'].replace(b':linux_device\n', b':uwp\ngoto :windows_device\n\n:linux_device\n')

@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
     java = list((sources / 'com/codename1/initializr/model').glob('*.java'))
     java += [sources / 'com/codename1/initializr/WebsiteThemeNative.java', root / 'scripts/tests/GenerateInitializr.java']
     cp = os.pathsep.join(map(str, deps))
-    subprocess.run(['javac', '--release', '8', '-cp', cp, '-d', str(classes)] + list(map(str, java)), check=True)
+    subprocess.run(['javac', '--release', '8', '-encoding', 'UTF-8', '-cp', cp, '-d', str(classes)] + list(map(str, java)), check=True)
     subprocess.run(['java', '-Djava.awt.headless=true', '-cp', cp + os.pathsep + str(classes) + os.pathsep + str(resources),
                     'com.codename1.initializr.model.GenerateInitializr', str(output)], check=True, timeout=60)
     for archive in sorted(output.glob('*.zip')):
