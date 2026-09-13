@@ -65,7 +65,7 @@ class MonetizationJava102Snippet {
     // button above both have to reach this label.
     SpanLabel rentalStatus = new SpanLabel();
 
-    void addExpiryLabel() {
+    void addExpiryLabel(Form hi) {
         // The receipts already on the device answer this with no round trip,
         // so the label is right the moment the form appears rather than after
         // the first synchronization comes back.

@@ -65,7 +65,7 @@ class MonetizationJava101Snippet {
     }
 
     // tag::monetization-java-101[]
-    void addSyncButton() {
+    void addSyncButton(Form hi) {
         Button syncReceipts = new Button("Synchronize Receipts");
 
         syncReceipts.addActionListener(e -> {
