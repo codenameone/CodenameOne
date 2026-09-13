@@ -204,6 +204,20 @@ public final class ServerSocket {
             channel.configureBlocking(false);
             selector = Selector.open();
             channel.register(selector, SelectionKey.OP_READ);
+            // ZERO IS A PROBE, NOT A WAIT. The translated twin is a poll(), where
+            // a zero timeout returns at once and says "not readable"; Selector's
+            // zero means the opposite -- select(0) is select(), which waits until
+            // something arrives. A caller asking "is there anything there?" on
+            // this arm hung until a client spoke, and the two arms have to answer
+            // the same question the same way. Negative is the other end of the
+            // same mapping: poll(-1) waits without a deadline, and select() is how
+            // that is spelled here.
+            if(timeoutMillis == 0) {
+                return selector.selectNow() > 0;
+            }
+            if(timeoutMillis < 0) {
+                return selector.select() > 0;
+            }
             return selector.select(timeoutMillis) > 0;
         } finally {
             if(selector != null) {

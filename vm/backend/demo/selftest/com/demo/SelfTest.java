@@ -2442,6 +2442,81 @@ public class SelfTest {
     }
 
     /**
+     * Asking whether a socket is readable RIGHT NOW is not a wait.
+     *
+     * <p>The translated arm is a poll(), where a zero timeout returns at once and
+     * says "nothing there". Selector's zero means the opposite -- select(0) is
+     * select(), which waits until something arrives -- so the same call answered
+     * one question on the device and hung on the simulator. The probe runs on its
+     * own thread and is joined with a bound, so a regression FAILS here instead
+     * of stopping the suite.
+     */
+    private static void aZeroTimeoutReadinessCheckDoesNotWait() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Tcp client = Tcp.connect("127.0.0.1", listener.getPort(), 5000);
+        final int accepted = listener.accept();
+        final boolean[] answered = new boolean[1];
+        final boolean[] readable = new boolean[1];
+        Thread probe = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    // Nothing has been sent on it, so the only right answer is
+                    // "no", and the only right time to give it is now.
+                    readable[0] = ServerSocket.awaitReadable(accepted, 0);
+                } catch (Exception ignored) {
+                    // answered stays false, which the check reports.
+                    return;
+                }
+                answered[0] = true;
+            }
+        });
+        probe.start();
+        probe.join(3000);
+        boolean returnedPromptly = answered[0];
+        boolean saidNo = !readable[0];
+        if(accepted >= 0) {
+            ServerSocket.closeFd(accepted);
+        }
+        client.close();
+        listener.close();
+        probe.join(5000);
+        check("a zero timeout answers rather than waiting", "true",
+                String.valueOf(returnedPromptly));
+        check("and the answer for a silent socket is no", "true",
+                String.valueOf(saidNo));
+    }
+
+    /**
+     * A region is resolved in its own AWS partition.
+     *
+     * <p>AWS China is a separate partition whose S3 endpoints end in
+     * amazonaws.com.cn. Building the commercial suffix for every region pointed a
+     * cn-north-1 deployment at a hostname that does not serve it -- every request
+     * and, worse, every presigned URL, which is handed to somebody else to fetch
+     * and outlives the process that made it.
+     */
+    private static void aRegionResolvesInItsOwnPartition() throws Exception {
+        check("a commercial region keeps the commercial suffix",
+                "s3.us-east-1.amazonaws.com",
+                CredentialEndpointProbe.s3EndpointFor("us-east-1"));
+        check("a China region uses the China suffix",
+                "s3.cn-north-1.amazonaws.com.cn",
+                CredentialEndpointProbe.s3EndpointFor("cn-north-1"));
+        check("and so does the other one",
+                "s3.cn-northwest-1.amazonaws.com.cn",
+                CredentialEndpointProbe.s3EndpointFor("cn-northwest-1"));
+        // GovCloud is its own partition and keeps the commercial suffix, so it is
+        // a control against matching too eagerly -- and so is a commercial region
+        // whose name merely begins with the letters of one that does not.
+        check("GovCloud keeps the commercial suffix",
+                "s3.us-gov-west-1.amazonaws.com",
+                CredentialEndpointProbe.s3EndpointFor("us-gov-west-1"));
+        check("a region that merely starts with cn is not the China partition",
+                "s3.cnorth-1.amazonaws.com",
+                CredentialEndpointProbe.s3EndpointFor("cnorth-1"));
+    }
+
+    /**
      * A container credential endpoint off this host must be encrypted.
      *
      * <p>AWS_CONTAINER_CREDENTIALS_FULL_URI is used as the environment gives it.
@@ -4335,6 +4410,8 @@ public class SelfTest {
         aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();
         aClosedSocketWakesItsBlockedReader();
+        aZeroTimeoutReadinessCheckDoesNotWait();
+        aRegionResolvesInItsOwnPartition();
         aRemoteCredentialEndpointMustBeEncrypted();
         anEndlessResponseIsRefused();
         aContradictoryLengthIsRefused();

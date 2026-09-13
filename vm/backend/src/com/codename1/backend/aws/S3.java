@@ -139,8 +139,30 @@ public final class S3 {
             throw new IOException("No AWS region: pass one, or set AWS_REGION");
         }
         requireRegionName(resolved);
-        return new S3(Credentials.resolve(), resolved,
-                "s3." + resolved + ".amazonaws.com", false, true, true);
+        return new S3(Credentials.resolve(), resolved, endpointFor(resolved),
+                false, true, true);
+    }
+
+    /**
+     * The S3 endpoint for a region, in that region's AWS PARTITION.
+     *
+     * <p>The commercial suffix is not universal. AWS China is a separate
+     * partition with its own DNS suffix, amazonaws.com.cn, so a deployment in
+     * cn-north-1 or cn-northwest-1 was being pointed at a commercial hostname
+     * that does not serve it -- every request and every presigned URL, which is
+     * the worse half: a presigned URL is handed to somebody else to fetch, so the
+     * wrong host outlives the process that made it.
+     *
+     * <p>GovCloud needs nothing here: us-gov-east-1 and us-gov-west-1 are their
+     * own partition but keep the commercial suffix. The two ISO partitions have
+     * suffixes of their own and are air-gapped networks this runtime has no way
+     * to reach, so they are deliberately not guessed at -- a wrong suffix there
+     * would be a silent misdirection of the same kind this fixes.
+     */
+    static String endpointFor(String region) {
+        boolean china = region.length() >= 3 && region.charAt(0) == 'c'
+                && region.charAt(1) == 'n' && region.charAt(2) == '-';
+        return "s3." + region + (china ? ".amazonaws.com.cn" : ".amazonaws.com");
     }
 
     /**

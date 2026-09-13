@@ -39,6 +39,11 @@ public final class CredentialEndpointProbe {
     private CredentialEndpointProbe() {
     }
 
+    /** The S3 endpoint this region resolves to; see S3.endpointFor. */
+    public static String s3EndpointFor(String region) {
+        return S3.endpointFor(region);
+    }
+
     /** "allowed", or "refused" with the reason the runtime gave. */
     public static String verdictFor(String url) {
         try {
