@@ -6,7 +6,7 @@ This chapter covers Codename One's modern sign-in stack: OpenID Connect, Sign in
 The stack is rebuilt around two new primitives:
 
 * `com.codename1.io.oidc.OidcClient` -- a full OpenID Connect / OAuth 2.0 client with PKCE, discovery, refresh and token persistence.
-* `com.codename1.io.oidc.SystemBrowser` -- routes the sign-in step through the platform's hardened sign-in surface (`ASWebAuthenticationSession` on iOS, Android Custom Tabs, the user's default browser on JavaSE / Web).
+* `com.codename1.io.oidc.SystemBrowser` -- routes the sign-in step through the platform's hardened sign-in surface where one exists: `ASWebAuthenticationSession` on iOS and Android Custom Tabs. JavaSE and the Web port have no such surface, so there it falls back to an in-app `BrowserWindow` -- a JavaFX `WebView` on the desktop. That's fine for development, and it's the reason a provider that blocks embedded views can refuse a simulator sign-in that works on a device.
 
 Every provider-specific class is a thin layer on top of these primitives, so once you learn the underlying client you understand the whole stack.
 
@@ -47,6 +47,8 @@ That call:
 image::img/oidc-sign-in-flow.svg[The sign-in flow across the app the platform browser and the provider,scaledwidth=95%]
 
 The token exchange is the leg worth noticing: it goes straight from your app to the provider's token endpoint, carrying the PKCE verifier, and the browser has already done its job by then. A provider that treats your app as a public client wants no secret on that request, which is the arrangement PKCE exists to make safe. Apple is the exception on its non-native path and wants a `client_secret` JWT your server mints, which is what <<apple-services-id-setup>> is about.
+
+Only the redirect URL crosses back from the browser, which is why Apple's non-iOS path needs a server in front of it: `AppleSignIn` asks for `response_mode=form_post`, so Apple POSTs `code` and `state` to your redirect URI rather than putting them in the query string, and `OidcClient` parses the URL alone. The page at that URI has to turn the POST into a redirect carrying the same parameters, or the sign-in fails with `STATE_MISMATCH`.
 
 Whether the token endpoint hands back a refresh token is up to the request: the quick start above asks for `openid`, `email` and `profile` and nothing more, so Google returns none and there is nothing for `refreshIfExpired` to renew. `GoogleConnect.signIn` adds `access_type=offline` and `prompt=consent` for exactly that reason.
 

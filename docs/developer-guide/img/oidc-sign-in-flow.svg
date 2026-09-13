@@ -15,24 +15,27 @@
   <text x="380.0" y="80" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">SystemBrowser</text>
   <text x="380.0" y="96" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">ASWebAuthenticationSession (iOS),</text>
   <text x="380.0" y="110" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Custom Tabs (Android),</text>
-  <text x="380.0" y="124" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">default browser elsewhere</text>
+  <text x="380.0" y="124" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">an in-app BrowserWindow elsewhere</text>
   <rect x="542" y="62" width="186" height="78" rx="5" fill="#f7f9fc" stroke="#a56a3a" stroke-width="1.2"/>
   <text x="635.0" y="80" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">Authorization endpoint</text>
   <text x="635.0" y="96" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">the user signs in here,</text>
   <text x="635.0" y="110" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">with a passkey if the</text>
   <text x="635.0" y="124" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">provider offers one</text>
-  <rect x="542" y="196" width="186" height="62" rx="5" fill="#f7f9fc" stroke="#a56a3a" stroke-width="1.2"/>
-  <text x="635.0" y="214" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">Redirect</text>
-  <text x="635.0" y="230" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">code + state sent to</text>
-  <text x="635.0" y="244" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">your redirect URI</text>
-  <rect x="262" y="196" width="236" height="62" rx="5" fill="#f7f9fc" stroke="#4a7a3d" stroke-width="1.2"/>
-  <text x="380.0" y="214" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Handed back to the app</text>
-  <text x="380.0" y="230" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">the custom scheme or HTTPS URL</text>
-  <text x="380.0" y="244" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">you registered with the OS</text>
-  <rect x="32" y="196" width="186" height="62" rx="5" fill="#f7f9fc" stroke="#4a6fa5" stroke-width="1.2"/>
-  <text x="125.0" y="214" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Verify state</text>
-  <text x="125.0" y="230" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">a mismatch aborts</text>
-  <text x="125.0" y="244" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">before any token call</text>
+  <rect x="542" y="190" width="186" height="74" rx="5" fill="#f7f9fc" stroke="#a56a3a" stroke-width="1.2"/>
+  <text x="635.0" y="208" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">Redirect</text>
+  <text x="635.0" y="224" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">code + state sent to</text>
+  <text x="635.0" y="238" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">your redirect URI, in the</text>
+  <text x="635.0" y="252" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">query string</text>
+  <rect x="262" y="190" width="236" height="74" rx="5" fill="#f7f9fc" stroke="#4a7a3d" stroke-width="1.2"/>
+  <text x="380.0" y="208" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Handed back to the app</text>
+  <text x="380.0" y="224" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">the custom scheme or HTTPS URL</text>
+  <text x="380.0" y="238" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">you registered with the OS. Only the</text>
+  <text x="380.0" y="252" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">URL crosses back, never a POST body</text>
+  <rect x="32" y="190" width="186" height="74" rx="5" fill="#f7f9fc" stroke="#4a6fa5" stroke-width="1.2"/>
+  <text x="125.0" y="208" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Verify state</text>
+  <text x="125.0" y="224" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">parsed out of that URL;</text>
+  <text x="125.0" y="238" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">a mismatch aborts before</text>
+  <text x="125.0" y="252" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">any token call</text>
   <rect x="32" y="300" width="186" height="76" rx="5" fill="#f7f9fc" stroke="#4a6fa5" stroke-width="1.2"/>
   <text x="125.0" y="318" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Token exchange</text>
   <text x="125.0" y="334" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">code + PKCE verifier;</text>
@@ -52,13 +55,13 @@
   <path d="M 257 96 L 262 100 L 257 104" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 498 100 L 542 100" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <path d="M 537 96 L 542 100 L 537 104" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
-  <path d="M 635 140 L 635 196" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
-  <path d="M 630 190 L 635 196 L 640 190" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <path d="M 635 140 L 635 190" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
+  <path d="M 630 184 L 635 190 L 640 184" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
   <path d="M 542 227 L 498 227" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
   <path d="M 503 223 L 498 227 L 503 231" fill="none" stroke="#a56a3a" stroke-width="1.5"/>
   <path d="M 262 227 L 218 227" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
   <path d="M 223 223 L 218 227 L 223 231" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
-  <path d="M 125 258 L 125 300" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 125 264 L 125 300" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 120 294 L 125 300 L 130 294" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 218 338 L 542 338" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 537 334 L 542 338 L 537 342" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
