@@ -89,6 +89,14 @@ SOURCE_MACRO_RE = re.compile(r"image::?([^\[\]\s]+)\[([^\]]*)\]")
 FIELD_NAME_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=")
 
 
+def unquote(value: str) -> str:
+    """Strip one layer of matching quotes, the way Asciidoctor reads a value."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] in "\"'" and value[-1] == value[0]:
+        return value[1:-1]
+    return value
+
+
 def split_fields(attrs: str) -> List[str]:
     """Split an attribute list on commas outside quoted values.
 
@@ -148,16 +156,26 @@ def scan_source(guide_dir: Path):
                 if len(fields) < 2:
                     continue
                 first = fields[0].strip()
-                alt = first[1:-1] if first[:1] in "\"'" and first[-1:] == first[:1] else first
+                positional_alt = True
+                named_alt = FIELD_NAME_RE.match(first)
+                if named_alt and named_alt.group(1).lower() == "alt":
+                    # The all-named form, image::x.png[alt="Diagram",width=640].
+                    # The first field is an assignment, not positional alt text.
+                    positional_alt = False
+                    first = first[named_alt.end():].strip()
+                alt = unquote(first)
                 for field in fields[1:]:
                     name = FIELD_NAME_RE.match(field)
                     if not name:
                         continue
                     lowered = name.group(1).lower()
                     if lowered in {"width", "height"}:
-                        named.add((src, alt))
+                        # Keyed by slot: naming a height says nothing about a
+                        # positional width sitting beside it, which may be the
+                        # tail of the alt text.
+                        named.add((src, alt, lowered))
                     elif lowered not in IMAGE_ATTRIBUTES:
-                        if first[:1] not in "\"'":
+                        if positional_alt and not first.startswith(('"', "'")):
                             tails.append((path, number, src, field.strip()))
                         break
     return tails, named
@@ -193,7 +211,7 @@ def offenders(markup: str, baseline: set, named_dimensions: set) -> List[Tuple[s
             if not DIMENSION_RE.match(value):
                 found.append((src, alt, html.unescape(value), False))
                 break
-            if (src, alt) in named_dimensions:
+            if (src, alt, slot) in named_dimensions:
                 continue
             key = f"{src}|{slot}|{value}|{alt}"
             if key not in baseline:
