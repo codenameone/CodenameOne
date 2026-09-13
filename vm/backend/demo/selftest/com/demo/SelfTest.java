@@ -567,6 +567,56 @@ public class SelfTest {
      * is reached. No request is made -- the refusal happens first, so the URL here
      * is never contacted.
      */
+    /**
+     * The transport's own fields cannot come from a caller.
+     *
+     * <p>libcurl documents that a header handed to CURLOPT_HTTPHEADER REPLACES
+     * the one it would have generated, and the body is configured separately --
+     * so "Content-Length: 0" alongside a real body tells the upstream the request
+     * ends where it does not, and a keep-alive peer reads the rest of that body
+     * as the next request on the connection. Host is the routing half: overriding
+     * it picks a different virtual host on the destination this code chose.
+     */
+    private static void theTransportOwnsItsOwnFields() throws Exception {
+        String[] owned = new String[] {
+            "Content-Length: 0",
+            "content-length: 0",            // the name is case insensitive
+            "Transfer-Encoding: chunked",
+            "Host: someone.else",
+        };
+        for(int iter = 0 ; iter < owned.length ; iter++) {
+            List one = new ArrayList();
+            one.add(owned[iter]);
+            String outcome;
+            try {
+                Web.request("POST", "http://127.0.0.1:1/nothing", one,
+                        "body".getBytes("UTF-8"));
+                outcome = "sent";
+            } catch (Exception refused) {
+                String message = String.valueOf(refused.getMessage());
+                outcome = message.indexOf("transport owns") >= 0 ? "refused"
+                        : "other: " + message;
+            }
+            check("the transport owns " + owned[iter], "refused", outcome);
+        }
+        // AND AN ORDINARY HEADER IS STILL SENT, which is what says the rule is
+        // about these four names and not about headers in general. Nothing is
+        // listening, so a connection failure is the answer that means "allowed".
+        List good = new ArrayList();
+        good.add("X-Api-Key: abc");
+        good.add("Content-Type: application/json");
+        String allowed;
+        try {
+            Web.request("POST", "http://127.0.0.1:1/nothing", good,
+                    "body".getBytes("UTF-8"));
+            allowed = "allowed";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            allowed = message.indexOf("transport owns") >= 0 ? "refused" : "allowed";
+        }
+        check("an ordinary header is still sent", "allowed", allowed);
+    }
+
     private static void outboundHeadersCannotCarryANewline() throws Exception {
         String[] bad = new String[] {
             "Authorization: Bearer abc\nX-Admin: true",  // the finding
@@ -2509,6 +2559,7 @@ public class SelfTest {
         theOtherClientChecksItsRequestLine();
         anIpv6HostIsBracketed();
         outboundHeadersCannotCarryANewline();
+        theTransportOwnsItsOwnFields();
         repeatedOutboundHeadersSurvive();
         anOversizedResponseIsRefusedNotAccumulated();
         onlyHttpUrlsAreFetched();

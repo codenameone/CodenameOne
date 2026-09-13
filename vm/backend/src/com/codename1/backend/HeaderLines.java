@@ -81,6 +81,7 @@ final class HeaderLines {
                 throw new IOException("A request header name is not a token");
             }
         }
+        requireNotTransportOwned(line.substring(0, colon));
         for(int iter = colon + 1 ; iter < line.length() ; iter++) {
             char c = line.charAt(iter);
             if(c == '\t') {
@@ -186,6 +187,36 @@ final class HeaderLines {
                         + "character or a space; this one does, at index " + iter
                         + ". Percent-encode it");
             }
+        }
+    }
+
+    /**
+     * Refuses a header the transport owns.
+     *
+     * <p>FRAMING AND ROUTING ARE NOT THE CALLER'S. libcurl documents that a
+     * header given to CURLOPT_HTTPHEADER REPLACES the one it would have
+     * generated, and the body is configured separately -- so a caller-supplied
+     * "Content-Length: 0" sent alongside a real body tells the upstream the
+     * request ends where it does not. A keep-alive peer then reads the rest of
+     * that body as the next request on the connection, which is request
+     * smuggling, offered to any application that forwards a caller's headers.
+     * Transfer-Encoding does the same through the other framing field.
+     *
+     * <p>Host is refused for the routing half of it: overriding it picks a
+     * different virtual host on the destination this code chose, so the request
+     * goes somewhere the caller was never entitled to name. Both arms derive it
+     * from the URL, which is the one place it should come from.
+     *
+     * <p>HttpURLConnection ignores all three as restricted headers, so the arms
+     * disagreed as well: dangerous when packaged, silently dropped locally.
+     */
+    private static void requireNotTransportOwned(String name) throws IOException {
+        if(name.equalsIgnoreCase("content-length")
+                || name.equalsIgnoreCase("transfer-encoding")
+                || name.equalsIgnoreCase("host")) {
+            throw new IOException("The transport owns " + name + ", and a request "
+                    + "cannot supply its own: framing is derived from the body and "
+                    + "the host from the URL");
         }
     }
 }

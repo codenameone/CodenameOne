@@ -111,6 +111,15 @@ public final class Aws {
         Iterator it = signedHeaders.entrySet().iterator();
         while(it.hasNext()) {
             Map.Entry entry = (Map.Entry)it.next();
+            // SIGNED BUT NOT SENT. host belongs in the canonical request -- the
+            // signature is computed over it and the service recomputes the same --
+            // but on the wire it is the transport's, derived from the URL, which
+            // is built from this very host one line below. Sending it as a header
+            // as well is how a request would carry two, and HeaderLines refuses
+            // the field now for the vhost override it hands an untrusted caller.
+            if("host".equals(entry.getKey())) {
+                continue;
+            }
             headerLines.add(entry.getKey() + ": " + entry.getValue());
         }
         String url = (secure ? "https://" : "http://") + host + encodePath(path);
