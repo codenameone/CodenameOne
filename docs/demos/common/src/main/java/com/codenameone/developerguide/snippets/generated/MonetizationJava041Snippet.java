@@ -104,8 +104,15 @@ class MonetizationJava041Snippet {
 
      // The form the user is looking at still shows the status from before the
      // purchase. The toast is not a substitute for repainting it.
+     //
+     // iOS registers its StoreKit observer during initialization, so an
+     // unfinished transaction can be re-delivered here before start() has
+     // built the form. The label is a field and is safe to set; the form may
+     // not exist yet, and start() paints it from the same method anyway.
      showRentalStatus();
+     if (current != null) {
      current.revalidate();
+     }
     }
 
     @Override
@@ -116,7 +123,7 @@ class MonetizationJava041Snippet {
 
     Purchase iap = Purchase.getInAppPurchase();
 
-    Form current = new Form();
+    Form current;
 
     void showRentalStatus() {
     }
