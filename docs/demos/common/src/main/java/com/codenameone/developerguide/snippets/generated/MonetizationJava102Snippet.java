@@ -62,8 +62,13 @@ class MonetizationJava102Snippet {
 
     // tag::monetization-java-102[]
     void addExpiryLabel() {
-        SpanLabel rentalStatus = new SpanLabel("Loading rental details...");
+        SpanLabel rentalStatus = new SpanLabel();
         Button syncReceipts = new Button("Synchronize Receipts");
+
+        // The receipts already on the device answer this without a round trip,
+        // so the label is correct the moment the form appears. The button is
+        // there for the user who thinks that answer has gone stale.
+        showRentalStatus(rentalStatus);
 
         syncReceipts.addActionListener(e -> {
             iap.synchronizeReceipts(0, success -> {
@@ -71,13 +76,11 @@ class MonetizationJava102Snippet {
                 // reached the receipt store AND the receipts came back. On false the
                 // receipts are still whatever the last successful sync left behind,
                 // so say so rather than presenting them as a fresh answer.
-                if (!success) {
+                if (success) {
+                    showRentalStatus(rentalStatus);
+                } else {
                     rentalStatus.setText("Could not reach the receipt store, "
                             + "showing the last known status");
-                } else if (iap.isSubscribed(PRODUCTS)) {
-                    rentalStatus.setText("World rental expires " + iap.getExpiryDate(PRODUCTS));
-                } else {
-                    rentalStatus.setText("You do not currently have a subscription to the world");
                 }
                 hi.revalidate();
             });
@@ -85,6 +88,14 @@ class MonetizationJava102Snippet {
 
         hi.add(rentalStatus);
         hi.add(syncReceipts);
+    }
+
+    void showRentalStatus(SpanLabel rentalStatus) {
+        if (iap.isSubscribed(PRODUCTS)) {
+            rentalStatus.setText("World rental expires " + iap.getExpiryDate(PRODUCTS));
+        } else {
+            rentalStatus.setText("You do not currently have a subscription to the world");
+        }
     }
     // end::monetization-java-102[]
 }
