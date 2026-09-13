@@ -554,6 +554,15 @@ public final class HttpServer {
             this.headers = null;
         }
 
+        /**
+         * The body, once it has been read. The only field that is not known when
+         * the header block is parsed, and the only one readRequest assigns after
+         * it -- see the comment there for why the rest must not be reassigned.
+         */
+        void setBody(String value) {
+            this.body = value;
+        }
+
         void reset(Conn conn, String method, String target, String version, byte[] raw,
                    int[] slices, int headerCount, String body,
                    int targetStart, int targetLength) {
@@ -2195,6 +2204,18 @@ public final class HttpServer {
         long[] vtByFd = new long[1024];
 
         /**
+         * Descriptor to the connection being served on it, for the borrow check in
+         * advance().
+         *
+         * Host-private for the same reason vtByFd is, and written from the virtual
+         * thread that serves the descriptor -- which runs on THIS host thread, so
+         * the write and the read in advance() are the same thread and no
+         * publication is involved. A server-wide table indexed by fd could not say
+         * that: the accept loop grows it from another thread.
+         */
+        Conn[] connByFd = new Conn[1024];
+
+        /**
          * Whether each descriptor is currently registered with this host's poller.
          *
          * Without ONESHOT the kernel no longer disarms on delivery, so this is the
@@ -2255,6 +2276,21 @@ public final class HttpServer {
             boolean[] grownArmed = new boolean[size];
             System.arraycopy(armedByFd, 0, grownArmed, 0, armedByFd.length);
             armedByFd = grownArmed;
+            Conn[] grownConns = new Conn[size];
+            System.arraycopy(connByFd, 0, grownConns, 0, connByFd.length);
+            connByFd = grownConns;
+        }
+
+        void setConn(int fd, Conn conn) {
+            if(fd < 0) {
+                return;
+            }
+            ensureCapacity(fd);
+            connByFd[fd] = conn;
+        }
+
+        Conn connOf(int fd) {
+            return fd >= 0 && fd < connByFd.length ? connByFd[fd] : null;
         }
 
         void setHandle(int fd, long handle) {
@@ -2262,6 +2298,7 @@ public final class HttpServer {
             vtByFd[fd] = handle;
             if(handle == 0) {
                 deadlineByFd[fd] = 0;
+                connByFd[fd] = null;
                 // The descriptor is being closed, and close() takes it out of the
                 // epoll set on its own. Clearing here keeps the flag from claiming
                 // a registration that the next connection to reuse this number
@@ -2435,6 +2472,30 @@ public final class HttpServer {
         }
         me.setDeadline(fd, 0);      // it is running, so it is not idle
         int state = VirtualThread.resume(handle);
+        if(state != VirtualThread.FINISHED) {
+            // IT STOPPED MID-REQUEST, and this is the only instant at which that
+            // is knowable before another virtual thread runs on this host.
+            //
+            // The zero-copy read hands back storage that is __thread -- one buffer
+            // per HOST thread, shared by every virtual thread multiplexed onto it
+            // -- and a Request parsed out of it holds slices into exactly that
+            // memory for as long as its handler runs. fill() already copies before
+            // a second read WITHIN one request, but a virtual thread does not have
+            // to be reading to give the host away: allocation backpressure or a
+            // fairness yield hands it over from anywhere, the handler included.
+            // The next connection resumed here then reads into the same storage,
+            // and the first request's headers, path and method are answered out of
+            // another client's bytes -- or, since the array's length is set per
+            // read, vanish entirely. Either way one request is being served with
+            // another's, which is an authorization decision made on the wrong
+            // request.
+            //
+            // Copying HERE rather than before every handler dispatch is what keeps
+            // the optimisation: a request that is read, served and written without
+            // ever stopping -- the whole of /plaintext -- never reaches this line,
+            // so the steady state still allocates nothing per request.
+            privatiseBorrowedBuffer(me.connOf(fd));
+        }
         if(state == VirtualThread.FINISHED) {
             me.setHandle(fd, 0);
             VirtualThread.free(handle);
@@ -2470,6 +2531,21 @@ public final class HttpServer {
             VirtualThread.free(handle);
             drop(fd);
         }
+    }
+
+    /**
+     * Give a connection its own copy of the host's read buffer.
+     *
+     * A no-op unless it is actually borrowing, which is what makes it cheap
+     * enough to call at every park. The Request is re-pointed with it: its slices
+     * name positions in the ARRAY, so copying the connection's reference alone
+     * would leave the request reading the storage the copy was made to escape.
+     */
+    private static void privatiseBorrowedBuffer(Conn conn) {
+        if(conn == null || !conn.borrowed) {
+            return;
+        }
+        conn.detachPreservingOffsets();
     }
 
     /**
@@ -3059,6 +3135,12 @@ public final class HttpServer {
          */
         Request pooledRequest;
 
+        /**
+         * The request currently parsed out of this connection's buffer, pooled or
+         * not, so detachPreservingOffsets can re-point it.
+         */
+        Request liveRequest;
+
         /** Reads more. False at end of stream. */
         boolean fill(byte[] scratch) throws IOException {
             if(borrowed && available() == 0 && !parsedFromBuffer) {
@@ -3236,6 +3318,27 @@ public final class HttpServer {
             if(keep >= needed) {
                 return true;
             }
+            if(borrowed) {
+                // BEFORE the compaction below, and before this parks waiting for
+                // the body.
+                //
+                // fill() takes this copy before a second read within one request,
+                // and the body path -- which is a second read within one request
+                // -- never called it. It grows a private array and COMPACTS what
+                // is left into it, while the Request's header slices still name
+                // absolute positions in the borrowed one, so the connection moves
+                // on and the request keeps reading the host's shared buffer. It
+                // then parks for the rest of the body, which is precisely when the
+                // host goes and reads another connection into that buffer.
+                //
+                // Measured, not reasoned: a POST whose head and body arrive in
+                // separate packets, with one other request served in between,
+                // answered with getHeader("X-Tag") == null where the same request
+                // alone answered its own value. Every header, the path and the
+                // method come out of the other client's bytes -- or vanish, since
+                // the array's length is set per read.
+                detachPreservingOffsets();
+            }
             long charged = 0;
             try {
             // RESERVED before allocated, not after. The charge is what bounds
@@ -3330,10 +3433,19 @@ public final class HttpServer {
          * to offset zero while the slices still name the old positions.
          */
         void detachPreservingOffsets() {
+            byte[] borrowedBuffer = buffer;
             byte[] owned = new byte[buffer.length];
             System.arraycopy(buffer, 0, owned, 0, buffer.length);
             buffer = owned;
             borrowed = false;
+            // AND THE REQUEST WITH IT. A Request holds the array itself, not this
+            // connection, so moving only `buffer` leaves it reading the borrowed
+            // storage -- the copy is made precisely because something else is
+            // about to write there. Offsets are unchanged, so re-pointing is the
+            // whole of it.
+            if(liveRequest != null && liveRequest.raw == borrowedBuffer) {
+                liveRequest.raw = owned;
+            }
         }
 
         /**
@@ -3492,6 +3604,12 @@ public final class HttpServer {
             if(host >= 0 && host * SERVED_STRIPE_STRIDE < servedStripes.length) {
                 conn.stripe = host * SERVED_STRIPE_STRIDE;
             }
+        }
+        // Registered with the host that resumes this virtual thread, so advance()
+        // can privatise the read buffer if this connection stops mid-request. Same
+        // thread as the reader, since the virtual thread runs on its own host.
+        if(virtualThreads) {
+            ownerOf(fd).setConn(fd, conn);
         }
         byte[] scratch = new byte[8192];
         int served = 0;
@@ -4850,6 +4968,44 @@ public final class HttpServer {
     }
 
     /**
+     * A DECLARED path -- a mount prefix, a route pattern -- in the form a request
+     * for it arrives as.
+     *
+     * A target is canonicalised before anything compares it, so /assets%7E and
+     * /assets~ are one resource by then. Whatever the declaring side wrote has to
+     * speak the same form or it matches NEITHER spelling: not the encoded
+     * request, which no longer looks like that when it is compared, and not the
+     * decoded one, which never did. A mount configured that way is simply
+     * unreachable, with nothing at startup or request time to say so.
+     *
+     * Shares Request's rule rather than restating it, because two implementations
+     * of "which octets are unreserved" that drift apart is the same defect in a
+     * slower form.
+     */
+    static String canonicalDeclaredPath(String value) {
+        if(value == null || value.indexOf('%') < 0) {
+            return value;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        int at = 0;
+        while(at < value.length()) {
+            char c = value.charAt(at);
+            if(c == '%' && at + 2 < value.length()) {
+                int hi = Request.hexDigit(value.charAt(at + 1));
+                int lo = Request.hexDigit(value.charAt(at + 2));
+                if(hi >= 0 && lo >= 0 && Request.isUnreservedByte((hi << 4) | lo)) {
+                    out.append((char)((hi << 4) | lo));
+                    at += 3;
+                    continue;
+                }
+            }
+            out.append(c);
+            at++;
+        }
+        return out.toString();
+    }
+
+    /**
      * Reads one request. Null when the peer closed; ProtocolException when what
      * arrived is not a request this server will act on.
      */
@@ -5109,6 +5265,12 @@ public final class HttpServer {
             request = new Request(method, target, version, raw, slices, headerCount, null,
                     sliceStart, sliceLength);
         }
+        // The connection has to be able to find whichever of the two it is: a
+        // borrow that becomes private has to take the request's pointer with it,
+        // and without pooling there is no other reference to follow. Never
+        // cleared, because the re-point compares the array identity and a request
+        // that has moved on names a different one.
+        conn.liveRequest = request;
 
         int contentLengthAt = -1;
         boolean chunked = false;
@@ -5278,13 +5440,22 @@ public final class HttpServer {
         if(body == null) {
             return request;
         }
-        if(POOL_REQUEST) {
-            request.reset(conn, method, target, version, raw, slices, headerCount, body,
-                    sliceStart, sliceLength);
-            return request;
-        }
-        return new Request(method, target, version, raw, slices, headerCount, body,
-                sliceStart, sliceLength);
+        // THE BODY ONLY. This used to re-point the whole request -- every field
+        // again, out of the locals above -- and `raw` is the one that cannot be
+        // re-pointed from here: reading the body may have taken the buffer
+        // private, and the local still names the HOST's shared array. Putting it
+        // back handed the request whatever had been read into that array since,
+        // which for a body arriving in a later packet is the next connection's
+        // request: headerCount and slices stayed this request's while the bytes
+        // under them became another client's.
+        //
+        // Reproduced with two connections on one host -- a POST whose head and
+        // body arrive separately, one GET served in between -- where every
+        // getHeader answered null against a request whose own head was still
+        // perfectly intact 82 bytes away. Nothing else changed between the parse
+        // and here, so nothing else needs assigning.
+        request.setBody(body);
+        return request;
     }
 
     /**

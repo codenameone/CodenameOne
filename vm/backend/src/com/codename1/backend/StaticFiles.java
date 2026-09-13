@@ -67,7 +67,12 @@ public final class StaticFiles implements HttpServer.Handler {
             throw new IOException("Document root does not exist: " + root);
         }
         this.root = resolved;
-        this.prefix = prefix == null || "/".equals(prefix) ? "" : stripTrailingSlash(prefix);
+        // CANONICALISED, because handle() matches it against the canonical path.
+        // A mount configured as /assets%7E was compared with a target that had
+        // already become /assets~, so neither spelling of the URL reached it and
+        // the mount served nothing at all. See HttpServer.canonicalDeclaredPath.
+        this.prefix = prefix == null || "/".equals(prefix) ? ""
+                : stripTrailingSlash(HttpServer.canonicalDeclaredPath(prefix));
         this.indexFile = indexFile == null ? "index.html" : indexFile;
         this.cacheControl = cacheControl;
     }

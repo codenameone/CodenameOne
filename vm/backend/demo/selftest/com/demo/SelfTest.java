@@ -43,6 +43,7 @@ import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
 import com.codename1.backend.StaticFiles;
 import com.codename1.backend.Tcp;
+import com.codename1.backend.VirtualThread;
 import com.codename1.backend.Web;
 import com.codename1.backend.aws.Credentials;
 import com.codename1.backend.FileCountProbe;
@@ -1732,6 +1733,101 @@ public class SelfTest {
                 "0", outcome);
     }
 
+    /**
+     * A request whose body arrives late must not be served another connection's
+     * bytes.
+     *
+     * The read buffer is __thread -- one per HOST thread, shared by every virtual
+     * thread multiplexed onto it -- and a request is parsed in place inside it, so
+     * its header slices name positions in storage the next connection will reuse.
+     * A body that has not all arrived parks the virtual thread with those slices
+     * live, the host goes and reads the next connection into that same buffer, and
+     * what the handler then reads is whatever landed there.
+     *
+     * Both spellings of the same request are sent here: the head alone, then one
+     * whole request on a second connection, then the withheld body. One worker, so
+     * the two connections certainly share a host. Measured before the fix, every
+     * getHeader on the first request answered null -- its own head sitting intact
+     * in a copy 82 bytes away -- while getMethod, which is a String, was still
+     * "POST". The same request with no second connection answered correctly, which
+     * is the control this check keeps: an implementation that reads nothing at all
+     * would pass the corrupted half and fail this one.
+     */
+    private static void aLateBodyIsNotServedAnotherConnectionsBytes() throws Exception {
+        check("a request with a late body reads its own headers",
+                "aaaaaa|x|6|POST", oneLateBodyRequest(false));
+        // The interleaved half needs the two connections to SHARE a thread, which
+        // is what one worker buys under virtual threads and what makes the buffer
+        // shared in the first place. Where they are real threads one worker cannot
+        // serve the second connection while the first waits for its body -- the
+        // two would simply wait for each other -- and the buffer is per thread
+        // there, so there is nothing for the second connection to overwrite.
+        if(!VirtualThread.supported()) {
+            note("interleaved late-body check skipped: this runtime has no virtual threads,"
+                    + " so the read buffer is not shared between connections");
+            return;
+        }
+        check("a request with a late body reads its own headers with another served between",
+                "aaaaaa|x|6|POST", oneLateBodyRequest(true));
+    }
+
+    private static String oneLateBodyRequest(boolean interleave) throws Exception {
+        final String[] seen = new String[1];
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                String tag = request.getHeader("X-Tag");
+                if("bbbbbb".equals(tag)) {
+                    return HttpServer.Response.text(200, "second");
+                }
+                seen[0] = tag + "|" + request.getHeader("Host") + "|"
+                        + request.getHeader("Content-Length") + "|" + request.getMethod();
+                return HttpServer.Response.text(200, "first");
+            }
+        });
+        try {
+            Tcp first = Tcp.connect("127.0.0.1", server.getPort(), 15000);
+            try {
+                // The head alone: the body is promised and withheld, so the server
+                // parses the headers and then parks waiting for the rest.
+                byte[] head = ("POST /a HTTP/1.1\r\nHost: x\r\nX-Tag: aaaaaa\r\n"
+                        + "Content-Length: 6\r\nConnection: close\r\n\r\n").getBytes("UTF-8");
+                first.write(head, 0, head.length);
+                Thread.sleep(300);
+                if(interleave) {
+                    Tcp second = Tcp.connect("127.0.0.1", server.getPort(), 15000);
+                    try {
+                        // Deliberately a different length from the first request, so
+                        // a stale slice lands somewhere that cannot still read right.
+                        byte[] whole = ("GET /bbbbbbbbbbbbbbbbbbbbbbb HTTP/1.1\r\n"
+                                + "Host: x\r\nX-Tag: bbbbbb\r\n"
+                                + "Connection: close\r\n\r\n").getBytes("UTF-8");
+                        second.write(whole, 0, whole.length);
+                        drainUntilClosed(second);
+                    } finally {
+                        second.close();
+                    }
+                    Thread.sleep(100);
+                }
+                byte[] body = "123456".getBytes("UTF-8");
+                first.write(body, 0, body.length);
+                drainUntilClosed(first);
+            } finally {
+                first.close();
+            }
+        } finally {
+            server.stop(2000);
+        }
+        return seen[0];
+    }
+
+    /** Reads until the peer closes, so the server has finished with the request. */
+    private static void drainUntilClosed(Tcp conn) throws Exception {
+        byte[] buffer = new byte[4096];
+        while(conn.read(buffer, 0, buffer.length) > 0) {
+            // the bytes do not matter; finishing does
+        }
+    }
+
     private static void aStaticFileComesBackWhole() throws Exception {
         String dir = "/tmp/cn1-selftest-static-" + System.currentTimeMillis();
         new java.io.File(dir).mkdirs();
@@ -1812,6 +1908,47 @@ public class SelfTest {
         check("a static file is served from its mount", "logo", plain);
         check("and from an encoded spelling of the same mount", "logo", encoded);
         check("an encoded slash does not end the mount", "not ours", encodedSlash);
+    }
+
+    /**
+     * The other half of the same rule: a mount DECLARED with an escape in it.
+     *
+     * <p>%7E is '~'. The request side resolves it before anything compares, so a
+     * mount configured as /assets%7E was matched against a path that had already
+     * become /assets~ -- and neither spelling of the URL reached it. Not the
+     * encoded one, which no longer looks like that by then, and not the decoded
+     * one, which never did. The mount served nothing at all, with nothing at
+     * startup or request time to say so.
+     */
+    private static void aMountDeclaredWithAnEscapeIsStillReachable() throws Exception {
+        String dir = "/tmp/cn1-selftest-mount-declared-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        java.io.FileOutputStream out = new java.io.FileOutputStream(dir + "/logo.txt");
+        try {
+            out.write("logo".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        final StaticFiles files = new StaticFiles(dir, "/assets%7E", null, null);
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = files.handle(request);
+                return served == null ? HttpServer.Response.text(404, "not ours") : served;
+            }
+        });
+        String asDeclared;
+        String asResolved;
+        try {
+            asDeclared = httpGetBody("127.0.0.1", server.getPort(), "/assets%7E/logo.txt");
+            asResolved = httpGetBody("127.0.0.1", server.getPort(), "/assets~/logo.txt");
+        } finally {
+            server.stop(2000);
+            new java.io.File(dir + "/logo.txt").delete();
+            new java.io.File(dir).delete();
+        }
+        check("a mount declared with an escape serves the spelling it was declared with",
+                "logo", asDeclared);
+        check("and the spelling that escape resolves to", "logo", asResolved);
     }
 
     /**
@@ -2722,8 +2859,10 @@ public class SelfTest {
         aMySqlPacketOutOfSequenceIsRefused();
         aNegativePostgresLengthThatIsNotNullIsRefused();
         aStaticFileComesBackWhole();
+        aLateBodyIsNotServedAnotherConnectionsBytes();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
+        aMountDeclaredWithAnEscapeIsStillReachable();
         anOutboundFailureDoesNotLogTheSecrets();
         aFieldValueIsOctetsOnEveryProtocol();
         aNestedFinallyDoesNotDefeatTheOuterCatch();
