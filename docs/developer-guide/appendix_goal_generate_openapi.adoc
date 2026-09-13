@@ -110,6 +110,10 @@ Call sites use the static factory:
 include::../demos/common/src/main/java/com/example/petstore/PetApiCallSite.java[tag=appendix-goal-generate-openapi-java-003,indent=0]
 ----
 
+NOTE: The call site here is written against the Java 17 output, where `Pet`
+is a record. On a Java 8 target the generator emits a class with public
+fields instead, so `pet.name()` becomes `pet.name`.
+
 
 The `<Tag>ApiImpl` class that actually performs the HTTP call lives
 in `target/generated-sources` -- the project source never references

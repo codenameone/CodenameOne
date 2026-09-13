@@ -87,6 +87,11 @@ Call sites use the static factory:
 include::../demos/common/src/main/java/com/example/hello/GreeterCallSite.java[tag=appendix-goal-generate-grpc-java-002,indent=0]
 ----
 
+NOTE: The call site above is written against the Java 17 output, where the
+messages are records. On a Java 8 target the generator emits classes with a
+public no-arg constructor and public fields instead, so construction becomes
+`new HelloRequest(); r.name = ...` and a read is `reply.message` rather than `reply.message()`.
+
 
 The `<Service>GrpcImpl` class that actually performs the gRPC-Web
 POST lives in `target/generated-sources` -- the project source
