@@ -45,7 +45,9 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
             script.chmod(0o755)  # archive modes are separately tested by StarterProjectServiceTest
         command = [str(script)] + ([target] if target else [])
         if windows:
-            command = [os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/c', 'call "' + str(script) + '" ' + target]
+            # cmd.exe parses its own command string, not the C-runtime quoting
+            # that subprocess applies to a list (which escapes quotes as backslashes).
+            command = '"' + os.environ.get('COMSPEC', 'cmd.exe') + '" /d /s /c ""' + str(script) + '" ' + target + '"'
         result = subprocess.run(command, cwd=parent, env=env, text=True, capture_output=True, timeout=30)
         assert result.returncode == code, (command, result.returncode, result.stdout, result.stderr)
         output = record.read_text()
