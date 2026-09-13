@@ -77,6 +77,12 @@ def split_attrs(attrs: str) -> List[str]:
 # valid as "640", and rejecting it would fail CI on a correct attribute list.
 DIMENSION_RE = re.compile(r"^\d+(?:\.\d+)?(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?$")
 
+# A positional dimension can also be an attribute reference the renderer
+# substitutes -- :diagram-width: 640 used as image::x.png[Diagram,{diagram-width}].
+# This gate does not resolve document attributes, so a lone reference is taken at
+# its word rather than reported as split alt text.
+ATTRIBUTE_REFERENCE_RE = re.compile(r"^\{[A-Za-z_][A-Za-z0-9_-]*\}$")
+
 # Named attributes an image macro actually takes. Checked by name rather than by
 # the presence of an "=", because alt text is prose and prose contains equals
 # signs: "Plot coordinates x, y=2 and z=3" splits into a field holding "y=2 and
@@ -84,15 +90,22 @@ DIMENSION_RE = re.compile(r"^\d+(?:\.\d+)?(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh
 # just "Plot coordinates x".
 IMAGE_ATTRIBUTES = frozenset({
     "alt", "align", "caption", "float", "format", "height", "id", "link",
-    "opts", "options", "poster", "role", "scale", "scaledwidth", "pdfwidth",
-    "title", "width", "window", "rel", "nofollow", "start", "end", "loop",
-    "autoplay", "theme", "lang", "fallback", "target", "reftext",
+    "loading", "opts", "options", "poster", "role", "scale", "scaledwidth",
+    "pdfwidth", "title", "width", "window", "rel", "nofollow", "start", "end",
+    "loop", "autoplay", "theme", "lang", "fallback", "target", "reftext",
 })
-NAMED_ATTRIBUTE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.-]*)\s*=")
+NAMED_ATTRIBUTE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$")
 
 
 def is_named_attribute(field: str) -> bool:
-    """True when the field is a named image attribute rather than split alt text."""
+    """True when the field is a named image attribute rather than split alt text.
+
+    Matched on the name, not on the mere presence of an "=", because alt text is
+    prose and prose contains equals signs. The value has to look like one value
+    too: "y=2 and z=3" has a name that is not an image attribute, and even a
+    real attribute name followed by a sentence is more likely to be a split than
+    an attribute.
+    """
     match = NAMED_ATTRIBUTE_RE.match(field.strip())
     return bool(match) and match.group(1).lower() in IMAGE_ATTRIBUTES
 
@@ -114,7 +127,9 @@ def offenders(path: Path) -> List[Tuple[int, str, str]]:
             # legitimate, units included.
             for field in fields[1:]:
                 value = field.strip()
-                if not value or is_named_attribute(value) or DIMENSION_RE.match(value):
+                if (not value or is_named_attribute(value)
+                        or DIMENSION_RE.match(value)
+                        or ATTRIBUTE_REFERENCE_RE.match(value)):
                     continue
                 found.append((number, match.group("target"), match.group("attrs")))
                 break
