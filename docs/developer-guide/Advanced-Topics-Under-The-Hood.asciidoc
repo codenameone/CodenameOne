@@ -1688,7 +1688,7 @@ peer that renders into a buffer.
 reaches it. The screenshot technique below can't reach it either, for the same reason.
 
 .Where a peer sits, and what follows from it
-image::img/peer-component-painting.svg[Where a native peer is composited relative to the Codename One layer, and how it differs by port,scaledwidth=85%]
+image::img/peer-component-painting.svg["Where a native peer is composited relative to the Codename One layer, and how it differs by port",scaledwidth=85%]
 
 NOTE: This was also the case in AWT/Swing to one degree or another...
 

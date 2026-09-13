@@ -310,7 +310,7 @@ image::img/in-app-purchase-subscription-dialog.png[Dialog shown when subscribing
 image::img/in-app-purchase-subscription-confirm.png[Simulator confirm dialog when purchasing a subscription,scaledwidth=40%]
 
 .Upon successful buy, the toastbar message is shown
-image::img/in-app-purchase-subscription-toastbar-success.png[Upon successful buy, the toastbar message is shown,scaledwidth=20%]
+image::img/in-app-purchase-subscription-toastbar-success.png["Upon successful buy, the toastbar message is shown",scaledwidth=20%]
 
 ==== Summary
 
