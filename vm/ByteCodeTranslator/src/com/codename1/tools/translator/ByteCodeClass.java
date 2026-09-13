@@ -1557,7 +1557,7 @@ public class ByteCodeClass {
         // while another thread was still inside the class initialiser, and then
         // read statics that had not been written yet. Releasing on "started"
         // cannot publish writes that happen after it.
-        b.append("int __").append(clsName).append("_LOADED__=0;\n");
+        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
         b.append("void __STATIC_INITIALIZER_");
         b.append(clsName);
         // ACQUIRE, not a plain load. This is the fast path of a double-checked
@@ -1670,9 +1670,14 @@ public class ByteCodeClass {
         // initialiser re-enters itself to proceed rather than deadlock, so it has
         // to be set before __CLINIT__ runs, and the check above the monitor is
         // that recursion guard. Nothing outside this function may treat it as
-        // "safe to use the class" -- the inline guards test __X_LOADED__, which is
-        // stored after __CLINIT__ returns. The release here is still wanted for
-        // the vtable and classToInterfaceMap rows written just above.
+        // "safe to use the class" in the JLS sense -- a class under initialization
+        // is not finished. The release is what the INLINE GUARDS acquire against:
+        // they test this flag, and it is what publishes the vtable and the
+        // classToInterfaceMap rows written just above. Guarding them on
+        // __X_LOADED__ instead would also be correct about the vtable and would
+        // additionally hold other threads until __CLINIT__ returned -- a strictly
+        // later gate than master opens, which moved layout on four native ports
+        // and is not what the visibility defect required.
         b.append(".initialized, JAVA_TRUE, __ATOMIC_RELEASE);\n");
         // init static fields and invoke the static initializer code block
         if(clInitMethod != null) {
@@ -2058,12 +2063,6 @@ public class ByteCodeClass {
         b.append("extern void __STATIC_INITIALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE);\n");
-        // The COMPLETION flag, for the inline guards. Set with a release store
-        // after __CLINIT__ returns; see the note where it is defined.
-        b.append("extern int __");
-        b.append(clsName);
-        b.append("_LOADED__;\n");
-        
         b.append("extern void __FINALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete);\n");
