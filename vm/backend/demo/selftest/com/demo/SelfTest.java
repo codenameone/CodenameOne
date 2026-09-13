@@ -1879,6 +1879,89 @@ public class SelfTest {
     }
 
     /**
+     * A handler may shut its own server down and still answer.
+     *
+     * <p>The request that calls stop() is itself one of the things stop() drains,
+     * and it cannot be released until stop() returns: the wait ran the whole
+     * window out, and the sweep afterwards closed the very descriptor the reply
+     * was owed on, so an admin endpoint that shuts the server down answered with
+     * a dropped connection. The drain now discounts what the calling handler
+     * holds and the sweep leaves its descriptor alone.
+     */
+    private static void aHandlerCanStopItsOwnServer() throws Exception {
+        final HttpServer[] holder = new HttpServer[1];
+        holder[0] = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                // The drain window is long on purpose: if the shutdown waits for
+                // this request, the client below waits with it and the elapsed
+                // time says so.
+                holder[0].stop(20000);
+                return HttpServer.Response.text(200, "stopping");
+            }
+        });
+        long started = System.currentTimeMillis();
+        String body;
+        try {
+            body = httpGetBody("127.0.0.1", holder[0].getPort(), "/shutdown");
+        } catch (Exception err) {
+            body = "failed: " + err.getMessage();
+        }
+        long elapsed = System.currentTimeMillis() - started;
+        check("a handler that stops its server still answers", "stopping", body);
+        check("and does not wait out the drain window for itself", "true",
+                String.valueOf(elapsed < 10000));
+    }
+
+    /**
+     * Two shutdowns are one teardown.
+     *
+     * <p>stop() had no claim, so two overlapping paths -- a signal handler and an
+     * application's own cleanup is the ordinary pair -- both snapshotted the same
+     * descriptors and ran the raw close that bypasses drop()'s ownership check.
+     * The first close releases the number and the second closes whatever has
+     * since been given it, and both also reach the unsynchronized Tls.close().
+     *
+     * <p>IF THIS REGRESSES, THE FAILURE WILL NOT LOOK LIKE THIS CHECK. The second
+     * close lands on a descriptor some LATER connection has been given, so what
+     * is seen is an unrelated check dying with "Socket write failed" -- measured,
+     * three runs out of three, from oneLateBodyRequest several checks further on.
+     * That is the defect's nature rather than a flaw in the check: a close that
+     * hits somebody else's socket cannot be caught by the connection it belongs
+     * to.
+     */
+    private static void twoShutdownsAreOneTeardown() throws Exception {
+        final HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1,
+                new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return HttpServer.Response.text(200, "ok");
+                    }
+                });
+        int port = server.getPort();
+        // It serves before the shutdown, so the check below cannot pass against a
+        // server that never worked.
+        String before = httpGetBody("127.0.0.1", port, "/x");
+        Thread other = new Thread(new Runnable() {
+            public void run() {
+                server.stop(2000);
+            }
+        });
+        other.start();
+        server.stop(2000);
+        other.join(30000);
+        String after;
+        try {
+            Tcp conn = Tcp.connect("127.0.0.1", port, 2000);
+            conn.close();
+            after = "still listening";
+        } catch (Exception expected) {
+            after = "stopped";
+        }
+        check("the server answered before the shutdown", "ok", before);
+        check("two concurrent stops leave it stopped, and the process alive",
+                "stopped", after);
+    }
+
+    /**
      * A connection field cannot smuggle a second field into the handshake.
      *
      * <p>Both wire protocols end each startup field with a NUL, so a NUL inside
@@ -3745,6 +3828,8 @@ public class SelfTest {
         aStaticFileComesBackWhole();
         aRefusedBodyIsNeverInvited();
         anInterimResponseIsSkipped();
+        aHandlerCanStopItsOwnServer();
+        twoShutdownsAreOneTeardown();
         aConnectionFieldCannotHoldASecondField();
         everyNativeStringRefusesANul();
         aTruncatingDatabasePathOpensNothing();

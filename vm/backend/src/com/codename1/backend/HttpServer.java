@@ -1368,6 +1368,10 @@ public final class HttpServer {
     private final java.util.concurrent.atomic.AtomicInteger http2Turns =
             new java.util.concurrent.atomic.AtomicInteger();
 
+    /** Whoever wins this owns the teardown; see stop(). */
+    private final java.util.concurrent.atomic.AtomicBoolean stopClaimed =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
     private final java.util.concurrent.atomic.AtomicInteger inFlightRequests =
             new java.util.concurrent.atomic.AtomicInteger();
 
@@ -1761,6 +1765,29 @@ public final class HttpServer {
      * out from under it, which is what a client sees as a truncated reply.
      */
     public void stop(int drainMillis) {
+        // CLAIMED, so one teardown runs however many callers ask for it. Two
+        // shutdown paths overlapping -- a signal handler and the application's own
+        // cleanup is the ordinary pair -- both snapshotted the same live
+        // descriptors and ran the raw close below, which bypasses drop()'s
+        // ownership check: the first close releases the number and the second
+        // closes whatever has since been given it. Both also reached the
+        // unsynchronized Tls.close(), freeing one native context twice.
+        //
+        // The loser returns rather than waiting. Its intent -- that the server be
+        // shut down -- is already being carried out, and blocking it here would
+        // deadlock a handler that calls stop() against the drain that is waiting
+        // for that same handler.
+        if(!stopClaimed.compareAndSet(false, true)) {
+            return;
+        }
+        // THE CALLER'S OWN REQUEST, when a handler is what asked for the shutdown.
+        // It holds one in-flight request and one active connection that cannot be
+        // released until this call returns, so draining to zero is waiting for
+        // something this thread is itself holding: the whole window elapsed, and
+        // the sweep then closed the descriptor the reply was owed on, so the
+        // caller of that endpoint got a dropped connection instead of an answer.
+        Object servingFd = SERVING_FD.get();
+        int callerFd = servingFd == null ? -1 : ((Integer)servingFd).intValue();
         running = false;
         reactor.remove(listener.getFd());
         listener.close();
@@ -1786,7 +1813,7 @@ public final class HttpServer {
         // answer at the end of its own turn; until then such a response can still
         // be cut short by a stop(), and that is a smaller fault than a native data
         // race during shutdown.
-        while(System.currentTimeMillis() < deadline && workOutstanding()) {
+        while(System.currentTimeMillis() < deadline && workOutstandingBesidesCaller(callerFd)) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -1806,13 +1833,21 @@ public final class HttpServer {
         // the thread that was using it.
         java.util.Iterator live = new java.util.ArrayList(liveConnections.keySet()).iterator();
         while(live.hasNext()) {
-            ServerSocket.closeFd(((Integer)live.next()).intValue());
+            int fd = ((Integer)live.next()).intValue();
+            if(fd == callerFd) {
+                // The one connection that must survive the sweep: this thread is
+                // inside its handler and has a response still to write. Closing it
+                // here is closing the answer to the request that asked for the
+                // shutdown.
+                continue;
+            }
+            ServerSocket.closeFd(fd);
         }
         // Then give those workers a moment to notice and unwind. Freeing a session
         // while one is still inside it is the thing being avoided, so the sweep below
         // waits for the count to reach zero rather than assuming it has.
         long freeBy = System.currentTimeMillis() + SESSION_RELEASE_GRACE_MILLIS;
-        while(System.currentTimeMillis() < freeBy && workOutstanding()) {
+        while(System.currentTimeMillis() < freeBy && workOutstandingBesidesCaller(callerFd)) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -1915,6 +1950,39 @@ public final class HttpServer {
      * loop and not the others, which is this same drift once already. One method
      * is what stops it happening a third time.
      */
+    /**
+     * The descriptor whose request this thread is currently serving, or null.
+     *
+     * <p>For stop(): a handler that calls it is itself the work being drained, so
+     * a shutdown from inside a request waited out the whole window for a request
+     * that could not finish until the shutdown returned, then closed the very
+     * descriptor the reply was owed on. The handler's caller got a dropped
+     * connection instead of an acknowledgement.
+     *
+     * <p>A ThreadLocal really is per VIRTUAL thread here, not per host: two
+     * connections interleaved on one host each read back their own value and
+     * neither saw the other's. Measured rather than assumed, because everything
+     * else in this file that is per host is per host precisely because the
+     * virtual threads share it.
+     */
+    private static final ThreadLocal SERVING_FD = new ThreadLocal();
+
+    /**
+     * workOutstanding(), minus what the calling handler is itself holding.
+     *
+     * <p>A handler that calls stop() holds one in-flight request and one active
+     * connection, and neither can be released until stop() returns -- so the
+     * drain has to discount them or it waits for itself. Any OTHER work still
+     * counts, which is the part of the drain worth having.
+     */
+    private boolean workOutstandingBesidesCaller(int callerFd) {
+        if(callerFd < 0) {
+            return workOutstanding();
+        }
+        return inFlightRequests.get() > 1 || activeRequests.get() > 1
+                || http2Turns.get() > 0 || pendingWork.get() > 0;
+    }
+
     private boolean workOutstanding() {
         return inFlightRequests.get() > 0 || http2Turns.get() > 0
                 || pendingWork.get() > 0 || activeRequests.get() > 0;
@@ -3684,6 +3752,7 @@ public final class HttpServer {
             // From here to the end of the write is the request being in flight. Not
             // the whole of serveOne: that is the CONNECTION, which outlives this.
             inFlightRequests.incrementAndGet();
+            SERVING_FD.set(new Integer(fd));
             try {
                 try {
                     response = handler.handle(request);
@@ -3708,6 +3777,7 @@ public final class HttpServer {
                 }
             } finally {
                 inFlightRequests.decrementAndGet();
+                SERVING_FD.set(null);
             }
             if(!keepAlive) {
                 drop(fd);
@@ -4036,6 +4106,7 @@ public final class HttpServer {
                         "HTTP/2", headers, stream.getBodyAsString());
                 Response response;
                 inFlightRequests.incrementAndGet();
+                SERVING_FD.set(new Integer(fd));
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -4225,6 +4296,7 @@ public final class HttpServer {
                     // deadline sweep could close the descriptor and free the session
                     // underneath it, which truncates the response at best.
                     inFlightRequests.decrementAndGet();
+                    SERVING_FD.set(null);
                 }
             }
             flushHttp2(fd, session, h2);
