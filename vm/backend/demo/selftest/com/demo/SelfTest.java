@@ -2289,6 +2289,65 @@ public class SelfTest {
     }
 
     /**
+     * Closing a socket under a blocked plaintext read still wakes it.
+     *
+     * <p>close() is how a blocked read gets cancelled, and closing a descriptor is
+     * also what hands its NUMBER back to the process -- so a reader still inside
+     * recv() with it can be served by whatever socket is opened next. The
+     * descriptor is therefore shut down rather than closed while an operation
+     * holds it, and the last operation out closes it for real.
+     *
+     * <p>What that trades is the thing this checks: shutdown has to wake the
+     * reader as reliably as close did, or cancelling a read would hang instead.
+     * The reuse half is by construction -- the number is not released while
+     * anyone is inside a native with it -- and is not observable from here.
+     */
+    private static void aClosedSocketWakesItsBlockedReader() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Thread silent = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    int client = listener.accept();
+                    if(client >= 0) {
+                        // Accepted and then SAYS NOTHING, which is what leaves the
+                        // client's read with nothing to return.
+                        Thread.sleep(4000);
+                        ServerSocket.closeFd(client);
+                    }
+                } catch (Exception ignored) {
+                    // The check below reports what the reader did.
+                }
+            }
+        });
+        silent.start();
+        final Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 5000);
+        final boolean[] returned = new boolean[1];
+        Thread reader = new Thread(new Runnable() {
+            public void run() {
+                byte[] buffer = new byte[64];
+                try {
+                    conn.read(buffer, 0, buffer.length);
+                } catch (Exception expected) {
+                    // Closed under it, which is the scenario.
+                }
+                returned[0] = true;
+            }
+        });
+        reader.start();
+        Thread.sleep(300);              // by now it is blocked in the native read
+        long started = System.currentTimeMillis();
+        conn.close();
+        reader.join(10000);
+        long woke = System.currentTimeMillis() - started;
+        listener.close();
+        silent.join(10000);
+        check("a blocked read returns when the socket is closed under it", "true",
+                String.valueOf(returned[0]));
+        check("and it returns promptly rather than waiting for the peer", "true",
+                String.valueOf(woke < 3000));
+    }
+
+    /**
      * A container credential endpoint off this host must be encrypted.
      *
      * <p>AWS_CONTAINER_CREDENTIALS_FULL_URI is used as the environment gives it.
@@ -4003,6 +4062,7 @@ public class SelfTest {
         aTruncatingDatabasePathOpensNothing();
         aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();
+        aClosedSocketWakesItsBlockedReader();
         aRemoteCredentialEndpointMustBeEncrypted();
         aContradictoryLengthIsRefused();
         aChunkedResponseEndsWhereItsFramingSays();

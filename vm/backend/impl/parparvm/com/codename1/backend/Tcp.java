@@ -153,12 +153,6 @@ public final class Tcp {
      * which is why the same code is safe on the simulator and unsafe only once it
      * is packaged. The subtraction avoids the overflow `offset + length` has.
      */
-    /** Operations currently inside OpenSSL on this connection's session. */
-    private int tlsInFlight;
-
-    /** A session close() could not free because one of those was still running. */
-    private long tlsAwaitingClose;
-
     private static void checkRange(byte[] buffer, int offset, int length) {
         if(buffer == null) {
             throw new NullPointerException("buffer");
@@ -166,6 +160,63 @@ public final class Tcp {
         if(offset < 0 || length < 0 || length > buffer.length - offset) {
             throw new IndexOutOfBoundsException("offset " + offset + ", length "
                     + length + ", buffer " + buffer.length);
+        }
+    }
+
+    /** Operations currently inside a native on this connection. */
+    private int inFlight;
+
+    /** Whether close() has been called; the fields below are then its leftovers. */
+    private boolean closing;
+
+    /** What the last operation out has to free, when close() could not. */
+    private long tlsAwaitingClose;
+    private long handleAwaitingClose;
+
+    /**
+     * Takes a claim on this connection for one operation.
+     *
+     * <p>Returns the TLS session to use, or 0 to use the plain socket, and leaves
+     * the descriptor in `claimed` -- both read under the monitor so they describe
+     * the same instant. The claim is what stops close() from releasing either one
+     * while this operation is inside a native with it.
+     */
+    private synchronized long claim(long[] claimed) throws IOException {
+        if(handle == 0) {
+            throw new IOException("Socket closed");
+        }
+        inFlight++;
+        claimed[0] = handle;
+        return tls;
+    }
+
+    /**
+     * Releases a claim, finishing a close() that was waiting on it.
+     *
+     * <p>The session is DISCARDED rather than shut down: close() has already
+     * shut the socket down, so there is no longer a peer to tell. The descriptor
+     * is closed last, and only here -- which is the whole point. Closing it in
+     * close() would release the NUMBER while this operation was still inside
+     * read() or write() with it, and a number is handed to the next socket this
+     * process opens, so the read would be served by an unrelated connection.
+     */
+    private void release() {
+        long discard = 0;
+        long closeNow = 0;
+        synchronized(this) {
+            inFlight--;
+            if(inFlight == 0 && closing) {
+                discard = tlsAwaitingClose;
+                tlsAwaitingClose = 0;
+                closeNow = handleAwaitingClose;
+                handleAwaitingClose = 0;
+            }
+        }
+        if(discard != 0) {
+            tlsDiscardImpl(discard);
+        }
+        if(closeNow != 0) {
+            closeImpl(closeNow);
         }
     }
 
@@ -189,16 +240,14 @@ public final class Tcp {
         if(length == 0) {
             return 0;
         }
-        long session = claimTls();
+        long[] claimed = new long[1];
+        long session = claim(claimed);
         int n;
-        if(session == 0) {
-            n = readImpl(handle, buffer, offset, length);
-        } else {
-            try {
-                n = tlsReadImpl(session, buffer, offset, length);
-            } finally {
-                releaseTls();
-            }
+        try {
+            n = session == 0 ? readImpl(claimed[0], buffer, offset, length)
+                             : tlsReadImpl(session, buffer, offset, length);
+        } finally {
+            release();
         }
         if(n < -1) {
             throw new IOException("Socket read failed");
@@ -216,16 +265,14 @@ public final class Tcp {
         if(length == 0) {
             return;
         }
-        long session = claimTls();
+        long[] claimed = new long[1];
+        long session = claim(claimed);
         int n;
-        if(session == 0) {
-            n = writeImpl(handle, buffer, offset, length);
-        } else {
-            try {
-                n = tlsWriteImpl(session, buffer, offset, length);
-            } finally {
-                releaseTls();
-            }
+        try {
+            n = session == 0 ? writeImpl(claimed[0], buffer, offset, length)
+                             : tlsWriteImpl(session, buffer, offset, length);
+        } finally {
+            release();
         }
         if(n != length) {
             throw new IOException("Socket write failed");
@@ -233,68 +280,52 @@ public final class Tcp {
     }
 
     /**
-     * Takes a claim on the TLS session for one operation, or 0 when there is
-     * none and the plain socket is what to use.
+     * Closes the connection, and does not release anything an operation still
+     * holds.
      *
-     * <p>The session handle is the SSL* itself, and SSL_read and SSL_write yield
-     * the VM thread while they are inside OpenSSL. close() on another thread --
-     * DbPool.close() closes every connection it knows about, including one a
-     * borrower is still using -- then called SSL_shutdown and SSL_free underneath
-     * them, and the operation resumed against freed OpenSSL state. That is a
-     * native crash in the packaged process, not an exception anything can catch.
+     * <p>When nothing is in flight this is the plain teardown it always was: shut
+     * the session down politely, close the descriptor, done.
      *
-     * <p>So the session is freed by whoever leaves last rather than by whoever
-     * closes. close() still returns at once: it closes the DESCRIPTOR, which is
-     * what a blocked SSL_read is really waiting on, so the other thread returns
-     * an error immediately and frees on its way out.
+     * <p>When something IS in flight -- the ordinary case, since close() is how a
+     * blocked read gets cancelled -- the descriptor is SHUT DOWN rather than
+     * closed. That is what wakes the other thread, and it leaves the number
+     * allocated to us until that thread returns. Closing it here instead would
+     * hand the number back to the process while a read() or write() was still
+     * inside a native with it, and the next socket this process opens is given
+     * that same number: the read would then be served, silently, by an unrelated
+     * connection. The last operation out closes it for real.
+     *
+     * <p>close() still returns at once either way. It has to: the thread it is
+     * cancelling may be one that never comes back.
      */
-    private synchronized long claimTls() {
-        if(tls != 0) {
-            tlsInFlight++;
-        }
-        return tls;
-    }
-
-    /** Releases a claim, freeing the session if a close() was waiting on it. */
-    private void releaseTls() {
-        long abandoned = 0;
-        synchronized(this) {
-            tlsInFlight--;
-            if(tlsInFlight == 0 && tlsAwaitingClose != 0) {
-                abandoned = tlsAwaitingClose;
-                tlsAwaitingClose = 0;
-            }
-        }
-        if(abandoned != 0) {
-            tlsCloseImpl(abandoned);
-        }
-    }
-
     public void close() {
-        long freeNow = 0;
-        long h;
+        long closeNow = 0;
+        long shutDownNow = 0;
+        long tlsCloseNow = 0;
         synchronized(this) {
-            if(tls != 0) {
-                // Handed to whoever is inside it, if anyone is; taken here if not.
-                if(tlsInFlight == 0) {
-                    freeNow = tls;
-                } else {
-                    tlsAwaitingClose = tls;
-                }
-                tls = 0;
+            if(closing) {
+                return;                 // idempotent, and only the first one frees
             }
-            h = handle;
+            closing = true;
+            if(inFlight == 0) {
+                tlsCloseNow = tls;
+                closeNow = handle;
+            } else {
+                tlsAwaitingClose = tls;
+                handleAwaitingClose = handle;
+                shutDownNow = handle;
+            }
+            tls = 0;
             handle = 0;
         }
-        // THE DESCRIPTOR FIRST. It is what an in-flight SSL_read is blocked on, so
-        // closing it is what makes that thread return and release its claim --
-        // otherwise close() would leave the session to be freed whenever the peer
-        // next said something, which for a silent peer is never.
-        if(h != 0) {
-            closeImpl(h);
+        if(shutDownNow != 0) {
+            shutdownImpl(shutDownNow);
         }
-        if(freeNow != 0) {
-            tlsCloseImpl(freeNow);
+        if(tlsCloseNow != 0) {
+            tlsCloseImpl(tlsCloseNow);
+        }
+        if(closeNow != 0) {
+            closeImpl(closeNow);
         }
     }
 
@@ -313,6 +344,12 @@ public final class Tcp {
     private static native int tlsReadImpl(long session, byte[] buffer, int offset, int length);
     private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);
     private static native void tlsCloseImpl(long session);
+
+    /**
+     * shutdown(2) on the descriptor: wakes whatever is blocked on it WITHOUT
+     * giving the number back to the process. See close().
+     */
+    private static native void shutdownImpl(long handle);
 
     /** Frees a session whose descriptor has already gone; see startTls. */
     private static native void tlsDiscardImpl(long session);

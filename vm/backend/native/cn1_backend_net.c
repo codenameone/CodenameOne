@@ -286,6 +286,29 @@ JAVA_INT com_codename1_backend_Tcp_writeImpl___long_byte_1ARRAY_int_int_R_int(CO
     return written;
 }
 
+/*
+ * Wakes whatever is blocked on this descriptor without releasing its number.
+ *
+ * close() is how a blocked read is cancelled, and closing is also what hands the
+ * number back to the process -- so a reader still inside recv() with it can be
+ * served by whatever socket is opened next. shutdown() only breaks the
+ * connection: the reader returns, the number stays ours, and the last operation
+ * out closes it for real. EBADF and ENOTCONN are both fine here -- the first
+ * means the race was already lost elsewhere and the second that the peer had
+ * gone -- and neither leaves anything for the caller to do.
+ */
+JAVA_VOID com_codename1_backend_Tcp_shutdownImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    int fd = cn1BackendFd(handle);
+    if(fd < 0) {
+        return;
+    }
+#ifdef _WIN32
+    shutdown(fd, SD_BOTH);
+#else
+    shutdown(fd, SHUT_RDWR);
+#endif
+}
+
 JAVA_INT com_codename1_backend_Tcp_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     int fd = cn1BackendFd(handle);
     if(fd < 0) {
