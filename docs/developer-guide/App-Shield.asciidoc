@@ -120,7 +120,7 @@ image::img/app-shield-request-path.svg[The order the shield works through a requ
 Once `init()` has run, `ConnectionRequest`, `Rest`, `RequestBuilder` and anything else built on `NetworkManager` are covered without further code. For a request to a protected host, on the network thread:
 
 * It waits for initialization to finish if a cold start is still in progress, rather than treating "not ready yet" as "not protected."
-* Any token the shield attached earlier is taken back off before the request is reused -- a redirect reuses the same request object, and a bearer token that follows a redirect off a protected host has been handed to whoever the redirect points at. A header your own `onRedirect()` installed under the same name is left alone: the shield removes its token only while the value is still the token it attached.
+* Any token the shield attached earlier is taken back off before the redirected request is sent -- a redirect reuses the same request object, and a bearer token that follows a redirect off a protected host has been handed to whoever the redirect points at. A header your own `onRedirect()` installed under the same name is left alone: the shield removes its token only while the value is still the token it attached.
 * The token is added under the token header, unless the URL isn't `https`, in which case the host's failure mode decides.
 * The certificate chain is collected and checked against the pin set, before any request body is written.
 

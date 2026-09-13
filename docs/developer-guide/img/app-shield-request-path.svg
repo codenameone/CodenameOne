@@ -13,10 +13,10 @@
   <circle cx="32" cy="184" r="13" fill="#ffffff" stroke="#a33a3a" stroke-width="1.5"/>
   <text x="32" y="188" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a33a3a">2</text>
   <text x="66" y="161" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">Take back a token it attached earlier</text>
-  <text x="326" y="161" font-family="Arial, sans-serif" font-size="9" fill="#888888">before the request object is reused</text>
+  <text x="326" y="161" font-family="Arial, sans-serif" font-size="9" fill="#888888">before the redirected request is sent</text>
   <text x="66" y="179" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">A redirect reuses the same request, and a bearer token that follows one off a protected host has</text>
-  <text x="66" y="194" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">been handed to whoever the redirect points at. Only the shield's own value is removed -- a header</text>
-  <text x="66" y="209" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">your onRedirect installed under the same name is left alone.</text>
+  <text x="66" y="194" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">been handed to whoever the redirect points at. Your onRedirect has already run by now, which is</text>
+  <text x="66" y="209" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">why a header it installed under the same name survives: only the shield's own value is removed.</text>
   <rect x="54" y="238" width="810" height="72" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
   <circle cx="32" cy="274" r="13" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
   <text x="32" y="278" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">3</text>
