@@ -89,18 +89,30 @@ This works through a new mechanism in storage where you can replace the storage 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava030Snippet.java[tag=security-java-030,indent=0]
 ----
 
-You can leverage that knowledge to change the encryption password on the encryption storage. This reads every entry through the old key and writes it back through the new one, so it belongs in a migration step rather than in ordinary app code. `EncryptedStorage` comes from the bouncy castle cn1lib, so this listing isn't part of the compiled examples:
+You can leverage that knowledge to change the encryption password on the encryption storage. Everything has to move at once: the key is installed for the whole of `Storage`, so any entry still written under the old one becomes unreadable the moment the new one goes in. Read them all first, swap the key, then write them all back. `EncryptedStorage` comes from the bouncy castle cn1lib, so this listing isn't part of the compiled examples:
 
 [listing]
 ----
 EncryptedStorage.install(oldKey);
-InputStream is = Storage.getInstance().createInputStream(storageFileName);
-byte[] data = Util.readInputStream(is);
+Map<String, byte[]> all = new LinkedHashMap<>();
+for (String name : Storage.getInstance().listEntries()) {
+    InputStream is = Storage.getInstance().createInputStream(name);
+    all.put(name, Util.readInputStream(is));
+    Util.cleanup(is);
+}
+
 EncryptedStorage.install(newKey);
-OutputStream o = Storage.getInstance().createOutputStream(storageFileName);
-o.write(data);
-o.close();
+for (Map.Entry<String, byte[]> e : all.entrySet()) {
+    OutputStream o = Storage.getInstance().createOutputStream(e.getKey());
+    o.write(e.getValue());
+    Util.cleanup(o);
+}
 ----
+
+That holds every entry in memory between the two loops, which is fine for the
+handful of records an app of this shape keeps and isn't fine for a storage
+full of cached images. Run it while nothing else is touching `Storage`, and do
+it once at startup rather than in response to anything a user can repeat.
 
 
 NOTE: It isn't a good idea to replace storage objects when an app is running so this is purely for this special case...

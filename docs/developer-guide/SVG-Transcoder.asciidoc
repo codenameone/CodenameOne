@@ -161,10 +161,11 @@ this listing isn't one of the compiled examples:
 [listing]
 ----
 import com.codename1.generated.svg.Logo;
+import com.codename1.ui.Display;
 
-Logo logo = new Logo();              // the SVG's declared size at DENSITY_MEDIUM
-Logo dense = new Logo(DENSITY_HIGH); // the same, read as a higher-density design
-Logo sized = new Logo(12f, 12f);     // 12mm square, converted per device
+Logo logo = new Logo();                      // declared size at DENSITY_MEDIUM
+Logo dense = new Logo(Display.DENSITY_HIGH); // read as a higher-density design
+Logo sized = new Logo(12f, 12f);             // 12mm square, converted per device
 
 myButton.setIcon(sized);
 ----
