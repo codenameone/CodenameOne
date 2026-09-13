@@ -220,6 +220,19 @@ public final class Http {
                     + " of the " + declared + " byte(s) its Content-Length declared, so "
                     + "the connection failed part way through it");
         }
+        // AND THE MESSAGE ENDS THERE. Content-Length is the whole of the framing:
+        // whatever follows the declared bytes is not part of this response, and
+        // handing it back as body meant a caller acted on the peer's answer with
+        // something else appended to it -- a second response, or bytes an
+        // attacker put after a short one. A short body is a transport failure and
+        // is reported above; a long one is the peer contradicting its own framing,
+        // and the framed answer is still perfectly readable, so this keeps exactly
+        // what was declared rather than refusing what was asked for.
+        if(declared >= 0 && bodyBytes.length > declared) {
+            byte[] framed = new byte[declared];
+            System.arraycopy(bodyBytes, 0, framed, 0, declared);
+            bodyBytes = framed;
+        }
         return new Response(status, names, values, decodeBody(bodyBytes, names, values));
     }
 

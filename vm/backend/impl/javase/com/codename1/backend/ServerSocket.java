@@ -55,6 +55,17 @@ public final class ServerSocket {
     }
 
     public static ServerSocket bind(String host, int port, int backlog) throws IOException {
+        // A NUL ENDS THE NAME where it becomes a C string, and what is left is
+        // a different address: "0.0.0.0" followed by a NUL and ".example" binds
+        // every interface on this host while whoever approved the name saw an
+        // .example one. Null is still the wildcard on purpose -- that is this
+        // method's own way of saying "every interface" -- but a name that was
+        // GIVEN has to survive the crossing intact. The Java SE arm fails such a
+        // name at resolution, so without this the two arms disagreed about which
+        // interfaces a configured host means.
+        if(host != null) {
+            Urls.requireHostName(host);
+        }
         ServerSocketChannel channel = ServerSocketChannel.open();
         try {
             channel.setOption(StandardSocketOptions.SO_REUSEADDR, Boolean.TRUE);

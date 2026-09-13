@@ -1878,6 +1878,90 @@ public class SelfTest {
     }
 
     /**
+     * A bind address that would name a different interface as a C string binds
+     * nothing.
+     *
+     * <p>A NUL ends the name where it becomes a C string, so "127.0.0.1" plus a
+     * NUL plus ".example" binds 127.0.0.1 -- and "0.0.0.0" spelled that way binds
+     * every interface on the host -- while whoever approved the configured name
+     * saw an .example one. The Java SE arm fails such a name at resolution, so
+     * the two arms disagreed about which interfaces a configured host means, and
+     * the one that binds wider is the packaged one.
+     */
+    private static void aTruncatingBindAddressBindsNothing() throws Exception {
+        String refusal;
+        try {
+            ServerSocket wrong = ServerSocket.bind("127.0.0.1\u0000.example", 0, 1);
+            wrong.close();
+            refusal = "bound";
+        } catch (Exception expected) {
+            String message = String.valueOf(expected.getMessage());
+            refusal = message.indexOf("control character") >= 0 ? "refused"
+                    : "refused for another reason: " + message;
+        }
+        // THE CONTROL: the same address without the NUL still binds, and null
+        // still means every interface, so this cannot pass by refusing everything.
+        ServerSocket honest = ServerSocket.bind("127.0.0.1", 0, 1);
+        boolean honestBound = honest.getPort() > 0;
+        honest.close();
+        ServerSocket wildcard = ServerSocket.bind(null, 0, 1);
+        boolean wildcardBound = wildcard.getPort() > 0;
+        wildcard.close();
+        check("a bind address holding a NUL is refused", "refused", refusal);
+        check("while the same address without one still binds", "true",
+                String.valueOf(honestBound));
+        check("and null still means every interface", "true",
+                String.valueOf(wildcardBound));
+    }
+
+    /**
+     * A response ends where its Content-Length says it does.
+     *
+     * <p>Content-Length is the whole of the framing, so whatever follows the
+     * declared bytes is not part of the response. Handing it back as body meant a
+     * caller acted on the peer's answer with something else appended -- a second
+     * response, or bytes an attacker put after a short one -- and a handler
+     * invoked on that acts on input the peer never sent.
+     */
+    private static void aResponseEndsAtItsDeclaredLength() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    byte[] request = new byte[4096];
+                    ServerSocket.read(client, request, 0, request.length);
+                    byte[] reply = ("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n"
+                            + "hi" + "AND SOMETHING NOBODY ASKED FOR").getBytes("UTF-8");
+                    ServerSocket.write(client, reply, 0, reply.length);
+                } catch (Exception ignored) {
+                    // The check below reports what the client made of it.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            outcome = Http.request("127.0.0.1", port, "GET", "/x", null).getBodyAsString();
+        } catch (Exception err) {
+            outcome = "failed: " + err.getMessage();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a response body is what its Content-Length framed", "hi", outcome);
+    }
+
+    /**
      * A path that would name a different file as a C string opens nothing.
      *
      * <p>A NUL inside it ENDS the path there, so "/etc/hosts\u0000.png" opens
@@ -3371,6 +3455,8 @@ public class SelfTest {
         aStaticFileComesBackWhole();
         aRefusedBodyIsNeverInvited();
         anInterimResponseIsSkipped();
+        aTruncatingBindAddressBindsNothing();
+        aResponseEndsAtItsDeclaredLength();
         aTruncatingPathOpensNothing();
         aTlsVerificationNameWithANulIsRefused();
         aHeadResponseIsNotReadAsTruncated();

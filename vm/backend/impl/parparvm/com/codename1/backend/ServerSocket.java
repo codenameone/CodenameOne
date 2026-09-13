@@ -50,6 +50,17 @@ public final class ServerSocket {
         if(port < 0 || port > 65535) {
             throw new IllegalArgumentException("port out of range: " + port);
         }
+        // A NUL ENDS THE NAME where it becomes a C string, and what is left is
+        // a different address: "0.0.0.0" followed by a NUL and ".example" binds
+        // every interface on this host while whoever approved the name saw an
+        // .example one. Null is still the wildcard on purpose -- that is this
+        // method's own way of saying "every interface" -- but a name that was
+        // GIVEN has to survive the crossing intact. The Java SE arm fails such a
+        // name at resolution, so without this the two arms disagreed about which
+        // interfaces a configured host means.
+        if(host != null) {
+            Urls.requireHostName(host);
+        }
         int fd = bindImpl(host, port, backlog);
         if(fd < 0) {
             throw new IOException("Could not bind " + (host == null ? "*" : host) + ":" + port);

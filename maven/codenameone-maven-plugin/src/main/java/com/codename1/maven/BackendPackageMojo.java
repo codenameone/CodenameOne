@@ -32,7 +32,9 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.model.Plugin;
 import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
@@ -283,6 +285,45 @@ public class BackendPackageMojo extends AbstractMojo {
      * complaint about it names neither Kotlin nor the reason. So say it plainly. The
      * developer guide's "Limits worth knowing" carries the same statement.
      */
+    /**
+     * The encoding this module's sources are actually written in.
+     *
+     * <p>These are the SAME sources the lifecycle has already compiled, so
+     * reading them differently here is a second, disagreeing compilation of one
+     * tree: a module that declares another encoding either fails packaging on
+     * bytes javac accepted a phase earlier, or -- worse, because nothing says so
+     * -- translates string literals and identifiers that are not the ones the JVM
+     * build produced.
+     *
+     * <p>Resolved the way the compiler plugin resolves it, most specific first:
+     * an explicit &lt;encoding&gt; on maven-compiler-plugin, then
+     * project.build.sourceEncoding, and UTF-8 only when the module says nothing.
+     * The platform default is deliberately not the last resort -- it makes the
+     * build depend on the machine that runs it, which is the reason Maven warns
+     * about it.
+     */
+    private String sourceEncoding() {
+        Plugin compiler = project.getPlugin("org.apache.maven.plugins:maven-compiler-plugin");
+        if (compiler != null && compiler.getConfiguration() instanceof Xpp3Dom) {
+            Xpp3Dom encoding = ((Xpp3Dom) compiler.getConfiguration()).getChild("encoding");
+            if (encoding != null && encoding.getValue() != null) {
+                String declared = encoding.getValue().trim();
+                // A configuration that is still a property reference is one Maven
+                // would have interpolated; an uninterpolated ${...} names no
+                // charset, so fall through rather than hand javac a literal.
+                if (declared.length() > 0 && declared.indexOf("${") < 0) {
+                    return declared;
+                }
+            }
+        }
+        String property = project.getProperties() == null ? null
+                : project.getProperties().getProperty("project.build.sourceEncoding");
+        if (property != null && property.trim().length() > 0) {
+            return property.trim();
+        }
+        return "UTF-8";
+    }
+
     private void requireMainClass(File classes) throws MojoFailureException {
         if (mainClass == null || mainClass.length() == 0) {
             throw new MojoFailureException("No entry point: set <mainClass>, or annotate "
@@ -313,7 +354,7 @@ public class BackendPackageMojo extends AbstractMojo {
 
         List<String> command = new ArrayList<String>(Arrays.asList(
                 new File(jdk8, "bin/javac").getAbsolutePath(),
-                "-nowarn", "-encoding", "UTF-8",
+                "-nowarn", "-encoding", sourceEncoding(),
                 "-bootclasspath", javaApi.getAbsolutePath(),
                 "-source", "1.8", "-target", "1.8",
                 "-d", classes.getAbsolutePath()));
