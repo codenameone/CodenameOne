@@ -106,7 +106,11 @@ def offenders(markup: str, baseline: set) -> List[Tuple[str, str, str, bool]]:
             if not DIMENSION_RE.match(value):
                 found.append((src, alt, html.unescape(value), False))
                 break
-            key = f"{src}|{slot}|{value}"
+            # The alt text is part of the identity on purpose. Keyed on src
+            # alone, one exemption covers every use of that image -- and an
+            # image reused later with its alt text truncated to the same width
+            # would inherit the exemption. game-3d.png already appears twice.
+            key = f"{src}|{slot}|{value}|{alt}"
             if key not in baseline:
                 found.append((src, alt, f"{slot}={value}", True))
                 break

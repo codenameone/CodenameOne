@@ -7,29 +7,33 @@
 # declared deliberately -- by adding a line, or by quoting the alt text if the
 # number was really part of it.
 #
-# Format: <src>|<width|height>|<value>
-img/car-androidauto-grid.png|width|640
-img/car-carplay-list.png|width|640
-img/car-now-playing.png|width|640
-img/car-sim-carplay-grid.png|width|640
-img/car-sim-carplay-list.png|width|640
-img/chat-view.png|width|320
-img/css-filter-blur-overview.png|width|260
-img/css-gradients-overview.png|width|300
-img/game-3d.png|width|240
-img/game-3d.png|width|250
-img/game-board.png|width|240
-img/game-cards.png|width|240
-img/game-casual.png|width|240
-img/game-scroller.png|width|240
-img/game-spritesheet.png|width|640
-img/gamebuilder-3d-preview.png|width|800
-img/gamebuilder-3d.png|width|800
-img/gamebuilder-editor.png|width|800
-img/gamebuilder-import.png|width|800
-img/gamebuilder-inspector.png|width|800
-img/gamebuilder-live.png|width|800
-img/surfaces-clock-widget.png|width|320
-img/surfaces-dynamic-island.png|width|640
-img/surfaces-sample-form.png|width|640
-img/surfaces-widget-preview.png|width|640
+# The alt text is part of the key so that an exemption covers ONE occurrence.
+# Keyed on the image alone, a reuse of that image whose alt text was truncated
+# to the same width would inherit the exemption.
+#
+# Format: <src>|<width|height>|<value>|<alt text>
+img/car-androidauto-grid.png|width|640|Android Auto grid template
+img/car-carplay-list.png|width|640|CarPlay list template
+img/car-now-playing.png|width|640|Now-playing / pane template
+img/car-sim-carplay-grid.png|width|640|Simulated CarPlay head unit rendering a CarGridTemplate
+img/car-sim-carplay-list.png|width|640|Simulated CarPlay head unit rendering a CarListTemplate
+img/chat-view.png|width|320|ChatView in the JavaSE simulator
+img/css-filter-blur-overview.png|width|260|CSS filter blur visual
+img/css-gradients-overview.png|width|300|CSS gradient examples
+img/game-3d.png|width|240|3D world demo
+img/game-3d.png|width|250|The 3D sample: a textured grid ground, stacked cube models, ringed buildings and billboarded coins
+img/game-board.png|width|240|Isometric checkers mid-game with a selected piece and a highlighted destination
+img/game-cards.png|width|240|The Memory card game mid-flip: two matched pairs and one card face up
+img/game-casual.png|width|240|Casual arena demo
+img/game-scroller.png|width|240|Side scroller demo
+img/game-spritesheet.png|width|640|A six-frame run cycle laid out as a sprite sheet
+img/gamebuilder-3d-preview.png|width|800|The 3D live preview — perspective camera over the board
+img/gamebuilder-3d.png|width|800|Editing a 3D map — the board autofits the canvas and zooms
+img/gamebuilder-editor.png|width|800|The Game Builder editing a 2D platformer
+img/gamebuilder-import.png|width|800|Importing a custom image into the Custom asset pack
+img/gamebuilder-inspector.png|width|800|Editing a selected object’s properties
+img/gamebuilder-live.png|width|800|Live preview — playing the level in a device frame
+img/surfaces-clock-widget.png|width|320|The analog clock widget rendered from a SurfaceVector in the simulator preview
+img/surfaces-dynamic-island.png|width|640|The simulator’s mock Dynamic Island pill and expanded live activity card
+img/surfaces-sample-form.png|width|640|The SurfacesSample main form with publish and live activity controls
+img/surfaces-widget-preview.png|width|640|The simulator Widgets preview rendering the delivery widget with a native countdown and progress bar above the mock Dynamic Island
