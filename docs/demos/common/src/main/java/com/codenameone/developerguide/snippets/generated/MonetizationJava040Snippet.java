@@ -85,7 +85,9 @@ class MonetizationJava040Snippet {
     
     void snippet() throws Exception {
         // tag::monetization-java-040[]
-        Purchase iap = Purchase.getInAppPurchase();
+        // The shared iap field, not a fresh getInAppPurchase(): receipts are
+        // cached on the instance, so a listener holding its own copy keeps
+        // answering from before the last synchronization.
         //...
         Button rentWorld1M = new Button("Rent World 1 Month");
         rentWorld1M.addActionListener(e->{
@@ -98,7 +100,7 @@ class MonetizationJava040Snippet {
          msg = "Rent the world for 1 month?";
          }
          if (Dialog.show("Confirm", msg, "Yes", "No")) {
-         Purchase.getInAppPurchase().purchase(SKU_WORLD_1_MONTH); // <3>
+         iap.purchase(SKU_WORLD_1_MONTH); // <3>
          // Note: since this is a non-renewable subscription it's a regular
          // product in the play store - therefore you use the purchase() method.
          // If it were a "subscription" product in the play store, then you
@@ -117,7 +119,7 @@ class MonetizationJava040Snippet {
          msg = "Rent the world for 1 year?";
          }
          if (Dialog.show("Confirm", msg, "Yes", "No")) {
-         Purchase.getInAppPurchase().purchase(SKU_WORLD_1_YEAR);
+         iap.purchase(SKU_WORLD_1_YEAR);
          // Note: since this is a non-renewable subscription it's a regular
          // product in the play store - therefore you use the purchase() method.
          // If it were a "subscription" product in the play store, then you
@@ -125,8 +127,10 @@ class MonetizationJava040Snippet {
          }
         });
         // end::monetization-java-040[]
+
     }
 
+    Purchase iap = Purchase.getInAppPurchase();
     static final String SKU_WORLD_1_YEAR = "com.example.world.year";
     String[] PRODUCTS = {SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR};
     static final String SKU_WORLD_1_MONTH = "com.example.world.month";
