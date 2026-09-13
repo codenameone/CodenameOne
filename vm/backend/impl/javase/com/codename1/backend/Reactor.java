@@ -79,19 +79,36 @@ public final class Reactor {
             java.util.Collections.synchronizedSet(new java.util.HashSet());
 
     public void add(int fd, int events) throws IOException {
-        Integer key = Integer.valueOf(fd);
-        if((events & ONESHOT) != 0) {
-            oneshot.add(key);
-        } else {
-            oneshot.remove(key);
-        }
+        rememberOneshot(Integer.valueOf(fd), events);
         synchronized (pending) {
             pending.add(new int[] {fd, events});
         }
         selector.wakeup();
     }
 
+    /**
+     * Records whether this descriptor is armed one-shot, which is a property of
+     * the LAST call that set its interest -- add() or modify() alike.
+     */
+    private void rememberOneshot(Integer key, int events) {
+        if((events & ONESHOT) != 0) {
+            oneshot.add(key);
+        } else {
+            oneshot.remove(key);
+        }
+    }
+
     public void modify(int fd, int events) throws IOException {
+        // THE SET, NOT ONLY THE INTEREST OPS. This updated what the selector waits
+        // for and left the one-shot bookkeeping at whatever add() had last said, so
+        // the two halves of a registration disagreed in both directions: adding a
+        // descriptor level-triggered and modifying it to ONESHOT left it
+        // level-triggered, and dropping ONESHOT by modify left await() still
+        // disarming it after one delivery. Both translated arms take the flag from
+        // every change they make -- EPOLL_CTL_MOD carries EPOLLONESHOT, and a
+        // kevent re-add carries EV_DISPATCH -- so this was the Java SE arm alone
+        // answering a documented call differently.
+        rememberOneshot(Integer.valueOf(fd), events);
         SelectionKey key = keys.get(Integer.valueOf(fd));
         if(key == null) {
             add(fd, events);

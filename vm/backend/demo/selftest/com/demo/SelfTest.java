@@ -2443,6 +2443,134 @@ public class SelfTest {
     }
 
     /**
+     * A framed response ends where its framing says, not when the peer hangs up.
+     *
+     * <p>This client asks for "Connection: close" and used to read to end of
+     * stream, so a peer that keeps the connection open anyway -- one that answers
+     * keep-alive whatever was asked, or a control endpoint that never hangs up --
+     * left it blocked in read() with the whole response already in the buffer.
+     * There is no read deadline on the socket, so that is forever: in
+     * LambdaRuntime it strands the invocation loop for the life of the instance.
+     *
+     * <p>The stub therefore answers and then holds the connection open, saying
+     * nothing more. The request runs on its own thread so a regression FAILS here
+     * instead of hanging the suite -- what is asserted is that the call finished
+     * at all, and that what it returned is the whole body rather than a prefix of
+     * it, which is the way a change like this breaks in the other direction.
+     */
+    private static void aFramedResponseEndsAtItsFraming() throws Exception {
+        check("a response framed by Content-Length ends there", "answered: hello",
+                heldOpenResponse("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"));
+        // The other framing, which ends at its last chunk and terminated trailer
+        // section rather than at a byte count.
+        check("a chunked response ends at its last chunk", "answered: hello",
+                heldOpenResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"
+                        + "3\r\nhel\r\n2\r\nlo\r\n0\r\n\r\n"));
+        // A bodiless response ends at the blank line, whatever it declares.
+        check("a 204 ends at its header block", "answered: ",
+                heldOpenResponse("HTTP/1.1 204 No Content\r\nContent-Length: 5\r\n\r\n"));
+        // And an interim response frames nothing, so the one after it decides.
+        check("an interim response does not end the message", "answered: hello",
+                heldOpenResponse("HTTP/1.1 100 Continue\r\n\r\n"
+                        + "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"));
+    }
+
+    /**
+     * Sends exactly this response to one request and then holds the connection
+     * open, and answers what the client made of it within a generous bound.
+     */
+    private static String heldOpenResponse(String response) throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        final String payload = response;
+        final boolean[] holding = new boolean[1];
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    // The request, far enough to know it arrived.
+                    byte[] in = new byte[4096];
+                    ServerSocket.read(client, in, 0, in.length);
+                    byte[] out = payload.getBytes("UTF-8");
+                    ServerSocket.write(client, out, 0, out.length);
+                    // AND THEN NOTHING. No close, which is the whole point.
+                    holding[0] = true;
+                    Thread.sleep(4000);
+                } catch (Exception ignored) {
+                    // The client hanging up first is a perfectly good ending.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        final String[] answer = new String[1];
+        Thread caller = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Http.Response got = Http.get("127.0.0.1", port, "/x");
+                    answer[0] = "answered: " + got.getBodyAsString();
+                } catch (Exception err) {
+                    answer[0] = "failed: " + err.getMessage();
+                }
+            }
+        });
+        caller.start();
+        caller.join(3000);
+        String outcome = answer[0] == null
+                ? "still blocked in read after the whole response arrived"
+                : answer[0];
+        listener.close();
+        stub.join(6000);
+        caller.join(6000);
+        return outcome;
+    }
+
+    /**
+     * The other direction of the same rule: level-triggered, then modified to
+     * one-shot, must actually stop reporting.
+     *
+     * <p>Kept apart from the check above because it needs a descriptor that was
+     * never added with ONESHOT -- on the arm this was broken on, one added that
+     * way stayed in the bookkeeping set forever, so modifying INTO one-shot
+     * looked correct there for the wrong reason and proved nothing.
+     */
+    private static void modifyingIntoOneShotDisarms() throws Exception {
+        Reactor reactor = Reactor.create();
+        ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 5000);
+        int peer = listener.accept();
+        int[] ready = new int[8];
+        try {
+            // Level-triggered: a connected socket is writable, and stays reported.
+            reactor.add(peer, Reactor.WRITE);
+            int first = reactor.await(ready, 1000);
+            int second = reactor.await(ready, 300);
+            reactor.modify(peer, Reactor.WRITE | Reactor.ONESHOT);
+            int third = reactor.await(ready, 1000);
+            int fourth = reactor.await(ready, 300);
+            check("a level-triggered write is reported", "1", String.valueOf(first));
+            check("and reported again", "1", String.valueOf(second));
+            check("modifying into one-shot still reports once", "1",
+                    String.valueOf(third));
+            check("and then stops", "0", String.valueOf(fourth));
+        } finally {
+            reactor.remove(peer);
+            reactor.close();
+            ServerSocket.closeFd(peer);
+            conn.close();
+            listener.close();
+        }
+    }
+
+    /**
      * The reactor's zero timeout is a probe, and its one-shot means once.
      *
      * <p>Two rules the arms have to share. A zero timeout is epoll_wait(..., 0)
@@ -2486,9 +2614,23 @@ public class SelfTest {
             reactor.add(peer, Reactor.WRITE | Reactor.ONESHOT);
             int first = reactor.await(ready, 1000);
             int second = reactor.await(ready, 300);
+            // AND MODIFY DECIDES IT TOO, in both directions. One-shot is a
+            // property of the last call that set a descriptor's interest, which on
+            // the translated arms falls out of the call itself -- EPOLL_CTL_MOD
+            // carries EPOLLONESHOT, a kevent re-add carries EV_DISPATCH -- while
+            // the Java SE arm kept a set of its own that only add() maintained.
+            // Modifying back to level-triggered therefore left the descriptor
+            // being disarmed after one delivery.
+            reactor.modify(peer, Reactor.WRITE);
+            int third = reactor.await(ready, 1000);
+            int fourth = reactor.await(ready, 300);
             check("a reactor probe answers rather than waiting", "answered 0", probe);
             check("a one-shot write fires once", "1", String.valueOf(first));
             check("and not again until it is re-armed", "0", String.valueOf(second));
+            check("modifying back to level-triggered re-arms it", "1",
+                    String.valueOf(third));
+            check("and level-triggered keeps reporting it", "1",
+                    String.valueOf(fourth));
         } finally {
             reactor.remove(peer);
             reactor.close();
@@ -4668,6 +4810,8 @@ public class SelfTest {
         aTruncatingBindAddressBindsNothing();
         aClosedSocketWakesItsBlockedReader();
         theReactorProbesAndFiresOnce();
+        modifyingIntoOneShotDisarms();
+        aFramedResponseEndsAtItsFraming();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
         halfACredentialPairIsRefused();

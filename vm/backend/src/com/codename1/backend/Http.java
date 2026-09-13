@@ -162,14 +162,94 @@ public final class Http {
     }
 
     private static Response readResponse(Tcp socket, String verb) throws IOException {
-        // "Connection: close" is requested above, so the whole response can be read
-        // to end-of-stream and parsed in memory. That keeps the parser free of the
-        // chunked/keep-alive state machine, at the cost of one connection per call --
-        // which on loopback is cheaper than the code it saves.
-        ByteArrayOutputStream raw = new ByteArrayOutputStream();
-        byte[] chunk = new byte[4096];
+        // "Connection: close" is requested above, so a conforming peer ends the
+        // message by closing, and the whole of it can be parsed in memory at once.
+        //
+        // ENDING IS NOT ONLY CLOSING, though. A peer that keeps the connection open
+        // regardless -- one that answers keep-alive whatever was asked, or a
+        // control endpoint that simply never hangs up -- left this blocked in
+        // read() with a COMPLETE response already in the buffer and nothing looking
+        // at it. There is no read deadline on this socket, so "blocked" means for
+        // as long as the process lives: in LambdaRuntime that strands the
+        // invocation loop for the lifetime of the instance. The message says where
+        // it ends, RFC 9112 6.3, so this now stops when its framing says so and
+        // waits for end-of-stream only when nothing else frames it.
+        //
+        // A READ DEADLINE WOULD HAVE BEEN THE WRONG TOOL, though it is the other
+        // obvious one: the Lambda protocol's GET /invocation/next is a long poll
+        // that is SUPPOSED to block until work arrives, so a timeout short enough
+        // to catch a stalled peer would break the loop it was meant to protect.
+        // What remains unbounded is a peer that accepts, sends nothing or half a
+        // message, and stalls -- that one needs a socket deadline, which needs a
+        // native this runtime does not have yet.
+        byte[] buffer = new byte[8192];
+        int size = 0;
+        // The framing, once the final header block has arrived: a whole-message
+        // length, or a chunk walk, or neither -- in which case end-of-stream is
+        // the framing and this reads exactly as it used to.
+        boolean framingKnown = false;
+        int total = -1;
+        boolean chunked = false;
+        int[] chunkCursor = new int[1];
+        int frameStart = 0;
+        int headerScan = 0;
         while(true) {
-            int n = socket.read(chunk, 0, chunk.length);
+            if(!framingKnown) {
+                int headerEnd = indexOfHeaderEnd(buffer, headerScan, size);
+                if(headerEnd < 0) {
+                    // Resume three bytes back, because the terminator can straddle
+                    // two reads. Never before the block being examined.
+                    headerScan = Math.max(frameStart, size - 3);
+                } else {
+                    String headerText = new String(buffer, frameStart,
+                            headerEnd - frameStart, "UTF-8");
+                    String[] lines = split(headerText, "\r\n");
+                    int status = lines.length == 0 ? -1 : parseStatus(lines[0]);
+                    if(status >= 100 && status < 200) {
+                        // An interim response frames nothing; the real one follows
+                        // it on the same connection. frameStart only moves forward.
+                        frameStart = headerEnd + 4;
+                        headerScan = frameStart;
+                        continue;
+                    }
+                    List headNames = new ArrayList();
+                    List headValues = new ArrayList();
+                    for(int iter = 1 ; iter < lines.length ; iter++) {
+                        int colon = lines[iter].indexOf(':');
+                        if(colon > 0) {
+                            headNames.add(lines[iter].substring(0, colon).trim());
+                            headValues.add(lines[iter].substring(colon + 1).trim());
+                        }
+                    }
+                    int bodyStart = headerEnd + 4;
+                    framingKnown = true;
+                    if(!carriesBody(verb, status)) {
+                        total = bodyStart;
+                    } else if(joinedHeader(headNames, headValues,
+                            "Transfer-Encoding") != null) {
+                        chunked = true;
+                        chunkCursor[0] = bodyStart;
+                    } else {
+                        int declared = declaredLength(headNames, headValues);
+                        total = declared >= 0 ? bodyStart + declared : -1;
+                    }
+                }
+            }
+            if(total >= 0 && size >= total) {
+                break;
+            }
+            if(chunked) {
+                int end = chunkedEnd(buffer, size, chunkCursor);
+                if(end >= 0) {
+                    break;
+                }
+            }
+            if(size == buffer.length) {
+                byte[] grown = new byte[buffer.length * 2];
+                System.arraycopy(buffer, 0, grown, 0, size);
+                buffer = grown;
+            }
+            int n = socket.read(buffer, size, buffer.length - size);
             if(n <= 0) {
                 break;
             }
@@ -185,15 +265,16 @@ public final class Http {
             // the transfer past CN1_WEB_MAX_RESPONSE_MB, default 64. This is the
             // same bound with the name its own family uses, so the two clients
             // answer alike.
-            if(raw.size() + n > MAX_RESPONSE_BYTES) {
+            if(size + n > MAX_RESPONSE_BYTES) {
                 throw new IOException("The response passed the "
                         + (MAX_RESPONSE_BYTES / (1024 * 1024)) + " MB this client "
                         + "will read; set CN1_HTTP_MAX_RESPONSE_MB higher if the "
                         + "endpoint really answers that much");
             }
-            raw.write(chunk, 0, n);
+            size += n;
         }
-        byte[] all = raw.toByteArray();
+        byte[] all = new byte[size];
+        System.arraycopy(buffer, 0, all, 0, size);
         if(all.length == 0) {
             // The peer closed without sending anything. Reporting this as malformed
             // HTTP sent every "the host went away" shutdown to the wrong diagnosis.
@@ -479,7 +560,12 @@ public final class Http {
     }
 
     private static int indexOfCrLf(byte[] data, int from) {
-        for(int iter = from ; iter + 1 < data.length ; iter++) {
+        return indexOfCrLf(data, from, data.length);
+    }
+
+    /** The same search, bounded by how much of a partly filled buffer is real. */
+    private static int indexOfCrLf(byte[] data, int from, int limit) {
+        for(int iter = Math.max(from, 0) ; iter + 1 < limit ; iter++) {
             if(data[iter] == '\r' && data[iter + 1] == '\n') {
                 return iter;
             }
@@ -525,12 +611,65 @@ public final class Http {
     }
 
     private static int indexOfHeaderEnd(byte[] data, int from) {
-        for(int iter = from ; iter + 3 < data.length ; iter++) {
+        return indexOfHeaderEnd(data, from, data.length);
+    }
+
+    /** The same search, bounded by how much of a partly filled buffer is real. */
+    private static int indexOfHeaderEnd(byte[] data, int from, int limit) {
+        for(int iter = Math.max(from, 0) ; iter + 3 < limit ; iter++) {
             if(data[iter] == '\r' && data[iter + 1] == '\n' && data[iter + 2] == '\r' && data[iter + 3] == '\n') {
                 return iter;
             }
         }
         return -1;
+    }
+
+    /**
+     * Walks chunk framing from the cursor, returning the index one past the end of
+     * the message once the last chunk and its trailer section have arrived, or -1
+     * while the message is still coming.
+     *
+     * <p>The cursor only ever moves forward, to the last chunk boundary this has
+     * fully parsed, so a body delivered in a thousand reads is walked once rather
+     * than a thousand times. What it does NOT do is decode: dechunk() does that
+     * afterwards, from the start, and this only has to agree with it about where
+     * the message stops.
+     */
+    private static int chunkedEnd(byte[] data, int size, int[] cursor)
+            throws IOException {
+        int pos = cursor[0];
+        while(true) {
+            int eol = indexOfCrLf(data, pos, size);
+            if(eol < 0) {
+                return -1;
+            }
+            int end = pos;
+            while(end < eol && data[end] != ';') {
+                end++;
+            }
+            int chunk = parseChunkSize(data, pos, end);
+            int after = eol + 2;
+            if(chunk == 0) {
+                // last-chunk, then a trailer section ending at an empty line.
+                int scan = after;
+                while(true) {
+                    int lineEnd = indexOfCrLf(data, scan, size);
+                    if(lineEnd < 0) {
+                        return -1;
+                    }
+                    if(lineEnd == scan) {
+                        return scan + 2;
+                    }
+                    scan = lineEnd + 2;
+                }
+            }
+            int next = after + chunk + 2;   // the chunk's bytes and its own CRLF
+            if(next > size) {
+                return -1;
+            }
+            pos = next;
+            cursor[0] = pos;
+        }
     }
 
     private static int parseStatus(String statusLine) throws IOException {

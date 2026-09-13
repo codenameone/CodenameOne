@@ -606,6 +606,28 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         route.pattern = declared.length() == 0 ? "/" : declared;
         route.javaMethod = m.getName();
 
+        // THE WHOLE PATTERN, not the part that becomes matcher bytes. A route's
+        // prefix goes through byteArrayLiteral, which refuses a non-ASCII
+        // character -- but for a dynamic route the prefix stops at the first '{',
+        // and everything after it is emitted as an ordinary Java string that
+        // bindPath compares against request.pathFrom(). That comparison is against
+        // widened wire octets, so "/files/{id}/caf\u00e9" matched neither the raw
+        // UTF-8 spelling nor the percent-encoded one: the route packaged cleanly
+        // and answered 404 to every request, which is the failure a build-time
+        // check exists to prevent. The contract generator refuses the same thing
+        // in the same words; this is the half that was only refused as far as the
+        // first placeholder.
+        int nonAscii = firstNonAscii(route.pattern);
+        if (nonAscii >= 0) {
+            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " declares the "
+                    + "route " + route.pattern + ", which holds a non-ASCII "
+                    + "character at index " + nonAscii + ". A request target arrives "
+                    + "as bytes, so such a route matches neither the raw spelling "
+                    + "nor the percent-encoded one; percent-encode it in the "
+                    + "annotation");
+            return null;
+        }
+
         int firstVar = route.pattern.indexOf('{');
         route.prefix = firstVar < 0 ? route.pattern : route.pattern.substring(0, firstVar);
         List<String> variableNames = new ArrayList<String>();
@@ -2325,6 +2347,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     }
 
     /** A route as a byte[] constant, which is what the request is compared against. */
+    /** Where a route pattern stops being ASCII, or -1. See buildRoute. */
+    private static int firstNonAscii(String pattern) {
+        for (int i = 0; i < pattern.length(); i++) {
+            if (pattern.charAt(i) > 0x7f) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static String byteArrayLiteral(String value) {
         StringBuilder sb = new StringBuilder("{");
         for (int i = 0; i < value.length(); i++) {

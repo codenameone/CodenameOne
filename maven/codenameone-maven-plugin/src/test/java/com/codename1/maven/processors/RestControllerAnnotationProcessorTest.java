@@ -404,6 +404,47 @@ public class RestControllerAnnotationProcessorTest {
         assertTrue(run(compile(source)).hasErrors());
     }
 
+    @Test
+    public void refusesANonAsciiRouteAfterItsFirstVariable() throws Exception {
+        // The prefix of a dynamic route becomes matcher BYTES, and byteArrayLiteral
+        // refuses a non-ASCII character there -- but the prefix stops at the first
+        // '{', and what follows was emitted as an ordinary Java string compared
+        // against request.pathFrom(), which is widened wire octets. So this route
+        // packaged cleanly and then matched nothing: not the raw UTF-8 spelling,
+        // whose octets widen to two chars rather than one, and not the
+        // percent-encoded spelling, which stays "%C3%A9". Refused at build time,
+        // where a person can see it, exactly as the contract generator does.
+        String source =
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Bad {\n"
+                + "    @GetMapping(\"/files/{id}/caf\u00e9\")\n"
+                + "    public String x(@PathVariable(\"id\") String id) { return id; }\n"
+                + "}\n";
+        ProcessorContext ctx = run(compile(source));
+        assertTrue("a route that can never match must fail the build",
+                ctx.hasErrors());
+        assertTrue("and the message must name what is wrong with it: "
+                        + ctx.getErrors(),
+                ctx.getErrors().toString().indexOf("non-ASCII") >= 0);
+    }
+
+    @Test
+    public void stillGeneratesAnAsciiRouteWithAVariableInIt() throws Exception {
+        // The control for the refusal above: the check is on the pattern's
+        // characters, not on having a variable or a suffix after one.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/files/{id}/cafe\")\n"
+                + "    public String x(@PathVariable(\"id\") String id) { return id; }\n"
+                + "}\n");
+        assertEquals("7", router.text("GET", "/files/7/cafe"));
+    }
+
     // ----------------------------------------------------------------
 
     /// The generated router, loaded and callable.

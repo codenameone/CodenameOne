@@ -818,7 +818,37 @@ JAVA_INT com_codename1_backend_Reactor_registerImpl___int_int_int_boolean_R_int(
 #elif defined(CN1_HAVE_KQUEUE)
     struct kevent ev[2];
     int n = 0;
-    (void)modify; /* kevent's ADD is idempotent, so a modify is the same call */
+    if(modify) {
+        /*
+         * EV_DISPATCH IS LATCHED AT CREATION on this kernel, which is what the
+         * line here used to assume away: "kevent's ADD is idempotent, so a modify
+         * is the same call". Re-adding an existing knote updates its parameters
+         * and re-enables it, but it neither sets nor clears EV_DISPATCH -- so a
+         * modify() that changed the one-shot bit silently did nothing, in both
+         * directions. Measured: a descriptor added ONESHOT and modified to level
+         * still fired once and stopped, and one added level and modified to
+         * ONESHOT kept firing. epoll has no such problem, because EPOLL_CTL_MOD
+         * replaces the whole event mask, EPOLLONESHOT included -- so this was the
+         * kqueue arm alone disagreeing with the other two about a documented call.
+         *
+         * Deleting first makes the EV_ADD below create the filter afresh with the
+         * flags actually asked for. A filter that is not there answers ENOENT,
+         * which is not an error here, and each delete goes in its own call
+         * because a failing change stops kevent() from applying the rest of a
+         * batch. Nothing can be missed in the gap: an EV_ADD reports current
+         * readiness, so a socket that is still readable or writable is reported
+         * again the moment it is re-added.
+         */
+        struct kevent drop;
+        if(events & CN1_EVENT_READ) {
+            EV_SET(&drop, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+            kevent(poller, &drop, 1, NULL, 0, NULL);
+        }
+        if(events & CN1_EVENT_WRITE) {
+            EV_SET(&drop, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+            kevent(poller, &drop, 1, NULL, 0, NULL);
+        }
+    }
     if(events & CN1_EVENT_READ) {
         // EV_DISPATCH is kqueue's EPOLLONESHOT: deliver once, then disable the
         // filter until it is re-enabled. EV_ENABLE on the re-arm turns it back on.
