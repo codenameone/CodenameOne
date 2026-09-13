@@ -262,7 +262,7 @@ Now that you have a receipt store registered, and you have synchronized your rec
 
 If you need to know more information about subscriptions, you can always just call `getReceipts()` to get a list of all the current receipts and determine for yourself what the user should have access to.
 
-In the hello world app you'll use this information in a few different places. On your main form you'll include a label to show the current expiry date, and you allow the user to press a button to synchronize receipts manually if they think the value is out of date:
+In the hello world app you'll use this information in a few different places. On your main form you'll include a label showing the current expiry date, painted from the receipts already on the device and repainted by whichever of the two synchronizations above comes back first:
 
 [source,java]
 ----

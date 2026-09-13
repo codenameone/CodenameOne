@@ -59,6 +59,10 @@ class MonetizationJava101Snippet {
     Form hi;
     Purchase iap = Purchase.getInAppPurchase();
     String[] PRODUCTS = {"com.codename1.world.month", "com.codename1.world.year"};
+    SpanLabel rentalStatus = new SpanLabel();
+
+    void showRentalStatus() {
+    }
 
     // tag::monetization-java-101[]
     void addSyncButton() {
@@ -66,8 +70,13 @@ class MonetizationJava101Snippet {
 
         syncReceipts.addActionListener(e -> {
             iap.synchronizeReceipts(0, success -> {
+                // synchronizeReceipts reports true only when every pending
+                // purchase reached the receipt store AND the receipts came
+                // back. On false nothing was reloaded, so there is nothing
+                // new to show and the status on screen stays as it was.
                 if (success) {
-                    // Update the UI from the freshly loaded receipts
+                    showRentalStatus();
+                    hi.revalidate();
                 } else {
                     ToastBar.showErrorMessage("Could not reach the receipt store");
                 }

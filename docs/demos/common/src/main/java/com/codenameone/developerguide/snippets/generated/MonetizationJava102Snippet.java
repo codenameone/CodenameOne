@@ -61,37 +61,16 @@ class MonetizationJava102Snippet {
     String[] PRODUCTS = {"com.codename1.world.month", "com.codename1.world.year"};
 
     // tag::monetization-java-102[]
-    // A field, not a local: the synchronization at the end of start() has to
-    // reach the same label, and so does the manual button below.
+    // A field, not a local: the synchronization at the end of start() and the
+    // button above both have to reach this label.
     SpanLabel rentalStatus = new SpanLabel();
 
     void addExpiryLabel() {
-        Button syncReceipts = new Button("Synchronize Receipts");
-
-        // The receipts already on the device answer this without a round trip,
-        // so the label is right the moment the form appears. The button is for
-        // the user who thinks that answer has gone stale.
+        // The receipts already on the device answer this with no round trip,
+        // so the label is right the moment the form appears rather than after
+        // the first synchronization comes back.
         showRentalStatus();
-
-        syncReceipts.addActionListener(e -> {
-            iap.synchronizeReceipts(0, success -> {
-                // synchronizeReceipts reports true only when every pending purchase
-                // reached the receipt store AND the receipts came back. On false
-                // nothing was reloaded, so there is nothing new to show.
-                if (success) {
-                    showRentalStatus();
-                    hi.revalidate();
-                } else {
-                    // Leave the label alone. It is still the last answer the
-                    // receipts gave, and overwriting it with the error would
-                    // cost the user the only status they had.
-                    ToastBar.showErrorMessage("Could not reach the receipt store");
-                }
-            });
-        });
-
         hi.add(rentalStatus);
-        hi.add(syncReceipts);
     }
 
     void showRentalStatus() {
