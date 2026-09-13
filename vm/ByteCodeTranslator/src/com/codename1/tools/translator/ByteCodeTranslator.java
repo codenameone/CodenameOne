@@ -663,40 +663,11 @@ public class ByteCodeTranslator {
         table.append("    }\n");
         table.append("    return 0;\n");
         table.append("}\n\n");
-        // Class.getResourceAsStream calls cn1FindResource, which has only a weak
-        // null-returning definition in nativeMethods -- the id table alone is not
-        // enough, because the id still has to be resolved to bytes. The image's
-        // resources stay mapped for the life of the process, so handing back the
-        // locked pointer is safe.
-        table.append("#if defined(_WIN32)\n");
-        table.append("/* Strong override of the weak cn1FindResource in nativeMethods.\n");
-        table.append(" * Off Windows the weak null-returning one stands, which is correct:\n");
-        table.append(" * there is no PE resource section to read. */\n");
-        table.append("const unsigned char* cn1FindResource(const char* name, int* lenOut) {\n");
-        table.append("    int id;\n");
-        table.append("    HMODULE module;\n");
-        table.append("    HRSRC info;\n");
-        table.append("    DWORD size;\n");
-        table.append("    HGLOBAL loaded;\n");
-        table.append("    void* data;\n");
-        table.append("    if (lenOut) { *lenOut = 0; }\n");
-        table.append("    id = cn1WinFindResourceId(name);\n");
-        table.append("    if (id == 0) { return 0; }\n");
-        table.append("    module = GetModuleHandleW(NULL);\n");
-        // RT_RCDATA expands to the NARROW MAKEINTRESOURCE; FindResourceW wants
-        // LPCWSTR. MSVC only warns (C4133) but clang-cl -- the cross-compile path
-        // this target actually uses -- errors, so spell the wide form explicitly.
-        table.append("    info = FindResourceW(module, MAKEINTRESOURCEW(id), (LPCWSTR) RT_RCDATA);\n");
-        table.append("    if (info == NULL) { return 0; }\n");
-        table.append("    size = SizeofResource(module, info);\n");
-        table.append("    loaded = LoadResource(module, info);\n");
-        table.append("    if (loaded == NULL) { return 0; }\n");
-        table.append("    data = LockResource(loaded);\n");
-        table.append("    if (data == NULL) { return 0; }\n");
-        table.append("    if (lenOut) { *lenOut = (int) size; }\n");
-        table.append("    return (const unsigned char*) data;\n");
-        table.append("}\n");
-        table.append("#endif\n");
+        // No cn1FindResource override is emitted. The id table above is built and
+        // linked, and nothing reads it: Class.getResourceAsStream deliberately does
+        // not consult embedded resources, because doing so changed how shipping
+        // applications render (see the comment there). Wiring these together is the
+        // whole of that future change.
         sourceManifest.recordGenerated("cn1_resources_table.c");
         Util.writeBytes(new File(srcRoot, "cn1_resources_table.c"),
                 table.toString().getBytes(StandardCharsets.UTF_8));
@@ -787,14 +758,11 @@ public class ByteCodeTranslator {
         table.append("    if (lenOut) { *lenOut = 0; }\n");
         table.append("    return 0;\n");
         table.append("}\n\n");
-        // Class.getResourceAsStream calls cn1FindResource, which has only a weak
-        // null-returning definition in nativeMethods. Without this strong override
-        // that weak one stands and every embedded resource reads as absent on this
-        // target -- the table is built, linked, and never consulted.
-        table.append("/* Strong override of the weak cn1FindResource in nativeMethods. */\n");
-        table.append("const unsigned char* cn1FindResource(const char* name, int* lenOut) {\n");
-        table.append("    return cn1LinuxFindResource(name, lenOut);\n");
-        table.append("}\n");
+        // No cn1FindResource override is emitted. The id table above is built and
+        // linked, and nothing reads it: Class.getResourceAsStream deliberately does
+        // not consult embedded resources, because doing so changed how shipping
+        // applications render (see the comment there). Wiring these together is the
+        // whole of that future change.
         sourceManifest.recordGenerated("cn1_resources_table.c");
         Util.writeBytes(new File(srcRoot, "cn1_resources_table.c"),
                 table.toString().getBytes(StandardCharsets.UTF_8));

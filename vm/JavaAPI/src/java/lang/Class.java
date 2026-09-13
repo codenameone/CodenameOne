@@ -196,22 +196,32 @@ public final class Class<T> implements java.lang.reflect.Type {
             absolute = lastDot < 0 ? "/" + name
                     : "/" + className.substring(0, lastDot).replace('.', '/') + "/" + name;
         }
-        byte[] embedded = cn1EmbeddedResource(absolute);
-        if (embedded != null) {
-            return new java.io.ByteArrayInputStream(embedded);
-        }
+        // Resources linked INTO the executable are deliberately not consulted here.
+        // They were, and it changed how shipping applications render.
+        //
+        // On master this method is `return null` on every ParparVM target, so no
+        // application has ever received anything from it, and every caller has
+        // always taken its not-found path. Reading the embedded table handed some
+        // of those callers a resource for the first time: the Windows, Linux and
+        // cross-compiled screenshot legs all began reporting ValidatorLightweight
+        // Picker as changed, a four-pixel layout shift with identical content -- a
+        // caller that had been falling back on a built-in default now had a file.
+        // The javadoc this replaces claimed "nothing can regress, only start
+        // working", which assumed every not-found path was strictly worse than the
+        // resource. That assumption was wrong, and three ports disagreed with it.
+        //
+        // The filesystem tier below stays, because it is OPT-IN: it answers only
+        // when CN1_RESOURCE_PATH names a search root, which no application sets and
+        // the self-hosted translator does. So an application sees exactly what it
+        // saw on master -- null -- and the translator can still find the C runtime
+        // it has to copy into its output.
+        //
+        // Letting applications read their own embedded resources is a good feature
+        // and wants its own change, where the screenshot baselines it moves can be
+        // reviewed as the point of the change rather than as fallout from one.
         return cn1FileResource(absolute);
     }
 
-    /**
-     * Resources linked into the executable, or null when there are none.
-     *
-     * The native side calls a weakly-linked {@code cn1FindResource}, which the
-     * generated resource table overrides on targets that embed resources. Where
-     * nothing provides it the weak symbol is null and this returns null, so a target
-     * that embeds nothing behaves exactly as it did before this existed.
-     */
-    private static native byte[] cn1EmbeddedResource(String name);
 
     /**
      * The filesystem half of {@link #getResourceAsStream}: looks the resource up

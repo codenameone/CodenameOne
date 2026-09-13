@@ -1963,48 +1963,6 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
     return newStringFromCString(threadStateData, clz->clsName);
 }
 
-/**
- * Resources linked into the executable, backing Class.getResourceAsStream.
- *
- * cn1FindResource has a weak definition here that finds nothing. A target that
- * embeds resources emits a strong one (the generated cn1_resources_table.c) and
- * overrides it; everywhere else this one stands and getResourceAsStream falls
- * through to the filesystem. That keeps every existing target unchanged --
- * getResourceAsStream returned a hard-coded null before this existed, so nothing
- * can regress, only start working.
- *
- * A weak DEFINITION rather than a weak declaration: Mach-O will not link an
- * undefined weak symbol without weak_import, while a weak definition is overridable
- * on both Mach-O and ELF.
- */
-__attribute__((weak)) const unsigned char* cn1FindResource(const char* name, int* lenOut) {
-    (void)name;
-    if(lenOut) {
-        *lenOut = 0;
-    }
-    return 0;
-}
-
-JAVA_OBJECT java_lang_Class_cn1EmbeddedResource___java_lang_String_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
-    if(name == JAVA_NULL) {
-        return JAVA_NULL;
-    }
-    const char* n = stringToUTF8(threadStateData, name);
-    if(n == 0) {
-        return JAVA_NULL;
-    }
-    int len = 0;
-    const unsigned char* data = cn1FindResource(n, &len);
-    // A NULL pointer means "not found". A zero LENGTH does not -- an embedded
-    // resource is allowed to be empty, and getResourceAsStream must hand back an
-    // empty stream for one rather than null, which callers read as absent.
-    if(data == 0 || len < 0) {
-        return JAVA_NULL;
-    }
-    JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(threadStateData, len);
-    memcpy(((JAVA_ARRAY)arr)->data, data, len);
-    return arr;
-}
 
 JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
     struct clazz* clz = (struct clazz*)cls;
