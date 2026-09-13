@@ -23,7 +23,6 @@
 package com.example.petstore;
 
 import com.codename1.components.ToastBar;
-import com.example.petstore.model.Pet;
 
 /// Call site for the `@RestClient` interface `cn1:generate-openapi` emits.
 /// Included by the developer guide's `generate-openapi` appendix.
@@ -34,14 +33,20 @@ class PetApiCallSite {
         PetApi api = PetApi.of("https://petstore3.swagger.io/api/v3");
 
         api.getPetById(10L, bearerToken, response -> {
-            Pet pet = response.getResponseData();
-            if (response.getResponseCode() != 200) {
+            // Two things have to be settled before the payload is a Pet.
+            // The generated impl passes null when the request never
+            // completed, and on an error status it forwards the raw
+            // Response<String> under this type -- so on that path
+            // getResponseData() is the error body, not a Pet, and
+            // touching it as one is a cast that does not throw on iOS.
+            if (response == null) {
+                ToastBar.showErrorMessage("The request did not complete");
+            } else if (response.getResponseCode() < 200 || response.getResponseCode() > 299) {
                 ToastBar.showErrorMessage(response.getResponseErrorMessage());
-            } else if (pet == null) {
-                // A 2xx with an empty or unmappable body leaves this null.
+            } else if (response.getResponseData() == null) {
                 ToastBar.showErrorMessage("The server returned no pet");
             } else {
-                ToastBar.showInfoMessage(pet.name());
+                ToastBar.showInfoMessage(response.getResponseData().name());
             }
         });
     }
