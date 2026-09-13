@@ -353,6 +353,74 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void anEncodedLiteralInTheTemplateIsStillRouted() throws Exception {
+        // dispatch() canonicalises the target it is handed -- a percent-encoded
+        // UNRESERVED octet is resolved -- so /status%7E and /status~ are one
+        // request by the time a route is chosen. The TEMPLATE was compared as
+        // written, so a contract that spelled its own literal encoded generated a
+        // client that asked for a route its own dispatcher could not answer: the
+        // two halves of one annotation disagreeing about what its path is.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.StatusApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface StatusApi {\n"
+                + "    @GET(\"/status%7E\")\n"
+                + "    void get(OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+
+        URLClassLoader loader = new URLClassLoader(
+                new URL[]{classes.toURI().toURL(), testClassesDir().toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> serverItf = loader.loadClass("com.example.StatusApiServer");
+        Object handler = Proxy.newProxyInstance(loader, new Class<?>[]{serverItf},
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method m, Object[] args) {
+                        return "ok";
+                    }
+                });
+        Class<?> dispatcherClass = loader.loadClass("com.example.StatusApiDispatcher");
+        Object dispatcher = dispatcherClass.getConstructor(serverItf).newInstance(handler);
+        Method dispatch = dispatcherClass.getMethod("dispatch",
+                String.class, String.class, java.util.Map.class, Object.class);
+
+        assertNotNull("the spelling the contract declared must route",
+                dispatch.invoke(dispatcher, "GET", "/status%7E", null, null));
+        assertNotNull("and so must the spelling it canonicalises to",
+                dispatch.invoke(dispatcher, "GET", "/status~", null, null));
+    }
+
+    @Test
+    public void twoSpellingsOfOneRouteCollide() throws Exception {
+        // The collision check reads the same canonical form, so a contract that
+        // declares one route twice in its two spellings is refused rather than
+        // generating a second branch that can never be reached.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.TwiceApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface TwiceApi {\n"
+                + "    @GET(\"/status%7E\")\n"
+                + "    void encoded(OnComplete<Response<String>> callback);\n"
+                + "    @GET(\"/status~\")\n"
+                + "    void raw(OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertTrue("one route declared twice must be refused: " + ctx.getErrors(),
+                String.valueOf(ctx.getErrors()).indexOf("only the first can ever be reached") >= 0);
+    }
+
+    @Test
     public void headIsAnsweredByTheGetRoute() throws Exception {
         // RFC 9110 defines HEAD as GET without the content, HttpServer routes it,
         // and it strips the body itself on both protocols. The generated

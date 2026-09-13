@@ -166,6 +166,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             if ((va = m.getAnnotation(RestClientAnnotationProcessor.PATCH_DESC)) != null)  { op.verb = "PATCH";  op.pathTemplate = va.getString("value"); verbCount++; }
             if (verbCount != 1) continue; // the client processor reports this
             if (op.pathTemplate == null) op.pathTemplate = "";
+            // CANONICALISED ONCE, HERE, before anything reads it: the predicates
+            // and route shapes below, and the collision check that compares them,
+            // all have to speak the form HttpServer.Request compares against or a
+            // contract's two halves disagree about what its own route is. See
+            // RestClientAnnotationProcessor.canonicalPath. The client keeps the
+            // spelling the author wrote -- it does not need to change, because
+            // the server resolves the encoding on arrival either way.
+            op.pathTemplate = RestClientAnnotationProcessor.canonicalPath(op.pathTemplate);
 
             Type[] paramTypes = Type.getArgumentTypes(m.getDescriptor());
             List<Map<String, AnnotationValues>> paramAnnotations = m.getParameterAnnotations();

@@ -742,6 +742,68 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
 
     /* package-private, not private: RestServerAnnotationProcessor generates the
        server half of the same contract and needs the identical parsing. */
+    /**
+     * A declared route pattern as the SERVER will see a request for it.
+     *
+     * <p>HttpServer.Request resolves a percent-encoded UNRESERVED octet before it
+     * compares a path -- "/status%7E" and "/status~" are the same resource and it
+     * makes them the same bytes -- so a pattern that kept the encoded spelling
+     * matched neither. The declared route was simply unreachable, by either
+     * spelling, with nothing at build time or request time to say so.
+     *
+     * <p>The same set RFC 3986 calls unreserved and HttpServer.isUnreservedByte
+     * implements: letters, digits, "-", ".", "_" and "~". Everything else is left
+     * exactly as written, which is what keeps %2F from becoming a path separator
+     * the author never wrote and %7B from becoming a placeholder brace.
+     */
+    static String canonicalPath(String pattern) {
+        if (pattern == null || pattern.indexOf('%') < 0) {
+            return pattern;
+        }
+        StringBuilder out = new StringBuilder(pattern.length());
+        int at = 0;
+        while (at < pattern.length()) {
+            char c = pattern.charAt(at);
+            if (c != '%' || at + 2 >= pattern.length()) {
+                out.append(c);
+                at++;
+                continue;
+            }
+            int hi = hexDigit(pattern.charAt(at + 1));
+            int lo = hexDigit(pattern.charAt(at + 2));
+            if (hi < 0 || lo < 0) {
+                out.append(c);
+                at++;
+                continue;
+            }
+            int octet = (hi << 4) | lo;
+            boolean unreserved = (octet >= 'a' && octet <= 'z')
+                    || (octet >= 'A' && octet <= 'Z') || (octet >= '0' && octet <= '9')
+                    || octet == '-' || octet == '.' || octet == '_' || octet == '~';
+            if (!unreserved) {
+                out.append(c);
+                at++;
+                continue;
+            }
+            out.append((char) octet);
+            at += 3;
+        }
+        return out.toString();
+    }
+
+    private static int hexDigit(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
     static String packageOf(String binary) {
         int dot = binary.lastIndexOf('.');
         return dot < 0 ? "" : binary.substring(0, dot);

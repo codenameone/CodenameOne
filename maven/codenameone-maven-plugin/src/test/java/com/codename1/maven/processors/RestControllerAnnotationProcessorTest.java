@@ -323,6 +323,51 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void anEncodedLiteralInThePatternIsStillReachable() throws Exception {
+        // A request target is canonicalised on arrival -- a percent-encoded
+        // UNRESERVED octet is resolved, so /status%7E and /status~ are the same
+        // resource and reach the router as the same bytes. The declared pattern
+        // was matched exactly as written, so a pattern that kept the encoded
+        // spelling matched NEITHER: not the encoded request, which no longer
+        // looks like that by the time it is compared, and not the decoded one,
+        // which never did. The route was simply unreachable, with nothing at
+        // build time or request time to say so.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/status%7E\")\n"
+                + "    public String s() { return \"ok\"; }\n"
+                + "}\n");
+        assertNotNull("the spelling the author declared must reach the route",
+                router.call("GET", "/status%7E", null));
+        assertNotNull("and so must the spelling it canonicalises to",
+                router.call("GET", "/status~", null));
+    }
+
+    @Test
+    public void aReservedEscapeInThePatternIsLeftEncoded() throws Exception {
+        // The other half of the same rule, and the reason the decode cannot
+        // simply be "unescape the pattern": %2F is a slash the author wrote
+        // INSIDE a segment, not a separator. Resolving it would silently turn one
+        // declared route into a two-segment one nobody wrote. The server leaves a
+        // reserved octet encoded on arrival, so the pattern has to as well.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/a%2Fb\")\n"
+                + "    public String s() { return \"ok\"; }\n"
+                + "}\n");
+        assertNotNull("the encoded slash is part of the literal",
+                router.call("GET", "/a%2Fb", null));
+        assertNull("and it is not a separator the author never wrote",
+                router.call("GET", "/a/b", null));
+    }
+
+    @Test
     public void namesTheBootstrapForThePackagingGoal() throws Exception {
         ProcessorContext ctx = run(compile(CONTROLLER_SOURCE));
         byte[] name = ctx.getEmittedResources()

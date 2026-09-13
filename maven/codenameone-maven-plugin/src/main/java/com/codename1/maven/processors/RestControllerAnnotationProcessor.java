@@ -599,7 +599,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             ProcessorContext ctx) {
         Route route = new Route();
         route.httpMethod = httpMethod;
-        route.pattern = pattern.length() == 0 ? "/" : pattern;
+        // CANONICALISED HERE, once, so the prefix, the matcher bytes and the
+        // route shape below are all derived from what the server will compare
+        // against. See RestClientAnnotationProcessor.canonicalPath.
+        String declared = RestClientAnnotationProcessor.canonicalPath(pattern);
+        route.pattern = declared.length() == 0 ? "/" : declared;
         route.javaMethod = m.getName();
 
         int firstVar = route.pattern.indexOf('{');
