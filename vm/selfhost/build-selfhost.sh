@@ -27,8 +27,25 @@ mkdir -p "$OUT"
 
 # 1. translator classes + ASM classpath, built once by maven and then cached.
 TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
+# Rebuild when the classes are MISSING or STALE. Testing only for existence meant
+# that re-running this after editing a translator source silently self-hosted the
+# previous build, and the resulting binary was then compared against a JVM side
+# built from the new sources -- which reports the intended change as a VM
+# divergence. verify-selfhost.sh carries the same guard for the same reason, and
+# maven's own incremental check is not enough on its own: it answered "Nothing to
+# compile - all classes are up to date" for a source three hours newer than its
+# class.
+needs_build=0
 if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ]; then
-    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am package -DskipTests)
+    needs_build=1
+elif [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" -name '*.java' -newer "$TRANSLATOR" -print -quit 2>/dev/null)" ]; then
+    echo "translator sources are newer than $TRANSLATOR -- rebuilding"
+    needs_build=1
+fi
+if [ "$needs_build" = 1 ]; then
+    # `clean` because the incremental check cannot be trusted here; it also removes
+    # selfhost-asm-classpath.txt, which the next block regenerates.
+    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am clean package -DskipTests)
 fi
 ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt"
 if [ ! -f "$ASM_CP_FILE" ]; then

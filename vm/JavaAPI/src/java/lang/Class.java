@@ -173,6 +173,24 @@ public final class Class<T> implements java.lang.reflect.Type {
         if (!absolute.startsWith("/")) {
             // Relative names resolve against this class's package, as the javadoc
             // above describes.
+            //
+            // KNOWN LIMITATION, for a NESTED class only. getName() cannot be told
+            // apart from a package here, because ParparVM builds the runtime class
+            // name as clsName.replace('_', '.') in ByteCodeClass -- it starts from
+            // the MANGLED name, so the '$' that separates a nested class from its
+            // outer one arrives as a '.', and so does any '_' in a class's own
+            // name. Outer$Inner therefore reports "a.b.Outer.Inner" where the JDK
+            // reports "a.b.Outer$Inner", and the package derived below is
+            // "a.b.Outer" rather than "a.b".
+            //
+            // The consequence is a MISS, not a wrong file: the derived path is a
+            // directory named after a class, which a resource tree does not have,
+            // so the lookup returns null exactly as it did before this method was
+            // implemented. It is deliberately not patched up by walking shorter
+            // prefixes -- a package really can be named like a class, and that
+            // would turn today's miss into a confidently wrong hit. The fix
+            // belongs in the name the VM reports, which is a change to getName()
+            // for every translated application and wants its own testing.
             String className = getName();
             int lastDot = className.lastIndexOf('.');
             absolute = lastDot < 0 ? "/" + name
@@ -210,9 +228,16 @@ public final class Class<T> implements java.lang.reflect.Type {
             return null;
         }
         String relative = absolute.substring(1);
+        // A resource name is not a path expression. Refusing any ".." segment keeps
+        // a lookup inside the search root it was found under; without it a name
+        // like "../../etc/passwd" reads straight out of the filesystem, and the
+        // caller is usually passing a name that came from data.
+        if (relative.length() == 0 || cn1EscapesRoot(relative)) {
+            return null;
+        }
         int from = 0;
         while (from <= path.length()) {
-            int end = path.indexOf(java.io.File.pathSeparatorChar, from);
+            int end = cn1PathEntryEnd(path, from);
             String root = end < 0 ? path.substring(from) : path.substring(from, end);
             if (root.length() > 0) {
                 java.io.File candidate = new java.io.File(root, relative);
@@ -230,6 +255,58 @@ public final class Class<T> implements java.lang.reflect.Type {
             from = end + 1;
         }
         return null;
+    }
+
+    /** True when any segment of a resource-relative path is "..". */
+    private static boolean cn1EscapesRoot(String relative) {
+        int from = 0;
+        while (from <= relative.length()) {
+            int slash = relative.indexOf('/', from);
+            String segment = slash < 0 ? relative.substring(from) : relative.substring(from, slash);
+            if (segment.equals("..")) {
+                return true;
+            }
+            if (slash < 0) {
+                return false;
+            }
+            from = slash + 1;
+        }
+        return false;
+    }
+
+    /**
+     * The index that ends the search-path entry starting at {@code from}, or -1 for
+     * the last one.
+     *
+     * This cannot use {@code File.pathSeparatorChar}, which is a hard-coded ':' in
+     * this class library rather than a platform value -- on a native Windows build
+     * that splits "C:\\res;D:\\res" after the drive letter and every entry is
+     * nonsense. Both separators are therefore accepted, and a ':' is not a
+     * separator when it sits directly after a single-letter entry and is followed
+     * by a slash, which is exactly a DOS drive prefix and never a POSIX path.
+     */
+    private static int cn1PathEntryEnd(String path, int from) {
+        for (int i = from; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == ';') {
+                return i;
+            }
+            if (c == ':') {
+                boolean driveLetter = i == from + 1
+                        && i + 1 < path.length()
+                        && (path.charAt(i + 1) == '\\' || path.charAt(i + 1) == '/')
+                        && cn1IsLetter(path.charAt(from));
+                if (!driveLetter) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /** ASCII letter test; Character.isLetter is locale-aware and not wanted here. */
+    private static boolean cn1IsLetter(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
     
     /**

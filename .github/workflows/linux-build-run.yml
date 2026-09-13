@@ -263,32 +263,6 @@ jobs:
           # The Windows pipeline passes a real boolean, which is why its gate
           # works. 'true' arms it here.
           CN1_REQUIRE_SUITE: 'true'
-          # Full DWARF into the <exe>.debug companion. The generated project defaults to
-          # -g1 -- lines and function names only -- so a core from this suite decodes to a
-          # backtrace and nothing else: every frame answers "No locals". That is what left
-          # the intermittent SIGSEGV here undiagnosed across four occurrences. The binary
-          # itself is still stripped; only the companion grows, and it is uploaded beside
-          # the core so the crash can be autopsied off the runner.
-          CN1_LINUX_FULL_DEBUG: 'true'
-          # BiBOP page validation, on the x64 leg only.
-          #
-          # CN1_GC_VERIFY already ran here and came back CLEAN over 2213 epochs, so
-          # the sweep is not reclaiming anything a survivor still references -- the
-          # premise this investigation had been working from is wrong. And the
-          # generated Display.c is semantically identical to master's (14 lines
-          # differ, all of them this PR's class-init guards), so the code that
-          # writes the field is not at fault either.
-          #
-          # What remains is a pointer that LOOKS valid but addresses the wrong
-          # object, which is what a retired-and-reformatted page produces and what
-          # the verifier would not call reclaimed. This guard checks on every fast
-          # allocation that bibopCurrent[ci] is owned, matches its size class, and
-          # that the bumped slot lies inside the page -- and aborts at the
-          # allocation that breaks it. Its comment names "the intermittent x64
-          # cn1BibopFastAlloc crash"; this is an intermittent x64 crash.
-          #
-          # x64 only via the matrix arch: it is the leg that SIGSEGVs.
-          CN1_LINUX_EXTRA_DEFINES: ${{ matrix.arch == 'x64' && 'CN1_BIBOP_VALIDATE' || '' }}
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a
@@ -297,25 +271,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -e
-          # Not silenced, and the outcome is stated. The hang dump attaches gdb from
-          # inside the test JVM, so an install that quietly failed here produced a
-          # hang-stacks.txt with nothing but sample headers -- which is how four
-          # occurrences of the suite stall ended up with no evidence at all. Still
-          # best-effort: a runner without gdb must not fail the suite, it must say so.
-          # $GITHUB_WORKSPACE, not a relative path: this step runs with
-          # working-directory: vm, so "scripts/ci/..." resolved to vm/scripts/ci and
-          # bash answered "No such file or directory". gdb was therefore NEVER
-          # installed on any Linux leg, and every hang-stacks.txt and crash-stacks.txt
-          # this job has ever produced was empty for that reason alone -- including
-          # the ones collected while chasing a SIGSEGV that dumped a 12GB core nobody
-          # could symbolise. The retry.sh call twenty lines below already had this
-          # right.
-          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-install.sh" gdb || echo "WARNING: gdb install failed"
-          if command -v gdb >/dev/null 2>&1; then
-            echo "gdb available: $(gdb --version | head -1)"
-          else
-            echo "WARNING: gdb is NOT on PATH -- a hang in this job will capture no thread stacks."
-          fi
+          bash scripts/ci/apt-get-install.sh gdb >/dev/null 2>&1 || true
           Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb-run.log 2>&1 &
           export DISPLAY=:99
           sleep 2
@@ -351,30 +307,11 @@ jobs:
             mkdir -p "$(dirname "$CN1_APP_LOG_TEE")"
             {
               echo "=== post-mortem of $core (elf=$elf) ==="
-              # The event-stack arrays are dumped explicitly because the crash this
-              # keeps producing is a store into one of them from
-              # Display.edtLoopImpl, and -O3 optimises the array temporary out of
-              # the frame -- "array=<optimized out>" is all `info locals` gives.
-              # The Display object itself survives as frame 1's __cn1ThisObject, so
-              # the arrays are reachable THROUGH it, and what matters is whether
-              # each header's length and data agree: cn1_set_array_element_int
-              # bounds-checks against ->length and then stores through ->data, so a
-              # fault there means those two fields disagree, which is a corrupted or
-              # dangling header rather than a bad index. Harmless noise when the
-              # faulting frame is something else -- gdb just prints an error.
               gdb "$elf" "$core" -batch -ex 'set pagination off' \
                 -ex 'thread apply all bt' \
                 -ex 'thread 1' -ex 'bt full' \
-                -ex 'frame 0' -ex 'info args' -ex 'info registers' \
+                -ex 'frame 0' -ex 'info args' \
                 -ex 'frame 1' -ex 'info locals' -ex 'info args' \
-                -ex 'set $d = (struct obj__com_codename1_ui_Display*)__cn1ThisObject' \
-                -ex 'p $d->com_codename1_ui_Display_inputEventStackTmp' \
-                -ex 'p *(JAVA_ARRAY)$d->com_codename1_ui_Display_inputEventStackTmp' \
-                -ex 'p *(JAVA_ARRAY)$d->com_codename1_ui_Display_inputEventStack' \
-                -ex 'p *(JAVA_ARRAY)$d->com_codename1_ui_Display_pointerMetaStackTmp' \
-                -ex 'p *(JAVA_ARRAY)$d->com_codename1_ui_Display_pointerMetaStack' \
-                -ex 'p $d->com_codename1_ui_Display_inputEventStackPointerTmp' \
-                -ex 'p $d->com_codename1_ui_Display_inputEventStackPointer' \
                 -ex 'p gcMarkWorklistTop' -ex 'p currentGcMarkValue' \
                 2>&1
             } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
@@ -384,12 +321,6 @@ jobs:
           # frames (e.g. a stack overflow's recursion / the caller that ran CN1 on a small
           # native stack). The suite binary is not stripped, so addr2line resolves them.
           elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
-          # The binary and the cores are NOT copied here. "Package core dump for
-          # offline autopsy" below already ships the unstripped ELF (plus .debug)
-          # and zstd-compresses each core into its own artifact. Copying them into
-          # the screenshot directory as well would upload multi-gigabyte cores twice
-          # on exactly the runs that crashed -- the runs whose screenshots and
-          # backtrace most need to survive the disk and upload budget.
           if [ -n "$elf" ] && [ -f "$CN1_APP_LOG_TEE" ]; then
             {
               echo "=== addr2line of CN1 backtrace addresses (from app log) ==="
@@ -407,63 +338,6 @@ jobs:
           name: linux-screenshot-raw-${{ matrix.arch }}
           path: artifacts/linux-port/raw
           if-no-files-found: warn
-          retention-days: 14
-
-      # The core itself, with everything needed to decode it off the runner: the
-      # stripped ELF the core refers to and its .debug companion. crash-stacks.txt is
-      # only ever the backtrace gdb could produce in-place; a real autopsy -- printing
-      # the object a faulting pointer came from, the slot beside it, the register that
-      # held it -- needs the core in hand. Cores of this app run to hundreds of MB, so
-      # they are compressed, capped, and collected ONLY when one exists, which means
-      # only when the suite actually crashed.
-      - name: Package core dump for offline autopsy
-        if: always()
-        run: |
-          set -u
-          shopt -s nullglob
-          cores=(/tmp/cn1-cores/core.*)
-          if [ ${#cores[@]} -eq 0 ]; then
-            echo "no core dumped -- nothing to package"
-            exit 0
-          fi
-          out="${GITHUB_WORKSPACE}/artifacts/linux-port/core"
-          mkdir -p "$out"
-          elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
-          if [ -n "$elf" ]; then
-            cp "$elf" "$out/" || true
-            [ -f "$elf.debug" ] && cp "$elf.debug" "$out/" || true
-          fi
-          for c in "${cores[@]}"; do
-            sz=$(stat -c%s "$c" 2>/dev/null || echo 0)
-            echo "core $c is $((sz/1024/1024))MB"
-            # zstd where available (far faster on a GB-scale core), else gzip.
-            if command -v zstd >/dev/null 2>&1; then
-              zstd -q -T0 -3 -o "$out/$(basename "$c").zst" "$c" || true
-            else
-              gzip -c "$c" > "$out/$(basename "$c").gz" || true
-            fi
-          done
-          echo "--- packaged ---"; ls -la "$out"
-          cat > "$out/README.txt" <<'TXT'
-          Decode this core off the runner:
-
-            zstd -d core.LinuxHelloMain.*.zst      # or gunzip for the .gz
-            gdb ./LinuxHelloMain ./core.LinuxHelloMain.*
-
-          LinuxHelloMain.debug must sit beside the binary -- it is linked by
-          --add-gnu-debuglink and carries all the DWARF, because the shipped binary is
-          stripped. Built with CN1_LINUX_FULL_DEBUG so variables and types are present:
-          "info locals", "p *someObject" and "info registers" all work, which they do
-          not on a default -g1 build.
-          TXT
-
-      - name: Upload core dump
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-core-${{ matrix.arch }}
-          path: artifacts/linux-port/core
-          if-no-files-found: ignore
           retention-days: 14
 
       # A runnable, self-contained windowed demo binary for this arch (opens a
@@ -497,21 +371,9 @@ jobs:
           name: linux-suite-classes
       - name: Unpack suite classes
         run: tar xzf suite-classes.tgz
-      # The musl leg had no crash wiring at all: when the suite died mid-run the
-      # only artifact was a short screenshot directory, which is indistinguishable
-      # from a hang. core_pattern is global to the host kernel rather than per
-      # namespace, but the kernel writes the file in the CRASHING process's mount
-      # namespace -- so an absolute path under /cn1 lands inside the container, and
-      # /cn1 is the bind-mounted workspace, which means the core is uploaded with
-      # everything else.
-      - name: Enable core dumps for the container
-        run: |
-          mkdir -p artifacts/linux-port/raw-musl
-          sudo sysctl -w kernel.core_pattern='/cn1/artifacts/linux-port/raw-musl/core.%e.%p' || true
-
       - name: Translate + build + run the suite in Alpine (musl, end-to-end)
         run: |
-          docker run --rm --ulimit core=-1 \
+          docker run --rm \
             -v "$GITHUB_WORKSPACE":/cn1 -w /cn1 \
             -e CN1_SHOT_OUTPUT_DIR=/cn1/artifacts/linux-port/raw-musl \
             -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
@@ -519,7 +381,7 @@ jobs:
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories
-              apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 openjdk17 maven gdb \
+              apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 openjdk17 maven \
                 gtk+3.0-dev cairo-dev pango-dev gdk-pixbuf-dev glib-dev fontconfig-dev freetype-dev \
                 curl-dev openssl-dev libepoxy-dev mesa-dev mesa-gles mesa-egl mesa-gbm mesa-dri-gallium \
                 webkit2gtk-4.1-dev gstreamer-dev gst-plugins-base-dev \
@@ -538,31 +400,9 @@ jobs:
               # core + Linux port (musl JDK8); the default cc on Alpine already links musl.
               cd /cn1/maven && mvn -B -pl linux -am -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
               cd /cn1/vm && mvn -B clean package -pl JavaAPI -am -DskipTests
-              ulimit -c unlimited || true
-              rc=0
               mvn -B test -pl tests -am \
                 -Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux \
-                -Dsurefire.failIfNoSpecifiedTests=false || rc=$?
-              # Keep the UNSTRIPPED binary next to any core: without it a core names
-              # addresses and nothing else, and the container is gone by the time the
-              # artifact is looked at.
-              out=/cn1/artifacts/linux-port/raw-musl
-              mkdir -p "$out"
-              elf="$(find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
-              if [ -n "$elf" ]; then cp "$elf" "$out/LinuxHelloMain" || true; fi
-              for core in "$out"/core.*; do
-                [ -f "$core" ] || continue
-                {
-                  echo "=== post-mortem of $core (elf=$elf) ==="
-                  gdb "$elf" "$core" -batch -ex "set pagination off" \
-                    -ex "thread apply all bt" -ex "thread 1" -ex "bt full" 2>&1
-                } >> "$out/crash-stacks.txt" || true
-              done
-              if [ ! -f "$out/crash-stacks.txt" ]; then
-                echo "no core file was written -- the suite stopped without a fatal signal" \
-                  > "$out/crash-stacks.txt"
-              fi
-              exit $rc
+                -Dsurefire.failIfNoSpecifiedTests=false
             '
       - name: Upload musl screenshots
         if: always()

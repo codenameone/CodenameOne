@@ -1964,21 +1964,6 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
 }
 
 /**
- * Backs Integer.TYPE and the eight other wrapper TYPE fields. The JDK needs a
- * native here for the same reason we do: `TYPE = int.class` cannot initialize the
- * field, because javac lowers a primitive class literal to a read of that very
- * field (getstatic TYPE; putstatic TYPE), leaving it null.
- *
- * Takes an int code rather than the JDK's String name deliberately. This runs
- * inside the wrapper class initializers, which are among the earliest code in the
- * process, and decoding a Java String here would drag in String.getBytes and the
- * charset machinery during Integer's own clinit. An int argument allocates
- * nothing and initializes nothing.
- *
- * The codes are an implementation detail shared only with java/lang/Class.java;
- * they are matched by CN1_PRIM_* there.
- */
-/**
  * Resources linked into the executable, backing Class.getResourceAsStream.
  *
  * cn1FindResource has a weak definition here that finds nothing. A target that

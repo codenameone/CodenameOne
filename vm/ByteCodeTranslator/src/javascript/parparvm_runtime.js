@@ -78,11 +78,7 @@ const PRIMITIVE_INFO = {
   JAVA_BYTE: { javaName: "byte", descriptor: "B" },
   JAVA_SHORT: { javaName: "short", descriptor: "S" },
   JAVA_INT: { javaName: "int", descriptor: "I" },
-  JAVA_LONG: { javaName: "long", descriptor: "J" },
-  // void is a primitive class too -- Void.TYPE is one, and unlike the other
-  // eight it is not reachable through a primitive class literal, so nothing
-  // needed it here until getPrimitiveClass did.
-  JAVA_VOID: { javaName: "void", descriptor: "V" }
+  JAVA_LONG: { javaName: "long", descriptor: "J" }
 };
 const jsObjectWrappers = typeof WeakMap === "function" ? new WeakMap() : null;
 const externalIdentityMap = typeof WeakMap === "function" ? new WeakMap() : null;
@@ -5759,22 +5755,15 @@ bindNative(["cn1_java_lang_Class_getComponentType_R_java_lang_Class"], function(
   }
   return classObjectForName(def.componentClass);
 });
-// Backs the wrapper classes' TYPE fields. The JavaAPI cannot initialize them with
-// a primitive class literal: javac lowers `int.class` to a read of Integer.TYPE
-// itself, so `TYPE = int.class` compiles to `getstatic TYPE; putstatic TYPE` and
-// leaves the field null. The codes match Class.CN1_PRIM_* in the JavaAPI and the
-// switch in nativeMethods.m.
-//
-// _primClass covers the same ground for a primitive class literal appearing in
-// ordinary code; this is the path taken by the wrapper clinits themselves.
-bindNative(["cn1_java_lang_Class_getPrimitiveClass_int_R_java_lang_Class"], function(typeCode) {
-  const names = ["JAVA_INT", "JAVA_LONG", "JAVA_SHORT", "JAVA_BYTE", "JAVA_CHAR",
-                 "JAVA_FLOAT", "JAVA_DOUBLE", "JAVA_BOOLEAN", "JAVA_VOID"];
-  const name = names[typeCode | 0];
-  if (!name) {
-    throw new Error("getPrimitiveClass: unknown primitive type code " + typeCode);
-  }
-  return classObjectForName(name);
+// A browser has no process environment, so getenv ANSWERS null rather than
+// failing. Without this the symbol falls through to the unsupported-native path,
+// which emits `throw new Error("environment variables are not available...")` --
+// and Class.getResourceAsStream consults CN1_RESOURCE_PATH, so a JavaScript
+// application asking for a resource got an exception where it previously got
+// null. Returning null is both the safe answer and the correct one: the variable
+// genuinely is not set.
+bindNative(["cn1_java_lang_System_getenvImpl_java_lang_String_R_java_lang_String"], function(name) {
+  return null;
 });
 bindNative(["cn1_java_lang_Class_isPrimitive_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isPrimitive ? 1 : 0; });
 bindNative(["cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object"], function(componentClass, length) {

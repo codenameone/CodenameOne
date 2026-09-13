@@ -72,12 +72,14 @@ jobs:
 
       # The translator has to exist as classes before it can translate itself.
       - name: Build the translator
-        run: scripts/ci/retry.sh mvn -q -B -pl ByteCodeTranslator -am package -DskipTests
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -q -B
+          -pl ByteCodeTranslator -am package -DskipTests
         working-directory: vm
 
       - name: Resolve the ASM classpath
         run: >-
-          scripts/ci/retry.sh mvn -q -B -pl ByteCodeTranslator
+          "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -q -B -pl ByteCodeTranslator
           dependency:build-classpath
           -Dmdep.outputFile=target/selfhost-asm-classpath.txt
         working-directory: vm
