@@ -27,28 +27,42 @@ from typing import List, Tuple
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 
-# image::target[attrlist] and the inline image:target[attrlist]
-IMAGE_RE = re.compile(r"^(?P<indent>\s*)image::?(?P<target>[^\[\]\s]+)\[(?P<attrs>.*)\]\s*$")
+# Block form image::target[attrs] and the inline form image:target[attrs], which
+# appears mid sentence, so this is searched rather than anchored to a whole line.
+IMAGE_RE = re.compile(r"image::?(?P<target>[^\[\]\s]+)\[(?P<attrs>[^\]]*)\]")
 
 
 def split_attrs(attrs: str) -> List[str]:
-    """Split on commas that are not inside quotes, the way AsciiDoc does."""
+    """Split on commas that are not inside a quoted value, the way AsciiDoc does.
+
+    A quote only opens a value when it is the first character of a field. An
+    apostrophe inside unquoted text -- "Don't change the classpath, ..." -- is
+    ordinary text, and treating it as an opening quote swallows the comma after
+    it and reports a genuinely broken macro as clean.
+    """
     out: List[str] = []
     buf: List[str] = []
     quote = ""
+    at_field_start = True
     for ch in attrs:
         if quote:
             if ch == quote:
                 quote = ""
             buf.append(ch)
-        elif ch in "\"'":
-            quote = ch
-            buf.append(ch)
-        elif ch == ",":
+            continue
+        if ch == ",":
             out.append("".join(buf))
             buf = []
-        else:
+            at_field_start = True
+            continue
+        if at_field_start and ch in "\"'":
+            quote = ch
             buf.append(ch)
+            at_field_start = False
+            continue
+        if not ch.isspace():
+            at_field_start = False
+        buf.append(ch)
     out.append("".join(buf))
     return out
 
@@ -56,25 +70,24 @@ def split_attrs(attrs: str) -> List[str]:
 def offenders(path: Path) -> List[Tuple[int, str, str]]:
     found = []
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        match = IMAGE_RE.match(line)
-        if not match:
-            continue
-        fields = split_attrs(match.group("attrs"))
-        if len(fields) < 2:
-            continue
-        first = fields[0].strip()
-        if first.startswith(('"', "'")):
-            # already quoted, so its commas belong to the alt text
-            continue
-        # A positional field after the alt text that carries no "=" is alt text
-        # that was split, not an attribute anybody wrote on purpose. A bare
-        # number is the legacy width/height positional form and is legitimate.
-        for field in fields[1:]:
-            value = field.strip()
-            if not value or "=" in value or value.isdigit():
+        for match in IMAGE_RE.finditer(line):
+            fields = split_attrs(match.group("attrs"))
+            if len(fields) < 2:
                 continue
-            found.append((number, match.group("target"), match.group("attrs")))
-            break
+            first = fields[0].strip()
+            if first.startswith(('"', "'")):
+                # already quoted, so its commas belong to the alt text
+                continue
+            # A positional field after the alt text that carries no "=" is alt
+            # text that was split, not an attribute anybody wrote on purpose. A
+            # bare number is the legacy width/height positional form and is
+            # legitimate.
+            for field in fields[1:]:
+                value = field.strip()
+                if not value or "=" in value or value.isdigit():
+                    continue
+                found.append((number, match.group("target"), match.group("attrs")))
+                break
     return found
 
 
