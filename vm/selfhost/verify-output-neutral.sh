@@ -26,26 +26,35 @@ OUT="$W/out"
 # relationships and still absorbs the switch from identity-hash names to sequential
 # ones.
 cn1_canon_labels() {
-    awk '{
-        line = $0
-        out = ""
-        # The label number leaks into DERIVED identifiers too -- catch_L<n>,
-        # restoreToL<n>, tryBlockOffsetL<n> -- so rewriting only label_L<n> left
-        # every try/catch-bearing file reporting as changed forever, which buries a
-        # real difference in permanent noise. All four spellings share one numbering.
-        while (match(line, /(label_L|catch_L|restoreToL|tryBlockOffsetL)[0-9]+/)) {
-            pre = substr(line, 1, RSTART - 1)
-            tok = substr(line, RSTART, RLENGTH)
-            line = substr(line, RSTART + RLENGTH)
-            # split the prefix from the number so both sides canonicalise together
-            nstart = match(tok, /[0-9]+$/)
-            kind = substr(tok, 1, nstart - 1)
-            num  = substr(tok, nstart)
-            if (!(num in seen)) { seen[num] = ++k }
-            out = out pre kind seen[num]
-        }
-        print out line
-    }' "$1"
+    awk '
+        # Reset the mapping at every generated FUNCTION boundary.
+        #
+        # The branch numbers labels with a METHOD-LOCAL counter, so L0 and L1 recur
+        # in every method, while master derives them from ASM identities that are
+        # distinct across the whole file. A file-wide map therefore folds the second
+        # method'"'"'s L0 onto the first method'"'"'s token on one side and not the other,
+        # and reports identical output as a codegen difference -- the mirror of the
+        # erase-everything bug, generating false positives instead of hiding real
+        # ones. Per-function scope matches how the names are actually minted.
+        /^[A-Za-z_][A-Za-z0-9_ \*]*\(/ { delete seen; k = 0 }
+        {
+            line = $0
+            out = ""
+            # The number leaks into derived identifiers too -- catch_L<n>,
+            # restoreToL<n>, tryBlockOffsetL<n> -- which must share the numbering
+            # WITHIN a function or every try/catch file reports as changed forever.
+            while (match(line, /(label_L|catch_L|restoreToL|tryBlockOffsetL)[0-9]+/)) {
+                pre = substr(line, 1, RSTART - 1)
+                tok = substr(line, RSTART, RLENGTH)
+                line = substr(line, RSTART + RLENGTH)
+                nstart = match(tok, /[0-9]+$/)
+                kind = substr(tok, 1, nstart - 1)
+                num  = substr(tok, nstart)
+                if (!(num in seen)) { seen[num] = ++k }
+                out = out pre kind seen[num]
+            }
+            print out line
+        }' "$1"
 }
 
 case "${1:?usage: capture <tag> | compare <a> <b> | vs-master}" in
@@ -80,6 +89,7 @@ vs-master)
         [ "$side" = m ] && TR="$MTR" || TR="$REPO/vm/ByteCodeTranslator/target/classes"
         mkdir -p "$OUT"
         ( cd "$W" && env -i PATH=/usr/bin:/bin HOME="$HOME" TMPDIR=/tmp LC_ALL=C \
+        CN1_NATIVE_VERIFY="${CN1_NATIVE_VERIFY:-}" \
             "$J8/bin/java" -cp "$TR:$ASM" com.codename1.tools.translator.ByteCodeTranslator \
             clean "$MAPI;$APP" "$OUT" CmpApp com.cmp CmpApp 1.0 clean none ) > "$W/$side.log" 2>&1 \
             || { echo "$side side FAILED"; tail -5 "$W/$side.log"; exit 1; }
@@ -128,6 +138,7 @@ capture)
     [ -z "$newest" ] || { echo "STALE: $TR older than $newest -- run mvn package first" >&2; exit 1; }
     rm -rf "$W/$TAG-tree" "$OUT"; mkdir -p "$OUT"
     ( cd "$W" && env -i PATH=/usr/bin:/bin HOME="$HOME" TMPDIR=/tmp LC_ALL=C \
+        CN1_NATIVE_VERIFY="${CN1_NATIVE_VERIFY:-}" \
         CN1_RESOURCE_PATH="$REPO/vm/ByteCodeTranslator/src" \
         "$J8/bin/java" -cp "$TR:$ASM" com.codename1.tools.translator.ByteCodeTranslator \
         clean "$JAPI;$REPO/vm/selfhost/target/asm-classes;$REPO/vm/selfhost/target/classes" \

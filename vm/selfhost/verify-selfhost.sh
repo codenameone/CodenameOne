@@ -56,10 +56,17 @@ W="$REPO/vm/selfhost/target/verify"
 rm -rf "$W"; mkdir -p "$W"
 OUT="$W/out"
 
+# CN1_NATIVE_VERIFY is forwarded explicitly. `env -i` starts from an EMPTY
+# environment, so a workflow-level `CN1_NATIVE_VERIFY: strict` never reached the
+# translator here and NativeSignatureVerifier.mode() defaulted to OFF -- the gate
+# reported a mode it was not running in, which is the failure this whole script
+# exists to prevent. Forwarded rather than hard-coded so a local run without it set
+# behaves as it always did.
 run() {
     local tag=$1; shift
     mkdir -p "$OUT"
     ( cd "$W" && env -i PATH=/usr/bin:/bin HOME="$HOME" TMPDIR=/tmp LC_ALL=C \
+        CN1_NATIVE_VERIFY="${CN1_NATIVE_VERIFY:-}" \
         CN1_RESOURCE_PATH="$REPO/vm/ByteCodeTranslator/src" "$@" ) > "$W/$tag.log" 2>&1 \
         || { echo "$tag FAILED"; tail -20 "$W/$tag.log"; exit 1; }
     mv "$OUT" "$W/$tag-tree"
