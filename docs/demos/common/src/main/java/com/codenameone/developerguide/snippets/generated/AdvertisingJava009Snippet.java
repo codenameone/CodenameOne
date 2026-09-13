@@ -70,10 +70,13 @@ class AdvertisingJava009Snippet {
                 .maxAdContentRating(AdConfig.RATING_G);
 
         AdManager.initialize(cfg, ready -> {
-            // false when no provider was installed, or the network's own
-            // initialize failed. Stop here: with no provider AdConsent reports
-            // consent as not required and canRequestAds() answers true, so
-            // carrying on would walk into loadAds() with nothing behind it.
+            // false when no provider was installed. It is not a report that
+            // the network is up: every provider hands its config to the native
+            // bridge and answers true straight away, while the SDK behind it
+            // initializes asynchronously. Worth checking anyway, because with
+            // no provider at all AdConsent reports consent as not required and
+            // canRequestAds() answers true, so carrying on would walk into
+            // loadAds() with nothing behind it.
             if (!ready) {
                 showAdFreeUi();
                 return;

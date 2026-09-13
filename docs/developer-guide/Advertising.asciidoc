@@ -101,6 +101,22 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 
+Two things about that flow are worth knowing before you rely on it.
+
+The readiness flag says a provider was installed and took the config; it isn't
+a report that the network came up. Every provider passes the config to its
+native bridge and answers `true` immediately, while the SDK behind it
+initializes asynchronously -- so an invalid SDK key surfaces as failing loads
+later, not as `false` here.
+
+And `AdConsent.requestConsent` presents a form only where the provider
+implements one. AdMob does, through Google's User Messaging Platform. AppLovin
+MAX and Unity LevelPlay read consent from an external CMP and the IAB TCF
+string instead, so their implementations report `STATUS_NOT_REQUIRED` at once
+and `canRequestAds()` always answers `true`. On those two the consent flow is
+the CMP's, not this one, and it has to be in place before the first load for
+EEA/UK users.
+
 `AdConfig` also carries the global compliance flags every network requires:
 test mode, test device ids, child directed treatment, under-age-of-consent
 treatment and a maximum ad content rating.
