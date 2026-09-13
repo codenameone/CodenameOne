@@ -75,6 +75,45 @@ def render(source: Path, attributes: Tuple[str, ...] = ()) -> str:
 
 BASELINE = Path("scripts/developer-guide/image-dimension-baseline.txt")
 
+# Named attributes an image macro takes. Used only to recognise a tail that
+# Asciidoctor swallowed as an unknown named attribute: [Plot coordinates x,
+# y=2 and z=3] becomes alt="Plot coordinates x" and a "y" attribute, with no
+# width or height emitted at all, so the rendered output shows nothing wrong.
+IMAGE_ATTRIBUTES = frozenset({
+    "alt", "align", "caption", "float", "format", "height", "id", "link",
+    "loading", "opts", "options", "poster", "role", "scale", "scaledwidth",
+    "pdfwidth", "title", "width", "window", "rel", "nofollow", "start", "end",
+    "loop", "autoplay", "theme", "lang", "fallback", "target", "reftext",
+})
+SOURCE_MACRO_RE = re.compile(r"image::?([^\[\]\s]+)\[([^\]]*)\]")
+FIELD_NAME_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=")
+
+
+def unknown_attribute_tails(guide_dir: Path) -> List[Tuple[Path, int, str, str]]:
+    """Macros whose alt text is followed by a field naming no real attribute.
+
+    Asciidoctor stores such a field as a named attribute and emits no width, so
+    the rendered output looks clean while the alt text has been cut at the
+    comma. This is the one case reading the render cannot see.
+    """
+    found = []
+    for path in sorted(guide_dir.rglob("*")):
+        if path.suffix not in {".adoc", ".asciidoc"} or not path.is_file():
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8",
+                                                     errors="replace").splitlines(), 1):
+            for match in SOURCE_MACRO_RE.finditer(line):
+                attrs = match.group(2)
+                fields = attrs.split(",")
+                if len(fields) < 2 or attrs.lstrip().startswith(('"', "'")):
+                    continue
+                for field in fields[1:]:
+                    name = FIELD_NAME_RE.match(field)
+                    if name and name.group(1).lower() not in IMAGE_ATTRIBUTES:
+                        found.append((path, number, match.group(1), field.strip()))
+                        break
+    return found
+
 
 def load_baseline() -> set:
     if not BASELINE.exists():
@@ -87,7 +126,7 @@ def load_baseline() -> set:
     return entries
 
 
-def offenders(markup: str, baseline: set) -> List[Tuple[str, str, str, bool]]:
+def offenders(markup: str, baseline: set, named_dimensions: set) -> List[Tuple[str, str, str, bool]]:
     """Rendered images whose width or height is not one, or is undeclared.
 
     Returns (src, alt, value, ambiguous). ambiguous marks the dimension-shaped
@@ -110,11 +149,32 @@ def offenders(markup: str, baseline: set) -> List[Tuple[str, str, str, bool]]:
             # alone, one exemption covers every use of that image -- and an
             # image reused later with its alt text truncated to the same width
             # would inherit the exemption. game-3d.png already appears twice.
+            if src.split("/")[-1] in named_dimensions:
+                continue
             key = f"{src}|{slot}|{value}|{alt}"
             if key not in baseline:
                 found.append((src, alt, f"{slot}={value}", True))
                 break
     return found
+
+
+def explicit_dimension_sources(guide_dir: Path) -> set:
+    """Images whose source names width= or height= outright.
+
+    A named dimension renders exactly like a positional one, and only the
+    positional form is ambiguous, so the named form is exempt without an entry.
+    """
+    named = set()
+    for path in guide_dir.rglob("*"):
+        if path.suffix not in {".adoc", ".asciidoc"} or not path.is_file():
+            continue
+        for match in SOURCE_MACRO_RE.finditer(path.read_text(encoding="utf-8",
+                                                             errors="replace")):
+            for field in match.group(2).split(","):
+                name = FIELD_NAME_RE.match(field)
+                if name and name.group(1).lower() in {"width", "height"}:
+                    named.add(match.group(1).split("/")[-1])
+    return named
 
 
 def main() -> int:
@@ -126,7 +186,9 @@ def main() -> int:
     sources = [Path(p) for p in args.sources] or [
         Path("docs/developer-guide/developer-guide.asciidoc")]
 
+    guide_dir = Path("docs/developer-guide")
     baseline = load_baseline()
+    named_dimensions = explicit_dimension_sources(guide_dir)
     total = 0
     seen = set()
     for source in sources:
@@ -134,7 +196,7 @@ def main() -> int:
             markup = render(source, attributes)
             if not markup:
                 return 1
-            for src, alt, spilled, ambiguous in offenders(markup, baseline):
+            for src, alt, spilled, ambiguous in offenders(markup, baseline, named_dimensions):
                 # the same image usually appears in both renders; report it once
                 if (src, alt, spilled) in seen:
                     continue
@@ -150,6 +212,12 @@ def main() -> int:
                 else:
                     print(f'    alt text was cut to "{alt}"')
                     print(f'    and "{spilled}" landed in the width slot')
+
+    for path, number, src, field in unknown_attribute_tails(guide_dir):
+        total += 1
+        print(f"{path}:{number}: {src}")
+        print(f'    "{field}" is not an image attribute, so Asciidoctor takes it')
+        print("    as a named one and cuts the alt text at the comma before it")
 
     if total:
         print()
