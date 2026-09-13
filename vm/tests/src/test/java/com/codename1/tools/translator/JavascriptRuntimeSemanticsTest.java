@@ -550,6 +550,58 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void executesHostCallsMadeFromAStaticInitializer(CompilerHelper.CompilerConfig config) throws Exception {
+        // Issue #5774. Class init used to be driven ONLY by the synchronous
+        // run-to-completion loop in ``ensureClassInitialized``, which steps the
+        // clinit generator with ``result.next()`` and DISCARDS the yielded op.
+        // A HOST_CALL raised inside a <clinit> was therefore never posted to
+        // the host and the ``yield`` resumed with ``undefined`` -- silently, so
+        // the app died later and somewhere else (an NPE inside
+        // ``LocalForage.<init>``, because the clinit's ``Window.current()`` had
+        // been answered ``undefined`` and the worker global got cached as the
+        // window).
+        //
+        // The fixture covers BOTH guard shapes and sums them, so either one
+        // failing changes the answer: a clinit reached through a plain static
+        // holder (echo 41 -> 42), and one reached through an interface field
+        // whose access javac writes against the IMPLEMENTING CLASS (echo 20 ->
+        // 21). The second only works if the guard owner is resolved to the
+        // declaring interface on the analysis side as well as the emitter's --
+        // read raw, it looks like an own-class access and the edge is dropped.
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-clinit-host-src");
+        Path classesDir = Files.createTempDirectory("js-clinit-host-classes");
+        Path javaApiDir = Files.createTempDirectory("js-clinit-host-javaapi");
+
+        Path vmHostDir = sourceDir.resolve("com").resolve("codename1").resolve("impl").resolve("platform").resolve("js");
+        Files.createDirectories(vmHostDir);
+        Files.write(vmHostDir.resolve("VMHost.java"),
+                JavascriptTargetIntegrationTest.loadFixture("com/codename1/impl/platform/js/VMHost.java").getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("JsClinitHostCallApp.java"),
+                JavascriptTargetIntegrationTest.loadFixture("JsClinitHostCallApp.java").getBytes(StandardCharsets.UTF_8));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-clinit-host-output");
+        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JsClinitHostCallApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsClinitHostCallApp-js");
+        WorkerRunResult result = runGeneratedWorkerBundleWithHostCallbacks(distDir);
+
+        assertEquals("result", result.type,
+                "A <clinit> that makes a host call must complete through the host callback protocol. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertEquals(63, result.result,
+                "A host call raised inside <clinit> must round-trip to the host and resume with its answer,"
+                        + " for a plain static holder (42) and an interface-declared field (21) alike. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(),
+                "Generated worker bundle should not emit an error message: " + result.errorMessage);
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void injectsEventsAndIgnoresUnknownMessagesThroughWorkerProtocol(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

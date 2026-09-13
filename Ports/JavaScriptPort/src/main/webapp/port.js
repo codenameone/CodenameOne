@@ -1298,9 +1298,21 @@ bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_h
       return wrapper;
     }
   }
+  // FALLBACK: no DOM window here and the host could not supply one. The
+  // worker global is NOT a window -- no document, no localforage, none of the
+  // members the JSO bridge is about to look up -- so this is a degraded
+  // answer, and it MUST NOT be cached. It used to be, and one early failed
+  // round-trip then pinned it for the life of the worker: every later
+  // ``Window.current()`` returned the worker global, and issue #5774's
+  // ``((LocalForageFactory)Window.current()).getLocalforage()`` read
+  // ``self.localforage`` -- undefined -> a Java null -> NPE inside
+  // ``LocalForage.<init>``, long after the call that actually failed.
+  // Leaving it uncached lets the next call retry and get the real window.
   wrapper = jvm.wrapJsObject((hasDomWindow ? nativeWindow : null) || global.self || global, "com_codename1_html5_js_browser_Window");
   jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
-  self.__cn1WindowWrapper = wrapper;
+  if (hasDomWindow) {
+    self.__cn1WindowWrapper = wrapper;
+  }
   return wrapper;
 });
 
