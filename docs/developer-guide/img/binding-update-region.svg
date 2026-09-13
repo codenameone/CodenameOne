@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="414" viewBox="0 0 900 414">
-  <rect x="0" y="0" width="900" height="414" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430">
+  <rect x="0" y="0" width="900" height="430" fill="#ffffff"/>
   <text x="450" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">What stops a two-way binding looping, and what that guard costs</text>
   <text x="450" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Both directions are live at once, so each one's effect is the other's trigger. The mechanism that breaks the cycle is</text>
   <text x="450" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">also the reason a setter that writes a second bound field does not reach the screen.</text>
@@ -23,11 +23,12 @@
   <text x="30" y="217" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">The update region is what keeps that from running forever</text>
   <text x="30" y="235" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Every framework-initiated mutation runs inside a region guarded by a thread-local depth counter. While it is positive,</text>
   <text x="30" y="250" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">notifyChanged does nothing and component listeners short-circuit. bind, refresh and commit each enter one.</text>
-  <rect x="16" y="278" width="868" height="120" rx="4" fill="#fbf6f6" stroke="#a33a3a" stroke-width="1.5"/>
+  <rect x="16" y="278" width="868" height="136" rx="4" fill="#fbf6f6" stroke="#a33a3a" stroke-width="1.5"/>
   <text x="30" y="300" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">And that is why a cross-field setter chain can fail to reach the screen</text>
   <text x="30" y="322" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">It depends on who called. An application calling setFirstName directly is not inside a region, so the nested</text>
   <text x="30" y="337" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">setFullName notifies at depth zero and its component refreshes normally. Reached from the component listener or</text>
   <text x="30" y="352" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">from commit(), the same chain runs inside a region already open, and the second field's notification is suppressed.</text>
-  <text x="30" y="367" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">From the listener, refresh() after the chain fixes it. From commit() it does not -- commit goes on to copy the stale</text>
-  <text x="30" y="382" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">component value back -- so defer the second write with callSerially, or bind the derived field one way.</text>
+  <text x="30" y="367" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">From the listener, refresh() after the chain fixes it. From commit() it does not, because commit goes on to copy the</text>
+  <text x="30" y="382" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">stale component value back. There, defer the second write with callSerially -- or bind the derived field one way,</text>
+  <text x="30" y="397" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">which stops the write-back but leaves the component stale, so it needs a refresh() after the commit as well.</text>
 </svg>
