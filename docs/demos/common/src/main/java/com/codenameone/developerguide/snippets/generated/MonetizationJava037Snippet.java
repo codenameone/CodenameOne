@@ -97,13 +97,12 @@ class MonetizationJava037Snippet {
     
     // tag::monetization-java-037[]
     public void start() {
-     // The same guard the earlier start() listing uses. Without it a resume
-     // builds a second form and hands it components the first one still owns,
-     // which Container rejects.
      if (current != null) {
+     // A resume. The form and everything on it survived, so rebuilding it
+     // would hand a second form components the first one still owns, which
+     // Container rejects.
      current.show();
-     return;
-     }
+     } else {
      Form hi = new Form("Hello World", BoxLayout.y());
 
      // ... the rest of the form
@@ -115,14 +114,17 @@ class MonetizationJava037Snippet {
 
      current = hi;
      hi.show();
+     }
 
-     // Now synchronize the receipts
+     // Outside the branch on purpose: a subscription can be bought, renewed
+     // or cancelled on another device while this one is suspended, so the
+     // resume needs this as much as the launch does.
      iap.synchronizeReceipts(0, success -> {
          // Whatever this brought back, the expiry label is now out of date.
          // Repaint it from the same method the manual button uses.
          if (success) {
              showRentalStatus();
-             hi.revalidate();
+             current.revalidate();
          }
      });
     }
