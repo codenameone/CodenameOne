@@ -38,27 +38,16 @@ import com.codename1.io.rest.Response;
 import com.codename1.io.rest.RestClients;
 import com.codename1.util.OnComplete;
 
-// tag::appendix-goal-generate-openapi-java-001[]
 @RestClient
-public interface PetApi {
+public interface UserApi {
 
-    @POST("/pet")
-    void addPet(@Body com.example.petstore.model.Pet body, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Pet>> callback);
+    @POST("/user")
+    void createUser(@Body com.example.petstore.model.User body, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.User>> callback);
 
-    @PUT("/pet")
-    void updatePet(@Body com.example.petstore.model.Pet body, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Pet>> callback);
+    @GET("/user/{username}")
+    void getUserByName(@Path("username") String username, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.User>> callback);
 
-    @GET("/pet/findByStatus")
-    void findPetsByStatus(@Query("status") String status, @Header("Authorization") String bearerToken, OnComplete<Response<java.util.List<com.example.petstore.model.Pet>>> callback);
-
-    @GET("/pet/{petId}")
-    void getPetById(@Path("petId") Long petId, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Pet>> callback);
-
-    @DELETE("/pet/{petId}")
-    void deletePet(@Path("petId") Long petId, @Header("Authorization") String bearerToken, OnComplete<Response<String>> callback);
-
-    static PetApi of(String baseUrl) {
-        return RestClients.create(PetApi.class, baseUrl);
+    static UserApi of(String baseUrl) {
+        return RestClients.create(UserApi.class, baseUrl);
     }
 }
-// end::appendix-goal-generate-openapi-java-001[]

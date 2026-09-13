@@ -48,24 +48,36 @@ files (only missing files are written).
 
 ==== Generated output
 
-For the Swagger Petstore reference spec the goal emits, under
+The listings in this section are the goal's own output, generated from a
+Swagger Petstore specification cut down to the `pet`, `store` and `user`
+tags. That spec is in the repository at
+`docs/demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi-petstore.json`,
+so you can run the goal against it and get these files byte for byte.
+
+One `@RestClient` interface per tag and one model per schema land under
 `common/src/main/java`:
 
 [listing]
 ----
 com/example/petstore/
   PetApi.java          // @RestClient interface, methods addPet, updatePet,
-                       // findPetsByStatus, getPetById, deletePet, ...
-  StoreApi.java        // @RestClient interface, methods getInventory,
-                       // placeOrder, getOrderById, deleteOrder
-  UserApi.java         // @RestClient interface
+                       // findPetsByStatus, getPetById, deletePet
+  StoreApi.java        // @RestClient interface, methods placeOrder,
+                       // getOrderById, deleteOrder
+  UserApi.java         // @RestClient interface, methods createUser,
+                       // getUserByName
 com/example/petstore/model/
   Pet.java             // @Mapped record (Java 17+) or class (Java 8)
   Order.java
   User.java
   Category.java
-  Tag.java
 ----
+
+`Tag.java` is missing from that list on purpose. The Petstore declares
+`Tag` and `Category` with the same two properties, and identical shapes
+collapse to one record, so `Pet.tags()` comes back typed as a list of
+`Category`. Give the two schemas different shapes if you want them to
+stay separate classes.
 
 Each `@RestClient` interface method is annotated with the HTTP verb
 and path; parameters are annotated `@Path` / `@Query` / `@Header` /
