@@ -86,6 +86,11 @@ final class BuildHintsDynamic {
                         + "CN1CallDirectoryExtensionIdentifier the host plist carries -- so an override has to "
                         + "reach both or the app asks the system to reload an identifier nothing installed.");
 
+        family(h, "ios.invite.buildSettings.*", "ios",
+                "Xcode build settings for the generated invite App Clip target. The clip is a "
+                        + "separate application bundle embedded in the app, so its deployment "
+                        + "target and device family are its own and an override reaches only it.");
+
         family(h, "ios.vpn.tunnel.buildSettings.*", "ios",
                 "Xcode build settings for the generated packet tunnel extension target. "
                         + "PRODUCT_BUNDLE_IDENTIFIER is read in two places -- the target's own settings and the "

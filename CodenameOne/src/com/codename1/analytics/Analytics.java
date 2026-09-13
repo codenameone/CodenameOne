@@ -27,6 +27,7 @@ import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -69,6 +70,17 @@ public final class Analytics {
     private static final String PREF_CONSENT_PERSONALIZATION = "cn1$analyticsConsentPersonalization";
     private static final String PREF_CONSENT_AD = "cn1$analyticsConsentAdStorage";
     private static final String PREF_DIMENSIONS = "cn1$analyticsDimensions";
+
+    // The client id the persisted dimensions were written under.
+    //
+    // Preferences.set discards the write-failure boolean, so an erasure that
+    // could not reach the disk removed the reserved dimensions from memory and
+    // left them in the file: the next launch loaded them back and attached the
+    // erased referral identity to the NEW client id, which is the one thing
+    // resetClientId() exists to prevent. Verifying the write closes that
+    // inside the process; this closes it across a restart, where no in-memory
+    // retry survives to run.
+    private static final String PREF_DIMENSIONS_OWNER = "cn1$analyticsDimensionsOwner";
 
     private static final Object LOCK = new Object();
     private static final List<AnalyticsProvider> PROVIDERS = new ArrayList<AnalyticsProvider>();
@@ -147,8 +159,34 @@ public final class Analytics {
         if (mode == null) {
             return;
         }
+        List<AnalyticsProvider> snapshot;
         synchronized (LOCK) {
+            if (mode == consentMode) {
+                return;
+            }
             consentMode = mode;
+            snapshot = new ArrayList<AnalyticsProvider>(PROVIDERS);
+        }
+        // Providers are told, because the mode decides what an absent choice
+        // means: under OPT_IN nothing is permitted until the user answers, and
+        // under OPT_OUT everything is until they refuse. Changing it therefore
+        // changes what is allowed for a user who has answered nothing, and
+        // without this dispatch ordinary events resumed while a feature that
+        // had stopped on the old mode stayed stopped -- the two disagreeing
+        // about the same user with nothing to reconcile them.
+        //
+        // The consent handed over is the effective one, exactly as
+        // setConsent() does, so a provider needs no second rule for this path.
+        AnalyticsConsent recorded = getConsent();
+        AnalyticsConsent effective = recorded != null ? recorded
+                : (mode == ConsentMode.OPT_OUT
+                        ? AnalyticsConsent.granted() : AnalyticsConsent.denied());
+        for (AnalyticsProvider p : snapshot) {
+            try {
+                p.onConsentChanged(effective);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
         }
     }
 
@@ -333,6 +371,12 @@ public final class Analytics {
     /// with every first-party batch. Passing a null value removes the key.
     /// Null or empty keys are ignored.
     ///
+    /// The `cn1_` prefix is RESERVED for dimensions the framework writes on
+    /// your behalf, and those are cleared by [#resetClientId] because they
+    /// identify the user across installs. A key of your own under that prefix
+    /// is accepted -- it always was -- but it will be erased along with them,
+    /// so pick another one.
+    ///
     /// #### Parameters
     ///
     /// - `key`: the dimension key
@@ -463,6 +507,13 @@ public final class Analytics {
     /// every provider with the new identity. Use this to honour a "right to be
     /// forgotten" / erasure request from the user.
     ///
+    /// Custom dimensions your application set are kept -- a `plan` or `role`
+    /// dimension describes the app, not the person, and losing it silently on
+    /// an erasure would surprise you. Dimensions under the reserved `cn1_`
+    /// prefix are cleared, because those are written for you by framework
+    /// features that identify the user across installs, and carrying them onto
+    /// a fresh id would re-link the two.
+    ///
     /// #### Returns
     ///
     /// the new client id
@@ -471,6 +522,15 @@ public final class Analytics {
         synchronized (LOCK) {
             clientId = newClientId();
             Preferences.set(PREF_CLIENT_ID, clientId);
+            // Cleared here rather than left to whichever feature wrote them.
+            // The feature's provider is the ordinary route and does more --
+            // it drops its own durable records too -- but a provider can be
+            // absent: Analytics.clearProviders() is public and the deprecated
+            // AnalyticsService.init() calls it. In that window an erasure left
+            // the reserved dimensions attached to the new id, and the next
+            // provider the application registered transmitted them. An erasure
+            // cannot depend on who happens to be registered when it runs.
+            clearReservedDimensions();
             snapshot = new ArrayList<AnalyticsProvider>(PROVIDERS);
         }
         AnalyticsContext ctx = context();
@@ -482,6 +542,44 @@ public final class Analytics {
             }
         }
         return clientId;
+    }
+
+    // Package private test seam: makes the store look the way it does after an
+    // erasure whose write never landed -- the reserved dimensions still in the
+    // file, stamped with the identity that has since been reset -- and drops
+    // the in-memory copy so the next read comes off the disk, which is what the
+    // next process would do. There is no other way to produce a failed
+    // Preferences write from a test.
+    static void simulateSurvivingDimensionsForTest(String raw, String owner) {
+        synchronized (LOCK) {
+            Preferences.set(PREF_DIMENSIONS, raw);
+            Preferences.set(PREF_DIMENSIONS_OWNER, owner);
+            DIMENSIONS.clear();
+            dimensionsLoaded = false;
+        }
+    }
+
+    /// The prefix reserved for dimensions the framework writes on your behalf.
+    /// Do not use it for your own dimensions: everything under it is cleared by
+    /// [#resetClientId].
+    public static final String RESERVED_DIMENSION_PREFIX = "cn1_";
+
+    // Must be called while holding LOCK.
+    private static void clearReservedDimensions() {
+        loadDimensions();
+        boolean changed = false;
+        Iterator<Map.Entry<String, String>> it = DIMENSIONS.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, String> e = it.next();
+            String key = e.getKey();
+            if (key != null && key.startsWith(RESERVED_DIMENSION_PREFIX)) {
+                it.remove();
+                changed = true;
+            }
+        }
+        if (changed) {
+            persistDimensions();
+        }
     }
 
     // Must be called while holding LOCK. Lazily loads the persisted dimensions
@@ -497,6 +595,40 @@ public final class Analytics {
         if (stored == null || stored.length() == 0) {
             return;
         }
+        // Whose dimensions these are. An erasure that could not reach the disk
+        // leaves the reserved entries in the file under the PREVIOUS identity;
+        // loading them would attach the referral the user asked to be rid of
+        // to their new client id, one launch later and with nothing in memory
+        // left to notice.
+        //
+        // An ABSENT stamp is ADOPTED, not treated as foreign, and the reason
+        // is specific enough to be worth writing down -- the strict reading
+        // was tried first and destroyed live data.
+        //
+        // Dropping a reserved dimension is only ever right when the FRAMEWORK
+        // wrote it, and the framework cannot have written one into an
+        // unstamped file. Every write of this record goes through
+        // persistDimensions(), which stamps in the same call, and Preferences
+        // keeps both keys in one record, so a file written by a version that
+        // owns reserved dimensions always carries a stamp. An absent one means
+        // the file predates the feature -- and back then `setDimension`
+        // accepted every key, documented no reserved prefix, and never wrote a
+        // `cn1_` dimension itself. So anything with that prefix in an
+        // unstamped file is the APPLICATION's, and dropping it silently
+        // deletes analytics segmentation from an app that did nothing wrong
+        // and never asked for an erasure.
+        //
+        // The erasure case the stamp defends against still works, because it
+        // cannot produce this state: the identity reset happens on a version
+        // that stamps, so the surviving file carries the PREVIOUS id and
+        // compares unequal below.
+        //
+        // clientId() rather than the field, because loading can happen before
+        // the id has been materialised and a null would make every file look
+        // foreign. It does not read dimensions, so there is no recursion.
+        String owner = Preferences.get(PREF_DIMENSIONS_OWNER, null);
+        boolean unstamped = owner == null;
+        boolean foreign = !unstamped && !clientId().equals(owner);
         String[] rows = split(stored, '\n');
         for (String row : rows) {
             if (row.length() == 0) {
@@ -508,18 +640,46 @@ public final class Analytics {
             }
             String key = row.substring(0, tab);
             String value = row.substring(tab + 1);
-            if (key.length() > 0) {
-                DIMENSIONS.put(key, value);
+            if (key.length() == 0) {
+                continue;
             }
+            if (foreign && key.startsWith(RESERVED_DIMENSION_PREFIX)) {
+                // The framework's own dimensions, belonging to an identity
+                // that has since been reset. Dropped rather than loaded: this
+                // is the erasure finishing late, and the alternative is
+                // handing the new client id the referral it was reset to
+                // forget.
+                //
+                // The APPLICATION's dimensions are kept. They are not what an
+                // erasure asked about, and losing a plan or role the app set
+                // would be a second bug in the name of fixing the first.
+                continue;
+            }
+            DIMENSIONS.put(key, value);
+        }
+        if (foreign || unstamped) {
+            // Rewritten under the current identity so the drop -- or, for an
+            // unstamped file, the one-time adoption -- happens once. If this
+            // write fails the next launch simply repeats it, which is the
+            // correct outcome either way.
+            persistDimensions();
         }
     }
 
     // Must be called while holding LOCK.
+    /// Writes the dimensions and the identity they belong to.
+    ///
+    /// There is deliberately NO read-back check here, and one was tried and
+    /// removed: `Preferences.set` updates a static table and `Preferences.get`
+    /// reads that same table, so reading a value back after writing it
+    /// compares memory with memory and reports success for a write that never
+    /// reached the disk. It looked like verification and verified nothing.
+    ///
+    /// The erasure is made safe by the stamp instead, which needs no write to
+    /// succeed -- see [#loadDimensions]. Both keys live in the SAME
+    /// preferences record, so they land together or not at all; there is no
+    /// state where the dimensions survive under a stamp that disowns them.
     private static void persistDimensions() {
-        if (DIMENSIONS.isEmpty()) {
-            Preferences.set(PREF_DIMENSIONS, "");
-            return;
-        }
         StringBuilder b = new StringBuilder();
         boolean first = true;
         for (Map.Entry<String, String> e : DIMENSIONS.entrySet()) {
@@ -529,7 +689,31 @@ public final class Analytics {
             b.append(sanitize(e.getKey())).append('\t').append(sanitize(e.getValue()));
             first = false;
         }
-        Preferences.set(PREF_DIMENSIONS, b.toString());
+        // ONE save for both keys. Preferences.set(String, Object) calls save()
+        // per key, so the two used to be two serializations of the whole map
+        // with a window between them -- and a comment here claimed they landed
+        // together because they share a record, which was simply wrong.
+        //
+        // The batched form makes that true instead of assumed. It is worth
+        // being precise about what it does and does not fix, because the
+        // obvious story is not the real one: save() writes the ENTIRE map, so
+        // a failed first save followed by a successful second still persisted
+        // both new values -- the "old dimensions under a new owner" state is
+        // not reachable that way. What the window really allowed was the
+        // reverse, a save that landed followed by one that did not, leaving
+        // new dimensions under the PREVIOUS stamp. loadDimensions() reads that
+        // as foreign and drops them, which is conservative and correct, and
+        // reconcileDimensions() puts them back from the durable record. One
+        // save removes the window rather than the consequence.
+        //
+        // clientId() rather than the field: the field is null until something
+        // materialises the id, and stamping a placeholder would make the file
+        // read as foreign on the next launch and drop the dimensions this call
+        // was in the middle of saving.
+        Map<String, Object> record = new LinkedHashMap<String, Object>();
+        record.put(PREF_DIMENSIONS, b.toString());
+        record.put(PREF_DIMENSIONS_OWNER, clientId());
+        Preferences.set(record);
     }
 
     // Replaces the delimiter characters so the persisted form parses back
