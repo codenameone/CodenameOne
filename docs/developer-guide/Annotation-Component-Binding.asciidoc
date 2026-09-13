@@ -149,8 +149,13 @@ doesn't help here.
 
 The deferred write still does. `Display.callSerially()` queues the write and
 returns, so `_commit` finishes and leaves its update region before the deferred
-`setFullName` runs and notifies at depth zero. Use that, or bind the derived
-field one way so `commit()` never writes it back.
+`setFullName` runs and notifies at depth zero.
+
+Binding the derived field one way stops the overwrite but doesn't finish the
+job: one-way fields aren't instrumented, and the `setFirstName` notification is
+still suppressed by the commit's region, so the model holds the derived value
+while the screen keeps the old one. If you go that way, call
+`binding.refresh()` after the commit to publish it.
 
 === POJOs versus Property objects
 
