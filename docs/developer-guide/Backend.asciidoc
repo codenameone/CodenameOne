@@ -11,7 +11,7 @@ cores against 64 connections, and the harness is in the repository so you can
 disagree with them.
 
 .The build pipeline and the request path
-image::img/backend-architecture.svg[Java compiled to C to a native binary, and a request travelling through a host thread and a virtual thread to the handler,scaledwidth=95%]
+image::img/backend-architecture.svg["Java compiled to C to a native binary, and a request travelling through a host thread and a virtual thread to the handler",scaledwidth=95%]
 
 === What this doesn't replace
 
