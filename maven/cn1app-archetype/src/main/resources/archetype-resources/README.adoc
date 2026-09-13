@@ -4,6 +4,22 @@ This is a multi-module maven project for building a Codename One application. Co
 
 == Getting Started
 
+Use a project JDK that supports the Java version in `common/pom.xml` (17 for a
+Java 17 project). Configure both the IDE project SDK and its Maven runner; a bundled
+IDE runtime does not necessarily configure terminal Java. Set `JAVA_HOME` and check
+`.\mvnw.cmd -v` on Windows or `./mvnw -v` on macOS/Linux.
+
+Extract the entire project, then open its root `pom.xml` as Maven. Run launchers from
+a terminal so errors remain visible. Windows PowerShell and Command Prompt use
+`.\build.bat javascript_cloud`; macOS/Linux use `./build.sh javascript_cloud` to submit
+a hosted JavaScript build. Complete browser login when prompted. The first build
+may take several minutes to download dependencies. Correct connection/proxy errors
+and retry the same command.
+
+`javascript` builds locally; `javascript_cloud` submits to the build server.
+The no-argument `build` default makes a local JAR and `run` starts the local simulator.
+These local operations do not create a cloud build.
+
 === Java
 
 If you plan to use Java as your primary language, https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html[start here].
@@ -19,7 +35,8 @@ IMPORTANT: If you use Eclipse as your IDE, **read this first**
 
 The _tools/eclipse_ directory contains eclipse ".launch" files that will add common Maven goals as menu items inside Eclipse.
 
-**After importing this project into Eclipse, you should import the launch files.**
+After the Maven import, choose *File > Import > Run/Debug > Launch Configurations*,
+select `tools/eclipse`, and import the launch files before using *Run > Run Configurations*.
 
 === Additional Steps for CodeRAD projects
 

@@ -1,0 +1,21 @@
+name: Starter launchers
+on:
+  pull_request:
+    paths: ['maven/cn1app-archetype/src/main/resources/archetype-resources/**', 'scripts/test-starter-launchers.py', '.github/workflows/starter-launchers.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  launchers:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Execute actual launchers and wrapper
+        run: python scripts/test-starter-launchers.py maven/cn1app-archetype/src/main/resources/archetype-resources
