@@ -117,6 +117,13 @@ and `canRequestAds()` always answers `true`. On those two the consent flow is
 the CMP's, not this one, and it has to be in place before the first load for
 EEA/UK users.
 
+WARNING: On iOS 14 and later the AdMob provider starts the App Tracking
+Transparency prompt alongside the User Messaging Platform request and fires its
+consent callback when UMP finishes, without waiting for the tracking answer. The
+callback can therefore arrive while the system prompt is still on screen, and a
+load started from it runs before tracking authorization is settled. Present the ATT
+prompt yourself at a point you control, and load after the user has answered.
+
 `AdConfig` also carries the global compliance flags every network requires:
 test mode, test device ids, child directed treatment, under-age-of-consent
 treatment and a maximum ad content rating.
