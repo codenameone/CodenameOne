@@ -32,6 +32,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.util.Map;
 
 /**
  * Java SE twin of FileIo.
@@ -84,38 +86,70 @@ public final class FileIo {
             boolean capturedDirectory = false;
             boolean capturedConsistent = false;
             Object capturedKey = null;
+            long capturedIdentity = 0;
+            long statedSize = 0;
             try {
                 if(channel != null) {
                     capturedSize = channel.size();
                 }
-                BasicFileAttributes attributes = Files.readAttributes(path,
-                        BasicFileAttributes.class);
-                capturedModified = attributes.lastModifiedTime().toMillis();
-                capturedDirectory = attributes.isDirectory();
-                capturedKey = attributes.fileKey();
+                // ONE SNAPSHOT, THE IDENTITY INCLUDED. The inode used to be read
+                // by a second Files.getAttribute(path, "unix:ino") after this one,
+                // and a second lookup of a PATH can find a different file: an
+                // atomic replace landing between the two paired the old file's
+                // size and mtime with the replacement's inode. openRead's
+                // agreement loop could not see it, because what that loop compares
+                // is the fileKey, which came from the first stat -- so a
+                // replacement that kept the length and the timestamp served the
+                // old bytes under the new file's ETag, and every later request for
+                // the new content was answered 304 for as long as the client
+                // asked. The unix view reports size, mtime, fileKey and ino
+                // together, so there is no second lookup left to race.
+                Map unix = null;
+                try {
+                    unix = Files.readAttributes(path, "unix:*");
+                } catch (Exception unsupported) {
+                    // Not a Unix filesystem view; the basic attributes below carry
+                    // the same identity in fileKey, just not as a number.
+                    unix = null;
+                }
+                if(unix != null) {
+                    Object sizeValue = unix.get("size");
+                    Object modifiedValue = unix.get("lastModifiedTime");
+                    Object inoValue = unix.get("ino");
+                    capturedKey = unix.get("fileKey");
+                    capturedDirectory = Boolean.TRUE.equals(unix.get("isDirectory"));
+                    if(modifiedValue instanceof FileTime) {
+                        capturedModified = ((FileTime)modifiedValue).toMillis();
+                    }
+                    if(sizeValue instanceof Number) {
+                        statedSize = ((Number)sizeValue).longValue();
+                    }
+                    if(inoValue instanceof Number) {
+                        capturedIdentity = ((Number)inoValue).longValue();
+                    }
+                } else {
+                    BasicFileAttributes attributes = Files.readAttributes(path,
+                            BasicFileAttributes.class);
+                    capturedModified = attributes.lastModifiedTime().toMillis();
+                    capturedDirectory = attributes.isDirectory();
+                    capturedKey = attributes.fileKey();
+                    statedSize = attributes.size();
+                    // The file key's hash is the next best identity available and
+                    // is derived from the same device and inode where there is
+                    // one -- and from this same snapshot, like everything else.
+                    capturedIdentity = capturedKey == null ? 0 : capturedKey.hashCode();
+                }
                 if(channel == null) {
-                    capturedSize = attributes.size();
+                    capturedSize = statedSize;
                     capturedConsistent = true;
                 } else {
                     // The descriptor and the path describing the same file is what
                     // makes the size/mtime pair -- and so the ETag -- describe the
                     // bytes this descriptor will actually serve.
-                    capturedConsistent = attributes.size() == capturedSize;
+                    capturedConsistent = statedSize == capturedSize;
                 }
             } catch (Exception ignored) {
                 // stat() reports the failure; there is nothing to do here.
-            }
-            long capturedIdentity = 0;
-            try {
-                Object ino = Files.getAttribute(path, "unix:ino");
-                if(ino instanceof Number) {
-                    capturedIdentity = ((Number)ino).longValue();
-                }
-            } catch (Exception unsupported) {
-                // Not a Unix filesystem view; the file key's hash is the next best
-                // identity available and is derived from the same device and inode
-                // where there is one.
-                capturedIdentity = capturedKey == null ? 0 : capturedKey.hashCode();
             }
             this.identity = capturedIdentity;
             this.size = capturedSize;
