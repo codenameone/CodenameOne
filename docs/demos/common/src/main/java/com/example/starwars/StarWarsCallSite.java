@@ -13,13 +13,16 @@ class StarWarsCallSite {
         StarWarsApi api = StarWarsApi.of("https://swapi.example.com/graphql");
 
         api.heroName(Episode.EMPIRE, bearerToken, response -> {
-            // A GraphQL response can carry data and errors at once, so isOk()
-            // reports whether the errors array came back empty rather than
-            // whether there is anything in getData().
-            if (response.isOk()) {
-                ToastBar.showInfoMessage(response.getData().hero().name());
-            } else {
+            // isOk() reports that the errors array came back empty, which is
+            // not the same as the query having found anything: the schema
+            // declares hero as Character, not Character!, so a successful
+            // response can still carry a null selection.
+            if (!response.isOk()) {
                 ToastBar.showErrorMessage(response.getResponseErrorMessage());
+            } else if (response.getData() == null || response.getData().hero() == null) {
+                ToastBar.showInfoMessage("No hero for that episode");
+            } else {
+                ToastBar.showInfoMessage(response.getData().hero().name());
             }
         });
     }
@@ -33,7 +36,16 @@ class StarWarsCallSite {
                 new GraphQLSubscription.Handler<OnReviewData>() {
             @Override
             public void onNext(GraphQLResponse<OnReviewData> response) {
-                ToastBar.showInfoMessage(response.getData().reviewAdded().stars() + " stars");
+                // onError is for the end of the stream. A per-field failure
+                // arrives here instead, as a next payload whose errors array
+                // is non-empty and whose data may be partial or absent.
+                if (response.hasErrors()) {
+                    ToastBar.showErrorMessage(response.getResponseErrorMessage());
+                }
+                OnReviewData data = response.getData();
+                if (data != null && data.reviewAdded() != null) {
+                    ToastBar.showInfoMessage(data.reviewAdded().stars() + " stars");
+                }
             }
 
             @Override

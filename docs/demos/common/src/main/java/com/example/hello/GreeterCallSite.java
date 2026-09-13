@@ -13,8 +13,10 @@ class GreeterCallSite {
         HelloRequest request = new HelloRequest("Ada", Arrays.asList("ada", "countess"), Mood.HAPPY);
 
         greeter.sayHello(request, bearerToken, response -> {
-            if (response.isOk()) {
+            if (response.isOk() && response.getResponseData() != null) {
                 ToastBar.showInfoMessage(response.getResponseData().message());
+            } else if (response.isOk()) {
+                ToastBar.showErrorMessage("The server returned an empty reply");
             } else {
                 // getResponseCode() is the gRPC status, not the HTTP one --
                 // a gRPC-Web call can carry a failure under HTTP 200.

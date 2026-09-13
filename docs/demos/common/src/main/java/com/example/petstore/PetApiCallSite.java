@@ -12,11 +12,14 @@ class PetApiCallSite {
         PetApi api = PetApi.of("https://petstore3.swagger.io/api/v3");
 
         api.getPetById(10L, bearerToken, response -> {
-            if (response.getResponseCode() == 200) {
-                Pet pet = response.getResponseData();
-                ToastBar.showInfoMessage(pet.name());
-            } else {
+            Pet pet = response.getResponseData();
+            if (response.getResponseCode() != 200) {
                 ToastBar.showErrorMessage(response.getResponseErrorMessage());
+            } else if (pet == null) {
+                // A 2xx with an empty or unmappable body leaves this null.
+                ToastBar.showErrorMessage("The server returned no pet");
+            } else {
+                ToastBar.showInfoMessage(pet.name());
             }
         });
     }
