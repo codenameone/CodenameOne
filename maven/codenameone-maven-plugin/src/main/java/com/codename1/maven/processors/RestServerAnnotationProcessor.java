@@ -252,6 +252,32 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             // A typo bound null, or 0 for a primitive, and the route still matched --
             // so the handler ran with the wrong identifier and nothing said so.
             String[] template = splitTemplate(op.pathTemplate);
+            // A NON-ASCII ROUTE IS REFUSED, not quietly generated. The dispatcher
+            // compares against a target that arrived as OCTETS, one char per byte,
+            // so "/caf\u00e9" in source is three characters where the request has
+            // four -- it could never match, and nothing said so: the route simply
+            // never ran.
+            //
+            // A review asked for the literal to be encoded to UTF-8 octets so that
+            // it would. That fixes one spelling and leaves the other: canonical()
+            // resolves percent-encoding only for unreserved ASCII, so "/caf%C3%A9"
+            // -- which is what a browser sends, and what the generated CLIENT half
+            // of this same contract would produce -- still would not match the
+            // octets. The two halves of one contract disagreeing about its own
+            // route is the defect this file exists to prevent, so the route is
+            // refused at build time instead, where a person can see it.
+            //
+            // It is also the rule the @RestController generator already applies,
+            // in byteArrayLiteral, for the same reason and in the same words.
+            int nonAscii = firstNonAscii(op.pathTemplate);
+            if (nonAscii >= 0) {
+                ctx.error(cls, api.binaryName + "." + op.name + " declares the route "
+                        + op.pathTemplate + ", which holds a non-ASCII character at "
+                        + "index " + nonAscii + ". A request target arrives as bytes, "
+                        + "so such a route matches neither the raw spelling nor the "
+                        + "percent-encoded one; percent-encode it in the annotation");
+                anyError = true;
+            }
             for (int pi = 0; pi < op.params.size(); pi++) {
                 Param p = op.params.get(pi);
                 if ("path".equals(p.bindKind) && placeholderIndex(template, p.bindName) < 0) {
@@ -1967,6 +1993,16 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        }\n");
         sb.append("        return out;\n");
         sb.append("    }\n");
+    }
+
+    /** Where a path template stops being ASCII, or -1. See the caller. */
+    private static int firstNonAscii(String template) {
+        for (int i = 0; i < template.length(); i++) {
+            if (template.charAt(i) > 0x7f) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static String[] splitTemplate(String template) {

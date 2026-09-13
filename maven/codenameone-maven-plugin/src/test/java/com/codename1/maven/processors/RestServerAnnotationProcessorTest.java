@@ -353,6 +353,52 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void aNonAsciiRouteIsRefusedRatherThanGeneratedUnreachable() throws Exception {
+        // The dispatcher compares against a target that arrived as OCTETS, one
+        // char per byte, so a literal written in source as one char is a different
+        // string from the request's two -- the route could never match and nothing
+        // said so. Encoding the literal to UTF-8 octets instead would fix the raw
+        // spelling and leave "/caf%C3%A9", which is what a browser sends and what
+        // the generated client half produces, so the contract would still
+        // disagree with itself. The @RestController generator already refuses
+        // these; this is the same rule on the other half.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.CafeApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface CafeApi {\n"
+                + "    @GET(\"/caf\\u00e9\")\n"
+                + "    void get(OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertTrue("a route that cannot match must be refused: " + ctx.getErrors(),
+                String.valueOf(ctx.getErrors()).indexOf("non-ASCII character") >= 0);
+    }
+
+    @Test
+    public void anAsciiRouteIsStillGenerated() throws Exception {
+        // The control: the refusal must be about the character, not about routes.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.PlainApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface PlainApi {\n"
+                + "    @GET(\"/cafe\")\n"
+                + "    void get(OnComplete<Response<String>> callback);\n"
+                + "}\n");
+        File classes = compileSources(sources);
+        ProcessorContext ctx = runProcessor(classes);
+        assertNoErrors(ctx);
+    }
+
+    @Test
     public void anEncodedLiteralInTheTemplateIsStillRouted() throws Exception {
         // dispatch() canonicalises the target it is handed -- a percent-encoded
         // UNRESERVED octet is resolved -- so /status%7E and /status~ are one
