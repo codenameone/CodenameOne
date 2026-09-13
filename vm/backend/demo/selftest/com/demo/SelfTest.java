@@ -2478,6 +2478,64 @@ public class SelfTest {
     }
 
     /**
+     * A peer that never stops sending is refused rather than held.
+     *
+     * <p>The reader runs to EOF, so an endpoint that streams without closing grew
+     * a buffer until the heap was gone -- and the failure lands on the whole
+     * process rather than on the request that caused it. The endpoint does not
+     * have to be hostile; a misconfigured one is enough. The sibling client
+     * already bounded this, so the two now answer alike.
+     */
+    private static void anEndlessResponseIsRefused() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        final boolean[] stop = new boolean[1];
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    byte[] request = new byte[4096];
+                    ServerSocket.read(client, request, 0, request.length);
+                    byte[] head = ("HTTP/1.1 200 OK\r\n"
+                            + "Content-Type: text/plain\r\n\r\n").getBytes("UTF-8");
+                    ServerSocket.write(client, head, 0, head.length);
+                    // AND THEN IT NEVER STOPS. No length, no close: exactly the
+                    // shape that has nothing to judge until EOF arrives.
+                    byte[] filler = new byte[64 * 1024];
+                    while(!stop[0]) {
+                        ServerSocket.write(client, filler, 0, filler.length);
+                    }
+                } catch (Exception ignored) {
+                    // The client refusing is what ends this write loop.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Http.request("127.0.0.1", port, "GET", "/x", null);
+            outcome = "read it all";
+        } catch (java.io.IOException refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("this client will read") >= 0 ? "refused"
+                    : "refused for another reason: " + message;
+        } finally {
+            stop[0] = true;
+            listener.close();
+        }
+        stub.join(10000);
+        check("a response that never ends is refused", "refused", outcome);
+    }
+
+    /**
      * A response that declares its length twice, differently, is refused.
      *
      * <p>The first Content-Length was taken and the rest ignored, so the framing
@@ -4278,6 +4336,7 @@ public class SelfTest {
         aTruncatingBindAddressBindsNothing();
         aClosedSocketWakesItsBlockedReader();
         aRemoteCredentialEndpointMustBeEncrypted();
+        anEndlessResponseIsRefused();
         aContradictoryLengthIsRefused();
         aChunkedResponseEndsWhereItsFramingSays();
         aResponseEndsAtItsDeclaredLength();

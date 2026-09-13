@@ -138,6 +138,29 @@ public final class Http {
         }
     }
 
+    /**
+     * How much of one response this client will hold, head and body together.
+     *
+     * <p>Mirrors CN1_WEB_MAX_RESPONSE_MB on the other client, including its
+     * default of 64, so the two agree about what is too much to read.
+     */
+    private static final long MAX_RESPONSE_BYTES =
+            (long)envMegabytes("CN1_HTTP_MAX_RESPONSE_MB", 64) * 1024L * 1024L;
+
+    /** 1..2047 MB, as the other client's reader bounds the same setting. */
+    private static int envMegabytes(String name, int fallback) {
+        String value = System.getenv(name);
+        if(value == null || value.length() == 0) {
+            return fallback;
+        }
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return parsed >= 1 && parsed <= 2047 ? parsed : fallback;
+        } catch (NumberFormatException err) {
+            return fallback;
+        }
+    }
+
     private static Response readResponse(Tcp socket, String verb) throws IOException {
         // "Connection: close" is requested above, so the whole response can be read
         // to end-of-stream and parsed in memory. That keeps the parser free of the
@@ -149,6 +172,24 @@ public final class Http {
             int n = socket.read(chunk, 0, chunk.length);
             if(n <= 0) {
                 break;
+            }
+            // BOUNDED WHILE IT IS READ, not judged once it is over. This reads to
+            // EOF, so a peer that never stops sending is a peer this process grows
+            // a buffer for until the heap is gone -- and nothing about the framing
+            // is even looked at until the connection closes. The endpoint does not
+            // have to be hostile to do it; a misconfigured one that streams is
+            // enough, and the failure lands on the whole process rather than on
+            // the request that caused it.
+            //
+            // The sibling client already had this: libcurl's write callback stops
+            // the transfer past CN1_WEB_MAX_RESPONSE_MB, default 64. This is the
+            // same bound with the name its own family uses, so the two clients
+            // answer alike.
+            if(raw.size() + n > MAX_RESPONSE_BYTES) {
+                throw new IOException("The response passed the "
+                        + (MAX_RESPONSE_BYTES / (1024 * 1024)) + " MB this client "
+                        + "will read; set CN1_HTTP_MAX_RESPONSE_MB higher if the "
+                        + "endpoint really answers that much");
             }
             raw.write(chunk, 0, n);
         }
