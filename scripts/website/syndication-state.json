@@ -2065,6 +2065,10 @@
         "id": 4639932,
         "url": "https://dev.to/codenameone/a-dialog-can-now-be-a-native-desktop-window-1jgk",
         "syndicated_at": "2026-09-12T16:17:44+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/a-dialog-can-now-be-a-native-desktop-window-ee68e1279c53?postPublishedType=initial",
+        "syndicated_at": "2026-09-13T15:00:50+00:00"
       }
     },
     "native-appkit-mac-port": {
