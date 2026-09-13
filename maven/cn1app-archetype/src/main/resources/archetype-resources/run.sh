@@ -1,4 +1,5 @@
 #!/bin/bash
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit 1
 MVNW="./mvnw"
 
 function simulator {
@@ -38,6 +39,7 @@ function help {
 CMD=$1
 
 if [ "$CMD" == "" ]; then
+  echo "Starting the LOCAL simulator. To submit a cloud build, run ./build.sh javascript_cloud."
   CMD="simulator"
 fi
 "$CMD"
