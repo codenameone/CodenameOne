@@ -173,6 +173,21 @@ public class PetServer {
                     }
                     return new HttpServer.Response(200, "text/plain", payload);
                 }
+                // Says whether a named request header REACHED THE HANDLER, as a
+                // status a client that reads no body can still see. An HTTP/2
+                // request may end with a trailer section, and a field that arrives
+                // there must not become a request header: a proxy that
+                // authenticates by setting one in the initial block, and stripping
+                // whatever the client sent, is defeated if the client can put the
+                // same name after the body instead. The HTTP/1.1 path discards its
+                // trailer section, so this is how the two are shown to agree.
+                if("/headerprobe".equals(stripQuery(target))) {
+                    String name = request.queryParam("name");
+                    String seen = name == null ? null : request.getHeader(name);
+                    return new HttpServer.Response(seen == null ? 200 : 409,
+                            "text/plain",
+                            (seen == null ? "absent" : "present:" + seen).getBytes("UTF-8"));
+                }
                 if("/reset".equals(stripQuery(target))) {
                     return new HttpServer.Response(205, "text/plain",
                             "junk".getBytes("UTF-8"));

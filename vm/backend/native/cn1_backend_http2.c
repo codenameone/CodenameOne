@@ -451,6 +451,17 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
     if(frame->hd.type != NGHTTP2_HEADERS) {
         return 0;
     }
+    /* THE INITIAL BLOCK ONLY. A request may end with a trailer section, and
+       appending those fields here put them in the same array Request.getHeader
+       reads -- so a client could place "x-authenticated-user" (or anything else a
+       proxy in front of this server sets and strips in the INITIAL block) after
+       the body and have the handler read it as though it had arrived with the
+       request. The HTTP/1.1 path consumes its trailer section and discards it;
+       this is the same answer on the other protocol, and the two must agree about
+       what a header is. */
+    if(frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
+        return 0;
+    }
     r = cn1H2FindOpen(s, frame->hd.stream_id);
     if(r == NULL) {
         return 0;
@@ -741,6 +752,40 @@ static int cn1H2ResolveExpect(CN1H2Session* s, CN1H2Request* r, int bodyToCome) 
     }
     if(found == 0) {
         return 0;
+    }
+    /* BEFORE THE INVITATION. 100-continue exists so a client can find out before
+       it uploads, and cn1H2OnData resets the stream the moment the body crosses
+       CN1_H2_MAX_BODY_BYTES -- so answering "go ahead" to a declared length
+       already past it makes the client send megabytes to have them refused. The
+       HTTP/1.1 path checks its own limit before answering the expectation; this
+       is that check on the other protocol. */
+    if(satisfiable != 0 && bodyToCome != 0) {
+        for(iter = 0 ; iter < r->headerCount ; iter++) {
+            if(r->headers[iter].name == NULL
+                    || strcmp(r->headers[iter].name, "content-length") != 0
+                    || r->headers[iter].value == NULL) {
+                continue;
+            }
+            {
+                char* end = NULL;
+                long long declared = strtoll(r->headers[iter].value, &end, 10);
+                /* Only a length this server can read is judged here. A malformed
+                   one is nghttp2's to refuse, and an unreadable value must not be
+                   turned into a refusal of its own by this loop. */
+                if(end != NULL && *end == '\0' && declared > CN1_H2_MAX_BODY_BYTES) {
+                    nghttp2_nv tooLarge[1];
+                    tooLarge[0].name = (uint8_t*)":status";
+                    tooLarge[0].namelen = 7;
+                    tooLarge[0].value = (uint8_t*)"413";
+                    tooLarge[0].valuelen = 3;
+                    tooLarge[0].flags = NGHTTP2_NV_FLAG_NONE;
+                    nghttp2_submit_response(s->session, r->streamId, tooLarge, 1, NULL);
+                    cn1H2Unlink(&s->open, r);
+                    cn1H2FreeRequest(r);
+                    return 1;
+                }
+            }
+        }
     }
     if(satisfiable == 0) {
         /* 417, now. Per-stream rather than closing the connection, which is the

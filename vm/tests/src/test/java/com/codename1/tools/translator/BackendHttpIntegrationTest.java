@@ -2137,6 +2137,47 @@ class BackendHttpIntegrationTest {
     }
 
     @Test
+    @DisplayName("an HTTP/2 body past the limit is refused instead of invited")
+    void http2RefusesAnOversizedBodyBeforeInvitingIt() throws Exception {
+        // 100-continue exists so a client finds out BEFORE it uploads, and the h2
+        // reader resets the stream the moment a body crosses the ceiling -- so
+        // answering "go ahead" to a declared length already past it makes the
+        // client send megabytes to have them thrown away. The HTTP/1.1 path
+        // checks its limit before answering the expectation; this is that check
+        // on the other protocol.
+        List<Integer> refused = h2Expect(port, "/echo", "100-continue", null, "999999999");
+        assertTrue(refused.contains(413),
+                "a body past the ceiling must be refused outright: " + refused);
+        assertTrue(!refused.contains(100),
+                "and must not be invited first: " + refused);
+        // The control: a length the server CAN take is still invited, so this
+        // cannot pass by refusing every expectation.
+        List<Integer> invited = h2Expect(port, "/echo", "100-continue", null, "5");
+        assertTrue(invited.contains(100),
+                "a body within the ceiling is still invited: " + invited);
+    }
+
+    @Test
+    @DisplayName("an HTTP/2 trailer is not a request header")
+    void http2TrailersAreNotRequestHeaders() throws Exception {
+        // A request may end with a trailer section, and those fields were being
+        // appended to the same array Request.getHeader reads. A proxy that
+        // authenticates by setting a header in the INITIAL block -- stripping
+        // whatever the client sent -- is then defeated by a client that puts the
+        // same name after the body instead, and the handler cannot tell the two
+        // apart. The HTTP/1.1 path consumes its trailer section and discards it.
+        //
+        // /headerprobe answers 409 when the handler saw the field and 200 when it
+        // did not, so the verdict survives a client that reads only statuses.
+        assertEquals(409, h2HeaderProbe(port, "x-injected", "yes", false),
+                "the control: the same field in the initial block IS a header, so "
+                        + "a 200 below would prove nothing");
+        assertEquals(200, h2HeaderProbe(port, "x-injected", "yes", true),
+                "a field that arrived in the trailer section must not reach the "
+                        + "handler as a request header");
+    }
+
+    @Test
     @DisplayName("a large h2 body survives the bounded output buffer")
     void http2DeliversABodyLargerThanTheOutputBuffer() throws Exception {
         // The serialisation buffer is capped, and the send callback answers
@@ -2497,12 +2538,91 @@ class BackendHttpIntegrationTest {
      * never sent when no 100 arrives, so a server that ignores the field ends
      * this at the read timeout with nothing in the list rather than passing.
      */
+    /**
+     * Sends one request whose named field arrives either in the initial header
+     * block or in a TRAILER section after the body, and answers what
+     * /headerprobe made of it: 200 when the handler did not see the field, 409
+     * when it did.
+     */
+    private int h2HeaderProbe(int onPort, String name, String value, boolean inTrailer)
+            throws Exception {
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
+        socket.setSoTimeout(20000);
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "POST");
+            hpackLiteral(block, ":path", "/headerprobe?name=" + name);
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            if (!inTrailer) {
+                hpackLiteral(block, name, value);
+            }
+            // END_HEADERS only: the body and, in the trailer case, the field come
+            // after it.
+            out.write(frame(1, 0x04, 1, block.toByteArray()));
+            out.write(frame(0, 0x00, 1, "hello".getBytes(StandardCharsets.UTF_8)));
+            if (inTrailer) {
+                ByteArrayOutputStream trailer = new ByteArrayOutputStream();
+                hpackLiteral(trailer, name, value);
+                // END_HEADERS | END_STREAM: a trailer section is what ends the
+                // message here.
+                out.write(frame(1, 0x05, 1, trailer.toByteArray()));
+            } else {
+                out.write(frame(0, 0x01, 1, new byte[0]));
+            }
+            out.flush();
+            long deadline = System.currentTimeMillis() + 20000;
+            InputStream in = socket.getInputStream();
+            int status = -1;
+            boolean done = false;
+            while (System.currentTimeMillis() < deadline && !done) {
+                byte[] header = readExactly(in, 9);
+                if (header == null) {
+                    break;
+                }
+                int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8)
+                        | (header[2] & 0xff);
+                int type = header[3] & 0xff;
+                int flags = header[4] & 0xff;
+                byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                if (payload == null) {
+                    break;
+                }
+                if (type == 1 && payload.length > 0) {
+                    status = hpackStatus(payload);
+                    done = (flags & 0x01) != 0;
+                } else if (type == 0) {
+                    done = (flags & 0x01) != 0;
+                } else if (type == 7) {
+                    fail("the server sent GOAWAY: "
+                            + new String(payload, StandardCharsets.UTF_8));
+                }
+            }
+            return status;
+        } finally {
+            socket.close();
+        }
+    }
+
     private List<Integer> h2Expect(int onPort, String path, String expect) throws Exception {
         return h2Expect(onPort, path, expect, null);
     }
 
     private List<Integer> h2Expect(int onPort, String path, String expect, String second)
             throws Exception {
+        return h2Expect(onPort, path, expect, second, null);
+    }
+
+    /**
+     * @param declaredLength a content-length to send with the expectation, or
+     *                       null to send none
+     */
+    private List<Integer> h2Expect(int onPort, String path, String expect, String second,
+                                   String declaredLength) throws Exception {
         List<Integer> statuses = new java.util.ArrayList<Integer>();
         Socket socket = new Socket();
         socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
@@ -2524,6 +2644,9 @@ class BackendHttpIntegrationTest {
             hpackLiteral(block, ":scheme", "http");
             hpackLiteral(block, ":authority", "127.0.0.1");
             hpackLiteral(block, "expect", expect);
+            if (declaredLength != null) {
+                hpackLiteral(block, "content-length", declaredLength);
+            }
             if (second != null) {
                 // A list field split across field lines, which RFC 9110 5.3 says
                 // is the same field value as the comma form.
