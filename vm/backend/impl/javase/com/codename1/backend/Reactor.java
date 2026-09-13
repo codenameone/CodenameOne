@@ -191,6 +191,16 @@ public final class Reactor {
             }
             SelectableChannel selectable = (SelectableChannel)channel;
             try {
+                // NON-BLOCKING FIRST, because register() refuses a blocking
+                // channel -- IllegalBlockingModeException -- and the catch below
+                // would then drop the registration silently: add() would appear to
+                // work and await() would never report the descriptor. poll() and
+                // kevent on the translated arms do not care what mode a descriptor
+                // is in, so a caller doing exactly what the API documents got an
+                // answer on the device and silence here. Selecting on a channel is
+                // what this class is for, so the mode it requires is this class's
+                // to set.
+                selectable.configureBlocking(false);
                 SelectionKey key = selectable.register(selector,
                         toOps(entry[1], selectable), Integer.valueOf(entry[0]));
                 keys.put(Integer.valueOf(entry[0]), key);

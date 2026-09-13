@@ -36,9 +36,13 @@ import java.nio.file.attribute.BasicFileAttributes;
 /**
  * Java SE twin of FileIo.
  *
- * FileChannel.transferTo IS sendfile on Linux and macOS, so the zero-copy path is
- * not lost here -- the JDK makes the same system call. The shared StaticFiles
- * logic above is untouched.
+ * This arm does NOT splice. It once did -- FileChannel.transferTo is sendfile on
+ * Linux and macOS, and this comment used to say so -- but sendFile here reads
+ * into a ByteBuffer and writes it out, so hasSendFile answers false and the
+ * shared StaticFiles logic takes its copying path, which owns one reusable
+ * buffer instead of allocating per call. The simulator serving a large file
+ * through a copy is the right trade; telling the shared code it was a kernel
+ * splice was not.
  */
 public final class FileIo {
     private FileIo() {
@@ -251,9 +255,14 @@ public final class FileIo {
     }
 
     public static boolean hasSendFile() {
-        // Still true: the caller's loop is the same either way, and this arm's
-        // implementation copies rather than splicing. See sendFile for why.
-        return true;
+        // FALSE, because it is false. This arm allocates a ByteBuffer per call
+        // and copies at most 64 KiB through it, so answering true sent
+        // StaticFiles down its sendfile branch: a large file then made roughly
+        // its own size in short-lived arrays instead of using copyBody's one
+        // reusable buffer, and isZeroCopy() told callers the kernel was splicing
+        // when nothing was. The answer was true when this arm used transferTo,
+        // and was left behind when that went.
+        return false;
     }
 
     public static int read(int fd, byte[] buffer, int offset, int length) {

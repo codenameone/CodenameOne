@@ -2738,6 +2738,83 @@ public class SelfTest {
     }
 
     /**
+     * A transfer coding overrides a length that came with it.
+     *
+     * <p>RFC 9112 6.1: when a message carries both, the coding wins and a
+     * response's Content-Length is ignored -- it describes the decoded body at
+     * best, and at worst it is the smuggling attempt the rule exists for.
+     * Applying it to the raw chunk framing measured the wrong bytes entirely: a
+     * declared 5 cut the wire form to five bytes and the decoder then called a
+     * complete response truncated.
+     */
+    private static void aTransferCodingOverridesTheLength() throws Exception {
+        check("a chunked response with a Content-Length is read by its coding",
+                "hello", codedReply("Content-Length: 5"));
+        // Even a length that contradicts the framing outright is ignored rather
+        // than believed, which is the half that would otherwise truncate.
+        check("and a contradictory one is still ignored", "hello",
+                codedReply("Content-Length: 99"));
+    }
+
+    /** Serves a chunked body that also declares a length. */
+    private static String codedReply(final String lengthField) throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    byte[] request = new byte[4096];
+                    ServerSocket.read(client, request, 0, request.length);
+                    byte[] reply = ("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n"
+                            + lengthField + "\r\n\r\n"
+                            + "5\r\nhello\r\n0\r\n\r\n").getBytes("UTF-8");
+                    ServerSocket.write(client, reply, 0, reply.length);
+                } catch (Exception ignored) {
+                    // The verdict below is what this check reports.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            outcome = Http.request("127.0.0.1", port, "GET", "/x", null).getBodyAsString();
+        } catch (Exception err) {
+            outcome = "failed: " + err.getMessage();
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        return outcome;
+    }
+
+    /**
+     * The static handler says whether it really splices, not whether it wishes
+     * it did.
+     *
+     * <p>The Java SE arm reads into a ByteBuffer and writes it out; it answered
+     * "yes" from when it used transferTo, so the shared code took its sendfile
+     * branch and a large file made roughly its own size in short-lived arrays
+     * instead of using the one reusable buffer -- and isZeroCopy() told callers
+     * the kernel was doing the work.
+     */
+    private static void zeroCopyIsClaimedOnlyWhereItHappens() throws Exception {
+        // The translated arm has sendfile(); the simulator does not. Whichever is
+        // running, the claim has to match it.
+        String expected = VirtualThread.supported() ? "true" : "false";
+        check("zero copy is claimed only where it happens", expected,
+                String.valueOf(StaticFiles.isZeroCopy()));
+    }
+
+    /**
      * A chunked response ends where its framing says, trailers included.
      *
      * <p>RFC 9112 7.1 ends the body with the last chunk, then the trailer
@@ -4473,6 +4550,8 @@ public class SelfTest {
         aRemoteCredentialEndpointMustBeEncrypted();
         anEndlessResponseIsRefused();
         aContradictoryLengthIsRefused();
+        aTransferCodingOverridesTheLength();
+        zeroCopyIsClaimedOnlyWhereItHappens();
         aChunkedResponseEndsWhereItsFramingSays();
         aResponseEndsAtItsDeclaredLength();
         aTruncatingPathOpensNothing();

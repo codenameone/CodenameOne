@@ -255,7 +255,20 @@ public final class Http {
         // Comparing that against the zero bytes it correctly sent reported every
         // such response as a truncated one, so this client could not make a HEAD
         // request against a conforming server at all.
-        int declared = carriesBody(verb, status) ? declaredLength(names, values) : -1;
+        // TRANSFER-ENCODING WINS. RFC 9112 6.1: when a message carries both, the
+        // transfer coding overrides the length, and a RECIPIENT of a response
+        // ignores the Content-Length -- it describes the decoded body at best,
+        // and at worst it is the smuggling attempt that rule exists for. Applying
+        // it to the raw chunk framing measured the wrong thing entirely: a
+        // declared 5 cut "5\r\nhello\r\n0\r\n\r\n" to five wire bytes, and the
+        // decoder then called a complete response truncated.
+        //
+        // The server's REQUEST reader refuses both together instead, which is the
+        // other half of the same rule: a request that frames itself twice is
+        // refused, a response that does is read by its coding.
+        boolean coded = joinedHeader(names, values, "Transfer-Encoding") != null;
+        int declared = carriesBody(verb, status) && !coded
+                ? declaredLength(names, values) : -1;
         if(declared >= 0 && bodyBytes.length < declared) {
             throw new IOException("The response body stopped after " + bodyBytes.length
                     + " of the " + declared + " byte(s) its Content-Length declared, so "
