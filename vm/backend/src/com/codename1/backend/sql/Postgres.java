@@ -106,6 +106,9 @@ public final class Postgres {
      */
     public static Postgres connect(String host, int port, String database, String user,
             String password, String sslMode, String caFile, int timeoutMillis) throws IOException {
+        // BEFORE THE SOCKET: a mode this code does not implement is a typo, and
+        // reading it as prefer is how "require" spelled wrong accepts plaintext.
+        SqlLimits.requireSslMode(sslMode);
         Tcp connection = Tcp.connect(host, port <= 0 ? 5432 : port, timeoutMillis);
         try {
             Wire wire = new Wire(connection);

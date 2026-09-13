@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.sql;
 
+import java.io.IOException;
+
 /**
  * The ceiling on one message from a database server, shared by both wire
  * protocols because the hazard is identical.
@@ -64,5 +66,32 @@ final class SqlLimits {
             }
         }
         return mb * 1024L * 1024L;
+    }
+
+    /**
+     * Refuses an sslmode this code does not implement.
+     *
+     * <p>FAILING CLOSED. Both engines compare the mode against "disable" and
+     * "require" and treat everything else as "prefer", so "Require",
+     * "required" or a plain typo asked for TLS and accepted plaintext if the
+     * server declined -- the one outcome the person who wrote the word was
+     * trying to prevent, reached by spelling it slightly wrong. A mode nobody
+     * implements is a configuration error, and it is worth more as a refused
+     * connection than as a quiet downgrade.
+     *
+     * <p>Null is the default and stays it: both entry points document the
+     * absent mode as "prefer", and a URL without the parameter is the ordinary
+     * case rather than a mistake.
+     */
+    static void requireSslMode(String sslMode) throws IOException {
+        if(sslMode == null) {
+            return;
+        }
+        if(!"require".equals(sslMode) && !"prefer".equals(sslMode)
+                && !"disable".equals(sslMode)) {
+            throw new IOException("sslmode=" + sslMode + " is not one this runtime "
+                    + "implements: use require, prefer or disable. It is refused "
+                    + "rather than read as prefer, which would accept plaintext");
+        }
     }
 }

@@ -1973,6 +1973,51 @@ public class SelfTest {
      * the new one end in an exception out of Database.open, so a check that only
      * caught something would have passed before the fix.
      */
+    /**
+     * An sslmode nobody implements is refused, not read as "prefer".
+     *
+     * <p>Both engines compared the mode against "disable" and "require" and took
+     * everything else as prefer, so "Require" or "required" asked for TLS and
+     * accepted plaintext when the server declined -- the one outcome the word was
+     * written to prevent, reached by spelling it slightly wrong.
+     */
+    private static void anUnknownSslModeIsRefused() throws Exception {
+        String[] typos = new String[] { "Require", "required", "requrie", "verify-full" };
+        for(int iter = 0 ; iter < typos.length ; iter++) {
+            check("sslmode=" + typos[iter] + " is refused", "refused",
+                    sslModeRefused(typos[iter]));
+        }
+        // THE THREE THIS RUNTIME IMPLEMENTS still open a connection -- there is
+        // nothing listening on port 1, so a connection failure is what "accepted"
+        // looks like here, and it is what says the refusals are about the mode.
+        String[] known = new String[] { "require", "prefer", "disable" };
+        for(int iter = 0 ; iter < known.length ; iter++) {
+            check("sslmode=" + known[iter] + " is accepted", "accepted",
+                    sslModeRefused(known[iter]));
+        }
+    }
+
+    /**
+     * Whether the ENGINE refuses the mode before it opens a socket.
+     *
+     * <p>Through Postgres.connect rather than Database.open: the URL parser has
+     * always refused an unknown sslmode, so the hole was only ever reachable by a
+     * caller of the public engine API -- which is a supported way in, and the one
+     * a pool or a framework would use. Testing the URL would have passed without
+     * the fix and said nothing.
+     */
+    private static String sslModeRefused(String mode) {
+        try {
+            com.codename1.backend.sql.Postgres.connect("127.0.0.1", 1, "db", "u", "pw",
+                    mode, null, 1000).close();
+            return "accepted";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            return message.indexOf("not one this runtime implements") >= 0
+                    ? "refused" : "accepted";
+        }
+    }
+
     private static void aTruncatedMySqlHeaderIsRefused() throws Exception {
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
@@ -2571,6 +2616,7 @@ public class SelfTest {
         storedTextComesBackUnchanged();
         scramIterationCountIsBounded();
         aTruncatedMySqlHeaderIsRefused();
+        anUnknownSslModeIsRefused();
         truncatedRowFramesAreRefused();
         aDeadSessionReportsItselfClosed();
         aSchemeIsRecognisedInAnyCase();

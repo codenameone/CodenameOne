@@ -86,6 +86,8 @@ public final class MySql {
      */
     public static MySql connect(String host, int port, String database, String user,
             String password, String sslMode, String caFile, int timeoutMillis) throws IOException {
+        // BEFORE THE SOCKET, for the reason Postgres gives one engine over.
+        SqlLimits.requireSslMode(sslMode);
         Tcp connection = Tcp.connect(host, port <= 0 ? 3306 : port, timeoutMillis);
         try {
             MySql session = new MySql(new Wire(connection));
