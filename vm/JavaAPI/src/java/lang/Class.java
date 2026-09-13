@@ -254,11 +254,17 @@ public final class Class<T> implements java.lang.reflect.Type {
             String root = end < 0 ? path.substring(from) : path.substring(from, end);
             if (root.length() > 0) {
                 java.io.File candidate = new java.io.File(root, relative);
-                if (candidate.exists()) {
+                // isFile(), not exists(): a DIRECTORY with the requested name exists
+                // and cannot be opened, and returning on that would abandon the
+                // search. Later roots still get their turn, which is the point of
+                // having a search path at all -- an earlier root holding an
+                // unusable candidate must not mask a usable one behind it.
+                if (candidate.isFile()) {
                     try {
                         return new java.io.FileInputStream(candidate);
                     } catch (java.io.IOException err) {
-                        return null;
+                        // Unreadable here does not mean absent everywhere: keep going.
+                        err = null;
                     }
                 }
             }

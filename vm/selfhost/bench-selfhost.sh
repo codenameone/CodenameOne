@@ -35,7 +35,19 @@ PARPAR="${CN1_SELFHOST_BIN:-$T/parpar-O3}"
 JAPI="$T/javaapi-classes"
 TR="$REPO/vm/ByteCodeTranslator/target/classes"
 ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"
-DEFAULT_JAVAS="/Users/shai/Library/Java/JavaVirtualMachines/azul-25/Contents/Home/bin/java,${JDK_8_HOME:-}/bin/java"
+# Reference JVMs, resolved rather than hard-coded. A developer-specific absolute
+# path here meant anyone else running the documented command died under `set -e`
+# while BUILDING the arm list, before a single measurement -- the benchmark was
+# runnable by one machine.
+#   SELFHOST_REF_JAVAS  explicit comma-separated list, wins outright
+#   JDK_25_HOME         a modern JDK to compare against
+#   java on PATH        whatever this shell would run
+cn1_first_java() {
+    for c in "${JDK_25_HOME:-}/bin/java" "$(command -v java 2>/dev/null || true)"; do
+        [ -n "$c" ] && [ -x "$c" ] && { echo "$c"; return; }
+    done
+}
+DEFAULT_JAVAS="$(cn1_first_java),${JDK_8_HOME:-}/bin/java"
 IFS=',' read -r -a REF_JAVAS <<< "${SELFHOST_REF_JAVAS:-$DEFAULT_JAVAS}"
 
 W="$T/bench"; rm -rf "$W"; mkdir -p "$W"
@@ -110,7 +122,15 @@ for i in "${!ARMS[@]}"; do
 done
 
 # --- memory, measured separately so the probe cannot perturb the clock ----------
-declare -a PEAKS
+#
+# Sampled in EVERY round and reduced with max, because the header promises the
+# maximum of N samples and a peak is a max. Measuring each arm once let a single
+# noisy run decide the reported ratio, which is the same mistake as quoting a
+# memory figure from one process: the number looked like a measurement and was a
+# sample.
+declare -a PEAKS PEAK_MAX
+for i in "${!ARMS[@]}"; do PEAK_MAX[$i]=0; done
+for round in $(seq 1 "$ROUNDS"); do
 for i in "${!ARMS[@]}"; do
     rm -rf "$W/run"; mkdir -p "$W/run"
     if [ "${ARMS[$i]}" = parpar ]; then
@@ -121,7 +141,15 @@ for i in "${!ARMS[@]}"; do
             clean "$JAPI;$CLASSES" "$W/run" "$APP" "$PKG" "$APP" 1.0 clean none 2>"$W/mem.txt" >/dev/null
     fi
     PEAKS[$i]=$(awk '/peak memory footprint/{print $1}' "$W/mem.txt")
-    printf "mem  %-8s peak %8.0f MB\n" "${NAMES[$i]}" "$(python3 -c "print(${PEAKS[$i]}/1048576.0)")"
+    printf "mem  %-8s round %d peak %8.0f MB\n" "${NAMES[$i]}" "$round" \
+        "$(python3 -c "print(${PEAKS[$i]}/1048576.0)")"
+    [ "${PEAKS[$i]}" -gt "${PEAK_MAX[$i]}" ] && PEAK_MAX[$i]="${PEAKS[$i]}"
+done
+done
+for i in "${!ARMS[@]}"; do
+    PEAKS[$i]="${PEAK_MAX[$i]}"
+    printf "mem  %-8s MAX over %d round(s) %8.0f MB\n" "${NAMES[$i]}" "$ROUNDS" \
+        "$(python3 -c "print(${PEAKS[$i]}/1048576.0)")"
 done
 
 echo

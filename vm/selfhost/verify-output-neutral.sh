@@ -19,6 +19,35 @@ J8="${JDK_8_HOME:?set JDK_8_HOME to a working JDK 8}"
 W="$REPO/vm/selfhost/target/neutral"
 OUT="$W/out"
 
+# Renumber label_L<n> by ORDER OF FIRST APPEARANCE within the file, rather than
+# erasing every label to one token. Erasing them makes a jump that was retargeted
+# from one existing label to another compare EQUAL -- which is precisely the
+# code-generation regression this comparison is for. Renumbering keeps the identity
+# relationships and still absorbs the switch from identity-hash names to sequential
+# ones.
+cn1_canon_labels() {
+    awk '{
+        line = $0
+        out = ""
+        # The label number leaks into DERIVED identifiers too -- catch_L<n>,
+        # restoreToL<n>, tryBlockOffsetL<n> -- so rewriting only label_L<n> left
+        # every try/catch-bearing file reporting as changed forever, which buries a
+        # real difference in permanent noise. All four spellings share one numbering.
+        while (match(line, /(label_L|catch_L|restoreToL|tryBlockOffsetL)[0-9]+/)) {
+            pre = substr(line, 1, RSTART - 1)
+            tok = substr(line, RSTART, RLENGTH)
+            line = substr(line, RSTART + RLENGTH)
+            # split the prefix from the number so both sides canonicalise together
+            nstart = match(tok, /[0-9]+$/)
+            kind = substr(tok, 1, nstart - 1)
+            num  = substr(tok, nstart)
+            if (!(num in seen)) { seen[num] = ++k }
+            out = out pre kind seen[num]
+        }
+        print out line
+    }' "$1"
+}
+
 case "${1:?usage: capture <tag> | compare <a> <b> | vs-master}" in
 vs-master)
     # Compare THIS branch's translator against MASTER's over one corpus.
@@ -58,22 +87,34 @@ vs-master)
     done
     # The C runtime is copied verbatim and this branch edits it on purpose, so it is
     # not part of the codegen question.
-    RUNTIME='^(cn1_globals\.[ch]|nativeMethods\.c|cn1_intrinsics\.h|java_io_File_runtime\.c|cn1-source-manifest\.txt)$'
+    RUNTIME='^(cn1_globals\\.[ch]|nativeMethods\\.c|cn1_intrinsics\\.h|java_io_File_runtime\\.c|cn1-source-manifest\\.txt)$'
+    # Walk the UNION of both trees, not master's listing. A file the branch emits and
+    # master does not would never be visited by a master-only loop, so a whole new
+    # generated class could appear and the gate would report neutral.
+    ( cd "$W/m-tree/dist/CmpApp-src" 2>/dev/null && ls ) > "$W/m.list" 2>/dev/null || : > "$W/m.list"
+    ( cd "$W/b-tree/dist/CmpApp-src" 2>/dev/null && ls ) > "$W/b.list" 2>/dev/null || : > "$W/b.list"
+    sort -u "$W/m.list" "$W/b.list" > "$W/all.list"
     n=0
-    for f in "$W/m-tree"/dist/CmpApp-src/*.c "$W/m-tree"/dist/CmpApp-src/*.h; do
-        [ -f "$f" ] || continue
-        base="$(basename "$f")"
+    while read -r base; do
+        [ -n "$base" ] || continue
         echo "$base" | grep -qE "$RUNTIME" && continue
-        other="$W/b-tree/dist/CmpApp-src/$base"
-        [ -f "$other" ] || { echo "ONLY IN MASTER: $base"; n=$((n+1)); continue; }
-        if ! diff -q <(sed -E 's/label_L[0-9]+/label_LX/g' "$f") \
-                     <(sed -E 's/label_L[0-9]+/label_LX/g' "$other") >/dev/null; then
+        case "$base" in *.c|*.h) ;; *) continue ;; esac
+        mf="$W/m-tree/dist/CmpApp-src/$base"; bf="$W/b-tree/dist/CmpApp-src/$base"
+        if [ ! -f "$mf" ]; then echo "  ONLY IN BRANCH: $base"; n=$((n+1)); continue; fi
+        if [ ! -f "$bf" ]; then echo "  ONLY IN MASTER: $base"; n=$((n+1)); continue; fi
+        if ! diff -q <(cn1_canon_labels "$mf") <(cn1_canon_labels "$bf") >/dev/null; then
             [ $n -lt 12 ] && echo "  differs: $base"
             n=$((n+1))
         fi
-    done
+    done < "$W/all.list"
     echo "VS-MASTER: $n generated file(s) differ beyond label naming"
-    [ "$n" = 0 ] || echo "Each one is a codegen change against master. Confirm every one is intended."
+    if [ "$n" != 0 ]; then
+        echo "Each one is a codegen change against master. Confirm every one is intended."
+        # Exit NONZERO. Printing a finding and returning 0 makes every caller read a
+        # real mismatch as a passing check, which is the failure mode this whole
+        # script exists to prevent.
+        exit 1
+    fi
     ;;
 capture)
     TAG="${2:?}"

@@ -38,8 +38,15 @@ TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
 needs_build=0
 if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ]; then
     needs_build=1
-elif [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" -name '*.java' -newer "$TRANSLATOR" -print -quit 2>/dev/null)" ]; then
-    echo "translator sources are newer than $TRANSLATOR -- rebuilding"
+elif [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" -type f -newer "$TRANSLATOR" -print -quit 2>/dev/null)" ]; then
+    # -type f, not -name '*.java'. The translator carries its C runtime as CLASSPATH
+    # RESOURCES -- cn1_globals.m, nativeMethods.m, java_io_File.m, cn1_win_compat.c,
+    # xmlvm.h and the rest -- and maven copies them into target/classes. Watching
+    # only Java sources meant editing any of those left the old copy in place, so
+    # the self-hosted binary embedded an obsolete runtime while the JVM side used
+    # the new one. That surfaces as a Gate A divergence pointing at the VM, which is
+    # exactly the misdiagnosis this guard exists to prevent.
+    echo "translator sources or resources are newer than $TRANSLATOR -- rebuilding"
     needs_build=1
 fi
 if [ "$needs_build" = 1 ]; then
@@ -55,9 +62,16 @@ fi
 ASM_CP="$(cat "$ASM_CP_FILE")"
 
 # 2. the C runtime the translator emits from its own classpath resources.
-for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h; do
-    cp "$REPO/vm/ByteCodeTranslator/src/$f" "$TRANSLATOR/$f"
-done
+#
+# Copy EVERY non-Java file maven would have staged, not a hand-listed four. The
+# list drifts: java_io_File.m, cn1_win_compat.c and xmlvm.h are all read through
+# the same classpath lookup, and a hand-written subset silently ships whichever
+# ones nobody remembered.
+( cd "$REPO/vm/ByteCodeTranslator/src" && find . -type f ! -name '*.java' -print ) \
+  | while read -r rel; do
+        mkdir -p "$TRANSLATOR/$(dirname "$rel")"
+        cp "$REPO/vm/ByteCodeTranslator/src/$rel" "$TRANSLATOR/$rel"
+    done
 
 # 3. JavaAPI, rebuilt from source whenever the source set changed.
 #
