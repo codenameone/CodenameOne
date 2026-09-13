@@ -105,6 +105,9 @@ public final class Tcp {
      * INSTEAD of the system trust store. See the translated twin for why.
      */
     public void startTls(String host, String caFile) throws IOException {
+        // The trust root is a file name that crosses to a native; see
+        // Urls.requireNoNul for what a NUL in it loads instead.
+        Urls.requireNoNul("An sslrootcert path", caFile);
         if(secure) {
             return;
         }

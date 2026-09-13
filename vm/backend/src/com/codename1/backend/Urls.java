@@ -164,4 +164,30 @@ final class Urls {
         }
         return query < 0 ? out : out + marker + "<redacted>";
     }
+
+    /**
+     * Refuses a path that carries a NUL.
+     *
+     * <p>THE SAME TRUNCATION AS THE URL AND THE HOST, in the third string this
+     * runtime hands to a native. stringToUTF8 keeps the zero byte and C stops
+     * there, so an sslrootcert of "/tmp/mine", a NUL, then "/etc/ssl/approved.pem"
+     * is a value that READS as the approved bundle and loads the other file:
+     * stat() and SSL_CTX_load_verify_locations() both see only the prefix, and
+     * the session then verifies against a trust root somebody else chose. A
+     * database URL can carry it as %00, which Url.decode turns into the NUL.
+     *
+     * <p>Narrower than the URL and host rules on purpose: a file name may
+     * legitimately hold a space, and on POSIX very nearly anything else. The NUL
+     * is the one byte no path can contain and the only one that truncates.
+     */
+    static void requireNoNul(String what, String value) throws IOException {
+        if(value == null) {
+            return;
+        }
+        if(value.indexOf('\u0000') >= 0) {
+            throw new IOException(what + " cannot hold a NUL: the native side reads "
+                    + "it as the end of the name, so the file opened would not be "
+                    + "the file named");
+        }
+    }
 }

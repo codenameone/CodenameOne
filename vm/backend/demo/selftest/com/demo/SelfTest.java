@@ -630,6 +630,38 @@ public class SelfTest {
      * server in this process sends its extra headers from a Map and so cannot
      * repeat a name.
      */
+    /**
+     * A CA path carrying a NUL is refused before OpenSSL sees it.
+     *
+     * <p>The third string this runtime hands to a native, after the URL and the
+     * host. stringToUTF8 keeps the zero byte and C stops there, so a value that
+     * READS as an approved bundle loads whatever sits before the NUL -- and the
+     * session then verifies against a trust root somebody else chose. A database
+     * URL can carry it as %00.
+     */
+    private static void aCaPathCannotBeTruncated() throws Exception {
+        ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        String outcome;
+        try {
+            // Connecting is enough -- the backlog accepts it -- because the check
+            // runs before any handshake does.
+            Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 2000);
+            try {
+                conn.startTls("127.0.0.1", "/tmp/mine\u0000/etc/ssl/approved.pem");
+                outcome = "accepted";
+            } catch (Exception refused) {
+                String message = String.valueOf(refused.getMessage());
+                outcome = message.indexOf("cannot hold a NUL") >= 0
+                        ? "refused" : "other: " + message;
+            } finally {
+                conn.close();
+            }
+        } finally {
+            listener.close();
+        }
+        check("a CA path carrying a NUL is refused", "refused", outcome);
+    }
+
     private static void aRepeatedResponseHeaderKeepsEveryValue() throws Exception {
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
@@ -2668,6 +2700,7 @@ public class SelfTest {
         anIpv6HostIsBracketed();
         outboundHeadersCannotCarryANewline();
         aRepeatedResponseHeaderKeepsEveryValue();
+        aCaPathCannotBeTruncated();
         theTransportOwnsItsOwnFields();
         repeatedOutboundHeadersSurvive();
         anOversizedResponseIsRefusedNotAccumulated();

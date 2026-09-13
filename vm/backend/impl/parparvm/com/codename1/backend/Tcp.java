@@ -91,6 +91,9 @@ public final class Tcp {
      * choose, so that is an error rather than a fallback.
      */
     public void startTls(String host, String caFile) throws IOException {
+        // The trust root is a file name that crosses to a native; see
+        // Urls.requireNoNul for what a NUL in it loads instead.
+        Urls.requireNoNul("An sslrootcert path", caFile);
         checkOpen();
         if(tls != 0) {
             return;
