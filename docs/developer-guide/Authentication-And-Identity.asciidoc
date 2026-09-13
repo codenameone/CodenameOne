@@ -46,7 +46,9 @@ That call:
 
 image::img/oidc-sign-in-flow.svg[The sign-in flow across the app the platform browser and the provider,scaledwidth=95%]
 
-The token exchange is the leg worth noticing: it goes straight from your app to the provider's token endpoint, with the PKCE verifier and no client secret. The browser has already done its job by then.
+The token exchange is the leg worth noticing: it goes straight from your app to the provider's token endpoint, carrying the PKCE verifier, and the browser has already done its job by then. A provider that treats your app as a public client wants no secret on that request, which is the arrangement PKCE exists to make safe. Apple is the exception on its non-native path and wants a `client_secret` JWT your server mints, which is what <<apple-services-id-setup>> is about.
+
+Whether the token endpoint hands back a refresh token is up to the request: the quick start above asks for `openid`, `email` and `profile` and nothing more, so Google returns none and there is nothing for `refreshIfExpired` to renew. `GoogleConnect.signIn` adds `access_type=offline` and `prompt=consent` for exactly that reason.
 
 ==== Picking a redirect URI
 

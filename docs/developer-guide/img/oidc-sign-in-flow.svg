@@ -7,7 +7,7 @@
   <rect x="530" y="20" width="210" height="460" rx="6" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
   <text x="635.0" y="40" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">The identity provider</text>
   <rect x="32" y="62" width="186" height="78" rx="5" fill="#f7f9fc" stroke="#4a6fa5" stroke-width="1.2"/>
-  <text x="125.0" y="80" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">OidcClient.signIn()</text>
+  <text x="125.0" y="80" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">OidcClient.authorize()</text>
   <text x="125.0" y="96" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">discovery document,</text>
   <text x="125.0" y="110" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">PKCE verifier + challenge,</text>
   <text x="125.0" y="124" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">state and nonce</text>
@@ -35,19 +35,19 @@
   <text x="125.0" y="244" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">before any token call</text>
   <rect x="32" y="300" width="186" height="76" rx="5" fill="#f7f9fc" stroke="#4a6fa5" stroke-width="1.2"/>
   <text x="125.0" y="318" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Token exchange</text>
-  <text x="125.0" y="334" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">code + PKCE verifier,</text>
-  <text x="125.0" y="348" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">no client secret on</text>
-  <text x="125.0" y="362" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">the device</text>
+  <text x="125.0" y="334" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">code + PKCE verifier;</text>
+  <text x="125.0" y="348" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">a public client sends</text>
+  <text x="125.0" y="362" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">no secret</text>
   <rect x="542" y="300" width="186" height="76" rx="5" fill="#f7f9fc" stroke="#a56a3a" stroke-width="1.2"/>
   <text x="635.0" y="318" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#a56a3a">Token endpoint</text>
-  <text x="635.0" y="334" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">returns id_token,</text>
-  <text x="635.0" y="348" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">access_token and</text>
-  <text x="635.0" y="362" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">refresh_token</text>
+  <text x="635.0" y="334" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">id_token and access_token,</text>
+  <text x="635.0" y="348" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">plus refresh_token only if</text>
+  <text x="635.0" y="362" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">offline access was asked for</text>
   <rect x="32" y="404" width="186" height="66" rx="5" fill="#f7f9fc" stroke="#4a6fa5" stroke-width="1.2"/>
   <text x="125.0" y="422" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">TokenStore</text>
   <text x="125.0" y="438" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">tokens persisted;</text>
-  <text x="125.0" y="452" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">refreshIfExpired renews</text>
-  <text x="125.0" y="466" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">them on next launch</text>
+  <text x="125.0" y="452" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">refreshIfExpired renews them</text>
+  <text x="125.0" y="466" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">when a refresh token came back</text>
   <path d="M 218 100 L 262 100" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 257 96 L 262 100 L 257 104" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
   <path d="M 498 100 L 542 100" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
