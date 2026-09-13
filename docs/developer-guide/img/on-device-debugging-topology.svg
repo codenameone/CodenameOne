@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="388" viewBox="0 0 880 388">
+  <rect x="0" y="0" width="880" height="388" fill="#ffffff"/>
+  <text x="440" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">How an IDE ends up debugging ParparVM code on a real device</text>
+  <text x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Three parties, and the one in the middle is the reason this works: the app carries its own compressed symbol table</text>
+  <text x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">and streams it to the proxy on connect, so the IDE gets a JDWP session over code that was translated to C.</text>
+  <rect x="16" y="74" width="242" height="74" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="137" y="100" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Your IDE</text>
+  <text x="137" y="120" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#666666">IntelliJ, NetBeans or jdb</text>
+  <text x="137" y="136" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#999999">speaks JDWP, and nothing else</text>
+  <path d="M 264 111 L 312 111" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 307 107 L 312 111 L 307 115" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <text x="288" y="103" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">JDWP</text>
+  <rect x="318" y="74" width="242" height="74" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="439" y="100" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a56a3a">The proxy</text>
+  <text x="439" y="120" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#666666">listens on your machine</text>
+  <text x="439" y="136" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#999999">accepts the device, holds JDWP open</text>
+  <path d="M 614 111 L 566 111" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 571 107 L 566 111 L 571 115" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <text x="590" y="103" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">dials out</text>
+  <rect x="620" y="74" width="242" height="74" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="741" y="100" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a7a3d">The app</text>
+  <text x="741" y="120" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#666666">iOS simulator, or a tethered device</text>
+  <text x="741" y="136" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#999999">connects out to proxyHost, sends symbols</text>
+  <rect x="16" y="178" width="414" height="116" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="30" y="200" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Launch the app, then attach</text>
+  <text x="30" y="216" font-family="Arial, sans-serif" font-size="9" fill="#888888">the order the quick start uses</text>
+  <text x="30" y="234" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Wait for the proxy to print that the device connected, that</text>
+  <text x="30" y="248" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">it loaded symbols, and that the JDWP handshake happened.</text>
+  <text x="30" y="262" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">With waitForAttach=true the app holds on its overlay until</text>
+  <text x="30" y="276" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">you are there.</text>
+  <rect x="450" y="178" width="414" height="116" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="464" y="200" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Attach the IDE, then launch</text>
+  <text x="464" y="216" font-family="Arial, sans-serif" font-size="9" fill="#888888">equally supported</text>
+  <text x="464" y="234" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The proxy keeps the session open and waits for symbols. If</text>
+  <text x="464" y="248" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">nothing connects within ten seconds it prints a checklist for</text>
+  <text x="464" y="262" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">the hint, proxyHost and the port -- fix it and launch without</text>
+  <text x="464" y="276" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">restarting the IDE session.</text>
+  <rect x="16" y="312" width="848" height="60" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="440" y="332" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">The device opens the connection, so your machine is the one that has to accept it. A physical device needs proxyHost set to its LAN</text>
+  <text x="440" y="347" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">address; the native iOS simulator reaches it on 127.0.0.1. Changing a build hint means rebuilding, because the hints are compiled in.</text>
+  <text x="440" y="362" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">If the bug reproduces in the Codename One simulator, debug it there instead: faster, and fewer limitations.</text>
+</svg>
