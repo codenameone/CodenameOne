@@ -197,18 +197,21 @@ public final class Class<T> implements java.lang.reflect.Type {
                     : "/" + className.substring(0, lastDot).replace('.', '/') + "/" + name;
         }
         // Resources linked INTO the executable are deliberately not consulted here.
-        // They were, and it changed how shipping applications render.
         //
-        // On master this method is `return null` on every ParparVM target, so no
-        // application has ever received anything from it, and every caller has
-        // always taken its not-found path. Reading the embedded table handed some
-        // of those callers a resource for the first time: the Windows, Linux and
-        // cross-compiled screenshot legs all began reporting ValidatorLightweight
-        // Picker as changed, a four-pixel layout shift with identical content -- a
-        // caller that had been falling back on a built-in default now had a file.
-        // The javadoc this replaces claimed "nothing can regress, only start
-        // working", which assumed every not-found path was strictly worse than the
-        // resource. That assumption was wrong, and three ports disagreed with it.
+        // CORRECTION, because the first version of this comment blamed the wrong
+        // thing: withdrawing this tier did NOT fix the ValidatorLightweightPicker
+        // screenshot difference, which persists without it. That is still an open
+        // question about this branch and the cause is elsewhere.
+        //
+        // The tier stays withdrawn on its own merits rather than that one. On
+        // master this method is `return null` on every ParparVM target, so no
+        // application has ever received anything from it and every caller has
+        // always taken its not-found path. Handing those callers a resource for the
+        // first time is a behaviour change for every shipping application, and it
+        // is a separate feature from self-hosting, which needs only the filesystem
+        // tier below. The javadoc this replaces claimed "nothing can regress, only
+        // start working" -- an assumption that every not-found path is strictly
+        // worse than the resource, which is not something this change established.
         //
         // The filesystem tier below stays, because it is OPT-IN: it answers only
         // when CN1_RESOURCE_PATH names a search root, which no application sets and
