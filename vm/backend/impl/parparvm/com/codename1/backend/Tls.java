@@ -58,6 +58,13 @@ public final class Tls {
      *   speak it however complete the rest of its implementation is.
      */
     public static Tls create(String certPath, String keyPath, boolean offerHttp2) throws IOException {
+        // BOTH PATHS, before either becomes a C string. A NUL inside one ends it
+        // there, so "/tmp/attacker-key" followed by a NUL and ".pem" loads
+        // /tmp/attacker-key while a caller that checked the directory or the
+        // suffix approved the .pem -- and what is loaded here is the identity the
+        // whole server presents, and the private key behind it.
+        Urls.requireNoNul("A TLS certificate path", certPath);
+        Urls.requireNoNul("A TLS private key path", keyPath);
         long ctx = createContextImpl(certPath, keyPath, offerHttp2);
         if(ctx == 0) {
             throw new IOException("Could not load the certificate and key from "

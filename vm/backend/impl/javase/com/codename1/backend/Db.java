@@ -84,7 +84,23 @@ public final class Db {
         }
     }
 
+    /** See the call sites: a statement holding a NUL means two things on two arms. */
+    private static void requireNoNulInStatement(String sql) throws IOException {
+        if(sql != null && sql.indexOf(0) >= 0) {
+            throw new IOException("An SQL statement cannot hold a NUL: sqlite "
+                    + "reads it as the end of the statement, and what is left "
+                    + "may still be a valid one that means something else");
+        }
+    }
+
     public synchronized int execute(String sql, Object[] params) throws IOException {
+        // THE SAME REFUSAL AS THE TRANSLATED ARM. There sqlite reads the statement
+        // as a C string, so a NUL ends it and what is left may still be a complete
+        // statement with its authorization clause gone -- see the note in the
+        // translated twin. JDBC is length-aware and would run the whole string
+        // here, which is the worse half of a divergence: the development loop
+        // accepts a statement the packaged build silently rewrites.
+        requireNoNulInStatement(sql);
         Connection c = live();
         try {
             if((params == null || params.length == 0) && sql.indexOf('?') < 0) {
@@ -130,6 +146,13 @@ public final class Db {
     }
 
     public synchronized List query(String sql, Object[] params) throws IOException {
+        // THE SAME REFUSAL AS THE TRANSLATED ARM. There sqlite reads the statement
+        // as a C string, so a NUL ends it and what is left may still be a complete
+        // statement with its authorization clause gone -- see the note in the
+        // translated twin. JDBC is length-aware and would run the whole string
+        // here, which is the worse half of a divergence: the development loop
+        // accepts a statement the packaged build silently rewrites.
+        requireNoNulInStatement(sql);
         Connection c = live();
         try {
             PreparedStatement statement = c.prepareStatement(sql);

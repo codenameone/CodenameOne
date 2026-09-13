@@ -44,6 +44,7 @@ import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
 import com.codename1.backend.StaticFiles;
 import com.codename1.backend.Tcp;
+import com.codename1.backend.Tls;
 import com.codename1.backend.VirtualThread;
 import com.codename1.backend.Web;
 import com.codename1.backend.aws.Aws;
@@ -1878,6 +1879,66 @@ public class SelfTest {
     }
 
     /**
+     * Every remaining string that crosses to a native refuses a NUL.
+     *
+     * <p>Six of these were reported one at a time, so this is the whole surface
+     * rather than the next instance: the natives taking a String in the packaged
+     * runtime are Web (method, url), FileIo (root, relative, path), Http2
+     * (status), Tcp (host, caFile), ServerSocket (host), Db (path, sql, bound
+     * value) and Tls (certPath, keyPath). Http2's status comes from an int and
+     * Db's bound VALUE is passed with its encoded length, so those two cannot
+     * truncate; the rest are checked, and these are the ones no other check in
+     * this file already drives.
+     */
+    private static void everyNativeStringRefusesANul() throws Exception {
+        String tlsCert;
+        try {
+            Tls.create("/tmp/cn1-cert\u0000.pem", "/tmp/cn1-key.pem");
+            tlsCert = "accepted";
+        } catch (java.io.IOException expected) {
+            tlsCert = String.valueOf(expected.getMessage()).indexOf("NUL") >= 0
+                    ? "refused" : "other: " + expected.getMessage();
+        }
+        String tlsKey;
+        try {
+            Tls.create("/tmp/cn1-cert.pem", "/tmp/cn1-key\u0000.pem");
+            tlsKey = "accepted";
+        } catch (java.io.IOException expected) {
+            tlsKey = String.valueOf(expected.getMessage()).indexOf("NUL") >= 0
+                    ? "refused" : "other: " + expected.getMessage();
+        }
+        String statement;
+        String dir = "/tmp/cn1-selftest-sql-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        Db db = Db.open(dir + "/t.db");
+        try {
+            db.execute("CREATE TABLE notes(id, owner)", null);
+            // The shape that matters: the cut leaves a COMPLETE statement whose
+            // authorization clause has gone.
+            db.execute("DELETE FROM notes WHERE id='1'\u0000 AND owner='bob'", null);
+            statement = "accepted";
+        } catch (java.io.IOException expected) {
+            statement = String.valueOf(expected.getMessage()).indexOf("NUL") >= 0
+                    ? "refused" : "other: " + expected.getMessage();
+        } finally {
+            db.close();
+            new java.io.File(dir + "/t.db").delete();
+            new java.io.File(dir).delete();
+        }
+        // The Java SE arm has no TLS at all -- there is no native to protect and
+        // create() refuses everything with one message -- so the two path checks
+        // are the translated arm's. Reported rather than silently skipped, so a
+        // run that does not exercise them says so.
+        if(String.valueOf(tlsCert).indexOf("not available") >= 0) {
+            note("TLS path checks skipped: this runtime has no TLS to configure");
+        } else {
+            check("a TLS certificate path holding a NUL is refused", "refused", tlsCert);
+            check("a TLS private key path holding a NUL is refused", "refused", tlsKey);
+        }
+        check("an SQL statement holding a NUL is refused", "refused", statement);
+    }
+
+    /**
      * A database path that would name a different file as a C string opens
      * nothing.
      *
@@ -3599,6 +3660,7 @@ public class SelfTest {
         aStaticFileComesBackWhole();
         aRefusedBodyIsNeverInvited();
         anInterimResponseIsSkipped();
+        everyNativeStringRefusesANul();
         aTruncatingDatabasePathOpensNothing();
         aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();

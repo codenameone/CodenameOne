@@ -266,6 +266,19 @@ public final class Db {
     }
 
     private long prepare(String sql, Object[] params) throws IOException {
+        // THE STATEMENT ITSELF cannot hold a NUL. sqlite3_prepare_v2 is called
+        // with -1, so it reads to the first zero byte -- and the native's note
+        // says such a truncation leaves an incomplete statement sqlite rejects.
+        // That is true of most cuts and not of all of them: "... WHERE id='1'"
+        // followed by a NUL and " AND owner='bob'" truncates to a statement that
+        // is perfectly complete and missing its authorization clause. Refused
+        // here so the claim holds by construction rather than by luck; no SQL
+        // this runtime can execute contains one, since sqlite reads C strings.
+        if(sql != null && sql.indexOf(0) >= 0) {
+            throw new IOException("An SQL statement cannot hold a NUL: sqlite "
+                    + "reads it as the end of the statement, and what is left "
+                    + "may still be a valid one that means something else");
+        }
         if(handle == 0) {
             throw new IOException("Database is closed");
         }

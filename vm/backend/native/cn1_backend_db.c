@@ -198,9 +198,12 @@ JAVA_INT com_codename1_backend_Db_bindStringImpl___long_int_java_lang_String_R_i
        The reading side has always passed sqlite3_column_bytes(); this is the same
        length, on the way in.
 
-       sqlite3_prepare_v2 above keeps -1 deliberately. A NUL there truncates the
-       STATEMENT, which sqlite then rejects as incomplete rather than storing
-       anything, and a statement is ours rather than the user's value.
+       sqlite3_prepare_v2 above keeps -1 deliberately, and the JAVA side refuses a
+       statement holding a NUL so that this stays safe. A truncated statement is
+       USUALLY incomplete and rejected, but not always: cutting "... WHERE id='1'"
+       before " AND owner='bob'" leaves a complete statement missing its
+       authorization clause. The refusal makes that unreachable rather than
+       improbable.
 
        SQLITE_TRANSIENT: the scratch buffer stringToUTF8Len returns is reused by the
        next conversion on this thread, so sqlite must take its own copy. */
