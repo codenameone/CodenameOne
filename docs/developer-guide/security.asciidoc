@@ -89,92 +89,31 @@ This works through a new mechanism in storage where you can replace the storage 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava030Snippet.java[tag=security-java-030,indent=0]
 ----
 
-You can leverage that knowledge to change the encryption password on the encryption storage. Everything has to move at once: the key is installed for the whole of `Storage`, so any entry still written under the old one becomes unreadable the moment the new one goes in. And the move has to survive being interrupted, because a half-converted store can't be read with either key, so it goes in three steps -- read everything under the old key, write it all to staging names under the new one, then replace the originals from staging. `EncryptedStorage` comes from the bouncy castle cn1lib, so this listing isn't part of the compiled examples:
+You can leverage that knowledge to change the encryption password on the encryption storage. The key is installed for the whole of `Storage`, so every entry has to move together: read them all under the old key, install the new one, write them all back. `EncryptedStorage` comes from the bouncy castle cn1lib, so this listing isn't part of the compiled examples:
 
 [listing]
 ----
-static final String MIGRATION_MARKER = "cn1KeyMigration.dat";
-static final String STAGED_SUFFIX = ".migrating";
-
-// Phase 1 -- read everything under the old key, into memory.
 EncryptedStorage.install(oldKey);
 Map<String, byte[]> all = new LinkedHashMap<>();
 for (String name : Storage.getInstance().listEntries()) {
-    if (name.equals(MIGRATION_MARKER) || name.endsWith(STAGED_SUFFIX)) {
-        continue;
-    }
     try (InputStream is = Storage.getInstance().createInputStream(name)) {
         all.put(name, Util.readInputStream(is));
     }
 }
 
-// Phase 2 -- with the new key in, write every entry to a staging name.
-// The originals are untouched and still readable with the old key, so a
-// crash anywhere in here loses nothing.
 EncryptedStorage.install(newKey);
 for (Map.Entry<String, byte[]> e : all.entrySet()) {
-    try (OutputStream o =
-            Storage.getInstance().createOutputStream(e.getKey() + STAGED_SUFFIX)) {
+    try (OutputStream o = Storage.getInstance().createOutputStream(e.getKey())) {
         o.write(e.getValue());
     }
 }
-
-// The commit point. Past here the staged copies are the source of truth,
-// and finishMigration below can complete the job with the new key alone.
-Storage.getInstance().writeObject(MIGRATION_MARKER,
-        new ArrayList<>(all.keySet()));
-finishMigration();
 ----
 
-`finishMigration` is the half that also runs at startup, so an interrupted
-migration completes rather than leaving the store half-converted:
+The `try`-with-resources is deliberate: `Util.cleanup` swallows a close failure, and on the write side a swallowed close means an entry was never finalized under the new key. Let it throw.
 
-[listing]
-----
-void finishMigration() {
-    if (!Storage.getInstance().exists(MIGRATION_MARKER)) {
-        return;
-    }
-    Object stored = Storage.getInstance().readObject(MIGRATION_MARKER);
-    if (!(stored instanceof List)) {
-        Storage.getInstance().deleteStorageFile(MIGRATION_MARKER);
-        return;
-    }
-    for (Object entry : (List<?>) stored) {
-        String name = (String) entry;
-        String staged = name + STAGED_SUFFIX;
-        if (!Storage.getInstance().exists(staged)) {
-            continue;        // already replaced on an earlier attempt
-        }
-        try (InputStream is = Storage.getInstance().createInputStream(staged)) {
-            byte[] data = Util.readInputStream(is);
-            try (OutputStream o = Storage.getInstance().createOutputStream(name)) {
-                o.write(data);
-            }
-        }
-        Storage.getInstance().deleteStorageFile(staged);
-    }
-    Storage.getInstance().deleteStorageFile(MIGRATION_MARKER);
-}
-----
+WARNING: This isn't crash-safe, and it can't be made crash-safe from the outside. If the process dies part way through the second loop, some entries are under each key and neither opens the whole store. `Storage` has no rename, so there is no way to stage the converted copies and swap them in atomically, and the recovery data lives only in that in-memory map.
 
-Call it with the new key installed, before anything else reads `Storage`.
-Either the marker is absent and there is nothing to do, or it names the
-entries whose new-key copies are already on disk and the loop finishes
-replacing them. Each entry is idempotent, so a crash during recovery only
-means recovery runs again.
-
-Two things this costs. It holds every entry in memory between phases one and
-two, which suits the handful of records an app of this shape keeps and does
-not suit a storage full of cached images. And it needs `Storage` quiet
-throughout, so it belongs at startup rather than anywhere a user can trigger
-it twice.
-
-Note the `try`-with-resources rather than `Util.cleanup`: `cleanup` swallows a
-close failure, and on the write side a swallowed close means an entry was
-never finalized under the new key. Let it throw -- a migration that reports
-success having lost an entry is worse than one that stops.
-
+Which is the real argument for not rotating the storage key at all. Encrypt `Storage` with a random key your app generates once, keep that key wrapped under the password-derived one in a single record outside `Storage`, and a password change re-wraps that one small record instead of rewriting every entry. Nothing else moves, so there is no half-converted state to recover from. If you do rewrite the store in place, do it once at startup with nothing else touching `Storage`, and treat the possibility of an interrupted run as something your app has to survive rather than something this loop prevents.
 
 NOTE: It isn't a good idea to replace storage objects when an app is running so this is purely for this special case...
 
