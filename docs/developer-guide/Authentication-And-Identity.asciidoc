@@ -10,6 +10,8 @@ The stack is rebuilt around two new primitives:
 
 Every provider-specific class is a thin layer on top of these primitives, so once you learn the underlying client you understand the whole stack.
 
+image::img/oidc-provider-stack.svg[The provider classes sitting on OidcClient and SystemBrowser,scaledwidth=95%]
+
 WARNING: The legacy `com.codename1.io.Oauth2` class is **deprecated**. It opens an in-app `WebBrowser`, which modern identity providers (Google, Apple, Microsoft, Facebook) now refuse to render -- they detect the embedded view and block the page. The new `OidcClient` works the same on every supported platform without that limitation. See <<migrating-from-oauth2>> for a migration recipe.
 
 === Why the change
@@ -39,6 +41,10 @@ That call:
 . Opens the OS system-browser sheet at the discovered authorization endpoint.
 . Exchanges the code for tokens on the discovered token endpoint.
 . Verifies `state` and `nonce`, decodes the ID token, and persists the tokens via the default `TokenStore`.
+
+image::img/oidc-sign-in-flow.svg[The sign-in flow across the app the platform browser and the provider,scaledwidth=95%]
+
+The token exchange is the leg worth noticing: it goes straight from your app to the provider's token endpoint, with the PKCE verifier and no client secret. The browser has already done its job by then.
 
 ==== Picking a redirect URI
 
