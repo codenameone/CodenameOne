@@ -77,6 +77,25 @@ def split_attrs(attrs: str) -> List[str]:
 # valid as "640", and rejecting it would fail CI on a correct attribute list.
 DIMENSION_RE = re.compile(r"^\d+(?:\.\d+)?(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?$")
 
+# Named attributes an image macro actually takes. Checked by name rather than by
+# the presence of an "=", because alt text is prose and prose contains equals
+# signs: "Plot coordinates x, y=2 and z=3" splits into a field holding "y=2 and
+# z=3", which an any-equals test waves through while the rendered alt text is
+# just "Plot coordinates x".
+IMAGE_ATTRIBUTES = frozenset({
+    "alt", "align", "caption", "float", "format", "height", "id", "link",
+    "opts", "options", "poster", "role", "scale", "scaledwidth", "pdfwidth",
+    "title", "width", "window", "rel", "nofollow", "start", "end", "loop",
+    "autoplay", "theme", "lang", "fallback", "target", "reftext",
+})
+NAMED_ATTRIBUTE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.-]*)\s*=")
+
+
+def is_named_attribute(field: str) -> bool:
+    """True when the field is a named image attribute rather than split alt text."""
+    match = NAMED_ATTRIBUTE_RE.match(field.strip())
+    return bool(match) and match.group(1).lower() in IMAGE_ATTRIBUTES
+
 
 def offenders(path: Path) -> List[Tuple[int, str, str]]:
     found = []
@@ -95,7 +114,7 @@ def offenders(path: Path) -> List[Tuple[int, str, str]]:
             # legitimate, units included.
             for field in fields[1:]:
                 value = field.strip()
-                if not value or "=" in value or DIMENSION_RE.match(value):
+                if not value or is_named_attribute(value) or DIMENSION_RE.match(value):
                     continue
                 found.append((number, match.group("target"), match.group("attrs")))
                 break
