@@ -2081,6 +2081,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-13T00:02:39+00:00"
+      },
+      "devto": {
+        "id": 4644566,
+        "url": "https://dev.to/codenameone/a-mac-app-not-an-ios-app-on-a-mac-2jce",
+        "syndicated_at": "2026-09-13T16:57:44+00:00"
       }
     }
   }
