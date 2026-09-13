@@ -437,6 +437,23 @@ JAVA_INT com_codename1_backend_Tcp_tlsWriteImpl___long_byte_1ARRAY_int_int_R_int
     return (JAVA_INT)written;
 }
 
+/*
+ * Frees a session WITHOUT touching its descriptor.
+ *
+ * For the one case where a close raced a handshake that had just succeeded: the
+ * descriptor is already closed and its number may belong to another connection
+ * by now, so SSL_shutdown here would write TLS bytes into somebody else's
+ * socket. There is nothing to tell the peer either -- the socket it was talking
+ * on is gone.
+ */
+void com_codename1_backend_Tcp_tlsDiscardImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG session) {
+    SSL* ssl = (SSL*)(intptr_t)session;
+    if(ssl == 0) {
+        return;
+    }
+    SSL_free(ssl);
+}
+
 void com_codename1_backend_Tcp_tlsCloseImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG session) {
     SSL* ssl = (SSL*)(intptr_t)session;
     if(ssl == 0) {
@@ -468,6 +485,9 @@ JAVA_INT com_codename1_backend_Tcp_tlsWriteImpl___long_byte_1ARRAY_int_int_R_int
 }
 
 void com_codename1_backend_Tcp_tlsCloseImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG session) {
+}
+
+void com_codename1_backend_Tcp_tlsDiscardImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG session) {
 }
 
 #endif

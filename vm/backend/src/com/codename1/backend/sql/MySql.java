@@ -1188,7 +1188,28 @@ public final class MySql {
         }
     }
 
-    private static void writeCString(ByteArrayOutputStream out, String value) {
+    /**
+     * A field the protocol ends with a NUL, so the value cannot contain one.
+     *
+     * <p>the login packet ends each of its fields with a NUL, which means a NUL inside a value does not truncate
+     * it -- it ENDS that field and what follows becomes the NEXT one. A database
+     * name of "admin", a NUL, "application_name", a NUL and "allowed.tenant"
+     * selects the admin database and sets a startup parameter nobody asked for,
+     * while the string as a whole still passes an application's suffix check on
+     * the name it thought it was connecting to. A URL carrying %00 decodes to
+     * exactly that.
+     *
+     * <p>Checked HERE rather than at the two fields a review named: this is the
+     * one place every such field is written, so a field added later is covered
+     * without anyone remembering to.
+     */
+    private static void writeCString(ByteArrayOutputStream out, String value)
+            throws IOException {
+        if(value != null && value.indexOf(0) >= 0) {
+            throw new IOException("A connection field cannot hold a NUL: the "
+                    + "protocol ends the field there and reads the rest as "
+                    + "another one");
+        }
         byte[] data = Wire.utf8(value);
         out.write(data, 0, data.length);
         out.write(0);

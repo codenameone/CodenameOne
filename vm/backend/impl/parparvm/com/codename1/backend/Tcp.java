@@ -107,14 +107,39 @@ public final class Tcp {
         if(tls != 0) {
             return;
         }
-        long session = startTlsImpl(handle, host, caFile);
+        long fd;
+        synchronized(this) {
+            if(handle == 0) {
+                throw new IOException("Socket closed");
+            }
+            fd = handle;
+        }
+        long session = startTlsImpl(fd, host, caFile);
         if(session == 0) {
             throw new IOException("TLS handshake with " + host + " failed: " + tlsErrorImpl());
         }
-        // Published under the same monitor the claim below takes, so a thread that
-        // goes on to read sees a session rather than a zero and the plain socket.
+        // Published under the same monitor the claim takes, so a thread that goes
+        // on to read sees a session rather than a zero and the plain socket.
+        //
+        // AND RECHECKED, because the handshake above holds no claim -- there is no
+        // session to claim yet. A close() during it closes the descriptor, which
+        // is what makes the handshake fail; the race that remains is the narrow
+        // one where it had just SUCCEEDED. Publishing then would report success on
+        // a closed socket and leave an SSL* that only a second close would free --
+        // by which time its descriptor number may belong to another connection,
+        // and SSL_shutdown would write TLS bytes into that one.
+        boolean lost;
         synchronized(this) {
-            tls = session;
+            lost = handle == 0;
+            if(!lost) {
+                tls = session;
+            }
+        }
+        if(lost) {
+            // Freed WITHOUT a shutdown: the descriptor is gone, so there is
+            // nothing to tell the peer and nothing safe to write to.
+            tlsDiscardImpl(session);
+            throw new IOException("Socket closed");
         }
     }
 
@@ -288,4 +313,7 @@ public final class Tcp {
     private static native int tlsReadImpl(long session, byte[] buffer, int offset, int length);
     private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);
     private static native void tlsCloseImpl(long session);
+
+    /** Frees a session whose descriptor has already gone; see startTls. */
+    private static native void tlsDiscardImpl(long session);
 }

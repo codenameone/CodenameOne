@@ -1879,6 +1879,91 @@ public class SelfTest {
     }
 
     /**
+     * A connection field cannot smuggle a second field into the handshake.
+     *
+     * <p>Both wire protocols end each startup field with a NUL, so a NUL inside
+     * a value does not truncate it -- it ENDS that field and the rest becomes the
+     * next one. A database name of "app", a NUL, "application_name", a NUL and
+     * "allowed.tenant" selects the app database and sets a startup parameter
+     * nobody asked for, while the whole string still passes a suffix check on the
+     * name the application thought it was connecting to.
+     *
+     * <p>The refusal happens while the packet is being built, before anything is
+     * written, so a listener that only accepts is enough to reach it.
+     */
+    private static void aConnectionFieldCannotHoldASecondField() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        // ACCEPTS AND HANGS UP. Without the guard the startup packet really is
+        // written -- that is the defect -- and the client then waits for an auth
+        // reply, so a silent listener would leave a REGRESSION hanging this suite
+        // instead of failing it. Closing makes that path fail at once, and the
+        // outcome below says which of the two happened.
+        Thread hangUp = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    int client = listener.accept();
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                } catch (Exception ignored) {
+                    // The check below reports what the client made of it.
+                }
+            }
+        });
+        hangUp.start();
+        String postgres;
+        try {
+            Database db = Database.open("postgres://u:pw@127.0.0.1:" + listener.getPort()
+                    + "/app\u0000application_name\u0000allowed.tenant?sslmode=disable");
+            db.close();
+            postgres = "accepted";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            postgres = message.indexOf("NUL") >= 0 ? "refused"
+                    : "refused for another reason: " + message;
+        } finally {
+            listener.close();
+        }
+        hangUp.join(10000);
+
+        final ServerSocket mysqlListener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = mysqlListener.accept();
+                    if(client >= 0) {
+                        mySqlStubSession(client);
+                    }
+                } catch (Exception ignored) {
+                    // The check below reports what the client made of it.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String mysql;
+        try {
+            Database db = Database.open("mysql://u:pw@127.0.0.1:" + mysqlListener.getPort()
+                    + "/app\u0000application_name\u0000allowed.tenant?sslmode=disable");
+            db.close();
+            mysql = "accepted";
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            mysql = message.indexOf("NUL") >= 0 ? "refused"
+                    : "refused for another reason: " + message;
+        } finally {
+            mysqlListener.close();
+        }
+        stub.join(10000);
+        check("a PostgreSQL connection field holding a NUL is refused", "refused", postgres);
+        check("a MySQL connection field holding a NUL is refused", "refused", mysql);
+    }
+
+    /**
      * Every remaining string that crosses to a native refuses a NUL.
      *
      * <p>Six of these were reported one at a time, so this is the whole surface
@@ -3660,6 +3745,7 @@ public class SelfTest {
         aStaticFileComesBackWhole();
         aRefusedBodyIsNeverInvited();
         anInterimResponseIsSkipped();
+        aConnectionFieldCannotHoldASecondField();
         everyNativeStringRefusesANul();
         aTruncatingDatabasePathOpensNothing();
         aLaterIfRangeDateDoesNotAuthoriseARange();
