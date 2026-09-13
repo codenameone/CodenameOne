@@ -785,8 +785,27 @@ final class JavascriptReachability {
                 Field f = (Field) instr;
                 int op = f.getOpcode();
                 if (op == Opcodes.GETSTATIC || op == Opcodes.PUTSTATIC) {
-                    // Touching a static triggers the owner's clinit.
-                    markClassInstantiated(JavascriptNameUtil.sanitizeClassName(f.getOwner()));
+                    // Touching a static triggers the owner's clinit -- and the
+                    // owner that matters is the one that DECLARES the field,
+                    // which is not always the one the Fieldref names. javac
+                    // writes ``getstatic Impl.VALUE`` for a field an interface
+                    // ``Impl`` implements declares (verified with javap), and
+                    // markClassInstantiated seeds clinits down the SUPERCLASS
+                    // chain only -- so the interface's <clinit> was seeded by
+                    // nothing, culled, and the field read back as its default
+                    // with no error anywhere. JLS 12.4.1 initializes the
+                    // declaring interface, so keep its initializer alive.
+                    //
+                    // Both are marked rather than just the resolved one: the
+                    // raw owner has been marked here for as long as this pass
+                    // has existed and other things may depend on that.
+                    String rawOwner = JavascriptNameUtil.sanitizeClassName(f.getOwner());
+                    markClassInstantiated(rawOwner);
+                    String declaringOwner = JavascriptMethodGenerator.resolveStaticFieldOwner(
+                            f.getOwner(), f.getFieldName(), byName);
+                    if (declaringOwner != null && !declaringOwner.equals(rawOwner)) {
+                        markClassInstantiated(declaringOwner);
+                    }
                 }
             } else if (instr instanceof Invoke) {
                 Invoke inv = (Invoke) instr;
