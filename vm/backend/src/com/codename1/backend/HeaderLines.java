@@ -187,6 +187,20 @@ final class HeaderLines {
                         + "character or a space; this one does, at index " + iter
                         + ". Percent-encode it");
             }
+            // A FRAGMENT IS NOT PART OF THE TARGET. RFC 9110 defines origin-form
+            // as an absolute path and an optional query, and a fragment is the
+            // client's own business -- it is never sent. Written into the request
+            // line anyway, a conforming upstream refuses the request and a lenient
+            // one reads "#private" as part of the resource, so the same URL names
+            // two different things depending on who answers it. The inbound parser
+            // refuses a fragment in a target already; this is the same rule facing
+            // the other way. Refused rather than trimmed, because dropping part of
+            // what the caller passed hides the mistake instead of reporting it.
+            if(c == '#') {
+                throw new IOException("A request path cannot hold a fragment and "
+                        + "this one does, at index " + iter + ". A fragment is not "
+                        + "sent to the server; remove it or percent-encode the '#'");
+            }
         }
     }
 

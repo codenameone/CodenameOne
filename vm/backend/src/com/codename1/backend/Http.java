@@ -110,10 +110,19 @@ public final class Http {
         // Tcp.connect checks the host; these two were nobody's.
         HeaderLines.requireMethod(method);
         HeaderLines.requireOriginForm(path);
+        // NULL IS GET HERE TOO. requireMethod tolerates null because the sibling
+        // Web API takes it and means GET -- libcurl is simply left to its default
+        // on one implementation and normalises it on the other -- but this client
+        // writes the request line itself, and appending a null reference to a
+        // StringBuilder writes the four characters "null". The peer was being
+        // asked for an undefined verb, which a conforming server answers 501 and a
+        // lenient one may treat as something else entirely: one API, three answers
+        // to the same argument.
+        String verb = method == null ? "GET" : method;
         Tcp socket = Tcp.connect(host, port, 0);
         try {
             StringBuilder head = new StringBuilder();
-            head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n");
+            head.append(verb).append(' ').append(path).append(" HTTP/1.1\r\n");
             head.append("Host: ").append(authority(host, port)).append("\r\n");
             head.append("Connection: close\r\n");
             head.append("Content-Length: ").append(body == null ? 0 : body.length).append("\r\n");
@@ -123,13 +132,13 @@ public final class Http {
             if(body != null && body.length > 0) {
                 socket.write(body, 0, body.length);
             }
-            return readResponse(socket);
+            return readResponse(socket, verb);
         } finally {
             socket.close();
         }
     }
 
-    private static Response readResponse(Tcp socket) throws IOException {
+    private static Response readResponse(Tcp socket, String verb) throws IOException {
         // "Connection: close" is requested above, so the whole response can be read
         // to end-of-stream and parsed in memory. That keeps the parser free of the
         // chunked/keep-alive state machine, at the cost of one connection per call --
@@ -177,13 +186,35 @@ public final class Http {
         // and produces side effects from input the caller never sent. The
         // declared length is the peer's own statement of what it owed, so a
         // shortfall is a transport failure and is reported as one.
-        int declared = declaredLength(names, values);
+        // ... EXCEPT where the declared length does not describe a body that was
+        // sent. RFC 9110 6.4.1: a response to HEAD, and any 1xx, 204 or 304, ends
+        // at the blank line whatever the header fields say -- and a conforming
+        // server answers HEAD with the Content-Length the GET would have carried.
+        // Comparing that against the zero bytes it correctly sent reported every
+        // such response as a truncated one, so this client could not make a HEAD
+        // request against a conforming server at all.
+        int declared = carriesBody(verb, status) ? declaredLength(names, values) : -1;
         if(declared >= 0 && bodyBytes.length < declared) {
             throw new IOException("The response body stopped after " + bodyBytes.length
                     + " of the " + declared + " byte(s) its Content-Length declared, so "
                     + "the connection failed part way through it");
         }
         return new Response(status, names, values, decodeBody(bodyBytes, names, values));
+    }
+
+    /**
+     * Whether a response with this status, to this verb, is one whose
+     * Content-Length describes bytes that follow the header block.
+     *
+     * <p>RFC 9110 6.4.1, and the list is exhaustive: a response to HEAD, and any
+     * 1xx, 204 or 304, is terminated by the first empty line after the header
+     * fields regardless of the fields present.
+     */
+    private static boolean carriesBody(String verb, int status) {
+        if("HEAD".equals(verb)) {
+            return false;
+        }
+        return !(status >= 100 && status < 200) && status != 204 && status != 304;
     }
 
     /**

@@ -144,8 +144,19 @@ public final class Aws {
         Iterator it = headers.entrySet().iterator();
         while(it.hasNext()) {
             Map.Entry entry = (Map.Entry)it.next();
-            canonicalHeaders.put(asciiLower(String.valueOf(entry.getKey())),
-                    collapse(String.valueOf(entry.getValue())));
+            // COMBINED, not replaced. Two entries differing only in case are one
+            // field to HTTP and to SigV4, which joins their values with a comma in
+            // the order they arrive. put() kept the last one, so the canonical
+            // request held one value while send() -- iterating this same map --
+            // put both on the wire: the service canonicalised what it received,
+            // got a different string, and answered 403 with nothing to say which
+            // header was at fault. Both loops walk one LinkedHashMap, so the order
+            // combined here is the order sent.
+            String name = asciiLower(String.valueOf(entry.getKey()));
+            String value = collapse(String.valueOf(entry.getValue()));
+            Object existing = canonicalHeaders.get(name);
+            canonicalHeaders.put(name, existing == null ? value
+                    : String.valueOf(existing) + "," + value);
         }
         StringBuilder headerBlock = new StringBuilder();
         StringBuilder signedNames = new StringBuilder();

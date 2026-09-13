@@ -45,6 +45,7 @@ import com.codename1.backend.StaticFiles;
 import com.codename1.backend.Tcp;
 import com.codename1.backend.VirtualThread;
 import com.codename1.backend.Web;
+import com.codename1.backend.aws.Aws;
 import com.codename1.backend.aws.Credentials;
 import com.codename1.backend.FileCountProbe;
 import com.codename1.backend.aws.ExpiryProbe;
@@ -1753,6 +1754,119 @@ public class SelfTest {
      * is the control this check keeps: an implementation that reads nothing at all
      * would pass the corrupted half and fail this one.
      */
+    /**
+     * A HEAD response declares the length of a body it correctly did not send.
+     *
+     * <p>RFC 9110 6.4.1: a response to HEAD ends at the blank line whatever the
+     * header fields say, and a conforming server answers it with the
+     * Content-Length the GET would have carried -- this server does exactly that.
+     * The client compared that number against the zero bytes it received and
+     * reported a truncated transfer, so it could not make a HEAD request against
+     * a conforming server at all, which is every server including ours.
+     */
+    private static void aHeadResponseIsNotReadAsTruncated() throws Exception {
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                return HttpServer.Response.text(200, "a body with some length to it");
+            }
+        });
+        String head;
+        String get;
+        try {
+            try {
+                head = String.valueOf(Http.request("127.0.0.1", server.getPort(),
+                        "HEAD", "/x", null).getStatus());
+            } catch (java.io.IOException err) {
+                // Reported rather than thrown, so a regression here is one failing
+                // check with the reason in it instead of a suite that stops.
+                head = "refused: " + err.getMessage();
+            }
+            // The control: the SAME route over GET still has its length checked,
+            // so this cannot pass by having stopped checking anything.
+            get = String.valueOf(Http.request("127.0.0.1", server.getPort(),
+                    "GET", "/x", null).getStatus());
+        } finally {
+            server.stop(2000);
+        }
+        check("a HEAD response is not reported as truncated", "200", head);
+        check("and a GET of the same route still answers", "200", get);
+    }
+
+    /**
+     * A null method is GET, on this client as well as the other one.
+     *
+     * <p>Web takes null and means GET -- one implementation normalises it, the
+     * other leaves libcurl to its default -- while this client wrote the request
+     * line itself and appended the four characters "null" as the verb.
+     */
+    private static void aNullMethodIsGet() throws Exception {
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                return HttpServer.Response.text(200, request.getMethod());
+            }
+        });
+        String seen;
+        try {
+            seen = Http.request("127.0.0.1", server.getPort(), null, "/verb", null)
+                    .getBodyAsString();
+        } finally {
+            server.stop(2000);
+        }
+        check("a null method reaches the server as GET", "GET", seen);
+    }
+
+    /**
+     * A fragment never goes out in a request target.
+     *
+     * <p>The inbound parser refuses one; this is the same rule facing outward.
+     */
+    private static void anOutboundFragmentIsRefused() throws Exception {
+        String refusal;
+        try {
+            Http.request("127.0.0.1", 1, "GET", "/users#private", null);
+            refusal = "accepted";
+        } catch (java.io.IOException expected) {
+            refusal = String.valueOf(expected.getMessage()).indexOf("fragment") >= 0
+                    ? "refused as a fragment" : "refused for another reason: "
+                            + expected.getMessage();
+        }
+        check("a fragment in an outbound target is refused", "refused as a fragment", refusal);
+    }
+
+    /**
+     * Two spellings of one header name are one field to SigV4.
+     *
+     * <p>The canonical request lower-cases every name, so X-Meta and x-meta
+     * collide there while both go out on the wire. AWS combines what it receives,
+     * with a comma, in arrival order; keeping only the last value signed a
+     * different string than the service verified and the answer was a 403 that
+     * named nothing. Asserted as the property itself: the duplicate pair must
+     * sign exactly as the combined single field does.
+     */
+    private static void caseVariantHeadersSignAsOneField() throws Exception {
+        Credentials credentials = new Credentials("AKIDEXAMPLE", "secret", null);
+        Map duplicated = new LinkedHashMap();
+        duplicated.put("X-Meta", "one");
+        duplicated.put("x-meta", "two");
+        Map combined = new LinkedHashMap();
+        combined.put("x-meta", "one,two");
+        Map query = new LinkedHashMap();
+        String hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        String duplicatedAuth = Aws.authorization(credentials, "us-east-1", "s3", "GET",
+                "/", query, duplicated, hash, "20260101T000000Z");
+        String combinedAuth = Aws.authorization(credentials, "us-east-1", "s3", "GET",
+                "/", query, combined, hash, "20260101T000000Z");
+        // And a control: a DIFFERENT combined value must not sign the same, or the
+        // comparison above would hold however the duplicates were handled.
+        Map wrong = new LinkedHashMap();
+        wrong.put("x-meta", "two");
+        String wrongAuth = Aws.authorization(credentials, "us-east-1", "s3", "GET",
+                "/", query, wrong, hash, "20260101T000000Z");
+        check("case-variant headers sign as one combined field", combinedAuth, duplicatedAuth);
+        check("and not as the last value alone",
+                "different", combinedAuth.equals(wrongAuth) ? "same" : "different");
+    }
+
     private static void aLateBodyIsNotServedAnotherConnectionsBytes() throws Exception {
         check("a request with a late body reads its own headers",
                 "aaaaaa|x|6|POST", oneLateBodyRequest(false));
@@ -2859,6 +2973,10 @@ public class SelfTest {
         aMySqlPacketOutOfSequenceIsRefused();
         aNegativePostgresLengthThatIsNotNullIsRefused();
         aStaticFileComesBackWhole();
+        aHeadResponseIsNotReadAsTruncated();
+        aNullMethodIsGet();
+        anOutboundFragmentIsRefused();
+        caseVariantHeadersSignAsOneField();
         aLateBodyIsNotServedAnotherConnectionsBytes();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
