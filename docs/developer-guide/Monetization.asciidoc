@@ -237,7 +237,7 @@ The following methods can be used for synchronization:
 
 In your hello world app you synchronize the subscriptions in a few places.
 
-At the end of the `start()` method:
+In the `start()` method, after the form is built:
 
 [source,java]
 ----

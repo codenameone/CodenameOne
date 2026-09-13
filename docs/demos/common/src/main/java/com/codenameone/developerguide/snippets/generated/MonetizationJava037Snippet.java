@@ -82,6 +82,12 @@ class MonetizationJava037Snippet {
 
     void showRentalStatus() {
     }
+
+    void addExpiryLabel(Form hi) {
+    }
+
+    void addSyncButton(Form hi) {
+    }
     MultiButton myMultiButton;
     Label label;
     BrowserComponent browserComponent;
@@ -89,8 +95,16 @@ class MonetizationJava037Snippet {
     
     // tag::monetization-java-037[]
     public void start() {
+     Form hi = new Form("Hello World", BoxLayout.y());
 
-    // ...
+     // ... the rest of the form
+
+     // The expiry label and the button that refreshes it, both of which
+     // the next two listings build.
+     addExpiryLabel(hi);
+     addSyncButton(hi);
+
+     hi.show();
 
      // Now synchronize the receipts
      iap.synchronizeReceipts(0, success -> {
