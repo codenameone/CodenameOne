@@ -35,15 +35,16 @@ IMAGE_RE = re.compile(r"image::?(?P<target>[^\[\]\s]+)\[(?P<attrs>[^\]]*)\]")
 def split_attrs(attrs: str) -> List[str]:
     """Split on commas that are not inside a quoted value, the way AsciiDoc does.
 
-    A quote only opens a value when it is the first character of a field. An
-    apostrophe inside unquoted text -- "Don't change the classpath, ..." -- is
-    ordinary text, and treating it as an opening quote swallows the comma after
-    it and reports a genuinely broken macro as clean.
+    A quote opens a value in two places: the start of a field, and straight
+    after the "=" of a named attribute, which is where link="https://a/b,c"
+    puts it. Anywhere else it is ordinary text -- the apostrophe in "Don't
+    change the classpath, ..." is not an opening quote, and treating it as one
+    swallows the comma after it and reports a broken macro as clean.
     """
     out: List[str] = []
     buf: List[str] = []
     quote = ""
-    at_field_start = True
+    can_open = True
     for ch in attrs:
         if quote:
             if ch == quote:
@@ -53,18 +54,28 @@ def split_attrs(attrs: str) -> List[str]:
         if ch == ",":
             out.append("".join(buf))
             buf = []
-            at_field_start = True
+            can_open = True
             continue
-        if at_field_start and ch in "\"'":
+        if can_open and ch in "\"'":
             quote = ch
             buf.append(ch)
-            at_field_start = False
+            can_open = False
+            continue
+        if ch == "=":
+            # a named attribute's value begins here, and it may be quoted
+            buf.append(ch)
+            can_open = True
             continue
         if not ch.isspace():
-            at_field_start = False
+            can_open = False
         buf.append(ch)
     out.append("".join(buf))
     return out
+
+
+# A positional width or height: a number, optionally with a unit. "50%" is as
+# valid as "640", and rejecting it would fail CI on a correct attribute list.
+DIMENSION_RE = re.compile(r"^\d+(?:\.\d+)?(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?$")
 
 
 def offenders(path: Path) -> List[Tuple[int, str, str]]:
@@ -80,11 +91,11 @@ def offenders(path: Path) -> List[Tuple[int, str, str]]:
                 continue
             # A positional field after the alt text that carries no "=" is alt
             # text that was split, not an attribute anybody wrote on purpose. A
-            # bare number is the legacy width/height positional form and is
-            # legitimate.
+            # dimension is the legacy width/height positional form and is
+            # legitimate, units included.
             for field in fields[1:]:
                 value = field.strip()
-                if not value or "=" in value or value.isdigit():
+                if not value or "=" in value or DIMENSION_RE.match(value):
                     continue
                 found.append((number, match.group("target"), match.group("attrs")))
                 break
