@@ -403,7 +403,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .2×2 TableLayout with 5 elements, notice that the last element is missing
-image::img/generated/table-layout-2x2.png[2×2 TableLayout with 5 elements, notice that the last element is missing,scaledwidth=20%]
+image::img/generated/table-layout-2x2.png["2×2 TableLayout with 5 elements, notice that the last element is missing",scaledwidth=20%]
 
 `TableLayout` supports the ability to grow the last column which can be enabled using the `setGrowHorizontally` method. You can also use a shortened terse syntax to construct a `TableLayout` but since the `TableLayout` is a constraint based layout you won't be able to use its full power with this syntax.
 

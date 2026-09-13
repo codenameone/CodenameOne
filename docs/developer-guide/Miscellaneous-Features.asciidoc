@@ -163,7 +163,7 @@ TIP: The `scheduleBackgroundTask` method is like `new Thread()` in some regards.
 
 
 .Contacts with the default photos on the simulator, on device these will use actual user photos when available
-image::img/contacts-with-photos.png[Contacts with the default photos on the simulator, on device these will use actual user photos when available,scaledwidth=20%]
+image::img/contacts-with-photos.png["Contacts with the default photos on the simulator, on device these will use actual user photos when available",scaledwidth=20%]
 
 TIP: Notice that the code above uses `callSerially` & `scheduleBackgroundTask` in a liberal nested way. This is important to avoid an EDT violation
 

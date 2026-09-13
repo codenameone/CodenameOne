@@ -85,7 +85,7 @@ To override a resource, select the platform where the override applies.
 
 [[override-platform]]
 .Override for platform, allows you to override the checked resources and replace them with another resource
-image::img/override-platform.png[Override for platform, allows you to override the checked resources and replace them with another resource]
+image::img/override-platform.png["Override for platform, allows you to override the checked resources and replace them with another resource"]
 
 You can then click the green checkbox to mark that resource as specific to this platform. All resources added while that platform is selected apply to that platform. If you change your mind, delete the override in override mode and it will stop applying.
 

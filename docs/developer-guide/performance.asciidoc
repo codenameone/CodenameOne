@@ -481,7 +481,7 @@ image::img/test-recorder-blank.png[The test recorder tool in the simulator,scale
 Once you press record a test will be generated for you as you use the application.
 
 .Test recording in progress, when done press the save icon
-image::img/test-recorder-in-progress.png[Test recording in progress, when done press the save icon,scaledwidth=50%]
+image::img/test-recorder-in-progress.png["Test recording in progress, when done press the save icon",scaledwidth=50%]
 
 You can build tests using the Codename One testing package to manipulate the Codename One UI programmatically and perform various assertions.
 
