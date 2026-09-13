@@ -121,4 +121,41 @@ final class HeaderLines {
         }
         return out;
     }
+
+    /**
+     * Refuses a method that is not a single HTTP token.
+     *
+     * THE SAME INJECTION THIS CLASS EXISTS FOR, through the other field of the
+     * request line. The packaged arm hands the method to libcurl as
+     * CURLOPT_CUSTOMREQUEST, which writes it into the request line verbatim: a
+     * method of "GET /admin HTTP/1.1", a CRLF and a header line puts a second
+     * request and a header of the caller's choosing on the wire, with the URL
+     * this code chose left dangling on the end. An application that forwards a
+     * caller's verb -- a proxy, a webhook relay -- hands that over. HttpURLConnection
+     * refuses the same string, so the arms disagreed about whether it was a
+     * request at all.
+     *
+     * <p>tchar, as RFC 9110 defines it for a method and a field name alike.
+     * Null is left to the caller: both arms read it as GET.
+     */
+    static void requireMethod(String method) throws IOException {
+        if(method == null) {
+            return;
+        }
+        if(method.length() == 0) {
+            throw new IOException("An HTTP method cannot be empty");
+        }
+        for(int iter = 0 ; iter < method.length() ; iter++) {
+            char c = method.charAt(iter);
+            boolean tchar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '!' || c == '#' || c == '$' || c == '%' || c == '&'
+                    || c == '\'' || c == '*' || c == '+' || c == '-' || c == '.'
+                    || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
+            if(!tchar) {
+                throw new IOException("An HTTP method is one token and this is not: "
+                        + "the character at index " + iter + " cannot appear in one");
+            }
+        }
+    }
 }

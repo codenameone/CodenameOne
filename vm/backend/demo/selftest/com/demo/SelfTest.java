@@ -619,6 +619,70 @@ public class SelfTest {
         return out.toString();
     }
 
+    /**
+     * A method is one token, on both arms.
+     *
+     * <p>The packaged arm gives it to libcurl as CURLOPT_CUSTOMREQUEST, which
+     * writes it into the request line as it stands: a method carrying a CRLF
+     * puts a second request line and a header of the caller's choosing on the
+     * wire. An application that forwards a caller's verb hands that over, and
+     * HttpURLConnection refuses the same string -- so the arms disagreed about
+     * whether it was a request at all.
+     */
+    private static void aMethodIsOneToken() throws Exception {
+        check("a method carrying a request line is refused", "refused",
+                methodRefused("GET /admin HTTP/1.1\r\nX-Evil: yes\r\nX:"));
+        check("and one carrying a space", "refused", methodRefused("GET POST"));
+        check("an ordinary verb is still sent", "sent", methodRefused("DELETE"));
+    }
+
+    /** Whether Web refuses `method` outright, rather than putting it on the wire. */
+    private static String methodRefused(String method) {
+        try {
+            Web.request(method, "http://127.0.0.1:1/nothing", null, null);
+            return "sent";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            return message.indexOf("one token") >= 0 ? "refused" : "sent";
+        }
+    }
+
+    /**
+     * A GET with a body keeps its verb, or says why it cannot.
+     *
+     * <p>HttpURLConnection rewrites a GET into a POST as soon as anything is
+     * written to it, silently, while the packaged arm sends the GET. A search
+     * endpoint that takes a body would be exercised with one verb in development
+     * and another in production. What both arms must satisfy is that the verb is
+     * never quietly changed: the packaged one sends GET, the local one refuses
+     * with a reason, exactly as PATCH does one direction over.
+     */
+    private static void aGetWithABodyKeepsItsVerb() throws Exception {
+        final String[] seen = new String[] { "<none>" };
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                seen[0] = request.getMethod();
+                return HttpServer.Response.text(200, "ok");
+            }
+        });
+        String outcome;
+        try {
+            Web.request("GET", "http://127.0.0.1:" + server.getPort() + "/x", null,
+                    "{\"q\":1}".getBytes("UTF-8"));
+            outcome = seen[0];
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("cannot send a GET with a body") >= 0
+                    ? "explained" : "other: " + message;
+        } finally {
+            server.stop(2000);
+        }
+        check("a GET with a body is sent as GET, or explained", "true",
+                String.valueOf("GET".equals(outcome) || "explained".equals(outcome)));
+        check("and never quietly turned into something else", "false",
+                String.valueOf("POST".equals(outcome)));
+    }
+
     private static void patchIsASendableVerb() throws Exception {
         String outcome;
         try {
@@ -2385,6 +2449,8 @@ public class SelfTest {
     private static void json() throws Exception {
         bothJsonWritersAgree();
         patchIsASendableVerb();
+        aMethodIsOneToken();
+        aGetWithABodyKeepsItsVerb();
         outboundHeadersCannotCarryANewline();
         repeatedOutboundHeadersSurvive();
         anOversizedResponseIsRefusedNotAccumulated();

@@ -175,6 +175,8 @@ public final class Web {
     public static Result request(String method, String url, List headers, byte[] body)
             throws IOException {
         Urls.requireHttp(url);
+        // The request line's other field; see HeaderLines.requireMethod.
+        HeaderLines.requireMethod(method);
         HeaderLines.validate(headers);
         HttpURLConnection connection;
         try {
@@ -235,6 +237,23 @@ public final class Web {
                 }
             }
             if(body != null && body.length > 0) {
+                if("GET".equals(verb)) {
+                    // SILENTLY REWRITTEN OTHERWISE. HttpURLConnection turns a GET
+                    // into a POST the moment anything is written to it -- the JDK
+                    // does it for backward compatibility and says nothing -- while
+                    // the packaged arm sends the GET the caller asked for through
+                    // CUSTOMREQUEST. A search endpoint that takes a body would be
+                    // exercised with the wrong verb in development and the right
+                    // one in production, which is the failure this arm exists to
+                    // not have. Said out loud instead, the way PATCH above is.
+                    throw new IOException("The local Java SE runtime cannot send a "
+                            + "GET with a body -- HttpURLConnection rewrites the verb "
+                            + "to POST as soon as one is written, and does it "
+                            + "silently. The packaged backend sends it as GET, so "
+                            + "this is a limitation of cn1:backend rather than of "
+                            + "your code. Exercise this path against the packaged "
+                            + "binary, or move the payload into the query string.");
+                }
                 connection.setDoOutput(true);
                 connection.setFixedLengthStreamingMode(body.length);
                 OutputStream out = connection.getOutputStream();

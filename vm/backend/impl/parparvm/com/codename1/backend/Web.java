@@ -165,6 +165,8 @@ public final class Web {
      */
     public static Result request(String method, String url, List headers, byte[] body) throws IOException {
         Urls.requireHttp(url);
+        // The request line's other field; see HeaderLines.requireMethod.
+        HeaderLines.requireMethod(method);
         HeaderLines.validate(headers);
         StringBuilder joined = new StringBuilder();
         if(headers != null) {
