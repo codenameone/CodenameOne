@@ -38,6 +38,11 @@ ATTR_RE = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 
 # A rendered width/height is a number, optionally with a unit. Anything else in
 # that slot is alt text that spilled into it.
+#
+# Dimension-SHAPED spill is the hard case and cannot be settled from the render:
+# [Results, 2024] and [Diagram,640] both come out as alt="X" width="N", and only
+# the author knows which was meant. Those are held against a baseline instead, so
+# the ones already in the guide stay quiet and a new one has to be declared.
 DIMENSION_RE = re.compile(r"^\s*\d+(?:\.\d+)?\s*(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?\s*$", re.I)
 
 
@@ -68,19 +73,43 @@ def render(source: Path, attributes: Tuple[str, ...] = ()) -> str:
         return out.read_text(encoding="utf-8", errors="replace")
 
 
-def offenders(markup: str) -> List[Tuple[str, str, str]]:
-    """Every rendered image whose width or height holds something that is not one."""
+BASELINE = Path("scripts/developer-guide/image-dimension-baseline.txt")
+
+
+def load_baseline() -> set:
+    if not BASELINE.exists():
+        return set()
+    entries = set()
+    for line in BASELINE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            entries.add(line)
+    return entries
+
+
+def offenders(markup: str, baseline: set) -> List[Tuple[str, str, str, bool]]:
+    """Rendered images whose width or height is not one, or is undeclared.
+
+    Returns (src, alt, value, ambiguous). ambiguous marks the dimension-shaped
+    case, where the render cannot say whether the author meant a width or lost
+    the tail of their alt text.
+    """
     found = []
     for tag in IMG_RE.findall(markup):
         attrs = {k.lower(): v for k, v in ATTR_RE.findall(tag)}
         for slot in ("width", "height"):
             value = attrs.get(slot)
-            if value is None or DIMENSION_RE.match(value):
+            if value is None:
                 continue
-            found.append((attrs.get("src", "?"),
-                          html.unescape(attrs.get("alt", "")),
-                          html.unescape(value)))
-            break
+            src = attrs.get("src", "?")
+            alt = html.unescape(attrs.get("alt", ""))
+            if not DIMENSION_RE.match(value):
+                found.append((src, alt, html.unescape(value), False))
+                break
+            key = f"{src}|{slot}|{value}"
+            if key not in baseline:
+                found.append((src, alt, f"{slot}={value}", True))
+                break
     return found
 
 
@@ -93,6 +122,7 @@ def main() -> int:
     sources = [Path(p) for p in args.sources] or [
         Path("docs/developer-guide/developer-guide.asciidoc")]
 
+    baseline = load_baseline()
     total = 0
     seen = set()
     for source in sources:
@@ -100,16 +130,22 @@ def main() -> int:
             markup = render(source, attributes)
             if not markup:
                 return 1
-            for src, alt, spilled in offenders(markup):
+            for src, alt, spilled, ambiguous in offenders(markup, baseline):
                 # the same image usually appears in both renders; report it once
-                if (src, alt) in seen:
+                if (src, alt, spilled) in seen:
                     continue
-                seen.add((src, alt))
+                seen.add((src, alt, spilled))
                 total += 1
                 where = "" if name == "html" else f" (in the {name} render)"
                 print(f"{source}: {src}{where}")
-                print(f'    alt text was cut to "{alt}"')
-                print(f'    and "{spilled}" landed in the width slot')
+                if ambiguous:
+                    print(f'    renders as alt="{alt}" with an undeclared {spilled}')
+                    print("    If that is a real width, add it to "
+                          f"{BASELINE}. If it is the tail of the alt")
+                    print("    text, quote the alt text instead.")
+                else:
+                    print(f'    alt text was cut to "{alt}"')
+                    print(f'    and "{spilled}" landed in the width slot')
 
     if total:
         print()

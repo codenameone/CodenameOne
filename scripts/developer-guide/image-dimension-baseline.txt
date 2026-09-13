@@ -1,0 +1,35 @@
+# Images that legitimately carry a POSITIONAL width or height.
+#
+# A positional dimension and alt text split by a comma render identically:
+# image::chart.png[Results, 2024] and image::ok.png[Diagram,640] both come out
+# as alt="X" width="N". The render cannot tell which the author meant, so the
+# ones already in the guide are recorded here and anything new has to be
+# declared deliberately -- by adding a line, or by quoting the alt text if the
+# number was really part of it.
+#
+# Format: <src>|<width|height>|<value>
+img/car-androidauto-grid.png|width|640
+img/car-carplay-list.png|width|640
+img/car-now-playing.png|width|640
+img/car-sim-carplay-grid.png|width|640
+img/car-sim-carplay-list.png|width|640
+img/chat-view.png|width|320
+img/css-filter-blur-overview.png|width|260
+img/css-gradients-overview.png|width|300
+img/game-3d.png|width|240
+img/game-3d.png|width|250
+img/game-board.png|width|240
+img/game-cards.png|width|240
+img/game-casual.png|width|240
+img/game-scroller.png|width|240
+img/game-spritesheet.png|width|640
+img/gamebuilder-3d-preview.png|width|800
+img/gamebuilder-3d.png|width|800
+img/gamebuilder-editor.png|width|800
+img/gamebuilder-import.png|width|800
+img/gamebuilder-inspector.png|width|800
+img/gamebuilder-live.png|width|800
+img/surfaces-clock-widget.png|width|320
+img/surfaces-dynamic-island.png|width|640
+img/surfaces-sample-form.png|width|640
+img/surfaces-widget-preview.png|width|640
