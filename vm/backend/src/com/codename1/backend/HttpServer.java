@@ -1754,6 +1754,25 @@ public final class HttpServer {
                 }
             }
         }
+        // AND THEN THE LAST RESPONSE. fullyStopped can be reached with work still
+        // outstanding -- that is the deliberate path where a handler is inside a
+        // request and the sessions are left alone rather than freed under it --
+        // and a handler that called stop() itself is exactly that case. Returning
+        // here on the flag alone let main() return, and the process takes its
+        // detached threads with it, so the response to the request that asked for
+        // the shutdown was dropped on the way out.
+        //
+        // Bounded, because this must not become a way to hang a shutdown: after
+        // the grace the caller gets control back whatever is still running.
+        long limit = System.currentTimeMillis() + SESSION_RELEASE_GRACE_MILLIS;
+        while(System.currentTimeMillis() < limit && workOutstanding()) {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     /**
@@ -1986,6 +2005,9 @@ public final class HttpServer {
      */
     private static final ThreadLocal SERVING_FD = new ThreadLocal();
 
+    /** Whether the request this thread serves is an HTTP/2 turn; see stop(). */
+    private static final ThreadLocal SERVING_H2 = new ThreadLocal();
+
     /**
      * workOutstanding(), minus what the calling handler is itself holding.
      *
@@ -1994,12 +2016,32 @@ public final class HttpServer {
      * drain has to discount them or it waits for itself. Any OTHER work still
      * counts, which is the part of the drain worth having.
      */
+    /**
+     * The headers a refusal this server invented may carry: none of the handler's.
+     *
+     * <p>The 503s above replace a response the server could not send, and they
+     * were submitted with that response's own header list. A login handler's
+     * Set-Cookie therefore went out on a 503 that said the operation was
+     * unavailable -- the client is told the request failed and is authenticated
+     * anyway -- and a validator or cache directive went out describing a body
+     * that was never sent. What the server says on its own behalf is the status,
+     * and nothing the handler wrote belongs to it.
+     */
+    private static List refusalHeaders() {
+        return new java.util.ArrayList();
+    }
+
     private boolean workOutstandingBesidesCaller(int callerFd) {
         if(callerFd < 0) {
             return workOutstanding();
         }
+        // AND THE TURN, on HTTP/2. serveHttp2 holds a turn for as long as the
+        // handler runs, exactly as the request and the connection are held, so
+        // leaving it counted meant an h2 handler calling stop() still waited out
+        // both windows in full -- the counter it was waiting for was its own.
+        int ownTurn = Boolean.TRUE.equals(SERVING_H2.get()) ? 1 : 0;
         return inFlightRequests.get() > 1 || activeRequests.get() > 1
-                || http2Turns.get() > 0 || pendingWork.get() > 0;
+                || http2Turns.get() > ownTurn || pendingWork.get() > 0;
     }
 
     private boolean workOutstanding() {
@@ -4126,6 +4168,7 @@ public final class HttpServer {
                 Response response;
                 inFlightRequests.incrementAndGet();
                 SERVING_FD.set(new Integer(fd));
+                SERVING_H2.set(Boolean.TRUE);
                 try {
                     response = handler.handle(request);
                     if(response == null) {
@@ -4196,9 +4239,9 @@ public final class HttpServer {
                     // the ceiling refuses. If there is no room for it, the status
                     // alone still has to reach the client -- dropping the whole
                     // response would leave the stream hanging.
-                    if(!h2.respond(stream.getId(), 503, "text/plain", extra,
+                    if(!h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(),
                             asciiBytes("too many files in flight"))) {
-                        h2.respond(stream.getId(), 503, "text/plain", extra, null);
+                        h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                     }
                 } else if(response.fileFd >= 0 && !noBody) {
                     // Streamed frame by frame out of the descriptor. Reading the file
@@ -4218,7 +4261,7 @@ public final class HttpServer {
                         // than the enforcement; this is the enforcement, and it
                         // happens in the same step that takes the descriptor.
                         StaticFiles.closeFile(response.fileFd);
-                        h2.respond(stream.getId(), 503, "text/plain", extra, null);
+                        h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                     }
                 } else {
                     // A HEAD describes the representation it is not sending, and
@@ -4276,7 +4319,7 @@ public final class HttpServer {
                         // Bodiless, because the reason for refusing is that there
                         // is no room for bodies. An explanatory body here is the
                         // one allocation that must not be attempted.
-                        h2.respond(stream.getId(), 503, "text/plain", extra, null);
+                        h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                     } else {
                         queuedBodyBytes += bodyBytes;
                     }
@@ -4316,6 +4359,7 @@ public final class HttpServer {
                     // underneath it, which truncates the response at best.
                     inFlightRequests.decrementAndGet();
                     SERVING_FD.set(null);
+                    SERVING_H2.set(null);
                 }
             }
             flushHttp2(fd, session, h2);

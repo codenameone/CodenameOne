@@ -2288,6 +2288,76 @@ public class SelfTest {
     }
 
     /**
+     * A response that declares its length twice, differently, is refused.
+     *
+     * <p>The first Content-Length was taken and the rest ignored, so the framing
+     * depended on field ORDER: 5 before 10 with ten bytes was accepted and cut to
+     * five, and the same two fields the other way round came back a transport
+     * error. An unparseable one was treated as absent, which turns off the
+     * truncation check entirely. RFC 9112 6.3: a message whose length is invalid
+     * or contradictory is invalid.
+     */
+    private static void aContradictoryLengthIsRefused() throws Exception {
+        check("a single length still frames the body", "hello",
+                lengthReply("Content-Length: 5", "hello"));
+        // The SAME pair both ways round: neither order may be believed.
+        check("two different lengths are refused", "refused",
+                lengthReply("Content-Length: 5\r\nContent-Length: 10", "helloworld"));
+        check("and are refused in the other order too", "refused",
+                lengthReply("Content-Length: 10\r\nContent-Length: 5", "helloworld"));
+        check("a length that is not a number is refused", "refused",
+                lengthReply("Content-Length: five", "hello"));
+        check("a negative length is refused", "refused",
+                lengthReply("Content-Length: -1", "hello"));
+        // Repeating the SAME value is the one duplicate RFC 9112 lets a recipient
+        // treat as one, so it must still work.
+        check("the same length twice is one length", "hello",
+                lengthReply("Content-Length: 5\r\nContent-Length: 5", "hello"));
+    }
+
+    /** Serves one canned response with the given length fields. */
+    private static String lengthReply(final String lengthFields, final String body)
+            throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    byte[] request = new byte[4096];
+                    ServerSocket.read(client, request, 0, request.length);
+                    byte[] reply = ("HTTP/1.1 200 OK\r\n" + lengthFields + "\r\n\r\n"
+                            + body).getBytes("UTF-8");
+                    ServerSocket.write(client, reply, 0, reply.length);
+                } catch (Exception ignored) {
+                    // The verdict below is what this check reports.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            outcome = Http.request("127.0.0.1", port, "GET", "/x", null).getBodyAsString();
+        } catch (java.io.IOException refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("Content-Length") >= 0 ? "refused"
+                    : "refused for another reason: " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        return outcome;
+    }
+
+    /**
      * A chunked response ends where its framing says, trailers included.
      *
      * <p>RFC 9112 7.1 ends the body with the last chunk, then the trailer
@@ -3896,6 +3966,7 @@ public class SelfTest {
         aTruncatingDatabasePathOpensNothing();
         aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();
+        aContradictoryLengthIsRefused();
         aChunkedResponseEndsWhereItsFramingSays();
         aResponseEndsAtItsDeclaredLength();
         aTruncatingPathOpensNothing();

@@ -256,17 +256,44 @@ public final class Http {
      * value is not a number. A chunked response has no Content-Length, so the
      * check above simply does not apply to one.
      */
-    private static int declaredLength(List names, List values) {
+    private static int declaredLength(List names, List values) throws IOException {
+        // EVERY occurrence, and they have to agree. Taking the first and treating
+        // an unparseable one as absent made the framing depend on field ORDER:
+        // "Content-Length: 5" before "Content-Length: 10" with ten bytes was
+        // accepted and cut to five, while the same two fields the other way round
+        // came back a transport error. RFC 9112 6.3 is that a message with an
+        // invalid or conflicting length is invalid -- and rejecting a repeated
+        // list is explicitly one of the two allowed answers.
+        //
+        // -1 still means ABSENT, which is a different thing from unreadable: a
+        // response with no Content-Length is ordinary (chunked, or ended by the
+        // close), and only the ones that make a claim are held to it.
+        int declared = -1;
         for(int iter = 0 ; iter < names.size() ; iter++) {
-            if("content-length".equalsIgnoreCase(String.valueOf(names.get(iter)))) {
-                try {
-                    return Integer.parseInt(String.valueOf(values.get(iter)).trim());
-                } catch (NumberFormatException err) {
-                    return -1;
-                }
+            if(!"content-length".equalsIgnoreCase(String.valueOf(names.get(iter)))) {
+                continue;
             }
+            String raw = String.valueOf(values.get(iter)).trim();
+            int parsed;
+            try {
+                parsed = Integer.parseInt(raw);
+            } catch (NumberFormatException err) {
+                throw new IOException("The response declares a Content-Length that "
+                        + "is not a number, so where its body ends cannot be known: "
+                        + raw);
+            }
+            if(parsed < 0) {
+                throw new IOException("The response declares a negative "
+                        + "Content-Length: " + raw);
+            }
+            if(declared >= 0 && declared != parsed) {
+                throw new IOException("The response declares two different "
+                        + "Content-Lengths, " + declared + " and " + parsed
+                        + ", so where its body ends depends on which is believed");
+            }
+            declared = parsed;
         }
-        return -1;
+        return declared;
     }
 
     /**
