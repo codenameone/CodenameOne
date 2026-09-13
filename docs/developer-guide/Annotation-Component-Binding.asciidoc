@@ -139,6 +139,14 @@ refresh. If you need the cross-field update to propagate, call
 restructure the model so the cross-field mutation happens outside the
 setter's call frame -- for example via a `Display.callSerially`.
 
+`commit()` is worse than suppression and neither remedy reaches it. When both
+fields are bound two-way and `fullName` is emitted after `firstName`, the
+generated `_commit` carries on to the `fullName` component, reads the value
+still sitting in it, and calls `setFullName` -- overwriting what
+`setFirstName` just derived. A later `binding.refresh()` then publishes the
+overwritten value, not the derived one. Bind a derived field one way, or derive
+it somewhere other than inside the setter.
+
 === POJOs versus Property objects
 
 A `String`, `int`, or `boolean` field is read and written through the
