@@ -1,7 +1,7 @@
 name: Starter launchers
 on:
   pull_request:
-    paths: ['maven/cn1app-archetype/src/main/resources/archetype-resources/**', 'scripts/test-starter-launchers.py', '.github/workflows/starter-launchers.yml']
+    paths: ['maven/cn1app-archetype/src/main/resources/archetype-resources/**', 'scripts/test-starter-launchers.py', 'scripts/sync-initializr-launchers.py', 'scripts/tests/**', 'scripts/initializr/common/src/main/**', '.github/workflows/starter-launchers.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,3 +19,11 @@ jobs:
           python-version: '3.12'
       - name: Execute actual launchers and wrapper
         run: python scripts/test-starter-launchers.py maven/cn1app-archetype/src/main/resources/archetype-resources
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Check embedded Initializr launcher parity
+        run: python scripts/sync-initializr-launchers.py
+      - name: Generate, extract and execute real Initializr downloads
+        run: python scripts/tests/generate-initializr-fixtures.py "${{ runner.temp }}/initializr-fixtures"

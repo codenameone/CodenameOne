@@ -16,7 +16,18 @@ windows = os.name == 'nt'
 with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     parent = Path(directory)
     project = parent / "Project O'Brien with spaces"
-    shutil.copytree(source, project)
+    if source.is_file():
+        if windows:
+            command = ["powershell", "-NoProfile", "-Command",
+                       "Expand-Archive -LiteralPath $env:CN1_TEST_ZIP -DestinationPath $env:CN1_TEST_PROJECT"]
+            subprocess.run(command, env=dict(os.environ, CN1_TEST_ZIP=str(source), CN1_TEST_PROJECT=str(project)), check=True)
+        else:
+            subprocess.run(['unzip', '-q', str(source), '-d', str(project)], check=True)
+        for name in ['build.sh', 'run.sh', 'mvnw']:
+            if not windows:
+                assert os.access(project / name, os.X_OK), name + ' must extract executable without chmod'
+    else:
+        shutil.copytree(source, project)
     properties = (project / '.mvn/wrapper/maven-wrapper.properties').read_text()
     url = next(line.split('=', 1)[1].strip() for line in properties.splitlines() if line.startswith('distributionUrl='))
     distro = url.rsplit('/', 1)[1].removesuffix('-bin.zip')
@@ -41,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
         record.unlink(missing_ok=True)
         env['CN1_TEST_EXIT'] = str(code)
         script = project / (launcher + ('.bat' if windows else '.sh'))
-        if not windows:
+        if not windows and source.is_dir():
             script.chmod(0o755)  # archive modes are separately tested by StarterProjectServiceTest
         command = [str(script)] + ([target] if target else [])
         if windows:
