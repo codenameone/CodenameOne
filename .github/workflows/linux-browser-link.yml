@@ -1,0 +1,20 @@
+name: Linux browser lazy linking
+on:
+  pull_request:
+    paths: ['Ports/LinuxPort/nativeSources/**', 'scripts/linux/check-browser-lazy-link.sh', '.github/workflows/linux-browser-link.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-link:
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install real GTK and WebKit headers
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev pkg-config binutils gcc
+      - name: Check debug and release objects without dead stripping
+        run: bash scripts/linux/check-browser-lazy-link.sh

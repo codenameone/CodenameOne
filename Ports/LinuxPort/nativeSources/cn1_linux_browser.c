@@ -256,19 +256,23 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_browserSetHost___long_int(
 
 typedef struct { CN1Browser* b; char* a; char* c; int x, y, w, h; } CN1BrowserOp;
 
+/* view is created only by webkit_web_view_new_with_user_content_manager above.
+ * WEBKIT_WEB_VIEW() would call webkit_web_view_get_type() directly, introducing
+ * a link-time dependency and breaking our optional, dynamically loaded WebKit. */
+
 static void cn1BrowserSetHtmlOnMain(void* p) {
     CN1BrowserOp* op = (CN1BrowserOp*) p;
-    p_webkit_web_view_load_html(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "", op->c);
+    p_webkit_web_view_load_html((WebKitWebView*) op->b->view, op->a ? op->a : "", op->c);
 }
 
 static void cn1BrowserSetUrlOnMain(void* p) {
     CN1BrowserOp* op = (CN1BrowserOp*) p;
-    p_webkit_web_view_load_uri(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "about:blank");
+    p_webkit_web_view_load_uri((WebKitWebView*) op->b->view, op->a ? op->a : "about:blank");
 }
 
 static void cn1BrowserExecuteOnMain(void* p) {
     CN1BrowserOp* op = (CN1BrowserOp*) p;
-    p_webkit_web_view_run_javascript(WEBKIT_WEB_VIEW(op->b->view), op->a ? op->a : "", 0, 0, 0);
+    p_webkit_web_view_run_javascript((WebKitWebView*) op->b->view, op->a ? op->a : "", 0, 0, 0);
 }
 
 static void cn1BrowserBoundsOnMain(void* p) {
