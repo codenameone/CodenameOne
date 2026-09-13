@@ -118,13 +118,47 @@ public final class Credentials {
     }
 
     /** AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN, or null. */
-    public static Credentials fromEnvironment() {
-        String id = System.getenv("AWS_ACCESS_KEY_ID");
-        String secret = System.getenv("AWS_SECRET_ACCESS_KEY");
-        if(id == null || id.length() == 0 || secret == null || secret.length() == 0) {
+    public static Credentials fromEnvironment() throws IOException {
+        return credentialsFrom(System.getenv("AWS_ACCESS_KEY_ID"),
+                System.getenv("AWS_SECRET_ACCESS_KEY"),
+                System.getenv("AWS_SESSION_TOKEN"));
+    }
+
+    /**
+     * The environment pair as credentials: null when NEITHER half is set, and an
+     * exception when one is.
+     *
+     * <p>HALF A PAIR IS A BROKEN DEPLOYMENT, not an absent one. Answering null
+     * for it sent resolve() on to the container endpoint and then to instance
+     * metadata, so a misspelled key in a Kubernetes Secret -- or a secret that
+     * failed to mount -- did not fail the workload: it ran under the node's role
+     * instead, with whatever that role can do, and the only evidence was an
+     * access denied somewhere else entirely, or nothing at all if the node role
+     * happened to be wider. Every other AWS SDK treats this as an error for the
+     * same reason; botocore has a name for it, PartialCredentialsError.
+     *
+     * <p>Taken apart from the getenv calls so the rule can be driven with values
+     * rather than by a process's environment, which it cannot set for itself.
+     * The session token is genuinely optional and is not part of the pair.
+     */
+    static Credentials credentialsFrom(String id, String secret, String token)
+            throws IOException {
+        boolean hasId = id != null && id.length() > 0;
+        boolean hasSecret = secret != null && secret.length() > 0;
+        if(!hasId && !hasSecret) {
             return null;
         }
-        String token = System.getenv("AWS_SESSION_TOKEN");
+        if(!hasId || !hasSecret) {
+            // The names only. This message goes wherever the caller logs it, and
+            // the half that IS set is a live credential.
+            throw new IOException("AWS_" + (hasId ? "SECRET_ACCESS_KEY" : "ACCESS_KEY_ID")
+                    + " is unset while AWS_"
+                    + (hasId ? "ACCESS_KEY_ID" : "SECRET_ACCESS_KEY")
+                    + " is set. Half a credential pair is a misconfiguration, so "
+                    + "it is refused rather than ignored: ignoring it would run "
+                    + "this workload under the container or instance role instead, "
+                    + "which is a different identity than the one configured here.");
+        }
         return new Credentials(id, secret,
                 token == null || token.length() == 0 ? null : token);
     }

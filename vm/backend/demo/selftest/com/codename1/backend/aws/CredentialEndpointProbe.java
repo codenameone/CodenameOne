@@ -44,6 +44,20 @@ public final class CredentialEndpointProbe {
         return S3.endpointFor(region);
     }
 
+    /**
+     * What the environment pair resolves to: "none", "credentials", or
+     * "refused". See Credentials.credentialsFrom -- the rule is about which of
+     * the two variables are set, and a process cannot set them for itself.
+     */
+    public static String pairVerdictFor(String id, String secret) {
+        try {
+            return Credentials.credentialsFrom(id, secret, null) == null
+                    ? "none" : "credentials";
+        } catch (IOException refused) {
+            return "refused";
+        }
+    }
+
     /** "allowed", or "refused" with the reason the runtime gave. */
     public static String verdictFor(String url) {
         try {

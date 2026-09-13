@@ -2544,6 +2544,40 @@ public class SelfTest {
     }
 
     /**
+     * Half an environment credential pair fails the workload, it does not
+     * quietly change its identity.
+     *
+     * <p>A misspelled key in a Kubernetes Secret, or one that failed to mount,
+     * leaves one of the two variables set. Reading that as "no environment
+     * credentials" sent resolve() on to the container endpoint and then to
+     * instance metadata, so the workload ran under the NODE's role -- a
+     * different identity with different grants, and no message anywhere saying
+     * so. The pair is the unit; the session token is not part of it.
+     *
+     * <p>Driven through the probe because a process cannot set its own
+     * environment, so the public method could only ever test the one case the
+     * harness happened to launch it with.
+     */
+    private static void halfACredentialPairIsRefused() throws Exception {
+        check("neither variable set is no environment credential", "none",
+                CredentialEndpointProbe.pairVerdictFor(null, null));
+        check("an empty pair is the same as an absent one", "none",
+                CredentialEndpointProbe.pairVerdictFor("", ""));
+        check("an id with no secret is refused", "refused",
+                CredentialEndpointProbe.pairVerdictFor("AKIAEXAMPLE", null));
+        check("a secret with no id is refused", "refused",
+                CredentialEndpointProbe.pairVerdictFor(null, "s3cret"));
+        // An empty string is how a Secret that mounted with no value arrives, and
+        // it is exactly as broken as an unset one.
+        check("and an empty half is a half", "refused",
+                CredentialEndpointProbe.pairVerdictFor("AKIAEXAMPLE", ""));
+        // The control: a whole pair still resolves, or this check would pass with
+        // the environment provider deleted outright.
+        check("a whole pair is credentials", "credentials",
+                CredentialEndpointProbe.pairVerdictFor("AKIAEXAMPLE", "s3cret"));
+    }
+
+    /**
      * A region is resolved in its own AWS partition.
      *
      * <p>AWS China is a separate partition whose S3 endpoints end in
@@ -4636,6 +4670,7 @@ public class SelfTest {
         theReactorProbesAndFiresOnce();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
+        halfACredentialPairIsRefused();
         aRemoteCredentialEndpointMustBeEncrypted();
         anEndlessResponseIsRefused();
         aContradictoryLengthIsRefused();
