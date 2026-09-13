@@ -214,6 +214,8 @@ attach the debugger afterwards. Default is `true`.
 
 === What you can step through
 
+image::img/android-debug-scope.svg["What a JDWP attach reaches on Android",scaledwidth=95%]
+
 Everything runs in one Dalvik/ART process, so the JDWP attach sees
 every class loaded by the app. In practical terms:
 
