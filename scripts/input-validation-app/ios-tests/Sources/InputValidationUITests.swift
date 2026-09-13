@@ -150,21 +150,40 @@ final class InputValidationUITests: XCTestCase {
         //
         // Stopped by the driver's keytype.stop gate, written as soon as the step
         // resolves either way. The app exits a second and a half after the suite
-        // finishes, and typing into a process that has left fails the XCUITest
-        // run even though every event landed; app.state is re-checked before
-        // each key so the loop cannot outlive the app in the gap between the
-        // gate being written and this loop waking up.
+        // finishes, and typing into a process that has left fails the XCUITest run
+        // even though every event landed.
+        //
+        // The GATE is checked before every key, not once per pass. It is the leading
+        // signal -- the driver writes it as soon as the step resolves, about a second
+        // and a half before the app goes -- whereas app.state only flips once the app
+        // is already on its way out, which is too late to stop a keystroke already
+        // being synthesised. Relying on app.state alone, and testing the gate only
+        // once per pass, left up to three keystrokes and a one-second sleep between
+        // the stop being requested and this loop noticing: a CI run typed straight
+        // through the app's exit that way, with every gesture already landed and
+        // CN1IV:SUITE:FINISHED already in the log, and failed anyway.
+        //
+        // The sleep is sliced for the same reason: a whole second of not looking is
+        // most of the margin the gate buys.
         for _ in 0..<15 {
             if stopRequested("keytype", syncDir: syncDir) {
                 return
             }
             for key in ["c", "n", "1"] {
+                if stopRequested("keytype", syncDir: syncDir) {
+                    return
+                }
                 guard app.state == .runningForeground else {
                     return
                 }
                 app.typeKey(key, modifierFlags: [])
             }
-            Thread.sleep(forTimeInterval: 1.0)
+            for _ in 0..<10 {
+                if stopRequested("keytype", syncDir: syncDir) {
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.1)
+            }
         }
     }
 
