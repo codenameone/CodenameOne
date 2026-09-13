@@ -233,36 +233,6 @@ public final class Class<T> implements java.lang.reflect.Type {
     }
     
     /**
-     * Type codes for {@link #getPrimitiveClass(int)}. Shared only with
-     * nativeMethods.m, which switches on the same values.
-     */
-    static final int CN1_PRIM_INT = 0;
-    static final int CN1_PRIM_LONG = 1;
-    static final int CN1_PRIM_SHORT = 2;
-    static final int CN1_PRIM_BYTE = 3;
-    static final int CN1_PRIM_CHAR = 4;
-    static final int CN1_PRIM_FLOAT = 5;
-    static final int CN1_PRIM_DOUBLE = 6;
-    static final int CN1_PRIM_BOOLEAN = 7;
-    static final int CN1_PRIM_VOID = 8;
-
-    /**
-     * Returns the class object for a primitive type, e.g. the one
-     * {@code int.class} and {@link Integer#TYPE} denote.
-     *
-     * The wrapper classes cannot initialize their {@code TYPE} fields with a
-     * primitive class literal: javac lowers {@code int.class} to a read of
-     * {@code Integer.TYPE} itself, so {@code TYPE = int.class} compiles to
-     * {@code getstatic TYPE; putstatic TYPE} and leaves the field null. The JDK
-     * declares an equivalent native for the same reason.
-     *
-     * Takes an int code rather than a name so that it allocates nothing and
-     * decodes nothing: it runs inside the wrapper class initializers, which are
-     * among the earliest code in the process.
-     */
-    static native Class getPrimitiveClass(int typeCode);
-
-    /**
      * Determines if this Class object represents an array class.
      */
     public native boolean isArray();

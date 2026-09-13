@@ -33,14 +33,14 @@ import java.util.Map;
 public class ByteCodeMethodArg {
     private final int arrayDimensions;
     private String type;
-    private Class primitiveType;
+    private PrimitiveType primitiveType;
 
     public ByteCodeMethodArg(String type, int dim) {
         this.type = type.replace('/', '_').replace('$', '_');
         arrayDimensions = dim;
     }
 
-    public ByteCodeMethodArg(Class type, int dim) {
+    public ByteCodeMethodArg(PrimitiveType type, int dim) {
         this.primitiveType = type;
         arrayDimensions = dim;
     }
@@ -49,13 +49,13 @@ public class ByteCodeMethodArg {
         if(type != null || arrayDimensions > 0) {
             return 'o';
         }
-        if(primitiveType == Long.TYPE) {
+        if(primitiveType == PrimitiveType.LONG) {
             return 'l';
         }
-        if(primitiveType == Double.TYPE) {
+        if(primitiveType == PrimitiveType.DOUBLE) {
             return 'd';
         }
-        if(primitiveType == Float.TYPE) {
+        if(primitiveType == PrimitiveType.FLOAT) {
             return 'f';
         }
         return 'i';
@@ -93,7 +93,11 @@ public class ByteCodeMethodArg {
         if(type != null) {
             return type.hashCode();
         }
-        return primitiveType.hashCode();
+        // ordinal(), not hashCode(): Enum.hashCode is an identity hash on OpenJDK
+        // and the ordinal in ParparVM's java.lang.Enum, so hashing on it would make
+        // a hash container of these args iterate in a different order under the
+        // self-hosted translator than under the JVM-hosted one.
+        return primitiveType.ordinal();
     }
 
     @Override
@@ -121,11 +125,11 @@ public class ByteCodeMethodArg {
     }
     
     public boolean isVoid() {
-        return primitiveType == Void.TYPE;
+        return primitiveType == PrimitiveType.VOID;
     }
     
     public boolean isDoubleOrLong() {
-        return (primitiveType == Double.TYPE || primitiveType == Long.TYPE) && arrayDimensions == 0;
+        return (primitiveType == PrimitiveType.DOUBLE || primitiveType == PrimitiveType.LONG) && arrayDimensions == 0;
     }
 
     /**
@@ -139,7 +143,7 @@ public class ByteCodeMethodArg {
         return type;
     }
     
-    public Class getPrimitiveType() {
+    public PrimitiveType getPrimitiveType() {
         return primitiveType;
     }
     

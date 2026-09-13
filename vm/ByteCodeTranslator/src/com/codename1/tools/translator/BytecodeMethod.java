@@ -786,16 +786,16 @@ public class BytecodeMethod implements SignatureSet {
         if(methodName.equals("<init>")) {
             methodName = "__INIT__";
             constructor = true;
-            returnType = new ByteCodeMethodArg(Void.TYPE, 0);
+            returnType = new ByteCodeMethodArg(PrimitiveType.VOID, 0);
         } else {
             if(methodName.equals("<clinit>")) {
                 methodName = "__CLINIT__";
-                returnType = new ByteCodeMethodArg(Void.TYPE, 0);
+                returnType = new ByteCodeMethodArg(PrimitiveType.VOID, 0);
                 staticMethod = true;
             } else {            
                 String retType = desc.substring(pos + 1);
                 if(retType.equals("V")) {
-                    returnType = new ByteCodeMethodArg(Void.TYPE, 0);
+                    returnType = new ByteCodeMethodArg(PrimitiveType.VOID, 0);
                 } else {
                     int dim = 0;
                     while(retType.startsWith("[")) {
@@ -818,28 +818,28 @@ public class BytecodeMethod implements SignatureSet {
                             returnType = new ByteCodeMethodArg(objectType, dim);
                             break;
                         case 'I':
-                            returnType = new ByteCodeMethodArg(Integer.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.INT, dim);
                             break;
                         case 'J':
-                            returnType = new ByteCodeMethodArg(Long.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.LONG, dim);
                             break;
                         case 'B':
-                            returnType = new ByteCodeMethodArg(Byte.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.BYTE, dim);
                             break;
                         case 'S':
-                            returnType = new ByteCodeMethodArg(Short.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.SHORT, dim);
                             break;
                         case 'F':
-                            returnType = new ByteCodeMethodArg(Float.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.FLOAT, dim);
                             break;
                         case 'D':
-                            returnType = new ByteCodeMethodArg(Double.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.DOUBLE, dim);
                             break;
                         case 'Z':
-                            returnType = new ByteCodeMethodArg(Boolean.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.BOOLEAN, dim);
                             break;
                         case 'C':
-                            returnType = new ByteCodeMethodArg(Character.TYPE, dim);
+                            returnType = new ByteCodeMethodArg(PrimitiveType.CHAR, dim);
                             break;
                     }
                 }
@@ -869,28 +869,28 @@ public class BytecodeMethod implements SignatureSet {
                     arguments.add(new ByteCodeMethodArg(objectType, currentArrayDim));
                     break;
                 case 'I':
-                    arguments.add(new ByteCodeMethodArg(Integer.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.INT, currentArrayDim));
                     break;
                 case 'J':
-                    arguments.add(new ByteCodeMethodArg(Long.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.LONG, currentArrayDim));
                     break;
                 case 'B':
-                    arguments.add(new ByteCodeMethodArg(Byte.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.BYTE, currentArrayDim));
                     break;
                 case 'S':
-                    arguments.add(new ByteCodeMethodArg(Short.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.SHORT, currentArrayDim));
                     break;
                 case 'F':
-                    arguments.add(new ByteCodeMethodArg(Float.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.FLOAT, currentArrayDim));
                     break;
                 case 'D':
-                    arguments.add(new ByteCodeMethodArg(Double.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.DOUBLE, currentArrayDim));
                     break;
                 case 'Z':
-                    arguments.add(new ByteCodeMethodArg(Boolean.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.BOOLEAN, currentArrayDim));
                     break;
                 case 'C':
-                    arguments.add(new ByteCodeMethodArg(Character.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.CHAR, currentArrayDim));
                     break;
             }
             currentArrayDim = 0;
@@ -2915,10 +2915,10 @@ public class BytecodeMethod implements SignatureSet {
      * is more specific (e.g. boolean / byte / short / char).
      */
     private String returnTypeChar() {
-        if (returnType.getPrimitiveType() == Boolean.TYPE) return "Z";
-        if (returnType.getPrimitiveType() == Byte.TYPE)    return "B";
-        if (returnType.getPrimitiveType() == Short.TYPE)   return "S";
-        if (returnType.getPrimitiveType() == Character.TYPE) return "C";
+        if (returnType.getPrimitiveType() == PrimitiveType.BOOLEAN) return "Z";
+        if (returnType.getPrimitiveType() == PrimitiveType.BYTE)    return "B";
+        if (returnType.getPrimitiveType() == PrimitiveType.SHORT)   return "S";
+        if (returnType.getPrimitiveType() == PrimitiveType.CHAR) return "C";
         return "I";
     }
 

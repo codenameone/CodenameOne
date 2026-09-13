@@ -41,7 +41,7 @@ public class ByteCodeField {
     
     private int arrayDimensions;
     private String type;
-    private Class primitiveType;
+    private PrimitiveType primitiveType;
     private boolean finalField;
     private Object value;
     private boolean privateField;
@@ -81,28 +81,28 @@ public class ByteCodeField {
                 type = objectType;
                 break;
             case 'I':
-                primitiveType = Integer.TYPE;
+                primitiveType = PrimitiveType.INT;
                 break;
             case 'J':
-                primitiveType = Long.TYPE;
+                primitiveType = PrimitiveType.LONG;
                 break;
             case 'B':
-                primitiveType = Byte.TYPE;
+                primitiveType = PrimitiveType.BYTE;
                 break;
             case 'S':
-                primitiveType = Short.TYPE;
+                primitiveType = PrimitiveType.SHORT;
                 break;
             case 'F':
-                primitiveType = Float.TYPE;
+                primitiveType = PrimitiveType.FLOAT;
                 break;
             case 'D':
-                primitiveType = Double.TYPE;
+                primitiveType = PrimitiveType.DOUBLE;
                 break;
             case 'Z':
-                primitiveType = Boolean.TYPE;
+                primitiveType = PrimitiveType.BOOLEAN;
                 break;
             case 'C':
-                primitiveType = Character.TYPE;
+                primitiveType = PrimitiveType.CHAR;
                 break;
         }
     }
@@ -211,31 +211,10 @@ public class ByteCodeField {
         if (primitiveType == null) {
             return type;
         }
-        if (primitiveType == Integer.TYPE) {
-            return "I";
-        }
-        if (primitiveType == Long.TYPE) {
-            return "J";
-        }
-        if (primitiveType == Byte.TYPE) {
-            return "B";
-        }
-        if (primitiveType == Short.TYPE) {
-            return "S";
-        }
-        if (primitiveType == Float.TYPE) {
-            return "F";
-        }
-        if (primitiveType == Double.TYPE) {
-            return "D";
-        }
-        if (primitiveType == Boolean.TYPE) {
-            return "Z";
-        }
-        if (primitiveType == Character.TYPE) {
-            return "C";
-        }
-        return null;
+        // A field is never void, so PrimitiveType.VOID's "V" is unreachable here;
+        // the chain this replaces returned null for it, which no caller handled
+        // either.
+        return primitiveType.getDescriptor();
     }
     
     public boolean isPrivate() {

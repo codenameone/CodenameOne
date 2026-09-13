@@ -29,7 +29,7 @@ package java.lang;
  */
 public final class Long extends Number implements Comparable<Long> {
     
-    public static final Class<Long> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_LONG);
+    public static Class<Long> TYPE = long.class;
     
     /**
      * The largest value of type long.

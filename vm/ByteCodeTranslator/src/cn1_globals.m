@@ -956,64 +956,6 @@ static void init_gc_thresholds() {
 
 //#define DEBUG_GC_OBJECTS_IN_HEAP
 
-/**
- * Scalar primitive class objects. See the comment on CN1_PRIMITIVE_CLASS_ID in
- * cn1_globals.h for why these exist and why their classId is a sentinel.
- *
- * baseClass is 0 because int.class.getSuperclass() is null, which
- * java_lang_Class_getSuperclass already returns for a null baseClass. isArray is
- * false and arrayType is 0: these are the scalar types, not the array classes,
- * which already exist as class_arrayN__JAVA_*.
- *
- * Designated initializers, unlike the positional generated ones beside them, so
- * that a future field added to struct clazz cannot silently shift every value.
- */
-/*
- * __codenameOneParentClsReference is the class OF this object. Every generated
- * clazz sets it to class__java_lang_Class, and CN1_CLASS_OF reads it to find the
- * vtable when a clazz is used as an ordinary object -- which is what happens the
- * moment one becomes a Map key. Leaving it zero segfaults on the first
- * hashCode(), well away from anything that names it.
- *
- * The comment sits outside the macro on purpose: backslash-newline splicing
- * happens before comments are removed, so an unbackslashed comment line inside
- * the macro would silently end the definition.
- */
-#define CN1_DEFINE_PRIMITIVE_CLASS_ARR(cname, jname, arrCls) \
-struct clazz cn1_primitive_class_##cname = { \
-    .__codenameOneParentClsReference = &class__java_lang_Class, \
-    .classId = CN1_PRIMITIVE_CLASS_ID, \
-    .clsName = jname, \
-    .isArray = JAVA_FALSE, \
-    .dimensions = 0, \
-    .arrayType = 0, \
-    .arrayClass = arrCls, \
-    .primitiveType = JAVA_TRUE, \
-    .baseClass = 0, \
-    .baseInterfaces = EMPTY_INTERFACES, \
-    .baseInterfaceCount = 0, \
-    .initialized = JAVA_TRUE \
-}
-
-/*
- * arrayClass is what java.lang.reflect.Array.newInstance resolves int.class to
- * before allocating; left zero the reflective allocator rejects every primitive
- * array outright. void is the one that stays zero on purpose -- void[] does not
- * exist, so Array.newInstance(void.class, n) must keep throwing.
- */
-#define CN1_DEFINE_PRIMITIVE_CLASS(cname, jname) \
-    CN1_DEFINE_PRIMITIVE_CLASS_ARR(cname, jname, 0)
-
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(int, "int", &class_array1__JAVA_INT);
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(long, "long", &class_array1__JAVA_LONG);
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(short, "short", &class_array1__JAVA_SHORT);
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(byte, "byte", &class_array1__JAVA_BYTE);
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(char, "char", &class_array1__JAVA_CHAR);
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(float, "float", &class_array1__JAVA_FLOAT);
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(double, "double", &class_array1__JAVA_DOUBLE);
-CN1_DEFINE_PRIMITIVE_CLASS_ARR(boolean, "boolean", &class_array1__JAVA_BOOLEAN);
-CN1_DEFINE_PRIMITIVE_CLASS(void, "void");
-
 struct clazz class_array1__JAVA_BOOLEAN = {
     DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };

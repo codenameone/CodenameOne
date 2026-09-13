@@ -610,25 +610,7 @@ JAVA_OBJECT java_lang_reflect_Array_newInstanceImpl___java_lang_Class_int_R_java
         throwException(threadStateData, ex);
         return NULL;
     }
-    // Element WIDTH, not sizeof(JAVA_OBJECT). This allocator only ever saw
-    // reference component types before, because a primitive class object did not
-    // exist to pass in -- Integer.TYPE and friends were null. Now that they do,
-    // allocating an int[] at 8 bytes per element would size the block off the end
-    // of what the array header declares, so the width has to come from the
-    // component type.
-    int cn1ElemSize = (int)sizeof(JAVA_OBJECT);
-    if (clz->primitiveType) {
-        if (clz == &cn1_primitive_class_boolean || clz == &cn1_primitive_class_byte) {
-            cn1ElemSize = 1;
-        } else if (clz == &cn1_primitive_class_char || clz == &cn1_primitive_class_short) {
-            cn1ElemSize = 2;
-        } else if (clz == &cn1_primitive_class_int || clz == &cn1_primitive_class_float) {
-            cn1ElemSize = 4;
-        } else if (clz == &cn1_primitive_class_long || clz == &cn1_primitive_class_double) {
-            cn1ElemSize = 8;
-        }
-    }
-    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz->arrayClass, cn1ElemSize, 1);
+    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz->arrayClass, sizeof(JAVA_OBJECT), 1);
     finishedNativeAllocations();
     return out;
 }
@@ -1996,71 +1978,6 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
  * The codes are an implementation detail shared only with java/lang/Class.java;
  * they are matched by CN1_PRIM_* there.
  */
-/** The descriptor for a primitive type code, or 0 for an unknown code. */
-static struct clazz* cn1PrimitiveClassFor(JAVA_INT typeCode) {
-    switch(typeCode) {
-        case 0: return &cn1_primitive_class_int;
-        case 1: return &cn1_primitive_class_long;
-        case 2: return &cn1_primitive_class_short;
-        case 3: return &cn1_primitive_class_byte;
-        case 4: return &cn1_primitive_class_char;
-        case 5: return &cn1_primitive_class_float;
-        case 6: return &cn1_primitive_class_double;
-        case 7: return &cn1_primitive_class_boolean;
-        case 8: return &cn1_primitive_class_void;
-    }
-    return 0;
-}
-
-JAVA_OBJECT java_lang_Class_getPrimitiveClass___int_R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_INT typeCode) {
-    // java.lang.Class MUST be initialised before one of these is handed out.
-    //
-    // The nine descriptors are static struct clazz, and they are returned as
-    // java.lang.Class OBJECTS: each carries
-    // __codenameOneParentClsReference = &class__java_lang_Class, so every virtual
-    // call on Integer.TYPE and friends -- hashCode, equals, toString, getClass --
-    // dispatches through class__java_lang_Class.vtable. That vtable is malloc'd by
-    // java.lang.Class's own static initialiser, and NOTHING on this path ran it:
-    // the callers are the wrapper classes' clinits (Integer, Boolean, ...), any of
-    // which can be the first class the program touches. Until it runs, the vtable
-    // is the zero a static initialises to.
-    //
-    // The initialiser is idempotent and returns on its completion flag, so this
-    // costs one acquire load once the class is up.
-    __STATIC_INITIALIZER_java_lang_Class(threadStateData);
-    // And REGISTER the descriptor in the GC's exact clazz registry.
-    //
-    // Every generated class__X is registered by CN1_CLAZZ_REGISTER on the first
-    // allocation of one of its instances, from every allocation entry point, so
-    // by construction the collector has seen every clazz address that can reach
-    // it. These nine allocate nothing -- they are static and handed out directly
-    // -- so they were the only clazz addresses in the process that reached Java
-    // while permanently unregistered, and the mark guard is documented to
-    // recognise a genuine clazz address "via an exact registry instead of a
-    // distance heuristic".
-    //
-    // The macro is idempotent and tests the trailing cn1ClazzRegistered flag
-    // first, so this is one predictable load after the first call.
-    CN1_CLAZZ_REGISTER(cn1PrimitiveClassFor(typeCode));
-    switch(typeCode) {
-        case 0: return (JAVA_OBJECT)&cn1_primitive_class_int;
-        case 1: return (JAVA_OBJECT)&cn1_primitive_class_long;
-        case 2: return (JAVA_OBJECT)&cn1_primitive_class_short;
-        case 3: return (JAVA_OBJECT)&cn1_primitive_class_byte;
-        case 4: return (JAVA_OBJECT)&cn1_primitive_class_char;
-        case 5: return (JAVA_OBJECT)&cn1_primitive_class_float;
-        case 6: return (JAVA_OBJECT)&cn1_primitive_class_double;
-        case 7: return (JAVA_OBJECT)&cn1_primitive_class_boolean;
-        case 8: return (JAVA_OBJECT)&cn1_primitive_class_void;
-    }
-    // Only java/lang/Class.java calls this, always with one of its own constants,
-    // so this is unreachable short of the two files disagreeing. Returning null
-    // would restore exactly the silent null TYPE this code exists to remove.
-    fprintf(stderr, "getPrimitiveClass: unknown primitive type code %d\n", (int)typeCode);
-    exit(1);
-    return JAVA_NULL;
-}
-
 /**
  * Resources linked into the executable, backing Class.getResourceAsStream.
  *

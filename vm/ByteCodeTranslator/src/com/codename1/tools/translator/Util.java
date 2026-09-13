@@ -29,9 +29,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.objectweb.asm.Opcodes;
 
 /**
@@ -40,36 +38,12 @@ import org.objectweb.asm.Opcodes;
  */
 public class Util {
 
-    private static final Map<Class, String> ctypeMap = new HashMap<Class, String>();
-    private static final Map<Class, String> sigTypeMap = new HashMap<Class, String>();
-
-    static {
-        ctypeMap.put(Integer.TYPE, "JAVA_INT");
-        ctypeMap.put(Long.TYPE, "JAVA_LONG");
-        ctypeMap.put(Short.TYPE, "JAVA_SHORT");
-        ctypeMap.put(Byte.TYPE, "JAVA_BYTE");
-        ctypeMap.put(Double.TYPE, "JAVA_DOUBLE");
-        ctypeMap.put(Float.TYPE, "JAVA_FLOAT");
-        ctypeMap.put(Boolean.TYPE, "JAVA_BOOLEAN");
-        ctypeMap.put(Character.TYPE, "JAVA_CHAR");
-        ctypeMap.put(Void.TYPE, "JAVA_VOID");
-        sigTypeMap.put(Integer.TYPE, "int");
-        sigTypeMap.put(Long.TYPE, "long");
-        sigTypeMap.put(Short.TYPE, "short");
-        sigTypeMap.put(Byte.TYPE, "byte");
-        sigTypeMap.put(Double.TYPE, "double");
-        sigTypeMap.put(Float.TYPE, "float");
-        sigTypeMap.put(Boolean.TYPE, "boolean");
-        sigTypeMap.put(Character.TYPE, "char");
-        sigTypeMap.put(Void.TYPE, "void");
+    public static String getCType(PrimitiveType type) {
+        return type == null ? null : type.getCType();
     }
 
-    public static String getCType(Class cls) {
-        return ctypeMap.get(cls);
-    }
-
-    public static String getSigType(Class cls) {
-        return sigTypeMap.get(cls);
+    public static String getSigType(PrimitiveType type) {
+        return type == null ? null : type.getSigType();
     }
 
     public static List<ByteCodeMethodArg> getMethodArgs(String methodDesc) {
@@ -98,28 +72,28 @@ public class Util {
                     arguments.add(new ByteCodeMethodArg(objectType, currentArrayDim));
                     break;
                 case 'I':
-                    arguments.add(new ByteCodeMethodArg(Integer.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.INT, currentArrayDim));
                     break;
                 case 'J':
-                    arguments.add(new ByteCodeMethodArg(Long.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.LONG, currentArrayDim));
                     break;
                 case 'B':
-                    arguments.add(new ByteCodeMethodArg(Byte.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.BYTE, currentArrayDim));
                     break;
                 case 'S':
-                    arguments.add(new ByteCodeMethodArg(Short.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.SHORT, currentArrayDim));
                     break;
                 case 'F':
-                    arguments.add(new ByteCodeMethodArg(Float.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.FLOAT, currentArrayDim));
                     break;
                 case 'D':
-                    arguments.add(new ByteCodeMethodArg(Double.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.DOUBLE, currentArrayDim));
                     break;
                 case 'Z':
-                    arguments.add(new ByteCodeMethodArg(Boolean.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.BOOLEAN, currentArrayDim));
                     break;
                 case 'C':
-                    arguments.add(new ByteCodeMethodArg(Character.TYPE, currentArrayDim));
+                    arguments.add(new ByteCodeMethodArg(PrimitiveType.CHAR, currentArrayDim));
                     break;
             }
             currentArrayDim = 0;

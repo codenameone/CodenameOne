@@ -30,8 +30,24 @@ public final class Short extends Number implements Comparable<Short> {
 
     /**
      * The class object for the primitive type this class wraps.
+     *
+     * Null on every ParparVM target, and declared only because ASM's compiled
+     * bytecode reads it: org.objectweb.asm.Type compares against Short.TYPE,
+     * Float.TYPE and Boolean.TYPE, so the self-hosted translator does not link
+     * without the three fields existing. ASM is a jar we cannot edit, which is
+     * the one case where JavaAPI grows to meet a dependency rather than the
+     * dependency being removed.
+     *
+     * It cannot be given a real value here. javac lowers a primitive class
+     * literal to a read of the boxed type's own TYPE field, so the obvious
+     * initializer compiles to "getstatic TYPE; putstatic TYPE" -- it reads the
+     * field it is initializing and stores the null straight back. The six
+     * wrappers that already declare TYPE are null for exactly that reason.
+     * Giving all nine real values needs VM-side primitive class objects; that
+     * work is not part of this change, and nothing in the translator depends on
+     * it now that the C-type tables are keyed on the PrimitiveType enum.
      */
-    public static final Class<Short> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_SHORT);
+    public static final Class<Short> TYPE = null;
 
     /**
      * The maximum value a Short can have.

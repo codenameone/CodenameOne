@@ -29,7 +29,7 @@ package java.lang;
  */
 public final class Double extends Number implements Comparable<Double> {
     
-    public static final Class<Double> TYPE = Class.getPrimitiveClass(Class.CN1_PRIM_DOUBLE);
+    public static final Class<Double> TYPE = double.class;
     /**
      * The largest positive finite value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7fefffffffffffffL)
      * See Also:Constant Field Values
