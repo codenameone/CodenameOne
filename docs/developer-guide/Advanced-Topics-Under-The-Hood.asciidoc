@@ -1108,7 +1108,7 @@ Support for JAR files in Codename One has been a source of confusion so its prob
 The first source of confusion is changing the classpath. You should NEVER change the classpath or add an external JAR through the IDE classpath UI. The reasoning here is simple, these IDEs don't package the JARs into the final executable and even if they did these JARs would probably use features unavailable or inappropriate for the device (for example: `java.io.File` etc.).
 
 .Don't change the classpath, this is how it should look for a typical Java 8 Codename One application
-image::img/cn1libs-dont-change-classpath.png[Don't change the classpath, this is how it should look for a typical Java 8 Codename One application,scaledwidth=40%]
+image::img/cn1libs-dont-change-classpath.png["Don't change the classpath, this is how it should look for a typical Java 8 Codename One application",scaledwidth=40%]
 
 Cn1libs are Codename One's file format for 3rd party extensions. It's physically a zip file containing other zip files and some meta-data.
 
@@ -1688,7 +1688,7 @@ peer that renders into a buffer.
 reaches it. The screenshot technique below can't reach it either, for the same reason.
 
 .Where a peer sits, and what follows from it
-image::img/peer-component-painting.svg[Where a native peer is composited relative to the Codename One layer, and how it differs by port,scaledwidth=85%]
+image::img/peer-component-painting.svg["Where a native peer is composited relative to the Codename One layer, and how it differs by port",scaledwidth=85%]
 
 NOTE: This was also the case in AWT/Swing to one degree or another...
 

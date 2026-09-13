@@ -331,7 +331,7 @@ camera-facing billboards in a 3D world and lets you draw 3D meshes alongside the
 That's the basis for deeper gameplay modes -- an over-the-shoulder racer, an
 isometric or top-down view with real depth, a 2.5D shooter.
 
-image::img/game-3d.png[The 3D sample: a textured grid ground, stacked cube models, ringed buildings and billboarded coins,250]
+image::img/game-3d.png["The 3D sample: a textured grid ground, stacked cube models, ringed buildings and billboarded coins",250]
 
 `Gaming3DDemoSample` (above) is built entirely from the primitives this section
 describes -- a textured ground plane, lit cube `Model` meshes, and billboarded
