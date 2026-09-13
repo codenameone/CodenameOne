@@ -1051,7 +1051,12 @@ final class JavascriptMethodGenerator {
             if (op != Opcodes.INVOKESTATIC) {
                 return null;
             }
-            return JavascriptNameUtil.sanitizeClassName(resolveDirectInvokeOwner((Invoke) instr));
+            // resolveDirectInvokeOwner answers null for a null owner, and
+            // sanitizeClassName dereferences what it is given. Callers already
+            // treat null as "no guard here", so hand them that rather than an
+            // NPE out of the analysis pass.
+            String invokeOwner = resolveDirectInvokeOwner((Invoke) instr);
+            return invokeOwner == null ? null : JavascriptNameUtil.sanitizeClassName(invokeOwner);
         }
         if (instr instanceof TypeInstruction) {
             // NEW names a concrete class outright -- nothing to resolve -- but
