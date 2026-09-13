@@ -87,10 +87,10 @@ class MonetizationJava041Snippet {
     // tag::monetization-java-041[]
     @Override
     public void itemPurchased(String sku) {
-     // The shared iap field, not a fresh getInAppPurchase(). Receipts are
-     // cached per Purchase instance and most ports hand back a new instance
-     // every call, so synchronizing a local one leaves the instance the
-     // label reads exactly as stale as it was.
+     // Nothing reads receipts off this instance until after the call below,
+     // so its cache loads from storage once the synchronization has written
+     // there -- which is the point of not holding a Purchase around.
+     Purchase iap = Purchase.getInAppPurchase();
 
      // Reload the receipts from the store. This answers false when the receipt
      // could not be submitted or fetched, and the receipt then stays pending --

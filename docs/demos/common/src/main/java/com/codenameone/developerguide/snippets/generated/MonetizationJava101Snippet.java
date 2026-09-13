@@ -69,7 +69,7 @@ class MonetizationJava101Snippet {
         Button syncReceipts = new Button("Synchronize Receipts");
 
         syncReceipts.addActionListener(e -> {
-            iap.synchronizeReceipts(0, success -> {
+            Purchase.getInAppPurchase().synchronizeReceipts(0, success -> {
                 // synchronizeReceipts reports true only when every pending
                 // purchase reached the receipt store AND the receipts came
                 // back. On false nothing was reloaded, so there is nothing

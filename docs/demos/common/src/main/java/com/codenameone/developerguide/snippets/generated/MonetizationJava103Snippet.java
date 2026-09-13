@@ -65,6 +65,12 @@ class MonetizationJava103Snippet {
     // one array is what makes the later listings read the way they do.
     static final String[] PRODUCTS = { SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR };
 
-    Purchase iap = Purchase.getInAppPurchase();
+    // There is deliberately no Purchase field here. Receipts are cached on the
+    // instance and loaded from storage the first time one is asked for, while
+    // the synchronization that refreshes them is static and may be running on
+    // an instance the port created. A held instance therefore keeps answering
+    // from the snapshot it loaded; a fresh getInAppPurchase() reads what the
+    // last completed synchronization persisted. It is a storage read, not a
+    // network call.
     // end::monetization-java-103[]
 }

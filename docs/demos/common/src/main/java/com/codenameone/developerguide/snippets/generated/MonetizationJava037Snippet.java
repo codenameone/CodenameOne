@@ -119,7 +119,7 @@ class MonetizationJava037Snippet {
      // Outside the branch on purpose: a subscription can be bought, renewed
      // or cancelled on another device while this one is suspended, so the
      // resume needs this as much as the launch does.
-     iap.synchronizeReceipts(0, success -> {
+     Purchase.getInAppPurchase().synchronizeReceipts(0, success -> {
          // Whatever this brought back, the expiry label is now out of date.
          // Repaint it from the same method the manual button uses.
          if (success) {

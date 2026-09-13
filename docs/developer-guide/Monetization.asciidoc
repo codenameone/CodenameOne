@@ -171,7 +171,7 @@ You'll expand on the theme of "Buying" the world for this app, except, this time
 . A 1-month subscription
 . A 1-year subscription
 
-Every listing in the rest of this chapter uses these three declarations:
+Every listing in the rest of this chapter uses these declarations:
 
 [source,java]
 ----

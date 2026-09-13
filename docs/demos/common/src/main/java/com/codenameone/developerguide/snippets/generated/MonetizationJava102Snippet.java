@@ -74,6 +74,7 @@ class MonetizationJava102Snippet {
     }
 
     void showRentalStatus() {
+        Purchase iap = Purchase.getInAppPurchase();
         if (iap.isSubscribed(PRODUCTS)) {
             rentalStatus.setText("World rental expires " + iap.getExpiryDate(PRODUCTS));
         } else {
