@@ -2288,6 +2288,67 @@ public class SelfTest {
     }
 
     /**
+     * A chunked response ends where its framing says, trailers included.
+     *
+     * <p>RFC 9112 7.1 ends the body with the last chunk, then the trailer
+     * section, then a final CRLF. Returning as soon as the zero-size line arrived
+     * accepted a peer that died right after "0" as a complete body, so a caller
+     * acted on a message that had stopped part way through.
+     */
+    private static void aChunkedResponseEndsWhereItsFramingSays() throws Exception {
+        check("a chunked response with its trailer section terminated is whole",
+                "hello", chunkedReply("5\r\nhello\r\n0\r\n\r\n"));
+        check("and one with real trailers is too", "hello",
+                chunkedReply("5\r\nhello\r\n0\r\nX-Checksum: 7\r\n\r\n"));
+        // THE CUT: everything above arrived, and then the peer stopped.
+        check("a chunked response cut off after its last chunk is refused",
+                "refused", chunkedReply("5\r\nhello\r\n0\r\n"));
+        check("and one whose trailer is not a header field is refused",
+                "refused", chunkedReply("5\r\nhello\r\n0\r\nnot a field\r\n\r\n"));
+    }
+
+    /** Serves one canned chunked body and reports the client's verdict. */
+    private static String chunkedReply(final String framing) throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    byte[] request = new byte[4096];
+                    ServerSocket.read(client, request, 0, request.length);
+                    byte[] reply = ("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"
+                            + framing).getBytes("UTF-8");
+                    ServerSocket.write(client, reply, 0, reply.length);
+                } catch (Exception ignored) {
+                    // The verdict below is what this check reports.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            outcome = Http.request("127.0.0.1", port, "GET", "/x", null).getBodyAsString();
+        } catch (java.io.IOException refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("chunked") >= 0 ? "refused"
+                    : "refused for another reason: " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        return outcome;
+    }
+
+    /**
      * A response ends where its Content-Length says it does.
      *
      * <p>Content-Length is the whole of the framing, so whatever follows the
@@ -3835,6 +3896,7 @@ public class SelfTest {
         aTruncatingDatabasePathOpensNothing();
         aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();
+        aChunkedResponseEndsWhereItsFramingSays();
         aResponseEndsAtItsDeclaredLength();
         aTruncatingPathOpensNothing();
         aTlsVerificationNameWithANulIsRefused();

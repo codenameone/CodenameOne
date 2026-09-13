@@ -1773,11 +1773,30 @@ public final class HttpServer {
         // closes whatever has since been given it. Both also reached the
         // unsynchronized Tls.close(), freeing one native context twice.
         //
-        // The loser returns rather than waiting. Its intent -- that the server be
-        // shut down -- is already being carried out, and blocking it here would
-        // deadlock a handler that calls stop() against the drain that is waiting
-        // for that same handler.
+        // The loser WAITS for the winner rather than returning, so stop() keeps the
+        // contract every caller already had: when it returns, the server is down.
+        // Returning early instead would let a second caller carry on while the
+        // teardown is still running -- the virtual-thread slot not yet released,
+        // descriptors not yet closed -- and that is a difference this file's own
+        // callers would feel.
+        //
+        // Bounded, though, because a handler that calls stop() must not be able to
+        // wedge itself against a drain that is waiting for that same handler: the
+        // bound is the whole teardown the winner is allowed, and after it this
+        // returns whether or not the winner finished.
         if(!stopClaimed.compareAndSet(false, true)) {
+            long limit = System.currentTimeMillis() + drainMillis
+                    + SESSION_RELEASE_GRACE_MILLIS + POLL_LOOP_JOIN_MILLIS;
+            synchronized(stopped) {
+                while(!fullyStopped && System.currentTimeMillis() < limit) {
+                    try {
+                        stopped.wait(50);
+                    } catch (InterruptedException err) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
             return;
         }
         // THE CALLER'S OWN REQUEST, when a handler is what asked for the shutdown.

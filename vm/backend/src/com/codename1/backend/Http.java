@@ -341,9 +341,39 @@ public final class Http {
             int size = parseChunkSize(data, pos, end);
             pos = eol + 2;
             if(size == 0) {
-                // Trailers may follow. They are header fields, not body bytes, and
-                // this client has no caller that reads them.
-                return out.toByteArray();
+                // AND THE MESSAGE ENDS WHERE THE FRAMING SAYS. RFC 9112 7.1:
+                // last-chunk, then the trailer section, then a final CRLF. Returning
+                // here as soon as the zero-size line arrived accepted a response
+                // that stopped mid-message -- a peer that died right after "0" was
+                // reported as a complete body -- and accepted whatever bytes
+                // happened to follow as a trailer nobody looked at. A truncated
+                // response is the one case a client must not round up to success,
+                // since the caller then acts on a body it believes is whole.
+                //
+                // The trailers themselves are still dropped: they are header
+                // fields, and this client has no caller that reads them. What
+                // changes is that they have to BE header fields, and the section
+                // has to be terminated.
+                while(true) {
+                    int lineEnd = indexOfCrLf(data, pos);
+                    if(lineEnd < 0) {
+                        throw new IOException("Truncated chunked response: the last "
+                                + "chunk is not followed by a terminated trailer "
+                                + "section, so the message stopped part way through");
+                    }
+                    if(lineEnd == pos) {
+                        return out.toByteArray();       // the empty line ends it
+                    }
+                    int colon = pos;
+                    while(colon < lineEnd && data[colon] != ':') {
+                        colon++;
+                    }
+                    if(colon == pos || colon == lineEnd) {
+                        throw new IOException("Malformed chunked response: the trailer "
+                                + "section holds a line that is not a header field");
+                    }
+                    pos = lineEnd + 2;
+                }
             }
             if(size > data.length - pos) {
                 throw new IOException("Truncated chunked response: chunk runs past the body");
