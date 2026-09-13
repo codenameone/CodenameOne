@@ -139,13 +139,18 @@ refresh. If you need the cross-field update to propagate, call
 restructure the model so the cross-field mutation happens outside the
 setter's call frame -- for example via a `Display.callSerially`.
 
-`commit()` is worse than suppression and neither remedy reaches it. When both
-fields are bound two-way and `fullName` is emitted after `firstName`, the
-generated `_commit` carries on to the `fullName` component, reads the value
-still sitting in it, and calls `setFullName` -- overwriting what
-`setFirstName` just derived. A later `binding.refresh()` then publishes the
-overwritten value, not the derived one. Bind a derived field one way, or derive
-it somewhere other than inside the setter.
+`commit()` is worse than suppression, and only one of the two remedies survives
+it. When both fields are bound two-way and `fullName` is emitted after
+`firstName`, the generated `_commit` carries on to the `fullName` component,
+reads the value still sitting in it, and calls `setFullName` -- overwriting what
+`setFirstName` just derived. An immediate `binding.refresh()` afterward
+publishes the overwritten value rather than the derived one, so that remedy
+doesn't help here.
+
+The deferred write still does. `Display.callSerially()` queues the write and
+returns, so `_commit` finishes and leaves its update region before the deferred
+`setFullName` runs and notifies at depth zero. Use that, or bind the derived
+field one way so `commit()` never writes it back.
 
 === POJOs versus Property objects
 
