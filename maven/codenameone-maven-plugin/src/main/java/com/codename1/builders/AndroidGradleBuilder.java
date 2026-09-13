@@ -1236,6 +1236,40 @@ public class AndroidGradleBuilder extends Executor {
         "com/codename1/vpn/tunnel/",
     };
 
+    /// The invite entry points, for the same library scan.
+    ///
+    /// Both of them, because an application can reference either alone: the
+    /// button without the facade, or the facade without the button. The second
+    /// is an exact class rather than a package, and matching it as a prefix is
+    /// the same answer -- a class name starts with itself.
+    private static final String[] INVITE_LIB_PREFIXES = {
+        "com/codename1/analytics/invite/",
+        "com/codename1/components/InviteButton",
+    };
+
+    /// Folds invite usage found inside submitted libraries into the scanner's
+    /// flags.
+    ///
+    /// A library that encapsulates invites was invisible to the scan over the
+    /// application's own classes, so usesInvites stayed false and every part of
+    /// the Android integration went missing at once: no App Links filter, no
+    /// onNewIntent splice, the install-referrer package deleted from the
+    /// generated sources, and the Play Install Referrer dependency never
+    /// selected. The library compiled against an API nothing had switched on.
+    ///
+    /// @param libsDir the submitted-libraries folder
+    /// @return the prefixes found, for the feature catalog
+    private java.util.Set<String> foldInInviteLibraryUsage(java.io.File libsDir) {
+        java.util.Set<String> found =
+                LibraryClassPrefixScan.prefixesFound(libsDir, INVITE_LIB_PREFIXES);
+        if (found.isEmpty()) {
+            return found;
+        }
+        debug("Invite usage found inside a submitted library: " + found);
+        usesInvites = true;
+        return found;
+    }
+
     /// Folds call and VPN usage found inside submitted libraries into the
     /// scanner's flags.
     ///
@@ -1264,6 +1298,10 @@ public class AndroidGradleBuilder extends Executor {
 
     /// Whether the app referenced com.codename1.vpn.tunnel.
     private boolean usesCustomTunnel;
+
+    /// Whether the app referenced the invite attribution API, and therefore
+    /// needs the App Links filter that lets an invite link open it.
+    private boolean usesInvites;
 
     private boolean integrateMoPub = false;
 
@@ -2841,6 +2879,13 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
                         usesCustomTunnel = true;
                     }
+                    // Both entry points, because an app can reference either
+                    // one alone: the button without the facade, or the facade
+                    // without the button.
+                    if (cls.indexOf("com/codename1/analytics/invite/") == 0
+                            || "com/codename1/components/InviteButton".equals(cls)) {
+                        usesInvites = true;
+                    }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
                     }
@@ -3193,6 +3238,14 @@ public class AndroidGradleBuilder extends Executor {
         for (String callVpnPrefix : callVpnFromLibraries) {
             aiAcc.consume(callVpnPrefix);
         }
+        // Invites, for the same two reasons. The flag decides the App Links
+        // filter, the onNewIntent splice and whether the install-referrer
+        // package survives; the CATALOG is what adds the Play Install Referrer
+        // dependency and lifts minSdk to 21. Setting only the flag left the
+        // referrer sources in the project with nothing to compile them against.
+        for (String invitePrefix : foldInInviteLibraryUsage(libsDir)) {
+            aiAcc.consume(invitePrefix);
+        }
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(libsDir);
         if (!libraryNearby.isEmpty()) {
@@ -3484,6 +3537,55 @@ public class AndroidGradleBuilder extends Executor {
             if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
                         existingApplication + callServices);
+            }
+        }
+
+        // The App Links filter that lets an invite link open the app instead
+        // of the browser (com.codename1.analytics.invite).
+        //
+        // AFTER the class scan, beside the call fragments, because the flag it
+        // reads is set BY that scan -- the same ordering the tunnel block below
+        // documents the hard way.
+        //
+        // Appended to android.xintent_filter rather than emitted at a new
+        // manifest site. That hint is already rendered inside the main
+        // <activity>, and rendered again into the wear companion manifest, so
+        // one append reaches both and cannot drift.
+        if (usesInvites && "true".equals(request.getArg("android.invite.appLinks", "true"))) {
+            String inviteHost = InviteBuildHints.domain(request);
+            String existingFilter = request.getArg("android.xintent_filter", "");
+            String withAppLinks = InviteManifestFragments.injectAppLinks(existingFilter,
+                    inviteHost, InviteBuildHints.slug(request));
+            if (!withAppLinks.equals(existingFilter)) {
+                debug("Invite attribution: adding the App Links filter for " + inviteHost);
+                request.putArgument("android.xintent_filter", withAppLinks);
+            }
+            // launchMode decides WHICH delivery path a link takes, not whether
+            // it arrives.
+            //
+            // singleTop (the default) and singleTask route a link into the
+            // running activity through onNewIntent. "standard" starts a SECOND
+            // activity instead -- and that activity's `currentForm` is an
+            // INSTANCE field, so it is null, `wasStopped` is true, and the
+            // generated run() goes on to createStartInvocation(): the
+            // application's start() runs and reads the link out of getAppArg()
+            // exactly as it does on a cold launch.
+            //
+            // This refused the build outright until a review round pointed at
+            // that field. It was wrong: the invite is delivered, and refusing
+            // rejected a configuration the app already built and shipped with.
+            // Warned instead, because the delivery is real but the path is the
+            // colder one and the second activity is a surprise worth naming.
+            String launchMode = request.getArg("android.activity.launchMode", "singleTop");
+            if ("standard".equals(launchMode)) {
+                warn("This app uses invite attribution "
+                        + "(com.codename1.analytics.invite) with "
+                        + "android.activity.launchMode=\"standard\". An invite link then starts a "
+                        + "second activity rather than reaching the running one, so the invite "
+                        + "arrives through the application's start() instead of onNewIntent(). "
+                        + "That works, and it is what a cold launch does anyway -- but "
+                        + "checkForInvite() has to be called from start(), and singleTop (the "
+                        + "default) or singleTask avoids the second activity entirely.");
             }
         }
 
@@ -5011,6 +5113,23 @@ public class AndroidGradleBuilder extends Executor {
             cipherPackage.delete();
         }
 
+        if (!usesInvites) {
+            // The Play Install Referrer implementation compiles against
+            // com.android.installreferrer, which is only on the classpath when
+            // the catalog has added it. Deleting it here keeps an app that
+            // never invites anyone from carrying the dependency, and from
+            // declaring the BIND_GET_INSTALL_REFERRER_SERVICE permission the
+            // aar's own manifest contributes.
+            File referrerPackage = new File(srcDir, "com/codename1/impl/android/referrer");
+            File[] referrerFiles = referrerPackage.listFiles();
+            if (referrerFiles != null) {
+                for (File f : referrerFiles) {
+                    f.delete();
+                }
+            }
+            referrerPackage.delete();
+        }
+
         pruneOptionalAiSources(srcDir);
 
         pruneBiometricSourcesForCompileSdk(srcDir,
@@ -6519,6 +6638,71 @@ public class AndroidGradleBuilder extends Executor {
                     + fbPkg + ".FirebaseAnalyticsBridgeImpl());\n";
         }
 
+        // Registers the Play Install Referrer reader with the invite API.
+        //
+        // A direct symbol reference in generated code rather than a
+        // Class.forName lookup: the reference exists exactly when the class
+        // does, R8 renames the call site and the target together, and there is
+        // no keep rule to forget. The class itself is a port source, not a
+        // generated string literal -- it owns a connection lifecycle, a
+        // reconnect path and a bounded retry, and as a literal it would be
+        // invisible to review and to the SpotBugs gate.
+        // The host the app-links filter was generated for, handed to the client
+        // so Invites.getLinkBase() cannot disagree with it. Without this an app
+        // that set invite.domain minted links for the default host while its
+        // intent filter named a custom one, and the installed app never opened
+        // its own links.
+        String inviteDomainProperty = "";
+        if (usesInvites) {
+            inviteDomainProperty = "        Display.getInstance().setProperty(\"invite.domain\", \""
+                    + InviteBuildHints.domain(request) + "\");\n";
+            // The slug goes with it, and for the same reason. This build claims
+            // /i/<slug>/ and nothing else, so a client that mints a bare
+            // /i/<code> link produces a url its own build cannot open -- and it
+            // would, because the client only learns the slug from the link
+            // service, which the first invite is minted before ever reaching.
+            String inviteSlug = InviteBuildHints.slug(request);
+            if (inviteSlug != null && inviteSlug.trim().length() > 0) {
+                inviteDomainProperty += "        Display.getInstance().setProperty(\"invite.slug\", \""
+                        + inviteSlug.trim() + "\");\n";
+            }
+        }
+
+        // An App Link that arrives while the activity is already resumed never
+        // reaches the application's start(). The lifecycle generated below
+        // returns early when wasStopped is false -- it just re-shows the
+        // current form -- so the documented checkForInvite() call in start()
+        // does not run, and the app arg the port stored a moment ago is cleared
+        // again by the next onStop(). The invite is silently lost: no claim, no
+        // invite_opened, for a delivery that worked perfectly.
+        //
+        // Generated rather than done in the port, because AndroidImplementation
+        // referencing the invite package would make PlatformFeatureCatalog
+        // match it for EVERY application -- a Play Install Referrer dependency
+        // and an API 21 floor on apps that never heard of invites. This splice
+        // lands only in an app whose classes actually use them, which is the
+        // same condition the registration above rides on.
+        String inviteNewIntent = "";
+        if (usesInvites) {
+            inviteNewIntent = "    protected void onNewIntent(android.content.Intent intent) {\n"
+                    + "        super.onNewIntent(intent);\n"
+                    + "        if(!Display.isInitialized()) {\n"
+                    + "            return;\n"
+                    + "        }\n"
+                    + "        Display.getInstance().callSerially(new Runnable() {\n"
+                    + "            public void run() {\n"
+                    + "                com.codename1.analytics.invite.Invites.checkForInvite();\n"
+                    + "            }\n"
+                    + "        });\n"
+                    + "    }\n\n";
+        }
+        String inviteRegisterInstall = "";
+        if (usesInvites) {
+            inviteRegisterInstall = "            com.codename1.analytics.invite.Invites"
+                    + ".registerInstallReferrerSource(new "
+                    + "com.codename1.impl.android.referrer.AndroidInstallReferrer());\n";
+        }
+
         String consumableCode;
         consumableCode = "public boolean isConsumable(String sku) {\n"
                 + "  boolean retVal = super.isConsumable(sku);\n"
@@ -6886,6 +7070,7 @@ public class AndroidGradleBuilder extends Executor {
                             + "            currentForm = null;\n"
                             + "        }\n"
                             + "    }\n\n"
+                            + inviteNewIntent
                             + "    protected void onPause() {\n"
                             + "        super.onPause();\n"
                             + "        synchronized(LOCK) {\n"
@@ -6897,6 +7082,8 @@ public class AndroidGradleBuilder extends Executor {
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
                             + firebaseRegisterInstall
+                            + inviteDomainProperty
+                            + inviteRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"
                             + fcmRegisterPushCode

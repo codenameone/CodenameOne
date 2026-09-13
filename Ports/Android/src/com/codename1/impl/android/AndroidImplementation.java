@@ -1654,6 +1654,97 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Delivers a link that arrived at an already-running activity, so the
+    /// router sees it on Android as it already does on iOS.
+    ///
+    /// The two ports were asymmetric here, and silently so. iOS routes every
+    /// deep link through `Display.setProperty("AppArg", url)`, which fires
+    /// [com.codename1.router.Navigation#dispatchExternalUrl]. Android's
+    /// `onNewIntent` only stored the intent, and [#getAppArg] then derived
+    /// the value lazily through the implementation's own setter -- so
+    /// `setProperty` never ran and the router never fired. Anything built on
+    /// `@Route` therefore worked on iOS and did nothing on Android, which
+    /// reads as a feature that "just doesn't convert" on the platform rather
+    /// than as a bug.
+    ///
+    /// Deliberately narrow. Only `ACTION_VIEW` with an http or https scheme
+    /// goes through here; `EXTRA_TEXT` shares, `content://` attachments and
+    /// `EXTRA_STREAM` payloads keep their existing lazy path. Dispatching for
+    /// every intent would double-fire against the `setAppArg` inside
+    /// [#getAppArg] and would change behaviour for every share-target
+    /// application in the field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intent`: the intent delivered to the running activity
+    static void dispatchNewIntentUrl(Intent intent) {
+        if (intent == null || instance == null || !Display.isInitialized()) {
+            return;
+        }
+        try {
+            if (!Intent.ACTION_VIEW.equals(intent.getAction())) {
+                return;
+            }
+            android.net.Uri data = intent.getData();
+            if (data == null) {
+                return;
+            }
+            String scheme = data.getScheme();
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return;
+            }
+            // Cleared first so the value below is what getAppArg() reports,
+            // rather than whatever the previous intent left cached.
+            instance.setAppArg(null);
+            clearIntentProperties();
+            // The intent is stored UNMODIFIED, and the url is marked as delivered by
+            // remembering the intent's identity instead of by erasing its data.
+            //
+            // Two earlier shapes were both wrong. Clearing the data on the intent
+            // passed in broke the ordinary way to extend onNewIntent() --
+            // super.onNewIntent(intent) followed by the subclass reading
+            // intent.getData(), which had just been nulled underneath it. Storing a
+            // data-less COPY fixed that one and broke two more readers: the
+            // documented `android.intent.data` property is published from whatever
+            // the activity has stored, and native integrations read
+            // getActivity().getIntent().getData() after onNewIntent(). Both saw a
+            // warm deep link as no deep link at all while cold links still carried
+            // it -- an asymmetry an application has no way to work around.
+            //
+            // What actually has to be suppressed is narrower than the data: only
+            // getAppArg()'s rebuilding of the url from the stored intent, because
+            // CodenameOneActivity.onStop() clears the app arg and the next read
+            // after a resume would otherwise report the same deep link a second
+            // time and open one tapped invite twice.
+            getActivity().setIntent(intent);
+            markAppArgDelivered(intent);
+            // Published here rather than left to getAppArg(), since the properties
+            // for the previous intent were just cleared and the reader that used to
+            // repopulate them lazily is exactly the one now suppressed.
+            publishIntentProperties(getActivity(), intent);
+            Display.getInstance().setProperty("AppArg", data.toString());
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    /// Identity of the intent whose url [#dispatchNewIntentUrl] already delivered as
+    /// the app arg. Weak because it needs to outlive nothing: the activity holds the
+    /// intent, and once it stores a different one this reference is free to go.
+    private static java.lang.ref.WeakReference<Intent> deliveredAppArgIntent;
+
+    private static void markAppArgDelivered(Intent intent) {
+        synchronized (intentPropertyLock) {
+            deliveredAppArgIntent = new java.lang.ref.WeakReference<Intent>(intent);
+        }
+    }
+
+    private static boolean isAppArgDelivered(Intent intent) {
+        synchronized (intentPropertyLock) {
+            return deliveredAppArgIntent != null && deliveredAppArgIntent.get() == intent;
+        }
+    }
+
     private static void clearIntentProperties() {
         synchronized (intentPropertyLock) {
             if (Display.isInitialized()) {
@@ -3723,6 +3814,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
             String scheme = intent.getScheme();
+            if (u != null && isAppArgDelivered(intent)) {
+                // dispatchNewIntentUrl() already handed this url over as the app arg
+                // on the warm path. The data stays on the intent for the readers that
+                // want it -- `android.intent.data` above, and native code asking the
+                // activity for its intent -- and only the second delivery is dropped.
+                u = null;
+            }
             if (u == null && intent.getExtras() != null) {
                 if (intent.getExtras().keySet().contains("android.intent.extra.STREAM")) {
                     try {
@@ -9981,42 +10079,176 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (listener != null && android.os.Build.VERSION.SDK_INT >= 22) {
                 chooser = buildShareChooserWithCallback(shareIntent, listener);
             } else {
+                // Pre-22 has no chooser callback at all, so the listener is
+                // completed here or never.
+                //
+                // Left unfulfilled, Display.share(..., listener) simply never
+                // answered on API 21 -- the lowest level an app using invites
+                // can run at, since the feature catalog lifts minSdk to 21 for
+                // the Play referrer. Invites.share() emitted no invite_shared,
+                // and InviteButton kept its invite marked outstanding for the
+                // life of the button because the outcome it waits for could
+                // not arrive.
+                //
+                // FAILED, not sharedTo(null), and the difference is the whole
+                // point of the listener.
+                //
+                // This runs BEFORE startActivity, and nothing afterwards can
+                // report the outcome: EXTRA_CHOSEN_COMPONENT arrives with API
+                // 22, and a chooser started for a result answers RESULT_CANCELED
+                // whether or not a target was picked. So a sharedTo here is a
+                // guess, and it is a guess in the direction that costs money --
+                // reportShareResult() emits invite_shared on it, and an
+                // application's reward logic sees a successful share for a
+                // sheet the user swiped away.
+                //
+                // FAILED carries the one thing that is actually known: the
+                // outcome was not observed. reportShareResult() emits nothing
+                // for it, so the funnel stays a measurement, and the callback
+                // still completes -- which is what the unfulfilled listener bug
+                // this branch was added for was about.
                 chooser = Intent.createChooser(shareIntent, "Share with...");
+                if (listener != null) {
+                    listener.onResult(com.codename1.share.ShareResult.failed(
+                            "this Android version does not report the chosen share target"));
+                }
             }
         } catch (Throwable t) {
-            // Fall back to the plain chooser, then synthesize a listener
-            // result so the app doesn't hang on an unfulfilled callback.
+            // Fall back to the plain chooser, then complete the listener so
+            // the app doesn't hang on an unfulfilled callback -- as FAILED,
+            // for the reason the branch above gives: the outcome of a plain
+            // chooser cannot be observed, and reporting a share that was not
+            // measured is the one direction that costs an application money.
             chooser = Intent.createChooser(shareIntent, "Share with...");
             if (listener != null) {
-                listener.onResult(com.codename1.share.ShareResult.sharedTo(null));
+                listener.onResult(com.codename1.share.ShareResult.failed(
+                        "the share target could not be observed: " + t));
             }
         }
         getContext().startActivity(chooser);
     }
 
-    private static int nextShareReceiverId = 1;
+    // ONE receiver for the process, and one listener held at a time.
+    //
+    // A receiver per share leaked every cancelled one. It is unregistered from
+    // inside onReceive, and Android sends nothing when the chooser is
+    // dismissed -- there is no public dismissal signal -- so a cancelled share
+    // left its receiver registered on the application context, holding the
+    // listener and, through it, the button and the form it is on. Each cancel
+    // added another, for the life of the process, and a share button is
+    // exactly the kind of control a user opens and backs out of repeatedly.
+    //
+    // Reusing one receiver bounds that at a single retained listener: the next
+    // share replaces the one a dismissal left behind. It cannot be driven to
+    // zero from here, because knowing the chooser was dismissed is the thing
+    // Android does not tell us.
+    //
+    // Instance fields, not static: there is one implementation per process,
+    // the receiver belongs to it, and a lazily initialised static is a
+    // different claim -- one SpotBugs reads as a threading bug, correctly,
+    // because nothing here would make it safe if it were true.
+    //
+    // Each chooser gets its OWN entry, keyed by a token the PendingIntent
+    // carries back, and they share the one receiver.
+    //
+    // A single replaceable listener was wrong: two share() calls that both
+    // present a chooser before either reports a selection would have the
+    // second overwrite the first, so picking a target in the first chooser
+    // invoked the SECOND call's listener and the second result was then
+    // dropped against a field that had already been cleared. The per-call
+    // receiver this replaced did not have that fault -- it gave each chooser
+    // its own action and its own PendingIntent -- so keeping the leak fixed
+    // must not cost that.
+    //
+    // What cannot be reclaimed is an entry for a chooser the user DISMISSED,
+    // because Android reports nothing for one. The map is bounded instead:
+    // beyond MAX_PENDING_SHARES the oldest is dropped, which is the same
+    // outcome the single field gave and only for shares that old. Insertion
+    // order is what LinkedHashMap gives, and the oldest outstanding chooser is
+    // the one the user is least likely to still be looking at.
+    //
+    // Touched from the Codename One EDT (share) and the Android main thread
+    // (onReceive), so every access is synchronized on the map itself. That is
+    // a native boundary crossing, not core framework code.
+    private BroadcastReceiver shareChooserReceiver;
+
+    private String shareChooserAction;
+
+    private static final String EXTRA_SHARE_TOKEN = "cn1ShareToken";
+
+    private static final int MAX_PENDING_SHARES = 8;
+
+    // UNGUESSABLE, because the token is what authenticates the broadcast.
+    //
+    // The receiver is registered exported -- RECEIVER_EXPORTED on API 33+, and
+    // the two-argument registration is externally reachable on older releases
+    // -- so any installed app can send <package>.CN1_SHARE_CHOSEN. setPackage()
+    // constrains the PendingIntent the framework creates; it does nothing to a
+    // forged explicit broadcast. With a counter starting at 1 that forgery was
+    // trivial, and it reported a fabricated successful ShareResult:
+    // invite_shared for a share that never happened, and whatever reward logic
+    // an application hangs off its own listener.
+    //
+    // A random token is the half of the repair that can be made from here.
+    // onReceive looks the token up and returns when it is not one this process
+    // issued, so a forged broadcast has to guess a 32-bit value that never
+    // leaves the PendingIntent. Registering the receiver non-exported is the
+    // better answer on API 33+ and is NOT done blind: a PendingIntent
+    // broadcast is delivered with this app's own identity, so it should still
+    // arrive -- but "should" is doing real work in that sentence and the
+    // failure mode is silent, the callback simply stopping and invite_shared
+    // stopping with it. That wants a device rather than an inference.
+    private final java.security.SecureRandom shareTokens = new java.security.SecureRandom();
+
+    private final java.util.LinkedHashMap<Integer, com.codename1.share.ShareResultListener>
+            pendingShares =
+            new java.util.LinkedHashMap<Integer, com.codename1.share.ShareResultListener>();
 
     @TargetApi(22)
     private Intent buildShareChooserWithCallback(Intent shareIntent, final com.codename1.share.ShareResultListener listener) {
         final Context appCtx = getContext().getApplicationContext();
-        final String action = appCtx.getPackageName() + ".CN1_SHARE_CHOSEN." + (nextShareReceiverId++);
+        // This chooser's own token, recorded before the receiver can fire.
+        final int token;
+        synchronized (pendingShares) {
+            token = shareTokens.nextInt();
+            pendingShares.put(Integer.valueOf(token), listener);
+            while (pendingShares.size() > MAX_PENDING_SHARES) {
+                java.util.Iterator<Integer> oldest = pendingShares.keySet().iterator();
+                oldest.next();
+                oldest.remove();
+            }
+        }
+        if (shareChooserReceiver != null) {
+            // Already registered and listening on the same action, so there is
+            // nothing to build but the PendingIntent below.
+            return chooserFor(appCtx, shareIntent, shareChooserAction, token);
+        }
+        final String action = appCtx.getPackageName() + ".CN1_SHARE_CHOSEN";
+        shareChooserAction = action;
         // The receiver fires once when the user picks a target. Android
         // does not expose a dismissal signal for the chooser, so the
         // listener simply does not fire on user-cancel (see comment
         // further down).
-        final boolean[] delivered = new boolean[1];
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context ctx, Intent intent) {
-                if (delivered[0]) return;
-                delivered[0] = true;
-                try { appCtx.unregisterReceiver(this); } catch (Throwable ignore) {}
+                // Taken by token, so this delivers to the chooser it belongs
+                // to and a repeat broadcast cannot deliver twice. The receiver
+                // stays registered for the next share.
+                com.codename1.share.ShareResultListener target;
+                synchronized (pendingShares) {
+                    target = pendingShares.remove(Integer.valueOf(
+                            intent.getIntExtra(EXTRA_SHARE_TOKEN, -1)));
+                }
+                if (target == null) {
+                    return;
+                }
                 String pkg = null;
                 try {
                     android.content.ComponentName cn = intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT);
                     if (cn != null) pkg = cn.getPackageName();
                 } catch (Throwable ignore) {}
-                listener.onResult(com.codename1.share.ShareResult.sharedTo(pkg));
+                target.onResult(com.codename1.share.ShareResult.sharedTo(pkg));
             }
         };
         IntentFilter filter = new IntentFilter(action);
@@ -10036,11 +10268,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!registered) {
             appCtx.registerReceiver(receiver, filter);
         }
+        // Recorded only once it is really listening, so a registration that
+        // threw is retried by the next share rather than skipped for ever.
+        shareChooserReceiver = receiver;
         // Android's chooser IntentSender callback never fires on
         // dismissal: there is no public API to observe a user-cancel.
         // Apps that need a dismissal signal must use Activity-resume.
 
+        return chooserFor(appCtx, shareIntent, action, token);
+    }
+
+    /// The chooser Intent itself, wrapping a broadcast PendingIntent on this
+    /// action.
+    ///
+    /// Split out because it is built on every share while the receiver behind
+    /// it is built once.
+    ///
+    /// **The token is the REQUEST CODE, not merely an extra.** What stood here
+    /// said FLAG_UPDATE_CURRENT made a fixed action safe because the
+    /// PendingIntent "is handed back with this chooser's extras, and only one
+    /// chooser is ever up at a time". Both halves were wrong. Android does not
+    /// include extras in PendingIntent identity, so with request code 0 and one
+    /// action every share resolved to the SAME PendingIntent and
+    /// FLAG_UPDATE_CURRENT overwrote the first chooser's token with the
+    /// second's -- selecting from the first chooser then delivered the second
+    /// token, invoked the second listener and stranded the first, which is the
+    /// per-chooser callback the token map exists to provide. And a second
+    /// chooser is the case being defended against, so assuming only one is up
+    /// assumed the bug away.
+    ///
+    /// The request code IS part of that identity, so passing the token makes
+    /// each chooser's PendingIntent distinct and its extras its own.
+    @TargetApi(22)
+    private Intent chooserFor(Context appCtx, Intent shareIntent, String action, int token) {
         Intent pi = new Intent(action).setPackage(appCtx.getPackageName());
+        pi.putExtra(EXTRA_SHARE_TOKEN, token);
         int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (android.os.Build.VERSION.SDK_INT >= 31) {
             // FLAG_MUTABLE was introduced in API 31; its numeric value
@@ -10048,7 +10310,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // still compiles against pre-31 android.jar build deps.
             piFlags |= 0x02000000;
         }
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(appCtx, 0, pi, piFlags);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(appCtx, token, pi, piFlags);
         return Intent.createChooser(shareIntent, "Share with...", pendingIntent.getIntentSender());
     }
 

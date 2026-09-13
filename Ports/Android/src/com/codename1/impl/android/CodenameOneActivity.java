@@ -314,6 +314,7 @@ public class CodenameOneActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        AndroidImplementation.dispatchNewIntentUrl(intent);
     }
     
     @Override

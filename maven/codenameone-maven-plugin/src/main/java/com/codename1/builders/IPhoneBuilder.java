@@ -26,6 +26,7 @@ import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSAppIntentsBuilder;
 import com.codename1.util.IOSCallDirectoryExtensionBuilder;
 import com.codename1.util.IOSDocumentProviderExtensionBuilder;
+import com.codename1.util.InviteAppClipBuilder;
 import com.codename1.util.IOSVpnTunnelExtensionBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.MatterExtensionBuilder;
@@ -1351,6 +1352,11 @@ public class IPhoneBuilder extends Executor {
     // other hand would fail its codesigning for a capability it never asked for.
     private boolean usesContinuitySync;
 
+    // Set when the app references com.codename1.analytics.invite (or the
+    // InviteButton that fronts it). Gates the associated domain and the
+    // entitlement that let an invite link open the app instead of Safari.
+    private boolean usesInvites;
+
     // Set when the app references com.codename1.documents. Gates the CN1_USE_DOCUMENTS native
     // define, the CN1Documents file provider extension and the app group that lets the two
     // processes meet.
@@ -1426,6 +1432,16 @@ public class IPhoneBuilder extends Executor {
     /// alongside the extension and read again when the target is written.
     private String matterAppGroup;
 
+    /// The app group the invite App Clip hands the code to the application
+    /// through. Empty when no clip was generated, which is also what the
+    /// generated stub tests before registering a reader.
+    private String inviteAppClipGroup = "";
+
+    /// Whether to GENERATE the clip, which is a narrower question than whether
+    /// to read a handoff. A developer shipping their own clip turns this off
+    /// and still needs the app group, the native reader and the registration.
+    private boolean inviteAppClipTargetWanted;
+
     /// The App Group the Call Directory extension and the app share.
     private String callDirectoryAppGroup;
 
@@ -1492,6 +1508,28 @@ public class IPhoneBuilder extends Executor {
     /// Records a boolean CarPlay entitlement (e.g. com.apple.developer.carplay-audio) unless the
     /// project already set it explicitly, mirroring how the App Attest / Apple Sign-In entitlements
     /// are injected. The downstream entitlements generator emits these as &lt;true/&gt;.
+    /// Whether a comma delimited ios.associatedDomains value already declares
+    /// `domain`.
+    ///
+    /// Compared element by element after trimming, never as a substring: an
+    /// existing `applinks:staging.cloud.codenameone.com` CONTAINS
+    /// `applinks:cloud.codenameone.com` is false, but the reverse containment
+    /// -- an existing entry for a longer host reading as the shorter one --
+    /// is exactly the mistake the surfaces url-scheme code documents, and the
+    /// same shape of bug applies here.
+    static boolean declaresAssociatedDomain(String existing, String domain) {
+        if (existing == null || domain == null) {
+            return false;
+        }
+        StringTokenizer tok = new StringTokenizer(existing, ",");
+        while (tok.hasMoreTokens()) {
+            if (tok.nextToken().trim().equals(domain)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void putCarPlayEntitlement(BuildRequest request, String key) {
         if (request.getArg("ios.entitlements." + key, null) == null) {
             request.putArgument("ios.entitlements." + key, "true");
@@ -2733,6 +2771,14 @@ public class IPhoneBuilder extends Executor {
                     if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
                         usesDocuments = true;
                     }
+                    // Invite attribution (com.codename1.analytics.invite). Both entry points,
+                    // because an app can reference either alone: the button without the facade,
+                    // or the facade without the button.
+                    if (!usesInvites
+                            && (cls.indexOf("com/codename1/analytics/invite/") == 0
+                                || "com/codename1/components/InviteButton".equals(cls))) {
+                        usesInvites = true;
+                    }
                     // State restoration and continuity (com.codename1.continuity.*). Gated on
                     // actual usage so the CN1_USE_CONTINUITY natives and the NSUserActivityTypes
                     // entry are only added for apps that hand work between devices.
@@ -3652,6 +3698,42 @@ public class IPhoneBuilder extends Executor {
         if (request.getArg("ios.disableScreenshots", "false").equalsIgnoreCase("true")) {
             disableScreenshots = "        Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
+        // The host the associated domain was generated for, handed to the
+        // client so Invites.getLinkBase() cannot disagree with it. Without this
+        // an app that set invite.domain minted links for the default host while
+        // its entitlement named a custom one, and the installed app never
+        // opened its own links.
+        String inviteDomainProperty = "";
+        if (usesInvites) {
+            inviteDomainProperty = "        Display.getInstance().setProperty(\"invite.domain\", \""
+                    + InviteBuildHints.domain(request) + "\");\n";
+            // The slug goes with it, and for the same reason. This build claims
+            // /i/<slug>/ and nothing else, so a client that mints a bare
+            // /i/<code> link produces a url its own build cannot open -- and it
+            // would, because the client only learns the slug from the link
+            // service, which the first invite is minted before ever reaching.
+            String inviteSlug = InviteBuildHints.slug(request);
+            if (inviteSlug != null && inviteSlug.trim().length() > 0) {
+                inviteDomainProperty += "        Display.getInstance().setProperty(\"invite.slug\", \""
+                        + inviteSlug.trim() + "\");\n";
+            }
+        }
+        resolveInviteAppClipGroup(request);
+        // The reader for what the App Clip left behind. A direct symbol
+        // reference, not a name lookup: obfuscation renames the class and
+        // Class.forName would answer nothing in a release build.
+        //
+        // Registered before i.init(), because Invites reads the handoff on its
+        // first checkForInvite() and a source registered after that has missed
+        // the only launch that had a code to give. Nothing else in the port
+        // names IOSAppClipHandoff, so a build without a clip strips it.
+        String inviteAppClipRegister = "";
+        if (inviteAppClipGroup != null && inviteAppClipGroup.length() > 0) {
+            inviteAppClipRegister = "            com.codename1.analytics.invite.Invites"
+                    + ".registerAppClipHandoffSource(new "
+                    + "com.codename1.impl.ios.IOSAppClipHandoff(\""
+                    + inviteAppClipGroup + "\"));\n";
+        }
         String dbLegacy = databaseLegacyStubProperty(request, usesDatabase);
 
         // If the build-time SVG transcoder produced a registry class, weave
@@ -3837,6 +3919,7 @@ public class IPhoneBuilder extends Executor {
                     + hardeningRuntimeProperties(request)
                     + newStorage
                     + disableScreenshots
+                    + inviteDomainProperty
                     + dbLegacy
                     + adPadding
                     + integrateFacebook
@@ -3849,6 +3932,7 @@ public class IPhoneBuilder extends Executor {
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"
                     + firebaseRegisterInstall
+                    + inviteAppClipRegister
                     + svgRegistryInstall
                     + phoneHealthBindingsInstall
                     + "            i.init(this);\n"
@@ -4345,6 +4429,106 @@ public class IPhoneBuilder extends Executor {
                 File CodenameOne_GLViewController_m = new File(buildinRes, "CodenameOne_GLViewController.m");
                 replaceInFile(CodenameOne_GLViewController_m, "BOOL vkbAlwaysOpen = NO;", "BOOL vkbAlwaysOpen = YES;");
             }
+            // Invite attribution needs an invite link to open the app rather
+            // than Safari, which on iOS means a universal link, which means the
+            // invite host has to be an associated domain.
+            //
+            // This MUST run before the block below. That block's only test is
+            // whether ios.associatedDomains is non-null, and it is what
+            // uncomments CN1_HANDLE_UNIVERSAL_LINKS in
+            // CodenameOne_GLViewController.h. Appending one line later would
+            // leave the define commented out: the entitlement would be present,
+            // application:continueUserActivity:restorationHandler: would not be
+            // compiled in, and every invite link would silently open the
+            // browser.
+            //
+            // The matching com.apple.developer.associated-domains entitlement
+            // is derived from this same hint by the entitlements generator, so
+            // it is not written separately here -- doing that would risk a
+            // duplicate key, which fails codesigning.
+            if (usesInvites
+                    && "true".equals(request.getArg("ios.invite.universalLinks", "true"))) {
+                String inviteHost = InviteBuildHints.domain(request);
+                String existingDomains = request.getArg("ios.associatedDomains", "");
+                // TWO prefixes on the same host, and they do different jobs.
+                //
+                // applinks: is what opens an INSTALLED app from the link.
+                // appclips: is what lets iOS offer the App Clip to somebody who
+                // does not have the app -- which is the whole iOS attribution
+                // path now, since the clip receives the invite url exactly and
+                // hands the code to the app the person then installs. Declaring
+                // only applinks: leaves that person with a Safari page and no
+                // way to attribute the install that follows.
+                String[] wanted = {"applinks:" + inviteHost, "appclips:" + inviteHost};
+                for (String want : wanted) {
+                    if (declaresAssociatedDomain(existingDomains, want)) {
+                        continue;
+                    }
+                    existingDomains = existingDomains.trim().length() == 0
+                            ? want : existingDomains + "," + want;
+                    debug("Invite attribution: adding the associated domain " + want);
+                }
+                request.putArgument("ios.associatedDomains", existingDomains);
+            }
+
+            // The App Clip. This is what makes iOS attribution deterministic:
+            // the clip is launched BY the invite link and is handed it exactly,
+            // so it knows the code with certainty and writes it into a
+            // container the installed application reads. Without it the only
+            // iOS answer is a statistical match against a profile of somebody
+            // who installed nothing -- which is what this replaced.
+            //
+            // Gated on the same usesInvites scan as everything else here, so a
+            // second binary, a second provisioning profile and an app group
+            // land only on an app that asked for invites, and on the same
+            // universalLinks hint: an app that suppressed the associated
+            // domain has no way for iOS to offer a clip and would ship one
+            // that can never launch.
+            if (inviteAppClipGroup.length() > 0) {
+                String inviteHost = InviteBuildHints.domain(request);
+                // Already resolved and validated before the stub was written,
+                // which needed it to decide whether to register a reader at
+                // all. Re-deriving it here would let the two disagree.
+                String group = inviteAppClipGroup;
+                // SPACE, not a comma, and read through declaresAppGroup.
+                //
+                // generateEntitlements splits ios.app_groups on " " alone, so
+                // a comma-joined pair reaches the device as a single <string>
+                // "group.a,group.b", which matches neither configured group.
+                // The app then signs and cannot open the container it shares
+                // with its own clip, which
+                // is this feature failing with no error anywhere. An app with
+                // no other app group never saw it, because there was nothing
+                // to join to.
+                //
+                // declaresAppGroup compares entry by entry and tolerates
+                // either separator when reading, which is both what makes this
+                // safe against a hand-written comma list and what hid the bug:
+                // group.com.acme.shared contains group.com.acme, and a
+                // substring test would decide the group was already present
+                // and entitle the clip for one group and the app for another.
+                String appGroups = request.getArg("ios.app_groups", "");
+                if (!declaresAppGroup(appGroups, group)) {
+                    request.putArgument("ios.app_groups",
+                            appendAppGroup(appGroups, group));
+                }
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_INVITE_APPCLIP",
+                            "#define CN1_INCLUDE_INVITE_APPCLIP");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_INVITE_APPCLIP", ex);
+                }
+                debug("Invite attribution: " + (inviteAppClipTargetWanted
+                                ? "generating the App Clip "
+                                        + InviteAppClipBuilder.CLIP_NAME
+                                : "reading a handoff from an App Clip this build "
+                                        + "does not generate")
+                        + " for " + inviteHost + " (app group " + group + ")");
+            }
+
             if (request.getArg("ios.associatedDomains", null) != null) {
                 // If the user has provided the ios.associatedDomains build hint, then we will need to
                 // enable handling for these events.
@@ -4976,8 +5160,7 @@ public class IPhoneBuilder extends Executor {
                 }
                 if (!present) {
                     request.putArgument("ios.app_groups",
-                            appGroups.trim().length() == 0 ? matterGroup
-                                    : appGroups.trim() + "," + matterGroup);
+                            appendAppGroup(appGroups, matterGroup));
                 }
                 matterAppGroup = matterGroup;
                 // Commissioning talks to the accessory over BLE before it has
@@ -5453,8 +5636,7 @@ public class IPhoneBuilder extends Executor {
                         // either separator when READING, which is what hid
                         // this.
                         request.putArgument("ios.app_groups",
-                                appGroups.trim().length() == 0 ? group
-                                        : appGroups.trim() + " " + group);
+                                appendAppGroup(appGroups, group));
                     }
                 }
                 // The call provider's identity is written into Info.plist
@@ -6104,8 +6286,8 @@ public class IPhoneBuilder extends Executor {
             if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 String appGroups = request.getArg("ios.app_groups", "");
                 if (!declaresAppGroup(appGroups, surfacesAppGroup)) {
-                    request.putArgument("ios.app_groups", appGroups.length() == 0
-                            ? surfacesAppGroup : appGroups + "," + surfacesAppGroup);
+                    request.putArgument("ios.app_groups",
+                            appendAppGroup(appGroups, surfacesAppGroup));
                 }
             }
 
@@ -6116,8 +6298,8 @@ public class IPhoneBuilder extends Executor {
             if (documentProviderEnabled) {
                 String appGroups = request.getArg("ios.app_groups", "");
                 if (!declaresAppGroup(appGroups, documentsAppGroup)) {
-                    request.putArgument("ios.app_groups", appGroups.length() == 0
-                            ? documentsAppGroup : appGroups + "," + documentsAppGroup);
+                    request.putArgument("ios.app_groups",
+                            appendAppGroup(appGroups, documentsAppGroup));
                 }
             }
 
@@ -6747,11 +6929,21 @@ public class IPhoneBuilder extends Executor {
             }
             // Wallet/widget extensions and .ios.appext archives mutate the Xcode project through
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
+            //
+            // The App Clip belongs in this list, and leaving it out was worth a
+            // whole broken feature: the target is created inside this block, so
+            // an invite-enabled app that uses no pods and no other extension --
+            // which is the DEFAULT shape of an app that just switched invites
+            // on -- built and shipped with no clip at all. Nothing reports it.
+            // The app signs, the association file lists it, and every iOS
+            // install settles as no_match for ever, because the clip that was
+            // supposed to hand the code over does not exist.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
                     || callDirectoryExtensionEnabled
                     || vpnTunnelBuilder.isEnabled()
                     || documentProviderEnabled
+                    || inviteAppClipTargetWanted
                     || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
                 try {
@@ -6796,6 +6988,18 @@ public class IPhoneBuilder extends Executor {
                             + "    # pass stomps them down to the app's deployment target (seen as WidgetKit\n"
                             + "    # sources compiling at iOS 14 instead of the extension's 16.1).\n"
                             + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
+                            // And the App Clip, which is not an app-extension: its product
+                            // type is a full application bundle, so the skip above never
+                            // matched it. Appending the clip's own settings after this pass
+                            // covers the FIRST run only -- the script re-runs after pods
+                            // integration, and on the second pass the target already exists,
+                            // so the guard that stops it being created twice also skips the
+                            // block that would restore its floor. This pass then left the
+                            // clip at the app's deployment target, commonly below 14, and
+                            // an App Clip built below 14 does not launch.
+                            + "    next if target.respond_to?(:product_type) && target.product_type == '"
+                            + InviteAppClipBuilder.PRODUCT_TYPE + "'\n"
+                            + ""
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
                             + simulatorArchitectureSettings
@@ -7206,6 +7410,15 @@ public class IPhoneBuilder extends Executor {
                         // extension's IPHONEOS_DEPLOYMENT_TARGET=16.1 survives it -- see the
                         // ordering note in appendWidgetExtensionRuby.
                         appendWidgetExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
+                    }
+
+                    if (inviteAppClipTargetWanted) {
+                        // Same ordering note: appended after the global deployment-target
+                        // pass, so the clip keeps its own iOS 14 floor -- which is not a
+                        // preference. App Clips do not exist below it, and one built against
+                        // an app targeting less does not launch.
+                        appendInviteAppClipTarget(appExtensionsBuilder, request,
+                                new File(tmpFile, "dist"));
                     }
 
                     if (documentProviderEnabled) {
@@ -12076,6 +12289,211 @@ public class IPhoneBuilder extends Executor {
         sb.append("}\nend\n");
     }
 
+    /// Decides whether this build gets an invite App Clip, and under which
+    /// app group.
+    ///
+    /// Called before the stub is written, because the stub is what registers
+    /// the reader and it needs the group as a literal. The target generation
+    /// runs much later and reads the same field, so the clip's entitlement and
+    /// the application's registration cannot disagree -- they did while this
+    /// was derived twice, and the symptom was a clip that stored a code into a
+    /// container nothing read.
+    ///
+    /// @param request the build request, whose ios.app_groups is left alone
+    ///                here; the enablement block adds the group
+    private void resolveInviteAppClipGroup(BuildRequest request) throws BuildException {
+        inviteAppClipGroup = "";
+        inviteAppClipTargetWanted = false;
+        // Gated on usesInvites and NOTHING else, which is the point.
+        //
+        // Both hints here say "do not do this FOR me", and both were reading
+        // as "turn the feature off". ios.invite.appClip says do not generate a
+        // clip, which a developer sets when they ship one of their own;
+        // ios.invite.universalLinks says do not inject the associated domain,
+        // which they set when they manage the entitlement by hand. Either one
+        // used to suppress the receiving side as well -- the app group, the
+        // native define and the registration of IOSAppClipHandoff -- so a
+        // correctly configured app whose own clip wrote the documented handoff
+        // into the documented container had nothing reading it, and every iOS
+        // install settled as no_match.
+        //
+        // What each hint governs is applied where that thing is done: the
+        // domain append is guarded by universalLinks at its own call site, and
+        // target generation by appClip just below.
+        if (!usesInvites) {
+            return;
+        }
+        String group = request.getArg("ios.invite.appGroup",
+                InviteAppClipBuilder.defaultAppGroup(request.getPackageName()));
+        group = group == null ? "" : group.trim();
+        if (!group.startsWith("group.")) {
+            throw new BuildException(
+                    "ios.invite.appGroup must be an app group identifier starting "
+                    + "\"group.\", got \"" + group + "\".");
+        }
+        inviteAppClipGroup = group;
+        inviteAppClipTargetWanted =
+                "true".equals(request.getArg("ios.invite.appClip", "true"));
+    }
+
+    /// Emits the App Clip target into the schemes ruby.
+    ///
+    /// Modelled on [#appendMatterExtensionTarget], with one structural
+    /// difference that is the whole reason this is not an app extension: a
+    /// clip is a full application bundle with its own product type, and
+    /// `new_target` has no symbol for that type in every xcodeproj version we
+    /// might meet -- so it is created as an application and the product type
+    /// assigned afterwards. An extension's `:app_extension` would produce a
+    /// binary Apple rejects at upload with a message about the extension
+    /// point, which names nothing a developer could act on.
+    ///
+    /// It also embeds into `AppClips/`, not `PlugIns/`. Copied into the wrong
+    /// folder the clip signs, uploads and never launches.
+    ///
+    /// @param sb      the ruby being assembled
+    /// @param request the build request
+    /// @param distDir the dist directory the clip's sources are staged under
+    private void appendInviteAppClipTarget(StringBuilder sb, BuildRequest request,
+            File distDir) throws IOException, BuildException {
+        String name = InviteAppClipBuilder.CLIP_NAME;
+        String inviteHost = InviteBuildHints.domain(request);
+        String displayName = request.getDisplayName() == null
+                ? request.getMainClass() : request.getDisplayName();
+        IOSWalletExtensionBuilder.writeFileMap(
+                InviteAppClipBuilder.buildFileMap(request.getPackageName(),
+                        inviteAppClipGroup, inviteHost, displayName,
+                        embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request),
+                        request.getArg("ios.invite.appStoreId", "").trim()),
+                new File(distDir, name));
+        log("Adding invite App Clip target " + name + " (app group "
+                + inviteAppClipGroup + ")");
+
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER",
+                InviteAppClipBuilder.bundleId(request.getPackageName()));
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
+        buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");
+        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
+                InviteAppClipBuilder.DEPLOYMENT_TARGET);
+        // The HOST's families, through the same helper every other embedded
+        // target here uses. Hard-coding iPhone was wrong twice over: App Clips
+        // do run on iPad, and an ios.project_type=ipad build has an iPad-only
+        // app target -- so an iPhone-only clip inside it shares no family with
+        // its container and App Store validation rejects the archive.
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
+                "$(inherited) @executable_path/Frameworks");
+        buildSettingsMap.put("SKIP_INSTALL", "YES");
+        // The clip is generated, self-contained UIKit and owns no Codename One
+        // objects, so it is built the way Apple's own template is rather than
+        // the way the port is.
+        buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        // An App Clip is a full application bundle and App Store validation
+        // rejects one with no icon, so the clip carries a catalog of its own.
+        //
+        // Blanking this setting -- which is what was here -- produced an
+        // invite-enabled archive that could not be uploaded at all, for a
+        // target the developer never asked to maintain. The host's icons are
+        // copied rather than a placeholder generated: a clip card showing a
+        // different icon than the app it installs is its own confusion, and
+        // the person seeing it has not installed anything yet.
+        //
+        // appendFilesToXcodeProjGroup already adds an .xcassets directory as a
+        // single resource -- it has to, or Xcode fails with "Multiple commands
+        // produce Contents.json" -- so staging it here is all that is needed.
+        File clipIcons = new File(distDir, name + "/Images.xcassets");
+        File hostIcons = new File(distDir, request.getMainClass() + "-src/Images.xcassets");
+        if (hostIcons.isDirectory()) {
+            copyDirectory(hostIcons, clipIcons);
+            buildSettingsMap.put("ASSETCATALOG_COMPILER_APPICON_NAME", "AppIcon");
+        } else {
+            // No host catalog to copy, which means this build has no icons at
+            // all and the app target has the same problem. Said out loud
+            // rather than shipping a setting that names a catalog that is not
+            // there, which fails the build instead of the upload.
+            log("Invite attribution: the application has no Images.xcassets, so the App Clip "
+                    + "ships without an icon and the archive will be rejected");
+        }
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.invite.buildSettings.")) {
+                buildSettingsMap.put(
+                        key.substring("ios.invite.buildSettings.".length()),
+                        request.getArg(key, ""));
+            }
+        }
+        // The name the product will ACTUALLY be built under, which is not
+        // necessarily the target name: ios.invite.buildSettings.PRODUCT_NAME
+        // can override it. The embed reference below names a file in
+        // BUILT_PRODUCTS_DIR, so hard-coding the target name made such a build
+        // fail while copying a product that was never produced.
+        String productName = effectiveExtensionProductName(
+                buildSettingsMap.get("PRODUCT_NAME"), name);
+        if (productName == null) {
+            throw new BuildException("ios.invite.buildSettings.PRODUCT_NAME is \""
+                    + buildSettingsMap.get("PRODUCT_NAME") + "\", which this build"
+                    + " cannot evaluate, so it cannot know what the App Clip's"
+                    + " product will be called or embed it in the app. Use a"
+                    + " literal name, or $(TARGET_NAME).");
+        }
+        // Guarded so re-running the script does not create a duplicate target;
+        // the build re-executes fix_xcode_schemes.rb after dependency
+        // integration.
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
+                + "clip_target = xcproj.new_target(:application, '" + name + "', :ios, '"
+                + InviteAppClipBuilder.DEPLOYMENT_TARGET + "')\n"
+                + "clip_target.product_type = '" + InviteAppClipBuilder.PRODUCT_TYPE + "'\n"
+                + "clip_target.add_system_framework('UIKit')\n"
+                // SKOverlay is the install affordance, and it is what carries
+                // the clip's stored data forward to the installed app.
+                + "clip_target.add_system_framework('StoreKit')\n"
+                + "clip_group = xcproj.new_group('" + name + "')\n");
+        appendFilesToXcodeProjGroup(sb, new File(distDir, name), "clip_group", "clip_target",
+                distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(clip_target)\n"
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
+                + escapeRuby(productName) + ".app', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
+                + "p.name=='Embed App Clips'} || "
+                + "main_app_target.new_copy_files_build_phase('Embed App Clips')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                // 16 is the products directory, and the destination path below
+                // is what puts the clip in AppClips/ rather than beside the
+                // executable. PlugIns (13) is where extensions go and is wrong
+                // here: the bundle signs and uploads and the clip never runs.
+                + "embed_phase.dst_subfolder_spec = \"16\"\n"
+                + "embed_phase.dst_path = \"$(CONTENTS_FOLDER_PATH)/AppClips\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Same guard every other iOS-only target here carries, and this
+            // one needs it more than most: an App Clip does not exist on the
+            // Mac at all. Left unfiltered, the Catalyst destination builds a
+            // target whose whole product type is unsupported there and then
+            // tries to place it inside the Mac app, which fails the archive --
+            // for a slice that could never have used it. The iOS app keeps its
+            // clip; the Mac slice ships without one, which costs nothing,
+            // because a Mac install was never attributed through a clip.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target"
+                    + " && d.target.uuid == clip_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("clip_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
+        }
+        sb.append("}\n");
+        sb.append("end\n");
+        sb.append("xcproj.save(project_file)\n");
+    }
+
     private void appendMatterExtensionTarget(StringBuilder sb, BuildRequest request, File distDir)
             throws IOException, BuildException {
         String name = MatterExtensionBuilder.EXTENSION_NAME;
@@ -16494,6 +16912,36 @@ public class IPhoneBuilder extends Executor {
      * @param group the group being added
      * @return true when the group is already declared
      */
+    /**
+     * Appends an app group using the delimiter the value ALREADY uses.
+     *
+     * <p>ios.app_groups is documented as a space-delimited list and the
+     * invite and widget blocks write it that way, while the Matter and
+     * surfaces blocks write commas -- and a comment beside one of them calls
+     * comma "the established" form. They cannot all be right, and the code
+     * that finally splits the value is not in this repository, so this does
+     * not pick a winner.</p>
+     *
+     * <p>What it removes is the MIXED value, which is broken whichever way
+     * the split is done: enabling invites alongside Matter or surfaces
+     * produced "group.invite,group.matter" or the reverse, and a split on
+     * either delimiter then yields a token containing the other, so neither
+     * group matches the entitlement generated for the extension or the clip.
+     * Following whatever separator is already there keeps the list
+     * homogeneous no matter which feature ran first.</p>
+     *
+     * @param declared the existing ios.app_groups value, possibly empty
+     * @param group    the group to add
+     * @return the new value
+     */
+    static String appendAppGroup(String declared, String group) {
+        String existing = declared == null ? "" : declared.trim();
+        if (existing.length() == 0) {
+            return group;
+        }
+        return existing + (existing.indexOf(',') >= 0 ? "," : " ") + group;
+    }
+
     static boolean declaresAppGroup(String declared, String group) {
         if (declared == null || group == null || group.length() == 0) {
             return false;

@@ -1252,6 +1252,30 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .doc("Allows adding an intent filter to the main android activity"));
 
+        h.add(new Hint("android.invite.appLinks")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("android")
+                .doc("Whether the build injects the `android:autoVerify` intent filter for the "
+                        + "invite link domain into the main activity. Set it to `false` only when "
+                        + "declaring the filter yourself through `android.xintent_filter`; with no "
+                        + "filter at all an invite link opens the browser instead of the app."));
+
+        h.add(new Hint("android.invite.signingFingerprint")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING_LIST)
+                .separator(",")
+                .platform("android")
+                .doc("Comma separated SHA-256 signing certificate fingerprints, in colon separated "
+                        + "hex, enrolled in the shared `assetlinks.json` alongside the one derived "
+                        + "from the build's keystore. Apps distributed through Play App Signing "
+                        + "must add the app signing certificate fingerprint from the Play Console "
+                        + "here: Google re-signs the app, so the upload key the build holds isn't "
+                        + "the certificate Android verifies against. Without it, App Links "
+                        + "verification fails on every Play install and nothing reports an "
+                        + "error."));
+
         h.add(new Hint("android.xlargeScreens")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)

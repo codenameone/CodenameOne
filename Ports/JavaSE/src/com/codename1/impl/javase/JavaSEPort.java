@@ -7532,6 +7532,90 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(appArg);
 
+        // Invite attribution. "Send App Argument" above already covers the
+        // installed-app path -- paste an invite link into it. What it cannot
+        // reach is the DEFERRED path, which is the half most likely to ship
+        // broken: the referrer parser is otherwise only exercised by a real
+        // Play install, on a real device, once.
+        final JMenu inviteMenu = new JMenu("Invite");
+
+        JMenuItem inviteReferrer = new JMenuItem("Simulate Deferred Install Referrer...");
+        inviteReferrer.setToolTipText("Answer the next invite attribution lookup with a "
+                + "synthetic Play install referrer");
+        inviteReferrer.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JPanel pnl = new JPanel();
+                JTextField tf = new JTextField(20);
+                pnl.add(new JLabel("Invite code"));
+                pnl.add(tf);
+                int val = JOptionPane.showConfirmDialog(canvas, pnl,
+                        "Simulate an install referrer", JOptionPane.OK_CANCEL_OPTION,
+                        JOptionPane.QUESTION_MESSAGE);
+                if (val != JOptionPane.OK_OPTION) {
+                    return;
+                }
+                final String code = tf.getText() == null ? "" : tf.getText().trim();
+                if (code.length() == 0) {
+                    return;
+                }
+                // The exact shape the link service puts on the Play url, so
+                // the parser under test is the real one.
+                final String referrer = "utm_source=cn1_invite&utm_medium=referral"
+                        + "&cn1_invite=" + code;
+                com.codename1.analytics.invite.Invites.registerInstallReferrerSource(
+                        new com.codename1.analytics.invite.InstallReferrerSource() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public void requestReferrer(
+                            com.codename1.analytics.invite.InstallReferrerCallback callback) {
+                        long now = System.currentTimeMillis() / 1000L;
+                        callback.onReferrer(referrer, now - 60L, now);
+                    }
+
+                    @Override
+                    public boolean discardReferrer() {
+                        // The simulator has no one-shot flag to burn: the menu
+                        // item is the trigger, and it can be used again.
+                        return true;
+                    }
+                });
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        com.codename1.analytics.invite.Invites.checkForInvite();
+                    }
+                });
+            }
+        });
+        inviteMenu.add(inviteReferrer);
+
+        JMenuItem inviteClear = new JMenuItem("Clear Invite Attribution State");
+        inviteClear.setToolTipText("Forget the attribution and the pending device profile, so "
+                + "the first-launch path can be run again");
+        inviteClear.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // Without this the once-per-install semantics make the
+                // deferred path testable exactly once per machine, which is
+                // how once-only bugs get shipped.
+                com.codename1.analytics.invite.Invites.registerInstallReferrerSource(null);
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        com.codename1.analytics.invite.Invites.reset();
+                    }
+                });
+            }
+        });
+        inviteMenu.add(inviteClear);
+
+        simulateMenu.add(inviteMenu);
+
 
         JMenuItem debugWebViews = new JMenuItem("Debug Web Views");
         debugWebViews.setEnabled(false);
@@ -8273,6 +8357,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.removeAll();
         simulateMenu.add(pause);
         simulateMenu.add(appArg);
+        simulateMenu.add(inviteMenu);
         simulateMenu.addSeparator();
         simulateMenu.add(locationSim);
         simulateMenu.add(bluetoothSim);
