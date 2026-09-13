@@ -153,6 +153,34 @@ public final class WizardDecisions {
         return out;
     }
 
+    /// The certificate the overview's "Apple distribution certificate" card is about, or null when
+    /// the account has none.
+    ///
+    /// It reported `certificates.get(0)` -- the first row of an unfiltered list -- so an account
+    /// holding a Mac certificate was told "Apple distribution certificate: Ready" beside the name
+    /// of a MAC APP DISTRIBUTION certificate, which cannot sign an iOS build and was never going
+    /// to be chosen for one (issue #5773). Nothing downstream was wrong; the panel was. Answering
+    /// from [#compatibleCertificates] makes the card agree with the code that actually picks.
+    public static SigningState.Certificate distributionCertificateForOverview(SigningState state) {
+        List<SigningState.Certificate> compatible = compatibleCertificates(state, "IOS_APP_STORE");
+        return compatible.isEmpty() ? null : compatible.get(0);
+    }
+
+    /// The profile the overview's "App Store profile" card is about, or null when there is none.
+    ///
+    /// Same defect, same shape: `profiles.get(0)` called a Development profile the App Store
+    /// profile. Both the type and the state matter -- a profile Apple has marked INVALID is one
+    /// the next build cannot sign with, so calling it "Ready" is the same false assurance.
+    public static SigningState.Profile appStoreProfileForOverview(SigningState state) {
+        for (SigningState.Profile p : state.profiles) {
+            if ("IOS_APP_STORE".equals(p.profileType())
+                    && (p.status() == null || "ACTIVE".equals(p.status()))) {
+                return p;
+            }
+        }
+        return null;
+    }
+
     /// The one input still missing before a profile can be created, phrased for the user, or null
     /// when nothing is. Reported in the same order the dialog lays the sections out, so the
     /// message always points at the first thing above the button rather than at whichever check
