@@ -123,7 +123,26 @@ public final class Reactor {
 
     public int await(int[] readyFds, int timeoutMillis) throws IOException {
         applyPending();
-        selector.select(timeoutMillis < 0 ? 0 : timeoutMillis);
+        // ZERO IS A PROBE HERE TOO. The translated arms are epoll_wait(..., 0)
+        // and kevent with a zero timespec, both of which return at once and
+        // report whatever is ready now; Selector's zero is select(), which waits.
+        // Mapping a NEGATIVE timeout to 0 was right for the same reason and by
+        // the same accident -- epoll_wait(-1) waits without a deadline and
+        // select() is how that is spelled -- so it is now spelled deliberately.
+        //
+        // The sibling in ServerSocket.awaitReadable had this and was fixed one
+        // finding earlier; that fix should have been a sweep of every select()
+        // in this arm rather than the one site reported. Deadlines' two are the
+        // third case and are CORRECT as they stand: there a zero timeout is a
+        // socket deadline of zero, which means no deadline on the translated arm
+        // too (SO_RCVTIMEO of zero blocks), so select(0) already agrees.
+        if(timeoutMillis == 0) {
+            selector.selectNow();
+        } else if(timeoutMillis < 0) {
+            selector.select();
+        } else {
+            selector.select(timeoutMillis);
+        }
         int count = 0;
         Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
         while(iterator.hasNext()) {

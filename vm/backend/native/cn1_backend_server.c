@@ -827,7 +827,16 @@ JAVA_INT com_codename1_backend_Reactor_registerImpl___int_int_int_boolean_R_int(
                0, 0, NULL);
     }
     if(events & CN1_EVENT_WRITE) {
-        EV_SET(&ev[n++], fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, NULL);
+        // AND THE SAME FOR WRITE. Without EV_DISPATCH this filter stays armed, so
+        // a descriptor registered WRITE | ONESHOT is reported writable again and
+        // again with no modify() in between -- and on a kqueue several hosts wait
+        // on, to more than one of them at once. That is the ownership the
+        // one-shot contract exists to give: exactly one waiter holds a connection
+        // until it re-arms. epoll gets this from EPOLLONESHOT above; kqueue needs
+        // it said.
+        EV_SET(&ev[n++], fd, EVFILT_WRITE,
+               EV_ADD | EV_ENABLE | ((events & CN1_EVENT_ONESHOT) ? EV_DISPATCH : 0),
+               0, 0, NULL);
     }
     if(n == 0) {
         return 0;

@@ -37,6 +37,7 @@ import com.codename1.backend.Db;
 import com.codename1.backend.DbPool;
 import com.codename1.backend.FileIo;
 import com.codename1.backend.Http;
+import com.codename1.backend.Reactor;
 import com.codename1.backend.Http1Date;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
@@ -2442,6 +2443,62 @@ public class SelfTest {
     }
 
     /**
+     * The reactor's zero timeout is a probe, and its one-shot means once.
+     *
+     * <p>Two rules the arms have to share. A zero timeout is epoll_wait(..., 0)
+     * and a zero timespec on kevent -- both answer immediately -- while
+     * Selector's zero is select(), which waits. And ONESHOT means the descriptor
+     * is reported to exactly one waiter until it is re-armed; on kqueue the WRITE
+     * filter was registered without EV_DISPATCH, so it stayed armed and a
+     * writable descriptor came back every time, to every host waiting on that
+     * kqueue.
+     */
+    private static void theReactorProbesAndFiresOnce() throws Exception {
+        final Reactor reactor = Reactor.create();
+        ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 5000);
+        int peer = listener.accept();
+        int[] ready = new int[8];
+        String probe;
+        try {
+            // A connected socket with nothing to read: the only right answer to
+            // "anything ready now?" is none, and the only right time is now.
+            final boolean[] answered = new boolean[1];
+            final int[] count = new int[1];
+            Thread prober = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        count[0] = reactor.await(new int[8], 0);
+                    } catch (Exception ignored) {
+                        return;
+                    }
+                    answered[0] = true;
+                }
+            });
+            prober.start();
+            prober.join(3000);
+            probe = answered[0] ? "answered " + count[0] : "waited";
+            prober.join(2000);
+
+            // ONE SHOT: registered for WRITE, which a connected socket is
+            // immediately, so the first await reports it. The second must not,
+            // because nothing re-armed it.
+            reactor.add(peer, Reactor.WRITE | Reactor.ONESHOT);
+            int first = reactor.await(ready, 1000);
+            int second = reactor.await(ready, 300);
+            check("a reactor probe answers rather than waiting", "answered 0", probe);
+            check("a one-shot write fires once", "1", String.valueOf(first));
+            check("and not again until it is re-armed", "0", String.valueOf(second));
+        } finally {
+            reactor.remove(peer);
+            reactor.close();
+            ServerSocket.closeFd(peer);
+            conn.close();
+            listener.close();
+        }
+    }
+
+    /**
      * Asking whether a socket is readable RIGHT NOW is not a wait.
      *
      * <p>The translated arm is a poll(), where a zero timeout returns at once and
@@ -4410,6 +4467,7 @@ public class SelfTest {
         aLaterIfRangeDateDoesNotAuthoriseARange();
         aTruncatingBindAddressBindsNothing();
         aClosedSocketWakesItsBlockedReader();
+        theReactorProbesAndFiresOnce();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
         aRemoteCredentialEndpointMustBeEncrypted();
