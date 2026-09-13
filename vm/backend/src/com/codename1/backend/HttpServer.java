@@ -5367,6 +5367,29 @@ public final class HttpServer {
             throw new ProtocolException(400, "both Content-Length and Transfer-Encoding");
         }
 
+        // BEFORE THE EXPECTATION IS ANSWERED, because 100 Continue is an
+        // invitation to send a body and these are the two reasons this server
+        // already knows it will not take one. Answering "go ahead" and then 413
+        // is the exact cost the mechanism exists to avoid: a conforming client
+        // uploads everything it declared -- up to the limit it is about to be
+        // refused for -- before it learns the answer. RFC 9110 10.1.1 says to
+        // send the final status instead when the request would be rejected.
+        //
+        // The body read below relies on these having run; they used to sit there
+        // instead, which is why a request with no Expect behaved correctly and
+        // one that politely asked first did not.
+        if(contentLength != null) {
+            // sliceToInt returns -1 for anything that is not a plain non-negative
+            // decimal, which covers the malformed and the negative cases the two
+            // separate checks here used to make after parsing.
+            if(declaredLength < 0) {
+                throw new ProtocolException(400, "malformed Content-Length");
+            }
+            if(declaredLength > MAX_BODY_BYTES) {
+                throw new ProtocolException(413, "request body too large");
+            }
+        }
+
         String expectation = request.getHeader("Expect");
         if(expectation != null) {
             // EVERY token, not just whether the one we know is among them. An
@@ -5404,15 +5427,8 @@ public final class HttpServer {
             }
             body = decoded.length == 0 ? null : new String(decoded, "UTF-8");
         } else if(contentLength != null) {
-            // sliceToInt returns -1 for anything that is not a plain non-negative
-            // decimal, which covers the malformed and the negative cases the two
-            // separate checks here used to make after parsing.
-            if(declaredLength < 0) {
-                throw new ProtocolException(400, "malformed Content-Length");
-            }
-            if(declaredLength > MAX_BODY_BYTES) {
-                throw new ProtocolException(413, "request body too large");
-            }
+            // Already refused above if it was malformed or too large, which has to
+            // happen before an Expect is answered rather than here.
             if(!conn.fillTo(declaredLength)) {
                 return null;
             }

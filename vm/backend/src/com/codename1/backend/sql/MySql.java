@@ -404,7 +404,12 @@ public final class MySql {
         Column[] columns = new Column[columnCount];
         if(columnCount > 0) {
             for(int iter = 0 ; iter < columnCount ; iter++) {
-                columns[iter] = parseColumn(readPacket().body);
+                Packet definition = readPacket();
+                try {
+                    columns[iter] = parseColumn(definition.body);
+                } catch (IOException malformed) {
+                    throw desynchronised(malformed);
+                }
             }
             readPacket(); // EOF
         }
@@ -496,7 +501,12 @@ public final class MySql {
         int resultColumns = columnCount(header.lengthEncoded());
         Column[] resultDefinitions = new Column[resultColumns];
         for(int iter = 0 ; iter < resultColumns ; iter++) {
-            resultDefinitions[iter] = parseColumn(readPacket().body);
+            Packet definition = readPacket();
+            try {
+                resultDefinitions[iter] = parseColumn(definition.body);
+            } catch (IOException malformed) {
+                throw desynchronised(malformed);
+            }
         }
         readPacket(); // EOF ending the definitions
         while(true) {
@@ -511,7 +521,11 @@ public final class MySql {
                 return 0;
             }
             if(rows != null) {
-                rows.add(decodeBinaryRow(packet.body, resultDefinitions));
+                try {
+                    rows.add(decodeBinaryRow(packet.body, resultDefinitions));
+                } catch (IOException malformed) {
+                    throw desynchronised(malformed);
+                }
             }
         }
     }
@@ -830,6 +844,29 @@ public final class MySql {
      * prepare response: sixteen bits. A result set with more columns than the
      * protocol can describe in its other half is not one this client needs to read.
      */
+    /**
+     * Marks a session whose stream position is no longer known.
+     *
+     * <p>columnCount already does this for a count it will not read; these are the
+     * other half of the same rule. A DECODE failure -- a row whose inner lengths
+     * or temporal fields are malformed, a column definition that does not parse --
+     * is thrown after readPacket has already taken a whole packet off the wire,
+     * so the rest of the result set is still unread. Nothing else closes there:
+     * readPacket closes when the READ fails, and a server ERROR packet is a clean
+     * state that must NOT close, or an ordinary duplicate-key error would destroy
+     * the connection it was reported on.
+     *
+     * <p>Left open, the statement's finally sends COM_STMT_CLOSE over the unread
+     * rows and isClosed() goes on advertising the session as reusable, so the pool
+     * hands it out and the next statement reads a previous one's row as its own
+     * answer -- or fails on a sequence number, several operations away from the
+     * request that broke it.
+     */
+    private IOException desynchronised(IOException err) {
+        close();
+        return err;
+    }
+
     private int columnCount(long declared) throws IOException {
         if(declared < 0 || declared > MAX_RESULT_COLUMNS) {
             close();                    // desynchronised; see readPacketHeader

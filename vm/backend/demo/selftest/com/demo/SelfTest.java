@@ -1755,6 +1755,69 @@ public class SelfTest {
      * would pass the corrupted half and fail this one.
      */
     /**
+     * A body this server will refuse is never invited.
+     *
+     * <p>100 Continue exists so a client can find out BEFORE it uploads. Sending
+     * it and then answering 413 is the exact cost the mechanism avoids: a
+     * conforming client transmits everything it declared -- up to the limit it is
+     * about to be refused for -- and only then reads the answer. RFC 9110 10.1.1
+     * says to send the final status instead when the request would be rejected.
+     * A request with no Expect was refused correctly all along; one that politely
+     * asked first was told to go ahead.
+     */
+    private static void aRefusedBodyIsNeverInvited() throws Exception {
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                return HttpServer.Response.text(200, "handled");
+            }
+        });
+        String tooLarge;
+        String malformed;
+        try {
+            tooLarge = expectationAnswer(server.getPort(), "999999999");
+            malformed = expectationAnswer(server.getPort(), "not-a-number");
+        } finally {
+            server.stop(2000);
+        }
+        check("a body past the limit is refused instead of invited", "413", tooLarge);
+        check("and so is one whose length is not a number", "400", malformed);
+    }
+
+    /**
+     * The first status this server answers to an Expect, or "invited" when it
+     * approved the body first.
+     */
+    private static String expectationAnswer(int port, String contentLength) throws Exception {
+        Tcp conn = Tcp.connect("127.0.0.1", port, 15000);
+        try {
+            byte[] head = ("POST /x HTTP/1.1\r\nHost: x\r\nExpect: 100-continue\r\n"
+                    + "Content-Length: " + contentLength + "\r\n"
+                    + "Connection: close\r\n\r\n").getBytes("UTF-8");
+            conn.write(head, 0, head.length);
+            // NOT ONE BYTE OF BODY is sent, which is the client this is about: it
+            // is waiting to be told. Whatever comes back came back without it.
+            ByteArrayOutputStream reply = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            while(true) {
+                int n = conn.read(chunk, 0, chunk.length);
+                if(n <= 0) {
+                    break;
+                }
+                reply.write(chunk, 0, n);
+            }
+            String text = new String(reply.toByteArray(), "UTF-8");
+            if(text.indexOf("100 Continue") >= 0) {
+                return "invited";
+            }
+            int space = text.indexOf(' ');
+            return space < 0 || text.length() < space + 4 ? "unreadable: " + text
+                    : text.substring(space + 1, space + 4);
+        } finally {
+            conn.close();
+        }
+    }
+
+    /**
      * An interim response is not the answer.
      *
      * <p>RFC 9110 15.2: a 1xx is a complete response with its own status line and
@@ -2473,6 +2536,198 @@ public class SelfTest {
         }
     }
 
+    /**
+     * A row this client cannot decode leaves the session unusable.
+     *
+     * <p>The decode throws after readPacket has already taken a whole packet off
+     * the wire, so the rest of the result set is still unread. columnCount closes
+     * for exactly this reason and the decoders did not, so the statement's finally
+     * sent COM_STMT_CLOSE over the unread rows and isOpen() went on calling the
+     * session reusable -- the pool then handed it out and the next statement read
+     * a previous one's row as its own answer.
+     *
+     * <p>Driven by a stub speaking just enough of the protocol to get there: a
+     * greeting, an OK for whatever is sent, a prepare response describing one
+     * column, and then a row whose value claims sixteen megabytes that are not
+     * there. A server ERROR packet is deliberately NOT this case -- that is a
+     * clean stream, and closing on one would destroy a connection over an
+     * ordinary duplicate key.
+     */
+    private static void aMalformedRowClosesTheMySqlSession() throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client >= 0) {
+                        mySqlStubSession(client);
+                    }
+                } catch (Exception ignored) {
+                    // The check below reports what the client made of it.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        Database db = null;
+        try {
+            db = Database.open("mysql://u:pw@127.0.0.1:" + port + "/db?sslmode=disable");
+            try {
+                db.query("SELECT x FROM t", null);
+                outcome = "decoded a row that cannot be decoded";
+            } catch (Exception failed) {
+                outcome = db.isOpen()
+                        ? "left the session open: " + failed.getMessage()
+                        : "closed";
+            }
+        } catch (Exception opening) {
+            outcome = "never reached the query: " + opening.getMessage();
+        } finally {
+            if(db != null) {
+                db.close();
+            }
+            listener.close();
+        }
+        stub.join(10000);
+        check("a MySQL row that will not decode closes the session", "closed", outcome);
+    }
+
+    /** Enough of the server side to carry one prepared statement to its rows. */
+    private static void mySqlStubSession(int client) throws Exception {
+        ByteArrayOutputStream greeting = new ByteArrayOutputStream();
+        greeting.write(10);                                  // protocol version
+        greeting.write("8.0.0-cn1stub".getBytes("UTF-8"));
+        greeting.write(0);
+        for(int iter = 0 ; iter < 4 ; iter++) {
+            greeting.write(0);                               // connection id
+        }
+        for(int iter = 0 ; iter < 8 ; iter++) {
+            greeting.write('a');                             // scramble, first part
+        }
+        greeting.write(0);                                   // filler
+        greeting.write(0x00);
+        greeting.write(0x82);            // PROTOCOL_41 | SECURE_CONNECTION, no SSL
+        greeting.write(45);                                  // character set
+        greeting.write(0);
+        greeting.write(0);                                   // status flags
+        greeting.write(0x08);
+        greeting.write(0x00);                                // PLUGIN_AUTH
+        greeting.write(21);                                  // scramble length
+        for(int iter = 0 ; iter < 10 ; iter++) {
+            greeting.write(0);                               // reserved
+        }
+        for(int iter = 0 ; iter < 12 ; iter++) {
+            greeting.write('b');                             // scramble, second part
+        }
+        greeting.write(0);
+        greeting.write("mysql_native_password".getBytes("UTF-8"));
+        greeting.write(0);
+        mySqlStubSend(client, 0, greeting.toByteArray());
+
+        while(true) {
+            byte[] packet = mySqlStubReceive(client);
+            if(packet == null) {
+                return;
+            }
+            int sequence = packet[0] & 0xff;
+            int command = packet.length > 1 ? packet[1] & 0xff : -1;
+            if(command == 0x16) {                            // COM_STMT_PREPARE
+                byte[] prepared = new byte[12];
+                prepared[1] = 1;                             // statement id
+                prepared[5] = 1;                             // one column
+                mySqlStubSend(client, sequence + 1, prepared);
+                mySqlStubSend(client, sequence + 2, mySqlStubColumn());
+                mySqlStubSend(client, sequence + 3, mySqlStubEof());
+            } else if(command == 0x17) {                     // COM_STMT_EXECUTE
+                mySqlStubSend(client, sequence + 1, new byte[]{1});
+                mySqlStubSend(client, sequence + 2, mySqlStubColumn());
+                mySqlStubSend(client, sequence + 3, mySqlStubEof());
+                // THE ROW: not null, and a value that says it is 16777215 bytes
+                // long with none of them present.
+                mySqlStubSend(client, sequence + 4, new byte[]{0, 0,
+                        (byte) 0xfd, (byte) 0xff, (byte) 0xff, (byte) 0xff});
+                mySqlStubSend(client, sequence + 5, mySqlStubEof());
+            } else {
+                mySqlStubSend(client, sequence + 1,
+                        new byte[]{0, 0, 0, 2, 0, 0, 0});    // OK
+            }
+        }
+    }
+
+    private static byte[] mySqlStubColumn() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        String[] strings = {"def", "db", "t", "t", "x", "x"};
+        for(int iter = 0 ; iter < strings.length ; iter++) {
+            byte[] bytes = strings[iter].getBytes("UTF-8");
+            out.write(bytes.length);
+            out.write(bytes, 0, bytes.length);
+        }
+        out.write(0x0c);                 // length of the fixed fields
+        out.write(33);
+        out.write(0);                    // character set, not 63, so not binary
+        for(int iter = 0 ; iter < 4 ; iter++) {
+            out.write(0);                // column length
+        }
+        out.write(0xfd);                 // VAR_STRING, read length-encoded
+        out.write(0);
+        out.write(0);                    // flags
+        out.write(0);                    // decimals
+        out.write(0);
+        out.write(0);                    // filler
+        return out.toByteArray();
+    }
+
+    private static byte[] mySqlStubEof() {
+        return new byte[]{(byte) 0xfe, 0, 0, 2, 0};
+    }
+
+    private static void mySqlStubSend(int client, int sequence, byte[] body) throws Exception {
+        byte[] packet = new byte[4 + body.length];
+        packet[0] = (byte)(body.length & 0xff);
+        packet[1] = (byte)((body.length >> 8) & 0xff);
+        packet[2] = (byte)((body.length >> 16) & 0xff);
+        packet[3] = (byte)(sequence & 0xff);
+        System.arraycopy(body, 0, packet, 4, body.length);
+        ServerSocket.write(client, packet, 0, packet.length);
+    }
+
+    /** The sequence number in element 0, the payload after it. Null at EOF. */
+    private static byte[] mySqlStubReceive(int client) throws Exception {
+        byte[] header = mySqlStubReadFully(client, 4);
+        if(header == null) {
+            return null;
+        }
+        int length = (header[0] & 0xff) | ((header[1] & 0xff) << 8)
+                | ((header[2] & 0xff) << 16);
+        byte[] body = length == 0 ? new byte[0] : mySqlStubReadFully(client, length);
+        if(body == null) {
+            return null;
+        }
+        byte[] out = new byte[body.length + 1];
+        out[0] = header[3];
+        System.arraycopy(body, 0, out, 1, body.length);
+        return out;
+    }
+
+    private static byte[] mySqlStubReadFully(int client, int count) throws Exception {
+        byte[] buffer = new byte[count];
+        int at = 0;
+        while(at < count) {
+            int n = ServerSocket.read(client, buffer, at, count - at);
+            if(n <= 0) {
+                return null;
+            }
+            at += n;
+        }
+        return buffer;
+    }
+
     private static void aTruncatedMySqlHeaderIsRefused() throws Exception {
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
@@ -3073,6 +3328,7 @@ public class SelfTest {
         storedTextComesBackUnchanged();
         scramIterationCountIsBounded();
         aTruncatedMySqlHeaderIsRefused();
+        aMalformedRowClosesTheMySqlSession();
         anUnknownSslModeIsRefused();
         truncatedRowFramesAreRefused();
         aDeadSessionReportsItselfClosed();
@@ -3082,6 +3338,7 @@ public class SelfTest {
         aMySqlPacketOutOfSequenceIsRefused();
         aNegativePostgresLengthThatIsNotNullIsRefused();
         aStaticFileComesBackWhole();
+        aRefusedBodyIsNeverInvited();
         anInterimResponseIsSkipped();
         aTlsVerificationNameWithANulIsRefused();
         aHeadResponseIsNotReadAsTruncated();
