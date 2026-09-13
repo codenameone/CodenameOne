@@ -130,10 +130,15 @@ public class IPhoneBuilder extends Executor {
     private File tmpFile;
     private File icon57;
     private File icon512;
-    // Bumped from 12.0 → 13.0 to enable NSURLSessionWebSocketTask
+    // Bumped from 12.0 to 13.0 to enable NSURLSessionWebSocketTask
     // (iOS 13+) used by com.codename1.io.WebSocket's iOS implementation.
     // BuildDaemon's iOS lane needs the same bump.
     private static final String DEFAULT_MIN_DEPLOYMENT_VERSION = "13.0";
+
+    /// The lowest deployment target the selected Xcode's iOS SDK accepts, or null off a Mac.
+    /// Read once in build() and used again when the extension targets are written, which do
+    /// not go through getDeploymentTarget().
+    private String sdkDeploymentFloor;
 
     // StringBuilder used for constructing ruby script with xcodeproj
     // which adds localized strings files to the project.
@@ -2018,6 +2023,24 @@ public class IPhoneBuilder extends Executor {
             // multitasking must provide a launch storyboard, or UILaunchScreen
             // when MinimumOSVersion is 14 or higher.
             addMinDeploymentTarget("14.0");
+        }
+        // Whatever the hints and features ask for, the SDK still has a floor of its own and it
+        // moves: Xcode 27 raised iOS from 12.0 to 15.0, which is above this builder's default
+        // of 14.0, so an unmodified project stopped building. Contributing it here raises the
+        // target instead, through the same maximum as everything else.
+        sdkDeploymentFloor = sdkMinimumDeploymentTarget("iphoneos");
+        if (sdkDeploymentFloor != null) {
+            addMinDeploymentTarget(sdkDeploymentFloor);
+            String pinnedDeploymentTarget = request.getArg("ios.deployment_target", null);
+            if (pinnedTargetIsBelow(pinnedDeploymentTarget, sdkDeploymentFloor)) {
+                // Raising past an explicit pin is worth a line in the log: the developer asked
+                // for something this Xcode cannot build, and the alternative to raising it is
+                // failing the build.
+                log("ios.deployment_target is pinned to " + pinnedDeploymentTarget
+                        + ", but this Xcode's iOS SDK accepts nothing below "
+                        + sdkDeploymentFloor + "; building against " + sdkDeploymentFloor
+                        + " instead. Apple raises this floor between Xcode releases.");
+            }
         }
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         appAttest = request.getArg("ios.appAttest", "false").equals("true");
@@ -6987,6 +7010,10 @@ public class IPhoneBuilder extends Executor {
                             + "    # second pass the extension targets already exist -- without this skip the\n"
                             + "    # pass stomps them down to the app's deployment target (seen as WidgetKit\n"
                             + "    # sources compiling at iOS 14 instead of the extension's 16.1).\n"
+                            + "    #\n"
+                            + "    # Skipping them leaves them below the SDK floor, which Xcode 27 refuses. They\n"
+                            + "    # are raised by extensionDeploymentFloorScript(), appended after the fragment\n"
+                            + "    # that CREATES them -- this pass runs before they exist.\n"
                             + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
                             // And the App Clip, which is not an app-extension: its product
                             // type is a full application bundle, so the skip above never
@@ -7607,7 +7634,11 @@ public class IPhoneBuilder extends Executor {
                             + "  raise e\n"
                             + "end\n"
                             + deploymentTargetStr
-                            + appExtensionsBuilder.toString();
+                            + appExtensionsBuilder.toString()
+                            // Last, because it has to see the extension targets the fragment
+                            // above creates. Ordering is the entire reason this is separate
+                            // from the global deployment-target pass.
+                            + extensionDeploymentFloorScript(sdkDeploymentFloor);
                     File bridgingHeaderFile = new File(new File(tmpDir, "dist"), "cn1-Bridging-Header.h");
                     if (!bridgingHeaderFile.exists()) {
                         this.createFile(bridgingHeaderFile, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
@@ -10227,6 +10258,665 @@ public class IPhoneBuilder extends Executor {
         return "iphoneos";
     }
 
+    /// A ruby fragment that raises every app-extension target to the SDK's minimum.
+    ///
+    /// Appended AFTER the fragment that creates the extensions, which is the whole point.
+    /// The global deployment-target pass runs before they exist and deliberately skips the
+    /// ones that do -- extensions own their target, and stomping them down turned a 16.1
+    /// WidgetKit extension into a 14.0 one. But leaving them alone entirely is how an app
+    /// with a VPN tunnel, call directory, share or notification-content extension still
+    /// failed under Xcode 27: those are generated at 12.0, the host target was raised to the
+    /// SDK floor and they were not, and Xcode refuses the whole build for any target below
+    /// the floor.
+    ///
+    /// So this raises and never lowers, which keeps both properties. Off a Mac, or wherever
+    /// the floor cannot be read, it emits nothing at all.
+    static String extensionDeploymentFloorScript(String sdkFloor) {
+        if (sdkFloor == null || sdkFloor.trim().length() == 0) {
+            return "";
+        }
+        return "\nbegin\n"
+                + "  sdk_floor = '" + escapeRubyStr(sdkFloor.trim()) + "'\n"
+                // A reference is resolved against the target's own settings and then the
+                // project's, which is what Xcode does. $(inherited) on a deployment target
+                // inherits the PROJECT's, and the project has already been raised.
+                + "  project_settings = {}\n"
+                + "  (xcproj.build_configurations || []).each do |c|\n"
+                + "    project_settings[c.name] = c.build_settings\n"
+                + "  end\n"
+                + "  # Resolves in the CONTEXT of the key being examined. A helper may be\n"
+                + "  # qualified too -- EXTENSION_MIN = 12.0 beside EXTENSION_MIN[sdk=iphoneos*]\n"
+                + "  # = 16.4 -- and Xcode reads the qualified one for a matching build. Taking\n"
+                + "  # the base would resolve 16.4 to 12.0 and clamp the extension DOWN to the\n"
+                + "  # floor, below what its code needs. The Java side carries a note about the\n"
+                + "  # same mistake, made with a [variant=...] helper.\n"
+                + "  #\n"
+                + "  # Returns the resolved text and whether anything about it was uncertain. A\n"
+                + "  # helper carrying qualifiers this pass did not match exactly could resolve\n"
+                + "  # higher on the real build, so an uncertain result is never used to lower a\n"
+                + "  # target -- only to raise one. Refusing to act leaves a genuinely low value\n"
+                + "  # for Xcode to reject by name, which beats silently weakening an extension.\n"
+                + "  # Whether a candidate value could possibly be at or above the floor. An\n"
+                + "  # unresolved expression could be anything, so it counts as possible; an\n"
+                + "  # empty or unparseable one is a value this pass would clamp anyway.\n"
+                + "  # The condition set a build-setting key carries. Applicability below is an\n"
+                + "  # ARRAY DIFFERENCE against this build's conditions, which is what makes the\n"
+                + "  # comparison order-independent -- the sort only keeps the sets canonical for\n"
+                + "  # reading and for any future equality use.\n"
+                + "  cn1_conds = lambda do |key, name|\n"
+                + "    key[name.length, key.length - name.length].to_s.scan(/\\[[^\\]]*\\]/).sort\n"
+                + "  end\n"
+                + "  cn1_may_clear = lambda do |v|\n"
+                + "    t = v.to_s.strip\n"
+                + "    return true if t.include?('$')\n"
+                + "    return false if t.empty?\n"
+                + "    begin\n"
+                + "      Gem::Version.new(t) >= Gem::Version.new(sdk_floor)\n"
+                + "    rescue ArgumentError\n"
+                + "      false\n"
+                + "    end\n"
+                + "  end\n"
+                + "  # Pick the value a setting resolves to for a build governed by `mine`.\n"
+                + "  #\n"
+                + "  # A key can carry several conditions -- [sdk=iphoneos*][arch=arm64] -- and a\n"
+                + "  # setting qualified on only SOME of them still applies. Conditions are\n"
+                + "  # compared as SETS by array difference, so their order does not matter and a\n"
+                + "  # qualifier that cannot hold for this build is correctly ignored. The most\n"
+                + "  # specific applicable declaration wins, which is what Xcode does.\n"
+                + "  #\n"
+                + "  # Returns the value and, when the answer is not decidable, the candidates it\n"
+                + "  # could have been: two equally specific declarations, or a key with NO\n"
+                + "  # conditions, where nothing is known about the build and any qualified\n"
+                + "  # sibling could win.\n"
+                + "  # Declarations of `nm` within ONE level, split into the ones that apply to\n"
+                + "  # this build and the ones whose conditions overlap it undecidably.\n"
+                + "  cn1_level = lambda do |nm, map, mine|\n"
+                + "    decls = map.keys.select { |k| k == nm || k.start_with?(nm + '[') }\n"
+                + "    applicable = decls.select do |k|\n"
+                + "      (cn1_conds.call(k, nm) - mine).empty?\n"
+                + "    end.sort_by { |k| -cn1_conds.call(k, nm).length }\n"
+                + "    # Conditions can OVERLAP without being equal: sdk=iphoneos27.* is narrower\n"
+                + "    # than sdk=iphoneos* and Xcode picks it for a matching build, but set\n"
+                + "    # logic on the raw text calls the two unrelated. Deciding which wins would\n"
+                + "    # mean evaluating the patterns against the SDK this archive is for, which\n"
+                + "    # this pass does not know; calling it undecidable costs only a raise that\n"
+                + "    # was not certainly needed, while guessing wrong lowers an extension.\n"
+                + "    overlapping = (decls - applicable).select do |k|\n"
+                + "      cn1_conds.call(k, nm).any? do |c|\n"
+                + "        ck, cv = c[1..-2].to_s.split('=', 2)\n"
+                + "        mine.any? do |m|\n"
+                + "          mk, mv = m[1..-2].to_s.split('=', 2)\n"
+                + "          # Same condition key, different text, and the glob prefixes nest --\n"
+                + "          # iphoneos* against iphoneos27.* can both match one SDK, while\n"
+                + "          # iphoneos* and iphonesimulator* never can, so those stay disjoint\n"
+                + "          # and the raise still happens.\n"
+                + "          if mk != ck || m == c\n"
+                + "            false\n"
+                + "          else\n"
+                + "            cp = cv.to_s.sub(/\\*$/, '')\n"
+                + "            mp = mv.to_s.sub(/\\*$/, '')\n"
+                + "            (cv.to_s.include?('*') || mv.to_s.include?('*')) &&\n"
+                + "              (cp.start_with?(mp) || mp.start_with?(cp))\n"
+                + "          end\n"
+                + "        end\n"
+                + "      end\n"
+                + "    end\n"
+                + "    [applicable, overlapping]\n"
+                + "  end\n"
+                + "  # Pick the value a setting resolves to for a build governed by `mine`.\n"
+                + "  #\n"
+                + "  # Xcode resolves per LEVEL: a TARGET declaration overrides a PROJECT one, and\n"
+                + "  # conditions rank only WITHIN a level. Pooling the two ranked a project's\n"
+                + "  # EXTENSION_MIN[sdk=iphoneos*] = 12.0 above the target's own unconditional\n"
+                + "  # EXTENSION_MIN = 16.4, purely because the first carries a condition -- so the\n"
+                + "  # pass read 12.0 where Xcode reads 16.4 and wrote the floor over a target that\n"
+                + "  # did not need it, LOWERING the extension. (The same pooling mistake once let\n"
+                + "  # a project SDKROOT outvote a watch target's own; it is the same shape.)\n"
+                + "  #\n"
+                + "  # A level is only skipped when it says nothing about this build: a target\n"
+                + "  # declaration whose condition cannot hold here does not suppress the project's,\n"
+                + "  # which is what Xcode does too. An overlap counts as saying something, because\n"
+                + "  # it MIGHT be what Xcode picks, and silently reading past it is the lowering\n"
+                + "  # this pass must never do.\n"
+                + "  #\n"
+                + "  # Returns the value and, when the answer is not decidable, the candidates it\n"
+                + "  # could have been: two equally specific declarations, or a key with NO\n"
+                + "  # conditions, where nothing is known about the build and any qualified\n"
+                + "  # sibling could win.\n"
+                + "  cn1_pick = lambda do |nm, own_map, proj_map, mine|\n"
+                + "    levels = [own_map, proj_map].reject { |m| m.nil? || m.empty? }\n"
+                + "    chosen = nil\n"
+                + "    chosen_i = nil\n"
+                + "    applicable = []\n"
+                + "    overlapping = []\n"
+                + "    levels.each_with_index do |map, idx|\n"
+                + "      a, o = cn1_level.call(nm, map, mine)\n"
+                + "      next if a.empty? && o.empty?\n"
+                + "      chosen = map\n"
+                + "      chosen_i = idx\n"
+                + "      applicable = a\n"
+                + "      overlapping = o\n"
+                + "      break\n"
+                + "    end\n"
+                + "    # A level chosen ONLY because something in it overlaps has not actually\n"
+                + "    # claimed this build: if the overlap turns out not to hold, Xcode carries\n"
+                + "    # on to the level below. With a project EXTENSION_MIN of 16.4 under a\n"
+                + "    # target EXTENSION_MIN[sdk=iphoneos27.1*] of 12.0, an iphoneos27.0 build\n"
+                + "    # really is 16.4 -- and dropping that possibility left nothing in the\n"
+                + "    # options that clears the floor, so the answer looked decided and the\n"
+                + "    # extension was written down to it. The fallback is a possibility, not\n"
+                + "    # the answer, so it joins the options rather than becoming the pick.\n"
+                + "    fallback = nil\n"
+                + "    if applicable.empty? && !overlapping.empty? && !chosen_i.nil?\n"
+                + "      levels[(chosen_i + 1)..-1].to_a.each do |map|\n"
+                + "        a2, _o2 = cn1_level.call(nm, map, mine)\n"
+                + "        next if a2.empty?\n"
+                + "        fallback = map[a2.first].to_s\n"
+                + "        break\n"
+                + "      end\n"
+                + "    end\n"
+                + "    picked = ''\n"
+                + "    options = []\n"
+                + "    unless applicable.empty?\n"
+                + "      best = applicable.first\n"
+                + "      best_n = cn1_conds.call(best, nm).length\n"
+                + "      tied = applicable.select { |k| cn1_conds.call(k, nm).length == best_n }\n"
+                + "      picked = chosen[best].to_s\n"
+                + "      options = tied.map { |k| chosen[k].to_s } if tied.length > 1\n"
+                + "    end\n"
+                + "    # A qualified sibling only makes the answer uncertain when it hinges on\n"
+                + "    # something this pass does NOT know. It knows the configuration, and\n"
+                + "    # whatever the key's own qualifier states, so EXTENSION_MIN[config=Release]\n"
+                + "    # is decidable while EXTENSION_MIN[sdk=iphoneos*] reached from an\n"
+                + "    # unqualified key is not. Treating every sibling as a threat would forfeit\n"
+                + "    # the configuration this pass just established it knows.\n"
+                + "    #\n"
+                + "    # Deliberately NOT scoped to the chosen level: choosing a level requires\n"
+                + "    # knowing which build this is, which is exactly what an unknown condition\n"
+                + "    # denies. Scoping it made the unqualified key resolve to a confident empty\n"
+                + "    # string and overwrote expressions that were fine.\n"
+                + "    known_keys = mine.map { |m| m[1..-2].to_s.split('=', 2).first }\n"
+                + "    # Only levels that can still decide this build are scanned. Once an\n"
+                + "    # APPLICABLE declaration wins at a level, everything beneath it is\n"
+                + "    # shadowed: a target EXTENSION_MIN of 12.0 is what Xcode reads no matter\n"
+                + "    # what EXTENSION_MIN[arch=arm64] the PROJECT carries, so letting that\n"
+                + "    # sibling raise uncertainty described a build Xcode never produces. The\n"
+                + "    # cost was not a lowering but the opposite -- a qualified key cannot take\n"
+                + "    # the branch path, so the 12.0 simply survived for the SDK to reject,\n"
+                + "    # which is the build failure this pass exists to prevent.\n"
+                + "    #\n"
+                + "    # When nothing was APPLICABLE, the level was chosen on an overlap alone and\n"
+                + "    # the levels below are still live, so they are scanned -- the same reason\n"
+                + "    # the fallback above is a candidate.\n"
+                + "    unknown = []\n"
+                + "    (applicable.empty? ? levels : [chosen]).each do |map|\n"
+                + "      next if map.nil?\n"
+                + "      map.keys.each do |k|\n"
+                + "        next unless k.start_with?(nm + '[')\n"
+                + "        next if applicable.include?(k)\n"
+                + "        hidden = cn1_conds.call(k, nm).any? do |c|\n"
+                + "          !known_keys.include?(c[1..-2].to_s.split('=', 2).first)\n"
+                + "        end\n"
+                + "        unknown << map[k].to_s if hidden\n"
+                + "      end\n"
+                + "    end\n"
+                + "    # UNION, not replace. A tie between two equally specific declarations has\n"
+                + "    # already put both values in options; overwriting them with the hidden\n"
+                + "    # siblings threw away the high half of the tie, and an answer that still\n"
+                + "    # had a 16.4 in it looked decided at 12.0.\n"
+                + "    options = (options + unknown + [picked]).uniq unless unknown.empty?\n"
+                + "    unless overlapping.empty?\n"
+                + "      options = (options.empty? ? [picked] : options) +\n"
+                + "                overlapping.map { |k| chosen[k].to_s }\n"
+                + "      options << fallback unless fallback.nil?\n"
+                + "    end\n"
+                + "    [picked, options]\n"
+                + "  end\n"
+                + "  # Expand references, carrying the name of the setting being expanded.\n"
+                + "  #\n"
+                + "  # $(inherited) means the inherited value of THAT setting, so the name has to\n"
+                + "  # travel with the recursion. A flat loop lost it: with EXTENSION_MIN =\n"
+                + "  # $(inherited) and IPHONEOS_DEPLOYMENT_TARGET = $(EXTENSION_MIN), the second\n"
+                + "  # pass saw a bare $(inherited) and resolved it as the deployment target's\n"
+                + "  # own inheritance rather than EXTENSION_MIN's -- reading the project's 15.0\n"
+                + "  # where Xcode reads its EXTENSION_MIN of 12.0, and leaving an extension the\n"
+                + "  # new SDK rejects.\n"
+                + "  cn1_expand = lambda do |value, own, proj, mine, ctx, depth, state, ov|\n"
+                + "    text = value.to_s\n"
+                + "    return text if depth >= " + MAX_SETTING_EXPANSIONS + " || !text.include?('$')\n"
+                + "    text.gsub(/\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/) do\n"
+                + "      ref = $1\n"
+                + "      if ref == 'inherited'\n"
+                + "        picked, options = cn1_pick.call(ctx, {}, proj, mine)\n"
+                + "        next_ctx = ctx\n"
+                + "      else\n"
+                + "        picked, options = cn1_pick.call(ref, own, proj, mine)\n"
+                + "        next_ctx = ref\n"
+                + "      end\n"
+                + "      if ov.key?(ref)\n"
+                + "        picked = ov[ref]\n"
+                + "        options = []\n"
+                + "      end\n"
+                + "      # Ambiguity WITHIN this context -- a tie, an undecidable overlap, a sibling\n"
+                + "      # on a condition nothing here knows. Kept alongside the context sweep in\n"
+                + "      # cn1_resolve_ctx: this one catches an alternative that cannot be reached\n"
+                + "      # by widening the context, the other catches one whose fragments only add\n"
+                + "      # up once composed.\n"
+                + "      if options.length > 1 && options.any? { |v| cn1_may_clear.call(v) }\n"
+                + "        state[:uncertain] = true\n"
+                + "      end\n"
+                + "      state[:multi][ref] = options if options.length > 1\n"
+                + "      cn1_expand.call(picked, own, proj, mine, next_ctx, depth + 1, state, ov)\n"
+                + "    end\n"
+                + "  end\n"
+                + "  # The build CONFIGURATION is part of the resolution context. Xcode allows\n"
+                + "  # EXTENSION_MIN[config=Release] just as it allows [sdk=...], and the caller is\n"
+                + "  # iterating configurations, so this is known rather than guessed. Leaving it\n"
+                + "  # out made both branches of a per-configuration helper look inapplicable, the\n"
+                + "  # answer confidently empty, and wrote the floor over Release -- raising Debug\n"
+                + "  # correctly and LOWERING Release from its real 16.4 in the same pass.\n"
+                + "  #\n"
+                + "  # The written key does not carry the configuration: the pass already writes\n"
+                + "  # into one configuration's settings, so the scoping is there rather than in\n"
+                + "  # the key.\n"
+                + "  # Every condition context this expression could be resolved under: the one we\n"
+                + "  # are in, plus that one widened by the conditions of any helper reachable from\n"
+                + "  # it, followed transitively.\n"
+                + "  cn1_alt_contexts = lambda do |value, own, proj, mine|\n"
+                + "    all_keys = (own.keys + proj.keys).uniq\n"
+                + "    seen = {}\n"
+                + "    queue = value.to_s.scan(/\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/).flatten\n"
+                + "    pool = []\n"
+                + "    until queue.empty?\n"
+                + "      ref = queue.shift\n"
+                + "      next if ref == 'inherited' || seen[ref]\n"
+                + "      seen[ref] = true\n"
+                + "      all_keys.select { |k| k == ref || k.start_with?(ref + '[') }.each do |k|\n"
+                + "        c = cn1_conds.call(k, ref)\n"
+                + "        # Never widen on a condition key this context already fixes. Adding\n"
+                + "        # [sdk=iphonesimulator*] to a context that is already [sdk=iphoneos*]\n"
+                + "        # invents a build that cannot exist, and the simulator helper it then\n"
+                + "        # resolves would veto a raise the device branch genuinely needs. If the\n"
+                + "        # key is already fixed the declaration either applies -- in which case\n"
+                + "        # there is nothing to widen -- or contradicts, in which case it is not a\n"
+                + "        # build. Overlapping wildcards on that same key are still caught, by the\n"
+                + "        # in-context ambiguity signal rather than here.\n"
+                + "        mine_keys = mine.map { |m| m[1..-2].to_s.split('=', 2).first }\n"
+                + "        fresh = c.reject do |cc|\n"
+                + "          mine_keys.include?(cc[1..-2].to_s.split('=', 2).first)\n"
+                + "        end\n"
+                + "        fresh.each { |cc| pool << cc unless pool.include?(cc) }\n"
+                + "        v = (own[k] || proj[k]).to_s\n"
+                + "        queue.concat(v.scan(/\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/).flatten)\n"
+                + "      end\n"
+                + "    end\n"
+                + "    # COMBINATIONS of independent conditions, not just each on its own. With\n"
+                + "    # PREFIX[arch=arm64] = 1 and SUFFIX[sdk=iphoneos*] = 6.4, the build that\n"
+                + "    # satisfies BOTH resolves to 16.4 -- and generating [arch=arm64] and\n"
+                + "    # [sdk=iphoneos*] only separately left every candidate below the floor, so\n"
+                + "    # the expression looked decidable and was replaced with it, lowering the\n"
+                + "    # arm64 device build from the 16.4 it really had.\n"
+                + "    #\n"
+                + "    # Only combinations across DISTINCT dimensions are builds: two conditions\n"
+                + "    # on one dimension are not intersected by Xcode, so such a pair describes\n"
+                + "    # nothing and is skipped. The subset count is capped because this is a\n"
+                + "    # power set; the cap is generous next to the two or three qualifiers a real\n"
+                + "    # archive carries, and reaching it only costs an unexplored context, which\n"
+                + "    # means less certainty and so no lowering.\n"
+                + "    subsets = [[]]\n"
+                + "    pool.each do |cc|\n"
+                + "      break if subsets.length >= " + MAX_ALT_CONTEXTS + "\n"
+                + "      subsets.concat(subsets.map { |sub| sub + [cc] })\n"
+                + "    end\n"
+                + "    out = []\n"
+                + "    subsets.each do |sub|\n"
+                + "      next if sub.empty?\n"
+                + "      names = sub.map { |m| m[1..-2].to_s.split('=', 2).first }\n"
+                + "      next unless names.uniq.length == names.length\n"
+                + "      widened = (mine + sub).uniq.sort\n"
+                + "      out << widened unless out.include?(widened) || widened == mine\n"
+                + "    end\n"
+                + "    out\n"
+                + "  end\n"
+                + "  # Uncertain when SOME context this expression could be resolved under clears the\n"
+                + "  # floor. The alternatives are CONTEXTS, not individual references: helpers that\n"
+                + "  # vary do so together, under the same condition, so forcing one reference while\n"
+                + "  # its sibling stays unresolved composes nonsense -- '16.' for a build whose real\n"
+                + "  # answer is 16.4. And a fragment is not a version: with $(PREFIX)$(SUFFIX),\n"
+                + "  # PREFIX = 1 and SUFFIX either 2.0 or 6.4, every fragment is below any floor\n"
+                + "  # while the arm64 build composes to 16.4.\n"
+                + "  cn1_resolve_ctx = lambda do |value, own, proj, mine|\n"
+                + "    state = { :uncertain => false, :multi => {} }\n"
+                + "    out = cn1_expand.call(value, own, proj, mine,\n"
+                + "                          'IPHONEOS_DEPLOYMENT_TARGET', 0, state, {})\n"
+                + "    uncertain = state[:uncertain]\n"
+                + "    cn1_alt_contexts.call(value, own, proj, mine).each do |ctx2|\n"
+                + "      alt_state = { :uncertain => false, :multi => {} }\n"
+                + "      alt = cn1_expand.call(value, own, proj, ctx2,\n"
+                + "                            'IPHONEOS_DEPLOYMENT_TARGET', 0, alt_state, {})\n"
+                + "      uncertain = true if cn1_may_clear.call(alt.strip)\n"
+                + "    end\n"
+                + "    [out.strip, uncertain]\n"
+                + "  end\n"
+                + "  cn1_resolve = lambda do |value, own, proj, qualifier, cfg|\n"
+                + "    mine = (qualifier.scan(/\\[[^\\]]*\\]/) + ['[config=' + cfg.to_s + ']']).sort\n"
+                + "    cn1_resolve_ctx.call(value, own, proj, mine)\n"
+                + "  end\n"
+                + "  xcproj.targets.each do |target|\n"
+                + "    next unless target.respond_to?(:product_type)\n"
+                + "    next unless target.product_type == 'com.apple.product-type.app-extension'\n"
+                + "    target.build_configurations.each do |config|\n"
+                + "      # IPHONEOS_DEPLOYMENT_TARGET means nothing on a watch, tv or macOS\n"
+                + "      # extension, and those are app-extension targets too: the generated\n"
+                + "      # CN1WatchWidgets is SDKROOT=watchos with WATCHOS_DEPLOYMENT_TARGET,\n"
+                + "      # and the document provider has a macOS flavour. Writing an iOS floor\n"
+                + "      # onto one is a stray setting at best. Only an extension this SDK's\n"
+                + "      # floor actually governs is considered.\n"
+                + "      # EVERY declaration, base or qualified. SDKROOT can be written as\n"
+                + "      # SDKROOT[arch=arm64_32], and reading only the unqualified key saw\n"
+                + "      # nothing, called the platform unknown, and wrote an iOS floor onto a\n"
+                + "      # watch extension -- the same stray setting this guard exists to stop,\n"
+                + "      # reached through a qualifier instead.\n"
+                + "      #\n"
+                + "      # 'iphone' covers iphoneos AND iphonesimulator: the simulator floor is\n"
+                + "      # the same and is read from the same setting, so matching only\n"
+                + "      # 'iphoneos' skipped a simulator-only configuration and left it low.\n"
+                + "      # The TARGET's own declarations decide, and the project is consulted\n"
+                + "      # only when the target names no platform at all. Pooling the two let an\n"
+                + "      # iOS project's SDKROOT outvote a watch extension's own watchos and put\n"
+                + "      # the iOS floor back onto it -- the generated project really does carry\n"
+                + "      # SDKROOT = iphoneos at project level, so this was not hypothetical.\n"
+                + "      cn1_platforms = lambda do |bs|\n"
+                + "        out = []\n"
+                + "        bs.each do |k, v|\n"
+                + "          base = k.to_s.split('[').first\n"
+                + "          next unless base == 'SDKROOT' || base == 'SUPPORTED_PLATFORMS'\n"
+                + "          out << v.to_s\n"
+                + "        end\n"
+                + "        out.reject { |v| v.empty? || v.include?('$') }\n"
+                + "      end\n"
+                + "      known = cn1_platforms.call(config.build_settings)\n"
+                + "      known = cn1_platforms.call(project_settings[config.name] || {}) if known.empty?\n"
+                + "      unless known.empty? || known.any? { |v| v.include?('iphone') }\n"
+                + "        next\n"
+                + "      end\n"
+                + "      proj = project_settings[config.name] || {}\n"
+                + "      # Every spelling of the setting, not just the bare one. Xcode honours\n"
+                + "      # IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] over the plain key for the\n"
+                + "      # build it matches, and an imported extension archive carries whatever\n"
+                + "      # its own project had -- so raising the base alone leaves a qualified\n"
+                + "      # 12.0 to win on the device archive and the build still fails. The\n"
+                + "      # base key is always considered, present or not, so an extension that\n"
+                + "      # declares no minimum at all still gets one.\n"
+                + "      keys = ['IPHONEOS_DEPLOYMENT_TARGET']\n"
+                + "      keys += config.build_settings.keys.select do |k|\n"
+                + "        k.start_with?('IPHONEOS_DEPLOYMENT_TARGET[')\n"
+                + "      end\n"
+                + "      keys.uniq.each do |key|\n"
+                + "        current = config.build_settings[key].to_s\n"
+                + "        # An ABSENT qualified key is not below the floor, it is simply absent;\n"
+                + "        # inventing one would pin a build Xcode was resolving from the base.\n"
+                + "        next if current.empty? && key != 'IPHONEOS_DEPLOYMENT_TARGET'\n"
+                + "        # An absent BASE key is not 'no minimum' either. Xcode falls through to\n"
+                + "        # the project, which always carries one here -- the generated pbxproj is\n"
+                + "        # written with ios.deployment_target. Writing the floor into the TARGET\n"
+                + "        # shadows that value, so an app at 16.4 whose extension merely did not\n"
+                + "        # restate it came out at 15.0: installable on an OS its code does not\n"
+                + "        # support, from a project that never asked for anything unusual.\n"
+                + "        #\n"
+                + "        # Unlike the qualified case above, this is not about inventing a key --\n"
+                + "        # the key IS synthesized when it is genuinely needed. It is about judging\n"
+                + "        # it against what Xcode would really read rather than against nothing.\n"
+                + "        if current.empty?\n"
+                + "          # Through the resolver, not proj[key]. The project can carry the value\n"
+                + "          # on a QUALIFIER -- IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] = 16.4 --\n"
+                + "          # which a bare lookup misses, and the unqualified key written here would\n"
+                + "          # then shadow it on the device build it governs.\n"
+                + "          # Only project declarations this target does not already override can\n"
+                + "          # be shadowed. A project [sdk=iphoneos*] is irrelevant when the TARGET\n"
+                + "          # carries its own [sdk=iphoneos*]: that key wins for exactly the build\n"
+                + "          # the project one governs, so an unqualified key written here cannot\n"
+                + "          # reach it -- and refusing to write on account of it would strand the\n"
+                + "          # OTHER builds, the simulator among them, at a value below the floor.\n"
+                + "          covered = keys.select do |k|\n"
+                + "            k.start_with?('IPHONEOS_DEPLOYMENT_TARGET[')\n"
+                + "          end.map { |k| cn1_conds.call(k, 'IPHONEOS_DEPLOYMENT_TARGET') }\n"
+                + "          uncovered = {}\n"
+                + "          proj.each do |pk, pv|\n"
+                + "            next unless pk.to_s.split('[').first == 'IPHONEOS_DEPLOYMENT_TARGET'\n"
+                + "            pc = cn1_conds.call(pk.to_s, 'IPHONEOS_DEPLOYMENT_TARGET')\n"
+                + "            uncovered[pk] = pv unless covered.include?(pc)\n"
+                + "          end\n"
+                + "          inh_mine = ['[config=' + config.name.to_s + ']']\n"
+                + "          inh_picked, inh_options =\n"
+                + "            cn1_pick.call('IPHONEOS_DEPLOYMENT_TARGET', {}, uncovered, inh_mine)\n"
+                + "          if inh_options.length > 1\n"
+                + "            # The project decides this by something this pass cannot evaluate. One\n"
+                + "            # unqualified key here would shadow every one of those branches, so it\n"
+                + "            # is written only when NO possibility clears the floor -- then it\n"
+                + "            # lowers nothing and still rescues a build that would be rejected.\n"
+                + "            next if inh_options.any? { |v| cn1_may_clear.call(v) }\n"
+                + "          else\n"
+                + "            current = inh_picked unless inh_picked.empty?\n"
+                + "          end\n"
+                + "        end\n"
+                + "        # A reference is judged by what it RESOLVES to. Skipping every $(...)\n"
+                + "        # was safe only for $(inherited); an imported archive writing\n"
+                + "        # $(EXTENSION_MIN) where that is 12.0 sailed past the floor and the\n"
+                + "        # archive still failed. A reference nothing defines expands to the\n"
+                + "        # empty string, so the extension would declare no minimum at all --\n"
+                + "        # the floor is the answer there, not the expression.\n"
+                + "        qualifier = key.start_with?('IPHONEOS_DEPLOYMENT_TARGET[') ?\n"
+                + "          key['IPHONEOS_DEPLOYMENT_TARGET'.length..-1] : ''\n"
+                + "        uncertain = false\n"
+                + "        if current.include?('$')\n"
+                + "          effective, uncertain =\n"
+                + "            cn1_resolve.call(current, config.build_settings, proj, qualifier,\n"
+                + "                             config.name)\n"
+                + "        else\n"
+                + "          effective = current\n"
+                + "        end\n"
+                + "        begin\n"
+                + "          below = effective.empty? ||\n"
+                + "                  Gem::Version.new(effective) < Gem::Version.new(sdk_floor)\n"
+                + "        rescue ArgumentError\n"
+                + "          below = true\n"
+                + "        end\n"
+                + "        # The uncertainty path runs BEFORE the floor test on the picked value.\n"
+                + "        # A high pick does not mean every build is high: with EXTENSION_MIN = 16.4\n"
+                + "        # beside EXTENSION_MIN[sdk=iphoneos*] = 12.0, the unqualified key resolves\n"
+                + "        # to 16.4 here and the device build resolves to 12.0 there. Testing `below`\n"
+                + "        # first read the 16.4, decided there was nothing to do, and left the device\n"
+                + "        # archive at 12.0 for the new SDK to reject.\n"
+                + "        #\n"
+                + "        # Running it unconditionally costs nothing: each candidate context is\n"
+                + "        # resolved and judged on its own, so only a branch PROVEN below the floor is\n"
+                + "        # ever pinned.\n"
+                + "        if uncertain\n"
+                + "          # Never lower on a guess. But a mixed conditional is not wholly a\n"
+                + "          # guess: when the base key resolves through a helper whose branches\n"
+                + "          # disagree -- EXTENSION_MIN[sdk=iphoneos*] = 12.0 beside\n"
+                + "          # [sdk=iphonesimulator*] = 16.0 -- the LOW branch is decided even\n"
+                + "          # though the whole expression is not. Skipping all of them left the\n"
+                + "          # device archive at 12.0 for Xcode 27 to reject.\n"
+                + "          #\n"
+                + "          # So the floor is written for exactly the branches proven below it,\n"
+                + "          # and the base expression is left to serve the rest. This does write\n"
+                + "          # a qualified key that was not there, which the unqualified case\n"
+                + "          # deliberately refuses to do -- the difference is evidence: there the\n"
+                + "          # branch is unknown, here its value was read.\n"
+                + "          # A QUALIFIED deployment key gets branches too. Restricting this to\n"
+                + "          # the bare key meant IPHONEOS_DEPLOYMENT_TARGET[arch=arm64] =\n"
+                + "          # $(EXTENSION_MIN), with the helper low on device and high on the\n"
+                + "          # simulator, was correctly called uncertain and then left exactly as\n"
+                + "          # it was -- the device arm64 archive still at 12.0 for the new SDK to\n"
+                + "          # reject. The key's own conditions simply join each candidate context.\n"
+                + "          key_conds = cn1_conds.call(key, 'IPHONEOS_DEPLOYMENT_TARGET')\n"
+                + "          if current.include?('$')\n"
+                + "            # Candidate branch CONTEXTS, not helper VALUES. A composed\n"
+                + "            # expression -- $(VERSION_MAJOR).$(VERSION_MINOR) -- has no\n"
+                + "            # per-helper answer: judged alone the minor reads '4', which is\n"
+                + "            # below every floor, and pinning on it would LOWER a branch whose\n"
+                + "            # real value is 16.4. That is worse than doing nothing, so each\n"
+                + "            # candidate context resolves the WHOLE expression before it is\n"
+                + "            # judged. The same pass also covers a nested branch value --\n"
+                + "            # EXTENSION_MIN[sdk=iphoneos*] = $(DEVICE_MIN) -- because the\n"
+                + "            # expander recurses in the context it was given.\n"
+                + "            all_keys = (config.build_settings.keys + proj.keys).uniq\n"
+                + "            # Follow helpers TRANSITIVELY. A reference's own value can be another\n"
+                + "            # reference -- EXTENSION_MIN = $(DEVICE_MIN) -- and the branches that\n"
+                + "            # decide the build may hang off the INNER name while the outer one\n"
+                + "            # carries no conditions at all. Scanning only the names written in the\n"
+                + "            # expression then found no candidate context, and the device target\n"
+                + "            # was left at its 12.0 for the new SDK to reject.\n"
+                + "            refs = []\n"
+                + "            seen_ref = {}\n"
+                + "            queue = current.scan(/\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/).flatten\n"
+                + "            until queue.empty?\n"
+                + "              ref = queue.shift\n"
+                + "              # The name space is finite and every name is visited once, so this\n"
+                + "              # terminates even when two helpers reference each other.\n"
+                + "              next if ref == 'inherited' || seen_ref[ref]\n"
+                + "              seen_ref[ref] = true\n"
+                + "              refs << ref\n"
+                + "              all_keys.select { |k| k == ref || k.start_with?(ref + '[') }.each do |k|\n"
+                + "                helper = (config.build_settings[k] || proj[k]).to_s\n"
+                + "                queue.concat(helper.scan(\n"
+                + "                  /\\$[({]([A-Za-z0-9_]+)(?::[A-Za-z0-9_]+)*[)}]/).flatten)\n"
+                + "              end\n"
+                + "            end\n"
+                + "            cands = []\n"
+                + "            refs.each do |ref|\n"
+                + "              all_keys.select { |bk| bk.start_with?(ref + '[') }.each do |bk|\n"
+                + "                c = cn1_conds.call(bk, ref)\n"
+                + "                next if c.empty?\n"
+                + "                next if cands.any? { |e| e[0] == c }\n"
+                + "                # Keep the suffix as the project spells it. Conditions compare\n"
+                + "                # as sets, so the sorted form resolves the same, but emitting\n"
+                + "                # the original keeps the written key looking like its siblings.\n"
+                + "                cands << [c, bk[ref.length..-1]]\n"
+                + "              end\n"
+                + "            end\n"
+                + "            cands.each do |cconds, csuffix|\n"
+                + "              # A candidate that contradicts the key's own qualifier is not a\n"
+                + "              # build: [sdk=iphonesimulator*] cannot hold for a key already\n"
+                + "              # written [sdk=iphoneos*]. Same condition key, different value, so\n"
+                + "              # nothing to pin.\n"
+                + "              #\n"
+                + "              # NESTED wildcards are rejected here too, and that is deliberate\n"
+                + "              # rather than an oversight. [sdk=iphoneos27.*] under a key written\n"
+                + "              # [sdk=iphoneos*] IS a real build, and such a branch can genuinely\n"
+                + "              # sit below the floor -- but there is no key that pins it safely:\n"
+                + "              #\n"
+                + "              #   - Writing both conditions does NOT intersect them. Measured on\n"
+                + "              #     Xcode 26.2 and 27, with IPHONEOS_DEPLOYMENT_TARGET = 16.4 and\n"
+                + "              #     IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][sdk=iphoneos27.*] =\n"
+                + "              #     15.0, xcodebuild -showBuildSettings -sdk iphoneos answers 15.0\n"
+                + "              #     against the 26.2 SDK -- which does not match iphoneos27.*. So\n"
+                + "              #     that key governs EVERY iphoneos build and would drag every\n"
+                + "              #     earlier SDK down from 16.4 to the floor.\n"
+                + "              #   - Writing only the narrower condition leaves two keys of equal\n"
+                + "              #     specificity, one condition each, and which one Xcode picks is\n"
+                + "              #     undefined -- the same reason a tie is treated as undecidable.\n"
+                + "              #\n"
+                + "              # Leaving it alone costs a build failure the developer can see and\n"
+                + "              # fix. Pinning it wrongly silently lowers a target, which is the one\n"
+                + "              # outcome this pass must never produce.\n"
+                + "              key_names = key_conds.map { |m| m[1..-2].to_s.split('=', 2).first }\n"
+                + "              clash = cconds.any? do |c|\n"
+                + "                nm2 = c[1..-2].to_s.split('=', 2).first\n"
+                + "                key_names.include?(nm2) && !key_conds.include?(c)\n"
+                + "              end\n"
+                + "              next if clash\n"
+                + "              merged = (key_conds + cconds).uniq.sort\n"
+                + "              # Same context as the base resolve: the branch's own conditions and\n"
+                + "              # the key's, PLUS the configuration being written. Through the same\n"
+                + "              # resolver, so a branch gets the composed-alternative judgement too\n"
+                + "              # rather than a second, weaker copy of it.\n"
+                + "              bctx = (merged + ['[config=' + config.name.to_s + ']']).sort\n"
+                + "              bv, buncertain =\n"
+                + "                cn1_resolve_ctx.call(current, config.build_settings, proj, bctx)\n"
+                + "              next if buncertain\n"
+                + "              next if bv.empty? || bv.include?('$')\n"
+                + "              next if cn1_may_clear.call(bv)\n"
+                + "              branch = key + csuffix\n"
+                + "              # The author's own branch may be SPELLED differently. Xcode compares\n"
+                + "              # conditions as sets, so [arch=arm64][sdk=iphoneos*] IS the branch\n"
+                + "              # [sdk=iphoneos*][arch=arm64] -- an exact-string check missed it and\n"
+                + "              # appended a second key for the same build carrying the floor, which\n"
+                + "              # can win and lower that build from the 16.4 its author chose.\n"
+                + "              #\n"
+                + "              # This compares with ==, so the sort inside cn1_conds is load bearing\n"
+                + "              # here in a way it is not where sets are compared by difference.\n"
+                + "              taken = config.build_settings.keys.any? do |k|\n"
+                + "                next false unless k.start_with?('IPHONEOS_DEPLOYMENT_TARGET[')\n"
+                + "                cn1_conds.call(k, 'IPHONEOS_DEPLOYMENT_TARGET') == merged\n"
+                + "              end\n"
+                + "              next if taken\n"
+                + "              puts \"Pinning #{target.name} #{branch} to the SDK minimum \" +\n"
+                + "                   \"#{sdk_floor} (the expression resolves to #{bv} there)\"\n"
+                + "              config.build_settings[branch] = sdk_floor\n"
+                + "            end\n"
+                + "          end\n"
+                + "          next\n"
+                + "        end\n"
+                + "        next unless below\n"
+                + "        was = current.empty? ? 'unset' : current\n"
+                + "        unless current == effective\n"
+                + "          was += ' -> ' + (effective.empty? ? 'unset' : effective)\n"
+                + "        end\n"
+                + "        puts \"Raising #{target.name} #{key} to the SDK minimum \" +\n"
+                + "             \"#{sdk_floor} (was #{was})\"\n"
+                + "        config.build_settings[key] = sdk_floor\n"
+                + "      end\n"
+                + "    end\n"
+                + "  end\n"
+                + "  xcproj.save\n"
+                // Raises, where the older deployment-target pass beside it warns and carries
+                // on. Deliberate: if this pass cannot run, the extensions stay under the floor
+                // and Xcode refuses the whole build anyway -- failing here names the cause,
+                // failing there does not. It also matches the newer fragments in this same
+                // script, which raise.
+                + "rescue => e\n"
+                + "  puts \"Error raising app extensions to the SDK minimum: #{$!}\"\n"
+                + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
+                + "  raise e\n"
+                + "end\n";
+    }
+
+    /// Whether an explicit `ios.deployment_target` sits below the SDK's floor, and is worth
+    /// telling the developer about.
+    ///
+    /// Deliberately NOT compareVersionStrings, which parses each dot-separated component with
+    /// Integer.parseInt and neither trims nor tolerates an empty one. Every other caller of
+    /// that helper arrives through maxVersionString, which trims entries and skips empty ones
+    /// first, so a hint written as `codename1.arg.ios.deployment_target=` or with a stray
+    /// space around the value has always been harmless. getArg returns that as a non-null
+    /// empty or padded string, so comparing it here directly would turn a tolerated typo into
+    /// a NumberFormatException on every Mac build.
+    ///
+    /// A blank pin is not a pin: nothing was asked for, so there is nothing to report.
+    static boolean pinnedTargetIsBelow(String pinned, String floor) {
+        if (pinned == null || pinned.trim().length() == 0) {
+            return false;
+        }
+        return AppleSdkFloor.compare(pinned, floor) < 0;
+    }
+
+    /// The lowest deployment target the selected Xcode will accept for `sdkName`.
+    ///
+    /// Xcode 27 raised every Apple platform's floor at once -- iOS and tvOS from 12.0 to 15.0,
+    /// watchOS from 4.0 to 9.0, macOS from 10.13 to 12.0 -- and a project under the floor fails
+    /// outright rather than warning. See AppleSdkFloor for why this is asked of the SDK instead
+    /// of kept as a version table, and for the measurements.
+    ///
+    /// Package-visible because the tv, mac and watch builders are delegates of this one and
+    /// need the same answer for their own slice; they have no Xcode of their own to ask.
+    String sdkMinimumDeploymentTarget(String sdkName) {
+        return AppleSdkFloor.minimumDeploymentTarget(sdkName, xcrunForSelectedXcode(),
+                selectedDeveloperDir());
+    }
+
     /// The xcrun beside the xcodebuild this build selected, or the system one.
     private String xcrunForSelectedXcode() {
         String selected = resolveXcodebuild();
@@ -10242,20 +10932,38 @@ public class IPhoneBuilder extends Executor {
     /// The developer directory of the selected Xcode -- <Xcode.app>/Contents/Developer -- so a
     /// tool run through the system xcrun still resolves inside it. Null when it cannot be told.
     private String selectedDeveloperDir() {
-        String fromEnvironment = System.getenv("DEVELOPER_DIR");
-        if (fromEnvironment != null && fromEnvironment.length() > 0) {
-            return fromEnvironment;
+        return developerDirFor(resolveXcodebuild(), System.getenv("DEVELOPER_DIR"));
+    }
+
+    /// The developer directory that goes with the xcodebuild this build actually runs.
+    ///
+    /// Derived from that binary BEFORE the environment is consulted. The two disagree when
+    /// XCODEBUILD names one Xcode and an inherited DEVELOPER_DIR names another:
+    /// resolveXcodebuild() prefers XCODEBUILD, so trusting the environment here answered for
+    /// an Xcode the build never uses. That was cosmetic while this only fed an
+    /// [sdk=iphoneosNN] qualifier; it stopped being cosmetic once the SDK's minimum
+    /// deployment target is read through it, since the wrong Xcode reports the old floor and
+    /// the project is then written below what the real one accepts.
+    ///
+    /// Split out from selectedDeveloperDir so the precedence can be tested without setting
+    /// environment variables, which Java cannot do to its own process.
+    static String developerDirFor(String resolvedXcodebuild, String envDeveloperDir) {
+        if (resolvedXcodebuild != null) {
+            // .../Contents/Developer/usr/bin/xcodebuild -> .../Contents/Developer
+            File developer = new File(resolvedXcodebuild).getParentFile();
+            for (int i = 0; i < 2 && developer != null; i++) {
+                developer = developer.getParentFile();
+            }
+            if (isDeveloperDir(developer)) {
+                return developer.getAbsolutePath();
+            }
         }
-        String selected = resolveXcodebuild();
-        if (selected == null) {
-            return null;
+        // Nothing usable derived: the environment is better than nothing, and this is the
+        // path a CommandLineTools-only machine takes.
+        if (envDeveloperDir != null && envDeveloperDir.length() > 0) {
+            return envDeveloperDir;
         }
-        // .../Contents/Developer/usr/bin/xcodebuild -> .../Contents/Developer
-        File developer = new File(selected).getParentFile();
-        for (int i = 0; i < 2 && developer != null; i++) {
-            developer = developer.getParentFile();
-        }
-        return isDeveloperDir(developer) ? developer.getAbsolutePath() : null;
+        return null;
     }
 
     /// Whether this really is an Xcode developer directory.
@@ -11500,6 +12208,17 @@ public class IPhoneBuilder extends Executor {
     /// Expansion passes before a value is called unresolvable. Settings nest a level or two in
     /// practice; the cap is what stops A = $(B), B = $(A) from spinning.
     private static final int MAX_SETTING_EXPANSIONS = 16;
+
+    /// Cap on the candidate contexts enumerated for one deployment-target expression.
+    ///
+    /// <p>The contexts are a POWER SET over the conditions the expression's helpers carry, so
+    /// this bounds an exponential. A real archive carries two or three qualifiers, well inside
+    /// it.</p>
+    ///
+    /// <p>Reaching the cap costs certainty, not safety: an unexplored context is one the pass
+    /// never learns clears the floor, and a pass that is less certain writes less, so it cannot
+    /// lower a target by running out of budget.</p>
+    private static final int MAX_ALT_CONTEXTS = 64;
 
     /// One build setting, in either of the two spellings Xcode accepts for a reference.
     ///
@@ -13676,8 +14395,11 @@ public class IPhoneBuilder extends Executor {
                 // app -- a watch that cannot install the app cannot show its complication, so
                 // defaulting to the lower number advertised support that does not exist. The
                 // extension's floor stays where it is for a project that lowers both.
+                // The effective target, not the constant: if the watchOS SDK raised the host
+                // above 10.0 then a complication still defaulting to 10.0 would advertise a
+                // version the app it lives in cannot be installed on.
                 .setDeploymentTarget(request.getArg("watchNative.surfaces.deploymentTarget",
-                        WatchNativeBuilder.MIN_DEPLOYMENT_TARGET));
+                        watchNativeBuilder.minDeploymentTarget()));
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             watchBuilder.addKind(kind);
         }

@@ -47,6 +47,53 @@ def run(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
+# The compiler every clang invocation below uses. One Xcode per run, so this is
+# genuinely constant; resolve_clang() sets it before any compiling starts.
+clang = "clang"
+
+
+def use_developer_dir(developer_dir):
+    """Pin every xcrun and clang below to one Xcode.
+
+    Without this the script shells out to whatever `xcrun` is on PATH. Locally
+    that is usually fine; in CI it is not -- the build scripts select their own
+    Xcode through scripts/lib/xcode.sh and export DEVELOPER_DIR only for their
+    own process, so this check ran against the runner's ambient Xcode and
+    resolved the project's frameworks against a DIFFERENT SDK than the one the
+    project was built with. A framework added in the newer SDK would then look
+    undeclared, or worse, a symbol our natives no longer get would still resolve.
+    """
+    if not developer_dir:
+        return
+    if not os.path.isdir(os.path.join(developer_dir, "Platforms")):
+        fail("--developer-dir %s has no Platforms directory; that is a "
+             "CommandLineTools install or a bad path, not an Xcode." % developer_dir)
+    os.environ["DEVELOPER_DIR"] = developer_dir
+
+
+def resolve_clang(developer_dir):
+    """The absolute clang belonging to the selected Xcode.
+
+    Setting DEVELOPER_DIR is enough for xcrun and nothing else. Xcode's clang
+    lives under Toolchains/XcodeDefault.xctoolchain/usr/bin, NOT under
+    Developer/usr/bin, so prepending the latter to PATH pins xcodebuild and
+    actool and leaves the compiler exactly where it was. A bare `clang` then
+    resolves off the ambient PATH and is not even necessarily Apple's: measured
+    on a developer machine here, `clang` is Homebrew LLVM 22.1.6, while
+    `xcrun --find clang` under the two installed Xcodes gives Apple clang 17.0.0
+    and 21.0.0 respectively. Compiling the port and linking the probe with a
+    third-party compiler against an Apple SDK is how this check would report
+    framework findings that say nothing about the build it is checking.
+    """
+    global clang
+    result = run(["xcrun", "--find", "clang"])
+    if result.returncode != 0 or not result.stdout.strip():
+        fail("could not locate clang through xcrun%s"
+             % (" for --developer-dir %s" % developer_dir if developer_dir else ""))
+    clang = result.stdout.strip()
+    return clang
+
+
 def fail(message):
     sys.stderr.write("check-ios-framework-links: %s\n" % message)
     sys.exit(2)
@@ -247,7 +294,7 @@ def compile_natives(sources, src_dir, sdk, target_triple, flags, out_dir, file_f
     for name in sources:
         obj = os.path.join(out_dir, name[:-2] + ".o")
         cmd = [
-            "clang", "-c", "-arch", "arm64", "-target", target_triple,
+            clang, "-c", "-arch", "arm64", "-target", target_triple,
             "-isysroot", sdk, "-fno-objc-arc", "-w",
             "-I", src_dir,
         ] + flags + file_flags.get(name, []) + [os.path.join(src_dir, name), "-o", obj]
@@ -334,11 +381,11 @@ def confirm_by_linking(symbols, declared, sdk, target_triple, work_dir):
             handle.write("    &cn1_probe_%d,\n" % i)
         handle.write("};\nint main(void) { return cn1_probe_refs[0] != 0; }\n")
     probe_o = os.path.join(work_dir, "probe.o")
-    result = run(["clang", "-c", "-arch", "arm64", "-target", target_triple,
+    result = run([clang, "-c", "-arch", "arm64", "-target", target_triple,
                   "-isysroot", sdk, "-w", probe_c, "-o", probe_o])
     if result.returncode != 0:
         fail("could not build the confirmation probe:\n%s" % result.stderr)
-    cmd = ["clang", "-arch", "arm64", "-target", target_triple, "-isysroot", sdk,
+    cmd = [clang, "-arch", "arm64", "-target", target_triple, "-isysroot", sdk,
            probe_o, "-o", os.path.join(work_dir, "probe.out")]
     for framework in sorted(declared):
         cmd += ["-framework", framework]
@@ -361,8 +408,16 @@ def main():
     parser.add_argument("--sdk", default="iphoneos", help="SDK to resolve against")
     parser.add_argument("--configuration", default="Release",
                         help="build configuration whose settings to use")
+    parser.add_argument("--developer-dir",
+                        default=os.environ.get("DEVELOPER_DIR"),
+                        help="Xcode Contents/Developer to resolve xcrun and clang "
+                             "against. Defaults to $DEVELOPER_DIR. Pass the same one the "
+                             "project was built with, or the SDK this resolves against "
+                             "and the SDK that produced the project will differ.")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    use_developer_dir(args.developer_dir)
+    resolve_clang(args.developer_dir)
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sdk = sdk_path(args.sdk)
@@ -377,6 +432,9 @@ def main():
 
     print("project           : %s (%s)" % (app, args.project_dir))
     print("sdk               : %s" % sdk)
+    # Printed because it is the thing that was silently wrong: a bare `clang` is
+    # not necessarily the selected Xcode's, or even Apple's.
+    print("clang             : %s" % clang)
     print("deployment target : %s" % triple)
     print("modules           : %s" % settings.get("CLANG_ENABLE_MODULES", "NO"))
     print("frameworks declared by the app target: %d" % len(declared))

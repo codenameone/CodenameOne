@@ -21,6 +21,8 @@ on:
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
       - 'scripts/check-ios-framework-links.py'
+      - 'scripts/check-ios-sdk-deltas.py'
+      - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
@@ -58,6 +60,8 @@ on:
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
       - 'scripts/check-ios-framework-links.py'
+      - 'scripts/check-ios-sdk-deltas.py'
+      - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-watch-ui-tests.sh'
       - 'scripts/run-tv-ui-tests.sh'
@@ -92,7 +96,25 @@ jobs:
     uses: ./.github/workflows/_build-ios-port.yml
 
   build-ios:
-    if: ${{ !inputs.watch_only }}
+    # The OpenGL lane does not run on pull requests. Every macOS job in this
+    # workflow shares one concurrency group ("ensure only one mac build runs at
+    # once" below), so the four of them execute strictly in series and this one
+    # sits in the middle of that chain: measured on run 34683216894 it occupied
+    # 40.8 minutes and delayed build-ios-tv behind it, about 50 minutes of the
+    # critical path for every PR.
+    #
+    # Metal is the default backend (ios.metal defaults to true), so a PR still
+    # gets the renderer its users get. GL remains selectable via ios.metal=false
+    # and is still built and screenshot-gated here on the nightly schedule, on
+    # master pushes and on workflow_dispatch -- the 143 baselines in
+    # scripts/ios/screenshots stay live rather than rotting untested.
+    #
+    # The SDK-delta gate still runs on every pull request -- it moved to the
+    # Metal job in this same change, and it sweeps the GL configuration from
+    # pristine sources regardless of which job hosts it. So a GL-only compile
+    # regression is still caught on the PR itself; what moves to nightly is the
+    # GL runtime and screenshot coverage.
+    if: ${{ !inputs.watch_only && github.event_name != 'pull_request' }}
     needs: build-port
     permissions:
       contents: read
@@ -255,9 +277,18 @@ jobs:
       - name: Check the port links only frameworks the project declares
         run: |
           set -euo pipefail
+          # Resolve against the SAME Xcode build-ios-app.sh used. This step used
+          # to shell out to the runner's ambient xcrun, so it answered "is this
+          # symbol declared?" against a different SDK than the one that produced
+          # the project it was checking.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
           scripts/check-ios-framework-links.py \
+            --developer-dir "$DEVELOPER_DIR" \
             "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
         timeout-minutes: 10
+
 
       - name: Run iOS UI screenshot tests
         env:
@@ -454,14 +485,12 @@ jobs:
         # without re-downloading.
         run: |
           set -euo pipefail
-          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-          if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
-            echo "Xcode 26 not found under /Applications. Cannot install Metal Toolchain." >&2
-            exit 1
-          fi
-          echo "Using $XCODE_APP"
-          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-          "$DEVELOPER_DIR/usr/bin/xcodebuild" -downloadComponent MetalToolchain
+          # Same selection the build scripts use, so this cannot install the
+          # component into one Xcode and then build with another.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
 
       - name: Enable Metal backend for hellocodenameone
@@ -505,9 +534,44 @@ jobs:
       - name: Check the port links only frameworks the project declares (Metal)
         run: |
           set -euo pipefail
+          # Resolve against the SAME Xcode build-ios-app.sh used. This step used
+          # to shell out to the runner's ambient xcrun, so it answered "is this
+          # symbol declared?" against a different SDK than the one that produced
+          # the project it was checking.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
           scripts/check-ios-framework-links.py \
+            --developer-dir "$DEVELOPER_DIR" \
             "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
         timeout-minutes: 10
+
+      # Apple can deprecate an API, or change a behaviour for anything LINKED
+      # against the new SDK, and nothing else here would notice: every other
+      # check compiles against one SDK and has nothing to compare it to. This one
+      # compiles the port twice, varying only -isysroot, so what it reports is
+      # caused by the SDK and not by the command line.
+      #
+      # It lives in the Metal job because that is the job that runs on pull
+      # requests. The check is renderer-independent -- it sweeps the GL, Metal
+      # and on-device-debug configurations itself, from pristine port sources --
+      # so hosting it here costs one build and still covers the GL path on every
+      # PR, including a PR that changes the checker. It previously sat in the GL
+      # job, which no longer runs for pull requests; leaving it there made the
+      # checker's own trigger path a no-op.
+      #
+      # It is a no-op on a runner that carries a single Xcode, which is the case
+      # today -- and it starts working, without another edit, on the first image
+      # that ships two. That is deliberate: the alternative is remembering to add
+      # it at exactly the moment a toolchain moves, which is the moment nobody
+      # has spare attention.
+      - name: Compare the port against the next iOS SDK
+        run: |
+          set -euo pipefail
+          scripts/check-ios-sdk-deltas.py \
+            --skip-if-single-sdk \
+            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+        timeout-minutes: 20
 
       - name: Run iOS UI screenshot tests (Metal)
         env:

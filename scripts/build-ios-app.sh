@@ -4,19 +4,12 @@ set -euo pipefail
 
 bia_log() { echo "[build-ios-app] $1"; }
 
-# Pin Xcode 26 for CI validation.
-if [ -z "${XCODE_APP:-}" ]; then
-  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-fi
-if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
-  bia_log "Xcode 26 not found. Set XCODE_APP to an installed Xcode 26 app bundle path." >&2
-  exit 1
-fi
-export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-export XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
-export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
-bia_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
-bia_log "Using XCODEBUILD=$XCODEBUILD"
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh for the
+# resolution order and for CN1_XCODE_MAJOR, the single knob that moves the
+# whole tree to the next Xcode.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode bia_log || exit 1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
