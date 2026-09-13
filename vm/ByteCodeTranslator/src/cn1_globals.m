@@ -6494,38 +6494,42 @@ static long long cn1PacingFootprintNow(void) {
     return fp;
 }
 
-// The footprint at which the run-ahead bound starts applying, scaled to the memory
-// this host actually has.
+// The footprint at which the run-ahead bound starts applying.
 //
-// A fixed 512MB says "this process has grown"; it does not say the machine is under
-// any pressure, and the bound exists for pressure. On a host with tens of GB free, a
-// process holding a couple of GB is nowhere near runaway, and clamping it there
-// parks the mutator against a collector that cannot get under the ceiling: measured
-// at 6.7-8.7s versus 1.4s for the same work, to save 2% of peak footprint.
+// This SCALED with available memory for a while -- max(512MB, fm/4) -- on the
+// reasoning that a fixed 512MB says "this process has grown" and not "the machine
+// is under pressure", and that on a host with tens of GB free, parking the mutator
+// at 512MB costs real time (measured 6.7-8.7s against 1.4s for the same work) to
+// save about 2% of peak footprint. That reasoning still looks right, and the
+// scaling is still withdrawn, because it broke an invariant master enforces.
 //
-// So take the larger of the absolute floor and a quarter of available memory. Two
-// properties this has to keep:
+// GcOverflowSpiralIntegrationTest pins the free-memory reading at 32GB and requires
+// the peak to stay under 2GB with no process ceiling. Scaled, the floor became
+// fm/4 = 8GB, so the growth test never fired, pacing never engaged, and the peak
+// was bounded only by the run-ahead allowance: 2159916KB on the ONE-marker arm,
+// where cycles are longest and the mutator reaches the full allowance every time.
+// The four-marker arms passed, which is what a bound that only holds when the
+// collector is fast looks like -- and the slow collector is the case the bound is
+// for.
 //
-//  - Where cn1_available_memory is the flat 100MB placeholder (Linux, Windows, and
-//    the non-Apple fallback), fm/4 is 25MB, the absolute floor wins, and behaviour is
-//    bit-for-bit what it was. Nothing changes on a platform where we cannot measure.
-//  - It only ever RAISES the floor, so the bound can only engage later than before,
-//    never earlier. It cannot make a constrained host more permissive than it was.
+// It is not re-tuned to sit just under the threshold here. The margin would be a
+// few percent on a shared runner, which is a flake rather than a fix. It belongs in
+// its own change, with the measurement that justifies it and a decision about what
+// the enforced bound should be.
 //
-// This is the no-per-process-ceiling path only. Where a ceiling exists -- iOS's dirty
-// memory limit, or an explicit process budget -- cn1PacingPark takes the bounded
-// branch instead and never reaches cn1BibopPacingCap, so none of this loosens the
-// admission control that keeps an app inside its own limit.
+// NOT REPRODUCIBLE ON macOS, which is worth knowing before trying: an A/B of this
+// function on an uncontended arm64 Mac measured 107904KB with the constant against
+// 109792KB with the scaling. Neither arm reaches even the 512MB floor, so the clamp
+// is never armed in EITHER and the value under test does not participate. Only the
+// CI leg drives the footprint into the gigabytes where the floor decides anything,
+// so a local pass here is not evidence about this change.
+//
+// What is NOT withdrawn is the capCeiling raise below, which is the other half of
+// the same idea and is measured to help on a real translation: at the 192MB clamp
+// the same workload peaked HIGHER (9736MB against 8325MB) and took twice as long
+// (46.3s against 23.8s). Only the arming point moves back.
 static long long cn1PacingGrowthFloorBytes(void) {
-    long long floor = CN1_PACING_GROWTH_FLOOR_BYTES;
-    long fm = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
-    if(fm > 0) {
-        long long scaled = (long long)fm / 4;
-        if(scaled > floor) {
-            floor = scaled;
-        }
-    }
-    return floor;
+    return CN1_PACING_GROWTH_FLOOR_BYTES;
 }
 
 static JAVA_BOOLEAN cn1PacingPastGrowthFloor(void) {
