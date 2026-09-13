@@ -78,6 +78,10 @@ class MonetizationJava037Snippet {
     Container myForm;
     Component component;
     Button button;
+    SpanLabel rentalStatus = new SpanLabel();
+
+    void showRentalStatus() {
+    }
     MultiButton myMultiButton;
     Label label;
     BrowserComponent browserComponent;
@@ -89,9 +93,13 @@ class MonetizationJava037Snippet {
     // ...
 
      // Now synchronize the receipts
-     iap.synchronizeReceipts(0, res->{
-     // Update the UI as necessary to reflect
-
+     iap.synchronizeReceipts(0, success -> {
+         // Whatever this brought back, the expiry label is now out of date.
+         // Repaint it from the same method the manual button uses.
+         if (success) {
+             showRentalStatus();
+             hi.revalidate();
+         }
      });
     }
     // end::monetization-java-037[]

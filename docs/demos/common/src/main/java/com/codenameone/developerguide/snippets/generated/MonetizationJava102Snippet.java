@@ -61,14 +61,17 @@ class MonetizationJava102Snippet {
     String[] PRODUCTS = {"com.codename1.world.month", "com.codename1.world.year"};
 
     // tag::monetization-java-102[]
+    // A field, not a local: the synchronization at the end of start() has to
+    // reach the same label, and so does the manual button below.
+    SpanLabel rentalStatus = new SpanLabel();
+
     void addExpiryLabel() {
-        SpanLabel rentalStatus = new SpanLabel();
         Button syncReceipts = new Button("Synchronize Receipts");
 
         // The receipts already on the device answer this without a round trip,
-        // so the label is correct the moment the form appears. The button is
-        // there for the user who thinks that answer has gone stale.
-        showRentalStatus(rentalStatus);
+        // so the label is right the moment the form appears. The button is for
+        // the user who thinks that answer has gone stale.
+        showRentalStatus();
 
         syncReceipts.addActionListener(e -> {
             iap.synchronizeReceipts(0, success -> {
@@ -76,7 +79,7 @@ class MonetizationJava102Snippet {
                 // reached the receipt store AND the receipts came back. On false
                 // nothing was reloaded, so there is nothing new to show.
                 if (success) {
-                    showRentalStatus(rentalStatus);
+                    showRentalStatus();
                     hi.revalidate();
                 } else {
                     // Leave the label alone. It is still the last answer the
@@ -91,7 +94,7 @@ class MonetizationJava102Snippet {
         hi.add(syncReceipts);
     }
 
-    void showRentalStatus(SpanLabel rentalStatus) {
+    void showRentalStatus() {
         if (iap.isSubscribed(PRODUCTS)) {
             rentalStatus.setText("World rental expires " + iap.getExpiryDate(PRODUCTS));
         } else {
