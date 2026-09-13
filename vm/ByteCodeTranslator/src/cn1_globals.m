@@ -6288,39 +6288,8 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_PACING_GROWTH_FLOOR_BYTES
 #define CN1_PACING_GROWTH_FLOOR_BYTES (512LL*1024*1024)
 #endif
-// Ceiling on how far a mutator may run ahead of a cycle in flight, regardless of
-// how much RAM the host has. See the measurement table in cn1BibopPacingCap.
-#ifndef CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES
-#define CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES (1024L*1024*1024)
-#endif
-// cn1_available_memory answers a flat 100MB on every platform where it cannot
-// measure: Linux, Windows, and the non-Apple fallback. That number is not a
-// reading, and a bound DERIVED from it is not a bound -- it is a constant that
-// happens to look like one.
-//
-// This matters asymmetrically. cn1PacingGrowthFloorBytes above only ever RAISES
-// its floor from fm, so on a placeholder host the absolute floor wins and
-// behaviour is bit-for-bit unchanged. The run-ahead bound below only ever LOWERS
-// the cap, so scaling it by a placeholder TIGHTENS pacing on exactly the hosts we
-// know nothing about. It did: BibopPageFloorIntegrationTest went red on arm64
-// Linux, where fm/8 is 12.5MB, while the same code passed on macOS where fm is
-// real.
-//
-// So the bound applies only where fm is a genuine reading. Returns 0 to mean
-// "not measurable here, leave the cap alone".
-#ifndef CN1_PACING_PLACEHOLDER_FREE_MEM
-#define CN1_PACING_PLACEHOLDER_FREE_MEM (1024L*1024*100)
-#endif
-static long cn1PacingRunAheadBound(long fm) {
-    if(fm <= CN1_PACING_PLACEHOLDER_FREE_MEM) {
-        return 0;
-    }
-    long bound = CN1_BIBOP_PACING_MAX_RUNAHEAD_BYTES;
-    if(bound > fm / 8) {
-        bound = fm / 8;
-    }
-    return bound;
-}
+// The run-ahead bound that stood here is withdrawn; see cn1PacingGrowthFloorBytes
+// below for the whole story. Pacing is master's again.
 // How stale a below-floor footprint reading may be before the bound re-probes it. The
 // probe is task_info on Apple and one /proc read on Linux -- a microsecond or two -- and
 // it is taken at most once per interval across the whole process, and only when the bound
@@ -6494,40 +6463,36 @@ static long long cn1PacingFootprintNow(void) {
     return fp;
 }
 
-// The footprint at which the run-ahead bound starts applying.
+// The footprint at which the pacing clamp starts applying. Master's constant.
 //
-// This SCALED with available memory for a while -- max(512MB, fm/4) -- on the
-// reasoning that a fixed 512MB says "this process has grown" and not "the machine
-// is under pressure", and that on a host with tens of GB free, parking the mutator
-// at 512MB costs real time (measured 6.7-8.7s against 1.4s for the same work) to
-// save about 2% of peak footprint. That reasoning still looks right, and the
-// scaling is still withdrawn, because it broke an invariant master enforces.
+// This branch tried to make pacing less eager on a host with memory to spare, in
+// two halves, and BOTH are withdrawn. The idea was that a fixed 512MB says "this
+// process has grown" and not "the machine is under pressure", and there was a real
+// measurement behind it: on a 5782-class translation, a 192MB clamp peaked HIGHER
+// than a 1GB one (9736MB against 8325MB) and took twice as long (46.3s against
+// 23.8s). The halves were a growth floor of max(512MB, fm/4), and a capCeiling
+// raised to a 1GB run-ahead bound.
 //
-// GcOverflowSpiralIntegrationTest pins the free-memory reading at 32GB and requires
-// the peak to stay under 2GB with no process ceiling. Scaled, the floor became
-// fm/4 = 8GB, so the growth test never fired, pacing never engaged, and the peak
-// was bounded only by the run-ahead allowance: 2159916KB on the ONE-marker arm,
-// where cycles are longest and the mutator reaches the full allowance every time.
-// The four-marker arms passed, which is what a bound that only holds when the
-// collector is fast looks like -- and the slow collector is the case the bound is
-// for.
+// They are withdrawn because each one reds a test master passes, and the two tests
+// pull in OPPOSITE directions -- which is the signal to stop tuning, not to keep
+// going:
 //
-// It is not re-tuned to sit just under the threshold here. The margin would be a
-// few percent on a shared runner, which is a flake rather than a fix. It belongs in
-// its own change, with the measurement that justifies it and a decision about what
-// the enforced bound should be.
+//   scaling in   GcOverflowSpiral peaked 2159916KB against a 2GB limit. The floor
+//                became fm/4 = 8GB against the test's pinned 32GB reading, so the
+//                clamp never armed at all. Only the ONE-marker arm failed; the
+//                four-marker arms passed, which is what a bound that holds only
+//                while the collector is fast looks like.
+//   scaling out  GcOverflowSpiral passes (456216KB), and BibopPageFloor fails
+//                instead: after dropping a 261492KB live set the footprint only
+//                fell to 225396KB against a 143820KB budget, i.e. the pages were
+//                not handed back.
 //
-// NOT REPRODUCIBLE ON macOS, which is worth knowing before trying: an A/B of this
-// function on an uncontended arm64 Mac measured 107904KB with the constant against
-// 109792KB with the scaling. Neither arm reaches even the 512MB floor, so the clamp
-// is never armed in EITHER and the value under test does not participate. Only the
-// CI leg drives the footprint into the gigabytes where the floor decides anything,
-// so a local pass here is not evidence about this change.
-//
-// What is NOT withdrawn is the capCeiling raise below, which is the other half of
-// the same idea and is measured to help on a real translation: at the 192MB clamp
-// the same workload peaked HIGHER (9736MB against 8325MB) and took twice as long
-// (46.3s against 23.8s). Only the arming point moves back.
+// Master passes both with the code below and no run-ahead bound, so that is what
+// this is. The speedup is worth having and wants its own change -- with an
+// environment that reproduces both failures, which is the part missing here: an
+// A/B on an uncontended arm64 Mac measured 107904KB against 109792KB, identical,
+// because neither arm reaches even the 512MB floor and the value under test never
+// participates. A local pass says nothing about any of this.
 static long long cn1PacingGrowthFloorBytes(void) {
     return CN1_PACING_GROWTH_FLOOR_BYTES;
 }
@@ -6625,12 +6590,6 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
         // Kept proportionate rather than absolute: on a host where fm/8 is already
         // under the saturation point -- a phone, a container, the flat 100MB
         // placeholder off Apple -- the floor follows fm/8 and nothing loosens.
-        {
-            long runAhead = cn1PacingRunAheadBound(fm);
-            if(runAhead > 0 && capCeiling < runAhead) {
-                capCeiling = runAhead;
-            }
-        }
         if(cap > capCeiling && cn1PacingPastGrowthFloor()) {
             cap = capCeiling;
         }
@@ -6653,17 +6612,6 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     // saturation point -- a phone, a container, the flat 100MB placeholder off
     // Apple -- this follows fm/8 and nothing is loosened. `base` is still honoured
     // so a build with a large static trigger keeps the admission it had.
-    {
-        long runAhead = cn1PacingRunAheadBound(fm);
-        if(runAhead > 0) {
-            if(cap > runAhead) {
-                cap = runAhead;
-            }
-            if(cap < base) {
-                cap = base;
-            }
-        }
-    }
     if(cn1PacingTraceOn()) {
         long seen = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
         while(cap < seen &&
