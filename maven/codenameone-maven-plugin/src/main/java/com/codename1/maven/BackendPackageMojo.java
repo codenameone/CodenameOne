@@ -437,22 +437,67 @@ public class BackendPackageMojo extends AbstractMojo {
     }
 
     private List<String> compileClasspathWithoutRuntime() throws MojoExecutionException {
-        List<String> out = new ArrayList<String>();
+        List<String> classpath = new ArrayList<String>();
         try {
             for (Object element : project.getCompileClasspathElements()) {
-                String path = String.valueOf(element);
-                if (path.indexOf("codenameone-backend") >= 0) {
-                    continue;
-                }
-                if (path.equals(project.getBuild().getOutputDirectory())) {
-                    continue;
-                }
-                out.add(path);
+                classpath.add(String.valueOf(element));
             }
         } catch (Exception err) {
             throw new MojoExecutionException("Could not resolve the compile classpath", err);
         }
+        return withoutRuntime(classpath, runtimeArtifactFile(),
+                project.getBuild().getOutputDirectory());
+    }
+
+    /**
+     * The classpath without the backend runtime and without this module's own
+     * output.
+     *
+     * <p>IDENTIFIED BY FILE, not by looking for "codenameone-backend" anywhere in
+     * a path. A project checked out under a directory whose name contains that --
+     * /work/codenameone-backend-demo/ is the obvious one -- has EVERY reactor
+     * dependency below it match, so a backend depending on a sibling contract
+     * module lost it from both the compile classpath and the translation, and
+     * failed on classes it plainly depends on. The name of a directory somewhere
+     * above the project is not something a build should read meaning into.
+     *
+     * <p>The runtime is left out because its sources are compiled into `classes`
+     * already; the module's own output for the same reason.
+     *
+     * @param runtime the resolved runtime artifact, or null when it cannot be
+     *                located -- then nothing is dropped for it, which is
+     *                duplicate work rather than a missing class
+     */
+    static List<String> withoutRuntime(List<String> classpath, File runtime, String ownOutput) {
+        List<String> out = new ArrayList<String>();
+        File runtimeFile = runtime == null ? null : runtime.getAbsoluteFile();
+        File output = ownOutput == null ? null : new File(ownOutput).getAbsoluteFile();
+        for (int i = 0; i < classpath.size(); i++) {
+            String path = classpath.get(i);
+            File element = new File(path).getAbsoluteFile();
+            if (runtimeFile != null && runtimeFile.equals(element)) {
+                continue;
+            }
+            if (output != null && output.equals(element)) {
+                continue;
+            }
+            out.add(path);
+        }
         return out;
+    }
+
+    /** The resolved file of com.codenameone:codenameone-backend, or null. */
+    private File runtimeArtifactFile() {
+        java.util.Set<Artifact> artifacts = project.getArtifacts();
+        if (artifacts != null) {
+            for (Artifact artifact : artifacts) {
+                if ("com.codenameone".equals(artifact.getGroupId())
+                        && "codenameone-backend".equals(artifact.getArtifactId())) {
+                    return artifact.getFile();
+                }
+            }
+        }
+        return null;
     }
 
     /**

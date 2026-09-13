@@ -115,6 +115,47 @@ class BackendPackageJarDependencyTest {
     }
 
     @Test
+    void keepsADependencyThatMerelyLivesUnderASimilarlyNamedDirectory(@TempDir File tmp)
+            throws Exception {
+        // The runtime used to be recognised by looking for "codenameone-backend"
+        // anywhere in a path, so a project checked out under
+        // /work/codenameone-backend-demo/ had EVERY reactor dependency below it
+        // match -- and a backend depending on a sibling contract module lost it
+        // from the compile classpath and the translation both, then failed on
+        // classes it plainly depends on.
+        File checkout = new File(tmp, "codenameone-backend-demo");
+        File contract = new File(checkout, "contract/target/classes");
+        assertTrue(contract.mkdirs());
+        File runtime = new File(tmp, "repo/codenameone-backend-8.0.jar");
+        assertTrue(runtime.getParentFile().mkdirs());
+        assertTrue(runtime.createNewFile());
+        File ownOutput = new File(checkout, "backend/target/classes");
+        assertTrue(ownOutput.mkdirs());
+
+        List<String> kept = BackendPackageMojo.withoutRuntime(
+                Arrays.asList(contract.getAbsolutePath(), runtime.getAbsolutePath(),
+                        ownOutput.getAbsolutePath()),
+                runtime, ownOutput.getAbsolutePath());
+
+        assertEquals(Collections.singletonList(contract.getAbsolutePath()), kept,
+                "the sibling module stays, and only the runtime and this module's "
+                        + "own output go: " + kept);
+    }
+
+    @Test
+    void keepsEverythingWhenTheRuntimeCannotBeLocated(@TempDir File tmp) throws Exception {
+        // Nothing is dropped for a runtime that is not there, which is duplicate
+        // work rather than a missing class.
+        File contract = new File(tmp, "contract/target/classes");
+        assertTrue(contract.mkdirs());
+
+        assertEquals(Collections.singletonList(contract.getAbsolutePath()),
+                BackendPackageMojo.withoutRuntime(
+                        Collections.singletonList(contract.getAbsolutePath()), null, null),
+                "a null runtime drops nothing");
+    }
+
+    @Test
     void addsNoInputWhenThereAreNoDependencies(@TempDir File tmp) throws Exception {
         File staged = new File(tmp, "dependency-classes");
         assertTrue(staged.mkdirs());
