@@ -208,6 +208,47 @@ def defines_for(gates, config_defines):
     return gates + EXTRA_DEFINES + config_defines
 
 
+def metal_for_sdk(sdk_path, dev_dirs):
+    """The `metal` compiler belonging to the Xcode that ships `sdk_path`.
+
+    Unlike clang, this one is NOT shared between the two runs. The shading language is
+    versioned with the SDK and its compiler is the only thing that can read the newer one,
+    so pairing an old metal with a new SDK would report the compiler's ignorance as an SDK
+    regression -- the opposite of what the clang choice avoids.
+
+    Returns None when the Xcode that owns the SDK has no metal at all.
+    """
+    resolved = os.path.realpath(sdk_path)
+    owners = [d for d in dev_dirs if resolved.startswith(os.path.realpath(d) + os.sep)]
+    for d in owners + [d for d in dev_dirs if d not in owners]:
+        candidate = os.path.join(d, "Toolchains", "XcodeDefault.xctoolchain",
+                                 "usr", "bin", "metal")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def compile_shader(metal, sdk, project_dir, filename):
+    """Compile one .metal file against `sdk`, returning the same shape as compile_one."""
+    cmd = [metal, "-c", "-isysroot", sdk, "-o", os.devnull,
+           os.path.join(NATIVE_SOURCES, filename)]
+    res = run(cmd)
+    out = res.stdout + res.stderr
+    diags, errors, fatal = parse_diagnostics(out, project_dir)
+    return diags, errors, fatal, out
+
+
+def metal_toolchain_missing(text):
+    """Whether this output is Xcode refusing to run metal at all.
+
+    The Metal toolchain is a separately downloaded component. When it is absent the tool
+    fails identically under BOTH SDKs, so the differential cancels it out and the sweep
+    would report a clean shader it never compiled -- a check satisfied by nothing having
+    happened. Detected so it can be said out loud instead.
+    """
+    return "missing Metal Toolchain" in text or "cannot execute tool 'metal'" in text
+
+
 def clang_for_sdk(sdk_path, dev_dirs):
     """The clang belonging to the Xcode that ships `sdk_path`.
 
@@ -603,6 +644,11 @@ def main():
     # still produced an OK.
     present = sorted(n for n in os.listdir(NATIVE_SOURCES)
                      if n.endswith(".m") or n.endswith(".c"))
+    # Metal shaders are compiled by a different tool and only under the Metal configuration,
+    # but they are part of the translation: ByteCodeTranslator adds .metal to the generated
+    # project, so a shading-language or availability change in a new SDK breaks the default
+    # Metal build while every Objective-C file still compiles and this checker says OK.
+    shaders = sorted(n for n in os.listdir(NATIVE_SOURCES) if n.endswith(".metal"))
     if not present:
         fail("no .m files under %s" % NATIVE_SOURCES)
     print("[ios-sdk-deltas] prefix  : %s" % prefix_header)
@@ -700,6 +746,10 @@ def main():
                        for n, w, b, c, _ in checked))
 
     blocking, informational = {}, {}
+    # Reported after the sweeps: a shader that was never compiled must not read as a shader
+    # that compiled cleanly.
+    shader_skip = None
+    shader_runs = set()
     for sweep_name, target in sweeps:
         for config_name, config_defines, _witness in CONFIGURATIONS:
             defines = defines_for(gates, config_defines)
@@ -720,6 +770,28 @@ def main():
                             truncated.append(name)
                         if errs == 0:
                             clean += 1
+                # The shaders, under the Metal configuration only. They compile with the
+                # SDK's OWN metal rather than one shared compiler -- see metal_for_sdk.
+                if config_name == "metal" and shaders:
+                    mtool = metal_for_sdk(sdk, dev_dirs)
+                    if mtool is None:
+                        shader_skip = ("no metal compiler in the Xcode that ships %s"
+                                       % os.path.basename(sdk))
+                    else:
+                        for sname in shaders:
+                            d, errs, fatal, text = compile_shader(
+                                mtool, sdk, project_dir, sname)
+                            if metal_toolchain_missing(text):
+                                shader_skip = ("the Metal toolchain component is not "
+                                               "installed (xcodebuild "
+                                               "-downloadComponent MetalToolchain)")
+                                break
+                            diags.extend(d)
+                            if fatal:
+                                truncated.append(sname)
+                            if errs == 0:
+                                clean += 1
+                            shader_runs.add(sname)
                 results[sdk_label] = (set(diags), clean, sorted(truncated))
 
             old_diags, _, old_truncated = results["old"]
@@ -773,6 +845,17 @@ def main():
                 # under both sweeps. Key on the diagnostic itself so it is reported once,
                 # with the contexts it was seen in.
                 bucket.setdefault(line, set()).add("%s/%s" % (sweep_name, config_name))
+
+    # Said out loud either way. A shader the differential never compiled cancels to nothing
+    # and would otherwise be indistinguishable from a shader that compiled clean.
+    if not shaders:
+        pass
+    elif shader_skip:
+        print("[ios-sdk-deltas] shaders : SKIPPED (%d not compiled) -- %s"
+              % (len(shaders), shader_skip))
+    else:
+        print("[ios-sdk-deltas] shaders : %d compiled against both SDKs (%s)"
+              % (len(shader_runs), ", ".join(sorted(shader_runs))))
 
     return report(blocking, informational, new_sdk, new_version, shipping_target,
                   args.verbose)
