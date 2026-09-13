@@ -73,16 +73,17 @@ class MonetizationJava102Snippet {
         syncReceipts.addActionListener(e -> {
             iap.synchronizeReceipts(0, success -> {
                 // synchronizeReceipts reports true only when every pending purchase
-                // reached the receipt store AND the receipts came back. On false the
-                // receipts are still whatever the last successful sync left behind,
-                // so say so rather than presenting them as a fresh answer.
+                // reached the receipt store AND the receipts came back. On false
+                // nothing was reloaded, so there is nothing new to show.
                 if (success) {
                     showRentalStatus(rentalStatus);
+                    hi.revalidate();
                 } else {
-                    rentalStatus.setText("Could not reach the receipt store, "
-                            + "showing the last known status");
+                    // Leave the label alone. It is still the last answer the
+                    // receipts gave, and overwriting it with the error would
+                    // cost the user the only status they had.
+                    ToastBar.showErrorMessage("Could not reach the receipt store");
                 }
-                hi.revalidate();
             });
         });
 
