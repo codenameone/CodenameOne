@@ -87,7 +87,10 @@ class MonetizationJava041Snippet {
     // tag::monetization-java-041[]
     @Override
     public void itemPurchased(String sku) {
-     Purchase iap = Purchase.getInAppPurchase();
+     // The shared iap field, not a fresh getInAppPurchase(). Receipts are
+     // cached per Purchase instance and most ports hand back a new instance
+     // every call, so synchronizing a local one leaves the instance the
+     // label reads exactly as stale as it was.
 
      // Reload the receipts from the store. This answers false when the receipt
      // could not be submitted or fetched, and the receipt then stays pending --
@@ -110,6 +113,8 @@ class MonetizationJava041Snippet {
      ToastBar.showErrorMessage("Failure occurred: "+errorMessage);
     }
     // end::monetization-java-041[]
+
+    Purchase iap = Purchase.getInAppPurchase();
 
     Form current = new Form();
 
