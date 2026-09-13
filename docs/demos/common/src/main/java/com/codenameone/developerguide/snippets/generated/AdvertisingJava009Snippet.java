@@ -69,7 +69,16 @@ class AdvertisingJava009Snippet {
                 .tagForChildDirectedTreatment(AdConfig.TAG_FALSE)
                 .maxAdContentRating(AdConfig.RATING_G);
 
-        AdManager.initialize(cfg, initialized -> {
+        AdManager.initialize(cfg, ready -> {
+            // false when no provider was installed, or the network's own
+            // initialize failed. Stop here: with no provider AdConsent reports
+            // consent as not required and canRequestAds() answers true, so
+            // carrying on would walk into loadAds() with nothing behind it.
+            if (!ready) {
+                showAdFreeUi();
+                return;
+            }
+
             // Consent has to be settled before the first load, not before
             // initialize: requestConsent presents the GDPR form and, on iOS,
             // the App Tracking Transparency prompt, and both need the SDK up.
