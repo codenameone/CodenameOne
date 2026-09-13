@@ -89,30 +89,78 @@ SOURCE_MACRO_RE = re.compile(r"image::?([^\[\]\s]+)\[([^\]]*)\]")
 FIELD_NAME_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*=")
 
 
-def unknown_attribute_tails(guide_dir: Path) -> List[Tuple[Path, int, str, str]]:
-    """Macros whose alt text is followed by a field naming no real attribute.
+def split_fields(attrs: str) -> List[str]:
+    """Split an attribute list on commas outside quoted values.
 
-    Asciidoctor stores such a field as a named attribute and emits no width, so
-    the rendered output looks clean while the alt text has been cut at the
-    comma. This is the one case reading the render cannot see.
+    A raw split loses title="coordinates x, y=2", which is valid and whose
+    comma belongs to the value. A quote opens a value at the start of a field
+    or straight after the "=" of a named one, and nowhere else -- an apostrophe
+    in prose is not an opening quote.
     """
-    found = []
+    out, buf, quote, can_open = [], [], "", True
+    for ch in attrs:
+        if quote:
+            if ch == quote:
+                quote = ""
+            buf.append(ch)
+            continue
+        if ch == ",":
+            out.append("".join(buf))
+            buf, can_open = [], True
+            continue
+        if can_open and ch in "\"'":
+            quote, can_open = ch, False
+            buf.append(ch)
+            continue
+        if ch == "=":
+            buf.append(ch)
+            can_open = True
+            continue
+        if not ch.isspace():
+            can_open = False
+        buf.append(ch)
+    out.append("".join(buf))
+    return out
+
+
+def scan_source(guide_dir: Path):
+    """One pass over the macros, yielding facts per OCCURRENCE.
+
+    Returns (tails, named) where tails are macros whose alt text is followed by
+    a field naming no real image attribute -- Asciidoctor stores those as named
+    attributes and emits no width, so the render shows nothing wrong -- and
+    named identifies the occurrences that state width= or height= outright,
+    which are unambiguous and need no baseline entry.
+
+    Both are keyed by (src, alt) rather than by image, because the same image is
+    reused with different captions and an exemption must not travel between
+    them.
+    """
+    tails, named = [], set()
     for path in sorted(guide_dir.rglob("*")):
         if path.suffix not in {".adoc", ".asciidoc"} or not path.is_file():
             continue
-        for number, line in enumerate(path.read_text(encoding="utf-8",
-                                                     errors="replace").splitlines(), 1):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for number, line in enumerate(text.splitlines(), 1):
             for match in SOURCE_MACRO_RE.finditer(line):
-                attrs = match.group(2)
-                fields = attrs.split(",")
-                if len(fields) < 2 or attrs.lstrip().startswith(('"', "'")):
+                src, attrs = match.group(1), match.group(2)
+                fields = split_fields(attrs)
+                if len(fields) < 2:
                     continue
+                first = fields[0].strip()
+                alt = first[1:-1] if first[:1] in "\"'" and first[-1:] == first[:1] else first
                 for field in fields[1:]:
                     name = FIELD_NAME_RE.match(field)
-                    if name and name.group(1).lower() not in IMAGE_ATTRIBUTES:
-                        found.append((path, number, match.group(1), field.strip()))
+                    if not name:
+                        continue
+                    lowered = name.group(1).lower()
+                    if lowered in {"width", "height"}:
+                        named.add((src, alt))
+                    elif lowered not in IMAGE_ATTRIBUTES:
+                        if first[:1] not in "\"'":
+                            tails.append((path, number, src, field.strip()))
                         break
-    return found
+    return tails, named
 
 
 def load_baseline() -> set:
@@ -145,36 +193,13 @@ def offenders(markup: str, baseline: set, named_dimensions: set) -> List[Tuple[s
             if not DIMENSION_RE.match(value):
                 found.append((src, alt, html.unescape(value), False))
                 break
-            # The alt text is part of the identity on purpose. Keyed on src
-            # alone, one exemption covers every use of that image -- and an
-            # image reused later with its alt text truncated to the same width
-            # would inherit the exemption. game-3d.png already appears twice.
-            if src.split("/")[-1] in named_dimensions:
+            if (src, alt) in named_dimensions:
                 continue
             key = f"{src}|{slot}|{value}|{alt}"
             if key not in baseline:
                 found.append((src, alt, f"{slot}={value}", True))
                 break
     return found
-
-
-def explicit_dimension_sources(guide_dir: Path) -> set:
-    """Images whose source names width= or height= outright.
-
-    A named dimension renders exactly like a positional one, and only the
-    positional form is ambiguous, so the named form is exempt without an entry.
-    """
-    named = set()
-    for path in guide_dir.rglob("*"):
-        if path.suffix not in {".adoc", ".asciidoc"} or not path.is_file():
-            continue
-        for match in SOURCE_MACRO_RE.finditer(path.read_text(encoding="utf-8",
-                                                             errors="replace")):
-            for field in match.group(2).split(","):
-                name = FIELD_NAME_RE.match(field)
-                if name and name.group(1).lower() in {"width", "height"}:
-                    named.add(match.group(1).split("/")[-1])
-    return named
 
 
 def main() -> int:
@@ -188,7 +213,7 @@ def main() -> int:
 
     guide_dir = Path("docs/developer-guide")
     baseline = load_baseline()
-    named_dimensions = explicit_dimension_sources(guide_dir)
+    tails, named_dimensions = scan_source(guide_dir)
     total = 0
     seen = set()
     for source in sources:
@@ -213,7 +238,7 @@ def main() -> int:
                     print(f'    alt text was cut to "{alt}"')
                     print(f'    and "{spilled}" landed in the width slot')
 
-    for path, number, src, field in unknown_attribute_tails(guide_dir):
+    for path, number, src, field in tails:
         total += 1
         print(f"{path}:{number}: {src}")
         print(f'    "{field}" is not an image attribute, so Asciidoctor takes it')
