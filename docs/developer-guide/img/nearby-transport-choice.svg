@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="332" viewBox="0 0 860 332">
+  <rect x="0" y="0" width="860" height="332" fill="#ffffff"/>
+  <text x="430" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Which nearby transport works for which pair of devices</text>
+  <text x="430" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">The nearby transport sits on Google's Nearby Connections and Apple's MultipeerConnectivity, which share no wire</text>
+  <text x="430" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">protocol. Two phones from different ecosystems will never discover each other through it, however you write the app.</text>
+  <rect x="16" y="74" width="828" height="46" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="430" y="94" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#222222">Are both ends the same platform?</text>
+  <text x="430" y="110" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#888888">this is the question to answer before choosing an API, not after</text>
+  <rect x="16" y="136" width="404" height="116" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="30" y="158" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Yes: Android to Android, or iOS to iOS</text>
+  <text x="30" y="174" font-family="Arial, sans-serif" font-size="9" fill="#888888">com.codename1.nearby.transport</text>
+  <text x="30" y="194" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The nearby transport is what you want. It gets the</text>
+  <text x="30" y="209" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">platform's own peer discovery and connection, and the</text>
+  <text x="30" y="224" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">API does not pretend to be more portable than the two</text>
+  <text x="30" y="239" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">frameworks under it.</text>
+  <path d="M 218 120 L 218 136" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 213 130 L 218 136 L 223 130" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="440" y="136" width="404" height="116" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="454" y="158" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a56a3a">No: iPhone to Android</text>
+  <text x="454" y="174" font-family="Arial, sans-serif" font-size="9" fill="#888888">two things already in the framework</text>
+  <text x="454" y="194" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">L2capChannel in com.codename1.bluetooth.le gives a raw</text>
+  <text x="454" y="209" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">byte stream over BLE. com.codename1.io.bonjour plus</text>
+  <text x="454" y="224" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">ordinary sockets works when both devices are on one</text>
+  <text x="454" y="239" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Wi-Fi network. Neither is a workaround; both are supported.</text>
+  <path d="M 642 120 L 642 136" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 637 130 L 642 136 L 647 130" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="16" y="270" width="828" height="46" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="430" y="289" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Ranging is a separate question and needs its own channel: both platforms make the two devices swap a token over a</text>
+  <text x="430" y="304" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">connection they already share, usually a GATT characteristic, before any radio ranging can start.</text>
+</svg>

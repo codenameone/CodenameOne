@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="449" viewBox="0 0 880 449">
+  <rect x="0" y="0" width="880" height="449" fill="#ffffff"/>
+  <text x="440" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">What the shield does to a request on a protected host</text>
+  <text x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Once init() has run, ConnectionRequest, Rest, RequestBuilder and anything else on NetworkManager are covered with</text>
+  <text x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">no further code. This is the order it happens in, on the network thread, and the order is the interesting part.</text>
+  <rect x="54" y="74" width="810" height="57" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <circle cx="32" cy="102" r="13" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="32" y="106" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">1</text>
+  <text x="66" y="94" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">Wait for initialization</text>
+  <text x="326" y="94" font-family="Arial, sans-serif" font-size="9" fill="#888888">a cold start may still be running</text>
+  <text x="66" y="112" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Not ready yet is not treated as not protected. The request waits rather than going out bare.</text>
+  <rect x="54" y="141" width="810" height="87" rx="4" fill="#ffffff" stroke="#a33a3a" stroke-width="1.5"/>
+  <circle cx="32" cy="184" r="13" fill="#ffffff" stroke="#a33a3a" stroke-width="1.5"/>
+  <text x="32" y="188" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a33a3a">2</text>
+  <text x="66" y="161" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">Take back a token it attached earlier</text>
+  <text x="326" y="161" font-family="Arial, sans-serif" font-size="9" fill="#888888">before the request object is reused</text>
+  <text x="66" y="179" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">A redirect reuses the same request, and a bearer token that follows one off a protected host has</text>
+  <text x="66" y="194" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">been handed to whoever the redirect points at. Only the shield's own value is removed -- a header</text>
+  <text x="66" y="209" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">your onRedirect installed under the same name is left alone.</text>
+  <rect x="54" y="238" width="810" height="72" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
+  <circle cx="32" cy="274" r="13" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="32" y="278" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">3</text>
+  <text x="66" y="258" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a56a3a">Attach the token</text>
+  <text x="326" y="258" font-family="Arial, sans-serif" font-size="9" fill="#888888">X-CN1-Attest by default, never Authorization</text>
+  <text x="66" y="276" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Authorization belongs to your user authentication. The two answer different questions and your</text>
+  <text x="66" y="291" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">server needs both. If the URL is not https the host's failure mode decides what happens instead.</text>
+  <rect x="54" y="320" width="810" height="57" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <circle cx="32" cy="348" r="13" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="32" y="352" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">4</text>
+  <text x="66" y="340" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Check the certificate chain</text>
+  <text x="326" y="340" font-family="Arial, sans-serif" font-size="9" fill="#888888">against the pin set</text>
+  <text x="66" y="358" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Before any request body is written, so a pin failure costs nothing and leaks nothing.</text>
+  <rect x="16" y="389" width="848" height="44" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="440" y="408" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">The response side is deliberately narrow: the guard sees the status code and the headers it asked for, which is how</text>
+  <text x="440" y="423" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">a server says this token was refused rather than this user's credentials were.</text>
+</svg>

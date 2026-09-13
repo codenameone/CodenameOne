@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="350" viewBox="0 0 860 350">
+  <rect x="0" y="0" width="860" height="350" fill="#ffffff"/>
+  <text x="430" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Starting call media: the callback that looks right, and the one that is</text>
+  <text x="430" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">The chapter calls this the single most common way to get a calling app wrong, and the reason is the failure mode:</text>
+  <text x="430" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">the wrong version works in every simulator and produces a silent call on a device, with no error anywhere.</text>
+  <rect x="16" y="78" width="190" height="56" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="111" y="100" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#333333">The call rings</text>
+  <text x="111" y="124" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">Calls.reportIncoming</text>
+  <path d="M 206 106 L 228 106" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 223 102 L 228 106 L 223 110" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="228" y="78" width="190" height="56" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="323" y="100" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#333333">The user answers</text>
+  <text x="323" y="124" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">answerRequested</text>
+  <path d="M 418 106 L 440 106" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 435 102 L 440 106 L 435 110" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="440" y="78" width="190" height="56" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="535" y="93" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#333333">The system takes</text>
+  <text x="535" y="107" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#333333">the audio session</text>
+  <text x="535" y="124" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">iOS: CallKit</text>
+  <path d="M 630 106 L 652 106" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 647 102 L 652 106 L 647 110" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="652" y="78" width="190" height="56" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="747" y="100" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a7a3d">You are told</text>
+  <text x="747" y="124" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">audioSessionActivated</text>
+  <rect x="16" y="168" width="404" height="104" rx="4" fill="#ffffff" stroke="#a33a3a" stroke-width="1.5"/>
+  <text x="30" y="190" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">Starting media here is the bug</text>
+  <text x="30" y="206" font-family="Arial, sans-serif" font-size="9" fill="#888888">answerRequested</text>
+  <text x="30" y="228" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The session is not yours yet. On iOS your app</text>
+  <text x="30" y="243" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">configures a category but must not activate it;</text>
+  <text x="30" y="258" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">CallKit does. Nothing throws, the call is silent.</text>
+  <path d="M 323 134 L 323 168" fill="none" stroke="#a33a3a" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <rect x="440" y="168" width="404" height="104" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="454" y="190" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Starting media here works</text>
+  <text x="454" y="206" font-family="Arial, sans-serif" font-size="9" fill="#888888">audioSessionActivated</text>
+  <text x="454" y="228" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The session is live and handed to you. Android</text>
+  <text x="454" y="243" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">has no CallKit, so the port fires this itself when</text>
+  <text x="454" y="258" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">the connection goes active: one rule, both ports.</text>
+  <path d="M 747 134 L 747 168" fill="none" stroke="#4a7a3d" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <rect x="16" y="292" width="828" height="44" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="430" y="310" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">A pushed call is already ringing before any of your code runs, so PushedCall hands you a session you never created</text>
+  <text x="430" y="325" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">and may already be answered. Attaching media to it is the same job, on the same callback.</text>
+</svg>

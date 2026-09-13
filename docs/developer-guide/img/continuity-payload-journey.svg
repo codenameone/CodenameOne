@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="352" viewBox="0 0 840 352">
+  <rect x="0" y="0" width="840" height="352" fill="#ffffff"/>
+  <text x="420" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Where a continuity payload goes, and why that decides what may go in it</text>
+  <text x="420" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">The type rule looks arbitrary until you follow the journey. A payload is written to disk, handed to an operating</text>
+  <text x="420" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">system, and possibly opened by a different build of your app on a device you have never seen.</text>
+  <rect x="16" y="74" width="188" height="58" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="110" y="98" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Your app</text>
+  <text x="110" y="115" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">builds an AppState</text>
+  <path d="M 204 103 L 222 103" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 217 99 L 222 103 L 217 107" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="222" y="74" width="188" height="58" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="316" y="98" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#333333">Written to disk</text>
+  <text x="316" y="115" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">on this device</text>
+  <path d="M 410 103 L 428 103" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 423 99 L 428 103 L 423 107" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="428" y="74" width="188" height="58" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="522" y="98" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#333333">Carried</text>
+  <text x="522" y="115" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">the OS, or your StateRelay</text>
+  <path d="M 616 103 L 634 103" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 629 99 L 634 103 L 629 107" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="634" y="74" width="188" height="58" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="728" y="98" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#333333">Opened</text>
+  <text x="728" y="115" font-family="Arial, sans-serif" font-size="8.5" text-anchor="middle" fill="#888888">another build, another device</text>
+  <rect x="16" y="148" width="394" height="112" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="30" y="170" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">What a payload admits</text>
+  <text x="30" y="186" font-family="Arial, sans-serif" font-size="9" fill="#888888">String, Integer, Long, Double, Boolean, List, Map</text>
+  <text x="30" y="204" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Six types and the two containers, because everything</text>
+  <text x="30" y="218" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">above has to survive a round trip through JSON and a</text>
+  <text x="30" y="232" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">build that may not have your classes. Anything else is</text>
+  <text x="30" y="246" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">refused where you produced it, naming the key.</text>
+  <rect x="430" y="148" width="394" height="112" rx="4" fill="#fbf6f6" stroke="#a33a3a" stroke-width="1.5"/>
+  <text x="444" y="170" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">What does not belong in one</text>
+  <text x="444" y="186" font-family="Arial, sans-serif" font-size="9" fill="#888888">a continuation is not secure storage</text>
+  <text x="444" y="204" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The payload crosses to another device and the operating</text>
+  <text x="444" y="218" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">system holds it on the way. Tokens and keys go in</text>
+  <text x="444" y="232" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">SecureStorage; the payload carries at most an identifier</text>
+  <text x="444" y="246" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">that means nothing on its own.</text>
+  <rect x="16" y="278" width="808" height="58" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="420" y="298" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Codename One runs no relay server. Continuation between Apple devices is the platform's; iPhone to Android, or two</text>
+  <text x="420" y="313" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">devices never in the same room, goes through a StateRelay you host. Which saved states belong to the same person is</text>
+  <text x="420" y="328" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">your account system's question, and a framework answering it would be guessing about your users.</text>
+</svg>

@@ -54,6 +54,8 @@ on a device, with no error anywhere. Use `audioSessionActivated`. The Android
 port synthesizes the same callback when the connection goes active, so the one
 piece of advice is correct everywhere.
 
+image::img/call-audio-session-timing.svg[Where to start call media in the callback sequence,scaledwidth=95%]
+
 *A pushed call is already ringing.* When a call arrives as a VoIP push, iOS
 requires it to be reported to the system _before any of your code runs_ and
 kills the app when it isn't -- so native code does the reporting from a fixed
@@ -81,7 +83,7 @@ and the user can turn the *Incoming calls* notification channel down in
 Settings. Anything below high importance files the notification in the shade
 instead of ringing, so the port treats it as it treats a revoked
 `POST_NOTIFICATIONS`: `Calls.getAvailability()` answers `NOT_PERMITTED` and
-`reportIncomingCall` is refused, rather than reporting a call that rings
+`Calls.reportIncoming` is refused, rather than reporting a call that rings
 nowhere.
 
 *Implement `providerReset`.* It means every call your app had is gone,
@@ -158,6 +160,8 @@ from either platform, and it's what apps that offer conferencing actually
 do.
 
 === Actions, And Why They Have To Be Answered
+
+image::img/call-action-contract.svg[How a CallAction is answered, and what an unanswered one costs,scaledwidth=90%]
 
 When the user answers on the lock screen, hangs up from the car, or taps the
 keypad, the request arrives with a `CallAction`. Both platforms require an

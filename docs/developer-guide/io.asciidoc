@@ -1769,7 +1769,7 @@ You can build a UI that would allow you to edit the `Contact` property in memory
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava172Snippet.java[tag=io-java-172,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/PropertiesBindingFigure.java[tag=io-java-172,indent=0]
 ----
 
 <1> Notice the use of the property's label, which allows better encapsulation
@@ -1781,7 +1781,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 <4> Numeric bindings "work"
 
 .Properties form for the contact
-image::img/properties-demo-binding.png[Properties form for the contact,scaledwidth=20%]
+image::img/generated/properties-demo-binding.png[Properties form for the contact,scaledwidth=30%]
 
 ====== Binding object & auto commit
 

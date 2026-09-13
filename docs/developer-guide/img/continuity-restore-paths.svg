@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="332" viewBox="0 0 840 332">
+  <rect x="0" y="0" width="840" height="332" fill="#ffffff"/>
+  <text x="420" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">What Continuity.restore() gives you, and what stays yours</text>
+  <text x="420" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Nothing here runs on its own. An app that never calls enable or setStateProvider behaves as it always did, and</text>
+  <text x="420" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">restore() is never called for you: where restoration belongs in a launch is the one thing only the app knows.</text>
+  <rect x="16" y="74" width="808" height="44" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="420" y="93" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#222222">You call Continuity.restore() somewhere in your launch</text>
+  <text x="420" y="108" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#888888">there is a saved state, and it is still within maxAge</text>
+  <rect x="16" y="136" width="394" height="118" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="30" y="158" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Your screens use @Route</text>
+  <text x="30" y="174" font-family="Arial, sans-serif" font-size="9" fill="#888888">restore() answers true</text>
+  <text x="30" y="194" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">The framework already wrote the navigation stack down,</text>
+  <text x="30" y="209" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">because it addresses screens by route. It rebuilds the</text>
+  <text x="30" y="224" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">stack and shows it. Show nothing yourself: true means a</text>
+  <text x="30" y="239" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">form is already up.</text>
+  <path d="M 213 118 L 213 136" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 208 130 L 213 136 L 218 130" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="430" y="136" width="394" height="118" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="444" y="158" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a56a3a">Your screens use new MyForm().show()</text>
+  <text x="444" y="174" font-family="Arial, sans-serif" font-size="9" fill="#888888">restore() answers false</text>
+  <text x="444" y="194" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Those moves are not addressable, so there was never a</text>
+  <text x="444" y="209" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">stack to write down. Your payload still arrives, handed</text>
+  <text x="444" y="224" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">to the StateProvider, and showing a screen from it is</text>
+  <text x="444" y="239" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">yours. Both are supported; one is automatic.</text>
+  <path d="M 627 118 L 627 136" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 622 130 L 627 136 L 632 130" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="16" y="272" width="808" height="44" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="420" y="290" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Saving is not something you do on the way out. Every navigation marks the state dirty and a checkpoint is written</text>
+  <text x="420" y="305" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">once per pass of the event loop, so call checkpoint() only for a change no navigation touched.</text>
+</svg>
