@@ -35,6 +35,7 @@ import com.codename1.backend.Crypto;
 import com.codename1.backend.Database;
 import com.codename1.backend.Db;
 import com.codename1.backend.DbPool;
+import com.codename1.backend.FileIo;
 import com.codename1.backend.Http;
 import com.codename1.backend.Http1Date;
 import com.codename1.backend.HttpServer;
@@ -1877,6 +1878,36 @@ public class SelfTest {
     }
 
     /**
+     * A path that would name a different file as a C string opens nothing.
+     *
+     * <p>A NUL inside it ENDS the path there, so "/etc/hosts\u0000.png" opens
+     * /etc/hosts while an application that validated the name it was given saw a
+     * .png and allowed it. The truncation happens only in the packaged runtime --
+     * the Java SE arm's Paths.get refuses the NUL and answers -1 -- so the
+     * simulator proves the extension check works and the device opens the other
+     * file. This check runs on BOTH arms, which is the point: it is the two
+     * answering alike that was missing.
+     */
+    private static void aTruncatingPathOpensNothing() throws Exception {
+        int truncated = FileIo.openRead("/etc/hosts\u0000.png");
+        if(truncated >= 0) {
+            FileIo.close(truncated);
+        }
+        String resolved = FileIo.realPath("/etc/hosts\u0000.png");
+        // THE CONTROL: the same path without the NUL still opens, so this cannot
+        // pass by refusing everything.
+        int honest = FileIo.openRead("/etc/hosts");
+        boolean honestOpened = honest >= 0;
+        if(honest >= 0) {
+            FileIo.close(honest);
+        }
+        check("a path holding a NUL opens nothing", "-1", String.valueOf(truncated));
+        check("and resolves to nothing", "null", String.valueOf(resolved));
+        check("while the same path without one still opens", "true",
+                String.valueOf(honestOpened));
+    }
+
+    /**
      * The name TLS verifies against is checked before it becomes a C string.
      *
      * <p>A NUL inside it ends the name there, so OpenSSL verifies the certificate
@@ -3340,6 +3371,7 @@ public class SelfTest {
         aStaticFileComesBackWhole();
         aRefusedBodyIsNeverInvited();
         anInterimResponseIsSkipped();
+        aTruncatingPathOpensNothing();
         aTlsVerificationNameWithANulIsRefused();
         aHeadResponseIsNotReadAsTruncated();
         aNullMethodIsGet();
@@ -3750,6 +3782,42 @@ public class SelfTest {
         } finally {
             plain.close();
         }
+
+        // CLOSED WHILE A READ IS INSIDE OPENSSL. The session handle is the SSL*
+        // itself and SSL_read yields the VM thread while it is in there, so a
+        // close on another thread -- which is what DbPool.close() does to a
+        // connection a borrower still holds -- used to call SSL_free underneath
+        // it. Nothing here can observe the free directly; what it asserts is the
+        // behaviour that depends on the ordering being right: the blocked read
+        // comes back rather than waiting for a peer that will never speak, and
+        // the process is still alive to answer for it.
+        int cameBack = 0;
+        for(int attempt = 0 ; attempt < 5 ; attempt++) {
+            final Tcp busy = Tcp.connect("api.github.com", 443, 10000);
+            busy.startTls("api.github.com");
+            final boolean[] returned = new boolean[1];
+            Thread reader = new Thread(new Runnable() {
+                public void run() {
+                    byte[] buffer = new byte[256];
+                    try {
+                        busy.read(buffer, 0, buffer.length);
+                    } catch (Exception expected) {
+                        // Closed under it, which is the scenario.
+                    }
+                    returned[0] = true;
+                }
+            });
+            reader.start();
+            // Nothing has been sent, so by now it is blocked inside SSL_read.
+            Thread.sleep(300);
+            busy.close();
+            reader.join(10000);
+            if(returned[0]) {
+                cameBack++;
+            }
+        }
+        check("a read inside OpenSSL comes back when the socket is closed under it",
+                "5", String.valueOf(cameBack));
 
         // The name on the certificate has to be checked, not just its chain. This
         // connects to a host that HAS a valid certificate and asks for a different

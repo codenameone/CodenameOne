@@ -46,6 +46,9 @@ public final class FileIo {
      * the caller can fall back rather than treat it as a missing file.
      */
     public static int openBeneath(String root, String relative) {
+        if(holdsNul(root) || holdsNul(relative)) {
+            return -1;
+        }
         return openBeneathImpl(root, relative);
     }
 
@@ -53,6 +56,9 @@ public final class FileIo {
     public static final int BENEATH_UNSUPPORTED = -2;
 
     public static int openRead(String path) {
+        if(holdsNul(path)) {
+            return -1;
+        }
         return openReadImpl(path);
     }
 
@@ -91,11 +97,34 @@ public final class FileIo {
      * alone is defeated by an encoded traversal or by a symlink out of the tree.
      */
     public static String realPath(String path) {
+        if(holdsNul(path)) {
+            return null;
+        }
         return realPathImpl(path);
     }
 
     public static void close(int fd) {
         closeImpl(fd);
+    }
+
+    /**
+     * Whether a path would name a different file once it becomes a C string.
+     *
+     * <p>A path crosses to open() and realpath() as a NUL-terminated string, so a
+     * NUL inside it ENDS the path there: "/etc/passwd\u0000.png" opens
+     * /etc/passwd, while an application that checked the name it was given saw a
+     * .png and allowed it. Nothing here is unusual about the caller -- validating
+     * an untrusted name by its extension and then opening it is the ordinary
+     * shape -- and the truncation happens only in the packaged runtime, so the
+     * simulator proves the check works and the device opens the other file.
+     *
+     * <p>Answered as "no such file" rather than thrown, because that is exactly
+     * what the Java SE twin does: Paths.get refuses a NUL, the catch answers -1
+     * and null, and these methods report failure by return value. The two arms
+     * have to give the same answer to the same argument.
+     */
+    private static boolean holdsNul(String value) {
+        return value != null && value.indexOf(0) >= 0;
     }
 
     private static native int openBeneathImpl(String root, String relative);

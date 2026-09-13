@@ -111,7 +111,11 @@ public final class Tcp {
         if(session == 0) {
             throw new IOException("TLS handshake with " + host + " failed: " + tlsErrorImpl());
         }
-        tls = session;
+        // Published under the same monitor the claim below takes, so a thread that
+        // goes on to read sees a session rather than a zero and the plain socket.
+        synchronized(this) {
+            tls = session;
+        }
     }
 
     /**
@@ -124,6 +128,12 @@ public final class Tcp {
      * which is why the same code is safe on the simulator and unsafe only once it
      * is packaged. The subtraction avoids the overflow `offset + length` has.
      */
+    /** Operations currently inside OpenSSL on this connection's session. */
+    private int tlsInFlight;
+
+    /** A session close() could not free because one of those was still running. */
+    private long tlsAwaitingClose;
+
     private static void checkRange(byte[] buffer, int offset, int length) {
         if(buffer == null) {
             throw new NullPointerException("buffer");
@@ -154,8 +164,17 @@ public final class Tcp {
         if(length == 0) {
             return 0;
         }
-        int n = tls == 0 ? readImpl(handle, buffer, offset, length)
-                         : tlsReadImpl(tls, buffer, offset, length);
+        long session = claimTls();
+        int n;
+        if(session == 0) {
+            n = readImpl(handle, buffer, offset, length);
+        } else {
+            try {
+                n = tlsReadImpl(session, buffer, offset, length);
+            } finally {
+                releaseTls();
+            }
+        }
         if(n < -1) {
             throw new IOException("Socket read failed");
         }
@@ -172,23 +191,85 @@ public final class Tcp {
         if(length == 0) {
             return;
         }
-        int n = tls == 0 ? writeImpl(handle, buffer, offset, length)
-                         : tlsWriteImpl(tls, buffer, offset, length);
+        long session = claimTls();
+        int n;
+        if(session == 0) {
+            n = writeImpl(handle, buffer, offset, length);
+        } else {
+            try {
+                n = tlsWriteImpl(session, buffer, offset, length);
+            } finally {
+                releaseTls();
+            }
+        }
         if(n != length) {
             throw new IOException("Socket write failed");
         }
     }
 
-    public void close() {
+    /**
+     * Takes a claim on the TLS session for one operation, or 0 when there is
+     * none and the plain socket is what to use.
+     *
+     * <p>The session handle is the SSL* itself, and SSL_read and SSL_write yield
+     * the VM thread while they are inside OpenSSL. close() on another thread --
+     * DbPool.close() closes every connection it knows about, including one a
+     * borrower is still using -- then called SSL_shutdown and SSL_free underneath
+     * them, and the operation resumed against freed OpenSSL state. That is a
+     * native crash in the packaged process, not an exception anything can catch.
+     *
+     * <p>So the session is freed by whoever leaves last rather than by whoever
+     * closes. close() still returns at once: it closes the DESCRIPTOR, which is
+     * what a blocked SSL_read is really waiting on, so the other thread returns
+     * an error immediately and frees on its way out.
+     */
+    private synchronized long claimTls() {
         if(tls != 0) {
-            long t = tls;
-            tls = 0;
-            tlsCloseImpl(t);
+            tlsInFlight++;
         }
-        if(handle != 0) {
-            long h = handle;
+        return tls;
+    }
+
+    /** Releases a claim, freeing the session if a close() was waiting on it. */
+    private void releaseTls() {
+        long abandoned = 0;
+        synchronized(this) {
+            tlsInFlight--;
+            if(tlsInFlight == 0 && tlsAwaitingClose != 0) {
+                abandoned = tlsAwaitingClose;
+                tlsAwaitingClose = 0;
+            }
+        }
+        if(abandoned != 0) {
+            tlsCloseImpl(abandoned);
+        }
+    }
+
+    public void close() {
+        long freeNow = 0;
+        long h;
+        synchronized(this) {
+            if(tls != 0) {
+                // Handed to whoever is inside it, if anyone is; taken here if not.
+                if(tlsInFlight == 0) {
+                    freeNow = tls;
+                } else {
+                    tlsAwaitingClose = tls;
+                }
+                tls = 0;
+            }
+            h = handle;
             handle = 0;
+        }
+        // THE DESCRIPTOR FIRST. It is what an in-flight SSL_read is blocked on, so
+        // closing it is what makes that thread return and release its claim --
+        // otherwise close() would leave the session to be freed whenever the peer
+        // next said something, which for a silent peer is never.
+        if(h != 0) {
             closeImpl(h);
+        }
+        if(freeNow != 0) {
+            tlsCloseImpl(freeNow);
         }
     }
 
