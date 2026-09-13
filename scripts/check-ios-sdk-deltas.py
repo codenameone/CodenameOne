@@ -247,6 +247,23 @@ def compile_shader(metal, sdk, project_dir, filename):
     res = run(cmd)
     out = res.stdout + res.stderr
     diags, errors, fatal = parse_diagnostics(out, project_dir)
+    if res.returncode != 0 and errors == 0 and not metal_toolchain_missing(out):
+        # The same guard compile_one carries, and it was missing here despite the docstring
+        # above claiming the same shape. metal can exit nonzero with nothing this parser
+        # recognises -- a driver-level failure, an SDK it cannot open, a signal -- and none of
+        # those carry a "file:line:col: kind:" prefix, so both counters stayed at zero and the
+        # shader was recorded CLEAN. The production Metal build would have failed on exactly
+        # that.
+        #
+        # The missing-toolchain case is excluded because it is reported separately, as a
+        # skip: it is not a finding about the SDK, and counting it here would turn "no Metal
+        # toolchain installed" into a blocking delta on every machine that lacks one.
+        errors += 1
+        fatal += 1
+        detail = out.strip().splitlines()
+        diags.append("%s:0:0: fatal error: metal exited %d with no parseable diagnostic%s"
+                     % (filename, res.returncode,
+                        (" (" + detail[-1].strip() + ")") if detail else ""))
     return diags, errors, fatal, out
 
 

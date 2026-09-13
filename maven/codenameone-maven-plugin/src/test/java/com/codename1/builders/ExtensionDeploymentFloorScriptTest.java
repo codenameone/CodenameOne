@@ -1035,4 +1035,39 @@ class ExtensionDeploymentFloorScriptTest {
         assertFalse(got.get(0).contains("[sdk=iphonesimulator*][sdk=iphoneos*]"),
                 "nor in the other order: " + got.get(0));
     }
+
+    /// A HIGH picked value does not mean every build is high. With EXTENSION_MIN = 16.4 beside
+    /// EXTENSION_MIN[sdk=iphoneos*] = 12.0, the unqualified key resolves to 16.4 while the
+    /// device build resolves to 12.0. Testing the picked value against the floor first read the
+    /// 16.4, concluded there was nothing to do, and left the device archive at 12.0 for the new
+    /// SDK to reject -- so the uncertainty path now runs before that test.
+    @Test
+    void aLowBranchIsPinnedEvenWhenThePickIsHigh(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "HighPick|" + EXT + "|EXTENSION_MIN->16.4;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]=15.0"),
+                "the device branch resolves to 12.0 and must be pinned even though the "
+                        + "unqualified pick is 16.4: " + got.get(0));
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET=$(EXTENSION_MIN)"),
+                "and the expression still serves every other build at 16.4: " + got.get(0));
+    }
+
+    /// The counterpart: running the uncertainty path unconditionally must not start pinning
+    /// branches that are fine. Every branch here clears the floor, so nothing is written.
+    @Test
+    void noBranchIsPinnedWhenEveryBranchIsHigh(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "HighAll|" + EXT + "|EXTENSION_MIN->16.4;"
+                        + "EXTENSION_MIN[sdk=iphoneos*]->16.0;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET->$(EXTENSION_MIN)");
+        assertFalse(got.get(0).contains("=15.0"),
+                "16.4 and 16.0 both clear the floor, so the pass must write nothing: "
+                        + got.get(0));
+    }
 }
