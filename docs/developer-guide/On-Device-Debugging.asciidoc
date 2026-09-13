@@ -30,7 +30,7 @@ to the IDE everything looks like attaching to a normal remote JVM.
 If your bug is reproducible in the simulator, stay in the simulator
 — its debugger is faster and has fewer limitations.
 
-image::img/on-device-debugging-topology.svg[How the IDE, the proxy and the app connect,scaledwidth=95%]
+image::img/on-device-debugging-topology.svg["How the IDE, the proxy and the app connect",scaledwidth=95%]
 
 === Quick start (IntelliJ IDEA)
 
