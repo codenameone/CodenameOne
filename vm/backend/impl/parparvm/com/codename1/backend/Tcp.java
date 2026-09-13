@@ -1,0 +1,201 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend;
+
+import java.io.IOException;
+
+/**
+ * Blocking TCP client socket for server-side (clean-target) binaries. Deliberately
+ * not com.codename1.io.Socket: that routes through CodenameOneImplementation, which
+ * a translated server binary does not have.
+ */
+public final class Tcp {
+    private long handle;
+    /** An OpenSSL session once startTls has run; 0 while the socket is plaintext. */
+    private long tls;
+
+    private Tcp(long handle) {
+        this.handle = handle;
+    }
+
+    public static Tcp connect(String host, int port, int timeoutMillis) throws IOException {
+        // The same range ServerSocket.bind refuses, and for the same reason: the
+        // native side renders this into the service string getaddrinfo parses, and
+        // a value past 65535 does not fail there -- glibc wraps it, so 65536 dials
+        // port 0 and 99999 dials 34463. The Java SE arm rejects it outright, so a
+        // malformed database URL reached a DIFFERENT port only once packaged.
+        if(port < 0 || port > 65535) {
+            throw new IllegalArgumentException("port out of range: " + port);
+        }
+        // And the timeout, for the same reason one line up: the native side reads
+        // every NON-POSITIVE value as "block with no deadline", so a negative one
+        // hangs a packaged server for the OS TCP timeout while the Java SE arm
+        // fails immediately out of Socket.connect. Zero keeps its documented
+        // meaning; below zero is not a shorter wait, it is a different API.
+        if(timeoutMillis < 0) {
+            throw new IllegalArgumentException("connect timeout must not be negative: "
+                    + timeoutMillis);
+        }
+        // The name reaches a resolver; see Urls.requireHostName for what a NUL
+        // in it does to the packaged arm, and why both arms refuse it.
+        Urls.requireHostName(host);
+        long h = connectImpl(host, port, timeoutMillis);
+        if(h == 0) {
+            throw new IOException("Connection to " + host + ":" + port + " failed");
+        }
+        return new Tcp(h);
+    }
+
+    /**
+     * Upgrades this connection to TLS, verifying the peer certificate against the
+     * system trust store and against `host`.
+     *
+     * An upgrade rather than a secure connect because that is the shape the
+     * database protocols need: PostgreSQL and MySQL both begin in plaintext and
+     * ask to start TLS mid-conversation, so a connect-time flag could not express
+     * it. Calling it immediately after connect gives the ordinary secure-connect
+     * behaviour.
+     */
+    public void startTls(String host) throws IOException {
+        startTls(host, null);
+    }
+
+    /**
+     * As {@link #startTls(String)}, verifying against the PEM bundle at `caFile`
+     * INSTEAD of the system trust store.
+     *
+     * This is what a managed database needs: RDS, Cloud SQL and the like present
+     * certificates from a private CA, and a development container presents one it
+     * generated for itself. Falling back to the system store when the named bundle
+     * fails to load would verify against roots the caller deliberately did not
+     * choose, so that is an error rather than a fallback.
+     */
+    public void startTls(String host, String caFile) throws IOException {
+        // The trust root is a file name that crosses to a native; see
+        // Urls.requireNoNul for what a NUL in it loads instead.
+        Urls.requireNoNul("An sslrootcert path", caFile);
+        checkOpen();
+        if(tls != 0) {
+            return;
+        }
+        long session = startTlsImpl(handle, host, caFile);
+        if(session == 0) {
+            throw new IOException("TLS handshake with " + host + " failed: " + tlsErrorImpl());
+        }
+        tls = session;
+    }
+
+    /**
+     * Refuses a slice that does not lie inside the array.
+     *
+     * recv() and SSL_read() index the array straight through the pointer they are
+     * given, and ParparVM adds no bounds check of its own, so a bad offset here is
+     * a native read or write of whatever is next in the heap rather than an
+     * exception. The JavaSE implementation gets this free from the stream API,
+     * which is why the same code is safe on the simulator and unsafe only once it
+     * is packaged. The subtraction avoids the overflow `offset + length` has.
+     */
+    private static void checkRange(byte[] buffer, int offset, int length) {
+        if(buffer == null) {
+            throw new NullPointerException("buffer");
+        }
+        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+            throw new IndexOutOfBoundsException("offset " + offset + ", length "
+                    + length + ", buffer " + buffer.length);
+        }
+    }
+
+    /** Whether this connection is encrypted. */
+    public boolean isSecure() {
+        return tls != 0;
+    }
+
+    /**
+     * Reads up to length bytes. Returns -1 at end of stream, matching InputStream.
+     */
+    public int read(byte[] buffer, int offset, int length) throws IOException {
+        checkOpen();
+        checkRange(buffer, offset, length);
+        // Answered here, never dispatched. InputStream returns 0 for a zero-length
+        // read and the Java SE arm inherits that, while recv(_, 0) returns 0 and
+        // the native maps a zero-byte read to END OF STREAM -- so a caller that
+        // computed an empty slice was told the peer had gone away, but only once
+        // packaged. SSL_read(_, 0) is worse: OpenSSL leaves it undefined and it
+        // can report an error.
+        if(length == 0) {
+            return 0;
+        }
+        int n = tls == 0 ? readImpl(handle, buffer, offset, length)
+                         : tlsReadImpl(tls, buffer, offset, length);
+        if(n < -1) {
+            throw new IOException("Socket read failed");
+        }
+        return n;
+    }
+
+    public void write(byte[] buffer, int offset, int length) throws IOException {
+        checkOpen();
+        checkRange(buffer, offset, length);
+        // Symmetry with read, and for the same reason on the TLS side:
+        // SSL_write(_, 0) is undefined too. This one happens to be harmless today
+        // -- the check below is n != length, and 0 != 0 is false -- which is a
+        // reason to make it explicit rather than to leave it resting on that.
+        if(length == 0) {
+            return;
+        }
+        int n = tls == 0 ? writeImpl(handle, buffer, offset, length)
+                         : tlsWriteImpl(tls, buffer, offset, length);
+        if(n != length) {
+            throw new IOException("Socket write failed");
+        }
+    }
+
+    public void close() {
+        if(tls != 0) {
+            long t = tls;
+            tls = 0;
+            tlsCloseImpl(t);
+        }
+        if(handle != 0) {
+            long h = handle;
+            handle = 0;
+            closeImpl(h);
+        }
+    }
+
+    private void checkOpen() throws IOException {
+        if(handle == 0) {
+            throw new IOException("Socket closed");
+        }
+    }
+
+    private static native long connectImpl(String host, int port, int timeoutMillis);
+    private static native int readImpl(long handle, byte[] buffer, int offset, int length);
+    private static native int writeImpl(long handle, byte[] buffer, int offset, int length);
+    private static native int closeImpl(long handle);
+    private static native long startTlsImpl(long handle, String host, String caFile);
+    private static native String tlsErrorImpl();
+    private static native int tlsReadImpl(long session, byte[] buffer, int offset, int length);
+    private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);
+    private static native void tlsCloseImpl(long session);
+}

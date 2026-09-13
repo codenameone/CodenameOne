@@ -1,0 +1,8 @@
+FROM golang:alpine AS build
+WORKDIR /src
+COPY gcpause.go .
+RUN go mod init gcpause >/dev/null 2>&1 || true
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/gcpause gcpause.go
+FROM alpine:3.20
+COPY --from=build /out/gcpause /gcpause
+ENTRYPOINT ["/gcpause"]

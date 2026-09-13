@@ -261,5 +261,15 @@
         </fileSet>
       </fileSets>
     </module>
+    <module id="${rootArtifactId}-backend" dir="backend" name="${rootArtifactId}-backend">
+      <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/java</directory>
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
   </modules>
 </archetype-descriptor>

@@ -1336,6 +1336,24 @@ int currentSizeOfAllObjectsInHeap = 0;
 // list are invisible to the sweep (only table entries are swept), so the
 // deferral can never free them early.
 static struct ThreadLocalData* cn1DeadPendingThreads = 0;  // guarded by criticalSection
+// How many TLDs are waiting on that queue, and the request that gets them drained.
+//
+// The queue is drained only at mark start, and a thread's TLD -- callStack arrays
+// ~50KB, pendingHeapAllocations ~27KB, the try-block array ~15KB -- is freed only
+// by that drain. A server whose connections churn while it allocates almost
+// nothing therefore has no reason to collect and no other way to reclaim: measured
+// as a sawtooth to 165MB over 2800 closed connections, dropping to 100MB the one
+// time a cycle happened to run.
+//
+// Allocation volume cannot express this: none of that memory was allocated by the
+// mutator, so the byte counters the trigger watches never move. Raising the
+// request makes the collector's next wake collect instead of idling again.
+static _Atomic int cn1DeadPendingCount = 0;
+#ifndef CN1_GC_DEAD_THREAD_DEMAND
+// ~1.6MB of queued thread state at the measured per-thread cost. Low enough to
+// bound the sawtooth, high enough that churn does not buy a cycle every few closes.
+#define CN1_GC_DEAD_THREAD_DEMAND 24
+#endif
 extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
 
 // ---- Immortal roots ------------------------------------------------------
@@ -1619,6 +1637,47 @@ void collectThreadResources(struct ThreadLocalData *current)
     current->gcQueuedForDrain = JAVA_TRUE;
     current->gcDeadNext = cn1DeadPendingThreads;
     cn1DeadPendingThreads = current;
+    // RAISING THE LATCH IS ALL THIS CAN DO, and that is a constraint rather than
+    // an omission. Review asked for the threshold transition to WAKE a collector
+    // already inside LOCK.wait(idle), since gcIdleWaitMillis() is read only
+    // before that wait. There is no thread here that may do the waking:
+    //
+    //  - An OS thread reaches this from markDeadThread() on the DYING thread,
+    //    after java_lang_Thread_runImpl returned. Its slot in allThreads is
+    //    already cleared and its TLD is already queued for drain, so the GC can
+    //    migrate or free its allocations at any moment and no longer walks it.
+    //    Entering a Java monitor from there is not a thing this thread may do.
+    //  - A virtual thread reaches it from cn1RetireVirtualThread() on the
+    //    CARRIER, which is live -- but a monitor enter there blocks the carrier,
+    //    and every other virtual thread it carries, on a lock the collector holds
+    //    for the length of its decision. Trading a queued TLD for a stalled
+    //    carrier is the worse of the two, and putting a Java monitor inside the
+    //    scheduler's teardown is a change to the mechanism that has already
+    //    deadlocked this collector twice.
+    //
+    // What bounds the exposure instead is in gcIdleWaitMillis: demand standing
+    // when the collector decides refuses the 30s idle and takes 200ms. The hole
+    // that leaves is demand arriving entirely INSIDE an idle that already began,
+    // and its cost is latency, not growth -- the queue drains at the next mark
+    // start and the count zeroes there.
+    //
+    // Note also that the scenario the finding names cannot reach the long idle.
+    // It requires !isHighFrequencyGC(), i.e. less than a full GC trigger's worth
+    // of allocation since the last cycle, while a server churning enough
+    // connections to retire CN1_GC_DEAD_THREAD_DEMAND virtual threads is
+    // allocating for every one of them. The two are the same traffic.
+    //
+    // If this is revisited, the cheap safe move is in the collector rather than
+    // here: take the short idle whenever cn1DeadPendingCount is NON-ZERO, not
+    // only at the threshold. That costs one extra 200ms cycle per burst of
+    // deaths (the drain zeroes the count, so it does not repeat) and nothing at
+    // all on an app where no thread is dying. It wants its own A/B against the
+    // GC benchmarks, which is why it is not folded in here.
+    if(atomic_fetch_add_explicit(&cn1DeadPendingCount, 1, memory_order_relaxed) + 1
+            >= CN1_GC_DEAD_THREAD_DEMAND) {
+        extern _Atomic int cn1GcNativeGcRequest;
+        atomic_store_explicit(&cn1GcNativeGcRequest, 1, memory_order_release);
+    }
 }
 
 // Drain the dead-thread queue on the GC thread at mark start: migrate each queued
@@ -1629,6 +1688,9 @@ static void cn1DrainDeadThreadPending() {
     lockCriticalSection();
     struct ThreadLocalData* head = cn1DeadPendingThreads;
     cn1DeadPendingThreads = 0;
+    // Under the same lock the pushes take, so a thread queued between the take and
+    // here counts toward the NEXT cycle rather than being lost.
+    atomic_store_explicit(&cn1DeadPendingCount, 0, memory_order_relaxed);
     while(head != 0) {
         struct ThreadLocalData* next = head->gcDeadNext;
         for(int heapTrav = 0 ; heapTrav < head->heapAllocationSize ; heapTrav++) {
@@ -1710,6 +1772,17 @@ volatile int gcSatbActive = 0;
 volatile int gcSatbTerminating = 0;
 static JAVA_OBJECT* gcSatbStack = 0;
 static long gcSatbTop = 0;                 // guarded by gcSatbMutex
+
+/*
+ * The take-side staging buffer, and the high-water mark both it and the log are
+ * trimmed against. File scope rather than a static inside cn1SatbTake so
+ * cn1SatbTrim can reach it: it grows exactly like the log and was never shrunk
+ * either, so the two together held ~28MB of EMPTY buffer on a backend that had
+ * seen one busy period. All three are guarded by gcSatbMutex.
+ */
+static JAVA_OBJECT* gcSatbScratch = 0;
+static long gcSatbScratchCap = 0;
+static long gcSatbPeak = 0;                // largest batch since the last trim
 static long gcSatbCap = 0;
 static pthread_mutex_t gcSatbMutex = PTHREAD_MUTEX_INITIALIZER;
 // Entries cn1SatbEnqueue could not record because its stack would not grow. Read by the
@@ -2108,42 +2181,121 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
 static long cn1SatbTake(JAVA_OBJECT** out) {
     pthread_mutex_lock(&gcSatbMutex);
     long n = gcSatbTop;
-    static JAVA_OBJECT* scratch = 0; static long scratchCap = 0;
-    if(n > scratchCap) {
+    if(n > gcSatbPeak) {
+        gcSatbPeak = n;                    // what the log actually had to hold
+    }
+    if(n > gcSatbScratchCap) {
         long nc = n < 8192 ? 8192 : n;
-        // Through a TEMPORARY. Assigning realloc's result straight back loses the existing
-        // buffer on failure, and advancing scratchCap alongside it made that permanent:
-        // every later take saw n <= scratchCap, skipped the realloc, found scratch NULL and
-        // returned 0, so the barrier kept logging into a stack nothing ever drained again.
-        JAVA_OBJECT* grown = (JAVA_OBJECT*)realloc(scratch, (size_t)nc * sizeof(JAVA_OBJECT));
-        if(grown != 0) {
-            scratch = grown;
-            scratchCap = nc;
+        JAVA_OBJECT* ns = (JAVA_OBJECT*)realloc(gcSatbScratch, (size_t)nc * sizeof(JAVA_OBJECT));
+        if(ns != 0) {
+            gcSatbScratch = ns;
+            gcSatbScratchCap = nc;
+        } else {
+            // realloc failed and left the OLD, smaller buffer and capacity in place.
+            // Copying n entries into it writes past the allocation, and does so with
+            // the collector running over the same heap.
+            //
+            // TAKE NOTHING, rather than the prefix that fits. A partial take leaves
+            // a tail in the log that the mark never sees, and the drain loop stops
+            // when a batch marks nothing new -- so the regress that would collect
+            // that tail is bounded by CN1_SATB_MAX_REOPENS and a big enough tail is
+            // still queued when the sweep starts. The cap's safety argument does not
+            // cover those entries: it rests on a reference stored after the fixpoint
+            // being marked or fresh, while a retained DELETION-barrier entry names
+            // exactly the object that is neither.
+            //
+            // Answering "empty" instead, AND counting a drop, hands the whole
+            // problem to machinery that already exists: cn1GcProcessReferences
+            // declines to clear on a drop, and the catch in the termination loop
+            // re-arms, retains every reference and goes round the fixpoint again.
+            // The entries stay in the log for a take that can hold them.
+            atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
+            pthread_mutex_unlock(&gcSatbMutex);
+            *out = gcSatbScratch;
+            return 0;
         }
     }
-    // CAPACITY, NOT JUST NON-NULLNESS. Growing through a temporary keeps the old buffer on
-    // failure, which is what the leak fix wanted -- and it means a FAILED growth leaves
-    // scratch non-null but SMALLER than n. Testing only scratch != 0 then memcpy'd n
-    // entries into an allocation sized for fewer: a heap overflow written by the collector
-    // under memory pressure, which is a far worse failure than the leak it replaced. The
-    // buffer is usable only if it exists AND is big enough.
-    JAVA_BOOLEAN usable = (scratch != 0 && scratchCap >= n) ? JAVA_TRUE : JAVA_FALSE;
-    if(n > 0 && usable) {
-        memcpy(scratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+    if(n > 0 && gcSatbScratch != 0) {
+        memcpy(gcSatbScratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+        // The whole log, every time: the branch above returns rather than staging a
+        // prefix, so n is gcSatbTop here and there is never a tail. The memmove is
+        // kept for the invariant rather than for a case that can arise -- if a
+        // future edit ever does take part of the log, what is left has to survive,
+        // because a dropped SATB entry is a reference the mark never sees and the
+        // object it named is swept while still live.
+        {
+            long left = gcSatbTop - n;
+            if(left > 0) {
+                memmove(gcSatbStack, gcSatbStack + n, (size_t)left * sizeof(JAVA_OBJECT));
+            }
+            gcSatbTop = left;
+        }
+    } else {
+        // Nothing could be staged; leave the log intact rather than clearing it.
+        // Counted as a drop even though nothing is LOST here: the caller is told
+        // the batch was empty, and cn1GcProcessReferences reads an empty batch as
+        // "termination can finish". A referent Reference.get() has handed out would
+        // then be cleared on the strength of a batch the mark never saw. The entries
+        // themselves stay in the log for the next take, which is why the partial
+        // path above does not count one: nothing there goes unseen.
+        if(gcSatbTop > 0) {
+            atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
+        }
+        n = 0;
     }
-    // TAKE-SIDE LOSS COUNTS AS A DROP TOO. gcSatbTop is reset either way, so entries that
-    // were successfully logged are discarded here when the scratch buffer could not be
-    // grown -- and the caller is told the batch was empty, which reads as "termination can
-    // finish". For a referent Reference.get() has handed out that is the same hazard as a
-    // failed enqueue and has to invalidate reference clearing the same way; a lost enqueue
-    // and a lost batch are indistinguishable to the object that gets swept.
-    if(n > 0 && !usable) {
-        atomic_fetch_add_explicit(&cn1SatbDrops, 1, memory_order_relaxed);
-    }
-    gcSatbTop = 0;
     pthread_mutex_unlock(&gcSatbMutex);
-    *out = scratch;
-    return usable ? n : 0;
+    *out = gcSatbScratch;
+    return n;
+}
+
+/*
+ * Give back the write-barrier log once the burst that sized it is over.
+ *
+ * gcSatbCap only ever DOUBLED. Nothing shrank it, so a backend that saw one busy
+ * period kept the peak for the life of the process: measured on the plaintext
+ * benchmark, 8MB of log and a matching staging buffer against a 12MB RSS -- two
+ * thirds of the process was an empty buffer, and the /json DTO route reached
+ * 16MB. gcSatbTop was 0 every time it was sampled, so none of it was in use.
+ *
+ * Trimmed against the high-water batch since the last trim rather than against
+ * the instantaneous depth, which is 0 here by construction (the sweep runs after
+ * a drain) and would shrink to the floor every cycle and re-grow through several
+ * reallocs on the next burst. The 4x slack and the doubling target mean a steady
+ * workload reaches a size it keeps, and only a workload whose peak genuinely fell
+ * pays a realloc.
+ *
+ * Called from the sweep, where the collector is already doing bulk work and one
+ * more pair of reallocs does not show. A failed shrink keeps the existing buffer:
+ * realloc is not required to succeed just because the block is getting smaller.
+ */
+#ifndef CN1_SATB_TRIM_FLOOR
+#define CN1_SATB_TRIM_FLOOR 8192           /* the size the log starts at: 64KB */
+#endif
+static void cn1SatbTrim(void) {
+    pthread_mutex_lock(&gcSatbMutex);
+    long peak = gcSatbPeak;
+    long want = peak * 2;
+    if(want < CN1_SATB_TRIM_FLOOR) {
+        want = CN1_SATB_TRIM_FLOOR;
+    }
+    /* Only when the log is idle -- a non-empty log is live data the mark phase
+       has not taken yet, and shrinking under it would drop tracked references. */
+    if(gcSatbTop == 0 && gcSatbCap > want * 4) {
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)want * sizeof(JAVA_OBJECT));
+        if(n != 0) {
+            gcSatbStack = n;
+            gcSatbCap = want;
+        }
+    }
+    if(gcSatbScratchCap > want * 4) {
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcSatbScratch, (size_t)want * sizeof(JAVA_OBJECT));
+        if(n != 0) {
+            gcSatbScratch = n;
+            gcSatbScratchCap = want;
+        }
+    }
+    gcSatbPeak = 0;
+    pthread_mutex_unlock(&gcSatbMutex);
 }
 
 void cn1RefreshFreeMemCache(void);   // defined near cn1BibopMaybeGc; drives the dynamic pacing cap
@@ -4246,13 +4398,14 @@ void codenameOneGCMark() {
             cn1GcSatbEntries += n;
 #endif
             if(n == 0) {
-                // A ZERO HERE IS NOT ALWAYS "NOTHING SLIPPED IN". cn1SatbTake reports an
-                // empty batch both when the log was empty and when it could not grow its
-                // scratch buffer and threw the entries away -- it records the second case
-                // in cn1SatbDrops, but this catch runs AFTER cn1GcProcessReferences made
-                // its last drop check, so nothing would otherwise look at the new value.
-                // A getter that logged successfully and had its batch discarded here would
-                // then keep a pointer the following sweep frees.
+                // A ZERO HERE IS NOT ALWAYS "NOTHING SLIPPED IN". cn1SatbTake now swaps
+                // the log's buffer out whole, so a zero from IT does mean the log was
+                // empty -- but an APPEND can still have failed to grow the log under OOM
+                // and dropped the entry on the mutator's side, and it records that in
+                // cn1SatbDrops. This catch runs AFTER cn1GcProcessReferences made its last
+                // drop check, so nothing would otherwise look at the new value. A getter
+                // whose log append was dropped would then keep a pointer the following
+                // sweep frees.
                 //
                 // Retaining is the answer rather than another clear pass: the barrier is
                 // coming down, so there is no sound basis left for deciding anything is
@@ -4696,6 +4849,33 @@ void codenameOneGCSweep() {
         cn1GcReleaseBlockedThreads();
         return;
     }
+    // AN UNDRAINED SATB LOG BLOCKS THE RECLAIM, for the same reason the stale
+    // index above does and with the same self-correcting cost.
+    //
+    // cn1SatbTake refuses to stage a batch it cannot hold, so the entries stay in
+    // the log -- but the termination loop is bounded by CN1_SATB_MAX_REOPENS, and
+    // an allocation that keeps failing for all of them leaves the loop reaching
+    // its cap with the log still occupied. cn1GcRetainAllReferences covers the
+    // Reference objects at that point and nothing else: an ordinary
+    // DELETION-barrier entry names an object that may be reachable through no
+    // other edge, and sweeping on that mark frees it while it is live.
+    //
+    // Reading it here is exact rather than approximate: every append is gated on
+    // gcSatbActive, which the loop lowered, and cn1SatbBulkQuiesce waited out the
+    // writers already past that check -- so anything still in the log now is
+    // something the MARK failed to see, never a store that merely arrived late.
+    {
+        long undrained;
+        pthread_mutex_lock(&gcSatbMutex);
+        undrained = gcSatbTop;
+        pthread_mutex_unlock(&gcSatbMutex);
+        if(undrained > 0) {
+            fprintf(stderr, "[GC] %ld SATB entries could not be drained, so this "
+                    "sweep is skipped; the next cycle retries\n", undrained);
+            cn1GcReleaseBlockedThreads();
+            return;
+        }
+    }
 #ifndef CN1_DISABLE_BIBOP
     // Reclaim dead slots on retired BiBOP pages (rebuild per-page free-lists from
     // the header epoch marks). Runs first, on the GC thread, with no marking in
@@ -4971,7 +5151,7 @@ static _Atomic int cn1BibopGcScheduled = 0;
 // field under synchronized(LOCK) -- which is exactly the monitor a parked thread must not
 // enter. So the parked path gets its own release/acquire flag, and gcIdleWaitMillis
 // consumes it alongside forceGc.
-static _Atomic int cn1GcNativeGcRequest = 0;
+_Atomic int cn1GcNativeGcRequest = 0;
 
 // Something that CHANGES when a collection starts, for callers that need to wait for the
 // one they just asked for rather than for a handshake that may never reach them.
@@ -5235,6 +5415,26 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
            && (long long)cn1MonotonicMillis() - lastPark < CN1_PACING_RECENT_PARK_MS) {
             return 200;
         }
+    }
+    // Queued dead-thread TLDs are the same race one more time, and they take the
+    // same answer. Reaching CN1_GC_DEAD_THREAD_DEMAND raises the native request
+    // latch, and that is ALL it can do: the push runs on the dying thread inside
+    // the critical section, so it may no more enter the Java monitor to notify
+    // than a parked thread may. A collector already inside the long idle
+    // therefore cannot see the request until the idle expires, and each further
+    // dead thread adds its TLD -- tens of kilobytes apiece, freed only by the
+    // drain at mark start -- so connection churn could pile up 30 SECONDS of
+    // them against a threshold meant to bound exactly that.
+    //
+    // Refusing the long idle while the demand stands bounds it to 200ms, on the
+    // same path the park case above already takes. It is the same predicate that
+    // raised the latch, so it says nothing new about when a cycle is owed, and it
+    // clears itself: the next cycle's drain zeroes the count. And a short idle
+    // only re-reads the request sooner -- it forces no cycle, which is the
+    // distinction that whole comment exists to preserve.
+    if(atomic_load_explicit(&cn1DeadPendingCount, memory_order_relaxed)
+            >= CN1_GC_DEAD_THREAD_DEMAND) {
+        return 200;
     }
     return highFrequency ? 200 : 30000;
 }
@@ -6052,6 +6252,24 @@ static int cn1BibopUpgradeFallbackPages(void) {
 static void cn1BibopTrimFreePool(void) {
 #if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32)
     if(cn1BibopReleaseOffset() == 0) {
+        // Say so, ONCE. This is a whole-process condition -- not one page and
+        // not one sweep -- so a build that lands on such a host returns no
+        // memory at all for its entire life, and every symptom of that looks
+        // like the collector failing to reclaim rather than declining to. The
+        // case that reaches here in practice is a 64KB system page: the rounded
+        // header plus one system page no longer fits inside a 64KB BiBOP page,
+        // and arm64 kernels are configurable this way, so the same binary can
+        // release on one host and not on another. Without this line that is
+        // invisible, and it reads as a collector bug.
+        static int reported = 0;
+        if(!reported) {
+            reported = 1;
+            fprintf(stderr, "CN1 GC: page release unavailable on this host "
+                            "(system page %ld, BiBOP page %d); the footprint "
+                            "will not fall\n",
+                    (long)getpagesize(), (int)CN1_BIBOP_PAGE_SIZE);
+            fflush(stderr);
+        }
         return;
     }
     pthread_mutex_lock(&bibopMutex);
@@ -8100,6 +8318,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     // pool this sweep just refilled, and outside the per-page loop so the madvise
     // work is batched rather than interleaved with the walk.
     cn1BibopTrimFreePool();
+    // Same idea one buffer over: the write-barrier log is sized by the busiest
+    // burst the process ever saw and was never given back.
+    cn1SatbTrim();
 }
 
 #ifdef CN1_GRACE_AUDIT
@@ -12738,6 +12959,30 @@ JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str) {
     }
     return JAVA_NULL;
 #endif
+    if(str == 0) {
+        return JAVA_NULL;
+    }
+    return newStringFromUtf8Len(threadStateData, str, (int)strlen(str));
+}
+
+/*
+ * UTF-8 to String, always, for a run of KNOWN LENGTH.
+ *
+ * newStringFromNative decodes what the PLATFORM uses -- UTF-8 on POSIX and the
+ * ANSI code page on Windows -- which is right for argv and the environment and
+ * wrong for anything that is UTF-8 by specification wherever it runs. SQLite text
+ * and HTTP/2 header octets are both that, so they need this rather than that.
+ *
+ * And newStringFromCString is not a decoder at all: it is the generated-literal
+ * reader, widening each byte and expanding ~~uXXXX escapes. Handing it external
+ * data corrupts every non-ASCII value and lets the data inject UTF-16 code units
+ * -- the header beside its declaration says so, and two backend natives were
+ * calling it on bytes from a database and from the network anyway.
+ *
+ * Length-aware because the callers know the length and a NUL is a legal byte in
+ * both sources; strlen would silently truncate at one.
+ */
+JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* str, int length) {
     int in = 0;
     int out = 0;
     /* JAVA_ARRAY_CHAR, not JAVA_CHAR: these are UTF-16 code UNITS destined for a
@@ -12745,11 +12990,12 @@ JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str) {
     JAVA_ARRAY_CHAR stackBuf[256];
     JAVA_ARRAY_CHAR* buf;
     JAVA_OBJECT result;
-    int length;
     if(str == 0) {
         return JAVA_NULL;
     }
-    length = (int)strlen(str);
+    if(length < 0) {
+        length = 0;
+    }
     /* One UTF-16 unit per input BYTE is always enough: a 1-byte sequence yields 1,
        and the only multi-unit case (a 4-byte sequence yielding a surrogate pair)
        yields 2 units from 4 bytes. An invalid byte yields exactly one U+FFFD. */
@@ -14122,6 +14368,13 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
 #endif
 
 const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
+    return stringToUTF8Len(threadStateData, str, NULL);
+}
+
+const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT* lengthOut) {
+    if(lengthOut != NULL) {
+        *lengthOut = 0;
+    }
     if(str == NULL) {
         return NULL;
     }
@@ -14149,6 +14402,9 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     char* cs = threadStateData->utf8Buffer;
     memcpy(cs, data, len);
     cs[len] = '\0';
+    if(lengthOut != NULL) {
+        *lengthOut = len;
+    }
     return cs;
 }
 

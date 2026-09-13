@@ -1,0 +1,17 @@
+# The load generator and the measurement side.
+#
+# wrk rather than a hand-written client: it is the tool these numbers are usually
+# quoted from, it keeps its own connections alive, and its own overhead is well
+# understood. A load generator written for one benchmark is a load generator whose
+# bugs are invisible.
+FROM debian:bookworm-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends wrk curl procps ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+ENTRYPOINT ["/bin/bash"]
+# strace is here for the syscall census in benchmarks/README.md: the per-request
+# syscall count is the difference between a poller registered once per connection
+# and one re-armed per request, and counting them is the only way to say which we
+# have rather than which we think we have.
+RUN apt-get update && apt-get install -y --no-install-recommends strace \
+ && rm -rf /var/lib/apt/lists/*

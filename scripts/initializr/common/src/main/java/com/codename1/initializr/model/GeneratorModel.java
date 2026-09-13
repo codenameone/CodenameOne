@@ -303,6 +303,11 @@ public class GeneratorModel {
             String platform = platforms[i];
             validateModulePomCoordinates(entries, platform, rootArtifactId + "-" + platform, true, version);
         }
+        // The backend module is checked for coordinates like the rest, but NOT for a
+        // dependency on the generated common module. It must not have one: common is
+        // compiled against codenameone-core, and a server has no display. Requiring it
+        // here would enforce exactly the mistake the module's own comment warns against.
+        validateModulePomCoordinates(entries, "backend", rootArtifactId + "-backend", false, version);
     }
 
     private void validateModulePomCoordinates(

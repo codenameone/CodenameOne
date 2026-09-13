@@ -611,7 +611,9 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
         return jvmSignatureToJavaType(payload);
     }
 
-    private static String jvmSignatureToJavaType(String sig) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    static String jvmSignatureToJavaType(String sig) {
         if (sig == null || sig.length() == 0) return "java.lang.Object";
         char c = sig.charAt(0);
         switch (c) {
@@ -694,20 +696,26 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
 
     /// Strips top-level generic parameters from a Java type name so it can be
     /// used as a `Class<T>` literal. `List<Pet>` -> `List`.
-    private static String stripGeneric(String javaType) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    static String stripGeneric(String javaType) {
         if (javaType == null) return "java.lang.Object";
         int lt = javaType.indexOf('<');
         return lt < 0 ? javaType : javaType.substring(0, lt);
     }
 
-    private static boolean isCallbackType(String descriptor) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    static boolean isCallbackType(String descriptor) {
         return "Lcom/codename1/util/OnComplete;".equals(descriptor);
     }
 
     /// Returns the Java type name for a parameter, preferring the generic
     /// signature when available so `List<Pet>` survives instead of erasing to
     /// `List`.
-    private static String javaTypeFor(Type asmType, String genericSig) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    static String javaTypeFor(Type asmType, String genericSig) {
         if (genericSig != null && genericSig.length() > 0) {
             return jvmSignatureToJavaType(genericSig);
         }
@@ -732,17 +740,85 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
     // Misc
     // ----------------------------------------------------------------
 
-    private static String packageOf(String binary) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    /**
+     * A declared route pattern as the SERVER will see a request for it.
+     *
+     * <p>HttpServer.Request resolves a percent-encoded UNRESERVED octet before it
+     * compares a path -- "/status%7E" and "/status~" are the same resource and it
+     * makes them the same bytes -- so a pattern that kept the encoded spelling
+     * matched neither. The declared route was simply unreachable, by either
+     * spelling, with nothing at build time or request time to say so.
+     *
+     * <p>The same set RFC 3986 calls unreserved and HttpServer.isUnreservedByte
+     * implements: letters, digits, "-", ".", "_" and "~". Everything else is left
+     * exactly as written, which is what keeps %2F from becoming a path separator
+     * the author never wrote and %7B from becoming a placeholder brace.
+     */
+    static String canonicalPath(String pattern) {
+        if (pattern == null || pattern.indexOf('%') < 0) {
+            return pattern;
+        }
+        StringBuilder out = new StringBuilder(pattern.length());
+        int at = 0;
+        while (at < pattern.length()) {
+            char c = pattern.charAt(at);
+            if (c != '%' || at + 2 >= pattern.length()) {
+                out.append(c);
+                at++;
+                continue;
+            }
+            int hi = hexDigit(pattern.charAt(at + 1));
+            int lo = hexDigit(pattern.charAt(at + 2));
+            if (hi < 0 || lo < 0) {
+                out.append(c);
+                at++;
+                continue;
+            }
+            int octet = (hi << 4) | lo;
+            boolean unreserved = (octet >= 'a' && octet <= 'z')
+                    || (octet >= 'A' && octet <= 'Z') || (octet >= '0' && octet <= '9')
+                    || octet == '-' || octet == '.' || octet == '_' || octet == '~';
+            if (!unreserved) {
+                out.append(c);
+                at++;
+                continue;
+            }
+            out.append((char) octet);
+            at += 3;
+        }
+        return out.toString();
+    }
+
+    private static int hexDigit(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
+    static String packageOf(String binary) {
         int dot = binary.lastIndexOf('.');
         return dot < 0 ? "" : binary.substring(0, dot);
     }
 
-    private static String simpleName(String binary) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    static String simpleName(String binary) {
         int dot = binary.lastIndexOf('.');
         return dot < 0 ? binary : binary.substring(dot + 1);
     }
 
-    private static String escape(String s) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    static String escape(String s) {
         if (s == null) return "";
         StringBuilder b = new StringBuilder(s.length() + 4);
         for (int i = 0; i < s.length(); i++) {
@@ -753,7 +829,9 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
         return b.toString();
     }
 
-    private static String sanitizeIdentifier(String s) {
+    /* package-private, not private: RestServerAnnotationProcessor generates the
+       server half of the same contract and needs the identical parsing. */
+    static String sanitizeIdentifier(String s) {
         if (s == null || s.length() == 0) return "p";
         StringBuilder b = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {

@@ -2872,6 +2872,13 @@ extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR da
  * for exactly that reason.
  */
 extern JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str);
+/**
+ * UTF-8 to String, always, for a run of KNOWN LENGTH. Use it for data that is
+ * UTF-8 by specification wherever it runs -- SQLite text, HTTP/2 header octets --
+ * where newStringFromNative's platform encoding would be the ANSI code page on
+ * Windows, and where newStringFromCString is not a decoder at all.
+ */
+extern JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* str, int length);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str);
 extern JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len);
 // Single-allocation fused compact-String builder (see cn1_globals.m). Returns a valid empty
@@ -3132,6 +3139,13 @@ extern JAVA_OBJECT __NEW_ARRAY_JAVA_FLOAT(CODENAME_ONE_THREAD_STATE, JAVA_INT si
 extern JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size);
 
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
+
+/* stringToUTF8, plus the byte count, for callers that must not stop at the first
+   NUL. A Java string may legally contain U+0000 and getBytes("UTF-8") encodes it
+   as a single zero byte, so the returned buffer is not always a C string in the
+   sense a length of -1 assumes -- see the sqlite3_bind_text call in the backend,
+   where taking the C length silently persisted a prefix. lengthOut may be NULL. */
+extern const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT* lengthOut);
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent);
 void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);

@@ -131,6 +131,11 @@ jobs:
           cd scripts
           npm init -y 2>/dev/null || true
           npm install playwright
+          # Playwright shells out to apt for the OS-level deps, so the runner
+          # image's third-party sources have to be pruned FIRST -- a broken
+          # vendor mirror makes its apt-get fail as a whole and it reports
+          # only "Failed to install browser dependencies".
+          bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
           npx playwright install-deps chromium
           npx playwright install chromium
 

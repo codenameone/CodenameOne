@@ -27,6 +27,7 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/tests/apt-get-update-test.sh'
       # The native warning gate's parser self-test runs from this workflow and nowhere
       # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
       # change to the parser, its fixture or a baseline could merge without the one check
@@ -85,6 +86,7 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/tests/apt-get-update-test.sh'
       # The native warning gate's parser self-test runs from this workflow and nowhere
       # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
       # change to the parser, its fixture or a baseline could merge without the one check
@@ -482,6 +484,12 @@ jobs:
       - name: Check build hint catalog
         if: ${{ matrix.java-version == 8 }}
         run: scripts/check-build-hint-catalog.sh
+      - name: Check the apt source prune keeps Ubuntu's own sources
+        if: ${{ matrix.java-version == 8 }}
+        # Cheap, and the rule it covers is only ever exercised on a runner whose
+        # apt is already broken -- so without this it would be tested by a red
+        # build and nothing else.
+        run: bash scripts/ci/tests/apt-get-update-test.sh
       - name: Check the build hint data file can be rendered
         if: ${{ matrix.java-version == 8 }}
         # Not a drift check: nothing is committed to drift from, because every
