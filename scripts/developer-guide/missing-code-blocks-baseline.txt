@@ -20,12 +20,6 @@ Monetization.asciidoc	You are now ready to see the full magic of the `validateAn
 SVG-Transcoder.asciidoc	the generated class directly:
 The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
 The-Components-Of-Codename-One.asciidoc	This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
-appendix_goal_generate_graphql.adoc	The `@GraphQLClient` interface looks like:
-appendix_goal_generate_graphql.adoc	an `OnComplete<GraphQLResponse<T>>`:
-appendix_goal_generate_graphql.adoc	ends the stream:
-appendix_goal_generate_grpc.adoc	Call sites use the static factory:
-appendix_goal_generate_grpc.adoc	The `@GrpcClient` interface looks like:
-appendix_goal_generate_openapi.adoc	Call sites use the static factory:
 io.asciidoc	In the above code you do the following:
 io.asciidoc	Since you assume most developers reading this will be familiar with Java here is the way to implement the multipart upload in the servlet API:
 io.asciidoc	That's what the new method of `URLImage` does:

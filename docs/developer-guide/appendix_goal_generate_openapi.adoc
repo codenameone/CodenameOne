@@ -91,6 +91,11 @@ collisions between an API class name and a same-named model.
 
 Call sites use the static factory:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/example/petstore/PetApiCallSite.java[tag=appendix-goal-generate-openapi-java-003,indent=0]
+----
+
 
 The `<Tag>ApiImpl` class that actually performs the HTTP call lives
 in `target/generated-sources` -- the project source never references
