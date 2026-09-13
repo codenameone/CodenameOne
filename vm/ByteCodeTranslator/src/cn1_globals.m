@@ -5572,6 +5572,32 @@ static void cn1BibopDoInit() {
 // ends between collections, so the post-sweep reports alone never show the state
 // the process actually died holding.
 static void cn1BibopExitReport(void) {
+    // QUIESCE FIRST. The three walks below read allObjectsInHeap, object headers and
+    // non-atomic page fields; a concurrent sweep clears, reuses and frees exactly
+    // those while they are being read. atexit runs with the collector still live, so
+    // without this the diagnostic can report corrupted totals or dereference a
+    // reclaimed legacy object -- in the batch-program exit case it exists to
+    // measure, which is the one case where it would be believed.
+    //
+    // Waiting the cycle OUT is the established shape here (see the ablation arm in
+    // the pending-table stall) and is what this needs: gcCurrentlyRunning covers
+    // mark and sweep, so once it clears, allObjectsInHeap and the page fields are
+    // nobody else's. The wait is BOUNDED -- a diagnostic must not turn a hung
+    // collector into a hung exit -- and on expiry the census is SKIPPED rather than
+    // run anyway, because a report read off a heap being swept is worse than no
+    // report: it looks like data.
+    {
+        int waitMs = 0;
+        while(gcCurrentlyRunning && waitMs < 2000) {
+            usleep(1000);
+            waitMs++;
+        }
+        if(gcCurrentlyRunning) {
+            fprintf(stderr, "[HEAP] exit census SKIPPED: collector still running after %dms\n",
+                    waitMs);
+            return;
+        }
+    }
     cn1HeapAccounting("exit");
     cn1LiveCensus("exit");
     cn1AllocCensus("exit");

@@ -77,7 +77,22 @@ label() {
 
 ARMS=(parpar "${REF_JAVAS[@]}")
 declare -a NAMES
-for a in "${ARMS[@]}"; do NAMES+=("$(label "$a")"); done
+# Names have to be UNIQUE, not merely descriptive: every tree, log and diff is filed
+# under one, so two arms sharing a label make the second `mv` land inside the first
+# arm's directory and the correctness check then compares a tree against itself
+# nested one level down -- a divergence that is an artefact of naming. Two arms
+# collide easily now that JDK 25 is discovered rather than hard-coded: with no
+# JDK_25_HOME the PATH fallback and JDK_8_HOME can both be Java 8.
+for a in "${ARMS[@]}"; do
+    base="$(label "$a")"
+    name="$base"; k=2
+    for prev in "${NAMES[@]}"; do
+        if [ "$prev" = "$name" ]; then name="${base}#${k}"; k=$((k+1)); fi
+    done
+    NAMES+=("$name")
+done
+# Say which executable each arm actually is, so a "#2" suffix is never a mystery.
+for i in "${!ARMS[@]}"; do echo "arm    : ${NAMES[$i]} -> ${ARMS[$i]}"; done
 echo "corpus : $CLASSES"
 echo "arms   : ${NAMES[*]}    rounds: $ROUNDS"
 echo "memory : peak phys_footprint (/usr/bin/time -l)"
