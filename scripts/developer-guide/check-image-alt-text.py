@@ -1,174 +1,104 @@
 #!/usr/bin/env python3
-"""Check that an image macro's alt text is a single attribute.
+"""Check that no image macro's alt text is truncated by an unquoted comma.
 
 AsciiDoc attribute lists are comma delimited, so an unquoted alt text containing
 a comma is not one attribute: everything after the first comma is read as the
-next positional attribute, which for ``image::`` is the width. A figure written
-as::
+next positional attribute, which for ``image::`` is the width. Asciidoctor is
+happy to do it, the book builds, the image appears -- and a screen reader gets
+half a sentence::
 
-    image::img/x.svg[How the IDE, the proxy and the app connect,scaledwidth=95%]
+    image::x.png[How the IDE, the proxy and the app connect,scaledwidth=95%]
+    -> <img src="x.png" alt="How the IDE" width="the proxy and the app connect">
 
-renders ``alt="How the IDE"`` and puts ``the proxy and the app connect`` in the
-width slot. Screen reader users get a truncated description and the width is
-nonsense. Quoting the string fixes it::
+That rendered ``width`` is the symptom, and it is what this checks. An earlier
+version of this script parsed the attribute list itself and lost repeatedly to
+escaped quotes, quoted values containing commas, attribute references, listing
+blocks, escaped macros and line continuations -- every one of them a case where
+reimplementing the parser disagreed with the parser. Rendering the book and
+reading the output delegates all of that to Asciidoctor, which cannot disagree
+with itself.
 
-    image::img/x.svg["How the IDE, the proxy and the app connect",scaledwidth=95%]
+Fix a finding by quoting the alt text::
 
-The failure is silent in every other gate: asciidoctor accepts it, the HTML
-builds, and the image renders.
+    image::x.png["How the IDE, the proxy and the app connect",scaledwidth=95%]
 """
 from __future__ import annotations
 
 import argparse
+import html
 import re
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Tuple
 
-ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
+IMG_RE = re.compile(r"<img\b[^>]*>", re.I)
+ATTR_RE = re.compile(r'(\w+)\s*=\s*"([^"]*)"')
 
-# Block form image::target[attrs] and the inline form image:target[attrs], which
-# appears mid sentence, so this is searched rather than anchored to a whole line.
-IMAGE_RE = re.compile(r"image::?(?P<target>[^\[\]\s]+)\[(?P<attrs>[^\]]*)\]")
-
-
-IMAGE_ATTRIBUTES = frozenset({
-    "alt", "align", "caption", "float", "format", "height", "id", "link",
-    "loading", "opts", "options", "poster", "role", "scale", "scaledwidth",
-    "pdfwidth", "title", "width", "window", "rel", "nofollow", "start", "end",
-    "loop", "autoplay", "theme", "lang", "fallback", "target", "reftext",
-})
-
-def split_attrs(attrs: str) -> List[str]:
-    """Split on commas that are not inside a quoted value, the way AsciiDoc does.
-
-    A quote opens a value in two places: the start of a field, and straight
-    after the "=" of a named attribute, which is where link="https://a/b,c"
-    puts it. Anywhere else it is ordinary text -- the apostrophe in "Don't
-    change the classpath, ..." is not an opening quote, and treating it as one
-    swallows the comma after it and reports a broken macro as clean.
-    """
-    out: List[str] = []
-    buf: List[str] = []
-    quote = ""
-    can_open = True
-    for ch in attrs:
-        if quote:
-            if ch == quote:
-                quote = ""
-            buf.append(ch)
-            continue
-        if ch == ",":
-            out.append("".join(buf))
-            buf = []
-            can_open = True
-            continue
-        if can_open and ch in "\"'":
-            quote = ch
-            buf.append(ch)
-            can_open = False
-            continue
-        if ch == "=":
-            # A named attribute's value begins here and may be quoted -- but only
-            # if what precedes the "=" is actually an attribute name. Alt text
-            # contains equals signs too: in [Compare x="left, right" values,...]
-            # the "x=" is prose, and opening quote mode there swallows the comma
-            # that splits the alt text.
-            buf.append(ch)
-            name = "".join(buf[:-1]).strip().lower()
-            can_open = name in IMAGE_ATTRIBUTES
-            continue
-        if not ch.isspace():
-            can_open = False
-        buf.append(ch)
-    out.append("".join(buf))
-    return out
+# A rendered width/height is a number, optionally with a unit. Anything else in
+# that slot is alt text that spilled into it.
+DIMENSION_RE = re.compile(r"^\s*\d+(?:\.\d+)?\s*(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?\s*$", re.I)
 
 
-# A positional width or height: a number, optionally with a unit. "50%" is as
-# valid as "640", and rejecting it would fail CI on a correct attribute list.
-DIMENSION_RE = re.compile(r"^\d+(?:\.\d+)?(?:%|px|pt|pc|em|rem|ex|in|cm|mm|vw|vh)?$")
-
-# A positional dimension can also be an attribute reference the renderer
-# substitutes -- :diagram-width: 640 used as image::x.png[Diagram,{diagram-width}].
-# This gate does not resolve document attributes, so a lone reference is taken at
-# its word rather than reported as split alt text.
-ATTRIBUTE_REFERENCE_RE = re.compile(r"^\{[A-Za-z_][A-Za-z0-9_-]*\}$")
-
-# Named attributes an image macro actually takes. Checked by name rather than by
-# the presence of an "=", because alt text is prose and prose contains equals
-# signs: "Plot coordinates x, y=2 and z=3" splits into a field holding "y=2 and
-# z=3", which an any-equals test waves through while the rendered alt text is
-# just "Plot coordinates x".
-NAMED_ATTRIBUTE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$")
+def render(source: Path) -> str:
+    """Render to HTML and return it, or an empty string if Asciidoctor refuses."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "out.html"
+        proc = subprocess.run(
+            ["asciidoctor", "--safe-mode=unsafe", "-a", "skip-front-matter",
+             "-o", str(out), str(source)],
+            capture_output=True, text=True)
+        if proc.returncode != 0 or not out.exists():
+            print(f"check-image-alt-text: could not render {source}", file=sys.stderr)
+            if proc.stderr.strip():
+                print(proc.stderr.strip()[:500], file=sys.stderr)
+            return ""
+        return out.read_text(encoding="utf-8", errors="replace")
 
 
-def is_named_attribute(field: str) -> bool:
-    """True when the field is a named image attribute rather than split alt text.
-
-    Matched on the name, not on the mere presence of an "=", because alt text is
-    prose and prose contains equals signs. The value has to look like one value
-    too: "y=2 and z=3" has a name that is not an image attribute, and even a
-    real attribute name followed by a sentence is more likely to be a split than
-    an attribute.
-    """
-    match = NAMED_ATTRIBUTE_RE.match(field.strip())
-    return bool(match) and match.group(1).lower() in IMAGE_ATTRIBUTES
-
-
-def offenders(path: Path) -> List[Tuple[int, str, str]]:
+def offenders(markup: str) -> List[Tuple[str, str, str]]:
+    """Every rendered image whose width or height holds something that is not one."""
     found = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        for match in IMAGE_RE.finditer(line):
-            fields = split_attrs(match.group("attrs"))
-            if len(fields) < 2:
+    for tag in IMG_RE.findall(markup):
+        attrs = {k.lower(): v for k, v in ATTR_RE.findall(tag)}
+        for slot in ("width", "height"):
+            value = attrs.get(slot)
+            if value is None or DIMENSION_RE.match(value):
                 continue
-            first = fields[0].strip()
-            if first.startswith(('"', "'")):
-                # already quoted, so its commas belong to the alt text
-                continue
-            # A positional field after the alt text that carries no "=" is alt
-            # text that was split, not an attribute anybody wrote on purpose. A
-            # dimension is the legacy width/height positional form and is
-            # legitimate, units included.
-            for field in fields[1:]:
-                value = field.strip()
-                if (not value or is_named_attribute(value)
-                        or DIMENSION_RE.match(value)
-                        or ATTRIBUTE_REFERENCE_RE.match(value)):
-                    continue
-                found.append((number, match.group("target"), match.group("attrs")))
-                break
+            found.append((attrs.get("src", "?"),
+                          html.unescape(attrs.get("alt", "")),
+                          html.unescape(value)))
+            break
     return found
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("paths", nargs="*", default=None,
-                        help="files or directories to check (default: the developer guide)")
+    parser.add_argument("sources", nargs="*",
+                        help="AsciiDoc files to render (default: the whole guide)")
     args = parser.parse_args()
 
-    roots = [Path(p) for p in args.paths] if args.paths else [Path("docs/developer-guide")]
-    files: List[Path] = []
-    for root in roots:
-        if root.is_dir():
-            files.extend(sorted(p for p in root.rglob("*") if p.suffix in ASCIIDOC_EXTENSIONS))
-        elif root.suffix in ASCIIDOC_EXTENSIONS:
-            files.append(root)
+    sources = [Path(p) for p in args.sources] or [
+        Path("docs/developer-guide/developer-guide.asciidoc")]
 
     total = 0
-    for path in files:
-        for number, target, attrs in offenders(path):
+    for source in sources:
+        markup = render(source)
+        if not markup:
+            return 1
+        for src, alt, spilled in offenders(markup):
             total += 1
-            print(f"{path}:{number}: alt text is split by a comma; quote it")
-            print(f"    image::{target}[{attrs}]")
+            print(f"{source}: {src}")
+            print(f'    alt text was cut to "{alt}"')
+            print(f'    and "{spilled}" landed in the width slot')
 
     if total:
         print()
-        print(f"check-image-alt-text: {total} image macro(s) whose alt text is cut short.")
-        print('Wrap the alt text in double quotes: image::x.svg["a, b",scaledwidth=50%]')
+        print(f"check-image-alt-text: {total} image(s) whose alt text is cut short by a comma.")
+        print('Quote the alt text: image::x.svg["a, b",scaledwidth=50%]')
         return 1
-    print(f"check-image-alt-text: {len(files)} file(s) clean.")
+    print(f"check-image-alt-text: {len(sources)} document(s) rendered, no truncated alt text.")
     return 0
 
 
