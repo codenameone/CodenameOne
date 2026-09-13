@@ -72,6 +72,8 @@ The default lookup matches GUI-builder names exactly.
 [[annotation-binding-loop,Loop guard]]
 A binding declared `twoWay = true` flows in both directions:
 
+image::img/binding-update-region.svg["How the update region breaks the two-way loop",scaledwidth=95%]
+
 . **Component -> model.** The generated binder installs a listener on
   the editable component (`TextField`, `CheckBox`, etc.). When the user
   mutates the component, the binder calls the model's setter (or
