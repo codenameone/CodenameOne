@@ -295,8 +295,18 @@ JAVA_LONG com_codename1_backend_FileIo_sendFileImpl___int_int_long_long_R_long(C
     for(;;) {
         len = (off_t)count;
         do {
+            /* RESET EVERY ATTEMPT, and only retried when nothing moved. `len` is
+               in-out: the interrupted call leaves the bytes it DID send in it, so
+               retrying from the same offset sent that prefix twice -- a static
+               body corrupted in the middle and a keep-alive connection misframed
+               against the Content-Length that went out ahead of it. It also asked
+               for the wrong length the second time, since the count it was given
+               had been overwritten by the count it had sent. An interrupted call
+               that moved bytes is progress, and the caller advances on it: the
+               test below breaks out and the tail returns it. */
+            len = (off_t)count;
             rc = sendfile(inFd, outFd, (off_t)offset, &len, NULL, 0);
-        } while(rc < 0 && errno == EINTR);
+        } while(rc < 0 && errno == EINTR && len == 0);
         /* Captured before CN1_RESUME_THREAD: the resume is a GC safepoint and can
            park this thread on a timed wait, which overwrites errno. Read after
            it, this classified a real sendfile failure by the WAIT's errno. */
