@@ -118,21 +118,53 @@ class CertificateWizardModelTest {
         SigningState devOnly = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
                 null, null, null, profiles, null, null);
 
-        assertNull(WizardDecisions.appStoreProfileForOverview(devOnly));
+        assertNull(WizardDecisions.appStoreProfileForOverview(devOnly, "com.example.app"));
 
         profiles.add(new SigningState.Profile(2L, "P_STALE", "dtest11 App Store",
                 "IOS_APP_STORE", "com.example.app", "u2", null, "INVALID"));
         SigningState stale = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
                 null, null, null, profiles, null, null);
 
-        assertNull(WizardDecisions.appStoreProfileForOverview(stale));
+        assertNull(WizardDecisions.appStoreProfileForOverview(stale, "com.example.app"));
 
         profiles.add(new SigningState.Profile(3L, "P_STORE", "dtest11 App Store",
                 "IOS_APP_STORE", "com.example.app", "u3", null, "ACTIVE"));
         SigningState ready = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
                 null, null, null, profiles, null, null);
 
-        assertEquals("P_STORE", WizardDecisions.appStoreProfileForOverview(ready).appleProfileId());
+        assertEquals("P_STORE", WizardDecisions.appStoreProfileForOverview(ready, "com.example.app").appleProfileId());
+    }
+
+    /**
+     * The card speaks for THIS project. Once "Sync with Apple" imports the whole account rather
+     * than only what this wizard created, another app's App Store profile is the likely first
+     * match -- and announcing it "Ready" here is the same false assurance as before, with the
+     * added twist that IOSProvisioningPreflight then refuses that very profile.
+     */
+    @Test
+    void overviewAppStoreCardIgnoresAnotherAppsProfile() {
+        List<SigningState.Profile> profiles = new ArrayList<SigningState.Profile>();
+        profiles.add(new SigningState.Profile(1L, "P_OTHER", "Someone Else App Store",
+                "IOS_APP_STORE", "com.example.other", "u1", null, "ACTIVE"));
+        SigningState other = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, null, profiles, null, null);
+
+        assertNull(WizardDecisions.appStoreProfileForOverview(other, "com.example.app"));
+
+        // Unknown project identifier: skipped rather than guessed, the same rule the build
+        // preflight follows. "None yet" beside a good profile is its own kind of wrong.
+        assertEquals("P_OTHER",
+                WizardDecisions.appStoreProfileForOverview(other, null).appleProfileId());
+        assertEquals("P_OTHER",
+                WizardDecisions.appStoreProfileForOverview(other, "  ").appleProfileId());
+
+        profiles.add(new SigningState.Profile(2L, "P_MINE", "My App Store",
+                "IOS_APP_STORE", "com.example.app", "u2", null, "ACTIVE"));
+        SigningState both = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, null, profiles, null, null);
+
+        assertEquals("P_MINE",
+                WizardDecisions.appStoreProfileForOverview(both, "com.example.app").appleProfileId());
     }
 
     /**

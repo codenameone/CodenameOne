@@ -169,14 +169,32 @@ public final class WizardDecisions {
     /// The profile the overview's "App Store profile" card is about, or null when there is none.
     ///
     /// Same defect, same shape: `profiles.get(0)` called a Development profile the App Store
-    /// profile. Both the type and the state matter -- a profile Apple has marked INVALID is one
-    /// the next build cannot sign with, so calling it "Ready" is the same false assurance.
-    public static SigningState.Profile appStoreProfileForOverview(SigningState state) {
+    /// profile. Three things have to match, and each has been wrong in this card at some point:
+    ///
+    ///  - the TYPE, because a Development profile is not an App Store profile;
+    ///  - the STATE, because a profile Apple has marked INVALID is one the next build cannot
+    ///    sign with, and "Ready" is the same false assurance;
+    ///  - the BUNDLE ID, because the card speaks for THIS project. An account accumulates
+    ///    profiles for every app its team ships, and once "Sync with Apple" imports the whole
+    ///    account rather than only what this wizard created, another app's App Store profile is
+    ///    the likely first match -- announced "Ready" here and then refused by
+    ///    IOSProvisioningPreflight, which compares the same two things.
+    ///
+    /// `projectBundleId` null or blank means the project's identifier could not be read, and the
+    /// filter is skipped rather than guessed: the same rule the preflight follows, because a card
+    /// reading "None yet" beside a perfectly good profile is its own kind of wrong.
+    public static SigningState.Profile appStoreProfileForOverview(SigningState state,
+                                                                  String projectBundleId) {
+        String wanted = projectBundleId == null ? null : projectBundleId.trim();
         for (SigningState.Profile p : state.profiles) {
-            if ("IOS_APP_STORE".equals(p.profileType())
-                    && (p.status() == null || "ACTIVE".equals(p.status()))) {
-                return p;
+            if (!"IOS_APP_STORE".equals(p.profileType())
+                    || !(p.status() == null || "ACTIVE".equals(p.status()))) {
+                continue;
             }
+            if (wanted != null && !wanted.isEmpty() && !wanted.equals(p.bundleId())) {
+                continue;
+            }
+            return p;
         }
         return null;
     }

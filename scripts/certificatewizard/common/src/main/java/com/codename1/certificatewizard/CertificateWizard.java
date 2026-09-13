@@ -460,7 +460,11 @@ public class CertificateWizard extends Lifecycle {
         setupCard(setup, "Apple distribution certificate",
                 distribution == null ? "None active" : "Ready",
                 distribution == null ? "-" : distribution.displayName());
-        SigningState.Profile appStore = WizardDecisions.appStoreProfileForOverview(state);
+        // Scoped to this project's bundle id. The certificate card is not, and that asymmetry is
+        // deliberate: an Apple Distribution certificate signs anything the team ships, while a
+        // provisioning profile is issued for one App ID and another app's is no use here.
+        SigningState.Profile appStore = WizardDecisions.appStoreProfileForOverview(
+                state, projectBundleIdentifier());
         setupCard(setup, "App Store profile",
                 appStore == null ? "None yet" : "Ready",
                 appStore == null ? "-" : appStore.name());
