@@ -99,11 +99,19 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
 
     static final class Op {
         String name, verb, pathTemplate, returnType;
+        /**
+         * returnType as Java SOURCE writes it; see sourceType. Kept beside the
+         * binary form rather than replacing it, because collectDtos and the DTO
+         * index look types up by the name the class file uses.
+         */
+        String sourceReturnType;
         final List<Param> params = new ArrayList<Param>();
     }
 
     static final class Param {
         String javaType, name, bindKind, bindName;
+        /** javaType as Java source writes it; see Op.sourceReturnType. */
+        String sourceJavaType;
     }
 
     @Override
@@ -115,7 +123,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
         dtos.clear();
+        // HELD FOR THE RUN, because the emitters below need the class index to
+        // tell a member class from a top-level one whose name merely contains a
+        // dollar -- and several of them are reached through helpers that would
+        // otherwise have to carry it through half a dozen signatures to get there.
+        context = ctx;
     }
+
+    private ProcessorContext context;
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
@@ -158,6 +173,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                     .parseGenericParameterSignatures(m.getSignature(), paramTypes.length);
 
             op.returnType = "void";
+            op.sourceReturnType = "void";
             int bodyCount = 0;
             for (int i = 0; i < paramTypes.length; i++) {
                 String descriptor = paramTypes[i].getDescriptor();
@@ -169,6 +185,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                     String payload = RestClientAnnotationProcessor.extractResponsePayload(genericSig);
                     op.returnType = (payload == null || payload.length() == 0)
                             ? "java.lang.Object" : payload;
+                    op.sourceReturnType = sourceType(op.returnType);
                     collectDtos(op.returnType, ctx);
                     continue;
                 }
@@ -176,6 +193,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 Map<String, AnnotationValues> pa = i < paramAnnotations.size() ? paramAnnotations.get(i) : null;
                 Param p = new Param();
                 p.javaType = RestClientAnnotationProcessor.javaTypeFor(paramTypes[i], genericSig);
+                p.sourceJavaType = sourceType(p.javaType);
                 AnnotationValues bind;
                 if (pa != null && (bind = pa.get(RestClientAnnotationProcessor.PATH_DESC)) != null) {
                     p.bindKind = "path";
@@ -497,6 +515,51 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                     : RestControllerAnnotationProcessor.resolveClass(ctx, superName);
         }
         return out;
+    }
+
+    /**
+     * A Java type expression written the way SOURCE has to write it.
+     *
+     * <p>A DTO declared as `public static class Dto` inside its contract -- which
+     * is where a contract's DTOs usually live -- has the binary name Outer$Dto,
+     * and that is what a descriptor yields. Java source reads it as a top-level
+     * identifier and cannot resolve it, so the generated codec, server interface
+     * and dispatcher all failed to compile for an otherwise valid DTO.
+     *
+     * <p>Each name in the expression is looked up rather than having its `$`
+     * replaced: `$` is legal in a top-level class name, and only the class file
+     * says which kind this is. A name that is not in the index is left exactly as
+     * it was -- it is not ours to rewrite.
+     *
+     * <p>The whole expression is walked so a nested type inside a generic or an
+     * array is converted too: java.util.List&lt;Outer$Dto&gt; and Outer$Dto[] are
+     * the shapes a contract produces.
+     */
+    private String sourceType(String javaType) {
+        if (javaType == null || javaType.indexOf('$') < 0) {
+            return javaType;
+        }
+        StringBuilder out = new StringBuilder(javaType.length());
+        int at = 0;
+        while (at < javaType.length()) {
+            char c = javaType.charAt(at);
+            if (!Character.isJavaIdentifierStart(c)) {
+                out.append(c);
+                at++;
+                continue;
+            }
+            int start = at;
+            while (at < javaType.length()
+                    && (Character.isJavaIdentifierPart(javaType.charAt(at))
+                        || javaType.charAt(at) == '.')) {
+                at++;
+            }
+            String name = javaType.substring(start, at);
+            AnnotatedClass known = name.indexOf('$') < 0 || context == null
+                    ? null : context.lookup(name.replace('.', '/'));
+            out.append(known == null ? name : known.getSourceName());
+        }
+        return out.toString();
     }
 
     private void collectDtos(String javaType, ProcessorContext ctx) {
@@ -831,7 +894,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 RestClientAnnotationProcessor.simpleName(dtoBinaryName) + "Json");
     }
 
-    private static String generateServerInterface(Api api) {
+    private String generateServerInterface(Api api) {
         StringBuilder sb = new StringBuilder(1024);
         if (api.packageName.length() > 0) sb.append("package ").append(api.packageName).append(";\n\n");
         sb.append("// Auto-generated by cn1:process-annotations from ").append(api.binaryName).append(". Do not edit.\n");
@@ -839,10 +902,11 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("@com.codename1.backend.annotations.Generated\n");
         sb.append("public interface ").append(api.serverSimpleName).append(" {\n");
         for (Op op : api.ops) {
-            sb.append("    ").append(op.returnType).append(' ').append(op.name).append('(');
+            sb.append("    ").append(op.sourceReturnType).append(' ').append(op.name).append('(');
             for (int i = 0; i < op.params.size(); i++) {
                 if (i > 0) sb.append(", ");
-                sb.append(op.params.get(i).javaType).append(' ').append(op.params.get(i).name);
+                sb.append(op.params.get(i).sourceJavaType).append(' ')
+                  .append(op.params.get(i).name);
             }
             sb.append(") throws Exception;\n");
         }
@@ -854,7 +918,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     // Dispatcher
     // ----------------------------------------------------------------
 
-    private static String generateDispatcher(Api api) {
+    private String generateDispatcher(Api api) {
         StringBuilder sb = new StringBuilder(8192);
         if (api.packageName.length() > 0) sb.append("package ").append(api.packageName).append(";\n\n");
         sb.append("// Auto-generated by cn1:process-annotations from ").append(api.binaryName).append(". Do not edit.\n");
@@ -976,7 +1040,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         return sb.toString();
     }
 
-    private static void emitRoute(StringBuilder sb, Op op) {
+    private void emitRoute(StringBuilder sb, Op op) {
         String[] template = splitTemplate(op.pathTemplate);
         sb.append("        if(").append(routeCondition(op)).append(") {\n");
         // Locals are positional (_a0, _a1, ...) rather than the parameter's own name:
@@ -985,7 +1049,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         // to collide with the generator's.
         for (int pi = 0; pi < op.params.size(); pi++) {
             Param p = op.params.get(pi);
-            sb.append("            ").append(p.javaType).append(" _a").append(pi).append(" = ");
+            sb.append("            ").append(p.sourceJavaType).append(" _a").append(pi).append(" = ");
             if ("path".equals(p.bindKind)) {
                 int idx = placeholderIndex(template, p.bindName);
                 if (idx < 0) {
@@ -1020,7 +1084,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         }
         sb.append("            ");
         if (!"void".equals(op.returnType)) {
-            sb.append(op.returnType).append(" _result = ");
+            sb.append(op.sourceReturnType).append(" _result = ");
         }
         sb.append("impl.").append(op.name).append('(');
         for (int i = 0; i < op.params.size(); i++) {
@@ -1072,7 +1136,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     /// throw -- it reads a String's header as a Map's and the process dies, which
     /// on a server takes every in-flight connection with it. Every path below
     /// either tests with instanceof or converts through text.
-    private static String fromBody(String javaType) {
+    private String fromBody(String javaType) {
         // The STRICT helper: a declared String body must have arrived as a JSON
         // string. The lenient one below exists for scalars, where converting
         // through text is the point.
@@ -1142,7 +1206,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     }
 
     /// The handler's return value, converted to something the JSON writer accepts.
-    private static String toJsonValue(String javaType, String expr) {
+    private String toJsonValue(String javaType, String expr) {
         if (isCollectionShape(javaType)) {
             String element = javaType.substring(javaType.indexOf('<') + 1, javaType.length() - 1);
             if (element.startsWith("java.")) {
@@ -1155,7 +1219,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             }
             return "listToMaps(" + expr + ", new ToMap() {\n"
                     + "                public java.util.Map convert(Object o) { return "
-                    + codecFor(element) + ".toMap((" + element + ")o); }\n"
+                    + codecFor(element) + ".toMap((" + sourceType(element) + ")o); }\n"
                     + "            })";
         }
         if (javaType.startsWith("java.") || javaType.indexOf('.') < 0) {
@@ -1554,7 +1618,11 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("public final class ").append(simple).append("Json {\n");
         sb.append("    private ").append(simple).append("Json() { }\n\n");
 
-        sb.append("    public static java.util.Map toMap(").append(binaryName).append(" o) {\n");
+        // THE SOURCE NAME for every reference to the type itself; the class being
+        // generated is still named from the binary one, which is a legal
+        // top-level name either way.
+        String sourceName = cls.getSourceName();
+        sb.append("    public static java.util.Map toMap(").append(sourceName).append(" o) {\n");
         sb.append("        if(o == null) return null;\n");
         sb.append("        java.util.Map m = new java.util.LinkedHashMap();\n");
         for (FieldInfo f : transferredFields(cls, ctx)) {
@@ -1565,9 +1633,9 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
         sb.append("        return m;\n");
         sb.append("    }\n\n");
 
-        sb.append("    public static ").append(binaryName).append(" fromMap(java.util.Map m) {\n");
+        sb.append("    public static ").append(sourceName).append(" fromMap(java.util.Map m) {\n");
         sb.append("        if(m == null) return null;\n");
-        sb.append("        ").append(binaryName).append(" o = new ").append(binaryName).append("();\n");
+        sb.append("        ").append(sourceName).append(" o = new ").append(sourceName).append("();\n");
         for (FieldInfo f : transferredFields(cls, ctx)) {
             if ((f.getAccess() & org.objectweb.asm.Opcodes.ACC_SYNTHETIC) != 0) continue;
             if (f.isFinal()) continue; // cannot be assigned after construction
@@ -1600,7 +1668,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
     /// the sink interface lives somewhere generated code may always depend on.
     /// That is a deliberate decision about this processor's dependency contract,
     /// not a detail to slip in behind a performance patch.
-    private static String fieldToJson(String type, String expr) {
+    private String fieldToJson(String type, String expr) {
         if (isCollectionShape(type)) {
             String element = type.substring(type.indexOf('<') + 1, type.length() - 1);
             if (element.startsWith("java.")) return "toValueList(" + expr + ")";
@@ -1608,14 +1676,14 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             // the DTOs themselves serialises them as toString().
             return "toMapList(" + expr + ", new ToMapFn() {\n"
                     + "            public java.util.Map convert(Object o) { return "
-                    + codecFor(element) + ".toMap((" + element + ")o); }\n"
+                    + codecFor(element) + ".toMap((" + sourceType(element) + ")o); }\n"
                     + "        })";
         }
         if (type.startsWith("java.") || type.indexOf('.') < 0) return expr;
         return codecFor(type) + ".toMap(" + expr + ")";
     }
 
-    private static String fieldFromJson(String type, String expr) {
+    private String fieldFromJson(String type, String expr) {
         if (isCollectionShape(type)) {
             String element = type.substring(type.indexOf('<') + 1, type.length() - 1);
             // Both branches below produce a List, so a Set-typed field has to be
@@ -1636,7 +1704,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
                 if (isSet) {
                     decoded = "setFromList(" + decoded + ")";
                 }
-                return "(" + type + ")(Object)" + decoded;
+                return "(" + sourceType(type) + ")(Object)" + decoded;
             }
             // Each element is converted through the element codec. Returning the
             // decoded Maps as-is -- which this used to do -- gives the handler a
@@ -1649,7 +1717,7 @@ public final class RestServerAnnotationProcessor extends AbstractAnnotationProce
             if (isSet) {
                 decodedDtos = "setFromList(" + decodedDtos + ")";
             }
-            return "(" + type + ")(Object)" + decodedDtos;
+            return "(" + sourceType(type) + ")(Object)" + decodedDtos;
         }
         if ("java.lang.String".equals(type)) return "asString(" + expr + ")";
         if ("int".equals(type))     return "asInt(" + expr + ")";

@@ -497,6 +497,39 @@ public class RestServerAnnotationProcessorTest {
     }
 
     @Test
+    public void aNestedDtoIsGeneratedWithItsSourceName() throws Exception {
+        // A DTO declared inside its contract is where a contract's DTOs usually
+        // live -- and inside an interface it is implicitly public static. Its
+        // binary name is PairApi$Dto, which is what a descriptor yields and what
+        // the codec's toMap/fromMap, the server interface's signature and the
+        // dispatcher's locals were all written with. javac reads that as a
+        // top-level identifier, so an ordinary contract generated sources that
+        // would not compile.
+        Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.PairApi",
+                "package com.example;\n"
+                + "import com.codename1.annotations.rest.*;\n"
+                + "import com.codename1.io.rest.Response;\n"
+                + "import com.codename1.util.OnComplete;\n"
+                + "@RestClient\n"
+                + "public interface PairApi {\n"
+                + "    public static class Dto {\n"
+                + "        public String name;\n"
+                + "        public java.util.List<Dto> children;\n"
+                + "    }\n"
+                + "    @POST(\"/pairs\")\n"
+                + "    void create(@Body Dto body, OnComplete<Response<Dto>> callback);\n"
+                + "}\n");
+        // runProcessor compiles what the processor emits, so reaching the end
+        // without an error is the assertion: every reference to the type -- the
+        // parameter, the return, the codec's cast, and the nested list's element
+        // -- was written in a form javac could resolve.
+        ProcessorContext ctx = runProcessor(compileSources(sources));
+        assertFalse("a nested DTO must generate compilable sources: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
     public void aPlaceholderRepeatedInTwoSegmentsIsRefused() throws Exception {
         // Every other check passes for this route: the @Path finds a placeholder,
         // the placeholder finds its @Path, and neither segment holds two. The two

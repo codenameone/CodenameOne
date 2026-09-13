@@ -161,6 +161,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     private static final class Controller {
         String binaryName;
+        /**
+         * The name to WRITE, which is the binary one until the controller is a
+         * member class: Notes$Api is how the class file names it and Notes.Api is
+         * how Java source has to, and the generated bootstrap and router both
+         * refer to the type by name.
+         */
+        String sourceName;
         String packageName;
         String simpleName;
         String routerSimpleName;
@@ -225,6 +232,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
         Controller controller = new Controller();
         controller.binaryName = cls.getBinaryName();
+        controller.sourceName = cls.getSourceName();
         controller.packageName = RestClientAnnotationProcessor.packageOf(controller.binaryName);
         controller.simpleName = RestClientAnnotationProcessor.simpleName(controller.binaryName);
         controller.routerSimpleName = controller.simpleName + "Router";
@@ -1151,8 +1159,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
         }
 
-        sb.append("\n    private final ").append(c.simpleName).append(" impl;\n\n");
-        sb.append("    public ").append(c.routerSimpleName).append("(").append(c.simpleName)
+        // The SOURCE name, qualified: the router sits in the controller's package,
+        // but a member class is Notes.Api there and not Notes$Api, which javac
+        // reads as a top-level identifier it cannot find.
+        sb.append("\n    private final ").append(c.sourceName).append(" impl;\n\n");
+        sb.append("    public ").append(c.routerSimpleName).append("(").append(c.sourceName)
           .append(" impl) {\n        this.impl = impl;\n    }\n\n");
 
         // throws Exception because Handler does: a controller method that reads a
@@ -2273,7 +2284,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         int index = 0;
         for (Controller c : controllers.values()) {
             sb.append("                    new ").append(qualify(c.packageName, c.routerSimpleName))
-              .append("(new ").append(c.binaryName).append("())");
+              .append("(new ").append(c.sourceName).append("())");
             sb.append(++index < controllers.size() ? ",\n" : "\n");
         }
         sb.append("                };\n");

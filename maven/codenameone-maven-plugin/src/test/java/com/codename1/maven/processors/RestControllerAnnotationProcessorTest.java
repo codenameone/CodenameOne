@@ -294,6 +294,35 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aNestedControllerIsGeneratedWithItsSourceName() throws Exception {
+        // A controller declared inside another class has the binary name
+        // Notes$Api, and that is what the generated router's field, its
+        // constructor parameter and the bootstrap's `new` were written with.
+        // javac reads it as a top-level identifier, so an otherwise valid
+        // controller produced sources that would not compile -- "cannot find
+        // symbol", in generated code the developer never wrote.
+        String source =
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "public class Notes {\n"
+                + "    @RestController\n"
+                + "    public static class Api {\n"
+                + "        @GetMapping(\"/x\")\n"
+                + "        public String x() { return \"x\"; }\n"
+                + "    }\n"
+                + "}\n";
+        // run() compiles what the processor emits, so reaching the end without an
+        // error IS the assertion: the generated sources named the type in a way
+        // javac could resolve.
+        ProcessorContext ctx = run(compile(source));
+        assertFalse("a nested controller must generate compilable sources: "
+                + ctx.getErrors(), ctx.hasErrors());
+        assertNotNull("and it is still a controller, with an entry point",
+                ctx.getEmittedResources()
+                        .get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE));
+    }
+
+    @Test
     public void namesTheBootstrapForThePackagingGoal() throws Exception {
         ProcessorContext ctx = run(compile(CONTROLLER_SOURCE));
         byte[] name = ctx.getEmittedResources()
