@@ -32,6 +32,13 @@ ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 IMAGE_RE = re.compile(r"image::?(?P<target>[^\[\]\s]+)\[(?P<attrs>[^\]]*)\]")
 
 
+IMAGE_ATTRIBUTES = frozenset({
+    "alt", "align", "caption", "float", "format", "height", "id", "link",
+    "loading", "opts", "options", "poster", "role", "scale", "scaledwidth",
+    "pdfwidth", "title", "width", "window", "rel", "nofollow", "start", "end",
+    "loop", "autoplay", "theme", "lang", "fallback", "target", "reftext",
+})
+
 def split_attrs(attrs: str) -> List[str]:
     """Split on commas that are not inside a quoted value, the way AsciiDoc does.
 
@@ -62,9 +69,14 @@ def split_attrs(attrs: str) -> List[str]:
             can_open = False
             continue
         if ch == "=":
-            # a named attribute's value begins here, and it may be quoted
+            # A named attribute's value begins here and may be quoted -- but only
+            # if what precedes the "=" is actually an attribute name. Alt text
+            # contains equals signs too: in [Compare x="left, right" values,...]
+            # the "x=" is prose, and opening quote mode there swallows the comma
+            # that splits the alt text.
             buf.append(ch)
-            can_open = True
+            name = "".join(buf[:-1]).strip().lower()
+            can_open = name in IMAGE_ATTRIBUTES
             continue
         if not ch.isspace():
             can_open = False
@@ -88,12 +100,6 @@ ATTRIBUTE_REFERENCE_RE = re.compile(r"^\{[A-Za-z_][A-Za-z0-9_-]*\}$")
 # signs: "Plot coordinates x, y=2 and z=3" splits into a field holding "y=2 and
 # z=3", which an any-equals test waves through while the rendered alt text is
 # just "Plot coordinates x".
-IMAGE_ATTRIBUTES = frozenset({
-    "alt", "align", "caption", "float", "format", "height", "id", "link",
-    "loading", "opts", "options", "poster", "role", "scale", "scaledwidth",
-    "pdfwidth", "title", "width", "window", "rel", "nofollow", "start", "end",
-    "loop", "autoplay", "theme", "lang", "fallback", "target", "reftext",
-})
 NAMED_ATTRIBUTE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$")
 
 
