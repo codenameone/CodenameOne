@@ -39,7 +39,8 @@
   IF "%%A"=="MVN_CMD" (set "__MVNW_CMD__=%%B") ELSE IF "%%B"=="" (echo %%A) ELSE (echo %%A=%%B)
 )
 @REM Restore caller environment before chaining to Maven; quote its complete path.
-@IF NOT "%__MVNW_CMD__%"=="" (endlocal & "%__MVNW_CMD__%" %*)
+@REM Distribution credentials must not reach Maven, its plugins or test processes.
+@IF NOT "%__MVNW_CMD__%"=="" (endlocal & set "MVNW_USERNAME=" & set "MVNW_PASSWORD=" & "%__MVNW_CMD__%" %*)
 @echo Cannot start Maven from wrapper. Check the download error above and your connection. >&2
 @exit /b 1
 : end batch / begin powershell #>

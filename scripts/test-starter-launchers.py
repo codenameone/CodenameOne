@@ -39,12 +39,14 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     executable = cache / 'wrapper/dists' / distro / cache_key / 'bin' / ('mvn.cmd' if windows else 'mvn')
     executable.parent.mkdir(parents=True)
     if windows:
-        executable.write_bytes(b'@echo off\r\necho %cd%>"%CN1_TEST_RECORD%"\r\necho %*>>"%CN1_TEST_RECORD%"\r\nexit /b %CN1_TEST_EXIT%\r\n')
+        executable.write_bytes(b'@echo off\r\nif defined MVNW_USERNAME exit /b 91\r\nif defined MVNW_PASSWORD exit /b 92\r\necho %cd%>"%CN1_TEST_RECORD%"\r\necho %*>>"%CN1_TEST_RECORD%"\r\nexit /b %CN1_TEST_EXIT%\r\n')
     else:
         executable.write_text('#!/bin/sh\npwd > "$CN1_TEST_RECORD"\nprintf "%s\\n" "$@" >> "$CN1_TEST_RECORD"\nexit "$CN1_TEST_EXIT"\n')
         executable.chmod(0o755)
     record = parent / 'record.txt'
     env = dict(os.environ, MAVEN_USER_HOME=str(cache), CN1_TEST_RECORD=str(record), CN1_TEST_EXIT='0')
+    if windows:
+        env.update(MVNW_USERNAME='wrapper-test-user', MVNW_PASSWORD='wrapper-test-password')
     env.pop('MVNW_REPOURL', None)
     env.pop('__MVNW_ARG0_NAME__', None)
 
@@ -77,4 +79,4 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     run('run', '', '-Psimulator')
     run('build', 'javascript_cloud', '-Dcodename1.buildTarget=javascript', 37)
     run('run', 'simulator', '-Psimulator', 37)
-    print('PASS: targets, local defaults, parent cwd, spaces/apostrophes, failure exit codes')
+    print('PASS: targets, local defaults, parent cwd, spaces/apostrophes, failure exit codes' + (', Windows credential isolation' if windows else ''))
