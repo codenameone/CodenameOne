@@ -115,6 +115,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 === What happens to a request
 
+image::img/app-shield-request-path.svg[The order the shield works through a request on a protected host,scaledwidth=95%]
+
 Once `init()` has run, `ConnectionRequest`, `Rest`, `RequestBuilder` and anything else built on `NetworkManager` are covered without further code. For a request to a protected host, on the network thread:
 
 * It waits for initialization to finish if a cold start is still in progress, rather than treating "not ready yet" as "not protected."

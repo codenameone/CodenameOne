@@ -32,6 +32,11 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.net.URL;
 import java.util.*;
 
@@ -42,6 +47,8 @@ import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.doxia.logging.Log;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -1981,5 +1988,589 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return value.isEmpty() || value.indexOf("${") >= 0 ? null : value;
     }
 
+
+    // ------------------------------------------------------------------
+    // SVG transcoder configuration
+    // ------------------------------------------------------------------
+    //
+    // Declared here rather than on TranscodeSVGMojo alone so that Maven injects
+    // them into every goal of this plugin. Two goals other than the transcoder
+    // need the same answers -- the self-repair below, and the placeholder
+    // diagnostic in CompileCSSMojo -- and both were reading defaults while the
+    // project had configured something else. A repair that transcodes from a
+    // directory the next build will not use, into an output directory the next
+    // build will not read, is worse than no repair. Maven resolves plugin-level
+    // <configuration> and the cn1.svg.* properties for any goal that declares
+    // the parameter, so declaring it once here covers both without anyone
+    // parsing Xpp3Dom by hand.
+
+    @Parameter(property = "cn1.svg.sourceDirs")
+    protected List<String> svgSourceDirs;
+
+    @Parameter(property = "cn1.svg.outputDir",
+            defaultValue = "${project.build.directory}/generated-sources/svg")
+    protected File svgOutputDir;
+
+    @Parameter(property = "cn1.svg.placeholderDir",
+            defaultValue = "${project.build.directory}/css-resources")
+    protected File svgPlaceholderDir;
+
+    @Parameter(property = "cn1.svg.package", defaultValue = SvgTranscodeRunner.DEFAULT_PACKAGE)
+    protected String svgPackage;
+
+    /** Where generated vector sources go, falling back to the standard location
+     *  when the parameter was not injected (a directly constructed mojo). */
+    protected File svgOutputDir() {
+        return svgOutputDir != null ? svgOutputDir
+                : new File(project.getBuild().getDirectory(),
+                        "generated-sources" + File.separator + "svg");
+    }
+
+    protected String svgPackage() {
+        return svgPackage != null && !svgPackage.isEmpty()
+                ? svgPackage : SvgTranscodeRunner.DEFAULT_PACKAGE;
+    }
+
+    /** A transcoder configured exactly as the bound goal would be. */
+    protected SvgTranscodeRunner newSvgTranscodeRunner() {
+        File placeholders = svgPlaceholderDir != null ? svgPlaceholderDir
+                : new File(project.getBuild().getDirectory(), "css-resources");
+        return new SvgTranscodeRunner(project.getBasedir(), svgSourceDirs,
+                svgOutputDir(), placeholders, svgPackage(), getLog());
+    }
+
+    // ------------------------------------------------------------------
+    // SVG transcoder self-repair
+    // ------------------------------------------------------------------
+
+    /**
+     * Adds {@code dir} to the module's compile source roots if it is not
+     * already there. Called by the SVG transcoder and by the self-repair
+     * below, both of which generate Java sources that javac has to see.
+     */
+    protected void registerSourceRoot(File dir) {
+        String path = dir.getAbsolutePath();
+        if (!project.getCompileSourceRoots().contains(path)) {
+            project.addCompileSourceRoot(path);
+            getLog().debug("Added compile source root " + path);
+        }
+    }
+
+    /**
+     * Brings a project created before the build-time SVG transcoder existed up
+     * to date, if and only if it actually has vector assets.
+     *
+     * <p>The {@code transcode-svg} goal is not bound by any lifecycle mapping
+     * an application module uses -- {@code components.xml} only maps the
+     * {@code cn1lib} packaging, and an app's {@code common} module is
+     * {@code jar} -- so it runs only when the pom declares the execution
+     * explicitly. That execution was added to the archetype well after the
+     * Maven project format shipped, which leaves every project generated before
+     * it silently without a transcoder.</p>
+     *
+     * <p>"Silently" is the problem worth fixing. The CSS compiler writes a 1x1
+     * transparent PNG into the theme for every {@code url(*.svg)} it sees and
+     * relies on the generated {@code SVGRegistry} to replace those entries at
+     * startup. With no registry nothing replaces them, so
+     * {@code theme.getImage("logo.svg")} returns a perfectly valid fully
+     * transparent 1x1 image: no exception, no warning, no null -- just a screen
+     * with nothing on it. The simulator hides this, because JavaSEPort finds
+     * the registry reflectively by class name and therefore tolerates any
+     * classpath layout, while the device builders look for the compiled class
+     * at one fixed path and emit no {@code installGlobal()} call when it is
+     * absent. The result is an app that looks correct in the simulator and
+     * renders blank on the device.</p>
+     *
+     * <p>So this does both halves: it transcodes now, into the current build,
+     * and then rewrites the pom so subsequent builds bind the goal the ordinary
+     * way. Doing only the second half would leave this build shipping the blank
+     * placeholders it just diagnosed.</p>
+     *
+     * <p>Must be called before {@code compile} for the first half to have any
+     * effect -- the generated sources are handed to javac through
+     * {@link #registerSourceRoot}.</p>
+     */
+    protected void ensureSvgTranscoderWired() throws MojoExecutionException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
+        if (isTranscodeSvgBound()) {
+            return;
+        }
+        if (!isCN1ApplicationModule()) {
+            // Applications only. getCN1ProjectDir() also recognizes a cn1lib
+            // (codenameone_library_appended.properties) and the cn1lib archetype
+            // binds generate-gui-sources too, so without this a library holding
+            // any .svg would be repaired as well -- and every registry is emitted
+            // under the one fixed name com.codename1.generated.svg.SVGRegistry,
+            // which the per-platform builders look for at that literal path. Two
+            // of them on one classpath means one wins and the other's images stay
+            // placeholders.
+            //
+            // That collision is a property of the transcoder's fixed-name
+            // registry, not of this repair: a library author who adds the
+            // execution by hand hits it exactly the same way. Aggregating
+            // multiple registries is a change to the transcoder's design and does
+            // not belong in a repair path. What does belong here is not creating
+            // the situation silently, in a module whose author never asked for a
+            // registry, while also rewriting their pom.
+            getLog().debug("Skipping the SVG transcoder repair: not an application module.");
+            return;
+        }
+        // Screen first, then run the transcoder exactly as the bound goal
+        // will run it. The repair used to have its own tolerant mode, which
+        // meant the run that decided the pom was safe to edit was not the run
+        // the pom then installed -- a file could transcode here and fail
+        // forever afterwards. One behaviour, decided before anything happens:
+        // either every input is something the goal can be relied on to read,
+        // in which case transcode and record it, or none of this happens.
+        SvgTranscodeRunner runner = newSvgTranscodeRunner();
+        List<String> unreadable;
+        try {
+            if (!runner.hasVectorSources()) {
+                // Nothing to transcode. A project with no vector assets is not
+                // out of date in any way that matters, so leave its pom alone.
+                return;
+            }
+            unreadable = runner.unreadableSources();
+        } catch (Exception ex) {
+            getLog().warn("Could not examine this project's vector sources (" + ex
+                    + "). The project has been left exactly as it was.");
+            return;
+        }
+        if (!unreadable.isEmpty()) {
+            // A .lottie is a ZIP the JSON parser cannot read, and an unrelated
+            // .json in a vector directory is claimed by extension alone. Running
+            // the goal over either aborts the build -- correct for a goal the
+            // developer bound, unacceptable for a repair that nobody asked for.
+            getLog().warn("Not running the build-time vector transcoder: these file(s) sit in "
+                    + "a vector source directory but are not animations the goal can read:");
+            for (String name : unreadable) {
+                getLog().warn("    " + name);
+            }
+            getLog().warn("Move them elsewhere and rebuild, or add the transcode-svg "
+                    + "execution yourself if they really are animations.");
+            return;
+        }
+
+        getLog().info("This project has SVG/Lottie assets but its pom does not run the "
+                + "build-time vector transcoder. Transcoding them now.");
+        try {
+            runner.run();
+            registerSourceRoot(svgOutputDir());
+        } catch (Exception ex) {
+            // Screened and still unhappy. Whatever it is, this build was
+            // passing before the repair touched it and must still pass.
+            getLog().warn("The build-time vector transcoder could not run over this project ("
+                    + ex + "). The project has been left exactly as it was.");
+            return;
+        }
+        addTranscodeSvgExecutionToPom();
+    }
+
+    /**
+     * True when this module is a Codename One <em>application</em>, as opposed
+     * to a cn1lib. The two are told apart by which marker file the project dir
+     * holds: an app has {@code codenameone_settings.properties}, a library has
+     * {@code codenameone_library_appended.properties} and no settings file.
+     */
+    private boolean isCN1ApplicationModule() {
+        File dir = getCN1ProjectDir();
+        return dir != null && new File(dir, "codenameone_settings.properties").isFile();
+    }
+
+    /** True when some execution of this plugin binds the transcode-svg goal. */
+    private boolean isTranscodeSvgBound() {
+        List<org.apache.maven.model.Plugin> plugins = project.getBuildPlugins();
+        if (plugins == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin p : plugins) {
+            if (!GROUP_ID.equals(p.getGroupId())
+                    || !"codenameone-maven-plugin".equals(p.getArtifactId())) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution e : p.getExecutions()) {
+                if (e.getGoals() != null && e.getGoals().contains("transcode-svg")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Inserts the {@code transcode-svg} execution into this module's pom.
+     *
+     * <p>Edited as text rather than through the Maven model: a pom is a file a
+     * developer owns and reads, and round-tripping it through a model writer
+     * reflows whitespace and can drop comments across the whole document to add
+     * eight lines. A located insert changes exactly the bytes being added. The
+     * result is parsed before it is written, and the original is kept as
+     * {@code pom.xml.bak}, so a pom this does not understand is left alone
+     * rather than damaged.</p>
+     */
+    private void addTranscodeSvgExecutionToPom() {
+        File pomFile = project.getFile();
+        if (pomFile == null || !pomFile.isFile()) {
+            warnCouldNotEditPom("the module has no pom file on disk");
+            return;
+        }
+        // Read and write in the encoding the document declares, not in UTF-8.
+        // A pom that says ISO-8859-1 and carries a non-ASCII developer name or
+        // description would otherwise be decoded wrongly, re-encoded as UTF-8
+        // and written back under an unchanged declaration -- silent corruption
+        // of a file this build does not own. The model-parser check below
+        // cannot see it either, because it is handed a String.
+        byte[] pomBytes;
+        try {
+            pomBytes = FileUtils.readFileToByteArray(pomFile);
+        } catch (IOException ex) {
+            warnCouldNotEditPom("it could not be read: " + ex.getMessage());
+            return;
+        }
+        Charset charset = declaredXmlEncoding(pomBytes);
+        if (charset == null) {
+            warnCouldNotEditPom("its declared XML encoding is not supported by this JVM");
+            return;
+        }
+        String pom = new String(pomBytes, charset);
+        if (pomDeclaresTranscodeSvg(pom)) {
+            // The file already declares it even though the resolved model did
+            // not report it -- an inactive profile is the usual reason. Adding
+            // a second copy would be worse than doing nothing. Asked of the
+            // parsed model rather than the raw text: a substring search also
+            // matched the goal named in a comment or in some unrelated value,
+            // and then silently refused to repair a project that had never
+            // declared it at all.
+            return;
+        }
+        String updated = insertTranscodeSvgExecution(pom);
+        if (updated == null) {
+            warnCouldNotEditPom("its codenameone-maven-plugin element could not be located");
+            return;
+        }
+        if (!parsesAndBindsTranscodeSvg(updated)) {
+            // The edit produced something Maven would not accept, or would
+            // accept without actually binding the goal. Never write it.
+            warnCouldNotEditPom("the edit did not produce a pom that Maven can read"
+                    + " with the goal bound");
+            return;
+        }
+        File backup = unusedBackupFile(pomFile);
+        if (backup == null) {
+            warnCouldNotEditPom("no free name was available for a backup of it");
+            return;
+        }
+        try {
+            FileUtils.copyFile(pomFile, backup);
+            writeInPlace(pomFile, updated, charset, backup, getLog());
+        } catch (IOException ex) {
+            warnCouldNotEditPom("it could not be written: " + ex.getMessage());
+            return;
+        }
+        getLog().info("Added the transcode-svg execution to " + pomFile
+                + " (previous contents saved as " + backup.getName() + ").");
+    }
+
+    /**
+     * Writes {@code content} over {@code target} in place, restoring
+     * {@code backup} if the write fails part way through.
+     *
+     * <p>This used to write a sibling temporary file and move it into place,
+     * for atomicity: a failure mid-write would otherwise leave a truncated pom
+     * and a build that no longer starts. The trouble is that a move replaces
+     * the inode, and the inode is what carries everything about the file that
+     * is not its content. Each attribute had to be cloned back by hand, and
+     * each one missed was a silent change to a file this build does not own --
+     * the mode (a group-writable pom came back rw-r--r--), the symlink (a
+     * shared pom quietly became an independent copy), then the owner and group
+     * (a container running as root leaving the developer a root-owned pom),
+     * with ACLs and extended attributes behind them. That list has no end, and
+     * a miss is invisible until it matters.</p>
+     *
+     * <p>Writing in place preserves all of it by construction: same inode, so
+     * same owner, group, mode, ACLs, extended attributes and hard links, and a
+     * symlink is followed rather than replaced. What it gives up is atomicity,
+     * and the backup taken moments earlier already covers that -- restored here
+     * automatically, and named in the error if even that fails. A truncated
+     * write needs the process to die between two syscalls on a file of a few
+     * kilobytes; losing a pom's ownership happens on every successful repair in
+     * a container.</p>
+     */
+    /** Test seam for {@link #writeInPlace}. */
+    static void writeInPlaceForTest(File target, String content, Charset charset, File backup)
+            throws IOException {
+        writeInPlace(target, content, charset, backup,
+                new org.apache.maven.plugin.logging.SystemStreamLog());
+    }
+
+    private static void writeInPlace(File target, String content, Charset charset,
+            File backup, org.apache.maven.plugin.logging.Log log) throws IOException {
+        try {
+            FileUtils.writeStringToFile(target, content, charset);
+        } catch (IOException ex) {
+            try {
+                FileUtils.copyFile(backup, target);
+                log.warn("Writing " + target.getName() + " failed part way through; it has been "
+                        + "restored from " + backup.getName() + ".");
+            } catch (IOException restoreFailed) {
+                log.error(target + " is incomplete and could not be restored automatically. "
+                        + "Its previous contents are in " + backup.getName() + ".");
+            }
+            throw ex;
+        }
+    }
+
+    /**
+     * A backup path that does not already exist: {@code pom.xml.bak}, else
+     * {@code pom.xml.bak.1} and upward. Null when none is free.
+     *
+     * <p>Copying onto {@code pom.xml.bak} unconditionally would destroy a
+     * developer's own backup, or the only copy left by an earlier repair, and
+     * an ordinary build is not allowed to do that. Never overwrite a file whose
+     * whole purpose is to be the copy of last resort.</p>
+     */
+    static File unusedBackupFile(File pomFile) {
+        File dir = pomFile.getParentFile();
+        File candidate = new File(dir, pomFile.getName() + ".bak");
+        if (!candidate.exists()) {
+            return candidate;
+        }
+        for (int i = 1; i <= 100; i++) {
+            candidate = new File(dir, pomFile.getName() + ".bak." + i);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The charset named in the document's XML declaration, {@code UTF-8} when
+     * it names none, or null when it names one this JVM cannot provide.
+     *
+     * <p>The declaration is probed as ISO-8859-1, which maps every byte and so
+     * never throws, and is ASCII-compatible with every encoding a pom is
+     * realistically written in -- enough to read the declaration itself
+     * regardless of what it turns out to say.</p>
+     */
+    static Charset declaredXmlEncoding(byte[] bytes) {
+        int probe = Math.min(bytes.length, 256);
+        String head = new String(bytes, 0, probe, StandardCharsets.ISO_8859_1);
+        Matcher m = XML_DECL_ENCODING.matcher(head);
+        if (!m.find()) {
+            return StandardCharsets.UTF_8;
+        }
+        String name = m.group(1).trim();
+        try {
+            return Charset.isSupported(name) ? Charset.forName(name) : null;
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static final Pattern XML_DECL_ENCODING = Pattern.compile(
+            "<\\?xml[^>]*?encoding\\s*=\\s*[\"']([^\"']+)[\"']");
+
+    /**
+     * Whether this pom declares the transcode-svg goal anywhere Maven would
+     * read it: the build, or any profile's build, active or not.
+     */
+    static boolean pomDeclaresTranscodeSvg(String pom) {
+        Model model;
+        try {
+            model = new MavenXpp3Reader().read(new StringReader(pom));
+        } catch (Exception ex) {
+            // Unparseable: insertTranscodeSvgExecution declines anyway, and the
+            // edited document is validated before it is written.
+            return false;
+        }
+        if (buildBindsTranscodeSvg(model.getBuild())) {
+            return true;
+        }
+        if (model.getProfiles() != null) {
+            for (org.apache.maven.model.Profile profile : model.getProfiles()) {
+                if (buildBindsTranscodeSvg(profile.getBuild())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean buildBindsTranscodeSvg(org.apache.maven.model.BuildBase build) {
+        if (build == null || build.getPlugins() == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin p : build.getPlugins()) {
+            if (!"codenameone-maven-plugin".equals(p.getArtifactId())) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution e : p.getExecutions()) {
+                if (e.getGoals() != null && e.getGoals().contains("transcode-svg")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The text edit itself, kept pure so it can be tested against real poms.
+     *
+     * <p>Returns the updated document, or null when this pom's shape is not
+     * understood well enough to edit safely -- the caller then leaves the file
+     * alone and tells the developer what to add by hand. The caller is also
+     * responsible for checking that the execution is not already present and
+     * for re-parsing the result before writing it.</p>
+     */
+    static String insertTranscodeSvgExecution(String pom) {
+        int marker = pom.indexOf("<artifactId>codenameone-maven-plugin</artifactId>");
+        if (marker < 0) {
+            return null;
+        }
+        int pluginStart = pom.lastIndexOf("<plugin>", marker);
+        int pluginEnd = pom.indexOf("</plugin>", marker);
+        if (pluginStart < 0 || pluginEnd < 0) {
+            return null;
+        }
+        String eol = pom.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+        int[] executions = findExecutionsTag(pom, pluginStart, pluginEnd);
+        if (executions != null) {
+            int tagStart = executions[0];
+            int tagClose = executions[1];
+            boolean selfClosing = executions[2] == 1;
+            String outerIndent = indentOfLineAt(pom, tagStart);
+            String indent = outerIndent + "    ";
+            if (selfClosing) {
+                // <executions/> has no content to insert into, so expand it into
+                // a real element. Appending a second <executions> sibling instead
+                // is well-formed XML that Maven rejects outright with
+                // "Duplicated tag: 'executions'", which would leave the project
+                // unbuildable until its backup was restored.
+                String openTag = trimTrailingWhitespace(pom.substring(tagStart, tagClose - 1)) + ">";
+                return pom.substring(0, tagStart)
+                        + openTag + eol
+                        + executionBlock(indent, eol) + eol
+                        + outerIndent + "</executions>"
+                        + pom.substring(tagClose + 1);
+            }
+            // The text right after <executions> already starts with a line
+            // break, so the block must not carry a trailing one of its own.
+            int insertAt = tagClose + 1;
+            return pom.substring(0, insertAt)
+                    + eol + executionBlock(indent, eol)
+                    + pom.substring(insertAt);
+        }
+        // The plugin is declared without any executions -- wrap ours in a
+        // new <executions> element just before </plugin>.
+        String indent = indentOfLineAt(pom, pluginEnd);
+        return pom.substring(0, pluginEnd)
+                + "<executions>" + eol
+                + executionBlock(indent + "        ", eol) + eol
+                + indent + "</executions>" + eol
+                + indent
+                + pom.substring(pluginEnd);
+    }
+
+    /**
+     * Locates the plugin's {@code executions} element between {@code from} and
+     * {@code to}, in any of the spellings a pom may legally use:
+     * {@code <executions>}, {@code <executions/>}, {@code <executions />} and
+     * any of those carrying attributes such as
+     * {@code combine.children="append"}.
+     *
+     * <p>Returns {@code {tagStart, indexOfClosingAngleBracket, selfClosing}} or
+     * null when there is none. An exact search for the literal
+     * {@code "<executions>"} missed every form but the first and fell through to
+     * appending a second element, which Maven refuses to parse. A {@code >}
+     * inside a quoted attribute value would still fool this scan; that is what
+     * the model-parser check on the finished document is for.</p>
+     */
+    private static int[] findExecutionsTag(String pom, int from, int to) {
+        int i = from;
+        while (true) {
+            int tagStart = pom.indexOf("<executions", i);
+            if (tagStart < 0 || tagStart >= to) {
+                return null;
+            }
+            int afterName = tagStart + "<executions".length();
+            char next = afterName < pom.length() ? pom.charAt(afterName) : '\0';
+            // Only a complete tag name counts -- not <executionsSomething>.
+            if (next == '>' || next == '/' || next == ' ' || next == '\t'
+                    || next == '\r' || next == '\n') {
+                int close = pom.indexOf('>', afterName);
+                if (close < 0 || close >= to) {
+                    return null;
+                }
+                return new int[]{tagStart, close, pom.charAt(close - 1) == '/' ? 1 : 0};
+            }
+            i = afterName;
+        }
+    }
+
+    private static String trimTrailingWhitespace(String s) {
+        int end = s.length();
+        while (end > 0 && Character.isWhitespace(s.charAt(end - 1))) {
+            end--;
+        }
+        return s.substring(0, end);
+    }
+
+    /**
+     * Reads the edited document with Maven's own model parser and confirms the
+     * goal is really bound.
+     *
+     * <p>A DOM well-formedness check is not enough, which is the whole lesson
+     * here: two sibling {@code <executions>} elements are perfectly well-formed
+     * XML and Maven still rejects the file with "Duplicated tag". Parsing with
+     * the parser that will actually read this pom catches that and every other
+     * structural mistake, and asking whether the goal came out bound catches an
+     * edit that parsed but landed somewhere useless.</p>
+     */
+    private static boolean parsesAndBindsTranscodeSvg(String pom) {
+        Model model;
+        try {
+            model = new MavenXpp3Reader().read(new StringReader(pom));
+        } catch (Exception ex) {
+            return false;
+        }
+        return buildBindsTranscodeSvg(model.getBuild());
+    }
+
+    private static String executionBlock(String indent, String eol) {
+        return indent + "<execution>" + eol
+                + indent + "    <!-- Added automatically: this project has SVG/Lottie" + eol
+                + indent + "         assets, and without this execution they compile to" + eol
+                + indent + "         blank 1x1 placeholders on the device. -->" + eol
+                + indent + "    <id>transcode-svg</id>" + eol
+                + indent + "    <phase>generate-sources</phase>" + eol
+                + indent + "    <goals>" + eol
+                + indent + "        <goal>transcode-svg</goal>" + eol
+                + indent + "    </goals>" + eol
+                + indent + "</execution>";
+    }
+
+    /** The leading whitespace of the line containing {@code pos}. */
+    private static String indentOfLineAt(String text, int pos) {
+        int lineStart = text.lastIndexOf('\n', pos) + 1;
+        int i = lineStart;
+        while (i < pos && (text.charAt(i) == ' ' || text.charAt(i) == '\t')) {
+            i++;
+        }
+        return text.substring(lineStart, i);
+    }
+
+    private void warnCouldNotEditPom(String why) {
+        getLog().warn("Could not add the transcode-svg execution to this project's pom because "
+                + why + ". This build transcoded the SVGs anyway, but add the execution "
+                + "yourself so later builds do the same:");
+        getLog().warn("    <execution>");
+        getLog().warn("        <id>transcode-svg</id>");
+        getLog().warn("        <phase>generate-sources</phase>");
+        getLog().warn("        <goals><goal>transcode-svg</goal></goals>");
+        getLog().warn("    </execution>");
+    }
+
 }
-    

@@ -92,6 +92,8 @@ anything for a desktop window, whose title and menus belong to the platform chro
 
 ==== getComponentForm() returns null inside a Window
 
+image::img/desktop-window-component-form.svg[Why a component can stop working inside a Window,scaledwidth=95%]
+
 This is the one behavioral sharp edge, and it's worth stating plainly:
 
 [source,java]

@@ -299,7 +299,7 @@
 ///
 /// ### FloatingHint
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-floatinghint.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-floatinghint.png)
 /// `com.codename1.components.FloatingHint` animates the text field hint into a label on top of
 /// the text field and visa versa
 ///

@@ -728,11 +728,18 @@ You can convert the sample above to use toggle buttons as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava156Snippet.java[tag=the-components-of-codename-one-java-156,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ToggleButtonFigure.java[tag=the-components-of-codename-one-java-156,indent=0]
 ----
 
-.Toggle button converted sample
-image::img/components-toggle-buttons.png[Toggle button converted sample,scaledwidth=20%]
+.Toggle button converted sample, on Android Material and iOS
+image:img/generated/components-toggle-buttons-android.png[Toggle buttons under Android Material,scaledwidth=35%]
+image:img/generated/components-toggle-buttons-ios.png[Toggle buttons under the iOS theme,scaledwidth=35%]
+
+Both themes draw the selection as a change of fill rather than of label color alone, so a
+selected toggle stays readable for someone who can't separate the two hues. The outlined row in
+each figure is the one holding focus: focus is drawn as a ring precisely so it can't be mistaken
+for a value, since the framework resolves a focused toggle through the same style whether
+it's checked or not.
 
 That's half the story though: to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
 
@@ -768,7 +775,7 @@ Notice the following about the code above and the resulting image:
 
 - When an element is placed alone within a `ComponentGroup` its a special case `UIID`.
 
-IMPORTANT: By default, `ComponentGroup` does *nothing*. You need to explicitly activate it in the theme by setting a theme property to true. Specifically you need to set `ComponentGroupBool` to `true` for `ComponentGroup` to do something otherwise its a box layout container! The `ComponentGroupBool` flag is true by default in the iOS native theme.
+IMPORTANT: A vertical `ComponentGroup` does *nothing* unless the theme sets the `ComponentGroupBool` constant to `true`; without it the group is just a box layout container. The legacy iOS themes set that flag, the current native themes don't, and neither of them styles the `GroupElement` UIIDs a vertical group applies. A *horizontal* group is the exception, as long as it keeps the UIID `setHorizontal` gives it: it's a segmented control, it renames its members to `ToggleButton`, and both native themes style that UIID and its `First` / `Last` / `Only` variants in full, so it needs no constant. Name your own element UIID with `setElementUIID` and it's theme-gated again, exactly like a vertical one.
 
 When `ComponentGroupBool` is set to true, the component group will change the styles of all components placed within it to match the element UIID given to it (GroupElement by default) with special caveats to the first/last/ elements. For example:
 
@@ -2609,11 +2616,11 @@ https://www.codenameone.com/javadoc/com/codename1/components/FloatingHint.html[F
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava137Snippet.java[tag=the-components-of-codename-one-java-137,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/FloatingHintFigure.java[tag=the-components-of-codename-one-java-137,indent=0]
 ----
 
-.The FloatingHint component with one component that contains text and another that doesn't
-image::img/components-floatinghint.png[The FloatingHint component with one component that contains text and another that doesn't,scaledwidth=30%]
+.The hint floats on the field being edited and stays inside the one that isn't
+image::img/generated/components-floatinghint.png[Floating hint,scaledwidth=30%]
 
 === Floating Button
 
