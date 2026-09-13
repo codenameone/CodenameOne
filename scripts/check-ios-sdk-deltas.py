@@ -220,8 +220,20 @@ def metal_for_sdk(sdk_path, dev_dirs):
     """
     resolved = os.path.realpath(sdk_path)
     owners = [d for d in dev_dirs if resolved.startswith(os.path.realpath(d) + os.sep)]
-    for d in owners + [d for d in dev_dirs if d not in owners]:
-        candidate = os.path.join(d, "Toolchains", "XcodeDefault.xctoolchain",
+    # The SDK's own path names its Xcode, which is the only reliable answer when --old-sdk or
+    # --new-sdk points at an Xcode outside DEVELOPER_DIR and /Applications -- a case the SDK
+    # pair selection explicitly supports. Same derivation clang_for_sdk uses.
+    marker = os.sep + "Platforms" + os.sep
+    if marker in resolved:
+        owners.insert(0, resolved[:resolved.index(marker)])
+    # And NO fallback to another Xcode, which is where this deliberately parts company with
+    # clang_for_sdk. One clang is shared between the two runs on purpose; metal is not,
+    # because the shading language is versioned with the SDK. An unrelated Xcode's metal
+    # reading this SDK would report its own ignorance of a newer language as an SDK delta --
+    # exactly the false finding the per-SDK pairing exists to prevent. Better to compile no
+    # shader, and say so, than to compile it with the wrong compiler.
+    for dev in owners:
+        candidate = os.path.join(dev, "Toolchains", "XcodeDefault.xctoolchain",
                                  "usr", "bin", "metal")
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate

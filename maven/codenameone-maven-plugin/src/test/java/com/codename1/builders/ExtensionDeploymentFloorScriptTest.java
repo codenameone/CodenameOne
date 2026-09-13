@@ -997,4 +997,42 @@ class ExtensionDeploymentFloorScriptTest {
                 "the device build inherits the project's qualified 16.4; an unqualified key here "
                         + "outranks it and lowers the extension: " + got.get(0));
     }
+
+    /// A QUALIFIED deployment key has branches too. Restricting branch pinning to the bare key
+    /// meant IPHONEOS_DEPLOYMENT_TARGET[arch=arm64] = $(EXTENSION_MIN), with the helper low on
+    /// device and high on the simulator, was correctly called uncertain and then left exactly
+    /// as it was -- the device arm64 archive still at 12.0 for the new SDK to reject.
+    @Test
+    void aQualifiedKeyGetsItsLowBranchesPinned(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "QualifiedBranch|" + EXT + "|EXTENSION_MIN[sdk=iphoneos*]->12.0;"
+                        + "EXTENSION_MIN[sdk=iphonesimulator*]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[arch=arm64]->$(EXTENSION_MIN)");
+        assertTrue(got.get(0).contains(
+                        "IPHONEOS_DEPLOYMENT_TARGET[arch=arm64][sdk=iphoneos*]=15.0"),
+                "the device arm64 branch resolves to 12.0 and must be pinned, merging the "
+                        + "key's own arch qualifier with the helper's sdk one: " + got.get(0));
+        assertTrue(got.get(0).contains("IPHONEOS_DEPLOYMENT_TARGET[arch=arm64]=$(EXTENSION_MIN)"),
+                "the expression still serves the simulator branch, which is 16.4: " + got.get(0));
+    }
+
+    /// A candidate that contradicts the key's own qualifier is not a build at all, so there is
+    /// nothing to pin: [sdk=iphonesimulator*] cannot hold for a key already written
+    /// [sdk=iphoneos*]. Without this the merge would invent
+    /// IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][sdk=iphonesimulator*].
+    @Test
+    void aContradictoryCandidateIsNotABranch(@TempDir Path dir) throws Exception {
+        assumeTrue(rubyAvailable(), "needs ruby");
+        List<String> got = applyWithProject(dir, "15.0",
+                "{'IPHONEOS_DEPLOYMENT_TARGET' => '15.0'}",
+                "Contradiction|" + EXT + "|EXTENSION_MIN[sdk=iphonesimulator*]->12.0;"
+                        + "EXTENSION_MIN[arch=arm64]->16.4;"
+                        + "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]->$(EXTENSION_MIN)");
+        assertFalse(got.get(0).contains("[sdk=iphoneos*][sdk=iphonesimulator*]"),
+                "a key cannot be both sdks at once: " + got.get(0));
+        assertFalse(got.get(0).contains("[sdk=iphonesimulator*][sdk=iphoneos*]"),
+                "nor in the other order: " + got.get(0));
+    }
 }
