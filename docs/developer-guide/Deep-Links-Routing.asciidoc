@@ -115,8 +115,24 @@ include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.js
 
 
 Tell Android which URLs to intercept by setting the
-`android.xintent_filter` build hint with a verified intent filter for
-your domain. The Android builder injects the filter into the manifest.
+`android.xintent_filter` build hint. The Android builder injects the
+value into the manifest verbatim, so it's the whole `<intent-filter>`
+element, with `\n` for the line breaks:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.properties[tag=deep-links-routing-properties-002,indent=0]
+----
+
+Three parts of that carry weight. `android:autoVerify="true"` is what
+makes Android fetch the `assetlinks.json` above at install time and open
+the link in your app without an app chooser; without it the filter still
+matches but the user is asked every time. The `<data>` element needs
+`android:scheme="https"` and the host, and narrowing it with
+`android:pathPrefix` keeps the app from claiming every URL on the domain.
+And the hint holds one value, so an app that also registers a custom
+scheme puts both `<intent-filter>` elements in the same string rather
+than setting the hint twice.
 
 The SHA-256 fingerprint comes from `keytool -list -v -keystore ...`, or
 from the Play Console under **Setup > App integrity** when using Play
