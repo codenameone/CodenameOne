@@ -171,6 +171,12 @@ You'll expand on the theme of "Buying" the world for this app, except, this time
 . A 1-month subscription
 . A 1-year subscription
 
+Every listing in the rest of this chapter uses these three declarations:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava103Snippet.java[tag=monetization-java-103,indent=0]
+----
 
 Notice that you create two separate SKUs for the 1 month and 1-year subscription.  **Each subscription period must have its own SKU**.  The example uses an array (`PRODUCTS`) that contains both of the SKUs. This is handy, as you'll see in the examples ahead, because the APIs for checking status and expiry date of a subscription take the SKUs in a "subscription group" as input.
 
