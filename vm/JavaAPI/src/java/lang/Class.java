@@ -74,6 +74,15 @@ public final class Class<T> implements java.lang.reflect.Type {
      * JDBC-driver idiom. That pattern cannot work on this platform for a second
      * reason anyway: obfuscation rewrites class names, so a name looked up as a
      * string does not survive a release build.
+     *
+     * &lt;p&gt;WHY IT IS NOT IMPLEMENTED, rather than left as an oversight: forcing the
+     * initializer needs a way to reach it from a Class object, and {@code struct
+     * clazz} carries no static-initializer function pointer -- only newInstanceFp
+     * and enumValueOfFp. Adding one is a field on EVERY class in EVERY application,
+     * to serve a flag whose only in-tree caller is ASM, which passes
+     * {@code initialize = false}. The cost is paid by every app and the benefit is
+     * claimed by none, so this stays documented rather than built. If a real caller
+     * ever needs it, emit the pointer then.
      */
     public static java.lang.Class forName(java.lang.String className, boolean initialize,
             ClassLoader loader) throws java.lang.ClassNotFoundException {
@@ -191,6 +200,13 @@ public final class Class<T> implements java.lang.reflect.Type {
             // would turn today's miss into a confidently wrong hit. The fix
             // belongs in the name the VM reports, which is a change to getName()
             // for every translated application and wants its own testing.
+            //
+            // PUSHBACK, so the next reader does not re-open this: fixing it HERE
+            // means guessing where the package ends, and every guess is wrong for
+            // some real input -- a package may legitimately be named like a class,
+            // and a class name may legitimately contain '_'. A guess would convert
+            // today's harmless miss into a confident wrong answer. The defect is
+            // that getName() is lossy; it is fixed there or not at all.
             String className = getName();
             int lastDot = className.lastIndexOf('.');
             absolute = lastDot < 0 ? "/" + name

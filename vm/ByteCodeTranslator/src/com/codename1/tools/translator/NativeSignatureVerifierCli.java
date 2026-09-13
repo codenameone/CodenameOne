@@ -41,6 +41,14 @@ import java.util.List;
  *
  * A translation never comes through here: the verifier's in-process entry points
  * are what Parser calls.
+ *
+ * NativeSignatureVerifier deliberately keeps NO delegating {@code main}. Nothing
+ * names it as one -- scripts/check-native-signatures.sh invokes this class, and no
+ * document spells the old command -- and adding one would recreate the very edge
+ * the split removes: the verifier would reference the CLI, and the CLI reaches
+ * java.util.zip. A second {@code main} also brings back the "Multiple main
+ * classes" refusal above. Backward compatibility for an invocation nobody has is
+ * not worth either.
  */
 public final class NativeSignatureVerifierCli {
     private NativeSignatureVerifierCli() {
