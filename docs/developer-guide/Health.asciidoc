@@ -40,6 +40,8 @@ Check `getAvailability()` before anything else. On Android it distinguishes a wo
 
 === Permissions, and the one thing that will surprise you
 
+image::img/health-read-authorization.svg["Why an empty health result never proves refusal",scaledwidth=95%]
+
 **You can't ask whether you are allowed to read.**
 
 HealthKit doesn't disclose read authorization. A read the user denied returns an empty result, indistinguishable from having no data at all, because an app that could tell the two apart could infer that a user is hiding a pregnancy or a prescription. That's a privacy guarantee, not a gap in this API.
