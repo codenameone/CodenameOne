@@ -48,7 +48,33 @@ public class JsClinitHostCallApp {
         }
     }
 
+    /**
+     * Second shape, and the reason the guard owner has to be RESOLVED rather
+     * than read off the instruction. {@code VALUE} is declared here, but javac
+     * writes the access below as {@code getstatic Implementor.VALUE} -- naming
+     * the implementing CLASS, not the declaring interface (verified with
+     * javap: {@code Fieldref Q$Impl.VALUE}).
+     *
+     * <p>An analysis reading that raw owner sees the caller's own class,
+     * concludes the class is already initialized by the time its code runs, and
+     * drops the edge -- while the emitter resolves the owner to this interface
+     * and guards it. {@code read()} then stays a plain function and its guard
+     * runs on the synchronous run-to-completion path, so this host call is
+     * never sent. That is the #5774 failure again, one resolution step away.
+     */
+    interface InterfaceSeed {
+        int VALUE = VMHost.echoInt(20);
+    }
+
+    static final class Implementor implements InterfaceSeed {
+        static int read() {
+            return VALUE;
+        }
+    }
+
     public static void main(String[] args) {
-        System.exit(HostCallInClinit.VALUE);
+        // 42 + 21: both shapes have to round-trip, and summing them means
+        // either one failing changes the answer.
+        System.exit(HostCallInClinit.VALUE + Implementor.read());
     }
 }

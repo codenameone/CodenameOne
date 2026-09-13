@@ -559,8 +559,15 @@ class JavascriptRuntimeSemanticsTest {
         // the app died later and somewhere else (an NPE inside
         // ``LocalForage.<init>``, because the clinit's ``Window.current()`` had
         // been answered ``undefined`` and the worker global got cached as the
-        // window). The fixture's <clinit> asks the host to echo 41; anything
-        // other than 42 coming back means the round trip did not happen.
+        // window).
+        //
+        // The fixture covers BOTH guard shapes and sums them, so either one
+        // failing changes the answer: a clinit reached through a plain static
+        // holder (echo 41 -> 42), and one reached through an interface field
+        // whose access javac writes against the IMPLEMENTING CLASS (echo 20 ->
+        // 21). The second only works if the guard owner is resolved to the
+        // declaring interface on the analysis side as well as the emitter's --
+        // read raw, it looks like an own-class access and the edge is dropped.
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("js-clinit-host-src");
@@ -585,8 +592,9 @@ class JavascriptRuntimeSemanticsTest {
         assertEquals("result", result.type,
                 "A <clinit> that makes a host call must complete through the host callback protocol. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
-        assertEquals(42, result.result,
-                "A host call raised inside <clinit> must round-trip to the host and resume with its answer. raw="
+        assertEquals(63, result.result,
+                "A host call raised inside <clinit> must round-trip to the host and resume with its answer,"
+                        + " for a plain static holder (42) and an interface-declared field (21) alike. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(),
                 "Generated worker bundle should not emit an error message: " + result.errorMessage);

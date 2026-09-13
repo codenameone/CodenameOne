@@ -801,10 +801,19 @@ final class JavascriptMethodGenerator {
      * a runtime-only field), preserving prior behaviour.
      */
     private static String resolveStaticFieldOwner(String owner, String fieldName) {
+        return resolveStaticFieldOwner(owner, fieldName, classIndex);
+    }
+
+    /**
+     * As {@link #resolveStaticFieldOwner(String, String)}, but with the class
+     * lookup supplied. {@code classIndex} is only populated at EMIT time (see
+     * {@link #setClassIndex}), so {@link JavascriptSuspensionAnalysis} -- which
+     * runs before it and has to reach the same answer -- passes its own index.
+     */
+    static String resolveStaticFieldOwner(String owner, String fieldName, Map<String, ByteCodeClass> idx) {
         if (owner == null) {
             return null;
         }
-        Map<String, ByteCodeClass> idx = classIndex;
         String start = JavascriptNameUtil.sanitizeClassName(owner);
         if (idx == null || fieldName == null) {
             return start;
@@ -1006,6 +1015,55 @@ final class JavascriptMethodGenerator {
      * (the enclosing method is a generator) and needed (the clinit chain can
      * suspend). See {@link #classClinitCanSuspend}.
      */
+    /**
+     * The class whose {@code <clinit>} guard this instruction produces, or
+     * {@code null} when it produces none. THE ONE implementation of that
+     * question: the emitter places the guards and
+     * {@link JavascriptSuspensionAnalysis} records each one as a call edge into
+     * that clinit, and the two must name the SAME class or the analysis elides
+     * an edge the emitter then emits a guard for.
+     *
+     * <p>Resolving the owner is the whole point. A {@code Fieldref} / static
+     * {@code Methodref} may name any accessible subtype rather than the
+     * declaring class -- javac writes {@code C.X} for a field {@code X} that an
+     * interface {@code C} implements declares -- and the emitter resolves that
+     * (see {@link #resolveStaticFieldOwner} / {@link #resolveDirectInvokeOwner})
+     * because {@code _S} and the clinit are both keyed on the declaring class.
+     * An analysis reading the RAW owner sees {@code C}, decides the access is
+     * to the caller's own class, and drops the edge -- while the emitter guards
+     * the interface. The method then stays synchronous and its guard runs on
+     * the run-to-completion path, which is exactly the #5774 failure the edges
+     * exist to prevent.
+     *
+     * @param idx class lookup; the analysis passes its own because
+     *            {@code classIndex} is not populated until emit time.
+     */
+    static String classInitGuardOwner(Instruction instr, Map<String, ByteCodeClass> idx) {
+        int op = instr.getOpcode();
+        if (instr instanceof Field) {
+            if (op != Opcodes.GETSTATIC && op != Opcodes.PUTSTATIC) {
+                return null;
+            }
+            Field field = (Field) instr;
+            return resolveStaticFieldOwner(field.getOwner(), field.getFieldName(), idx);
+        }
+        if (instr instanceof Invoke) {
+            if (op != Opcodes.INVOKESTATIC) {
+                return null;
+            }
+            return JavascriptNameUtil.sanitizeClassName(resolveDirectInvokeOwner((Invoke) instr));
+        }
+        if (instr instanceof TypeInstruction) {
+            // NEW names a concrete class outright -- nothing to resolve -- but
+            // ``_O`` initializes it through the SYNCHRONOUS driver, so the site
+            // still needs the guard (and therefore the edge).
+            return op == Opcodes.NEW
+                    ? JavascriptNameUtil.runtimeTypeName(((TypeInstruction) instr).getTypeName())
+                    : null;
+        }
+        return null;
+    }
+
     private static String classInitGuard(String owner, boolean suspendingContext, String indent) {
         if (suspendingContext && classClinitCanSuspend(owner)) {
             return indent + "yield* _Ig(\"" + owner + "\");\n";

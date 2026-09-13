@@ -553,12 +553,17 @@ final class JavascriptSuspensionAnalysis {
                     // answered ``undefined`` because the guard ran on the
                     // synchronous run-to-completion path. Recording the edge
                     // here is what lets the emitter use ``yield* _Ig(...)``
-                    // there, and the two sides MUST agree: a ``yield*`` in a
-                    // plain ``function`` is a SyntaxError, so this walk mirrors
-                    // JavascriptMethodGenerator.classClinitCanSuspend exactly
-                    // (self + superclass chain + interfaces) and elides the
-                    // same own-class/ancestor cases the emitter does.
-                    String initOwner = classInitGuardOwner(instr);
+                    // there, and the two sides MUST agree, so the owner comes
+                    // from the emitter's own ``classInitGuardOwner`` rather
+                    // than from ``instr.getOwner()``. A Fieldref / static
+                    // Methodref may name any accessible SUBTYPE instead of the
+                    // declaring class, and reading it raw made the
+                    // own-class/ancestor elision below fire on an access the
+                    // emitter guards against an interface -- dropping the edge
+                    // for a clinit that does suspend. The walk below still
+                    // mirrors classClinitCanSuspend (self + superclass chain +
+                    // interfaces) and elides what the emitter elides.
+                    String initOwner = JavascriptMethodGenerator.classInitGuardOwner(instr, byName);
                     if (initOwner != null) {
                         addClinitEdges(callersOf, caller, initOwner, true);
                     }
@@ -755,33 +760,6 @@ final class JavascriptSuspensionAnalysis {
     // interface walk on the miss path an unmemoised version made
     // JavascriptTargetIntegrationTest go from 48s to 378s.
     private final Map<String, BytecodeMethod> resolvedTargets = new HashMap<String, BytecodeMethod>();
-
-    /**
-     * The class whose {@code <clinit>} guard the emitter places for this
-     * instruction, or {@code null} when the instruction triggers no guard.
-     * Mirrors the emitter's guard sites: GETSTATIC / PUTSTATIC
-     * (appendStraightLineEnsureClassInitialized /
-     * appendInterpreterEnsureClassInitialized), INVOKESTATIC, and NEW (whose
-     * {@code _O} initializes the class on the way to allocating).
-     */
-    private static String classInitGuardOwner(Instruction instr) {
-        int op = instr.getOpcode();
-        if (instr instanceof com.codename1.tools.translator.bytecodes.Field) {
-            if (op == Opcodes.GETSTATIC || op == Opcodes.PUTSTATIC) {
-                return ((com.codename1.tools.translator.bytecodes.Field) instr).getOwner();
-            }
-            return null;
-        }
-        if (instr instanceof Invoke) {
-            return op == Opcodes.INVOKESTATIC ? ((Invoke) instr).getOwner() : null;
-        }
-        if (instr instanceof com.codename1.tools.translator.bytecodes.TypeInstruction) {
-            return op == Opcodes.NEW
-                    ? ((com.codename1.tools.translator.bytecodes.TypeInstruction) instr).getTypeName()
-                    : null;
-        }
-        return null;
-    }
 
     /**
      * Records {@code caller} as a caller of every {@code <clinit>} in
