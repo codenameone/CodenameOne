@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="366" viewBox="0 0 880 366">
+  <rect x="0" y="0" width="880" height="366" fill="#ffffff"/>
+  <text x="440" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Why a component can go quiet inside a desktop Window</text>
+  <text x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">getComponentForm() names the enclosing Form, and inside a Window the honest answer is none. The chapter calls this</text>
+  <text x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">the one behavioural sharp edge, and what makes it sharp is that almost nothing throws when it happens.</text>
+  <rect x="16" y="74" width="848" height="46" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+  <text x="440" y="94" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="middle" fill="#222222">A component asks who it belongs to</text>
+  <text x="440" y="110" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#888888">the same component, in a Form and in a Window</text>
+  <rect x="16" y="138" width="414" height="134" rx="4" fill="#fbf6f6" stroke="#a33a3a" stroke-width="1.5"/>
+  <text x="30" y="160" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a33a3a">getComponentForm()</text>
+  <text x="30" y="176" font-family="Arial, sans-serif" font-size="9" fill="#888888">null inside a Window</text>
+  <text x="30" y="196" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Most callers are written as</text>
+  <text x="30" y="211" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Form f = getComponentForm();</text>
+  <text x="30" y="226" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">if (f != null) { ... }</text>
+  <text x="30" y="241" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">so the work is skipped and nothing throws. That is why</text>
+  <text x="30" y="256" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">the symptom is silence.</text>
+  <path d="M 223 120 L 223 138" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 218 132 L 223 138 L 228 132" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="450" y="138" width="414" height="134" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="464" y="160" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">getTopLevelContainer()</text>
+  <text x="464" y="176" font-family="Arial, sans-serif" font-size="9" fill="#888888">the Form, or the Window</text>
+  <text x="464" y="196" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">What Codename One's own components ask, which is why</text>
+  <text x="464" y="211" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">the framework works inside a Window. A third-party</text>
+  <text x="464" y="226" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">component works there once it asks this too.</text>
+  <text x="464" y="241" font-family="Arial, sans-serif" font-size="10.5" fill="#333333"></text>
+  <path d="M 657 120 L 657 138" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <path d="M 652 132 L 657 138 L 662 132" fill="none" stroke="#bbbbbb" stroke-width="1.5"/>
+  <rect x="16" y="290" width="848" height="60" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="440" y="310" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">So the thing to look for is behaviour that stopped rather than an exception. A component placed in a Window that</text>
+  <text x="440" y="325" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">will not scroll, will not take focus, or will not animate is almost always calling getComponentForm somewhere</text>
+  <text x="440" y="340" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">and quietly deciding it is detached.</text>
+</svg>
