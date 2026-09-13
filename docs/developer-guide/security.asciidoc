@@ -35,8 +35,7 @@ Notice that this is a temporary roadblock as any savvy hacker would compile the 
 
 NOTE: This isn't encoding or encryption — it's a simple obfuscation of the data.
 
-There are two simple methods in the `Util` class:
-
+The `Util` class has two static methods for it: `xorEncode(String)` turns a string into the obfuscated form, and `xorDecode(String)` turns it back.
 
 They use a simple xor based obfuscation to make a String less readable. For example, if you've code like this:
 
@@ -90,7 +89,18 @@ This works through a new mechanism in storage where you can replace the storage 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava030Snippet.java[tag=security-java-030,indent=0]
 ----
 
-You can leverage that knowledge to change the encryption password on the encryption storage using pseudo-code like this:
+You can leverage that knowledge to change the encryption password on the encryption storage. This reads every entry through the old key and writes it back through the new one, so it belongs in a migration step rather than in ordinary app code. `EncryptedStorage` comes from the bouncy castle cn1lib, so this listing isn't part of the compiled examples:
+
+[listing]
+----
+EncryptedStorage.install(oldKey);
+InputStream is = Storage.getInstance().createInputStream(storageFileName);
+byte[] data = Util.readInputStream(is);
+EncryptedStorage.install(newKey);
+OutputStream o = Storage.getInstance().createOutputStream(storageFileName);
+o.write(data);
+o.close();
+----
 
 
 NOTE: It isn't a good idea to replace storage objects when an app is running so this is purely for this special case...

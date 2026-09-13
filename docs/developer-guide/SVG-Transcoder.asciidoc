@@ -152,8 +152,22 @@ no SVGs gets no weaving.
 === Calling the registry yourself
 
 If you don't use `theme.css` but still want a transcoded SVG, construct
-the generated class directly:
+the generated class directly. It lands in
+`com.codename1.generated.svg` and is named after the file, so
+`src/main/svg/logo.svg` becomes `com.codename1.generated.svg.Logo`.
+The class exists only after a build has run the transcoder, which is why
+this listing isn't one of the compiled examples:
 
+[listing]
+----
+import com.codename1.generated.svg.Logo;
+
+Logo logo = new Logo();              // the SVG's declared size at DENSITY_MEDIUM
+Logo dense = new Logo(DENSITY_HIGH); // the same, read as a higher-density design
+Logo sized = new Logo(12f, 12f);     // 12mm square, converted per device
+
+myButton.setIcon(sized);
+----
 
 Constructors come in three flavours, matching the three CSS sizing
 mechanisms above. The two-`float` constructor takes millimeters; that's
