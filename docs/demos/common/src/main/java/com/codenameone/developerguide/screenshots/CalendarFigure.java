@@ -28,17 +28,23 @@ import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.Date;
+import java.util.TimeZone;
 
 /// Figure for the Components chapter.
 ///
 /// The chapter's sample uses `new Calendar()`, which opens on today. A figure
-/// has to be reproducible, so this one pins the month -- otherwise the golden
-/// would change on the first of every month and the guide's screenshot check
-/// would fail for reasons that have nothing to do with the code.
+/// has to be reproducible, so this one pins the instant AND the zone.
+///
+/// The instant alone is not enough: `Calendar(long)` resolves it through
+/// `TimeZone.getDefault()`, so the same millisecond is a different day either
+/// side of midnight -- 2024-06-15T12:00:00Z is the 16th in UTC+12 -- and the
+/// golden then depends on where it was generated rather than on the code.
 public final class CalendarFigure implements GuideFigure {
 
     /// 2024-06-15T12:00:00Z, chosen only for being fixed.
     private static final long PINNED = 1718452800000L;
+
+    private static final TimeZone ZONE = TimeZone.getTimeZone("UTC");
 
     @Override
     public String id() {
@@ -48,7 +54,7 @@ public final class CalendarFigure implements GuideFigure {
     @Override
     public Form build() {
         Form hi = new Form("Calendar", new BorderLayout());
-        Calendar cld = new Calendar(PINNED);
+        Calendar cld = new Calendar(PINNED, ZONE);
         cld.addActionListener((e) -> Log.p("You picked: " + new Date(cld.getSelectedDay())));
         hi.add(BorderLayout.CENTER, cld);
         hi.show();

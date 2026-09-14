@@ -380,11 +380,11 @@ To activate this feature use `setAutoSizeMode(true)` for example:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/AutoSizeFigure.java[tag=the-components-of-codename-one-java-017,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava017Snippet.java[tag=the-components-of-codename-one-java-017,indent=0]
 ----
 
 .Automatically sizes the fonts of the buttons/labels based on text and available space
-image::img/generated/autosize.png[Automatically sizes the fonts of the buttons/labels based on text and available space,scaledwidth=20%]
+image::img/autosize.png[Automatically sizes the fonts of the buttons/labels based on text and available space,scaledwidth=20%]
 
 
 === TextField and TextArea
@@ -747,11 +747,11 @@ For example, to enclose the `CheckBox` components in a vertical `ComponentGroup`
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentGroupToggleFigure.java[tag=the-components-of-codename-one-java-157,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava157Snippet.java[tag=the-components-of-codename-one-java-157,indent=0]
 ----
 
 .Toggle button converted sample wrapped in ComponentGroup
-image::img/generated/components-toggle-buttons-component-group.png[Toggle button converted sample wrapped in ComponentGroup,scaledwidth=20%]
+image::img/components-toggle-buttons-component-group.png[Toggle button converted sample wrapped in ComponentGroup,scaledwidth=20%]
 
 === ComponentGroup
 
