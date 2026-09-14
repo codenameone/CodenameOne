@@ -42,14 +42,33 @@ public enum CallAvailability {
     /// Another application holds a call the system will not interrupt.
     OTHER_APP_IN_CALL,
 
-    /// The user has switched this app's calling off, or the required
-    /// permission or role is missing.
+    /// A permission the port needs to ring a call is missing.
+    ///
+    /// Android only; iOS never answers this. Three causes, and only one of
+    /// them is answered by a prompt: `MANAGE_OWN_CALLS` missing is a normal
+    /// permission granted at install, so there is nothing to ask for and the
+    /// manifest is what has to change; `POST_NOTIFICATIONS` ungranted on API
+    /// 33+ is a runtime permission and is requestable; notifications switched
+    /// off or the incoming-call channel below high importance is a setting,
+    /// which only the user can change in the system's own screens.
+    ///
+    /// A disabled `PhoneAccount` is NOT one of them -- nothing queries that,
+    /// and it surfaces later as a [CallError#CALL_REFUSED] on the report --
+    /// so a handler for this value must not send the user to the calling
+    /// switch.
     NOT_PERMITTED,
 
     /// The platform has no system call integration at all.
     UNSUPPORTED,
 
-    /// [Calls#configure] has not run, so a report would be refused.
+    /// [Calls#configure] has not completed successfully, so a report would
+    /// be refused.
+    ///
+    /// Not proof that it never ran: Android's configure answers
+    /// [CallError#UNAUTHORIZED] when registering the account throws, and
+    /// leaves the port unconfigured, so this value is what a caller sees
+    /// afterwards. Calling configure again changes nothing until the reason
+    /// it failed is fixed.
     ///
     /// Appended rather than inserted: the ordinals cross the SPI boundary.
     ///

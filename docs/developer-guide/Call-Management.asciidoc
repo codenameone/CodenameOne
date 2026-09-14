@@ -159,6 +159,145 @@ call yourself and reporting that as a single call -- that needs no permission
 from either platform, and it's what apps that offer conferencing actually
 do.
 
+=== The Values These APIs Hand You
+
+Everything above takes or returns a handful of small types from
+`com.codename1.call`. Six are enumerations -- `CallState`, `CallDirection`,
+`CallEndReason`, `CallAvailability`, `CallHandleType` and `CallError` -- so a
+value that isn't one of their constants won't compile, though a `switch` over
+one isn't required to cover every constant and an unhandled state falls through
+rather than failing the build. `CallHandle` and `CallException` are ordinary
+classes and `CallId` is a holder for static helpers whose identifiers are
+plain strings, so none of those three offer `values()` or anything else
+enum-shaped.
+
+`CallState`:: `RINGING`, `DIALING`, `ACTIVE`, `HELD`, `ENDED`. Incoming calls
+start at `RINGING` and outgoing ones at `DIALING`, but `ACTIVE` and `HELD`
+cycle in both directions -- `CallSession.setHeld(false)` and a fulfilled resume
+both put a held call back to `ACTIVE`, so code that treats `HELD` as one-way
+rejects a legitimate resume or leaves media paused. `ENDED` is the only
+terminal state, and it's where you release whatever the call was holding. The
+session's asynchronous operations -- `end`, `setHeld`, `setMuted`, `sendDigits`,
+`groupWith` -- fail with `CallError.INVALID_ID` once a call has ended, which is
+how a bookkeeping bug in the app surfaces; the reporting methods that return
+`void`, such as `reportConnected` and `update`, return without a word instead,
+so don't wait on them for that signal.
+
+`CallDirection`:: `INCOMING` or `OUTGOING`, fixed when the session is created
+and never changing after that. Read it when you hold a session you didn't
+report yourself -- a session passed to a listener, or fetched from
+`Calls.getSessions()` -- rather than keeping your own note of the direction
+beside the call id.
+
+`CallEndReason`:: `REMOTE_ENDED`, `LOCAL_ENDED`, `UNANSWERED`, `BUSY`, `FAILED`,
+`FILTERED`. `FILTERED` covers more ground than its name suggests. It's
+// vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
+documented as the system declining the call rather than the user -- Do Not
+Disturb, or a blocked number -- and it differs from `UNANSWERED` in that the
+call never rang. The Android port also reports it for a fulfilled reject,
+though, so a Decline from the lock screen arrives as `FILTERED` there while a
+hang-up after answering arrives as `LOCAL_ENDED`. Read it as "this call ended
+without being taken, and not because the far end gave up," and don't try to
+tell an explicit decline from a silent block out of this value alone.
+
+`CallAvailability`:: what `Calls.getAvailability()` answers before you report a
+call, and `AVAILABLE` is the only value that lets one ring. Check it before an
+incoming report; an outgoing call is a different question. On Android the
+notification gate that makes this answer `NOT_PERMITTED` applies to incoming
+calls alone -- an outgoing call never rings, so `reportOutgoing` goes through
+and refusing it would take away a call the user started. The values need three
+different responses, not two. `EMERGENCY_CALL_IN_PROGRESS` and
+`OTHER_APP_IN_CALL` pass on their own, so a retry is the right move --
+`THIS_APP_IN_CALL` is in the same family, though Android's bridge never reports it
+by design, because Telecom accepts a second call from the same account.
+`NOT_CONFIGURED` means `Calls.configure` hasn't completed successfully, which
+is yours to fix in code and not something a user can clear; prompting for it
+strands them in front of a dialog that changes nothing. Read it as "not
+configured," not as "never called," because on Android a `configure` that threw
+answered `UNAUTHORIZED` and left the port without a registered account, so calling it again
+without fixing what it reported changes nothing. `NOT_PERMITTED` is Android only -- iOS never
+answers it -- and it covers three conditions with three different fixes, none
+of which is the calling switch. `MANAGE_OWN_CALLS` missing: that one is a
+normal permission granted at install, so there's no prompt behind it and
+`Calls.requestPermissions` doesn't ask. The builder declares it for you
+whenever the app uses the call packages, so its absence means something
+rewrote the manifest, and the fix is in the build rather than on the device.
+`POST_NOTIFICATIONS` not yet granted on Android 13 and later: that one is a
+runtime permission, asking for `PERMISSION_NOTIFICATIONS` is exactly right, and
+it's the usual answer the first time an app rings.
+Notifications switched off for the app, or the incoming-call channel dropped
+below high importance: no permission is missing, so only the system's own
+notification settings can clear it.
+Only `UNSUPPORTED` is permanent.
+
+`CallHandle` and `CallHandleType`:: who the call is with, and one of `GENERIC`,
+`PHONE_NUMBER` or `EMAIL_ADDRESS`. Build a handle with `CallHandle.phone(...)`,
+`CallHandle.email(...)` or `CallHandle.generic(...)` rather than by hand; the
+type travels with the value and decides how the system displays and dials it.
+
+`CallId`:: static helpers for the identifier both ends of a call have to agree
+on, which is a `String` rather than a type of its own. `CallId.random()` mints
+one, `CallId.isValid(...)` checks one that arrived over your own connection, and
+`CallId.normalize(...)` puts it in the form the platform expects.
+
+`CallError` and `CallException`:: why an action failed, as an enum and the
+exception that carries it. Don't sort these into "this call" and "this app" --
+the codes cut across that line, and what to do about one depends on the
+condition behind it rather than on the code alone.
+
+`CALL_REFUSED` is the system declining to place or ring the call right now, and
+it spans both kinds of cause: an emergency call or another app's self-managed
+call passes on its own, while the user having switched your app's calling off,
+or `Calls.configure` not having run, refuses every report until something
+changes. Nothing in the code tells you which you got: Android's refusal
+carries one message naming all three causes. `Calls.getAvailability()` is worth
+asking first, and won't always separate them either -- it never checks whether
+the registered `PhoneAccount` was disabled, and its foreign-call test needs
+`READ_PHONE_STATE`, which the port doesn't declare by design and treats as "no"
+when absent. It can answer `AVAILABLE` and the report still come back
+`CALL_REFUSED`. Retry on a timer that slows down rather than reading anything
+into a repeat: the emergency or foreign call that caused the first refusal is often
+still up for the second, and a persistent refusal looks identical.
+
+// vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
+`CALL_FILTERED` means the system suppressed the call before it rang -- Do Not
+Disturb on iOS, or a blocked number -- so no action will arrive for it.
+`DUPLICATE_CALL` means that identifier is already live. `Calls.report` checks
+its own session map first, so a second report of an id your app already has
+fails here and never reaches a port -- retrying it fails identically every
+time. Fetch the existing session and update that instead. The reconciliation
+the ports do, folding a repeat into an update, is for reports arriving from the
+native side, not for this call.
+
+`NOT_SUPPORTED` is either the whole integration or the one operation you asked
+for. `Calls.isSupported()` covers the first -- Android self-managed calls need
+API 26, CallKit is absent from tvOS and watchOS -- so branch on it rather than
+waiting for the error. It doesn't cover the second: `setMuted` answers
+`NOT_SUPPORTED` on Android because Telecom won't let a self-managed call set its
+own mute state, and `groupWith` answers it on every port today. Disable the
+capability that came back unsupported, not calling as a whole.
+
+`UNAUTHORIZED` comes from two places on Android and nowhere else: a
+`SecurityException` out of configure or a report, which means `MANAGE_OWN_CALLS`
+is missing, and an incoming report refused because notifications are off or the
+incoming-call channel sits below high importance. That second one is two
+conditions wearing one code, and they part exactly as they do under
+`NOT_PERMITTED` above: a `POST_NOTIFICATIONS` the user hasn't granted is cleared by asking,
+while notifications switched off or a lowered channel is a setting no prompt
+reaches. Ask once, and if the code comes back with the permission already
+granted, stop asking -- the recovery is in settings. A denied microphone grant or a declined
+call-screening role doesn't arrive here -- `Calls.requestPermissions` resolves
+with the bitmask it got and `CallDirectory.requestScreeningRole` resolves
+`false`, so read those results rather than waiting for an error.
+
+`BUSY` is about neither a call nor the app: a conflicting operation is already
+running, which can be another call but can equally be an unrelated request
+holding a shared channel -- `CallDirectory.requestScreeningRole()` answers it
+when another dialog owns the activity result -- so retry the operation rather
+than blaming a session. And `PROVIDER_RESET` says the call provider was reset
+while that one operation was in flight, so it could never be answered; the
+provider works again afterward and the next report may well succeed.
+
 === Actions, And Why They Have To Be Answered
 
 image::img/call-action-contract.svg["How a CallAction is answered, and what an unanswered one costs",scaledwidth=90%]
