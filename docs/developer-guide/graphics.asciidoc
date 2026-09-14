@@ -783,9 +783,9 @@ To verify that locking might be a problem you can launch the performance monitor
 
 ==== MultiImage
 
-Multi images don't physically exist as a concept within the Codename One API so there is no way to actually create them and they're in no way distinguishable from `EnclodedImage`.
+Multi images don't physically exist as a concept within the Codename One API so there is no way to actually create them and they're in no way distinguishable from `EncodedImage`.
 
-The built-in support for multi images is in the resource file loading logic where a MultiImage is decoded and the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EnclodedImage`.
+The built-in support for multi images is in the resource file loading logic where a MultiImage is decoded and the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EncodedImage`.
 
 The 9-image borders use multi images by default to keep their appearance more refined on the different DPI’s.
 

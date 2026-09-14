@@ -340,6 +340,12 @@ jobs:
           # docs/website/**. Putting those paths here would run this whole job
           # (maven install, demo build, screenshots) for every blog post.
           python3 scripts/developer-guide/check-guide-links.py
+          # A class name the guide gets slightly wrong sends the reader looking
+          # for something that is not there, and nothing else here reads the
+          # names: EnclodedImage, ConectionRequest, GenenricListCellRenderer,
+          # BubbleTransiton, SwipableContainer, GridbagLayout,
+          # InifiniteContainer, DataChangeListener and MiGLayout all shipped.
+          python3 scripts/developer-guide/check-guide-api-names.py
 
       - name: Build Developer Guide HTML and PDF
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'

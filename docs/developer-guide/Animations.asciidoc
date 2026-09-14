@@ -311,7 +311,7 @@ image::img/transition-flip.jpg[Fade transition is probably the simplest one arou
 
 ==== Bubble transition
 
-https://www.codenameone.com/javadoc/com/codename1/ui/animations/BubbleTransition.html[BubbleTransiton] morphs a component into another component using a circular growth motion.
+https://www.codenameone.com/javadoc/com/codename1/ui/animations/BubbleTransition.html[BubbleTransition] morphs a component into another component using a circular growth motion.
 
 The `BubbleTransition` accepts the component that will grow into the bubble effect as one of its arguments. It's primarily
 designed for `Dialog` transitions although it could work for more creative use cases:
