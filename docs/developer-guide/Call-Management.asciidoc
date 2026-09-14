@@ -227,17 +227,35 @@ one, `CallId.isValid(...)` checks one that arrived over your own connection, and
 `CallId.normalize(...)` puts it in the form the platform expects.
 
 `CallError` and `CallException`:: why an action failed, as an enum and the
-exception that carries it. `CALL_REFUSED`, `CALL_FILTERED` and `DUPLICATE_CALL`
-are about the call you tried to place or report, while `NOT_SUPPORTED` and
-`UNAUTHORIZED` are about the app or the platform and keep failing until
-something changes. Two don't fit that split. `BUSY` means a conflicting
-operation is already running, which can be another call but can equally be an
-unrelated request holding a shared channel -- `CallDirectory.requestScreeningRole()`
-answers it when another dialog owns the activity result -- so retry the
-operation rather than blaming a session. And `PROVIDER_RESET` says the system's
-call provider was reset while that one operation was in flight, so it could
-never be answered; the provider is usable again afterward and the next report
-may well succeed.
+exception that carries it. Don't sort these into "this call" and "this app" --
+the codes cut across that line, and what to do about one depends on the
+condition behind it rather than on the code alone.
+
+`CALL_REFUSED` is the system declining to place or ring the call right now, and
+it spans both: an emergency call or another app's self-managed call passes on
+its own, while the user having switched your app's calling off, or
+`Calls.configure` not having run, refuses every report until something changes.
+`Calls.getAvailability()` is what tells the two apart.
+
+// vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
+`CALL_FILTERED` means the system suppressed the call before it rang -- Do Not
+Disturb on iOS, or a blocked number -- so no action will arrive for it.
+`DUPLICATE_CALL` means that identifier is already known; the ports fold a
+repeat report into an update and only surface this when the collision can't be
+reconciled, so seeing it points at your id allocation.
+
+`NOT_SUPPORTED` is the platform: Android self-managed calls need API 26 and
+CallKit is absent from tvOS and watchOS, and `Calls.isSupported()` lets
+cross-platform code branch before it ever sees the code. `UNAUTHORIZED` is a
+missing runtime permission or role.
+
+`BUSY` is about neither a call nor the app: a conflicting operation is already
+running, which can be another call but can equally be an unrelated request
+holding a shared channel -- `CallDirectory.requestScreeningRole()` answers it
+when another dialog owns the activity result -- so retry the operation rather
+than blaming a session. And `PROVIDER_RESET` says the call provider was reset
+while that one operation was in flight, so it could never be answered; the
+provider works again afterward and the next report may well succeed.
 
 === Actions, And Why They Have To Be Answered
 
