@@ -109,6 +109,16 @@ class BackendTest {
     @Test
     @DisplayName("a server with no database opens none")
     void opensNoDatabaseWhenThereIsNothingToOpen() throws Exception {
+        // SAID OUT LOUD, because the other reason to open a database is a
+        // registered entity, and that registry is static and never cleared -- a
+        // server with one is SUPPOSED to open a pool. If a test class that
+        // registers one ever shares this JVM, the assertion below stops being
+        // about what it says it is, so the precondition fails first and names
+        // why. The module forks a JVM per test class to keep this true.
+        assertEquals(0, com.codename1.backend.orm.EntityManager.registered().length,
+                "another test class registered an entity into this JVM, so this server "
+                        + "has a reason to open a database and the assertion below would "
+                        + "be measuring that instead");
         int port = freePort();
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
