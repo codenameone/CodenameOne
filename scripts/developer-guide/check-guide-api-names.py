@@ -43,7 +43,12 @@ IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
                        '.xml', '.gradle', '.swift', '.cs')
 
-JAVADOC = re.compile(r'codenameone\.com/javadoc/(com/codename1/[A-Za-z0-9/]+)\.html')
+# The last segment may name a nested class -- URLImage.ImageAdapter,
+# ActionEvent.Type, LayeredLayout.LayeredLayoutConstraint.Inset -- so the dot
+# belongs in the pattern. Excluding it skipped those links entirely.
+JAVADOC = re.compile(
+    r'codenameone\.com/javadoc/(com/codename1/[A-Za-z0-9/]+(?:\.[A-Z][A-Za-z0-9]*)*)'
+    r'\.html')
 # A backticked identifier, or a bare word in prose that is shaped like a class
 # name. The bare form needs both shapes: a name can lead with an acronym --
 # URLImage, GZIPInputStream, JSONParser -- and the CamelCase alternative alone
@@ -59,20 +64,6 @@ LINE_COMMENT = re.compile(r'(?<![:"\'])//[^\n]*')
 XML_COMMENT = re.compile(r'<!--.*?-->', re.S)
 
 
-def class_index():
-    """Simple and fully qualified names of every class an app can reference."""
-    simple, qualified = set(), set()
-    for root in APP_ROOTS:
-        for path, _, files in os.walk(root):
-            for name in files:
-                if not name.endswith('.java'):
-                    continue
-                simple.add(name[:-5])
-                rel = os.path.join(path, name)[len(root) + 1:-5]
-                qualified.add(rel.replace(os.sep, '.'))
-    return simple, qualified
-
-
 def strip_comments(text):
     """Removes comments, which are prose and carry the same typos.
 
@@ -85,6 +76,53 @@ def strip_comments(text):
     text = BLOCK_COMMENT.sub(' ', text)
     text = LINE_COMMENT.sub(' ', text)
     return XML_COMMENT.sub(' ', text)
+
+
+# A type declared inside another one. Read from the source rather than
+# guessed, so a javadoc link to Outer.Inner is checked as exactly as one to a
+# top-level class.
+NESTED = re.compile(r'\b(?:class|interface|enum)\s+([A-Z][A-Za-z0-9]*)')
+
+
+def class_index():
+    """Simple and fully qualified names of every class an app can reference.
+
+    Nested types are included under their outer class -- URLImage.ImageAdapter
+    -- because the guide links to them and a javadoc URL spells them that way.
+    """
+    simple, qualified = set(), set()
+    for root in APP_ROOTS:
+        for path, _, files in os.walk(root):
+            for name in files:
+                if not name.endswith('.java'):
+                    continue
+                outer = name[:-5]
+                simple.add(outer)
+                rel = os.path.join(path, name)[len(root) + 1:-5]
+                dotted = rel.replace(os.sep, '.')
+                qualified.add(dotted)
+                try:
+                    with open(os.path.join(path, name), encoding='utf-8',
+                              errors='ignore') as handle:
+                        # Comments hold sample code, and a "class MyListener"
+                        # written in a javadoc example is not a type anyone
+                        # can link to.
+                        declared = set(NESTED.findall(
+                            strip_comments(handle.read())))
+                except OSError:
+                    continue
+                for inner in declared:
+                    if inner == outer:
+                        continue
+                    # Flat rather than exact nesting: a javadoc URL spells a
+                    # doubly nested type Outer.Middle.Inner, and every segment
+                    # of it is declared in this one file.
+                    simple.add(inner)
+                    qualified.add(dotted + '.' + inner)
+                    for other in declared:
+                        if other != inner:
+                            qualified.add(dotted + '.' + other + '.' + inner)
+    return simple, qualified
 
 
 def tree_identifiers():
@@ -153,6 +191,21 @@ def near_miss_of(word, candidates):
     return best
 
 
+def is_invented_name(word, simple, anywhere):
+    """Whether this is a name the guide invents for the reader's own class.
+
+    "MyForm", "MyConstraint", "MyCalendar": the guide writes these, and each
+    is a near-miss for the class it is built from. Exempting every word that
+    starts with "My" was too much -- "MygLayout" is one edit from MigLayout
+    and would have been waved through on its first two letters -- so what
+    follows the prefix has to be a real name in its own right.
+    """
+    if not word.startswith('My') or len(word) < 4 or not word[2].isupper():
+        return False
+    rest = word[2:]
+    return rest in simple or rest in anywhere
+
+
 def is_plural_of_a_class(word, simple):
     return (word.endswith('s') and word[:-1] in simple) or \
            (word.endswith('es') and word[:-2] in simple)
@@ -177,9 +230,8 @@ def main():
             if word in simple or word in seen:
                 continue
             seen.add(word)
-            if is_plural_of_a_class(word, simple) or word.startswith('My'):
-                # "MyForm", "MyConstraint": names the guide invents for the
-                # reader's own class, which are near-misses by construction.
+            if is_plural_of_a_class(word, simple) or \
+                    is_invented_name(word, simple, anywhere):
                 continue
             near = near_miss_of(word, simple)
             if near is None:
