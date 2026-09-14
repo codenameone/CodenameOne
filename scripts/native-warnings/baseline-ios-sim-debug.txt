@@ -38,7 +38,6 @@ port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wunused-function|unused functio
 port|Ports/iOSPort/nativeSources/CN1ES2compat.m|-Wunused-variable|unused variable ?|10 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1Language.m|-Wunused-function|unused function ?|2 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1SoundPool.m|-Wobjc-multiple-method-names|multiple methods named ? found|2 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/CN1TapGestureRecognizer.m|-Wobjc-method-access|instance method ? not found (return type defaults to ?)|2 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1TapGestureRecognizer.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? (aka ?) to ?|5 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1TextInputView.m|-Wdeprecated-declarations|? is deprecated: first deprecated in iOS ?|3 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CN1VideoIO.m|-Wunused-function|unused function ?|1 instance(s) when the baseline was written; not yet triaged
@@ -66,7 +65,6 @@ port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wdeprecated-dec
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wenum-conversion|implicit conversion from enumeration type ? (aka ?) to different enumeration type ? (aka ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wenum-conversion|implicit conversion from enumeration type ? to different enumeration type ? (aka ?)|4 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wincompatible-pointer-types|incompatible pointer types initializing ? (aka ?) with an expression of type ? (aka ?)|2 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wobjc-method-access|instance method ? not found (return type defaults to ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wobjc-missing-super-calls|method possibly missing a [super awakeFromNib] call|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wpointer-sign|passing ? (aka ?) to parameter of type ? converts between pointers to integer types with different sign|2 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? (aka ?) to ? (aka ?)|2 instance(s) when the baseline was written; not yet triaged
@@ -130,7 +128,6 @@ port|Ports/iOSPort/nativeSources/IOSNative.m|-Wincompatible-pointer-types-discar
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wincompatible-pointer-types|incompatible pointer types assigning to ? (aka ?) from ? (aka ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wincompatible-pointer-types|incompatible pointer types passing ? (aka ?) to parameter of type ?|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wnonnull|null passed to a callee that requires a non-null argument|1 instance(s) when the baseline was written; not yet triaged
-port|Ports/iOSPort/nativeSources/IOSNative.m|-Wobjc-method-access|instance method ? not found (return type defaults to ?)|1 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? (aka ?) to ? (aka ?)|6 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? (aka ?) to ?|7 instance(s) when the baseline was written; not yet triaged
 port|Ports/iOSPort/nativeSources/IOSNative.m|-Wshorten-64-to-32|implicit conversion loses integer precision: ? to ?|28 instance(s) when the baseline was written; not yet triaged

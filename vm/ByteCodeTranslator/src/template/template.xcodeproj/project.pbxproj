@@ -278,6 +278,22 @@
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				/* A message whose selector the RECEIVER'S CLASS does not declare is a
+				   warning by default, and what it costs is not a warning: with no
+				   declaration clang assumes the method returns id and infers the argument
+				   types from the call, so a struct passed by value is handed over without
+				   anything checking it against the definition. Dispatch then succeeds at
+				   runtime when the method exists, and crashes when it does not, so neither
+				   half of that is visible until a device does it. The macOS project has
+				   carried this since it was written; the iOS one could not until the port's
+				   last four undeclared sends were fixed (issue #5779), and the warning
+				   census in scripts/native-warnings/ is what holds it at zero.
+				   Not -Wundeclared-selector, deliberately: a selector routed through the
+				   responder chain names a method no class in scope declares, and that is
+				   correct rather than a mistake. */
+				WARNING_CFLAGS = (
+					"-Werror=objc-method-access",
+				);
 				/* Both of these were off, along with three others, to quieten the
 				   translated C. A census of a full application build with all five
 				   forced on found ZERO of either -- in generated code, in the
@@ -333,6 +349,22 @@
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				/* A message whose selector the RECEIVER'S CLASS does not declare is a
+				   warning by default, and what it costs is not a warning: with no
+				   declaration clang assumes the method returns id and infers the argument
+				   types from the call, so a struct passed by value is handed over without
+				   anything checking it against the definition. Dispatch then succeeds at
+				   runtime when the method exists, and crashes when it does not, so neither
+				   half of that is visible until a device does it. The macOS project has
+				   carried this since it was written; the iOS one could not until the port's
+				   last four undeclared sends were fixed (issue #5779), and the warning
+				   census in scripts/native-warnings/ is what holds it at zero.
+				   Not -Wundeclared-selector, deliberately: a selector routed through the
+				   responder chain names a method no class in scope declares, and that is
+				   correct rather than a mistake. */
+				WARNING_CFLAGS = (
+					"-Werror=objc-method-access",
+				);
 				/* Both of these were off, along with three others, to quieten the
 				   translated C. A census of a full application build with all five
 				   forced on found ZERO of either -- in generated code, in the
