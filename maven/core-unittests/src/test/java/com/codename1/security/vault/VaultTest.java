@@ -557,9 +557,12 @@ class VaultTest extends UITestBase {
         vault.enroll(pw("p"), remember).get();
 
         // Rotate with the rewrap made to fail, which is what leaves the stale wrap behind.
+        // The call still SUCCEEDS -- the rotation was committed before the rewrap was attempted,
+        // and a caller that sequences a database rekey after it must not skip that rekey; see
+        // aRotationThatCannotRewrapTheDeviceKeyStillReportsSuccess. What this test is about is
+        // the state that leaves behind, which the reported outcome does not change.
         device.refuseWrites = true;
-        assertNotNull(errorOf(vault.rotateDataKey(pw("p"))),
-                "the rotation should report that it could not rewrite the device wrap");
+        assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue());
         device.refuseWrites = false;
         vault.lock();
 
@@ -1119,6 +1122,40 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRotationThatCannotRewrapTheDeviceKeyStillReportsSuccess() {
+        // Rewrapping the remembered-device key is the LAST step of a rotation whose metadata and
+        // data key are already committed, so a failure there -- a cancelled passkey prompt, a
+        // keystore that has gone away -- is not a failed rotation. Reporting one is what breaks
+        // the caller: the ordinary sequence is rotateDataKey().get() and then rekey the database
+        // under the new key, and an exception here skips the rekey. The database then stays under
+        // the superseded key while every later unlock derives the new one, and it cannot be
+        // opened again after a restart.
+        VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(freshName()).configure(options);
+        assertTrue(vault.enroll(pw("p"), options).get().booleanValue());
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+        byte[] beforeRotation = vault.seal("note", "contents".getBytes()).get();
+
+        device.refuseEnsure = true;
+        assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue(),
+                "the rotation was committed, so it must not be reported as failed");
+        device.refuseEnsure = false;
+
+        // Losing the remembered unlock is the part that really did fail, and it is visible:
+        // the wrap of the superseded key is discarded rather than left to unwrap into a key
+        // that no longer opens anything new.
+        assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+
+        // The rotation is real on both sides: new records use the new key, and the retired
+        // chain still reaches what was sealed before it.
+        byte[] afterRotation = vault.seal("later", "more".getBytes()).get();
+        Vault reopened = Vault.named(vault.getName()).configure(fast());
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals("more".getBytes(), reopened.open("later", afterRotation).get());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", beforeRotation).get());
+    }
+
+    @Test
     void anUnwritableDeviceStoreFailsLoudlyRatherThanSilently() {
         device.refuseWrites = true;
         Vault vault = Vault.named(freshName())
@@ -1257,6 +1294,109 @@ class VaultTest extends UITestBase {
         Vault reopened = Vault.named(name).configure(options);
         assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
         assertArrayEquals("contents".getBytes(), reopened.open("note", afterRotation).get());
+    }
+
+    @Test
+    void aForkWithAHigherCounterButAnOlderKeyIsRefused() {
+        // The counter counts mutations on whichever device made them, so it is not a causal
+        // clock. Two devices that diverge from the same base can each raise it a different
+        // number of times, and the one that ends up HIGHER is not necessarily a descendant:
+        // rotating once costs one step and reaches a new key, while changing the password twice
+        // costs two and keeps the old one. Comparing the two integers accepts the second over
+        // the first, overwrites the rotated key and its retired chain, and everything sealed
+        // since the rotation becomes unreadable.
+        VaultOptions options = fast();
+        String rotator = freshName();
+        Vault first = Vault.named(rotator).configure(options);
+        first.enroll(pw("p"), options).get();
+        byte[] base = first.exportSyncState();
+
+        // A second device joins from the same base.
+        String other = freshName();
+        Vault second = Vault.named(other).configure(options);
+        assertTrue(second.importSyncState(base, pw("p")).get().booleanValue());
+
+        // One rotation on the first device: counter 2, data key version 2.
+        assertTrue(first.rotateDataKey(pw("p")).get().booleanValue());
+        byte[] afterRotation = first.seal("note", "contents".getBytes()).get();
+
+        // Two password changes on the second: counter 3, data key version still 1.
+        assertTrue(second.changePassword(pw("p"), pw("p2")).get().booleanValue());
+        assertTrue(second.changePassword(pw("p2"), pw("p3")).get().booleanValue());
+        byte[] higherCounterOlderKey = second.exportSyncState();
+
+        assertEquals(VaultError.CONFLICT,
+                errorOf(first.importSyncState(higherCounterOlderKey, pw("p3"))),
+                "a record whose key lineage does not contain the local key must be refused "
+                + "however high its counter is");
+
+        // And the refusal actually saved something: the rotated key is still here.
+        Vault reopened = Vault.named(rotator).configure(options);
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", afterRotation).get());
+    }
+
+    @Test
+    void twoIndependentRotationsToTheSameVersionAreRefused() {
+        // The nastier half of the same problem. Both devices rotate, so both reach data key
+        // version 2 -- but they are DIFFERENT version-2 keys, and a version number cannot tell
+        // them apart. An extra password change on one side also moves the counters apart, so
+        // neither the counter comparison nor the equal-counter fork check sees it. What settles
+        // it is the key itself: the incoming chain is walked back to the local version and the
+        // key that comes out has to be the local one.
+        VaultOptions options = fast();
+        String mine = freshName();
+        Vault first = Vault.named(mine).configure(options);
+        first.enroll(pw("p"), options).get();
+        byte[] base = first.exportSyncState();
+
+        String theirs = freshName();
+        Vault second = Vault.named(theirs).configure(options);
+        assertTrue(second.importSyncState(base, pw("p")).get().booleanValue());
+
+        assertTrue(first.rotateDataKey(pw("p")).get().booleanValue());
+        byte[] afterRotation = first.seal("note", "contents".getBytes()).get();
+
+        // The other device changes its password first, so it ends on the same version with a
+        // higher counter.
+        assertTrue(second.changePassword(pw("p"), pw("p2")).get().booleanValue());
+        assertTrue(second.rotateDataKey(pw("p2")).get().booleanValue());
+        byte[] theirVersionTwo = second.exportSyncState();
+
+        assertEquals(VaultError.CONFLICT,
+                errorOf(first.importSyncState(theirVersionTwo, pw("p2"))),
+                "two independent rotations to the same version are a fork, not a descendant");
+
+        Vault reopened = Vault.named(mine).configure(options);
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", afterRotation).get());
+    }
+
+    @Test
+    void aGenuineDescendantStillImports() {
+        // The guard above has to let the ordinary case through, or it is just a refusal. A
+        // device that rotates and changes its password is a descendant however far its counter
+        // has moved, because rotation retires the key it replaces into the chain the check walks.
+        VaultOptions options = fast();
+        String source = freshName();
+        Vault first = Vault.named(source).configure(options);
+        first.enroll(pw("p"), options).get();
+        byte[] base = first.exportSyncState();
+
+        String target = freshName();
+        Vault second = Vault.named(target).configure(options);
+        assertTrue(second.importSyncState(base, pw("p")).get().booleanValue());
+        byte[] sealedUnderVersionOne = second.seal("old", "early".getBytes()).get();
+
+        assertTrue(first.rotateDataKey(pw("p")).get().booleanValue());
+        assertTrue(first.changePassword(pw("p"), pw("p2")).get().booleanValue());
+        assertTrue(first.rotateDataKey(pw("p2")).get().booleanValue());
+        byte[] descendant = first.exportSyncState();
+
+        assertTrue(second.importSyncState(descendant, pw("p2")).get().booleanValue(),
+                "a record that descends from the local one must still import");
+        // And the chain it brought still reaches back to what was sealed before the rotations.
+        assertArrayEquals("early".getBytes(), second.open("old", sealedUnderVersionOne).get());
     }
 
     @Test

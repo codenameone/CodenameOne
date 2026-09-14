@@ -63,7 +63,7 @@ class JavascriptSecurityHeadersTest {
     @Test
     void everyInlineBlockInTheShippedPageIsHashed() throws Exception {
         String html = indexTemplate();
-        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(html);
+        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(html, "");
 
         List<String> scripts = JavascriptSecurityHeaders.hashesOf(html, "script");
         List<String> styles = JavascriptSecurityHeaders.hashesOf(html, "style");
@@ -185,7 +185,7 @@ class JavascriptSecurityHeadersTest {
 
     @Test
     void thePolicyDeniesTheThingsThatMatter() throws Exception {
-        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate());
+        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate(), "");
         assertTrue(csp.indexOf("object-src 'none'") >= 0);
         assertTrue(csp.indexOf("base-uri 'none'") >= 0);
         assertTrue(csp.indexOf("frame-ancestors 'none'") >= 0);
@@ -200,9 +200,61 @@ class JavascriptSecurityHeadersTest {
         assertEquals("child-src 'self'", clause(csp, "child-src"));
     }
 
+    private static String bridgeSource() throws Exception {
+        Path bridge = Paths.get("..", "ByteCodeTranslator", "src", "javascript",
+                "browser_bridge.js").toAbsolutePath().normalize();
+        assertTrue(Files.exists(bridge), "browser_bridge.js not found at " + bridge);
+        return new String(Files.readAllBytes(bridge), StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void theStyleTheBridgeInjectsAtRuntimeIsHashedToo() throws Exception {
+        // A srcdoc document inherits the embedder's policy, so the <style> the print path builds
+        // is governed by style-src exactly like one in index.html. Nothing in the page mentions
+        // it, so hashing the page alone left the printout's layout silently dropped under an
+        // activated CSP.
+        String bridge = bridgeSource();
+        List<String> styles = JavascriptSecurityHeaders.runtimeStyles(bridge);
+        assertFalse(styles.isEmpty(),
+                "the bridge no longer marks any runtime style, so this test checks nothing");
+        // The marked literal has to be the text the browser really receives, or the hash is a
+        // hash of something else.
+        for (String css : styles) {
+            assertTrue(bridge.indexOf("'" + css + "'") >= 0,
+                    "the marked literal is not present verbatim in the bridge: " + css);
+        }
+
+        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate(), bridge);
+        for (String css : styles) {
+            String hash = JavascriptSecurityHeaders.sha256(css);
+            assertTrue(clause(csp, "style-src").indexOf(hash) >= 0,
+                    "style-src does not cover a style the bridge injects: " + css);
+        }
+        // And it stays absent when the bridge is not there to be read, rather than contributing
+        // a hash of the empty string -- which would match any empty <style> an attacker injects.
+        String withoutBridge = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate(), "");
+        for (String css : styles) {
+            assertTrue(withoutBridge.indexOf(JavascriptSecurityHeaders.sha256(css)) < 0);
+        }
+    }
+
+    @Test
+    void aMarkedLiteralThatCarriesAnEscapeFailsTheBuild() {
+        // The bytes hashed here and the bytes the browser parses have to be the same string. A
+        // backslash means they are not, and a hash of the wrong text is worse than no hash: the
+        // case looks covered and the style is still dropped.
+        try {
+            JavascriptSecurityHeaders.runtimeStyles(
+                    "var s = /* cn1-csp-style */ 'a\\'b';");
+            fail("an escaped literal must be refused rather than hashed as read");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage().indexOf("escape") >= 0, expected.getMessage());
+        }
+    }
+
     @Test
     void theWasmConcessionIsNarrowAndEvalIsNotGranted() throws Exception {
-        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate());
+        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate(), "");
         // The port's SQLite is WebAssembly, so this one is unavoidable.
         assertTrue(csp.indexOf("'wasm-unsafe-eval'") >= 0);
         // And this one is not: Display.execute("javascript:") is an opt-in that most applications

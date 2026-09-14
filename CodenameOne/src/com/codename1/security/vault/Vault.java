@@ -1485,11 +1485,24 @@ public final class Vault {
                         // of the superseded key lying about: that is discarded, and the vault is
                         // still openable by password. The version stamped into the record makes
                         // the same state safe after a crash, where this handler never runs.
+                        //
+                        // And it is NOT rethrown. The rewrap is the last step of a rotation that
+                        // has already been committed, so reporting the whole call as failed
+                        // describes a state that does not exist -- and the caller acts on that
+                        // report. The sequence this breaks is the ordinary one: rotate the vault
+                        // key, then rekey the database under it. An exception here makes the
+                        // caller skip the rekey, so the database stays under the superseded key
+                        // while every later unlock derives the new one, and it cannot be opened
+                        // again after a restart. Losing a remembered unlock is recoverable with a
+                        // password; losing the database is not.
+                        //
+                        // The degradation is still observable: the device record is gone, so
+                        // getPolicy() answers SESSION_ONLY, which is the state the device is
+                        // actually in. A caller that cares re-establishes it with remember(...).
                         try {
                             rememberNow(remembered.policy);
-                        } catch (VaultException rewrapFailed) {
+                        } catch (RuntimeException rewrapFailed) {
                             Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                            throw rewrapFailed;
                         }
                     }
                     out.complete(Boolean.TRUE);
@@ -1610,7 +1623,15 @@ public final class Vault {
                             password, wrapBinding(incoming, PURPOSE_PASSWORD));
                     // Checked against the key this record itself describes, which is the only
                     // point at which the counter it claims can be believed.
-                    requireAuthenticRecord(incoming, key);
+                    try {
+                        requireAuthenticRecord(incoming, key);
+                        if (local != null) {
+                            requireKeyContinuity(local, incoming, key);
+                        }
+                    } catch (RuntimeException refused) {
+                        Bytes.zero(key);
+                        throw refused;
+                    }
                     if (generation != lockGeneration) {
                         // The record is still written -- enrolling this device is the point of the
                         // call and it succeeded. What is refused is leaving the vault unlocked
@@ -1809,7 +1830,17 @@ public final class Vault {
     /// Always a copy, even for the current version, so the caller can zero what it is given
     /// without reaching into the vault's own key.
     byte[] dataKeyAtVersion(int wanted) {
-        int current = metadata.dataKeyVersion;
+        return keyAtVersion(metadata, dataKey, wanted);
+    }
+
+    /// Walks `record`'s retired chain back from its current data key to version `wanted`.
+    ///
+    /// Takes the record and its key as parameters rather than reading the open vault, because
+    /// [#importSyncState] has to walk a record that is not this device's -- see the key
+    /// continuity check there. The answer is a fresh array the caller owns and must zero;
+    /// `currentKey` is left alone.
+    private byte[] keyAtVersion(VaultMetadata record, byte[] currentKey, int wanted) {
+        int current = record.dataKeyVersion;
         if (wanted > current) {
             throw new VaultException(VaultError.UNSUPPORTED_FORMAT,
                     "this record was sealed under data key version " + wanted
@@ -1817,17 +1848,17 @@ public final class Vault {
                     + "; synchronise before reading it");
         }
         byte[] key = new byte[32];
-        System.arraycopy(dataKey, 0, key, 0, 32);
+        System.arraycopy(currentKey, 0, key, 0, 32);
         boolean reached = false;
         try {
             for (int version = current - 1; version >= wanted; version--) {
-                byte[] link = metadata.retired.get(Integer.valueOf(version));
+                byte[] link = record.retired.get(Integer.valueOf(version));
                 if (link == null) {
                     throw new VaultException(VaultError.KEY_MISSING,
                             "the key chain in this vault does not reach version " + wanted);
                 }
                 byte[] older = SecureEnvelope.parse(link).open(key,
-                        binding(metadata, DATA_KEY_RECORD, PURPOSE_RETIRED + "." + version));
+                        binding(record, DATA_KEY_RECORD, PURPOSE_RETIRED + "." + version));
                 Bytes.zero(key);
                 key = older;
             }
@@ -1887,6 +1918,64 @@ public final class Vault {
             Bytes.zero(expected);
         }
     }
+
+    /// Refuses an incoming sync record whose key lineage does not contain the one this device
+    /// is already using.
+    ///
+    /// The counter alone cannot decide this. It counts mutations on whichever device made them,
+    /// so it is not a causal clock: two devices that diverge from the same base can each raise it
+    /// a different number of times, and the one that ends up higher is not necessarily a
+    /// descendant of the other. A device that rotates once reaches counter 2 with a version-2 key;
+    /// a device that changes its password twice reaches counter 3 still holding the version-1 key.
+    /// Importing the second over the first passes every counter test there is, and overwrites the
+    /// version-2 key and its retired chain with a record that has never heard of them -- after
+    /// which every record the first device sealed since rotating is permanently unreadable.
+    ///
+    /// What is checked instead is continuity: walk the INCOMING record's retired chain back to the
+    /// version the local record is on, and require the key that comes out to be the local one. A
+    /// genuine descendant always passes, because rotation retires the key it replaces into exactly
+    /// that chain. A fork does not, whichever way its counter went.
+    ///
+    /// The local key is identified by its MAC rather than by unwrapping it. Unwrapping would need
+    /// the local password, and the record being imported is frequently the one that CHANGED the
+    /// password -- so the local wrap is under a password this caller no longer has, and a
+    /// legitimate password-change sync would be refused. The MAC is keyed by the record's own data
+    /// key, so recomputing it under the candidate ancestor answers the same question without one.
+    private void requireKeyContinuity(VaultMetadata local, VaultMetadata incoming, byte[] incomingKey) {
+        if (local.mac == null) {
+            // Nothing to check the ancestor against. Fall back on the one thing that is still
+            // certain: a chain that ends below the local version cannot contain the local key.
+            if (incoming.dataKeyVersion < local.dataKeyVersion) {
+                throw new VaultException(VaultError.CONFLICT, CONTINUITY_MESSAGE);
+            }
+            return;
+        }
+        byte[] ancestor;
+        try {
+            ancestor = keyAtVersion(incoming, incomingKey, local.dataKeyVersion);
+        } catch (VaultException noChain) {
+            // Either the incoming record never reached the local version, or its chain is
+            // incomplete. Both mean the same thing here, and neither is the error the walk
+            // reports to a reader opening an old record.
+            throw new VaultException(VaultError.CONFLICT, CONTINUITY_MESSAGE);
+        }
+        try {
+            byte[] expected = recordMac(local, ancestor);
+            try {
+                if (!Bytes.constantTimeEquals(expected, local.mac)) {
+                    throw new VaultException(VaultError.CONFLICT, CONTINUITY_MESSAGE);
+                }
+            } finally {
+                Bytes.zero(expected);
+            }
+        } finally {
+            Bytes.zero(ancestor);
+        }
+    }
+
+    private static final String CONTINUITY_MESSAGE =
+            "the sync state does not descend from the vault already on this device; importing it "
+            + "would discard the key this device is using and everything sealed under it";
 
     private byte[] recordMac(VaultMetadata meta, byte[] key) {
         byte[] saved = meta.mac;

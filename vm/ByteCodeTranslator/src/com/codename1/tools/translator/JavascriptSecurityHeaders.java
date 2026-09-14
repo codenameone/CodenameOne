@@ -83,7 +83,10 @@ final class JavascriptSecurityHeaders {
         File index = new File(outputDirectory, "index.html");
         String html = index.isFile()
                 ? new String(Files.readAllBytes(index.toPath()), StandardCharsets.UTF_8) : "";
-        String csp = contentSecurityPolicy(html);
+        File bridge = new File(outputDirectory, "browser_bridge.js");
+        String bridgeSource = bridge.isFile()
+                ? new String(Files.readAllBytes(bridge.toPath()), StandardCharsets.UTF_8) : "";
+        String csp = contentSecurityPolicy(html, bridgeSource);
 
         // Everything goes in a subdirectory, including `_headers`, and that last part is the
         // important one.
@@ -118,7 +121,7 @@ final class JavascriptSecurityHeaders {
      * @param html the generated index.html
      * @return the policy value, without the header name
      */
-    static String contentSecurityPolicy(String html) {
+    static String contentSecurityPolicy(String html, String bridgeSource) {
         StringBuilder scriptSources = new StringBuilder("'self' 'wasm-unsafe-eval'");
         for (String hash : hashesOf(html, "script")) {
             scriptSources.append(" '").append(hash).append('\'');
@@ -126,6 +129,15 @@ final class JavascriptSecurityHeaders {
         StringBuilder styleSources = new StringBuilder("'self'");
         for (String hash : hashesOf(html, "style")) {
             styleSources.append(" '").append(hash).append('\'');
+        }
+        // The page is not the only thing this policy governs. The bridge builds a srcdoc
+        // document to print an image through, and a srcdoc document inherits the embedder's
+        // CSP -- so the <style> inside it is checked against style-src just like one in
+        // index.html, and without its hash the printout loses its layout. Hashing the literal
+        // out of the bridge as emitted keeps the two from drifting: there is one copy of the
+        // text and the policy is derived from it.
+        for (String css : runtimeStyles(bridgeSource)) {
+            styleSources.append(" '").append(sha256(css)).append('\'');
         }
         return "default-src 'self'; "
                 + "script-src " + scriptSources + "; "
@@ -145,6 +157,45 @@ final class JavascriptSecurityHeaders {
                 + "form-action 'none'; "
                 + "frame-ancestors 'none'; "
                 + "upgrade-insecure-requests";
+    }
+
+    /// The exact text of every `<style>` body the bridge injects at runtime.
+    ///
+    /// Each is marked in `browser_bridge.js` with a `cn1-csp-style` block comment followed by a
+    /// single-quoted literal on the same line. An escape inside that literal would mean the text
+    /// the browser sees differs from the bytes read here, and a hash computed from the wrong text
+    /// is worse than no hash -- it looks like the case is covered. So this refuses rather than
+    /// guesses.
+    static List<String> runtimeStyles(String bridgeSource) {
+        List<String> out = new ArrayList<String>();
+        String marker = "/* cn1-csp-style */";
+        int at = 0;
+        while (true) {
+            int found = bridgeSource.indexOf(marker, at);
+            if (found < 0) {
+                return out;
+            }
+            int open = bridgeSource.indexOf('\'', found + marker.length());
+            int lineEnd = bridgeSource.indexOf('\n', found);
+            if (open < 0 || (lineEnd >= 0 && open > lineEnd)) {
+                throw new IllegalStateException(
+                        "a cn1-csp-style marker in browser_bridge.js is not followed by a "
+                        + "single-quoted literal on the same line");
+            }
+            int close = bridgeSource.indexOf('\'', open + 1);
+            if (close < 0 || (lineEnd >= 0 && close > lineEnd)) {
+                throw new IllegalStateException(
+                        "an unterminated cn1-csp-style literal in browser_bridge.js");
+            }
+            String css = bridgeSource.substring(open + 1, close);
+            if (css.indexOf('\\') >= 0) {
+                throw new IllegalStateException(
+                        "a cn1-csp-style literal in browser_bridge.js contains an escape, so the "
+                        + "text the browser sees is not the text being hashed: " + css);
+            }
+            out.add(css);
+            at = close + 1;
+        }
     }
 
     /**

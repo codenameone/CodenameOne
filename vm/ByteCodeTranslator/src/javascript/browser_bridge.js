@@ -4913,9 +4913,16 @@
         // thumbnail on a white page in most browsers. Wrap it in a page-filling
         // <img> so the printout actually shows the image.
         var dataUrl = 'data:' + mimeType + ';base64,' + b64;
+        // A srcdoc document inherits the embedder's CSP, so this <style> is governed by
+        // the generated style-src and would be dropped -- taking the page-filling layout
+        // with it -- unless its hash is listed. The marker below is what
+        // JavascriptSecurityHeaders scans for: it hashes the literal out of the bridge as
+        // it was emitted, so the policy always describes the text that actually ships.
+        // Keep it a single-line, single-quoted literal with no escapes; the generator
+        // fails the build rather than guess if that stops being true.
+        var printStyle = /* cn1-csp-style */ '@page{margin:0}html,body{margin:0;padding:0;background:#fff}img{display:block;width:100%;height:auto}';
         var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
-          + '<style>@page{margin:0}html,body{margin:0;padding:0;background:#fff}'
-          + 'img{display:block;width:100%;height:auto}</style></head>'
+          + '<style>' + printStyle + '</style></head>'
           + '<body><img src="' + dataUrl + '"></body></html>';
         try { iframe.srcdoc = html; }
         catch (e) { iframe.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(html); }
@@ -5784,6 +5791,14 @@
           tryLoad(0);
           return;
         }
+        // Legacy path, reached only where the CSS Font Loading API above is missing. The
+        // rule is built from the font's own name and URL, so it has no fixed text and
+        // cannot be hashed into style-src the way the print style above is -- a generated
+        // CSP therefore blocks it. That is detectable rather than silent: a <style> the
+        // policy refused never gets a CSSOM sheet, so styleEl.sheet stays null, and this
+        // reports the font as not loaded instead of claiming success for a rule that was
+        // dropped.
+        var styleBlocked = false;
         if (typeof document !== 'undefined' && document.head) {
           var styleEl = document.createElement('style');
           var escapedName = cssStringEscape(fontName);
@@ -5794,6 +5809,13 @@
               + "src: url('" + escapedUrl + "') format('" + escapedFormat + "'); }"
           ));
           document.head.appendChild(styleEl);
+          styleBlocked = !styleEl.sheet;
+        }
+        if (styleBlocked) {
+          resolve({ loaded: false, path: 'styleOnly',
+            error: 'the @font-face rule was blocked by the page Content-Security-Policy; '
+              + 'this browser has no CSS Font Loading API to use instead' });
+          return;
         }
         if (typeof WebFont !== 'undefined' && typeof WebFont.load === 'function') {
           WebFont.load({
