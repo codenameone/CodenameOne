@@ -186,8 +186,9 @@ public final class Vault {
         ProtectionReport.Builder b = ProtectionReport.builder();
         boolean enrolled = state() != NOT_ENROLLED;
         b.set(Protection.PERSISTENT, enrolled);
-        b.set(Protection.ENCRYPTED_AT_REST, enrolled);
         if (deviceRecord() == null) {
+            // No stored key, so the only thing at rest is ciphertext under a password-derived key.
+            b.set(Protection.ENCRYPTED_AT_REST, enrolled);
             // No device wrap, so the only thing that can reopen this vault is the password. None
             // of the key-storage protections apply, because no key is stored.
             b.set(Protection.NON_EXTRACTABLE_KEY, false);
@@ -196,6 +197,11 @@ public final class Vault {
             b.set(Protection.USER_VERIFICATION, false);
         } else {
             ProtectionReport deviceReport = device.protection();
+            // From the store: a wrapping key kept in the clear beside the ciphertext means the
+            // records are encrypted and the protection is not.
+            b.set(Protection.ENCRYPTED_AT_REST,
+                    enrolled ? deviceReport.answer(Protection.ENCRYPTED_AT_REST)
+                            : ProtectionReport.NO);
             b.set(Protection.NON_EXTRACTABLE_KEY, deviceReport.answer(Protection.NON_EXTRACTABLE_KEY));
             b.set(Protection.OS_PROTECTED, deviceReport.answer(Protection.OS_PROTECTED));
             b.set(Protection.HARDWARE_BACKED, deviceReport.answer(Protection.HARDWARE_BACKED));
@@ -364,6 +370,13 @@ public final class Vault {
     /// be read
     public AsyncResource<Boolean> unlockWithPassword(final char[] password) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // Captured HERE, on the calling thread, and not inside the worker below.
+        //
+        // Reading it in the worker looks equivalent and is not: the worker may not be scheduled
+        // until after a lock() has already run, and it would then read the post-lock value, agree
+        // with itself, and publish the key into a vault the application had just closed. Measured
+        // -- a test that locked between the call and the worker starting reopened the vault.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -376,6 +389,11 @@ public final class Vault {
                     SecureEnvelope envelope = SecureEnvelope.parse(meta.passwordWrap);
                     byte[] key = envelope.openWithPassword(password,
                             binding(meta, DATA_KEY_RECORD, PURPOSE_PASSWORD));
+                    if (generation != lockGeneration) {
+                        Bytes.zero(key);
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while it was being unlocked");
+                    }
                     metadata = meta;
                     // Unlocking an already-unlocked vault would otherwise leave the previous
                     // array in the heap with nothing pointing at it, which is the one copy this
@@ -404,6 +422,9 @@ public final class Vault {
     /// user.
     public AsyncResource<Boolean> unlockRemembered() {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread. The unwrap can prompt and can take as long as the user does, and
+        // a vault locked in the meantime must not be reopened by a result already in flight.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -432,10 +453,6 @@ public final class Vault {
                                 + "has been discarded; unlock with the password to remember it "
                                 + "again");
                     }
-                    // Read before the unwrap, compared after it. The unwrap can prompt and can
-                    // take as long as the user does, and a vault locked in the meantime must not
-                    // be silently reopened by a result that was already in flight.
-                    int generation = lockGeneration;
                     key = await(deviceProtection().unwrap(deviceKeyId(), record.wrap,
                                     binding(meta, DATA_KEY_RECORD, PURPOSE_DEVICE).serialize()),
                             "the remembered device key could not be used");
@@ -865,10 +882,14 @@ public final class Vault {
                     byte[] rewrapped = SecureEnvelope.sealWithPassword(newPassword,
                             options.getKdf(), meta.dataKeyId, meta.dataKeyVersion,
                             binding(meta, DATA_KEY_RECORD, PURPOSE_PASSWORD), key);
-                    meta.passwordWrap = rewrapped;
-                    meta.counter++;
-                    writeMetadata(meta);
-                    metadata = meta;
+                    // Same discipline as rotation: a copy is written and then adopted, so a failed
+                    // write leaves the vault on the record that is actually stored rather than on
+                    // one holding a password wrap nobody can find.
+                    VaultMetadata next = meta.copy();
+                    next.passwordWrap = rewrapped;
+                    next.counter = meta.counter + 1;
+                    writeMetadata(next);
+                    metadata = next;
                     passwordNeedsRewrap = false;
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -903,12 +924,14 @@ public final class Vault {
                     char[] code = Base32.encode(raw).toCharArray();
                     Bytes.zero(raw);
                     byte[] derived = recoveryKey(code);
-                    metadata.recoveryWrap = SecureEnvelope.seal(derived, metadata.dataKeyId,
-                            metadata.dataKeyVersion,
-                            binding(metadata, DATA_KEY_RECORD, PURPOSE_RECOVERY), dataKey);
+                    VaultMetadata next = metadata.copy();
+                    next.recoveryWrap = SecureEnvelope.seal(derived, next.dataKeyId,
+                            next.dataKeyVersion,
+                            binding(next, DATA_KEY_RECORD, PURPOSE_RECOVERY), dataKey);
                     Bytes.zero(derived);
-                    metadata.counter++;
-                    writeMetadata(metadata);
+                    next.counter = metadata.counter + 1;
+                    writeMetadata(next);
+                    metadata = next;
                     out.complete(code);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -921,6 +944,8 @@ public final class Vault {
     /// Unlocks with a recovery code from [#createRecoveryCode()].
     public AsyncResource<Boolean> unlockWithRecoveryCode(final char[] code) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -934,6 +959,11 @@ public final class Vault {
                     derived = recoveryKey(code);
                     byte[] key = SecureEnvelope.parse(meta.recoveryWrap).open(derived,
                             binding(meta, DATA_KEY_RECORD, PURPOSE_RECOVERY));
+                    if (generation != lockGeneration) {
+                        Bytes.zero(key);
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while it was being unlocked");
+                    }
                     metadata = meta;
                     Bytes.zero(dataKey);
                     dataKey = key;
@@ -985,24 +1015,29 @@ public final class Vault {
                     }
                     fresh = SecureRandom.bytes(32);
                     int newVersion = meta.dataKeyVersion + 1;
+                    // Built on a copy, and swapped in only once it is safely written. Advancing
+                    // the live record first would leave a failed write holding a version the key
+                    // in hand does not match, and an application that caught the error and kept
+                    // going would stamp that version onto records encrypted with the old key.
+                    VaultMetadata next = meta.copy();
                     // The outgoing key sealed under the incoming one, which is the link that lets
                     // an old record still be opened.
-                    meta.retired.put(Integer.valueOf(meta.dataKeyVersion),
+                    next.retired.put(Integer.valueOf(meta.dataKeyVersion),
                             SecureEnvelope.seal(fresh, meta.dataKeyId, newVersion,
                                     binding(meta, DATA_KEY_RECORD,
                                             PURPOSE_RETIRED + "." + meta.dataKeyVersion),
                                     dataKey));
-                    meta.dataKeyVersion = newVersion;
-                    meta.passwordWrap = SecureEnvelope.sealWithPassword(password, options.getKdf(),
-                            meta.dataKeyId, newVersion,
-                            binding(meta, DATA_KEY_RECORD, PURPOSE_PASSWORD), fresh);
-                    meta.recoveryWrap = null;
-                    meta.counter++;
-                    writeMetadata(meta);
+                    next.dataKeyVersion = newVersion;
+                    next.passwordWrap = SecureEnvelope.sealWithPassword(password, options.getKdf(),
+                            next.dataKeyId, newVersion,
+                            binding(next, DATA_KEY_RECORD, PURPOSE_PASSWORD), fresh);
+                    next.recoveryWrap = null;
+                    next.counter = meta.counter + 1;
+                    writeMetadata(next);
                     Bytes.zero(dataKey);
                     dataKey = fresh;
                     fresh = null;
-                    metadata = meta;
+                    metadata = next;
                     DeviceRecord remembered = deviceRecord();
                     if (remembered != null) {
                         // The device wrap holds the old key. Re-wrapping is part of the rotation;
@@ -1074,6 +1109,8 @@ public final class Vault {
     /// - `password`: the vault password, cleared by this method
     public AsyncResource<Boolean> importSyncState(final byte[] state, final char[] password) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -1105,6 +1142,15 @@ public final class Vault {
                     // password would replace a working local record with one that cannot be used.
                     byte[] key = SecureEnvelope.parse(incoming.passwordWrap).openWithPassword(
                             password, binding(incoming, DATA_KEY_RECORD, PURPOSE_PASSWORD));
+                    if (generation != lockGeneration) {
+                        // The record is still written -- enrolling this device is the point of the
+                        // call and it succeeded. What is refused is leaving the vault unlocked
+                        // afterwards, because the application asked for it to be locked.
+                        writeMetadata(incoming);
+                        Bytes.zero(key);
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while the sync state was being imported");
+                    }
                     writeMetadata(incoming);
                     metadata = incoming;
                     Bytes.zero(dataKey);

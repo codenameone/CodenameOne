@@ -79,7 +79,26 @@ final class VaultMetadata {
     final java.util.Hashtable<Integer, byte[]> retired = new java.util.Hashtable<Integer, byte[]>();
 
     /// Lines this build did not recognise, kept so they survive a round trip.
-    private String unknown = "";
+    String unknown = "";
+
+    /// A detached copy, for building the next state without touching the one in use.
+    ///
+    /// Mutating the live record in place and writing it afterwards means a failed write leaves the
+    /// vault holding a record it never persisted -- and, during a rotation, one whose key version
+    /// has advanced past the key actually in hand. Everything sealed after that is labelled with a
+    /// version it was not encrypted under.
+    VaultMetadata copy() {
+        VaultMetadata out = new VaultMetadata();
+        out.vaultId = vaultId;
+        out.dataKeyId = dataKeyId;
+        out.dataKeyVersion = dataKeyVersion;
+        out.counter = counter;
+        out.passwordWrap = passwordWrap;
+        out.recoveryWrap = recoveryWrap;
+        out.retired.putAll(retired);
+        out.unknown = unknown;
+        return out;
+    }
 
     String serialize() {
         StringBuilder b = new StringBuilder();

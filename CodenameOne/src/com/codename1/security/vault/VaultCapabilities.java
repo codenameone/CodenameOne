@@ -68,9 +68,11 @@ public final class VaultCapabilities {
     public ProtectionReport protectionFor(UnlockPolicy policy) {
         ProtectionReport.Builder b = ProtectionReport.builder();
         b.set(Protection.PERSISTENT, true);
-        b.set(Protection.ENCRYPTED_AT_REST, true);
         b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);
         if (policy == UnlockPolicy.SESSION_ONLY) {
+            // Nothing that can reopen the vault is written, so what is at rest is ciphertext under
+            // a key derived from a password that is stored nowhere. Genuinely encrypted at rest.
+            b.set(Protection.ENCRYPTED_AT_REST, true);
             b.set(Protection.NON_EXTRACTABLE_KEY, false);
             b.set(Protection.OS_PROTECTED, false);
             b.set(Protection.HARDWARE_BACKED, false);
@@ -82,6 +84,12 @@ public final class VaultCapabilities {
         DeviceProtection forPolicy = policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
                 && device.userVerifying() != null ? device.userVerifying() : device;
         ProtectionReport report = forPolicy.protection();
+        // Taken from the store rather than assumed. A remembered vault is only as encrypted at
+        // rest as the wrapping key is: where that key sits in the clear beside the ciphertext --
+        // the simulator, and Android before the keystore existed -- the records are ciphertext and
+        // the protection is not there, so a caller requiring it must be refused rather than
+        // reassured. Hardcoding yes here would have defeated those stores reporting honestly.
+        b.set(Protection.ENCRYPTED_AT_REST, report.answer(Protection.ENCRYPTED_AT_REST));
         b.set(Protection.NON_EXTRACTABLE_KEY, report.answer(Protection.NON_EXTRACTABLE_KEY));
         b.set(Protection.OS_PROTECTED, report.answer(Protection.OS_PROTECTED));
         b.set(Protection.HARDWARE_BACKED, report.answer(Protection.HARDWARE_BACKED));

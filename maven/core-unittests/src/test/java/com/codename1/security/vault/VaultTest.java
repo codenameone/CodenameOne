@@ -420,6 +420,85 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void metadataCopyIsIndependentOfTheRecordItCameFrom() {
+        // Rotation, changePassword and createRecoveryCode all build the next record on a copy and
+        // adopt it only once it is written, so a failed write leaves the vault on the record that
+        // is actually stored. That is only true if the copy is genuinely detached -- a copy that
+        // shared its retired map, or that was quietly replaced by returning `this`, would put the
+        // mutation straight back onto the live record and undo the whole fix.
+        //
+        // The failed-write path itself cannot be reached from here: this harness stores entries in
+        // a map with no failure mode. What is testable is the property the fix rests on.
+        VaultMetadata original = new VaultMetadata();
+        original.vaultId = "abc";
+        original.dataKeyVersion = 3;
+        original.counter = 9;
+        original.passwordWrap = new byte[] {1, 2};
+        original.retired.put(Integer.valueOf(2), new byte[] {7});
+
+        VaultMetadata copy = original.copy();
+        assertNotSame(original, copy);
+        assertNotSame(original.retired, copy.retired);
+        assertEquals("abc", copy.vaultId);
+        assertEquals(3, copy.dataKeyVersion);
+        assertEquals(9, copy.counter);
+        assertEquals(1, copy.retired.size());
+
+        copy.dataKeyVersion = 4;
+        copy.counter = 10;
+        copy.recoveryWrap = new byte[] {5};
+        copy.retired.put(Integer.valueOf(3), new byte[] {8});
+        assertEquals(3, original.dataKeyVersion, "the original must not move");
+        assertEquals(9, original.counter, "the original must not move");
+        assertNull(original.recoveryWrap, "the original must not move");
+        assertEquals(1, original.retired.size(), "the original's chain must not move");
+    }
+
+    @Test
+    void aVaultLockedWhileAPasswordUnlockRunsStaysLocked() throws Exception {
+        // lock() documents that an operation in flight cannot deliver afterwards. The remembered
+        // path checked for that and the password path did not -- and the password path is the slow
+        // one, hundreds of thousands of iterations during which a lifecycle stop callback can
+        // easily land.
+        //
+        // Deterministic, not a race to win: the unlock is deliberately given a KDF slow enough
+        // that it is certainly still deriving when the lock arrives, and the generation it
+        // compares against is captured when the call is made rather than when its worker starts.
+        // An earlier version of this test captured it in the worker and reopened the vault, which
+        // is how that hole was found.
+        String name = freshName();
+        VaultOptions slow = new VaultOptions()
+                .kdf(KdfProfile.pbkdf2(2000000))
+                .deviceProtection(device);
+        Vault vault = Vault.named(name).configure(slow);
+        vault.enroll(pw("p"), slow).get();
+        vault.lock();
+
+        final Vault reopened = Vault.named(name).configure(slow);
+        final java.util.concurrent.CountDownLatch called =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicReference<VaultError> outcome =
+                new java.util.concurrent.atomic.AtomicReference<VaultError>();
+        Thread unlocking = new Thread(new Runnable() {
+            public void run() {
+                called.countDown();
+                outcome.set(errorOf(reopened.unlockWithPassword(pw("p"))));
+            }
+        });
+        unlocking.start();
+        called.await();
+        // Two million iterations of software HMAC is seconds; a tenth of one is comfortably
+        // inside it, so the lock lands mid-derivation every time rather than most of the time.
+        Thread.sleep(100);
+        reopened.lock();
+        unlocking.join(60000);
+
+        assertEquals(VaultError.LOCKED, outcome.get(),
+                "an unlock that was already running when lock() arrived must be refused");
+        assertFalse(reopened.isUnlocked(), "lock() must leave the vault closed");
+    }
+
+    @Test
     void aSuccessfulRotationLeavesTheDeviceStillRemembered() {
         // The other side of the version check. Stamping the data key version into the device
         // record is what makes a stale wrap detectable -- and if the stamp were written from the

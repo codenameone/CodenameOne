@@ -83,7 +83,14 @@ public final class HTML5SecureStorage extends SecureStorage {
 
     /// Where encrypted entries live. A separate namespace rather than the same one, so a partly
     /// migrated store is a state that can be read rather than a guess about what a given blob is.
-    private static final String ENCRYPTED_PREFIX = "cn1secure.v2.";
+    ///
+    /// **Disjoint from the legacy prefix, not nested inside it.** The obvious spelling was
+    /// `cn1secure.v2.`, and it collides: the encrypted entry for account `foo` and the plaintext
+    /// entry for an account literally named `v2.foo` are then the same storage key, so writing one
+    /// destroys the other and a read cannot tell ciphertext from plaintext. `cn1secure2.` cannot
+    /// be produced by `legacyKey` for any account, because that always has a `.` where this has a
+    /// `2`.
+    private static final String ENCRYPTED_PREFIX = "cn1secure2.";
 
     /// The device key every entry here is encrypted under. One key for the whole store: a key per
     /// entry would multiply the IndexedDB round trips and protect nothing extra, since anything

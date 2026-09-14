@@ -1636,8 +1636,8 @@ final class JavascriptBundleWriter {
      * databases do not open, discovered by a user. Those are not symmetrical.</p>
      */
     static Set<String> optionalAssetsToSkip(File outputDirectory) {
-        Boolean usesSqlite = translatedOutputReferences(outputDirectory, sqliteNativePrefix());
-        if (usesSqlite == null || usesSqlite.booleanValue()) {
+        int usesSqlite = translatedOutputReferences(outputDirectory, sqliteNativePrefix());
+        if (usesSqlite != REFERENCE_ABSENT) {
             return Collections.emptySet();
         }
         Set<String> skip = new HashSet<String>();
@@ -1647,16 +1647,30 @@ final class JavascriptBundleWriter {
         return skip;
     }
 
+    /** The marker appears in the emitted application. */
+    static final int REFERENCE_PRESENT = 1;
+
+    /** The application was emitted and does not mention the marker. */
+    static final int REFERENCE_ABSENT = 0;
+
+    /** The emitted output could not be read, so nothing is known. Never treat this as absent. */
+    static final int REFERENCE_UNKNOWN = -1;
+
     /**
      * Whether any emitted {@code translated_app*.js} mentions {@code marker}.
      *
-     * @return {@code TRUE} or {@code FALSE}, or {@code null} when the output could not be read --
-     *         which callers must treat as "assume it is needed" rather than as {@code FALSE}
+     * <p>An {@code int} rather than a nullable {@code Boolean}. The third state is the whole point
+     * of this method, and a {@code Boolean} carrying it auto-unboxes to a NullPointerException at
+     * the first caller who forgets -- which is what SpotBugs reports as NP_BOOLEAN_RETURN_NULL.
+     * The same three-answer shape is used by {@code SecureStorage.entryState} and
+     * {@code ProtectionReport}.</p>
+     *
+     * @return {@link #REFERENCE_PRESENT}, {@link #REFERENCE_ABSENT} or {@link #REFERENCE_UNKNOWN}
      */
-    static Boolean translatedOutputReferences(File outputDirectory, String marker) {
+    static int translatedOutputReferences(File outputDirectory, String marker) {
         File[] files = outputDirectory.listFiles();
         if (files == null) {
-            return null;
+            return REFERENCE_UNKNOWN;
         }
         boolean sawTranslatedOutput = false;
         for (File file : files) {
@@ -1668,15 +1682,15 @@ final class JavascriptBundleWriter {
             try {
                 String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
                 if (text.indexOf(marker) >= 0) {
-                    return Boolean.TRUE;
+                    return REFERENCE_PRESENT;
                 }
             } catch (IOException unreadable) {
-                return null;
+                return REFERENCE_UNKNOWN;
             }
         }
         // No translated output at all means this was not a translation, and the caller has no
         // basis to drop anything.
-        return sawTranslatedOutput ? Boolean.FALSE : null;
+        return sawTranslatedOutput ? REFERENCE_ABSENT : REFERENCE_UNKNOWN;
     }
 
     private static void copyJavaScriptPortWebAppAssets(File outputDirectory) throws IOException {
