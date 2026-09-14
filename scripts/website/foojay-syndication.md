@@ -23,6 +23,8 @@ the bundle must stay under 15 MB. Prefer their
 recommended 1600 × 900 preview under 300 KB when authoring the original post.
 Mermaid shortcodes become native fenced diagrams; CN1 post links and footer
 removal use the shared renderer.
+The shared Codename One aside leaves its background unset so Foojay's light
+and dark themes control its contrast, as requested by the Foojay editors.
 
 ## One-time GitHub setup
 

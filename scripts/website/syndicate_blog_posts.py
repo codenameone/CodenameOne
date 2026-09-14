@@ -45,8 +45,9 @@ SITE_BASE_URL = "https://www.codenameone.com"
 ELIGIBILITY_FLOOR = dt.date(2026, 4, 30)  # posts must be strictly newer than this
 MIN_AGE_DAYS = 7
 
+# Leave the background to the host theme so the aside works in dark mode.
 CN1_BLURB = (
-    '<aside style="border-left: 4px solid #007aff; background: #f6f8fa; '
+    '<aside style="border-left: 4px solid #007aff; '
     'padding: 14px 18px; margin: 24px 0; border-radius: 4px; font-size: 0.95em;">'
     "<strong>What is Codename One?</strong> Codename One is an open-source "
     "framework for building native iOS, Android, desktop, and web apps from a "
