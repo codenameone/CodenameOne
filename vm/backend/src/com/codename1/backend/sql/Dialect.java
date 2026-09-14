@@ -272,6 +272,23 @@ public abstract class Dialect {
     }
 
     /**
+     * Whether {@code sql} updates an existing row when it conflicts.
+     *
+     * <p>What {@link com.codename1.backend.Database#insert} needs before it
+     * trusts a key that came from connection state. See
+     * {@link Placeholders#updatesOnConflict}.
+     */
+    public boolean updatesOnConflict(String sql) throws IOException {
+        if(sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.updatesOnConflict(sql, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /**
      * Where {@code sql} stops being the statement and starts being its
      * terminator, its trailing comment or trailing space.
      *

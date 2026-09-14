@@ -25,7 +25,12 @@ package com.codename1.backend.sql;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Every statement shape the scanner has to read, against every dialect.
@@ -43,6 +48,43 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * disagree, they disagree on purpose and the row says so.
  */
 class ScannerTest {
+
+    @Test
+    @DisplayName("an upsert is recognised as SQL, not found as text")
+    void upsertsAreRecognised() throws Exception {
+        // Database refuses one of these on the engines that read the generated
+        // key from connection state, so a miss returns another row's key and a
+        // false positive refuses a plain insert. Both halves matter.
+        assertTrue(Dialect.SQLITE.updatesOnConflict(
+                "INSERT INTO t (a) VALUES (?) ON CONFLICT (a) DO UPDATE SET b = 1"));
+        assertTrue(Dialect.MYSQL.updatesOnConflict(
+                "INSERT INTO t (a) VALUES (?) ON DUPLICATE KEY UPDATE b = 1"));
+        // Case and spacing are the statement's to choose, and a comment can sit
+        // between the words.
+        assertTrue(Dialect.SQLITE.updatesOnConflict(
+                "insert into t (a) values (?) on conflict do\n  update set b = 1"));
+        assertTrue(Dialect.MYSQL.updatesOnConflict(
+                "INSERT INTO t (a) VALUES (?) ON DUPLICATE /* here */ KEY UPDATE b = 1"));
+
+        // DO NOTHING is not an update: nothing is written, the row count is
+        // zero, and insert() already answers zero for that.
+        assertFalse(Dialect.SQLITE.updatesOnConflict(
+                "INSERT INTO t (a) VALUES (?) ON CONFLICT DO NOTHING"));
+        assertFalse(Dialect.SQLITE.updatesOnConflict("INSERT INTO t (a) VALUES (?)"));
+        // REPLACE inserts a row, so last_insert_rowid() does answer for it.
+        assertFalse(Dialect.SQLITE.updatesOnConflict("REPLACE INTO t (a) VALUES (?)"));
+
+        // And the words are read as SQL: inside a literal or a comment they are
+        // not keywords, and a longer word that merely contains one is not it.
+        assertFalse(Dialect.SQLITE.updatesOnConflict(
+                "INSERT INTO t (a) VALUES ('do update')"));
+        assertFalse(Dialect.SQLITE.updatesOnConflict(
+                "INSERT INTO t (a) VALUES (?) -- do update"));
+        assertFalse(Dialect.MYSQL.updatesOnConflict(
+                "INSERT INTO t (a) VALUES (?) /* on duplicate key update */"));
+        assertFalse(Dialect.SQLITE.updatesOnConflict(
+                "INSERT INTO t (redo, updated) VALUES (?, ?)"));
+    }
 
     @Test
     @DisplayName("where a statement ends, per dialect")
@@ -118,6 +160,22 @@ class ScannerTest {
         // Database refuses the insert rather than reporting one key for two rows.
         rows("INSERT INTO t (a) VALUES (1) /*!50100 , (2) */", 1, 1, Dialect.VERSION_GATED);
         rows("INSERT INTO t (a) VALUES (1) /*!99999 , (2) */", 1, 1, Dialect.VERSION_GATED);
+
+        // A placeholder INSIDE a version gate is refused rather than counted:
+        // MySQL prepares "SELECT 1 /*!99999 + ? */" with no parameters at all on
+        // a server the gate excludes, so counting the one supplied here reaches
+        // the server as a parameter the statement does not have.
+        assertThrows(IOException.class,
+                () -> Dialect.MYSQL.bind("SELECT 1 /*!99999 + ? */", 1));
+        assertThrows(IOException.class,
+                () -> Dialect.MYSQL.bind("SELECT ? /*!50100 , ? */", 2));
+        // A gate with no placeholder in it is nobody's problem, and a
+        // placeholder OUTSIDE one beside it is still a placeholder.
+        assertEquals("SELECT ? /*!99999 + 1 */", Dialect.MYSQL.bind("SELECT ? /*!99999 + 1 */", 1));
+        // And the gate means nothing to the other two, where "/*!99999 + ? */"
+        // is a comment and the ? inside it is not a parameter at all.
+        assertEquals("SELECT 1 /*!99999 + ? */",
+                Dialect.SQLITE.bind("SELECT 1 /*!99999 + ? */", 0));
 
         // An ordinary block comment is still ignored on all three.
         rows("INSERT INTO t (a) VALUES (1) /* , (2) */", 1, 1, 1);
