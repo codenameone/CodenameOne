@@ -1264,7 +1264,23 @@ public final class Vault {
                     // wrap would be a code the vault accepts and the caller never received.
                     stampMac(next, dataKey);
                     requireSameGeneration(generation);
-                    commitMetadata(metadata, next);
+                    VaultMetadata previous = metadata;
+                    commitMetadata(previous, next);
+                    if (generation != lockGeneration) {
+                        // Asked again, because the check above is before a storage write and a
+                        // lock can land inside one. Completing here would hand back a working
+                        // recovery credential after lock() had already returned.
+                        //
+                        // And simply refusing is not enough, for the reason the comment above
+                        // gives: this call REPLACES any previous recovery wrap, so a refusal
+                        // that left the new record standing would retire a code the user still
+                        // holds in favour of one they were never given. The previous record goes
+                        // back, so the vault is exactly as it was before this call.
+                        Bytes.zero(code);
+                        commitMetadata(next, previous);
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while a recovery code was being created");
+                    }
                     metadata = next;
                     out.complete(code);
                 } catch (VaultException failed) {
@@ -1627,7 +1643,28 @@ public final class Vault {
                     // swallowed: the device is enrolled, but not under the policy that was asked
                     // for, and the caller has to know that.
                     if (options.getPolicy() != UnlockPolicy.SESSION_ONLY) {
-                        rememberNow(options.getPolicy());
+                        try {
+                            rememberNow(options.getPolicy());
+                        } catch (RuntimeException rememberFailed) {
+                            // The same rollback enroll() does, and for the same reason -- this
+                            // round added the remembering step here without mirroring it, so a
+                            // cancelled passkey prompt left the device enrolled and unlocked
+                            // under session-only access while the import reported failure.
+                            //
+                            // Safe here too: an import that has just joined this device to the
+                            // vault has sealed nothing of its own yet, so removing the record
+                            // destroys no data. The record being removed is this device's copy,
+                            // not the sync state it came from.
+                            Storage.getInstance().deleteStorageFile(metadataKey());
+                            try {
+                                forgetEveryMechanism();
+                            } catch (RuntimeException alsoFailed) {
+                                // Nothing here can reach a half-made key, and reporting this
+                                // instead of the original would name the wrong failure.
+                            }
+                            lock();
+                            throw rememberFailed;
+                        }
                     }
                     touch();
                     out.complete(Boolean.TRUE);

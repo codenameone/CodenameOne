@@ -933,6 +933,34 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anImportThatCannotRememberLeavesNothingBehind() {
+        // The remembering step was added to import in the round before this one without the
+        // rollback enroll() already had, so a refused device store left this device enrolled and
+        // unlocked under session-only access while the import reported failure.
+        String name = freshName();
+        Vault first = Vault.named(name).configure(fast());
+        first.enroll(pw("p"), fast()).get();
+        byte[] state = first.exportSyncState();
+
+        device.refuseEnsure = true;
+        String otherName = freshName();
+        VaultOptions remembering = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault second = Vault.named(otherName).configure(remembering);
+        assertEquals(VaultError.STORAGE_UNAVAILABLE,
+                errorOf(second.importSyncState(state, pw("p"))));
+
+        // Nothing left behind: not a record, and not an open vault.
+        assertFalse(second.isUnlocked(), "a failed import must not leave the vault open");
+        assertEquals(Vault.NOT_ENROLLED,
+                Vault.named(otherName).configure(remembering).state());
+
+        // And the retry works rather than colliding with a ghost.
+        device.refuseEnsure = false;
+        assertTrue(Vault.named(otherName).configure(remembering)
+                .importSyncState(state, pw("p")).get().booleanValue());
+    }
+
+    @Test
     void importingSyncStateRefusesAnUnmetRequirement() {
         // And require(...) governs this door too.
         String name = freshName();
