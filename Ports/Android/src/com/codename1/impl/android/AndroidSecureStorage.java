@@ -256,11 +256,16 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     /// Whether this entry is still in the pre-keystore format, read without decrypting anything.
+    ///
+    /// Through plainPrefs(), which is the file a legacy value is actually in. The first version of
+    /// this opened PREFS -- the prompting, biometric tier -- where a value written by
+    /// legacyPlainSet has never been, so it saw nothing, fell through to the store-wide report,
+    /// and let a required ENCRYPTED_AT_REST read hand back exactly the plaintext it was meant to
+    /// catch. It is also the accessor that works without an Activity, which matters for the same
+    /// reason get() uses it: this tier exists so a background caller can read a cached secret.
     private boolean isLegacyPlaintext(String account) {
         try {
-            SharedPreferences prefs = AndroidNativeUtil.getActivity()
-                    .getApplicationContext()
-                    .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            SharedPreferences prefs = plainPrefs();
             if (prefs == null) {
                 return false;
             }

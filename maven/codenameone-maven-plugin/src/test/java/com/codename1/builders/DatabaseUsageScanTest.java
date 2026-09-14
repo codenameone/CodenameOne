@@ -732,6 +732,95 @@ class DatabaseUsageScanTest {
                 "com/codename1/db/DatabaseConfig");
     }
 
+    /// Every class of the vault package, exactly as the builders see it in the staged tree.
+    private void writeVaultFramework() throws IOException {
+        String[] vault = {
+            "AssociatedData", "Bytes", "KdfProfile", "KeyHandle", "KeyUsage", "Protection",
+            "ProtectionReport", "SecureEnvelope", "SecureStorageDeviceProtection", "UnlockPolicy",
+            "Vault", "VaultCapabilities", "VaultError", "VaultException", "VaultKeyHandle",
+            "VaultMetadata", "VaultOptions", "package-info"
+        };
+        for (int iter = 0; iter < vault.length; iter++) {
+            // Each of these carries the package in its own name, which is what made the package
+            // prove its own use before they were excluded.
+            writeClass("com/codename1/security/vault/" + vault[iter] + ".class",
+                    "com/codename1/security/vault/Vault");
+        }
+        writeClass("com/codename1/security/vault/spi/DeviceProtection.class",
+                "com/codename1/security/vault/ProtectionReport");
+        writeClass("com/codename1/security/SecureStorage.class",
+                "com/codename1/security/vault/ProtectionReport");
+    }
+
+    @Test
+    void theVaultPackageDoesNotProveItsOwnUse() throws IOException {
+        // The staged tree is the application merged with the framework, so every vault class is
+        // in it whether or not anything calls one -- and each carries its own package name in its
+        // constant pool. Scanning them found the string and reported the application as a vault
+        // user, which on iOS links the private CommonCrypto GCM SPI into a binary Apple scans.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/ui/Form");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesVault(),
+                "the vault package's reference to itself is not the application's");
+    }
+
+    @Test
+    void anApplicationThatDoesUseTheVaultIsStillSeen() throws IOException {
+        // The exclusion above must not become a blanket one: an application really naming a vault
+        // type is what the gate exists to find.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/security/vault/Vault");
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesVault());
+    }
+
+    @Test
+    void anApplicationClassInsideTheVaultPackageIsStillScanned() throws IOException {
+        // Excluded by name, never as a directory. The package is the framework's by convention
+        // and not by ownership, so a helper an application or a library puts there has to be
+        // scanned like any other application class.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/codename1/security/vault/MyHelper.class",
+                "com/codename1/security/vault/Vault");
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesVault());
+    }
+
+    @Test
+    void theExclusionListCoversEveryClassInTheVaultPackage() {
+        // A list held by hand goes stale silently, and the failure is the one above coming back:
+        // a class added to the package later charges every application the vault. Held against
+        // the sources rather than trusted.
+        java.io.File pkg = new java.io.File("../../CodenameOne/src/com/codename1/security/vault");
+        assertTrue(pkg.isDirectory(), "vault sources not found at " + pkg.getAbsolutePath());
+        int checked = 0;
+        java.io.File[] roots = {pkg, new java.io.File(pkg, "spi")};
+        for (int dir = 0; dir < roots.length; dir++) {
+            java.io.File[] files = roots[dir].listFiles();
+            assertTrue(files != null && files.length > 0, "empty: " + roots[dir]);
+            for (int iter = 0; iter < files.length; iter++) {
+                String name = files[iter].getName();
+                if (!name.endsWith(".java")) {
+                    continue;
+                }
+                String relative = "com/codename1/security/vault/"
+                        + (dir == 1 ? "spi/" : "")
+                        + name.substring(0, name.length() - ".java".length());
+                assertTrue(Executor.isFrameworkDatabaseClass(relative + ".class"),
+                        relative + " is in the vault package but is not excluded from the usage "
+                        + "scan, so its own name will report every application as a vault user");
+                checked++;
+            }
+        }
+        assertTrue(checked >= 18, "only " + checked + " vault classes seen, so this checked "
+                + "nothing like the whole package");
+    }
+
     @Test
     void anApplicationThatNeverTouchesTheDatabaseGetsNoEngine() throws IOException {
         writeFramework();

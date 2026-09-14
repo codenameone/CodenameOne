@@ -832,6 +832,34 @@ public abstract class Executor {
         // heard of the vault would link a private CommonCrypto SPI on iOS.
         // (Display and CodenameOneImplementation are already listed above for the database.)
         "com/codename1/security/SecureStorage",
+        // And the vault package itself, which is the larger half of the same problem. Every one
+        // of these classes carries its own name in its constant pool, so leaving them in made
+        // the package prove its own use: the scan found the string in Vault.class and charged an
+        // application that has never heard of a vault the private CommonCrypto SPI on iOS. Listed
+        // by name rather than skipped as a directory, for the reason the database package is:
+        // the package is the framework's by convention, not by ownership, and an application or
+        // a library putting a class there must still be scanned. VaultClassExclusionTest holds
+        // this list against the package, so a class added later cannot quietly reopen it.
+        "com/codename1/security/vault/AssociatedData",
+        "com/codename1/security/vault/Bytes",
+        "com/codename1/security/vault/KdfProfile",
+        "com/codename1/security/vault/KeyHandle",
+        "com/codename1/security/vault/KeyUsage",
+        "com/codename1/security/vault/Protection",
+        "com/codename1/security/vault/ProtectionReport",
+        "com/codename1/security/vault/SecureEnvelope",
+        "com/codename1/security/vault/SecureStorageDeviceProtection",
+        "com/codename1/security/vault/UnlockPolicy",
+        "com/codename1/security/vault/Vault",
+        "com/codename1/security/vault/VaultCapabilities",
+        "com/codename1/security/vault/VaultError",
+        "com/codename1/security/vault/VaultException",
+        "com/codename1/security/vault/VaultKeyHandle",
+        "com/codename1/security/vault/VaultMetadata",
+        "com/codename1/security/vault/VaultOptions",
+        "com/codename1/security/vault/package-info",
+        "com/codename1/security/vault/spi/DeviceProtection",
+        "com/codename1/security/vault/spi/package-info",
         "com/codename1/db/Row",
         "com/codename1/db/RowExt",
         "com/codename1/db/ThreadSafeDatabase",
@@ -1281,7 +1309,7 @@ public abstract class Executor {
     ///
     /// The `$` test catches a nested class, which belongs to the class that declares it --
     /// `SQLMap$SqlType$8` is `SQLMap`.
-    private static boolean isFrameworkDatabaseClass(String path) {
+    static boolean isFrameworkDatabaseClass(String path) {
         String name = path.substring(0, path.length() - ".class".length());
         for (int iter = 0; iter < FRAMEWORK_DATABASE_CLASSES.length; iter++) {
             String framework = FRAMEWORK_DATABASE_CLASSES[iter];
