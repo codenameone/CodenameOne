@@ -226,6 +226,49 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void aDecimalChildComparisonDoesNotThrow() {
+        // isNumeric learning to read a decimal put "2.5" through
+        // TextEvaluator's Integer.parseInt, which threw. The two halves of the
+        // comparison have to read the same grammar.
+        Result r = Result.fromContent(
+                "<t><item><price>2.5</price><n>A</n></item></t>", Result.XML);
+        String[] found = r.getAsStringArray("/t/item[price=2.5]/n");
+        assertEquals(1, found.length, "a decimal equality found nothing");
+        assertEquals("A", found[0]);
+    }
+
+    @Test
+    void aBigJsonNumberIsStillANumber() {
+        // The parser hands a large number back as "1.0E7". Rejecting the
+        // exponent dropped the comparison to text, where it sorts before "3".
+        Result r = Result.fromContent(
+                "{\"players\":[{\"rank\":10000000,\"name\":\"BIG\"},"
+                + "{\"rank\":1,\"name\":\"A\"}]}", Result.JSON);
+        String[] small = r.getAsStringArray("/players[@rank < 3]/name");
+        assertEquals(1, small.length, "ten million compared as less than three");
+        assertEquals("A", small[0]);
+    }
+
+    @Test
+    void aChildTextComparisonIsNotBackwards() {
+        // TextEvaluator's non-numeric branch was inverted the same way the
+        // attribute one was.
+        Result r = Result.fromContent(
+                "<t><p><name>alpha</name><id>1</id></p>"
+                + "<p><name>zulu</name><id>2</id></p></t>", Result.XML);
+        // Through text(), which is how the factory reaches TextEvaluator with
+        // an ordering comparison at all -- a bare child name with < is not
+        // dispatched anywhere.
+        String[] early = r.getAsStringArray("//name[text() < 'm']/../id");
+        assertEquals(1, early.length, "less-than matched the wrong element");
+        assertEquals("1", early[0]);
+
+        String[] late = r.getAsStringArray("//name[text() > 'm']/../id");
+        assertEquals(1, late.length, "greater-than matched the wrong element");
+        assertEquals("2", late[0]);
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for

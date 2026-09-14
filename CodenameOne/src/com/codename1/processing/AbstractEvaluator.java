@@ -331,11 +331,14 @@ abstract class AbstractEvaluator implements Evaluator {
 
     /// Utility method for subclasses to determine if a string is a number
     ///
-    /// Digits, and also a leading sign and one decimal point. Digits alone was
-    /// too narrow once an attribute expression could read a JSON field: the
-    /// parser hands numbers back as doubles, so a rank of 1 arrives as "1.0",
-    /// and a comparison that could not see it as a number fell through to
-    /// comparing the two as text -- where "5.0" is less than "3".
+    /// Digits, and also a leading sign, one decimal point and an exponent --
+    /// the grammar `Double.parseDouble` reads, because that is what the
+    /// callers hand it. Digits alone was too narrow once an attribute
+    /// expression could read a JSON field: the parser returns numbers as
+    /// doubles, so a rank of 1 arrives as "1.0" and a rank of ten million as
+    /// "1.0E7". A comparison that cannot see either as a number falls through
+    /// to comparing them as text, where "5.0" is less than "3" and "1.0E7"
+    /// comes before it.
     ///
     /// #### Parameters
     ///
@@ -345,26 +348,43 @@ abstract class AbstractEvaluator implements Evaluator {
     ///
     /// true when the value is a number
     protected boolean isNumeric(String text) {
-        text = text.trim();
-        int tlen = text.length();
-        int start = tlen > 0 && (text.charAt(0) == '-' || text.charAt(0) == '+')
-                ? 1 : 0;
-        if (start >= tlen) {
+        String value = text.trim();
+        int length = value.length();
+        int at = 0;
+        if (at < length && (value.charAt(at) == '-' || value.charAt(at) == '+')) {
+            at++;
+        }
+        int digits = 0;
+        while (at < length && Character.isDigit(value.charAt(at))) {
+            at++;
+            digits++;
+        }
+        if (at < length && value.charAt(at) == '.') {
+            at++;
+            while (at < length && Character.isDigit(value.charAt(at))) {
+                at++;
+                digits++;
+            }
+        }
+        if (digits == 0) {
             return false;
         }
-        boolean point = false;
-        for (int i = start; i < tlen; i++) {
-            char c = text.charAt(i);
-            if (c == '.') {
-                if (point || i + 1 >= tlen) {
-                    return false;
-                }
-                point = true;
-            } else if (!Character.isDigit(c)) {
+        if (at < length && (value.charAt(at) == 'e' || value.charAt(at) == 'E')) {
+            at++;
+            if (at < length
+                    && (value.charAt(at) == '-' || value.charAt(at) == '+')) {
+                at++;
+            }
+            int exponent = 0;
+            while (at < length && Character.isDigit(value.charAt(at))) {
+                at++;
+                exponent++;
+            }
+            if (exponent == 0) {
                 return false;
             }
         }
-        return true;
+        return at == length;
     }
 
     /// Utility method for subclasses to determine strip single/double quotes
