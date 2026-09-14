@@ -52,6 +52,7 @@ public final class MySql {
     /** Capability bits, from the protocol's CLIENT_* set. */
     private static final int CLIENT_LONG_PASSWORD = 0x00000001;
     private static final int CLIENT_LONG_FLAG = 0x00000004;
+    private static final int CLIENT_FOUND_ROWS = 0x00000002;
     private static final int CLIENT_CONNECT_WITH_DB = 0x00000008;
     private static final int CLIENT_LOCAL_FILES = 0x00000080;
     private static final int CLIENT_PROTOCOL_41 = 0x00000200;
@@ -161,12 +162,21 @@ public final class MySql {
             useTls = false;
         }
 
-        // Deliberately NOT CLIENT_FOUND_ROWS. With it MySQL reports the rows an
-        // UPDATE MATCHED rather than the rows it changed, so an update that found
-        // its row and altered nothing answers 1 where Database.execute documents
-        // "the number of rows changed" and where SQLite and Postgres both answer
-        // 0. Code that reads 0 as "no such row" would have been told it succeeded.
-        int capabilities = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG
+        // CLIENT_FOUND_ROWS, so that an UPDATE reports the rows it MATCHED.
+        //
+        // An earlier version left it off, on the stated grounds that SQLite and
+        // PostgreSQL answer 0 for an update that found its row and changed
+        // nothing. They do not. Measured against all three, "UPDATE t SET a = 7
+        // WHERE id = 1" on a row that already holds 7:
+        //
+        //     sqlite 1, postgresql 1, mysql 0   (without this bit)
+        //
+        // so MySQL was the one engine out of step, and it is the direction that
+        // does harm: Dao.update reads the count as "did a row match", a handler
+        // turns false into a 404, and saving an entity nobody had edited
+        // answered "no such row". A row that genuinely is not there still
+        // reports 0 on all three, which is the case that has to keep working.
+        int capabilities = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_FOUND_ROWS
                 | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
                 | CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA;
         if(database != null && database.length() > 0) {

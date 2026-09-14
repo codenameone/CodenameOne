@@ -200,6 +200,14 @@ public class OrmCheck {
         notes.insert(note);
         note.title = "changed";
         check("update reports the row", "true", String.valueOf(notes.update(note)));
+        // AND AN UPDATE THAT CHANGES NOTHING STILL FOUND ITS ROW. MySQL counts
+        // rows it altered rather than rows it matched unless the connection asks
+        // for CLIENT_FOUND_ROWS, so without that bit saving an entity nobody had
+        // edited answered false here -- and a handler turns false into a 404.
+        // SQLite and PostgreSQL always answered true, so this is the assertion
+        // that holds the three to one answer.
+        check("an update that changes nothing still reports its row", "true",
+                String.valueOf(notes.update(note)));
         check("the update took", "changed",
                 notes.findById(Long.valueOf(note.id)).title);
         check("delete reports the row", "true", String.valueOf(notes.delete(note)));
