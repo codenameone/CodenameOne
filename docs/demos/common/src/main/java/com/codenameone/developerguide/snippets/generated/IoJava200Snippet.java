@@ -71,6 +71,10 @@ class IoJava200Snippet {
         // plain identifier, not a path -- the platform decides where it lands.
         Database db = Database.openOrCreate("propertiesdemo.db");
         try {
+            // A fresh database is empty, so anything that reads or writes a
+            // table has to create it first.
+            db.execute("CREATE TABLE IF NOT EXISTS Contact ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
             db.execute("INSERT INTO Contact (name) VALUES (?)", new String[] { "Ada" });
         } finally {
             Util.cleanup(db);

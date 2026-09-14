@@ -61,7 +61,10 @@ class AuthenticationAndIdentityJava200Snippet {
 
     // tag::authentication-and-identity-java-200[]
     void firebaseEmailSignIn(String email, String password) {
-        FirebaseAuth auth = FirebaseAuth.getInstance();
+        // withApiKey is not optional: without it every call completes its
+        // AsyncResource with IllegalStateException instead of reaching
+        // Firebase. Do it once, wherever your app initializes.
+        FirebaseAuth auth = FirebaseAuth.getInstance().withApiKey("YOUR_WEB_API_KEY");
         auth.signInWithEmailAndPassword(email, password)
             .ready(user -> {
                 // A Firebase token, not an OIDC one -- it is what your

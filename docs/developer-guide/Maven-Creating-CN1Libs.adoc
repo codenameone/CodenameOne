@@ -349,10 +349,10 @@ examples:
 
 [listing]
 ----
-import com.example.mylib.MyLib;
+import com.example.HelloWorld;
 
 // ... inside start()
-MyLib.helloWorld();
+HelloWorld.helloWorld();
 ----
 
 
