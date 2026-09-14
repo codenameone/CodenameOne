@@ -201,7 +201,11 @@ without being taken, and not because the far end gave up," and don't try to
 tell an explicit decline from a silent block out of this value alone.
 
 `CallAvailability`:: what `Calls.getAvailability()` answers before you report a
-call, and `AVAILABLE` is the only value that lets one ring. The rest need three
+call, and `AVAILABLE` is the only value that lets one ring. Check it before an
+incoming report; an outgoing call is a different question. On Android the
+notification gate that makes this answer `NOT_PERMITTED` applies to incoming
+calls alone -- an outgoing call never rings, so `reportOutgoing` goes through
+and refusing it would take away a call the user started. The values need three
 different responses, not two. `EMERGENCY_CALL_IN_PROGRESS` and
 `OTHER_APP_IN_CALL` pass on their own, so a retry is the right move --
 `THIS_APP_IN_CALL` is in the same family, though Android's bridge never reports it
