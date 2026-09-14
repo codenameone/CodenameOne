@@ -171,6 +171,12 @@ You'll expand on the theme of "Buying" the world for this app, except, this time
 . A 1-month subscription
 . A 1-year subscription
 
+Every listing in the rest of this chapter uses these declarations:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava103Snippet.java[tag=monetization-java-103,indent=0]
+----
 
 Notice that you create two separate SKUs for the 1 month and 1-year subscription.  **Each subscription period must have its own SKU**.  The example uses an array (`PRODUCTS`) that contains both of the SKUs. This is handy, as you'll see in the examples ahead, because the APIs for checking status and expiry date of a subscription take the SKUs in a "subscription group" as input.
 
@@ -237,7 +243,7 @@ The following methods can be used for synchronization:
 
 In your hello world app you synchronize the subscriptions in a few places.
 
-At the end of the `start()` method:
+In the `start()` method, after the form is built:
 
 [source,java]
 ----
@@ -245,6 +251,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 And you also provide a button to allow the user to manually synchronize the receipts:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava101Snippet.java[tag=monetization-java-101,indent=0]
+----
 
 
 ===== Expiry dates and subscription status
@@ -257,7 +268,12 @@ Now that you have a receipt store registered, and you have synchronized your rec
 
 If you need to know more information about subscriptions, you can always just call `getReceipts()` to get a list of all the current receipts and determine for yourself what the user should have access to.
 
-In the hello world app you'll use this information in a few different places. On your main form you'll include a label to show the current expiry date, and you allow the user to press a button to synchronize receipts manually if they think the value is out of date:
+In the hello world app you'll use this information in a few different places. On your main form you'll include a label showing the current expiry date, painted from the receipts already on the device and repainted by whichever of the two synchronizations above comes back first:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava102Snippet.java[tag=monetization-java-102,indent=0]
+----
 
 
 ===== Allowing the user to purchase the subscription
@@ -423,17 +439,17 @@ Now that you've set up and built the app, take a look at the source code so you 
 
 The example uses the https://github.com/shannah/cn1-generic-webservice-client[Generic Webservice Client Library] from inside your `ReceiptStore` implementation to load receipts from the web service, and insert new receipts to the database.
 
-The source for your ReceiptStore is as follows:
+The full `ReceiptStore` implementation is in the client project linked above.
 
 
 Notice that you aren't doing any calculation of expiry dates in your client app, as you did in the previous post (on non-renewable receipts). Since you are using a server now, it makes sense to move all that logic over to the server.
 
-The `createRESTClient()` method shown there creates a `RESTfulWebServiceClient` and configuring it to use basic authentication with a username and password. The idea is that your user would have logged into your app at some point, and you would have a username and password on hand to pass back to the web service with the receipt data so that you can connect the subscription to a user account. The source of that method is listed here:
+Its `createRESTClient()` method builds a `RESTfulWebServiceClient` using basic authentication. The idea is that your user has logged into your app at some point, so you have a username and password to send along with the receipt data and can tie the subscription to an account.
 
 
 ===== Server-Side
 
-On the server-side, your REST controller is a standard JAX-RS REST interface. The Netbeans web service wizard generated it and then it was modified to suit the purposes here. The methods of the `ReceiptsFacadeREST` class for the REST API are shown here:
+On the server side the REST controller is a standard JAX-RS interface. Its `ReceiptsFacadeREST` class is in the server project linked above.
 
 
 The magic happens inside that `validateAndSaveReceipt()` method, which You'll cover in detail soon.
@@ -451,10 +467,10 @@ NOTE: This example only checks receipts from the iTunes and Play stores because 
 
 For this tutorial, the example uses a purpose-built library to handle receipt validation in a way that hides as much of the complexity as possible. It supports both Google Play receipts and iTunes receipts.
 
-The general usage is as follows:
+The server project linked above shows it in use.
 
 
-As you can see from this snippet, the complexity of receipt validation has been reduced to entering three configuration strings:
+In that project the complexity of receipt validation is reduced to entering three configuration strings:
 
 1. `APPLE_SECRET` - This is a "secret" string that you will get from iTunes connect when you set up your in-app products.
 2. `GOOGLE_DEVELOPER_API_CLIENT_ID` - A client ID that you'll get from the Google developer API console when you set up your API service credentials.
@@ -464,7 +480,7 @@ The next section walks through the steps to get these values.
 
 ==== The `validateAndSaveReceipt()` method
 
-You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
+`validateAndSaveReceipt()` is where the work happens, and it's worth reading in full in the server project linked above.
 
 
 NOTE:  In many of the code snippets for the Server-side code, you'll see references to both a `Receipts` class and a `Receipt` class. This is slightly confusing. The `Receipts` class is a JPA entity the encapsulates a row from the "receipts" table of your SQL database. The `Receipt` class is `com.codename1.payment.Receipt`.  It's used to interface with the IAP validation library.

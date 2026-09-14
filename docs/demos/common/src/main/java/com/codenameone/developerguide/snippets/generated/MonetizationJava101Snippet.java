@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+
 package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
@@ -50,86 +51,39 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.analytics.*;
-import com.codename1.appreview.*;
-import com.codename1.ads.*;
-import com.codename1.util.*;
 import java.util.*;
 
 
-class MonetizationJava037Snippet {
+class MonetizationJava101Snippet {
 
-
-    Object context;
-    Object url;
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
     Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
+    Purchase iap = Purchase.getInAppPurchase();
+    String[] PRODUCTS = {"com.codename1.world.month", "com.codename1.world.year"};
     SpanLabel rentalStatus = new SpanLabel();
-
-    Form current;
 
     void showRentalStatus() {
     }
 
-    void addExpiryLabel(Form hi) {
-    }
-
+    // tag::monetization-java-101[]
     void addSyncButton(Form hi) {
+        Button syncReceipts = new Button("Synchronize Receipts");
+
+        syncReceipts.addActionListener(e -> {
+            Purchase.getInAppPurchase().synchronizeReceipts(0, success -> {
+                // synchronizeReceipts reports true only when every pending
+                // purchase reached the receipt store AND the receipts came
+                // back. On false nothing was reloaded, so there is nothing
+                // new to show and the status on screen stays as it was.
+                if (success) {
+                    showRentalStatus();
+                    hi.revalidate();
+                } else {
+                    ToastBar.showErrorMessage("Could not reach the receipt store");
+                }
+            });
+        });
+
+        hi.add(syncReceipts);
     }
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    
-    // tag::monetization-java-037[]
-    public void start() {
-     if (current != null) {
-     // A resume. The form and everything on it survived, so rebuilding it
-     // would hand a second form components the first one still owns, which
-     // Container rejects.
-     current.show();
-     } else {
-     Form hi = new Form("Hello World", BoxLayout.y());
-
-     // ... the rest of the form
-
-     // The expiry label and the button that refreshes it, both of which
-     // the next two listings build.
-     addExpiryLabel(hi);
-     addSyncButton(hi);
-
-     current = hi;
-     hi.show();
-     }
-
-     // Outside the branch on purpose: a subscription can be bought, renewed
-     // or cancelled on another device while this one is suspended, so the
-     // resume needs this as much as the launch does.
-     Purchase.getInAppPurchase().synchronizeReceipts(0, success -> {
-         // Whatever this brought back, the expiry label is now out of date.
-         // Repaint it from the same method the manual button uses.
-         if (success) {
-             showRentalStatus();
-             current.revalidate();
-         }
-     });
-    }
-    // end::monetization-java-037[]
-
-    Purchase iap = Purchase.getInAppPurchase();
-
+    // end::monetization-java-101[]
 }

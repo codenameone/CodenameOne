@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+
 package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
@@ -50,86 +51,35 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.analytics.*;
-import com.codename1.appreview.*;
-import com.codename1.ads.*;
-import com.codename1.util.*;
 import java.util.*;
 
 
-class MonetizationJava037Snippet {
+class MonetizationJava102Snippet {
 
-
-    Object context;
-    Object url;
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
     Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
+    Purchase iap = Purchase.getInAppPurchase();
+    String[] PRODUCTS = {"com.codename1.world.month", "com.codename1.world.year"};
+
+    // tag::monetization-java-102[]
+    // A field, not a local: the synchronization at the end of start() and the
+    // button above both have to reach this label.
     SpanLabel rentalStatus = new SpanLabel();
 
-    Form current;
+    void addExpiryLabel(Form hi) {
+        // The receipts already on the device answer this with no round trip,
+        // so the label is right the moment the form appears rather than after
+        // the first synchronization comes back.
+        showRentalStatus();
+        hi.add(rentalStatus);
+    }
 
     void showRentalStatus() {
+        Purchase iap = Purchase.getInAppPurchase();
+        if (iap.isSubscribed(PRODUCTS)) {
+            rentalStatus.setText("World rental expires " + iap.getExpiryDate(PRODUCTS));
+        } else {
+            rentalStatus.setText("You do not currently have a subscription to the world");
+        }
     }
-
-    void addExpiryLabel(Form hi) {
-    }
-
-    void addSyncButton(Form hi) {
-    }
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    
-    // tag::monetization-java-037[]
-    public void start() {
-     if (current != null) {
-     // A resume. The form and everything on it survived, so rebuilding it
-     // would hand a second form components the first one still owns, which
-     // Container rejects.
-     current.show();
-     } else {
-     Form hi = new Form("Hello World", BoxLayout.y());
-
-     // ... the rest of the form
-
-     // The expiry label and the button that refreshes it, both of which
-     // the next two listings build.
-     addExpiryLabel(hi);
-     addSyncButton(hi);
-
-     current = hi;
-     hi.show();
-     }
-
-     // Outside the branch on purpose: a subscription can be bought, renewed
-     // or cancelled on another device while this one is suspended, so the
-     // resume needs this as much as the launch does.
-     Purchase.getInAppPurchase().synchronizeReceipts(0, success -> {
-         // Whatever this brought back, the expiry label is now out of date.
-         // Repaint it from the same method the manual button uses.
-         if (success) {
-             showRentalStatus();
-             current.revalidate();
-         }
-     });
-    }
-    // end::monetization-java-037[]
-
-    Purchase iap = Purchase.getInAppPurchase();
-
+    // end::monetization-java-102[]
 }

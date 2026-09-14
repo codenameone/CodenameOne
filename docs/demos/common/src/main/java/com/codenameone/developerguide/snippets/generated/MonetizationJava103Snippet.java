@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+
 package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
@@ -50,86 +51,26 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
-import com.codename1.analytics.*;
-import com.codename1.appreview.*;
-import com.codename1.ads.*;
-import com.codename1.util.*;
 import java.util.*;
 
 
-class MonetizationJava037Snippet {
+class MonetizationJava103Snippet {
 
+    // tag::monetization-java-103[]
+    static final String SKU_WORLD_1_MONTH = "com.codename1.world.month";
+    static final String SKU_WORLD_1_YEAR = "com.codename1.world.year";
 
-    Object context;
-    Object url;
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
-    Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
-    SpanLabel rentalStatus = new SpanLabel();
+    // Both periods of the same subscription group. Every Purchase method that
+    // asks about status or expiry takes the whole group, so keeping them in
+    // one array is what makes the later listings read the way they do.
+    static final String[] PRODUCTS = { SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR };
 
-    Form current;
-
-    void showRentalStatus() {
-    }
-
-    void addExpiryLabel(Form hi) {
-    }
-
-    void addSyncButton(Form hi) {
-    }
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    
-    // tag::monetization-java-037[]
-    public void start() {
-     if (current != null) {
-     // A resume. The form and everything on it survived, so rebuilding it
-     // would hand a second form components the first one still owns, which
-     // Container rejects.
-     current.show();
-     } else {
-     Form hi = new Form("Hello World", BoxLayout.y());
-
-     // ... the rest of the form
-
-     // The expiry label and the button that refreshes it, both of which
-     // the next two listings build.
-     addExpiryLabel(hi);
-     addSyncButton(hi);
-
-     current = hi;
-     hi.show();
-     }
-
-     // Outside the branch on purpose: a subscription can be bought, renewed
-     // or cancelled on another device while this one is suspended, so the
-     // resume needs this as much as the launch does.
-     Purchase.getInAppPurchase().synchronizeReceipts(0, success -> {
-         // Whatever this brought back, the expiry label is now out of date.
-         // Repaint it from the same method the manual button uses.
-         if (success) {
-             showRentalStatus();
-             current.revalidate();
-         }
-     });
-    }
-    // end::monetization-java-037[]
-
-    Purchase iap = Purchase.getInAppPurchase();
-
+    // There is deliberately no Purchase field here. Receipts are cached on the
+    // instance and loaded from storage the first time one is asked for, while
+    // the synchronization that refreshes them is static and may be running on
+    // an instance the port created. A held instance therefore keeps answering
+    // from the snapshot it loaded; a fresh getInAppPurchase() reads what the
+    // last completed synchronization persisted. It is a storage read, not a
+    // network call.
+    // end::monetization-java-103[]
 }

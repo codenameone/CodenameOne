@@ -383,6 +383,45 @@ class PurchaseTest extends UITestBase {
     }
 
     @EdtTest
+    void testReceiptQueuedDuringFetchIsSubmittedBeforeSyncReportsSuccess() {
+        // A purchase completing while a synchronization is already fetching
+        // could not start one of its own -- syncInProgress was already true --
+        // and the fetch in flight was requested before the receipt existed.
+        // Reporting success at the end of that fetch handed the caller a
+        // snapshot without the purchase in it and left the receipt pending
+        // until something synchronized again.
+        final TestReceiptStore store = new TestReceiptStore();
+        purchase.setReceiptStore(store);
+
+        store.setOnFetch(new Runnable() {
+            public void run() {
+                // Stand in for the native purchase callback arriving while
+                // this fetch is outstanding. This is the entry point the
+                // ports use.
+                Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, "late", "tx-late",
+                        System.currentTimeMillis(), "order-late");
+            }
+        });
+
+        final boolean[] result = new boolean[1];
+        final int[] callCount = new int[1];
+        purchase.synchronizeReceipts(0, new SuccessCallback<Boolean>() {
+            public void onSucess(Boolean value) {
+                callCount[0]++;
+                result[0] = Boolean.TRUE.equals(value);
+            }
+        });
+        flushSerialCalls();
+
+        assertEquals(1, callCount[0], "the callback still fires exactly once");
+        assertTrue(result[0]);
+        assertEquals(1, store.getSubmittedReceipts().size(),
+                "the receipt queued during the fetch must be submitted before success is reported");
+        assertTrue(purchase.getPendingPurchases().isEmpty(),
+                "and it must not be left in the pending queue");
+    }
+
+    @EdtTest
     void testSynchronizeReceiptsDoesNotInfinitelyResubmitReceiptWithNullTransactionId() {
         // A receipt with a null transactionId must still be removable from the
         // pending queue.  Otherwise synchronizeReceipts recurses forever,
@@ -438,6 +477,13 @@ class PurchaseTest extends UITestBase {
         private List<Receipt> receipts = new ArrayList<Receipt>();
         private final List<Receipt> submitted = new ArrayList<Receipt>();
         private boolean submitResult = true;
+        /// Runs once, inside the first fetch, so a test can simulate a
+        /// purchase arriving while a synchronization is outstanding.
+        private Runnable onFetch;
+
+        void setOnFetch(Runnable onFetch) {
+            this.onFetch = onFetch;
+        }
 
         void setReceipts(List<Receipt> receipts) {
             this.receipts = new ArrayList<Receipt>(receipts);
@@ -452,6 +498,11 @@ class PurchaseTest extends UITestBase {
         }
 
         public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
+            if (onFetch != null) {
+                Runnable r = onFetch;
+                onFetch = null;
+                r.run();
+            }
             Receipt[] data = receipts.toArray(new Receipt[receipts.size()]);
             callback.onSucess(data);
         }
