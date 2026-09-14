@@ -300,6 +300,12 @@ public final class Database {
         // means the same thing on all three, so the statement is refused instead,
         // before it runs.
         int tuples = dialect.countInsertRows(sql);
+        if(tuples == Dialect.VERSION_GATED) {
+            throw new IOException("This statement's tuples sit behind a MySQL version-gated "
+                    + "comment, so how many rows it inserts depends on the server and this "
+                    + "client cannot ask. insert() answers with ONE generated key; use "
+                    + "execute() for a statement whose shape the server decides: [" + sql + "]");
+        }
         if(tuples > 1) {
             throw new IOException("insert() answers with ONE generated key and this "
                     + "statement inserts " + tuples + " rows, which the three engines key "

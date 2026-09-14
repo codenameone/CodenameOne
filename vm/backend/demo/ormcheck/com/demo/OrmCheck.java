@@ -121,6 +121,8 @@ public class OrmCheck {
         note.created = new Date(1700000000000L);
         note.payload = new byte[] {1, 2, 3, 0, 4};
         note.revision = null;
+        note.initial = 'x';
+        note.grade = null;
         note.cached = "never stored";
         notes.insert(note);
         check("the generated key is written back", "true", String.valueOf(note.id > 0));
@@ -140,13 +142,20 @@ public class OrmCheck {
         // A NUL INSIDE the blob, which is where a length-unaware path truncates.
         check("byte[] content", "1,2,3,0,4", join(back.payload));
         check("a null boxed field stays null", "null", String.valueOf(back.revision));
+        check("char", "x", String.valueOf(back.initial));
+        // A nullable char has no default to fall back on, so it is read through
+        // a conversion of its own rather than through the primitive one.
+        check("a null boxed char stays null", "null", String.valueOf(back.grade));
         check("@DbTransient is not stored", "null", String.valueOf(back.cached));
 
         // And a value in the boxed column comes back as that value.
         back.revision = Long.valueOf(7);
+        back.grade = Character.valueOf('A');
         notes.update(back);
         check("a boxed field round trips", "7",
                 String.valueOf(notes.findById(Long.valueOf(note.id)).revision));
+        check("a boxed char round trips", "A",
+                String.valueOf(notes.findById(Long.valueOf(note.id)).grade));
     }
 
     private static void updatesAndDeletes(Dao<Note> notes) throws Exception {

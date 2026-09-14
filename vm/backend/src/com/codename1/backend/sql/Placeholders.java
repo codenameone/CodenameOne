@@ -191,6 +191,17 @@ final class Placeholders {
                                boolean hashComments, boolean dollarQuotedStrings,
                                boolean dashCommentNeedsSpace, boolean bracketIdentifiers,
                                boolean executableComments) throws IOException {
+        if(executableComments && hasVersionGate(sql)) {
+            // UNKNOWABLE, which is not the same as "no tuples to count".
+            // "/*!50100 , (2) */" adds a row on a server past 5.1 and nothing on
+            // an older one; "/*!99999 ..." adds nothing anywhere today. This
+            // scanner has no connection to ask, and both wrong answers are bad:
+            // counting the contents refuses a statement that inserts one row,
+            // ignoring them runs a multi-row insert through a method that
+            // promises one key. So it says it cannot tell, and Database.insert
+            // refuses with a message naming the reason.
+            return VERSION_GATED;
+        }
         int at = 0;
         int depth = 0;
         int length = sql.length();
@@ -312,6 +323,30 @@ final class Placeholders {
         return at;
     }
 
+    /** countInsertRows: the statement's row count depends on the server version. */
+    static final int VERSION_GATED = -2;
+
+    /**
+     * Whether the statement carries a MySQL version-gated executable comment --
+     * "/*!" followed by digits.
+     *
+     * <p>Scanned crudely on purpose: this runs before the tuple walk and only has
+     * to notice that a gate EXISTS. A "/*!" inside a string literal would be a
+     * false positive, and the cost of one is a refusal with a clear message
+     * rather than a wrong count.
+     */
+    private static boolean hasVersionGate(String sql) {
+        int at = sql.indexOf("/*!");
+        while(at >= 0) {
+            int after = at + 3;
+            if(after < sql.length() && sql.charAt(after) >= '0' && sql.charAt(after) <= '9') {
+                return true;
+            }
+            at = sql.indexOf("/*!", at + 3);
+        }
+        return false;
+    }
+
     /**
      * Whether {@code word} sits at {@code at} as a whole word, ignoring case --
      * so the VALUES in "revalues" or "values_of" is not the keyword.
@@ -427,6 +462,12 @@ final class Placeholders {
                     after++;
                 }
                 return after;
+                // The VERSION GATE those digits carry is deliberately not read
+                // here; see countInsertRows, which refuses to answer for a
+                // statement carrying one. "/*!50100 ..." runs on any server past
+                // 5.1 and "/*!99999 ..." runs on none, so what the statement
+                // MEANS depends on a version this scanner has no connection to
+                // ask for.
             }
             return skipBlockComment(sql, at, nestedComments);
         }

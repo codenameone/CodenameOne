@@ -253,7 +253,14 @@ public abstract class Dialect {
      * a multi-row insert has no single key that means the same thing on three
      * engines. Counting the tuples is what lets it refuse BEFORE the rows are
      * written rather than after.
+     *
+     * <p>{@link #VERSION_GATED} is the third answer: a MySQL statement whose
+     * tuples sit behind a version-gated executable comment inserts a number of
+     * rows that depends on the server, and this has no connection to ask.
      */
+    /** countInsertRows: the row count depends on the server version. */
+    public static final int VERSION_GATED = Placeholders.VERSION_GATED;
+
     public int countInsertRows(String sql) throws IOException {
         if(sql == null) {
             throw new IOException("No statement");

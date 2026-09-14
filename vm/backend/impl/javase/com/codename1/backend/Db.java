@@ -63,12 +63,19 @@ public final class Db {
         // cn1:backend and then fail once translated -- a dev loop that behaves
         // differently from production, which is the one thing it must not do.
         // Database is what speaks to those servers, on both arms.
-        if(path != null && path.startsWith("jdbc:") && !path.startsWith("jdbc:sqlite:")) {
+        // IGNORING CASE, like the translated twin and like DataSource: a URL
+        // scheme is case insensitive, and recognising "jdbc:sqlite:" here while
+        // the other two recognised "JDBC:SQLITE:" made the same string an
+        // in-memory database on one arm and a file named after the URL on the
+        // other.
+        if(path != null && path.regionMatches(true, 0, "jdbc:", 0, 5)
+                && !path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
             throw new IOException("Db opens SQLite only, and the translated build "
                     + "would hand " + path + " to sqlite3_open. Use Database.open for "
                     + "PostgreSQL or MySQL.");
         }
-        String url = path != null && path.startsWith("jdbc:") ? path : "jdbc:sqlite:" + path;
+        String url = path != null && path.regionMatches(true, 0, "jdbc:", 0, 5)
+                ? path : "jdbc:sqlite:" + path;
         try {
             Connection connection = DriverManager.getConnection(url);
             connection.setAutoCommit(true);

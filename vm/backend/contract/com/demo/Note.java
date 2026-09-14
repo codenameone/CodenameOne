@@ -67,6 +67,15 @@ public class Note {
     /** Boxed, so the column can be null and come back as null. */
     public Long revision;
 
+    /** A primitive char, which is stored as one-character text. */
+    public char initial;
+
+    /**
+     * And its boxed form, which the generator reads through a DIFFERENT
+     * conversion: nullable, so it cannot fall back to a default character.
+     */
+    public Character grade;
+
     /** Never stored: the ORM leaves it alone and so does the table. */
     @DbTransient
     public String cached;

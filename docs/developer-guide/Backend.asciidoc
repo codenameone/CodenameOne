@@ -379,10 +379,11 @@ Three things this doesn't do, on purpose. Relationships aren't supported --
 fails the build with a message saying to persist the foreign key as a scalar.
 `createTable` creates a table that isn't there and does nothing at all to one
 that is, so it's a convenience for development and for tests rather than a
-migration tool. And a boolean and a date are stored as integers on every engine,
-0 or 1 and epoch milliseconds, because a native timestamp comes back as text
-whose format follows the server's own time zone and would not round-trip the
-same way on three engines.
+migration tool. And a boolean, a date and a char are stored as integers on every
+engine -- 0 or 1, epoch milliseconds, and the UTF-16 code unit -- because a
+native timestamp comes back as text whose format follows the server's own time
+zone and would not round-trip the same way on three engines, and because a char
+that was never assigned holds NUL, which PostgreSQL refuses inside a text value.
 
 === Sharing the contract with the app
 
