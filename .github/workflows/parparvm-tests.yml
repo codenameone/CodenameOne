@@ -90,7 +90,15 @@ jobs:
       - name: Install native build tools
         run: |
           bash scripts/ci/apt-get-update.sh
-          sudo apt-get install -y clang
+          # clang alone is not enough to LINK a backend binary. vm/backend's
+          # build.sh links -lcurl -lssl -lcrypto -lnghttp2 (outbound TLS is
+          # libcurl's, the auth primitives are OpenSSL's, the HTTP/2 framing is
+          # nghttp2's) and needs their headers to compile the natives that call
+          # them. Without these, every test that builds a server binary --
+          # BackendDatabaseTest, BackendOrmTest, BackendRuntimeSelfTest --
+          # compiled, failed at the link, and SKIPPED, which this job reported
+          # as green for as long as it has existed.
+          sudo apt-get install -y clang libcurl4-openssl-dev libssl-dev libnghttp2-dev
 
       # Install JDKs and export their paths
       - name: Set up JDK 8
