@@ -79,6 +79,26 @@ public final class Values {
         if(value == null) {
             return null;
         }
+        if(value instanceof Double || value instanceof Float) {
+            // SQLITE HAS NO COLUMN TYPES, only affinities: an INTEGER column
+            // holds 12.5 if something put one there -- a migration, raw SQL,
+            // another client -- and the driver hands it back as a Double.
+            // longValue() then truncated it into the entity, while the exact-text
+            // branch below refuses the identical "12.5". The same value cannot be
+            // corrupted one way and refused the other because of how the engine
+            // chose to encode it.
+            double exact = ((Number)value).doubleValue();
+            if(exact != Math.floor(exact) || Double.isInfinite(exact) || Double.isNaN(exact)) {
+                throw new IOException("A column holding " + describe(value)
+                        + " has a fractional part and the field it is read into is an "
+                        + "integer; the value would have to be rounded to fit");
+            }
+            if(exact < -9.223372036854776E18 || exact > 9.223372036854776E18) {
+                throw new IOException("A column holding " + describe(value)
+                        + " is outside the range of the integer field it is read into");
+            }
+            return Long.valueOf((long)exact);
+        }
         if(value instanceof Number) {
             return Long.valueOf(((Number)value).longValue());
         }
@@ -117,37 +137,62 @@ public final class Values {
     /** The value as a 32-bit integer, or {@code fallback} when it is null. */
     public static int asInt(Object value, int fallback) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? fallback : (int)out.longValue();
+        return out == null ? fallback : (int)narrowed(out.longValue(), value,
+                -2147483648L, 2147483647L, "int");
     }
 
     /** The value as a boxed 32-bit integer, or null. */
     public static Integer asIntObject(Object value) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? null : Integer.valueOf((int)out.longValue());
+        return out == null ? null : Integer.valueOf((int)narrowed(out.longValue(), value,
+                -2147483648L, 2147483647L, "int"));
     }
 
     /** The value as a 16-bit integer, or {@code fallback} when it is null. */
     public static short asShort(Object value, short fallback) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? fallback : (short)out.longValue();
+        return out == null ? fallback : (short)narrowed(out.longValue(), value,
+                -32768L, 32767L, "short");
     }
 
     /** The value as a boxed 16-bit integer, or null. */
     public static Short asShortObject(Object value) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? null : Short.valueOf((short)out.longValue());
+        return out == null ? null : Short.valueOf((short)narrowed(out.longValue(), value,
+                -32768L, 32767L, "short"));
     }
 
     /** The value as a byte, or {@code fallback} when it is null. */
     public static byte asByte(Object value, byte fallback) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? fallback : (byte)out.longValue();
+        return out == null ? fallback : (byte)narrowed(out.longValue(), value,
+                -128L, 127L, "byte");
     }
 
     /** The value as a boxed byte, or null. */
     public static Byte asByteObject(Object value) throws IOException {
         Long out = asLongObject(value);
-        return out == null ? null : Byte.valueOf((byte)out.longValue());
+        return out == null ? null : Byte.valueOf((byte)narrowed(out.longValue(), value,
+                -128L, 127L, "byte"));
+    }
+
+    /**
+     * {@code number} when the field it is going into can hold it, or a refusal.
+     *
+     * <p>A cast would WRAP: a column holding 2147483648 read into an int field
+     * became -2147483648, which is a different row's key, a different count, a
+     * different answer -- and nothing said so. The columns these fields map to
+     * are ordinary integer columns on every engine, and SQLite's are not even
+     * range-checked, so a value too large for the field is something a migration
+     * or another client can put there any day.
+     */
+    private static long narrowed(long number, Object value, long min, long max, String field)
+            throws IOException {
+        if(number < min || number > max) {
+            throw new IOException("A column holding " + describe(value)
+                    + " is outside the range of the " + field + " field it is read into");
+        }
+        return number;
     }
 
     /** The value as a double, or {@code fallback} when it is null. */

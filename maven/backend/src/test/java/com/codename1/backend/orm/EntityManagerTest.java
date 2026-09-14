@@ -211,6 +211,35 @@ class EntityManagerTest {
     }
 
     @Test
+    @DisplayName("a fractional or oversized value is refused however the engine encoded it")
+    void refusesValuesThatWouldNotSurviveTheField() throws Exception {
+        // SQLite has affinities rather than types: an INTEGER column holds 12.5
+        // if a migration or another client put one there, and the driver returns
+        // a Double. Truncating that while refusing the identical "12.5" as text
+        // meant the same value was corrupted or refused depending only on how the
+        // engine chose to encode it.
+        assertThrows(IOException.class, () -> Values.asLong(Double.valueOf(12.5), 0));
+        assertThrows(IOException.class, () -> Values.asLong(Float.valueOf(12.5f), 0));
+        assertThrows(IOException.class, () -> Values.asLong("12.5", 0));
+        // An integral double is an integer and passes.
+        assertEquals(12L, Values.asLong(Double.valueOf(12.0), 0));
+        assertThrows(IOException.class,
+                () -> Values.asLong(Double.valueOf(Double.POSITIVE_INFINITY), 0));
+
+        // And a narrowing conversion refuses rather than wrapping: 2147483648 in
+        // an int field used to arrive as -2147483648.
+        assertThrows(IOException.class, () -> Values.asInt(Long.valueOf(2147483648L), 0));
+        assertThrows(IOException.class, () -> Values.asIntObject(Long.valueOf(-2147483649L)));
+        assertThrows(IOException.class, () -> Values.asShort(Long.valueOf(32768L), (short)0));
+        assertThrows(IOException.class, () -> Values.asByte(Long.valueOf(128L), (byte)0));
+        // The edges themselves still fit.
+        assertEquals(2147483647, Values.asInt(Long.valueOf(2147483647L), 0));
+        assertEquals(-2147483648, Values.asInt(Long.valueOf(-2147483648L), 0));
+        assertEquals((short)-32768, Values.asShort(Long.valueOf(-32768L), (short)0));
+        assertEquals((byte)127, Values.asByte(Long.valueOf(127L), (byte)0));
+    }
+
+    @Test
     @DisplayName("findOne asks the database for one row")
     void findOneAsksForOneRow() throws Exception {
         DataSource pool = DataSource.open(":memory:");
