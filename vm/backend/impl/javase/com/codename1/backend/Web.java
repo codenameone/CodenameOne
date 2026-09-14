@@ -248,8 +248,18 @@ public final class Web {
             // state-changing kind, so following blindly can perform it twice, the
             // second time somewhere the caller never named. Both arms take the
             // restricted path for one.
+            // AND ONLY FOR A SAFE METHOD. An empty DELETE or PUT carries neither a
+            // header nor a body, so the two tests above find nothing to leak --
+            // and there is nothing, but leaking is only half of it. A 307 or a 308
+            // preserves the METHOD, so following one repeats the state change at a
+            // Location the caller never chose. GET and HEAD are the methods
+            // RFC 9110 4.2.1 calls safe; anything else, including a method spelled
+            // in lower case, is treated as unsafe, which is the direction to be
+            // wrong in. A null method means GET on both arms.
+            boolean safeMethod = method == null || "GET".equals(method)
+                    || "HEAD".equals(method);
             connection.setInstanceFollowRedirects((headers == null || headers.isEmpty())
-                    && (body == null || body.length == 0));
+                    && (body == null || body.length == 0) && safeMethod);
             connection.setRequestProperty("User-Agent", "codenameone-backend");
             if(headers != null) {
                 for(int iter = 0 ; iter < headers.size() ; iter++) {

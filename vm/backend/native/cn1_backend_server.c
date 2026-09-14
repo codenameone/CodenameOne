@@ -954,7 +954,28 @@ JAVA_INT com_codename1_backend_Reactor_waitImpl___int_int_1ARRAY_int_R_int(CODEN
         } while(n < 0 && errno == EINTR);
         CN1_RESUME_THREAD;
         for(i = 0 ; i < n && count < capacity ; i++) {
-            out[count++] = (JAVA_INT)events[i].ident;
+            /* ONE DESCRIPTOR, ONE SLOT. kqueue registers a filter at a time and
+               reports one event per FILTER, so a descriptor watched for READ and
+               WRITE that becomes both at once arrives here twice -- while epoll
+               reports it once, with a combined mask, and so does a Selector key.
+               Copied straight out, that is the same connection handed to two
+               workers, each believing it owns it. And in an array with one slot
+               the second event is simply left in the kqueue, so the descriptor
+               comes back on the next wait with no modify() in between, which is
+               exactly what a ONESHOT registration promises cannot happen.
+               The scan is over what this call has already written, which is at
+               most the capacity the caller asked for. */
+            JAVA_INT fd = (JAVA_INT)events[i].ident;
+            int seen = 0, j;
+            for(j = 0 ; j < count ; j++) {
+                if(out[j] == fd) {
+                    seen = 1;
+                    break;
+                }
+            }
+            if(!seen) {
+                out[count++] = fd;
+            }
         }
         return n < 0 ? -1 : count;
     }

@@ -220,6 +220,7 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
     char* urlCopy = NULL;
     char* bodyCopy = NULL;
     JAVA_INT bodyLength = 0;
+    int safeMethod;
 
     if(url == JAVA_NULL) {
         return 0;
@@ -420,7 +421,19 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
        the state-changing kind, so following blindly can mean performing it twice,
        the second time somewhere the caller never named. It therefore takes the
        same restricted path a headered one does. */
-    if(headers == NULL && bodyLength == 0) {
+    /* AND ONLY FOR A SAFE METHOD. An empty DELETE or PUT carries neither a
+       header nor a body, so the two tests above say there is nothing to leak --
+       and there is not, but leaking is only half of it. A 307 or a 308 preserves
+       the METHOD, so following one repeats the state change at a Location this
+       caller never chose: a taken-over or merely misconfigured endpoint answers
+       one redirect and the delete happens on its host instead. GET and HEAD are
+       the methods RFC 9110 4.2.1 calls safe, and they are the only ones followed
+       freely here. A method spelled any other way -- lower case, unknown, or
+       absent-but-not-null -- is treated as unsafe, which is the direction to be
+       wrong in; a NULL method is libcurl's own default GET. */
+    safeMethod = methodCopy == NULL || strcmp(methodCopy, "GET") == 0
+            || strcmp(methodCopy, "HEAD") == 0;
+    if(headers == NULL && bodyLength == 0 && safeMethod) {
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     } else {
         /* This #ifdef may never fire, for the same reason the PATH_AS_IS one

@@ -2500,6 +2500,52 @@ public class SelfTest {
                         "s3cret-payload".getBytes("UTF-8")));
         check("and a bodiless request still follows one", "200 a request arrived",
                 redirectOutcome("GET", "302 Found", null));
+        // AND THE METHOD COUNTS TOO. An empty DELETE leaks nothing, and a 307
+        // preserves the method, so following it performs the delete on a host the
+        // caller never named. RFC 9110 4.2.1: GET and HEAD are the safe ones.
+        check("an empty DELETE is not followed off-host either", "307 nothing",
+                redirectOutcome("DELETE", "307 Temporary Redirect", null));
+        check("nor is an empty PUT", "307 nothing",
+                redirectOutcome("PUT", "307 Temporary Redirect", null));
+    }
+
+    /**
+     * One ready descriptor is one slot, whatever a poller counts.
+     *
+     * <p>kqueue registers a filter at a time and reports one event per FILTER, so
+     * a descriptor watched for READ and WRITE that becomes both at once is
+     * reported twice -- while epoll reports it once with a combined mask, and a
+     * Selector answers with one key. Copied straight through, that is one
+     * connection handed to two workers, each believing it owns it.
+     */
+    private static void oneReadyDescriptorIsOneSlot() throws Exception {
+        Reactor reactor = Reactor.create();
+        ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 5000);
+        int peer = listener.accept();
+        int[] ready = new int[8];
+        try {
+            // Readable and writable at the same moment, watched for both.
+            byte[] hello = "hi".getBytes("UTF-8");
+            conn.write(hello, 0, hello.length);
+            // WAIT FOR THE BYTES FIRST. Registering before they land leaves only
+            // the WRITE filter ready, and then one event is the right answer for
+            // the wrong reason -- the first version of this check passed just as
+            // well with the coalescing removed, which is no check at all.
+            ServerSocket.awaitReadable(peer, 2000);
+            reactor.add(peer, Reactor.READ | Reactor.WRITE);
+            int reported = reactor.await(ready, 1000);
+            check("a descriptor ready both ways is reported once", "1",
+                    String.valueOf(reported));
+            check("and it is the descriptor that was watched", String.valueOf(peer),
+                    String.valueOf(ready[0]));
+        } finally {
+            reactor.remove(peer);
+            reactor.close();
+            ServerSocket.closeFd(peer);
+            conn.close();
+            listener.close();
+        }
     }
 
     /**
@@ -5016,6 +5062,7 @@ public class SelfTest {
         aFramedResponseEndsAtItsFraming();
         aChunkSizeCannotWrapTheWalk();
         aRedirectDoesNotCarryTheBodyOffHost();
+        oneReadyDescriptorIsOneSlot();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
         halfACredentialPairIsRefused();
