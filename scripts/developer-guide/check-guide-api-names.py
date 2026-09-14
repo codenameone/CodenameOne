@@ -5,8 +5,11 @@ Two questions, both answered from the tree rather than from a list of
 approved words.
 
 1.  Every ``codenameone.com/javadoc/com/codename1/.../Foo.html`` link must
-    name a class that exists.  The URL carries the full package, so this is
-    exact, and a dead one is a 404 for the reader.
+    name a class the published javadoc carries.  The URL spells the full
+    package, so this is exact, and a dead one is a 404 for the reader.
+    ``com.codename1.impl`` and package-private types are not published --
+    see ``.github/scripts/build_javadocs.sh`` -- so a link to one is dead
+    even though the source is right here.
 
 2.  A word that is one edit away from a Codename One class, and that appears
     nowhere in this repository's own sources, is a misspelling of that class.
@@ -78,17 +81,69 @@ def strip_comments(text):
     return XML_COMMENT.sub(' ', text)
 
 
-# A type declared inside another one. Read from the source rather than
-# guessed, so a javadoc link to Outer.Inner is checked as exactly as one to a
-# top-level class.
-NESTED = re.compile(r'\b(?:class|interface|enum)\s+([A-Z][A-Za-z0-9]*)')
+# A type declaration, with the modifiers that decide whether javadoc publishes
+# it. Nested types are read from the source rather than guessed, so a link to
+# Outer.Inner is checked as exactly as one to a top-level class.
+DECLARATION = re.compile(
+    r'(?P<modifiers>(?:\b(?:public|protected|private|static|final|abstract'
+    r'|strictfp|sealed|non-sealed)\s+)*)'
+    r'\b(?:class|interface|enum|@interface)\s+(?P<name>[A-Z][A-Za-z0-9]*)')
+# Declarations and braces in one pass, so a file is read once.
+TOKEN = re.compile(DECLARATION.pattern + r'|[{}]')
+# The published javadoc drops this package and everything under it; see
+# .github/scripts/build_javadocs.sh, which greps those sources out of its
+# argfile and passes -exclude on top.
+UNPUBLISHED_PACKAGE = 'com.codename1.impl'
+
+
+def declared_types(source):
+    """Every type in one compilation unit, with its real nesting.
+
+    Yields ``(trail, published)``, where trail runs from the outermost type
+    inwards -- so URLImage.ImageAdapter comes out as a pair and two sibling
+    interfaces never join. Taking every ordered pair of declarations instead
+    invented URLImage.RequestDecorator.ErrorCallback, which has no page, and
+    accepted a guide link to it.
+
+    Publication follows javadoc's ``-protected``: a type has a page when it
+    and every type enclosing it are public or protected.
+    """
+    out = []
+    stack = []
+    depth = 0
+    pending = None
+    # One pass. Searching for the next declaration from each position instead
+    # re-scanned the rest of the file every time, which is quadratic and took
+    # a minute over the tree.
+    for token in TOKEN.finditer(source):
+        text = token.group(0)
+        if text == '{':
+            if pending is not None:
+                stack.append((depth, pending))
+                trail = [name for _, (name, _) in stack]
+                published = all(flag for _, (_, flag) in stack)
+                out.append((trail, published))
+                pending = None
+            depth += 1
+        elif text == '}':
+            depth -= 1
+            while stack and stack[-1][0] >= depth:
+                stack.pop()
+            pending = None
+        else:
+            modifiers = token.group('modifiers').split()
+            pending = (token.group('name'),
+                       'public' in modifiers or 'protected' in modifiers)
+    return out
 
 
 def class_index():
-    """Simple and fully qualified names of every class an app can reference.
+    """Simple and fully qualified names of every class the guide may link to.
 
     Nested types are included under their outer class -- URLImage.ImageAdapter
     -- because the guide links to them and a javadoc URL spells them that way.
+    A type the published javadoc does not carry is left out, since the point
+    of the link check is that the reader reaches a page.
     """
     simple, qualified = set(), set()
     for root in APP_ROOTS:
@@ -97,31 +152,27 @@ def class_index():
                 if not name.endswith('.java'):
                     continue
                 outer = name[:-5]
-                simple.add(outer)
                 rel = os.path.join(path, name)[len(root) + 1:-5]
-                dotted = rel.replace(os.sep, '.')
-                qualified.add(dotted)
+                package = rel.replace(os.sep, '.').rsplit('.', 1)[0]
+                if package == UNPUBLISHED_PACKAGE or \
+                        package.startswith(UNPUBLISHED_PACKAGE + '.'):
+                    continue
                 try:
                     with open(os.path.join(path, name), encoding='utf-8',
                               errors='ignore') as handle:
                         # Comments hold sample code, and a "class MyListener"
                         # written in a javadoc example is not a type anyone
                         # can link to.
-                        declared = set(NESTED.findall(
-                            strip_comments(handle.read())))
+                        source = strip_comments(handle.read())
                 except OSError:
                     continue
-                for inner in declared:
-                    if inner == outer:
+                for trail, published in declared_types(source):
+                    if not published or trail[0] != outer:
+                        # javadoc runs with -protected, so a package-private
+                        # type has no page even though the source is here.
                         continue
-                    # Flat rather than exact nesting: a javadoc URL spells a
-                    # doubly nested type Outer.Middle.Inner, and every segment
-                    # of it is declared in this one file.
-                    simple.add(inner)
-                    qualified.add(dotted + '.' + inner)
-                    for other in declared:
-                        if other != inner:
-                            qualified.add(dotted + '.' + other + '.' + inner)
+                    simple.add(trail[-1])
+                    qualified.add('.'.join([package] + trail))
     return simple, qualified
 
 
