@@ -437,12 +437,8 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while it was being unlocked");
                     }
-                    metadata = meta;
-                    // Unlocking an already-unlocked vault would otherwise leave the previous
-                    // array in the heap with nothing pointing at it, which is the one copy this
-                    // class can still do something about.
-                    Bytes.zero(dataKey);
-                    dataKey = key;
+                    requireAuthenticRecord(meta, key);
+                    publishKey(generation, meta, key);
                     passwordNeedsRewrap = envelope.getKdf().needsUpgrade();
                     touch();
                     out.complete(Boolean.TRUE);
@@ -515,9 +511,8 @@ public final class Vault {
                         throw new VaultException(VaultError.CORRUPT,
                                 "the device wrap did not contain a data key");
                     }
-                    metadata = meta;
-                    Bytes.zero(dataKey);
-                    dataKey = key;
+                    requireAuthenticRecord(meta, key);
+                    publishKey(generation, meta, key);
                     key = null;
                     touch();
                     out.complete(Boolean.TRUE);
@@ -965,7 +960,11 @@ public final class Vault {
                     // isExportable() correctly reports as exportable. Handing back a report
                     // saying NON_EXTRACTABLE_KEY while the object contradicts it is the kind
                     // of guarantee that gets believed.
-                    out.complete(new VaultKeyHandle(Vault.this, lockGeneration, derived,
+                    // `generation`, not lockGeneration. Reading the field again here meant a
+                    // lock landing between the check above and this line stamped the handle
+                    // with the POST-lock value -- so the handle considered itself live and went
+                    // on sealing and opening with key material the lock had invalidated.
+                    out.complete(new VaultKeyHandle(Vault.this, generation, derived,
                             purpose, meta.dataKeyVersion, extractedKeyProtection()));
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -1216,9 +1215,8 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while it was being unlocked");
                     }
-                    metadata = meta;
-                    Bytes.zero(dataKey);
-                    dataKey = key;
+                    requireAuthenticRecord(meta, key);
+                    publishKey(generation, meta, key);
                     touch();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -1998,6 +1996,32 @@ public final class Vault {
     /// counter raised. Everything inside such a record agrees with itself, and an offline client
     /// has nothing to compare it against. That is the freshness limit documented on
     /// [#importSyncState].
+    /// Publishes a recovered key, and undoes it if a lock arrived while it was being published.
+    ///
+    /// The check and the assignment are two statements and a lock can land between them. What
+    /// this does NOT do is make them atomic: that means a mutex in core, and this project's
+    /// model is one thread on each side of a boundary with a plain int counter for work that
+    /// outlives the EDT turn that started it -- which is exactly what `generation` is. A lock
+    /// here would be the first of several, each closing the interleaving the last one opened.
+    ///
+    /// So the window is not closed; the OUTCOME is. If the generation moved, the key just
+    /// published is withdrawn and the vault is left locked, which is the state lock() was
+    /// asking for. A caller that raced is told LOCKED rather than handed an open vault, and
+    /// the transient is a few statements wide and self-correcting rather than permanent.
+    private void publishKey(int generation, VaultMetadata meta, byte[] key) {
+        metadata = meta;
+        // Unlocking an already-unlocked vault would otherwise leave the previous array in the
+        // heap with nothing pointing at it, which is the one copy this class can still do
+        // something about.
+        Bytes.zero(dataKey);
+        dataKey = key;
+        if (generation != lockGeneration) {
+            lock();
+            throw new VaultException(VaultError.LOCKED,
+                    "the vault was locked while it was being unlocked");
+        }
+    }
+
     /// Refuses to deliver when the vault was locked while this operation was running.
     ///
     /// lock() promises that nothing in flight delivers afterwards, and an operation that reads

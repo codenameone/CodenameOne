@@ -996,6 +996,45 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRecordWithItsRetiredChainRemovedIsRefused() {
+        // Damage rather than forgery: dropping a retired.N line makes everything sealed under
+        // version N unreadable, and without a tag over the whole record the vault opens and
+        // reports itself healthy while it happens.
+        //
+        // This exercises the IMPORT path, which is where a record arrives from somewhere else.
+        // The same verification now also runs on the three local unlock paths -- password,
+        // remembered and recovery code -- and that half has NO test here: reaching the stored
+        // record means the vault's own storage key, which is private to the class. What covers
+        // it is the round trip, since every unlock in this suite now verifies a tag that some
+        // other operation stamped.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue());
+        vault.lock();
+
+        // Take the stored record out through the sync export, drop its retired chain, and put it
+        // back. The password wrap is untouched, so only the tag stands between this and a vault
+        // that opens with a hole in it.
+        String record = new String(Vault.named(name).configure(fast()).exportSyncState(),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(record.indexOf("retired.") >= 0, "the rotation must leave a retired link");
+        StringBuilder damaged = new StringBuilder();
+        String[] lines = com.codename1.util.StringUtil.tokenize(record, '\n').toArray(new String[0]);
+        for (int iter = 0; iter < lines.length; iter++) {
+            if (!lines[iter].startsWith("retired.")) {
+                damaged.append(lines[iter]).append('\n');
+            }
+        }
+
+        Vault reopened = Vault.named(freshName()).configure(fast());
+        assertEquals(VaultError.AUTHENTICATION_FAILED,
+                errorOf(reopened.importSyncState(
+                        damaged.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        pw("p"))));
+    }
+
+    @Test
     void anOldRecordWithItsCounterRaisedIsRefused() {
         // The counter is the whole of the rollback defence and it is plaintext, so a server that
         // serves sync state can edit it. Raising it on an OLD record makes that record look newer
