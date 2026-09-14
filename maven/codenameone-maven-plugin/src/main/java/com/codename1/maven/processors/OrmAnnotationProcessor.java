@@ -73,6 +73,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     public static final String ID_DESC = "Lcom/codename1/annotations/Id;";
     public static final String COLUMN_DESC = "Lcom/codename1/annotations/Column;";
     public static final String DB_TRANSIENT_DESC = "Lcom/codename1/annotations/DbTransient;";
+    /// The marker every generated source here carries, so that the class this
+    /// processor wrote on a previous pass is not read as a name collision on
+    /// the next one. See wouldReplaceAnExistingClass.
+    private static final String GENERATED_DESC = "Lcom/codename1/backend/annotations/Generated;";
 
     static final String BOOTSTRAP_BINARY = "cn1app.DaoBootstrap";
     static final String BOOTSTRAP_SIMPLE = "DaoBootstrap";
@@ -262,6 +266,27 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
             pf.dialectKind = dialectKind(pf.kind);
             pf.boxed = isBoxed(pf.kind);
+            if (backend && isJavaPrimitive(pf)) {
+                // A PRIMITIVE CANNOT HOLD NULL, so the column it is stored in
+                // must not allow one: a nullable column read into an int gave
+                // the field 0 where the row held nothing, and the two are the
+                // same bits to everything downstream. Declared here rather than
+                // only refused on the way in, so the database enforces it too.
+                //
+                // Backend only. The client flavour writes a SQLite schema that
+                // already exists in shipped applications, and CREATE TABLE IF
+                // NOT EXISTS would leave those alone while new installs got a
+                // different one -- a split worth making on its own and not as a
+                // side effect of this.
+                if (col != null && col.getBoolOrDefault("nullable", false)) {
+                    ctx.error(cls, "@Entity field " + ec.binaryName + "." + f.getName()
+                            + " is a primitive and is marked @Column(nullable=true), which "
+                            + "cannot both be true: a primitive has no null to read. Declare "
+                            + "the field as its boxed type.");
+                    continue;
+                }
+                pf.nullable = false;
+            }
 
             AnnotationValues idAnn = f.getAnnotation(ID_DESC);
             if (idAnn != null) {
@@ -348,9 +373,27 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
         Map<String, String> sources = new LinkedHashMap<String, String>();
         for (EntityClass ec : accepted.values()) {
+            if (backend && wouldReplaceAnExistingClass(ec.daoBinaryName,
+                    "dao for " + ec.binaryName, ctx)) {
+                continue;
+            }
             sources.put(ec.daoBinaryName,
                     backend ? generateBackendDaoSource(ec) : generateDaoSource(ec));
         }
+        if (ctx.hasErrors()) return;
+        // THE BOOTSTRAP IS NOT CHECKED, and the difference from the daos above
+        // is whose namespace the name sits in. A dao is named after the
+        // developer's entity and lands in the developer's package, so
+        // NoteCn1BackendDao is a name they could reasonably have chosen and a
+        // collision there is theirs. The bootstrap has a fixed name in `cn1app`,
+        // a package this processor generates into and nothing else does -- a
+        // class there is squatting on a reserved name, not colliding with one.
+        //
+        // And checking it costs something real: target/classes from a build
+        // before the marker existed holds an unmarked bootstrap, so the check
+        // would fail the first build after an upgrade with a message telling the
+        // developer to rename a class they never wrote. It carries the marker
+        // regardless, which is what makes its provenance readable.
         sources.put(backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY,
                 generateBootstrapSource(accepted.values(), backend));
         try {
@@ -772,6 +815,27 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// Whether a field can hold null, which is what separates `int` from
     /// `Integer` and decides both halves of the generated access.
+    /// Whether the field is a Java PRIMITIVE, which is the set that cannot hold
+    /// null and therefore the set whose columns are declared NOT NULL.
+    ///
+    /// Not `!isBoxed`: that asks whether the binary name contains a dot, which
+    /// `byte[]` does not -- so a blob column was declared NOT NULL and every
+    /// entity with an unset one failed to insert. The kind is what carries the
+    /// answer, and it has to be paired with `boxed` because Integer and int
+    /// share a kind.
+    private static boolean isJavaPrimitive(PersistedField f) {
+        if (f.boxed) {
+            return false;
+        }
+        switch (f.kind.kind) {
+            case INT: case LONG: case SHORT: case BYTE:
+            case CHAR: case DOUBLE: case FLOAT: case BOOLEAN:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static boolean isBoxed(PropertyTypeKind k) {
         String binary = k.binaryName;
         if (binary == null) {
@@ -930,6 +994,52 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
+    /// Refuses to generate over a class the project already has.
+    ///
+    /// What is compiled here lands in the same output directory, so a name that
+    /// already exists is simply overwritten -- silently, because what is
+    /// generated compiles perfectly well and javac never sees the two as
+    /// duplicates: the existing one is a classpath class, not a second source.
+    ///
+    /// The name being taken is not enough to refuse. An incremental build runs
+    /// process-classes again without a clean and finds the dao this processor
+    /// wrote on the first pass, so an unconditional lookup reports our own
+    /// output as a collision and every second build fails. The generated
+    /// sources carry `@Generated` for exactly this reason; a real user-defined
+    /// collision has no marker and is still refused. The daos have carried the
+    /// marker since they were first generated, so no existing output is read as
+    /// a collision by this. The same shape as
+    /// RestServerAnnotationProcessor and RestControllerAnnotationProcessor,
+    /// which learned it the same way.
+    ///
+    /// Backend only, deliberately: the client flavour has shipped without this
+    /// check and adding it there would turn a working build into a failing one
+    /// for anyone who already collided, which is a change to make on its own.
+    private boolean wouldReplaceAnExistingClass(String binaryName, String what,
+            ProcessorContext ctx) {
+        AnnotatedClass existing = ctx.lookup(binaryName.replace('.', '/'));
+        if (existing == null) {
+            return false;
+        }
+        if (existing.getClassAnnotations().containsKey(GENERATED_DESC)) {
+            return false;
+        }
+        ctx.error(binaryName + " already exists, and the " + what + " generated here would "
+                + "replace it. Rename that class, or rename the entity the name is "
+                + "derived from.");
+        return true;
+    }
+
+    /// A primitive field's column value, refused when it is SQL NULL.
+    ///
+    /// The conversions take a fallback and would answer it, so a null column
+    /// read into an int gave the field 0 -- indistinguishable from a row that
+    /// really holds 0. The tables this ORM creates declare such a column NOT
+    /// NULL, so this is what answers for the ones it did not create.
+    private static String required(PersistedField f) {
+        return ORM + "Values.required(value, \"" + f.fieldName + "\")";
+    }
+
     /// A column value into a field, through the tolerant conversions in
     /// `Values`: the same column is a Long from one engine and exact text from
     /// another, and neither is the field's type.
@@ -942,31 +1052,31 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 return;
             case INT:
                 sb.append(field).append(" = ").append(values)
-                  .append(f.boxed ? "asIntObject(value);" : "asInt(value, 0);");
+                  .append(f.boxed ? "asIntObject(value);" : "asInt(" + required(f) + ", 0);");
                 return;
             case LONG:
                 sb.append(field).append(" = ").append(values)
-                  .append(f.boxed ? "asLongObject(value);" : "asLong(value, 0L);");
+                  .append(f.boxed ? "asLongObject(value);" : "asLong(" + required(f) + ", 0L);");
                 return;
             case SHORT:
                 sb.append(field).append(" = ").append(values)
-                  .append(f.boxed ? "asShortObject(value);" : "asShort(value, (short)0);");
+                  .append(f.boxed ? "asShortObject(value);" : "asShort(" + required(f) + ", (short)0);");
                 return;
             case BYTE:
                 sb.append(field).append(" = ").append(values)
-                  .append(f.boxed ? "asByteObject(value);" : "asByte(value, (byte)0);");
+                  .append(f.boxed ? "asByteObject(value);" : "asByte(" + required(f) + ", (byte)0);");
                 return;
             case DOUBLE:
                 sb.append(field).append(" = ").append(values)
-                  .append(f.boxed ? "asDoubleObject(value);" : "asDouble(value, 0);");
+                  .append(f.boxed ? "asDoubleObject(value);" : "asDouble(" + required(f) + ", 0);");
                 return;
             case FLOAT:
                 sb.append(field).append(" = ").append(values)
-                  .append(f.boxed ? "asFloatObject(value);" : "asFloat(value, 0);");
+                  .append(f.boxed ? "asFloatObject(value);" : "asFloat(" + required(f) + ", 0);");
                 return;
             case BOOLEAN:
                 sb.append(field).append(" = ").append(values)
-                  .append(f.boxed ? "asBooleanObject(value);" : "asBoolean(value, false);");
+                  .append(f.boxed ? "asBooleanObject(value);" : "asBoolean(" + required(f) + ", false);");
                 return;
             case CHAR:
                 // asCodeUnit, not asString: reading the boxed form through
@@ -977,7 +1087,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     sb.append(field).append(" = ").append(values).append("asCodeUnitObject(value);");
                 } else {
                     sb.append(field).append(" = ").append(values)
-                      .append("asCodeUnit(value, '\\0');");
+                      .append("asCodeUnit(").append(required(f)).append(", '\\0');");
                 }
                 return;
             case DATE:
@@ -1015,6 +1125,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         sb.append("@SuppressWarnings({\"all\"})\n");
         String simple = backend ? BACKEND_BOOTSTRAP_SIMPLE : BOOTSTRAP_SIMPLE;
+        if (backend) {
+            // The collision check reads this: without it the bootstrap written
+            // on the first pass looks like an application class on the second.
+            sb.append("@com.codename1.backend.annotations.Generated\n");
+        }
         sb.append("public final class ").append(simple).append(" {\n");
         sb.append("    public ").append(simple).append("() {\n");
         for (EntityClass ec : classes) {

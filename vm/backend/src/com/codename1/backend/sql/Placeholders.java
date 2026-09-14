@@ -265,7 +265,9 @@ final class Placeholders {
             at++;
         }
         if(valuesAt < 0) {
-            return -1;
+            return withoutATupleList(sql, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers,
+                    executableComments);
         }
         // The tuple list, and NOTHING AFTER IT. Counting every top-level group
         // to the end of the statement swept up whatever followed the tuples --
@@ -319,7 +321,57 @@ final class Placeholders {
             }
             at++;
         }
-        return rows == 0 ? -1 : rows;
+        if(rows == 0) {
+            // The word VALUES with no tuple after it, which is "DEFAULT VALUES".
+            return withoutATupleList(sql, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers,
+                    executableComments);
+        }
+        return rows;
+    }
+
+    /**
+     * How many rows an INSERT with no tuple list writes: one, or an unknown
+     * number.
+     *
+     * <p>Three shapes reach here and only one of them is unbounded. "INSERT INTO
+     * t DEFAULT VALUES" and MySQL's "INSERT INTO t SET a = ?" write exactly one
+     * row, and refusing them would refuse an ordinary single-row insert. An
+     * insert whose rows come from a QUERY -- INSERT ... SELECT, or MySQL's
+     * INSERT ... TABLE -- writes a number of rows only the server knows, which
+     * is what {@code -1} means here and what Database.insert refuses.
+     *
+     * <p>The keyword has to be at the TOP LEVEL to count: "INSERT INTO t SET a =
+     * (SELECT max(x) FROM u)" is a single row whose value happens to come from a
+     * subquery, and the parentheses are what say so.
+     */
+    private static int withoutATupleList(String sql, boolean nestedComments,
+                                         boolean backslashEscapes, boolean hashComments,
+                                         boolean dollarQuotedStrings,
+                                         boolean dashCommentNeedsSpace,
+                                         boolean bracketIdentifiers,
+                                         boolean executableComments) throws IOException {
+        int at = 0;
+        int depth = 0;
+        int length = sql.length();
+        while(at < length) {
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            if(next > at) {
+                at = next;
+                continue;
+            }
+            char c = sql.charAt(at);
+            if(c == '(') {
+                depth++;
+            } else if(c == ')') {
+                depth--;
+            } else if(depth == 0 && (isWord(sql, at, "select") || isWord(sql, at, "table"))) {
+                return -1;
+            }
+            at++;
+        }
+        return 1;
     }
 
     /** The index of the next character that is neither whitespace nor a comment. */

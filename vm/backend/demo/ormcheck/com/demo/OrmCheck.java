@@ -500,9 +500,17 @@ public class OrmCheck {
         }
         Dao<Note> notes = em.dao(Note.class);
         notes.query().delete();
-        // Written as raw SQL, the way a migration or another client would.
-        pool.execute("INSERT INTO cn1_notes (title, views, pinned, score, \"createdAt\") "
-                + "VALUES (?, 12.5, 0, 0, 0)", new Object[] {"fractional"});
+        // The ROW is written by the ORM and then one COLUMN is overwritten with
+        // raw SQL, the way a migration or another client would. Writing the
+        // whole row by hand named the columns it cared about and left the rest
+        // to the schema, which stopped working the moment a primitive column
+        // became NOT NULL -- the fixture, not the feature. This version names
+        // one column and stays correct however many the entity gains.
+        Note seed = new Note();
+        seed.title = "fractional";
+        notes.insert(seed);
+        pool.execute("UPDATE cn1_notes SET views = 12.5 WHERE id = ?",
+                new Object[] {Long.valueOf(seed.id)});
         String refusedFraction;
         try {
             notes.findAll();
@@ -515,8 +523,11 @@ public class OrmCheck {
         check("a fractional value in an int field is refused", "refused", refusedFraction);
 
         notes.query().delete();
-        pool.execute("INSERT INTO cn1_notes (title, views, pinned, score, \"createdAt\") "
-                + "VALUES (?, 2147483648, 0, 0, 0)", new Object[] {"oversized"});
+        Note big = new Note();
+        big.title = "oversized";
+        notes.insert(big);
+        pool.execute("UPDATE cn1_notes SET views = 2147483648 WHERE id = ?",
+                new Object[] {Long.valueOf(big.id)});
         String refusedRange;
         try {
             notes.findAll();
@@ -527,6 +538,27 @@ public class OrmCheck {
                     ? "refused" : "other: " + message;
         }
         check("a value past an int field is refused, not wrapped", "refused", refusedRange);
+
+        // AND THE COLUMN CANNOT BE NULL IN THE FIRST PLACE. A primitive field
+        // has no null to read, so the table the ORM creates says so and the
+        // engine refuses the write -- which is why the refusal above is for a
+        // table somebody else made, not for this one.
+        notes.query().delete();
+        Note present = new Note();
+        present.title = "not null";
+        notes.insert(present);
+        String refusedNull;
+        try {
+            // A ROW HAS TO BE THERE. An UPDATE that matches nothing succeeds on
+            // every engine, so an empty table made this pass whatever the schema
+            // said -- a check satisfiable by "nothing happened" is no check.
+            pool.execute("UPDATE cn1_notes SET views = NULL WHERE id = ?",
+                    new Object[] {Long.valueOf(present.id)});
+            refusedNull = "accepted";
+        } catch (Exception err) {
+            refusedNull = "refused";
+        }
+        check("a primitive's column is declared NOT NULL", "refused", refusedNull);
         notes.query().delete();
     }
 

@@ -31,6 +31,7 @@ import java.util.Date;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Every encoding an engine can send, against every field type it can be read
@@ -164,6 +165,27 @@ class ValuesTest {
         // characters, which is why every cell here is rendered rather than
         // printed.
         expect(new byte[] {1, 2, 3}, "\\x01\\x02\\x03,!,!,!,!,!,!,!,!,!,3,!");
+    }
+
+    @Test
+    @DisplayName("a primitive field refuses SQL NULL instead of taking a default")
+    void nullIntoAPrimitive() throws Exception {
+        // The conversions take a fallback, so without this an int field read a
+        // null column as 0 -- the same bits as a row that really holds 0, told
+        // apart by nobody. The tables this ORM creates declare such a column NOT
+        // NULL; this answers for the ones it did not create.
+        assertThrows(IOException.class, () -> Values.required(null, "views"));
+        // The message names the field, because the row does not.
+        try {
+            Values.required(null, "views");
+            throw new IllegalStateException("should have refused");
+        } catch (IOException err) {
+            assertTrue(err.getMessage().indexOf("views") >= 0, err.getMessage());
+        }
+        // Anything that is not null passes straight through, zero included: a
+        // column that HOLDS zero is a value, not an absence.
+        assertEquals(Long.valueOf(0), Values.required(Long.valueOf(0), "views"));
+        assertEquals("", Values.required("", "title"));
     }
 
     @Test

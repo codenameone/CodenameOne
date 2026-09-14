@@ -50,6 +50,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ScannerTest {
 
     @Test
+    @DisplayName("an insert with no tuple list is one row, or an unknown number")
+    void insertsWithoutATupleList() throws Exception {
+        // -1 means "cannot tell", and Database.insert refuses it. Which shapes
+        // land there matters in both directions: a query-sourced insert that
+        // slipped through returned one engine-specific key for however many rows
+        // it wrote, and a single-row form wrongly landing there would refuse an
+        // ordinary insert.
+        rows("INSERT INTO t DEFAULT VALUES", 1, 1, 1);
+        // MySQL's single-row form, which names no VALUES at all.
+        rows("INSERT INTO t SET a = ?", 1, 1, 1);
+        // The rows come from a query: only the server knows how many.
+        rows("INSERT INTO t (a) SELECT b FROM u", -1, -1, -1);
+        rows("INSERT INTO t SELECT * FROM u", -1, -1, -1);
+        rows("INSERT INTO t (a) TABLE u", -1, -1, -1);
+        rows("WITH c AS (SELECT 1) INSERT INTO t (a) SELECT * FROM c", -1, -1, -1);
+        // A SUBQUERY IS NOT A SOURCE OF ROWS. The parentheses are what say so,
+        // and without the depth test this single row read as unbounded.
+        rows("INSERT INTO t SET a = (SELECT max(x) FROM u)", 1, 1, 1);
+        rows("INSERT INTO t DEFAULT VALUES RETURNING id", 1, 1, 1);
+        // And the word inside a literal is not the keyword.
+        rows("INSERT INTO t SET a = 'select one'", 1, 1, 1);
+    }
+
+    @Test
     @DisplayName("an upsert is recognised as SQL, not found as text")
     void upsertsAreRecognised() throws Exception {
         // Database refuses one of these on the engines that read the generated
