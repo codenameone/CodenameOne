@@ -93,7 +93,13 @@ public final class Values {
                         + " has a fractional part and the field it is read into is an "
                         + "integer; the value would have to be rounded to fit");
             }
-            if(exact < -9.223372036854776E18 || exact > 9.223372036854776E18) {
+            // 9.223372036854776E18 IS 2^63, and Long.MAX_VALUE is 2^63 - 1,
+            // which no double can represent. So the boundary value compares
+            // equal to the literal rather than greater, and the cast below then
+            // clamps it to Long.MAX_VALUE: a different number, silently. The
+            // upper bound is exclusive for that reason; the lower one is not,
+            // because -2^63 IS Long.MIN_VALUE exactly.
+            if(exact < -9.223372036854776E18 || exact >= 9.223372036854776E18) {
                 throw new IOException("A column holding " + describe(value)
                         + " is outside the range of the integer field it is read into");
             }
@@ -222,13 +228,35 @@ public final class Values {
     /** The value as a float, or {@code fallback} when it is null. */
     public static float asFloat(Object value, float fallback) throws IOException {
         Double out = asDoubleObject(value);
-        return out == null ? fallback : (float)out.doubleValue();
+        return out == null ? fallback : narrowedToFloat(out.doubleValue(), value);
     }
 
     /** The value as a boxed float, or null. */
     public static Float asFloatObject(Object value) throws IOException {
         Double out = asDoubleObject(value);
-        return out == null ? null : Float.valueOf((float)out.doubleValue());
+        return out == null ? null : Float.valueOf(narrowedToFloat(out.doubleValue(), value));
+    }
+
+    /**
+     * {@code number} as a float, when a float can hold it.
+     *
+     * <p>A float field's column is DOUBLE on MySQL and DOUBLE PRECISION on
+     * PostgreSQL, both of which hold numbers a float cannot: 1e100 narrowed to
+     * INFINITY, so the entity held something the row does not and writing it
+     * back would store that or fail. The integral converters were given this
+     * check a round ago and this one was missed.
+     *
+     * <p>A value that is ALREADY infinite or NaN passes through: PostgreSQL can
+     * store either, and reproducing what the row holds is right. What is refused
+     * is a finite number becoming an infinite one.
+     */
+    private static float narrowedToFloat(double number, Object value) throws IOException {
+        if(!Double.isNaN(number) && !Double.isInfinite(number)
+                && (number > 3.4028234663852886E38 || number < -3.4028234663852886E38)) {
+            throw new IOException("A column holding " + describe(value)
+                    + " is outside the range of the float field it is read into");
+        }
+        return (float)number;
     }
 
     /** The value as a flag: anything non-zero, or the text of one, is true. */
@@ -249,10 +277,27 @@ public final class Values {
         return number == null ? null : Boolean.valueOf(number.longValue() != 0);
     }
 
-    /** The first character of the value, or {@code fallback} when it is empty. */
-    public static char asChar(Object value, char fallback) {
-        String text = asString(value);
-        return text == null || text.length() == 0 ? fallback : text.charAt(0);
+    /**
+     * The first character of the value, or {@code fallback} when it is null or
+     * empty.
+     *
+     * <p>TEXT ONLY. An entity's char field is stored in a text column, so a
+     * number or a blob arriving here means the table and the entity disagree --
+     * and taking the first character of however that value happens to print is
+     * not a reading of it: a byte[] gave whatever its first byte decoded to, a
+     * Long gave the first DIGIT, and NaN gave 'N'. Every other converter in this
+     * class refuses an encoding it cannot mean; this one used to accept them all.
+     */
+    public static char asChar(Object value, char fallback) throws IOException {
+        if(value == null) {
+            return fallback;
+        }
+        if(!(value instanceof String)) {
+            throw new IOException("A column holding " + describe(value)
+                    + " cannot be read as a character; the field expects text");
+        }
+        String text = (String)value;
+        return text.length() == 0 ? fallback : text.charAt(0);
     }
 
     /**
@@ -266,6 +311,14 @@ public final class Values {
      * than guessed at.
      */
     public static Date asDate(Object value) throws IOException {
+        if(value instanceof Boolean) {
+            // A flag is not a moment. asLongObject reads one as 0 or 1, which
+            // would make "true" the first millisecond of 1970 rather than an
+            // error, and every other converter refuses the encodings it cannot
+            // mean.
+            throw new IOException("A column holding " + describe(value)
+                    + " cannot be read as a date");
+        }
         Long millis = asLongObject(value);
         return millis == null ? null : new Date(millis.longValue());
     }
