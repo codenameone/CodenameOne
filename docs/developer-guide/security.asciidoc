@@ -248,6 +248,38 @@ A passkey signature isn't an encryption key, and it's worth being clear why, bec
 
 Not every authenticator implements it. Enrolment checks `prf.enabled` from the creation ceremony and refuses to keep a credential that can't derive, so `capabilities().supports(...)` tells you the truth rather than offering a prompt with nothing behind it. And note that **WebAuthn doesn't work on an IP-address origin at all** -- a relying-party id has to be a domain. For local development that means serving from `localhost`, not `127.0.0.1`.
 
+==== Measured browser support
+
+Run by hand against the shipped bridge on macOS, with Touch ID as the platform authenticator:
+
+[cols="2,1,1,1"]
+|===
+|Browser |Device key |Passkey PRF |`storage.persisted()`
+
+|Chrome 152
+|yes
+|yes
+|false
+
+|Safari 26.6
+|yes
+|yes
+|false
+
+|Firefox 155
+|yes
+|yes
+|false
+|===
+
+"Device key" is the whole `REMEMBER_DEVICE` path: a non-extractable `CryptoKey` structured-cloned into IndexedDB, a wrap round trip, and a wrong binding correctly failing its tag. That's the one that mattered -- it's the default, and had Safari refused the clone, remembered vaults would have been broken on every iPhone and Mac.
+
+PRF derived 32 stable bytes in all three, and in Chrome the same bytes after the browser was quit and reopened.
+
+What this doesn't cover: mobile Safari, Chrome on Android, Windows Hello, hardware security keys, and older versions of all three. The runtime detection above is what protects those -- the table says what was seen, not what's guaranteed. Every one of these browsers reported `storage.persisted()` as false on a fresh profile, which is why `PERSISTENT` is reported from storage working rather than from that call.
+
+Reproduce any row with `node scripts/verify-javascript-vault-passkey.mjs`, which serves a page running the same bridge an application does.
+
 `REQUIRE_USER_VERIFICATION` isn't available everywhere. Ask `vault.capabilities().supports(policy)` before you offer the switch, because a "remember this device" toggle on a platform that can't remember is worse than no toggle.
 
 ==== Asking what actually protects it
