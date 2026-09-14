@@ -642,7 +642,7 @@ public class CN extends CN1Constants {
     ///
     /// - Platform - Similar to microedition.platform
     ///
-    /// - OS - returns what is the underlying platform e.g. - iOS, Android, RIM, SE...
+    /// - OS - returns what is the underlying platform e.g. - iOS, Android, SE...
     ///
     /// - OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
     ///
@@ -1267,7 +1267,7 @@ public class CN extends CN1Constants {
     ///
     /// #### Returns
     ///
-    /// the name of the platform e.g. ios, rim, win, and, me, HTML5
+    /// the name of the platform e.g. ios, and, win, mac, linux, HTML5
     public static String getPlatformName() {
         return Display.impl.getPlatformName();
     }

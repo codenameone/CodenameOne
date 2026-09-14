@@ -280,7 +280,7 @@ public final class NetworkManager {
 
     /// Thread count should never be changed when the network is running since it will have no effect.
     /// Increasing the thread count can bring many race conditions and problems to the surface,
-    /// furthermore MIDP doesn't require support for more than one network thread hence increasing
+    /// furthermore some platforms don't support more than one network thread hence increasing
     /// the thread count might fail.
     ///
     /// #### Parameters
@@ -703,7 +703,7 @@ public final class NetworkManager {
     }
 
     /// Sets the timeout in milliseconds for network connections, a timeout may be "faked"
-    /// for platforms that don't support the notion of a timeout such as MIDP
+    /// for platforms that don't support the notion of a timeout
     ///
     /// #### Parameters
     ///
