@@ -671,13 +671,14 @@ public final class LinuxNative {
     /**
      * Whether a usable Secret Service is actually reachable from this process.
      *
-     * <p>Side-effect free, which is the point: {@link #dpapiProtect(byte[])} answers the same
-     * question but STORES a secret to do it, so probing with it would litter the user's keyring
-     * on every capability query. This loads the library and resolves the symbols -- the same gate
-     * every other entry point here passes through, cached after the first call -- and reports
-     * whether that succeeded.
+     * <p>Reachable, not merely installed. Loading libsecret says nothing about the session
+     * behind it: on a headless machine, or one with a broken D-Bus or no keyring daemon, the
+     * library loads and every write still fails. This performs a lookup for a token that cannot
+     * exist, which contacts the service and stores nothing -- {@link #dpapiProtect(byte[])}
+     * would answer the same question by writing a secret into the user's keyring, which is no
+     * way to answer a capability query.
      *
-     * @return true when libsecret loaded and its symbols resolved
+     * @return true when a Secret Service answered
      */
     public static native boolean secretServiceAvailable();
 

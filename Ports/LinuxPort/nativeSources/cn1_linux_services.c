@@ -492,15 +492,51 @@ static const SecretSchema cn1SecretSchema = {
     { { "token", SECRET_SCHEMA_ATTRIBUTE_STRING }, { "NULL", 0 } }
 };
 
+/* 0 = untried, 1 = the service answered. A negative is never cached: a session whose D-Bus or
+ * keyring comes up later must be able to start working without a restart. */
+static int cn1_secret_service_state = 0;
+
 /*
- * Whether libsecret loaded and its symbols resolved -- the same gate dpapiProtect and
- * dpapiUnprotect pass through, asked without the side effect of storing anything. Answering this
- * from the token-storage layer instead reported a working Secret Service on any desktop where
- * ordinary storage was readable, so a capability check advertised a store whose every write
- * would fail. cn1LoadSecret caches its result, so repeated calls cost nothing.
+ * Whether a Secret Service is actually REACHABLE, which is not the same question as whether
+ * libsecret is installed.
+ *
+ * Loading the library and resolving its symbols says nothing about the session behind it: on a
+ * headless machine, or one with a broken D-Bus or no keyring daemon, libsecret loads perfectly
+ * and secret_password_store_sync still fails -- so reporting availability from cn1LoadSecret
+ * alone advertised a store whose every write returns null, which is the same defect one layer up
+ * from answering it out of ordinary CN1 storage.
+ *
+ * The probe is a LOOKUP, for a token that cannot exist. That reaches the service over D-Bus, and
+ * it is the only one of the four symbols this port resolves that both contacts the service and
+ * stores nothing -- dpapiProtect answers the same question by writing a secret into the user's
+ * keyring, which is no way to answer a capability query. A miss and an unreachable service both
+ * return NULL, so the GError is what separates them: set means the call could not be made, unset
+ * means the service answered and had nothing.
+ *
+ * No unlock prompt: the collection is unlocked per matching item, and a token that matches
+ * nothing gives libsecret nothing to unlock.
  */
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_secretServiceAvailable___R_boolean(CODENAME_ONE_THREAD_STATE) {
-    return cn1LoadSecret() ? JAVA_TRUE : JAVA_FALSE;
+    GError* err = 0;
+    gchar* found;
+    if (!cn1LoadSecret()) {
+        return JAVA_FALSE;
+    }
+    if (cn1_secret_service_state > 0) {
+        return JAVA_TRUE;
+    }
+    found = p_secret_password_lookup_sync(&cn1SecretSchema, 0, &err,
+            "token", "cn1-secret-service-probe", NULL);
+    if (found) {
+        /* Cannot happen with this token, and freed rather than leaked if it ever does. */
+        p_secret_password_free(found);
+    }
+    if (err) {
+        g_error_free(err);
+        return JAVA_FALSE;
+    }
+    cn1_secret_service_state = 1;
+    return JAVA_TRUE;
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiProtect___byte_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data) {
