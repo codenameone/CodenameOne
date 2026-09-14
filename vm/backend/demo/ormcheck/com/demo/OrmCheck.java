@@ -79,6 +79,8 @@ public class OrmCheck {
                 createTableIsIdempotent(notes);
                 anEntityThatIsOnlyAKey(em);
                 aTerminatedStatementStillAnswersItsKey(pool);
+                anUpsertThatUpdatesStillAnswers(pool);
+                aMultiRowInsertIsRefused(pool);
             } finally {
                 notes.dropTable();
             }
@@ -295,6 +297,81 @@ public class OrmCheck {
                     String.valueOf(pool.query("SELECT name FROM cn1_terminated", null).size()));
         } finally {
             pool.execute("DROP TABLE IF EXISTS cn1_terminated", null);
+        }
+    }
+
+    /**
+     * An upsert that UPDATES an existing row still answers, on every engine.
+     *
+     * <p>One row, and each engine spells the conflict clause its own way, which
+     * is why this is the one check that branches. What it is really about is
+     * MySQL: it reports TWO affected rows for a single-tuple ON DUPLICATE KEY
+     * UPDATE that changed a row, and reading that as "rows inserted" refused an
+     * ordinary upsert AFTER it had committed.
+     */
+    private static void anUpsertThatUpdatesStillAnswers(DataSource pool) throws Exception {
+        String engine = pool.dialect().getName();
+        boolean mysql = "mysql".equals(engine);
+        pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
+        pool.execute("CREATE TABLE cn1_upsert (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
+                + " NOT NULL UNIQUE, hits INTEGER)", null);
+        try {
+            long first = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
+                    new Object[] {"a", Long.valueOf(1)}, "id");
+            check("the upsert fixture inserted", "true", String.valueOf(first > 0));
+            String upsert = mysql
+                    ? "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
+                            + "ON DUPLICATE KEY UPDATE hits = hits + 1"
+                    : "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
+                            + "ON CONFLICT (name) DO UPDATE SET hits = cn1_upsert.hits + 1";
+            String answered;
+            try {
+                pool.insert(upsert, new Object[] {"a", Long.valueOf(1)}, "id");
+                answered = "answered";
+            } catch (Exception err) {
+                answered = "threw: " + err.getMessage();
+            }
+            check("an upsert that updated a row does not report failure", "answered", answered);
+            List rows = pool.query("SELECT hits FROM cn1_upsert WHERE name = ?",
+                    new Object[] {"a"});
+            check("and the update happened", "2",
+                    String.valueOf(((java.util.Map)rows.get(0)).values().iterator().next()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
+        }
+    }
+
+    /**
+     * A multi-row insert is refused BEFORE it writes, on every engine.
+     *
+     * <p>The three key one differently -- SQLite reports the last, MySQL the
+     * first, PostgreSQL returns a row per insert -- so there is no key insert()
+     * could answer with.
+     */
+    private static void aMultiRowInsertIsRefused(DataSource pool) throws Exception {
+        pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
+        pool.execute("CREATE TABLE cn1_multi (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + ")", null);
+        try {
+            String refused;
+            try {
+                pool.insert("INSERT INTO cn1_multi (name) VALUES (?), (?)",
+                        new Object[] {"one", "two"}, "id");
+                refused = "accepted";
+            } catch (Exception err) {
+                String message = String.valueOf(err.getMessage());
+                refused = message.indexOf("ONE generated key") >= 0
+                        ? "refused" : "other: " + message;
+            }
+            check("a multi-row insert is refused", "refused", refused);
+            check("and it wrote nothing", "0",
+                    String.valueOf(pool.query("SELECT name FROM cn1_multi", null).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
         }
     }
 

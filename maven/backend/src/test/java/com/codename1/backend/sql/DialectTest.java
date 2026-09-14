@@ -271,6 +271,33 @@ class DialectTest {
     }
 
     @Test
+    @DisplayName("MySQL's VALUES() expression does not become the insert's clause")
+    void countsFromTheFirstValuesClause() throws Exception {
+        // MySQL's ON DUPLICATE KEY UPDATE uses a VALUES(column) EXPRESSION, and
+        // it sits at the top level. Counting from the LAST match found that
+        // function call, saw one group, and let a two-row insert through.
+        assertEquals(2, Dialect.MYSQL.countInsertRows(
+                "INSERT INTO t (a) VALUES (?), (?) ON DUPLICATE KEY UPDATE a = VALUES(a)"));
+        assertEquals(1, Dialect.MYSQL.countInsertRows(
+                "INSERT INTO t (a) VALUES (?) ON DUPLICATE KEY UPDATE a = VALUES(a)"));
+    }
+
+    @Test
+    @DisplayName("MySQL's double quotes are a string, with escapes")
+    void readsMySqlDoubleQuotedStrings() throws Exception {
+        // In its default SQL mode MySQL reads "..." as a string literal with the
+        // same backslash escapes its single-quoted strings have. Scanned as an
+        // identifier without escapes, this ended at the escaped quote and counted
+        // the ? that followed.
+        assertEquals("SELECT \"it\\\"s ?\", ?",
+                Dialect.MYSQL.bind("SELECT \"it\\\"s ?\", ?", 1));
+        // On the other two a double-quoted run is an IDENTIFIER, where a
+        // backslash is an ordinary character.
+        assertEquals("SELECT \"we?rd\" FROM t WHERE a = $1",
+                Dialect.POSTGRES.bind("SELECT \"we?rd\" FROM t WHERE a = ?", 1));
+    }
+
+    @Test
     @DisplayName("a statement ends before its terminator and its trailing comment")
     void findsWhereTheStatementEnds() throws Exception {
         // Where PostgreSQL's RETURNING has to be inserted. After the end it is

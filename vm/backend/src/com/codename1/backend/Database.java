@@ -243,6 +243,16 @@ public final class Database {
      * needs. It is quoted for the engine, so a column named "order" or one whose
      * case matters is spelled correctly rather than folded.
      *
+     * <p>ONE ROW. A statement whose VALUES clause names more than one tuple is
+     * refused before it runs, because the three engines key a multi-row insert
+     * differently and there is no answer that means the same thing on all of
+     * them. A statement whose row count its text does NOT show -- an
+     * INSERT ... SELECT -- is refused on PostgreSQL, where RETURNING counts the
+     * rows for certain, and answers with the engine's last-insert-id on the
+     * other two, where asking would mean trusting MySQL's affected-row count,
+     * which says two for an upsert that touched one row. Use execute() for a
+     * statement that inserts an unknown number of rows.
+     *
      * @param sql an INSERT in the portable form, with no RETURNING of its own
      * @return the generated key, or 0 where the statement inserted no row -- an
      *         ignored conflict, most often -- or where the engine generated none
@@ -279,7 +289,13 @@ public final class Database {
             if(changed == 0) {
                 return 0;
             }
-            requireOneRow(changed, sql);
+            // NOT CHECKED AGAINST THE TUPLE COUNT. MySQL reports TWO affected
+            // rows for a single-tuple "INSERT ... ON DUPLICATE KEY UPDATE" that
+            // updated a row, and for REPLACE, so reading that number as "how
+            // many rows this inserted" refused an ordinary upsert -- after it
+            // had committed. The count of tuples is what the preflight above
+            // decides on, and it reads the statement rather than the engine's
+            // accounting.
             return lastInsertId();
         }
         // RETURNING makes this a statement that answers with rows, so it goes
@@ -294,7 +310,17 @@ public final class Database {
         if(returned.isEmpty()) {
             return 0;
         }
-        requireOneRow(returned.size(), sql);
+        if(returned.size() > 1) {
+            // RETURNING yields one row per row inserted, which is a count of
+            // rows rather than of MySQL's accounting, so this one is sound. It
+            // catches what the preflight cannot read -- an INSERT ... SELECT --
+            // and the rows are committed by the time it does, which is what the
+            // message says.
+            throw new IOException("insert() answers with ONE generated key and this "
+                    + "statement inserted " + returned.size() + " rows, which are committed. "
+                    + "Use execute() for a statement that inserts more than one row: ["
+                    + sql + "]");
+        }
         Map row = (Map)returned.get(0);
         Object value = row.values().iterator().next();
         if(value instanceof Number) {
@@ -305,25 +331,6 @@ public final class Database {
         }
         throw new IOException("The generated key came back as something other than a "
                 + "number, so the column named is not the generated one: " + idColumn);
-    }
-
-    /**
-     * Refuses an insert that turned out to touch more than one row.
-     *
-     * <p>The count is checked BEFORE the statement runs wherever the shape can
-     * be seen -- see {@link com.codename1.backend.sql.Dialect#countInsertRows} --
-     * and this is the arm for the shapes it cannot: an INSERT ... SELECT names no
-     * tuples to count. The rows are committed by the time this throws, which is
-     * exactly why the message says so rather than reporting a query that returned
-     * too much.
-     */
-    private static void requireOneRow(int rows, String sql) throws IOException {
-        if(rows > 1) {
-            throw new IOException("insert() answers with ONE generated key and this "
-                    + "statement inserted " + rows + " rows, which are committed. The three "
-                    + "engines key a multi-row insert differently, so there is no one key to "
-                    + "answer with; use execute() for this statement: [" + sql + "]");
-        }
     }
 
     /**
