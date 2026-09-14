@@ -2354,6 +2354,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // left here is the part that differs between one server and the next:
         // which controllers there are and what each of them is given.
         sb.append("        com.codename1.backend.Backend.builder()\n");
+        if (needsDatabase()) {
+            // A controller that declares a DataSource or an EntityManager needs
+            // a database, and this is where the build says so: the builder opens
+            // one for a server that has no entities either, which is how a
+            // development profile's in-memory default reaches a controller that
+            // asked only for the pool.
+            sb.append("                .requiresDataSource()\n");
+        }
         sb.append("                .handlers(new com.codename1.backend.Backend.Handlers() {\n");
         sb.append("            public com.codename1.backend.HttpServer.Handler[] create(\n");
         sb.append("                    com.codename1.backend.DataSource dataSource,\n");
@@ -2372,6 +2380,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("    }\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// Whether any controller declared a constructor that needs a database.
+    private boolean needsDatabase() {
+        for (Controller c : controllers.values()) {
+            if ("ENTITIES".equals(c.injection) || "DATASOURCE".equals(c.injection)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// What the generated entry point passes to one controller's constructor.

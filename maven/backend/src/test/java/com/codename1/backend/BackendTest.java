@@ -360,6 +360,47 @@ class BackendTest {
         }
     }
 
+    @Test
+    @DisplayName("a handler that declares it needs a database gets the development default")
+    void opensTheDevelopmentDefaultForAHandlerThatNeedsOne() throws Exception {
+        // A controller declaring a DataSource, with no entities behind it and no
+        // URL configured, on a development profile. The pool used to be null
+        // here and requireDataSource then advised running on a development
+        // profile -- which is what was already happening. The build says the
+        // handlers need one; the profile says where to get it.
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        final DataSource[] seen = new DataSource[1];
+        Backend backend = Backend.builder(Config.of(settings, "dev"))
+                .quiet()
+                .requiresDataSource()
+                .handlers(new Backend.Handlers() {
+                    public HttpServer.Handler[] create(DataSource dataSource,
+                            com.codename1.backend.orm.EntityManager entities) throws Exception {
+                        seen[0] = Backend.requireDataSource(dataSource, "com.example.Api");
+                        return new HttpServer.Handler[] {ok()};
+                    }
+                })
+                .start();
+        try {
+            assertNotNull(seen[0]);
+            assertEquals("ok", get(port, "/"));
+        } finally {
+            backend.stop();
+        }
+        // And a server that does NOT say it needs one still opens none: the
+        // point is the declared dependency, not the profile.
+        Properties quiet = new Properties();
+        quiet.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend none = Backend.builder(Config.of(quiet, "dev")).quiet().handler(ok()).start();
+        try {
+            assertNull(none.getDataSource());
+        } finally {
+            none.stop();
+        }
+    }
+
     private static HttpServer.Handler ok() {
         return new HttpServer.Handler() {
             public HttpServer.Response handle(HttpServer.Request request) throws Exception {

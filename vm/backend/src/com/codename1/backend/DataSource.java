@@ -143,7 +143,7 @@ public final class DataSource {
         // The FIRST connection is opened here, and it is what decides the engine:
         // the alternative is parsing the URL a second time in this class and
         // having two answers to the same question.
-        if(isMemory(url) && size > 1) {
+        if(size > 1 && !namesAServerEngine(url) && isMemory(url)) {
             // BEFORE anything is opened. Refusing after the first connection was
             // made leaked its native handle every time a process caught the
             // configuration error and retried -- and this question is answered by
@@ -256,7 +256,16 @@ public final class DataSource {
                 // connect -- lets several threads decide at once that the pool
                 // has room and open more connections than it is allowed.
                 Database opened = Database.open(url);
-                configure(opened);
+                try {
+                    configure(opened);
+                } catch (IOException err) {
+                    // Not in `all` yet, so nothing else can ever close it: a WAL
+                    // pragma the filesystem refuses would leak one handle per
+                    // borrow, and the pool would go on believing it has room to
+                    // open another. The eager path in open() already does this.
+                    opened.close();
+                    throw err;
+                }
                 all.add(opened);
                 return opened;
             }
@@ -472,10 +481,51 @@ public final class DataSource {
     /**
      * Whether this URL names an in-memory SQLite database.
      *
-     * <p>":memory:" is the plain spelling; a file: URI with mode=memory is the
-     * other one SQLite accepts, and a pool over it has the same defect.
+     * <p>":memory:" is the plain spelling; a file: URI carrying mode=memory as a
+     * QUERY PARAMETER is the other one SQLite accepts, and a pool over it has
+     * the same defect.
+     *
+     * <p>The parameter is matched as a parameter rather than as a substring. A
+     * plain search found "mode=memory" in an ordinary path -- /tmp/mode=memory.db
+     * is a file somebody may reasonably have -- and in any part of a server URL,
+     * including a password. Ask {@link #namesAServerEngine} first: this question
+     * is only ever about SQLite.
      */
     private static boolean isMemory(String url) {
-        return ":memory:".equals(url) || url.indexOf("mode=memory") >= 0;
+        if(":memory:".equals(url)) {
+            return true;
+        }
+        int query = url.indexOf('?');
+        if(query < 0) {
+            return false;
+        }
+        int at = query + 1;
+        while(at < url.length()) {
+            int end = url.indexOf('&', at);
+            if(end < 0) {
+                end = url.length();
+            }
+            if(end - at == 11 && url.regionMatches(at, "mode=memory", 0, 11)) {
+                return true;
+            }
+            at = end + 1;
+        }
+        return false;
+    }
+
+    /**
+     * Whether the URL names one of the engines that is reached over a network,
+     * which is the same test {@link Database#open} makes -- by scheme, ignoring
+     * case, because RFC 3986 says a scheme is case insensitive. Anything else is
+     * a SQLite path.
+     */
+    private static boolean namesAServerEngine(String url) {
+        return hasScheme(url, "postgres://") || hasScheme(url, "postgresql://")
+                || hasScheme(url, "mysql://") || hasScheme(url, "mariadb://");
+    }
+
+    private static boolean hasScheme(String url, String scheme) {
+        return url.length() >= scheme.length()
+                && url.regionMatches(true, 0, scheme, 0, scheme.length());
     }
 }

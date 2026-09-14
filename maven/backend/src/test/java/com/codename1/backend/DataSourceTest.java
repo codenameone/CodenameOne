@@ -145,6 +145,27 @@ class DataSourceTest {
     }
 
     @Test
+    @DisplayName("a file whose name contains mode=memory is a file")
+    void doesNotMistakeAPathForAnInMemoryDatabase(@TempDir File dir) throws Exception {
+        // The refusal matched "mode=memory" anywhere in the URL, so an ordinary
+        // path -- and any server URL whose password or database name happened to
+        // contain that text -- could not be pooled at all. It is a SQLite URI
+        // PARAMETER, and only ever a question about SQLite.
+        String path = new File(dir, "mode=memory.db").getAbsolutePath();
+        DataSource pool = DataSource.open(path, 2);
+        try {
+            assertEquals(2, pool.getMaxSize());
+            pool.execute("CREATE TABLE t (a INTEGER)", null);
+        } finally {
+            pool.close();
+        }
+        // And the real thing is still refused, spelled either way.
+        assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
+        assertThrows(IOException.class,
+                () -> DataSource.open("file:app?mode=memory&cache=shared", 2));
+    }
+
+    @Test
     @DisplayName("dropping a dead connection wakes a borrower waiting for capacity")
     void discardingWakesAWaiter() throws Exception {
         // The pool is full and every connection is out, so a borrower waits. The

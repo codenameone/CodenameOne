@@ -201,6 +201,7 @@ public final class Backend {
         private StaticFiles staticFiles;
         private boolean createTables;
         private boolean createTablesGiven;
+        private boolean handlersNeedADatabase;
         private boolean quiet;
 
         Builder(Config config) {
@@ -297,6 +298,30 @@ public final class Backend {
         public Builder createTables(boolean create) {
             this.createTables = create;
             this.createTablesGiven = true;
+            return this;
+        }
+
+        /**
+         * Says that the handlers this server builds need a database, so one is
+         * opened even when nothing else asks for it.
+         *
+         * <p>The generated entry point calls this when any controller declares a
+         * constructor taking a {@link DataSource} or an
+         * {@link EntityManager}. Without it, a controller that declares a
+         * database dependency, has no entities behind it, and runs on a
+         * development profile with no URL configured was refused at start-up by
+         * {@link #requireDataSource} -- whose message suggests running on a
+         * development profile, which is what was already happening.
+         *
+         * <p>The alternative was to open the development default whenever the
+         * profile allows it. That is the wrong fix: it would give a database to
+         * every server that has no use for one, which contradicts "a server with
+         * no database opens none" and costs a file handle to prove it. What was
+         * actually missing is that a DECLARED dependency did not drive the
+         * decision, and the build knows exactly which controllers declare one.
+         */
+        public Builder requiresDataSource() {
+            this.handlersNeedADatabase = true;
             return this;
         }
 
@@ -471,9 +496,10 @@ public final class Backend {
          * The pool, or null when this server has no database.
          *
          * <p>One is opened when the deployment named a database, when the caller
-         * handed one in, or when the build generated an entity -- because an
-         * entity with nowhere to live is a server that would fail on its first
-         * query instead of at start-up.
+         * handed one in, when a handler said it needs one (see
+         * {@link #requiresDataSource}), or when the build generated an entity --
+         * because an entity with nowhere to live is a server that would fail on
+         * its first query instead of at start-up.
          */
         private DataSource openDataSource() throws IOException {
             if(dataSource != null) {
@@ -483,7 +509,7 @@ public final class Backend {
                 return DataSource.open(dataSourceUrl);
             }
             boolean configured = config.get(Config.DATASOURCE_URL) != null;
-            if(!configured && EntityManager.registered().length == 0) {
+            if(!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
                 return null;
             }
             return DataSource.fromConfig(config);
