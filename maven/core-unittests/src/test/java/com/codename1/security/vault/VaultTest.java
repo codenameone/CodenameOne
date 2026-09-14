@@ -48,6 +48,9 @@ class VaultTest extends UITestBase {
         boolean userVerification;
         boolean refuseWrites;
         boolean unreadable;
+        /// What the wrapping store says about encryption at rest. False is the JavaSE simulator
+        /// and Android below API 23, where the key sits in the clear beside the ciphertext.
+        boolean encryptedAtRest = true;
         DeviceProtection gatedVariant;
 
         @Override
@@ -61,7 +64,7 @@ class VaultTest extends UITestBase {
         public ProtectionReport protection() {
             return ProtectionReport.builder()
                     .set(Protection.PERSISTENT, !refuseWrites)
-                    .set(Protection.ENCRYPTED_AT_REST, true)
+                    .set(Protection.ENCRYPTED_AT_REST, encryptedAtRest)
                     .set(Protection.NON_EXTRACTABLE_KEY, true)
                     .set(Protection.OS_PROTECTED, true)
                     .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
@@ -696,6 +699,25 @@ class VaultTest extends UITestBase {
         VaultError error = errorOf(vault.enroll(pw("p"), options));
         assertEquals(VaultError.POLICY_NOT_MET, error);
         assertEquals(Vault.NOT_ENROLLED, vault.state());
+    }
+
+    @Test
+    void changingPolicyRecheckesTheRequiredProtections() {
+        // SESSION_ONLY genuinely is encrypted at rest -- nothing that can reopen the vault is
+        // written down -- so this enrolls. REMEMBER_DEVICE has to put a wrapping key in the
+        // store, and on the simulator or Android below API 23 that store reports NO.
+        VaultOptions options = fast().policy(UnlockPolicy.SESSION_ONLY)
+                .require(Protection.ENCRYPTED_AT_REST);
+        Vault vault = Vault.named(freshName()).configure(options);
+        assertTrue(vault.enroll(pw("p"), options).get().booleanValue());
+
+        device.encryptedAtRest = false;
+        // Supported and permitted are different questions. setPolicy asked only the first, so
+        // the requirement enrollment enforced was dropped on the way to a weaker store.
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(vault.setPolicy(UnlockPolicy.REMEMBER_DEVICE)));
+        // Refused before anything moved: no device wrap, and the policy is unchanged.
+        assertTrue(device.keys.isEmpty());
+        assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
     }
 
     @Test

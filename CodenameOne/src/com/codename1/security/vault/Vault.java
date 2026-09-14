@@ -1326,6 +1326,14 @@ public final class Vault {
             public void run() {
                 try {
                     requirePolicySupported(policy);
+                    // Judged against the policy being moved TO, and before options is mutated or
+                    // any record is deleted, so a refusal leaves the vault exactly as it was.
+                    // Enrollment enforces require(...) and this did not, so a vault enrolled
+                    // SESSION_ONLY with require(ENCRYPTED_AT_REST) could move to REMEMBER_DEVICE
+                    // and persist its wrapping key in a store that reports ENCRYPTED_AT_REST=NO
+                    // -- the JavaSE simulator, or Android below API 23. Supported and permitted
+                    // are different questions, and only the first was being asked.
+                    requireProtections(policy);
                     options.policy(policy);
                     DeviceRecord current = deviceRecord();
                     UnlockPolicy previous = current == null
@@ -1407,11 +1415,21 @@ public final class Vault {
     }
 
     private void requireProtections() {
+        requireProtections(options.getPolicy());
+    }
+
+    /// The required protections, judged against the policy named here rather than the one
+    /// currently configured.
+    ///
+    /// setPolicy needs the distinction: it is asking whether the policy it is about to move TO
+    /// still satisfies what this vault was required to have, and the configured policy at that
+    /// moment is the one being left behind.
+    private void requireProtections(UnlockPolicy policy) {
         Protection[] required = options.getRequired();
         if (required.length == 0) {
             return;
         }
-        ProtectionReport report = capabilities().protectionFor(options.getPolicy());
+        ProtectionReport report = capabilities().protectionFor(policy);
         Protection unmet = report.firstUnmet(required);
         if (unmet != null) {
             throw new VaultException(VaultError.POLICY_NOT_MET,

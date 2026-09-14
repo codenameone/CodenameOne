@@ -246,10 +246,17 @@ public final class HTML5SecureStorage extends SecureStorage {
     }
 
     public ProtectionReport protectionOf(String account) {
-        if (account != null && !Storage.getInstance().exists(encryptedKey(account))
-                && Storage.getInstance().exists(legacyKey(account))) {
+        if (account != null && Storage.getInstance().exists(legacyKey(account))) {
             // A plaintext entry that has not been migrated yet. Reporting the store's capability
             // here would say this value is encrypted when it is sitting in the open.
+            //
+            // The legacy copy alone decides this, whether or not an encrypted one exists beside
+            // it. An interrupted migration leaves both, and get() deliberately falls back to the
+            // plaintext when the encrypted copy will not open -- so answering "encrypted"
+            // because the encrypted entry is present would let a caller's ENCRYPTED_AT_REST
+            // requirement be satisfied by a value that is then served from the open one. It
+            // corrects itself: the first get() that opens the ciphertext deletes the plaintext,
+            // and this answers encrypted from then on.
             ProtectionReport.Builder b = ProtectionReport.builder();
             b.set(Protection.PERSISTENT, true);
             b.set(Protection.ENCRYPTED_AT_REST, false);
