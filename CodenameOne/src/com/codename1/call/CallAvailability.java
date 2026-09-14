@@ -42,8 +42,15 @@ public enum CallAvailability {
     /// Another application holds a call the system will not interrupt.
     OTHER_APP_IN_CALL,
 
-    /// The user has switched this app's calling off, or the required
-    /// permission or role is missing.
+    /// A permission the port needs to ring a call is missing.
+    ///
+    /// Android only, and only two causes reach here: `MANAGE_OWN_CALLS`
+    /// not granted, or notifications off / the incoming-call channel below
+    /// high importance. Both are recoverable by asking. A disabled
+    /// `PhoneAccount` is NOT one of them -- nothing queries that, and it
+    /// surfaces later as a [CallError#CALL_REFUSED] on the report -- so a
+    /// handler for this value must not send the user to the calling switch.
+    /// iOS never answers this at all.
     NOT_PERMITTED,
 
     /// The platform has no system call integration at all.

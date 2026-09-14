@@ -213,7 +213,11 @@ by design, because Telecom accepts a second call from the same account.
 `NOT_CONFIGURED` means `Calls.configure` hasn't run, which is yours to fix in
 code and not something a user can clear; prompting for it strands them in front
 of a dialog that changes nothing. `NOT_PERMITTED` is the one that wants the
-user: they switched your app's calling off, or a permission or role is missing.
+user, and it means a permission rather than a setting: Android answers it when
+`MANAGE_OWN_CALLS` was never granted, or when notifications are off or the
+incoming-call channel sits below high importance, and iOS never answers it at
+all. Send the user to the permission that's missing; the calling switch isn't
+what this value is about.
 Only `UNSUPPORTED` is permanent.
 
 `CallHandle` and `CallHandleType`:: who the call is with, and one of `GENERIC`,
@@ -235,12 +239,15 @@ condition behind it rather than on the code alone.
 it spans both kinds of cause: an emergency call or another app's self-managed
 call passes on its own, while the user having switched your app's calling off,
 or `Calls.configure` not having run, refuses every report until something
-changes. `Calls.getAvailability()` is worth asking first but won't always
-separate them -- on Android it never checks whether the registered
-`PhoneAccount` was disabled, and its foreign-call test needs `READ_PHONE_STATE`,
-which the port doesn't declare by design and treats as "no" when absent. It
-can answer `AVAILABLE` and the report still come back `CALL_REFUSED`, so treat a
-repeat of it as a settings problem rather than something to retry.
+changes. Nothing in the code tells you which you got: Android's refusal
+carries one message naming all three causes. `Calls.getAvailability()` is worth
+asking first, and won't always separate them either -- it never checks whether
+the registered `PhoneAccount` was disabled, and its foreign-call test needs
+`READ_PHONE_STATE`, which the port doesn't declare by design and treats as "no"
+when absent. It can answer `AVAILABLE` and the report still come back
+`CALL_REFUSED`. Retry on a timer that slows down rather than reading anything
+into a repeat: the emergency or foreign call that caused the first refusal is often
+still up for the second, and a persistent refusal looks identical.
 
 // vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
 `CALL_FILTERED` means the system suppressed the call before it rang -- Do Not

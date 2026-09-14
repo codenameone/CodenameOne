@@ -42,9 +42,18 @@ public enum CallError {
     /// the inert fallback bridge fails every operation with it.
     NOT_SUPPORTED,
 
-    /// A required runtime permission or role is missing: `MANAGE_OWN_CALLS`
-    /// on Android, the microphone grant on either platform, or the call
-    /// screening role the user declined.
+    /// A permission the operation needed is missing.
+    ///
+    /// Emitted in two places, both Android: a `SecurityException` out of
+    /// configure or a report, which means `MANAGE_OWN_CALLS` was never granted,
+    /// and an incoming report refused because notifications are off or the
+    /// incoming-call channel sits below high importance. The second grants
+    /// no permission, so re-requesting permissions cannot clear it.
+    ///
+    /// A denied microphone grant and a declined call screening role do NOT
+    /// arrive here: [com.codename1.call.session.Calls#requestPermissions(int)]
+    /// resolves with the mask it got and `CallDirectory.requestScreeningRole`
+    /// resolves false, so read those results rather than waiting for this.
     UNAUTHORIZED,
 
     /// The system refused to place or ring this call right now, and may
