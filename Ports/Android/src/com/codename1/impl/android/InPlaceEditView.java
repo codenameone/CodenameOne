@@ -1542,8 +1542,9 @@ public class InPlaceEditView extends FrameLayout{
         if (sInstance != null) {
             ViewParent p = sInstance.getParent();
             if (p instanceof ViewGroup) {
+                final ViewGroup parent = (ViewGroup) p;
                 try {
-                    ((ViewGroup) p).removeView(sInstance);
+                    parent.removeView(sInstance);
                 } catch (RuntimeException err) {
                     // Detaching the EditText runs Editor.onDetachedFromWindow, which
                     // unregisters an OnDrawListener the platform may already have
@@ -1564,13 +1565,61 @@ public class InPlaceEditView extends FrameLayout{
                     // down for closing a form that had a text field on it.
                     Log.e(TAG, "removeView threw while releasing the editor: "
                             + err + " " + Log.getStackTraceString(err));
+
+                    // The throw lands inside dispatchDetachedFromWindow(), and
+                    // ViewGroup.removeViewInternal only takes the child out of its
+                    // array and clears its parent pointer AFTER that call returns. So
+                    // this view is still a child of parent, and the caller is about to
+                    // add a second InPlaceEditView next to it. Left alone that stacks
+                    // overlays, and the stale one is still hit-testable above the form.
+                    //
+                    // GONE first, because that part cannot fail to matter: a GONE child
+                    // is not measured, not drawn and not offered touches, so the leftover
+                    // stops being able to intercept anything even if it never leaves the
+                    // hierarchy.
+                    orphanEditView(parent, sInstance);
                 }
             }
-            // Cleared whether or not the detach threw. sInstance is what the caller
-            // tests before building a replacement, so leaving it set after a failed
-            // release wedges every later edit against a view that is already gone
-            // from the hierarchy.
+            // Cleared whether or not the detach threw -- but only after the failed
+            // path above has hidden the leftover and queued its removal, so "no
+            // sInstance" never means "an invisible editor is still taking input".
+            // Leaving it set instead would wedge every later edit against a view that
+            // is half out of the hierarchy.
             sInstance = null;
+        }
+    }
+
+    /**
+     * Disposes of an edit view that removeView() failed to detach.
+     *
+     * Hides it immediately so it cannot draw or take touches, then asks for the
+     * removal again on a later turn of the looper. By then the window teardown that
+     * collided with the first attempt has finished and the view's attach info is
+     * cleared, so ViewGroup skips dispatchDetachedFromWindow() entirely -- which is
+     * the call that threw. If it throws anyway the view stays GONE and harmless,
+     * which is why the retry is best effort rather than a loop.
+     */
+    private static void orphanEditView(final ViewGroup parent, final InPlaceEditView orphan) {
+        try {
+            orphan.setVisibility(View.GONE);
+        } catch (RuntimeException err) {
+            Log.e(TAG, "could not hide the leftover editor: " + err);
+        }
+        try {
+            parent.post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (orphan.getParent() == parent) {
+                            parent.removeView(orphan);
+                        }
+                    } catch (RuntimeException err) {
+                        Log.e(TAG, "leftover editor could not be detached on retry: " + err);
+                    }
+                }
+            });
+        } catch (RuntimeException err) {
+            Log.e(TAG, "could not queue the leftover editor removal: " + err);
         }
     }
 
