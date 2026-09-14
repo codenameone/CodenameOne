@@ -514,7 +514,19 @@ final class Placeholders {
     }
 
     private static boolean isWordChar(char c) {
-        return c == '_' || c == '$' || (c >= '0' && c <= '9')
+        // ANYTHING ABOVE ASCII COUNTS. PostgreSQL's unquoted identifiers admit
+        // the letters of the server encoding, not just a-z, and this predicate
+        // decides where a token begins: with ASCII alone, the $ in "cafe$usd$"
+        // -- e-acute in place of that e -- looked like the start of a
+        // dollar-quoted string rather than part of the identifier, and a
+        // perfectly good statement was refused as unterminated.
+        //
+        // A superset of PostgreSQL's rule, deliberately. The question asked here
+        // is only whether a character joins the token before it, and a $ or a
+        // keyword sitting immediately after a non-ASCII character is part of an
+        // identifier under every reading -- a dollar-quote opener follows
+        // whitespace, an operator or a bracket.
+        return c == '_' || c == '$' || c >= 0x80 || (c >= '0' && c <= '9')
                 || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
 
