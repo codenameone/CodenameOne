@@ -84,6 +84,14 @@ class ScannerTest {
                 "INSERT INTO t (a) VALUES (?) /* on duplicate key update */"));
         assertFalse(Dialect.SQLITE.updatesOnConflict(
                 "INSERT INTO t (redo, updated) VALUES (?, ?)"));
+
+        // A GATED upsert reads as one. Unlike the tuple count and the parameter
+        // count, "might it update?" has a safe answer when the server version is
+        // unknown -- and it is yes, so this needs no VERSION_GATED case of its
+        // own: a statement that updates on some servers has no reliable key on
+        // any of them.
+        assertTrue(Dialect.MYSQL.updatesOnConflict(
+                "INSERT INTO t (a) VALUES (?) /*!50100 ON DUPLICATE KEY UPDATE b = 1 */"));
     }
 
     @Test
