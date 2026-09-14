@@ -176,9 +176,10 @@ one-way rejects a legitimate resume or leaves media paused. `ENDED` is the only
 terminal state: a call never leaves it, acting on one that has reports
 `CallError.INVALID_ID`, and it's where you release whatever the call held.
 
-`CallDirection`:: `INCOMING` or `OUTGOING`. Worth reading rather than inferring
-from which method you called: a call your app reported can be re-delivered to
-you after a process restart, and the direction is how you tell the two apart.
+`CallDirection`:: `INCOMING` or `OUTGOING`, fixed when the call is reported and
+never changing after that. Read it when you hold a session you didn't report
+yourself -- a session passed to a listener, or fetched from `Calls.getSessions()` --
+rather than keeping your own note of the direction beside the call id.
 
 `CallEndReason`:: `REMOTE_ENDED`, `LOCAL_ENDED`, `UNANSWERED`, `BUSY`, `FAILED`,
 // vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
@@ -189,11 +190,14 @@ as "the user rejected this" -- that's `LOCAL_ENDED`, and conflating the two
 sends the wrong status back to whatever placed the call.
 
 `CallAvailability`:: what `Calls.getAvailability()` answers before you report a
-call. `AVAILABLE` is the only value that lets a call ring.
-`EMERGENCY_CALL_IN_PROGRESS`, `OTHER_APP_IN_CALL` and `THIS_APP_IN_CALL` are
-temporary and worth retrying; `NOT_PERMITTED`, `UNSUPPORTED` and
-`NOT_CONFIGURED` aren't, and the last of those usually means `Calls.configure`
-hasn't run.
+call, and `AVAILABLE` is the only value that lets one ring. The rest divide
+three ways rather than two. `EMERGENCY_CALL_IN_PROGRESS`, `OTHER_APP_IN_CALL`
+and `THIS_APP_IN_CALL` pass on their own, so a retry is the right response.
+`NOT_CONFIGURED` means `Calls.configure` hasn't run and `NOT_PERMITTED` means
+the user switched your app's calling off or a permission or role is missing --
+both clear once you do something about them, so they call for asking the user
+rather than either retrying or giving up. Only `UNSUPPORTED` is
+permanent: the platform has no telephony integration to offer.
 
 `CallHandle` and `CallHandleType`:: who the call is with. Build one with
 `CallHandle.phone(...)`, `CallHandle.email(...)` or `CallHandle.generic(...)`
