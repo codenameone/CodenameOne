@@ -105,9 +105,14 @@ public final class HTML5PasskeyProtection extends DeviceProtection {
         // browser answers persisted() false on a fresh profile.
         b.set(Protection.PERSISTENT, usable);
         b.set(Protection.ENCRYPTED_AT_REST, usable);
-        // The authenticator's HMAC secret never leaves it -- there is no API that exports one, on
-        // purpose. This is the one protection a browser can report as genuinely yes.
-        b.set(Protection.NON_EXTRACTABLE_KEY, usable);
+        // NO, and the distinction is the whole point. The authenticator's HMAC secret never
+        // leaves it and there is no API that exports one -- but that secret is not the wrapping
+        // key. nativePrfDerive hands the 32 byte PRF output back to Java, and wrap() and
+        // unwrap() pass exactly that array to SecureEnvelope as the AES key, so the key doing
+        // the work is an ordinary byte[] in the heap. Reporting the authenticator's property as
+        // if it were the key's let require(NON_EXTRACTABLE_KEY) accept this configuration, which
+        // is the same mistake the operational key handle made with the device report.
+        b.set(Protection.NON_EXTRACTABLE_KEY, false);
         // A platform authenticator is held by the operating system and a roaming one is not, and
         // the page is not told which it got. Unknown is the answer, not a guess from the fact that
         // a prompt appeared.

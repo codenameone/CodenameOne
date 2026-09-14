@@ -74,7 +74,7 @@ function makeIndexedDb() {
   // promise in onerror says nothing to the DOM, so a handler that only resolved still lost the
   // whole transaction -- which nothing here could see, because this stub simply had no such
   // rule and the Chromium suite was the first thing to notice.
-  function request(run, onAbort) {
+  function request(run, onAbort, onError) {
     const req = { onsuccess: null, onerror: null, result: undefined, error: null };
     queueMicrotask(() => {
       try {
@@ -85,6 +85,12 @@ function makeIndexedDb() {
         let prevented = false;
         const event = { preventDefault() { prevented = true; } };
         if (req.onerror) req.onerror(event);
+        // The event BUBBLES to the transaction whether or not preventDefault was called --
+        // preventDefault cancels the default action, not the propagation. Not modelling this is
+        // why a commit that rejected on tx.onerror passed here and failed in a real browser.
+        if (onError) {
+          onError(e);
+        }
         if (!prevented && onAbort) {
           onAbort(e);
         }
@@ -129,15 +135,35 @@ function makeIndexedDb() {
         }
         undo.length = 0;
       };
-      // Settles after the requests queued on it, the way a real one does: the handlers are
-      // attached during this turn, so the completion has to be scheduled behind them.
+      // One dispatch point for the whole transaction lifecycle, in the order a browser uses:
+      // a request error reaches the transaction FIRST, and only then does the transaction
+      // complete or abort. Scheduling those independently let completion win the race, the
+      // commit promise settled before the error arrived, and a bug that only Chromium could see
+      // passed here twice.
       const tx = { oncomplete: null, onabort: null, onerror: null, error: null };
+      let pendingError = null;
+      let mustAbort = false;
+      const bubble = (cause) => {
+        pendingError = cause;
+        tx.error = cause || null;
+      };
+      const abort = (cause) => {
+        if (mustAbort) {
+          return;
+        }
+        mustAbort = true;
+        tx.error = cause || tx.error;
+        rollback();
+      };
       setTimeout(() => {
-        if (aborted) {
+        if (pendingError && tx.onerror) {
+          tx.onerror();
+        }
+        if (mustAbort) {
+          if (tx.onabort) tx.onabort();
           return;
         }
         if (failEveryCommit) {
-          aborted = true;
           rollback();
           tx.error = Object.assign(new Error('quota exceeded'), { name: 'QuotaExceededError' });
           if (tx.onabort) tx.onabort();
@@ -145,25 +171,8 @@ function makeIndexedDb() {
         }
         if (tx.oncomplete) tx.oncomplete();
       }, 0);
-      // Rolls the transaction back and fires onabort, exactly as an uncancelled request error
-      // does in a browser.
-      let aborted = false;
-      const abort = (cause) => {
-        if (aborted) {
-          return;
-        }
-        aborted = true;
-        rollback();
-        tx.error = cause || null;
-        // DISPATCHED as a task, not inline. A browser fires abort as an event, so handlers
-        // attached later in the same turn still see it -- and cn1VaultCommit attaches its
-        // handler in the .then AFTER the request settles. Calling tx.onabort inline found it
-        // still null, nothing ever settled the commit promise, and the harness exited zero with
-        // empty stdout: a hang dressed as a pass.
-        setTimeout(() => { if (tx.onabort) tx.onabort(); }, 0);
-      };
       const store = {
-        get: (key) => request(() => data.get(key), abort),
+        get: (key) => request(() => data.get(key), abort, bubble),
         add: (record) => request(() => {
           if (data.has(record.id)) {
             constraintErrors++;
@@ -187,9 +196,9 @@ function makeIndexedDb() {
           remember(record.id);
           data.set(record.id, stored);
           return record.id;
-        }, abort),
+        }, abort, bubble),
         delete: (key) => request(() => { remember(key); data.delete(key); return undefined; },
-            abort)
+            abort, bubble)
       };
       tx.objectStore = () => store;
       return tx;
@@ -408,6 +417,19 @@ function payload(reply) {
     // And nothing was left behind claiming to be a key.
     const afterAbort = await call({ op: 'keyState', keyId: 'commit-probe' });
     results.keyStateAfterAbort = payload(afterAbort)[0];
+
+    // A DELETION whose transaction aborts is not a deletion either. Reporting OK on the request
+    // alone let "forget this device" succeed while the key survived the rollback -- and a later
+    // enrolment would then find it and adopt it.
+    // A key of its own, because KEY was deleted earlier in this run and a delete that finds
+    // nothing proves nothing.
+    await call({ op: 'ensureKey', keyId: 'delete-probe' });
+    fakeIndexedDb.setFailEveryCommit(true);
+    const notDeleted = await call({ op: 'deleteKey', keyId: 'delete-probe' });
+    results.deleteUncommittedStatus = status(notDeleted);
+    fakeIndexedDb.setFailEveryCommit(false);
+    const stillThere = await call({ op: 'keyState', keyId: 'delete-probe' });
+    results.keyStateAfterFailedDelete = payload(stillThere)[0];
 
     console.log(JSON.stringify(results));
   } catch (e) {

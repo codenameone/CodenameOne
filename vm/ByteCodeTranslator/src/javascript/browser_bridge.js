@@ -540,9 +540,12 @@
       tx.onabort = function() {
         reject(tx.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
       };
-      tx.onerror = function() {
-        reject(tx.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
-      };
+      // Deliberately NO tx.onerror. preventDefault on a request error stops the default action
+      // -- the abort -- but it does not stop the event PROPAGATING, so a handled ConstraintError
+      // still reaches the transaction. Rejecting there failed the commit for the very case the
+      // handling exists to allow, and the loser of two racing ensureKey calls reported a storage
+      // failure instead of adopting the winner's key. Abort is the authoritative signal: an
+      // error that was not handled aborts, and onabort fires then anyway.
     });
   }
 
@@ -1028,9 +1031,18 @@
       return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
         return store['delete'](CN1_PRF_STORE_PREFIX + String(keyId));
       }).then(function() {
-        return cn1VaultReply(CN1V_OK, null);
+        // A deletion is not a deletion until its transaction commits, for the same reason a
+        // write is not a write. Reporting OK on the request alone let "forget this device"
+        // succeed while the record survived the abort -- and a later enrolment would then find
+        // it and adopt it.
+        return cn1VaultCommit(tx).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        });
       });
-    }, function(error) {
+      // then(null, fn) and not then(ok, fn): a handler passed as the SECOND argument sees only
+      // the rejection of the promise it is attached to, never one raised inside its own sibling
+      // -- so the commit rejection above sailed past it and became an unhandled rejection.
+    }).then(null, function(error) {
       return cn1VaultReply(cn1VaultStatusOf(error), null);
     });
   }
@@ -1155,9 +1167,13 @@
           return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
             return store['delete'](String(request.keyId));
           }).then(function() {
-            return cn1VaultReply(CN1V_OK, null);
+            // Committed before it is called deleted; see cn1VaultPrfForget.
+            return cn1VaultCommit(tx).then(function() {
+              return cn1VaultReply(CN1V_OK, null);
+            });
           });
-        }, function(error) {
+          // then(null, fn); see cn1VaultPrfForget for why the second-argument form is wrong here.
+        }).then(null, function(error) {
           return cn1VaultReply(cn1VaultStatusOf(error), null);
         });
       }

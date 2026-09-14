@@ -182,6 +182,13 @@ class JavascriptVaultBridgeTest {
         assertEquals("5", r.get("ensureKeyUncommittedStatus"));
         // And the aborted write left nothing behind claiming to be a key. 0 is KEY_ABSENT.
         assertEquals("0", r.get("keyStateAfterAbort"));
+
+        // The same rule for a DELETION, which the first sweep of this missed: reporting OK on
+        // the request alone let forgetDevice and destroyLocalData answer true while the key
+        // survived the rollback, where a later enrolment would find and adopt it.
+        assertNotEquals("0", r.get("deleteUncommittedStatus"));
+        // 1 is KEY_PRESENT -- the key really did survive, which is why saying otherwise matters.
+        assertEquals("1", r.get("keyStateAfterFailedDelete"));
     }
 
     @Test
