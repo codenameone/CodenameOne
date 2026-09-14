@@ -250,6 +250,46 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void refusesAnExplicitTypeOnAGeneratedKey() throws Exception {
+        // A generated key's declaration is one indivisible form per engine --
+        // SQLite's AUTOINCREMENT is legal only after the exact words INTEGER
+        // PRIMARY KEY -- so there is nowhere to put BIGINT UNSIGNED. It used to
+        // be discarded in silence, which made @Column(type) mean what it says on
+        // every column but this one.
+        File classes = compileFixture(
+                "com.example.Invoice",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Invoice {\n"
+                        + "    @Id @Column(type=\"BIGINT UNSIGNED\") public long id;\n"
+                        + "    public Invoice() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertTrue("an explicit type on a generated key should be refused", ctx.hasErrors());
+        assertTrue("the message should name the type: " + ctx.getErrors(),
+                ctx.getErrors().toString().indexOf("BIGINT UNSIGNED") >= 0);
+    }
+
+    @Test
+    public void keepsAnExplicitTypeOnAnAssignedKey() throws Exception {
+        // The other side: with the application assigning the key there is no
+        // engine-specific syntax to agree with, so the declared type is written
+        // through and this must keep building.
+        File classes = compileFixture(
+                "com.example.Voucher",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Voucher {\n"
+                        + "    @Id(autoIncrement=false) @Column(type=\"CHAR(36)\")\n"
+                        + "    public String code;\n"
+                        + "    public Voucher() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertFalse("an assigned key may declare its type: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
     public void refusesAGeneratedStringKeyOnTheServer() throws Exception {
         // No engine generates a string key: SQLite's AUTOINCREMENT is legal only
         // after INTEGER PRIMARY KEY and the other two count. Caught here rather

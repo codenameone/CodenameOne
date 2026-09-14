@@ -74,6 +74,30 @@ class ScannerTest {
     }
 
     @Test
+    @DisplayName("a dollar after a non-ASCII letter is part of the identifier")
+    void nonAsciiIdentifiersReachTheirDollar() throws Exception {
+        // PostgreSQL's unquoted identifiers carry the letters of the server
+        // encoding, so "caf\u00e9$usd$" is one column name. Reading the token
+        // boundary as ASCII-only made the $ look like a dollar-quote opener,
+        // and the statement was refused as an unterminated literal -- a valid
+        // query that never ran, with a message about a string it does not have.
+        String sql = "SELECT caf\u00e9$usd$ FROM totals WHERE id = ?";
+        assertEquals("SELECT caf\u00e9$usd$ FROM totals WHERE id = $1",
+                Dialect.POSTGRES.bind(sql, 1));
+        // The same name on the engines that have no dollar quoting at all.
+        assertEquals(sql, Dialect.MYSQL.bind(sql, 1));
+        assertEquals(sql, Dialect.SQLITE.bind(sql, 1));
+
+        // A REAL dollar-quoted body still opens, because it follows a boundary
+        // rather than a letter -- which is the distinction being made.
+        assertEquals("SELECT $tag$ ? $tag$, $1",
+                Dialect.POSTGRES.bind("SELECT $tag$ ? $tag$, ?", 1));
+        // And a keyword is not one when a non-ASCII letter runs into it.
+        assertEquals(1, Dialect.POSTGRES.countInsertRows(
+                "INSERT INTO t (a) VALUES (?) /* caf\u00e9values (2) */"));
+    }
+
+    @Test
     @DisplayName("an upsert is recognised as SQL, not found as text")
     void upsertsAreRecognised() throws Exception {
         // Database refuses one of these on the engines that read the generated

@@ -286,6 +286,13 @@ final class Table {
     private String declaration(ColumnDefinition column) {
         if(column.isId()) {
             if(column.isGenerated()) {
+                // The DECLARED TYPE IS NOT CONSULTED, and that is not an
+                // oversight: a generated key's declaration is one indivisible
+                // form per engine -- SQLite's AUTOINCREMENT is legal only after
+                // the exact words INTEGER PRIMARY KEY -- so there is nowhere to
+                // put an arbitrary type. @Column(type) on an autoIncrement @Id
+                // is refused by the annotation processor rather than discarded
+                // here, so this branch is only ever reached without one.
                 return dialect.generatedKeyColumn(column.getKind());
             }
             if(column.getDeclaredType() != null) {
