@@ -1550,6 +1550,102 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anOperationalKeyHeldAcrossARotationStopsWorking() {
+        // Rotation leaves the vault open, so the lock generation does not move -- and a handle
+        // handed out before it went on using the subkey derived from the SUPERSEDED data key.
+        // Sealing stayed readable, because the envelope carries the version the handle was made
+        // at and open() walks the retired chain back to it. mac() has nothing to carry: its tag
+        // records no version, so one produced by a stale handle after a rotation cannot be
+        // verified by any handle obtained afterwards, here or anywhere else, and nothing said so.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+
+        KeyHandle stale = vault.operationalKey("cache").get();
+        assertFalse(stale.isDestroyed());
+        byte[] tagBefore = stale.mac("payload".getBytes()).get();
+
+        assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue());
+
+        assertTrue(stale.isDestroyed(),
+                "a handle derived from the superseded data key is not live");
+        AssociatedData binding = AssociatedData.of("app", "v", "r", "cache");
+        assertEquals(VaultError.LOCKED, errorOf(stale.seal("more".getBytes(), binding)));
+        assertEquals(VaultError.LOCKED, errorOf(stale.mac("payload".getBytes())));
+
+        // A fresh handle works, and is honest about the old tag rather than silently disagreeing:
+        // the tag was made under the previous key and this one cannot verify it.
+        KeyHandle fresh = vault.operationalKey("cache").get();
+        assertFalse(fresh.isDestroyed());
+        byte[] tagAfter = fresh.mac("payload".getBytes()).get();
+        assertFalse(java.util.Arrays.equals(tagBefore, tagAfter),
+                "the rotation really did change this purpose's key");
+        assertFalse(fresh.verifyMac("payload".getBytes(), tagBefore).get().booleanValue());
+        assertTrue(fresh.verifyMac("payload".getBytes(), tagAfter).get().booleanValue());
+    }
+
+    @Test
+    void anOperationalKeyHeldAcrossASyncImportStopsWorking() {
+        // The other way the data key is replaced while the vault stays open. Importing another
+        // device's state installs ITS key, which need not be related to this one's at all.
+        Vault origin = Vault.named(freshName()).configure(fast());
+        origin.enroll(pw("p"), fast()).get();
+
+        Vault joining = Vault.named(freshName()).configure(fast());
+        assertTrue(joining.importSyncState(origin.exportSyncState(), pw("p")).get()
+                .booleanValue());
+        KeyHandle joined = joining.operationalKey("cache").get();
+        assertFalse(joined.isDestroyed());
+
+        // A refresh of the same state, which is the ordinary sync call and republishes the key.
+        assertTrue(joining.importSyncState(origin.exportSyncState(), pw("p")).get()
+                .booleanValue(), "re-importing the same state is a refresh and must work");
+        assertTrue(joined.isDestroyed(),
+                "an import republishes the data key, so handles derived from the old one die");
+    }
+
+    @Test
+    void aDestructionThatCannotDeleteTheRecordReportsFailure() {
+        // deleteStorageFile returns void on every port, so the loop cannot tell a delete that
+        // happened from one that did not -- and both real ports fail one silently: JavaSE
+        // discards File.delete()'s boolean, the browser catches and logs the IndexedDB error.
+        // Reporting TRUE there is the worst answer available: a metadata record that survived
+        // leaves a vault the password still opens, on a call whose whole contract is that it is
+        // gone.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertTrue(vault.putSecret("token", pw("abc123")).get().booleanValue());
+
+        TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(
+                vaultRecordName(name));
+        try {
+            assertEquals(VaultError.STORAGE_UNAVAILABLE, errorOf(vault.destroyLocalData()),
+                    "a destruction that left the vault record behind must not report success");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+        }
+
+        // The vault really is still openable, which is what the TRUE would have been denying.
+        Vault survivor = Vault.named(name).configure(fast());
+        assertTrue(survivor.unlockWithPassword(pw("p")).get().booleanValue());
+        // And the call still locked, because everything it did manage to delete had happened.
+        assertFalse(vault.isUnlocked());
+    }
+
+    /// The storage entry the vault record lands in, found rather than spelled out.
+    private static String vaultRecordName(String vaultName) {
+        for (String entry : Storage.getInstance().listEntries()) {
+            if (entry.indexOf(vaultName) > 0 && entry.indexOf(".s.") < 0
+                    && !entry.endsWith(".device")) {
+                return entry;
+            }
+        }
+        throw new IllegalStateException("no vault record for " + vaultName);
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

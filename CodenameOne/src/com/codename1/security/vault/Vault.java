@@ -104,6 +104,21 @@ public final class Vault {
     /// result computed before a lock is not delivered after one.
     private int lockGeneration;
 
+    /// Incremented whenever the data key is replaced, which is not the same event as a lock.
+    ///
+    /// A rotation leaves the vault open, so lockGeneration does not move -- and a KeyHandle
+    /// handed out before it went on answering with the subkey derived from the SUPERSEDED data
+    /// key. Sealing stayed self-consistent, because the handle stamps the version it was made at
+    /// and open() walks the retired chain back to it, but mac() has no version to stamp: a tag
+    /// produced by a stale handle after a rotation cannot be verified by any handle obtained
+    /// afterwards, here or on another device, and nothing reports that.
+    ///
+    /// So a handle dies at a rotation exactly as it dies at a lock. The alternative -- resolving
+    /// the live subkey on every use -- would silently change what getVersion() describes and what
+    /// a tag from one handle means over its lifetime, which is a worse contract than a refusal
+    /// the caller can see.
+    private int keyGeneration;
+
     private long lastActivity;
     private boolean passwordNeedsRewrap;
     private VaultMetadata metadata;
@@ -393,7 +408,7 @@ public final class Vault {
                         + "the password instead of enrolling again");
             }
             metadata = verified;
-            dataKey = key;
+            adoptKey(key);
             key = null;
             touch();
             if (options.getPolicy() != UnlockPolicy.SESSION_ONLY) {
@@ -798,6 +813,7 @@ public final class Vault {
                         storage.deleteStorageFile(deviceRecordKey());
                         storage.deleteStorageFile(metadataKey());
                         forgetEveryMechanism();
+                        requireEverythingGone(storage, entries, prefix);
                     } finally {
                         // In a finally, because once ANY of that has happened the live key and
                         // cached record describe a vault that is no longer on disk. A device key
@@ -1128,7 +1144,8 @@ public final class Vault {
                     // lock landing between the check above and this line stamped the handle
                     // with the POST-lock value -- so the handle considered itself live and went
                     // on sealing and opening with key material the lock had invalidated.
-                    out.complete(new VaultKeyHandle(Vault.this, generation, derived,
+                    out.complete(new VaultKeyHandle(Vault.this, generation, keyGeneration,
+                            derived,
                             purpose, meta.dataKeyVersion, extractedKeyProtection()));
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -1548,8 +1565,7 @@ public final class Vault {
                                 "the vault was locked while the key was being rotated; the "
                                 + "rotation is stored and the vault is closed");
                     }
-                    Bytes.zero(dataKey);
-                    dataKey = fresh;
+                    adoptKey(fresh);
                     fresh = null;
                     metadata = next;
                     DeviceRecord remembered = deviceRecord();
@@ -2226,6 +2242,24 @@ public final class Vault {
         return lockGeneration;
     }
 
+    /// The key generation, for a handle to notice that the key it derives from has been replaced.
+    int keyGeneration() {
+        return keyGeneration;
+    }
+
+    /// Installs a data key, and tells every handle derived from the old one that it is stale.
+    ///
+    /// One place, because a counter that is bumped at some of the assignments is worse than none:
+    /// a handle would keep working across exactly the rotation nobody remembered to stamp.
+    private void adoptKey(byte[] key) {
+        // Unlocking an already-unlocked vault would otherwise leave the previous array in the
+        // heap with nothing pointing at it, which is the one copy this class can still do
+        // something about.
+        Bytes.zero(dataKey);
+        dataKey = key;
+        keyGeneration++;
+    }
+
     private VaultMetadata requireMetadata() {
         VaultMetadata meta = loadMetadata();
         if (meta == null) {
@@ -2441,11 +2475,7 @@ public final class Vault {
     /// the transient is a few statements wide and self-correcting rather than permanent.
     private void publishKey(int generation, VaultMetadata meta, byte[] key) {
         metadata = meta;
-        // Unlocking an already-unlocked vault would otherwise leave the previous array in the
-        // heap with nothing pointing at it, which is the one copy this class can still do
-        // something about.
-        Bytes.zero(dataKey);
-        dataKey = key;
+        adoptKey(key);
         if (generation != lockGeneration) {
             lock();
             throw new VaultException(VaultError.LOCKED,
@@ -2517,6 +2547,36 @@ public final class Vault {
 
     private AssociatedData binding(VaultMetadata meta, String record, String purpose) {
         return AssociatedData.of(application, meta.vaultId, record, purpose);
+    }
+
+    /// Refuses to report a destruction that did not remove everything.
+    ///
+    /// deleteStorageFile returns void, so the loop above cannot tell a delete that happened from
+    /// one that did not -- and both real ports can fail one silently: JavaSE discards
+    /// File.delete()'s boolean, and the browser catches and logs the IndexedDB error. Reporting
+    /// TRUE there is the worst answer available: a metadata record that survived leaves a vault
+    /// the password still opens, on a call whose entire contract is that it is gone. Checked
+    /// rather than assumed, the same way removeSecret answers with exists() instead of with the
+    /// fact that it asked.
+    private void requireEverythingGone(Storage storage, String[] entries, String prefix) {
+        StringBuilder left = new StringBuilder();
+        for (String entry : entries) {
+            if (entry != null && entry.startsWith(prefix) && storage.exists(entry)) {
+                left.append(left.length() == 0 ? "" : ", ").append("a secret");
+                break;
+            }
+        }
+        if (storage.exists(deviceRecordKey())) {
+            left.append(left.length() == 0 ? "" : ", ").append("the device wrap");
+        }
+        if (storage.exists(metadataKey())) {
+            left.append(left.length() == 0 ? "" : ", ").append("the vault record");
+        }
+        if (left.length() > 0) {
+            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                    "this device's storage did not remove everything it was asked to; "
+                    + left + " is still here");
+        }
     }
 
     /// Whether the record this call wrote is still exactly as it wrote it and nothing has been

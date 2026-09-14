@@ -41,6 +41,7 @@ final class VaultKeyHandle extends KeyHandle {
 
     private final Vault owner;
     private final int generation;
+    private final int keyGeneration;
     private final String purpose;
     private final int version;
     private final ProtectionReport protection;
@@ -50,10 +51,11 @@ final class VaultKeyHandle extends KeyHandle {
         KeyUsage.SEAL, KeyUsage.OPEN, KeyUsage.MAC, KeyUsage.VERIFY_MAC
     };
 
-    VaultKeyHandle(Vault owner, int generation, byte[] material, String purpose, int version,
-                   ProtectionReport protection) {
+    VaultKeyHandle(Vault owner, int generation, int keyGeneration, byte[] material, String purpose,
+                   int version, ProtectionReport protection) {
         this.owner = owner;
         this.generation = generation;
+        this.keyGeneration = keyGeneration;
         this.material = material;
         this.purpose = purpose == null ? "" : purpose;
         this.version = version;
@@ -169,17 +171,27 @@ final class VaultKeyHandle extends KeyHandle {
 
     @Override
     public boolean isDestroyed() {
-        return material == null || generation != owner.generation();
+        return material == null || generation != owner.generation()
+                || keyGeneration != owner.keyGeneration();
     }
 
     /// The material, or a refusal. Checked on every operation rather than only at creation,
     /// because the vault can lock between the two and a handle that kept working afterwards would
     /// make [Vault#lock()] a suggestion.
+    ///
+    /// A rotation counts as well, and that is the less obvious half. Rotation leaves the vault
+    /// open, so the lock generation does not move -- and this handle went on using the subkey
+    /// derived from the superseded data key. Sealing stayed readable, because the envelope
+    /// carries the version this handle was made at and [#open] walks the retired chain back to
+    /// it. [#mac] has nothing to carry: its tag records no version, so one produced here after a
+    /// rotation cannot be verified by any handle obtained afterwards, and nothing says so. A
+    /// refusal the caller can see is the smaller failure.
     private byte[] live() {
         if (isDestroyed()) {
             throw new VaultException(VaultError.LOCKED,
-                    "this key handle was invalidated, either by destroy() or because its vault "
-                    + "was locked");
+                    "this key handle is no longer valid: destroy() was called, or its vault was "
+                    + "locked, or the data key it derives from was rotated or replaced by a sync "
+                    + "import. Ask the vault for a new handle");
         }
         return material;
     }

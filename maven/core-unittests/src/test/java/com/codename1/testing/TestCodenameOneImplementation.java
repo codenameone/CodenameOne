@@ -3340,6 +3340,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private String duringStorageDeleteFor;
     private Runnable duringStorageDelete;
 
+    /**
+     * Makes deletes of {@code name} silently do nothing, the way a real port can.
+     *
+     * <p>{@code deleteStorageFile} returns void on every port, so a failure is invisible to the
+     * caller: JavaSE discards {@code File.delete()}'s boolean and the browser catches and logs
+     * the IndexedDB error. This reproduces that rather than an exception, because an exception
+     * is the case that was never the problem.</p>
+     *
+     * @param name the storage entry whose deletes should be ignored, or null to stop ignoring
+     */
+    public void setStorageDeleteIgnored(String name) {
+        storageDeleteIgnored = name;
+    }
+
+    private String storageDeleteIgnored;
+
     @Override
     public void deleteStorageFile(String name) {
         if (duringStorageDelete != null && name != null && name.equals(duringStorageDeleteFor)) {
@@ -3347,6 +3363,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             duringStorageDelete = null;
             duringStorageDeleteFor = null;
             once.run();
+        }
+        if (name != null && name.equals(storageDeleteIgnored)) {
+            return;
         }
         storageEntries.remove(name);
         // a real port publishes an entry by replacing it, so deleting one abandons
