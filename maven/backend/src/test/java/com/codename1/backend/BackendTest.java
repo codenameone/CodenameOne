@@ -300,6 +300,37 @@ class BackendTest {
     }
 
     @Test
+    @DisplayName("a URL written in code still takes its pool settings from the deployment")
+    void aCodedUrlKeepsTheConfiguredPoolSettings(@TempDir File dir) throws Exception {
+        // .dataSource(url) chooses WHICH database, not how many connections to
+        // it: the size, the busy timeout and the borrow timeout describe the
+        // machine the process runs on, so they stay the deployment's to set. The
+        // first version opened the URL with the built-in defaults instead, and
+        // cn1.datasource.pool.size was silently ignored by every server that
+        // named its database in code.
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        settings.setProperty(Config.DATASOURCE_POOL_SIZE, "3");
+        final DataSource[] seen = new DataSource[1];
+        Backend backend = Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .dataSource(new File(dir, "pool.db").getAbsolutePath())
+                .handlers(new Backend.Handlers() {
+                    public HttpServer.Handler[] create(DataSource dataSource,
+                            com.codename1.backend.orm.EntityManager entities) {
+                        seen[0] = dataSource;
+                        return new HttpServer.Handler[] {ok()};
+                    }
+                })
+                .start();
+        try {
+            assertEquals(3, seen[0].getMaxSize());
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("a pool the builder opened from a URL is closed when the start fails")
     void closesAUrlBuiltPoolOnFailure() throws Exception {
         // Ownership is whether the BUILDER opened it, not whether anything was

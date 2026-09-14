@@ -166,6 +166,27 @@ class DataSourceTest {
     }
 
     @Test
+    @DisplayName("and the JDBC spelling is recognised whatever its case")
+    void theJdbcPrefixIsCaseInsensitive() throws Exception {
+        // A URL is not case sensitive in its scheme, and the two arms disagreed:
+        // the translated Db stripped the prefix case insensitively while the JVM
+        // one compared with startsWith, so "JDBC:SQLITE::memory:" was a server
+        // URL to one of them and an in-memory database to the other. Whichever
+        // way it is spelled it is one database, and one connection.
+        assertThrows(IOException.class, () -> DataSource.open("JDBC:SQLite::memory:", 2));
+        DataSource pool = DataSource.open("JDBC:SQLite::memory:");
+        try {
+            assertEquals(1, pool.getMaxSize());
+            assertEquals(Dialect.SQLITE, pool.dialect());
+            pool.execute("CREATE TABLE t (a INTEGER)", null);
+            pool.execute("INSERT INTO t (a) VALUES (?)", new Object[] {Long.valueOf(1)});
+            assertEquals(1, pool.query("SELECT a FROM t", null).size());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     @DisplayName("the JDBC spelling of an in-memory database is one too")
     void recognisesTheJdbcSpelling() throws Exception {
         // Db.open passes a jdbc:sqlite: URL through verbatim, so this is the

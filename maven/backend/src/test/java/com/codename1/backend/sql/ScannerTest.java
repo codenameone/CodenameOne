@@ -111,7 +111,14 @@ class ScannerTest {
         // MySQL's /*! ... */ is executable: what is inside RUNS, so the second
         // tuple here is a second row.
         rows("INSERT INTO t (a) VALUES (1) /*! , (2) */", 1, 1, 2);
-        rows("INSERT INTO t (a) VALUES (1) /*!50100 , (2) */", 1, 1, 2);
+        // A VERSION-GATED one is a third answer. "/*!50100 ..." runs on 5.1 and
+        // up and "/*!99999 ..." on nothing, so what the statement inserts is a
+        // property of the server this connection happens to reach. A count and a
+        // silence would both be guesses, so the scanner says it cannot know and
+        // Database refuses the insert rather than reporting one key for two rows.
+        rows("INSERT INTO t (a) VALUES (1) /*!50100 , (2) */", 1, 1, Dialect.VERSION_GATED);
+        rows("INSERT INTO t (a) VALUES (1) /*!99999 , (2) */", 1, 1, Dialect.VERSION_GATED);
+
         // An ordinary block comment is still ignored on all three.
         rows("INSERT INTO t (a) VALUES (1) /* , (2) */", 1, 1, 1);
         // And a placeholder inside an executable comment is a placeholder there.

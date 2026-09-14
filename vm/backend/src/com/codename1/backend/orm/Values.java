@@ -216,11 +216,29 @@ public final class Values {
             return Double.valueOf(((Number)value).doubleValue());
         }
         if(value instanceof String) {
+            String text = ((String)value).trim();
+            double parsed;
             try {
-                return Double.valueOf(Double.parseDouble(((String)value).trim()));
+                parsed = Double.parseDouble(text);
             } catch (NumberFormatException err) {
                 throw notANumber(value, "a number");
             }
+            // A NUMERIC column comes back as exact text, and parseDouble answers
+            // INFINITY for a finite number too large to hold -- 1e999 -- and ZERO
+            // for one too small. Either way the entity would carry a value the
+            // row does not, which is the same silent substitution the integral
+            // conversions refuse. An Infinity or NaN the database really stores
+            // is spelled as such, and passes.
+            if(Double.isInfinite(parsed) && !spellsNonFinite(text)) {
+                throw new IOException("A column holding " + describe(value)
+                        + " is too large for the floating point field it is read into");
+            }
+            if(parsed == 0.0 && hasNonZeroDigit(text)) {
+                throw new IOException("A column holding " + describe(value)
+                        + " is too small for the floating point field it is read into, "
+                        + "which would read it as zero");
+            }
+            return Double.valueOf(parsed);
         }
         throw notANumber(value, "a number");
     }
@@ -278,6 +296,26 @@ public final class Values {
     }
 
     /**
+     * The first character of the value as a boxed Character, or null.
+     *
+     * <p>The nullable twin of {@link #asChar}, and text-only for the same
+     * reason: the generated access for a Character field used asString and kept
+     * the first character of whatever a blob decoded to, while the primitive
+     * char field beside it refused the same row.
+     */
+    public static Character asCharObject(Object value) throws IOException {
+        if(value == null) {
+            return null;
+        }
+        if(!(value instanceof String)) {
+            throw new IOException("A column holding " + describe(value)
+                    + " cannot be read as a character; the field expects text");
+        }
+        String text = (String)value;
+        return text.length() == 0 ? null : Character.valueOf(text.charAt(0));
+    }
+
+    /**
      * The first character of the value, or {@code fallback} when it is null or
      * empty.
      *
@@ -298,6 +336,58 @@ public final class Values {
         }
         String text = (String)value;
         return text.length() == 0 ? fallback : text.charAt(0);
+    }
+
+    /**
+     * The value as a UTF-16 code unit, or {@code fallback} when it is null.
+     *
+     * <p>This is how an entity's char field is stored: the NUMBER of the code
+     * unit, in an integer column, on every engine. Text would be the obvious
+     * choice and it is the wrong one, because a char is not a string. The
+     * default value of an unset char field is {@code '\0'}, and PostgreSQL
+     * refuses a NUL inside a text value outright ("invalid byte sequence for
+     * encoding UTF8: 0x00"), so an entity with an untouched char field could not
+     * be inserted at all. An unpaired surrogate -- also a perfectly legal char --
+     * has no UTF-8 encoding either. As a number both are ordinary values, and
+     * they compare exactly rather than through whatever collation the column
+     * happens to carry, which on MySQL is case insensitive by default.
+     *
+     * <p>Text is still accepted, for a column somebody mapped onto an existing
+     * CHAR(1): a number and a string cannot be confused for one another, so
+     * there is no ambiguity in taking both.
+     */
+    public static char asCodeUnit(Object value, char fallback) throws IOException {
+        Character out = asCodeUnitObject(value);
+        return out == null ? fallback : out.charValue();
+    }
+
+    /**
+     * The nullable twin of {@link #asCodeUnit}.
+     */
+    public static Character asCodeUnitObject(Object value) throws IOException {
+        if(value == null) {
+            return null;
+        }
+        if(value instanceof String) {
+            String text = (String)value;
+            return text.length() == 0 ? null : Character.valueOf(text.charAt(0));
+        }
+        if(!(value instanceof Number)) {
+            throw new IOException("A column holding " + describe(value)
+                    + " cannot be read as a character");
+        }
+        Long number = asLongObject(value);
+        if(number == null) {
+            return null;
+        }
+        long unit = number.longValue();
+        if(unit < 0 || unit > 65535) {
+            // NARROWING would answer a different character rather than say so,
+            // which is what every other integral conversion here refuses to do.
+            throw new IOException("A column holding " + describe(value)
+                    + " is outside the range of a character");
+        }
+        return Character.valueOf((char)unit);
     }
 
     /**
@@ -370,6 +460,34 @@ public final class Values {
             throw new IOException("A column holding " + describe(value)
                     + " is outside the range of the integer field it is read into");
         }
+    }
+
+    /** Whether the text itself says infinity or NaN, rather than overflowing to one. */
+    private static boolean spellsNonFinite(String text) {
+        for(int iter = 0 ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            if(c == 'i' || c == 'I' || c == 'n' || c == 'N') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the text carries a non-zero digit before its exponent, which is
+     * what separates a real number that UNDERFLOWED from an honest zero.
+     */
+    private static boolean hasNonZeroDigit(String text) {
+        for(int iter = 0 ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            if(c == 'e' || c == 'E') {
+                return false;
+            }
+            if(c >= '1' && c <= '9') {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static IOException notANumber(Object value, String wanted) {

@@ -728,7 +728,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 return KIND_TIMESTAMP;
             case BYTE_ARRAY:
                 return KIND_BLOB;
-            case CHAR: case STRING:
+            case CHAR:
+                // The CODE UNIT, not one-character text. A char field that was
+                // never assigned holds '\0', and PostgreSQL refuses a NUL inside
+                // a text value -- so a text column made an untouched char field
+                // impossible to insert there while it worked on SQLite. See
+                // Values.asCodeUnit. The client dao keeps its own TEXT mapping:
+                // it talks to a SQLite file, which has neither problem, and its
+                // schema is already written.
+                return KIND_INTEGER;
+            case STRING:
             default:
                 return KIND_TEXT;
         }
@@ -898,10 +907,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 return;
             case CHAR:
                 if (f.boxed) {
-                    sb.append(field).append(" == null ? null : String.valueOf(")
+                    sb.append(field).append(" == null ? null : Long.valueOf(")
                       .append(field).append(".charValue())");
                 } else {
-                    sb.append("String.valueOf(").append(field).append(")");
+                    sb.append("Long.valueOf(").append(field).append(")");
                 }
                 return;
             case DATE:
@@ -952,13 +961,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                   .append(f.boxed ? "asBooleanObject(value);" : "asBoolean(value, false);");
                 return;
             case CHAR:
+                // asCodeUnit, not asString: reading the boxed form through
+                // asString kept the first character of whatever a blob happened
+                // to decode to, while the primitive char field beside it refused
+                // the same row. Both read the integer the column holds.
                 if (f.boxed) {
-                    sb.append("{ String _c = ").append(values).append("asString(value); ")
-                      .append(field).append(" = _c == null || _c.length() == 0 ? null ")
-                      .append(": Character.valueOf(_c.charAt(0)); }");
+                    sb.append(field).append(" = ").append(values).append("asCodeUnitObject(value);");
                 } else {
                     sb.append(field).append(" = ").append(values)
-                      .append("asChar(value, '\\0');");
+                      .append("asCodeUnit(value, '\\0');");
                 }
                 return;
             case DATE:

@@ -506,7 +506,16 @@ public final class Backend {
                 return dataSource;
             }
             if(dataSourceUrl != null && dataSourceUrl.length() > 0) {
-                return DataSource.open(dataSourceUrl);
+                // The URL is the builder's, the POOL SETTINGS are still the
+                // deployment's. cn1.datasource.pool.size, the busy timeout and
+                // the borrow timeout have no builder methods, so opening with
+                // the defaults here left an operator no way to tune a pool whose
+                // URL the code happens to name -- against this builder's own
+                // rule that what it is not told comes from the configuration.
+                return DataSource.open(dataSourceUrl,
+                        config.getInt(Config.DATASOURCE_POOL_SIZE, 0),
+                        config.getInt(Config.DATASOURCE_BUSY_MILLIS, 5000),
+                        config.getInt(Config.DATASOURCE_BORROW_MILLIS, 10000));
             }
             boolean configured = config.get(Config.DATASOURCE_URL) != null;
             if(!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
