@@ -188,6 +188,44 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void anAttributeExpressionReadsAJsonFieldEverywhereItAppears() {
+        // The guide has always said an attribute expression selects the child
+        // of that name on a JSON document. Only the existence test did: a
+        // comparison and a terminal read both went to getAttribute(), which
+        // answers null for every name there, so they found nothing.
+        Result r = Result.fromContent(
+                "{\"players\":[{\"id\":10,\"rank\":1,\"name\":\"A\"},"
+                + "{\"id\":20,\"rank\":5,\"name\":\"B\"}]}", Result.JSON);
+
+        assertEquals(2, r.getAsStringArray("/players/@id").length,
+                "reading an attribute at the end of a path found no JSON field");
+        String[] byValue = r.getAsStringArray("/players[@rank='1']/name");
+        assertEquals(1, byValue.length, "an equality predicate found no JSON field");
+        assertEquals("A", byValue[0]);
+        String[] byComparison = r.getAsStringArray("/players[@rank < 3]/name");
+        assertEquals(1, byComparison.length, "a comparison found no JSON field");
+        assertEquals("A", byComparison[0],
+                "the comparison matched the wrong side");
+    }
+
+    @Test
+    void aTextComparisonIsNotBackwards() {
+        // The non-numeric branch of the less-than method answered when the
+        // attribute sorted AFTER the value, and the greater-than method did
+        // the reverse. Every comparison against a text attribute was inverted.
+        Result r = Result.fromContent(
+                "<t><p name='alpha' id='1'/><p name='zulu' id='2'/></t>", Result.XML);
+
+        String[] early = r.getAsStringArray("/t/p[@name < 'm']/@id");
+        assertEquals(1, early.length, "less-than matched the wrong element");
+        assertEquals("1", early[0]);
+
+        String[] late = r.getAsStringArray("/t/p[@name > 'm']/@id");
+        assertEquals(1, late.length, "greater-than matched the wrong element");
+        assertEquals("2", late[0]);
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for

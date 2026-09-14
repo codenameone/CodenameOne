@@ -329,7 +329,13 @@ abstract class AbstractEvaluator implements Evaluator {
         }
     }
 
-    /// Utility method for subclasses to determine if an entire string is digits
+    /// Utility method for subclasses to determine if a string is a number
+    ///
+    /// Digits, and also a leading sign and one decimal point. Digits alone was
+    /// too narrow once an attribute expression could read a JSON field: the
+    /// parser hands numbers back as doubles, so a rank of 1 arrives as "1.0",
+    /// and a comparison that could not see it as a number fell through to
+    /// comparing the two as text -- where "5.0" is less than "3".
     ///
     /// #### Parameters
     ///
@@ -337,12 +343,24 @@ abstract class AbstractEvaluator implements Evaluator {
     ///
     /// #### Returns
     ///
-    /// true of the value contains only digits.
+    /// true when the value is a number
     protected boolean isNumeric(String text) {
         text = text.trim();
         int tlen = text.length();
-        for (int i = 0; i < tlen; i++) {
-            if (!Character.isDigit(text.charAt(i))) {
+        int start = tlen > 0 && (text.charAt(0) == '-' || text.charAt(0) == '+')
+                ? 1 : 0;
+        if (start >= tlen) {
+            return false;
+        }
+        boolean point = false;
+        for (int i = start; i < tlen; i++) {
+            char c = text.charAt(i);
+            if (c == '.') {
+                if (point || i + 1 >= tlen) {
+                    return false;
+                }
+                point = true;
+            } else if (!Character.isDigit(c)) {
                 return false;
             }
         }

@@ -1168,7 +1168,11 @@ public final class Result {
             // nothing, and it can hold another set.
             for (Object o : nodesOf(obj)) {
                 StructuredContent node = (StructuredContent) o;
-                String v = node.getAttribute(key);
+                // Through the same resolver the predicates use, so a path that
+                // READS an attribute and a predicate that TESTS one agree on
+                // what an attribute is. On JSON they did not: "/players/@id"
+                // answered nothing while "id" sat there as a child.
+                String v = MapContent.attributeOrField(node, key);
                 if (v != null) {
                     // the node rather than the set, so a caller can still walk
                     // back to the parent of the attribute it read

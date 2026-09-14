@@ -38,3 +38,6 @@ CodenameOne/src/com/codename1/processing/Result.java | Sun Microsystems 2007 BSD
 CodenameOne/src/com/codename1/processing/ResultTokenizer.java | Sun Microsystems 2007 BSD-licensed source, derivative work by Eric Coolman, retaining its original notice
 CodenameOne/src/com/codename1/processing/AttributeEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/SubContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+CodenameOne/src/com/codename1/processing/AbstractEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+CodenameOne/src/com/codename1/processing/IndexEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+CodenameOne/src/com/codename1/processing/HashtableContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text

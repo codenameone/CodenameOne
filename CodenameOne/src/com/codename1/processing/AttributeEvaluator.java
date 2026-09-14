@@ -70,48 +70,12 @@ class AttributeEvaluator extends AbstractEvaluator {
         // "[@rank]", the documented way to select the elements that carry an
         // attribute, matched nothing at all and said nothing about it.
         String name = expr.startsWith("@") ? expr.substring(1) : expr;
-        if (element.getAttribute(name) != null || hasJsonField(element, name)) {
+        if (MapContent.attributeOrField(element, name) != null) {
             return element;
         }
         return super.evaluateSingle(element, expr);
     }
 
-
-    /// Whether this JSON element has a usable value under this name.
-    ///
-    /// The JSON half of "does this element have it?". A document parsed from
-    /// JSON has no attributes at all -- MapContent.getAttribute() answers null
-    /// for every name -- and the field an attribute expression names is a
-    /// child there.
-    ///
-    /// A field explicitly set to null counts as NOT having one, which makes
-    /// `[@rank]` and `[@rank=null]` exact complements over three cases --
-    /// no key, a null value, a real value -- and matches what the path
-    /// answers on its own: reading that field gives null either way. It is
-    /// also the only reading XML can share, since an attribute there cannot
-    /// be present and null at once, and these two predicates have to mean the
-    /// same thing in both formats. Key presence would be a different question
-    /// and the expression language has no way to ask it.
-    ///
-    /// Restricted to JSON on purpose. XML draws the distinction the expression
-    /// language does: `[@rank]` asks about an attribute and `[rank]` asks
-    /// about a child element, and reading a child here would make the first
-    /// match an element that only has the second.
-    ///
-    /// - `element`: the element to ask
-    ///
-    /// - `name`: the attribute name, already stripped of its '@'
-    ///
-    /// #### Returns
-    ///
-    /// true when this is a JSON element carrying a field of that name
-    private static boolean hasJsonField(StructuredContent element, String name) {
-        if (!(element instanceof MapContent)) {
-            return false;
-        }
-        java.util.List children = element.getChildren(name);
-        return children != null && !children.isEmpty();
-    }
 
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(com.codename1.path.impl.StructuredContent, java.lang.String, java.lang.String)
@@ -120,20 +84,26 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = element.getAttribute(lvalue);
+        String attr = MapContent.attributeOrField(element, lvalue);
         if (attr == null) {
             return null;
         }
+        // Quotes come off first: a quoted literal is still a literal, and
+        // leaving them on made every comparison against one fall through to
+        // comparing text. That went unnoticed while an attribute was always a
+        // bare XML string; a JSON field arrives as "1.0", so "[@rank='1']"
+        // compared "1.0" with "1" and matched nothing.
+        rvalue = stripQuotes(rvalue);
         if (isNumeric(rvalue) && isNumeric(attr)) {
-            int l = Integer.parseInt(attr);
-            int r = Integer.parseInt(rvalue);
-            if (l < r) {
+            if (Double.parseDouble(attr) < Double.parseDouble(rvalue)) {
                 return element;
             }
             return null;
         }
-        rvalue = stripQuotes(rvalue);
-        if (attr.compareTo(rvalue) > 0) {
+        // Backwards: this is the LESS-than method and it answered when the
+        // attribute sorted AFTER the value. Reachable whenever either side is
+        // not a number, which is most of the time for a text attribute.
+        if (attr.compareTo(rvalue) < 0) {
             return element;
         }
         return null;
@@ -146,20 +116,19 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = element.getAttribute(lvalue);
+        String attr = MapContent.attributeOrField(element, lvalue);
         if (attr == null) {
             return null;
         }
+        rvalue = stripQuotes(rvalue);
         if (isNumeric(rvalue) && isNumeric(attr)) {
-            int l = Integer.parseInt(attr);
-            int r = Integer.parseInt(rvalue);
-            if (l > r) {
+            if (Double.parseDouble(attr) > Double.parseDouble(rvalue)) {
                 return element;
             }
             return null;
         }
-        rvalue = stripQuotes(rvalue);
-        if (attr.compareTo(rvalue) < 0) {
+        // Backwards, the same way the less-than method was.
+        if (attr.compareTo(rvalue) > 0) {
             return element;
         }
         return null;
@@ -172,7 +141,7 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = element.getAttribute(lvalue);
+        String attr = MapContent.attributeOrField(element, lvalue);
         // "[@attr=null]" is the documented way to ask for the elements that do
         // NOT carry an attribute, and it is the one predicate whose answer is
         // yes precisely when the attribute is absent. The check below returned
@@ -187,20 +156,18 @@ class AttributeEvaluator extends AbstractEvaluator {
         // such field, or this predicate matched every object in a JSON
         // document, including the ones that carry the field.
         if ("null".equals(rvalue)) {
-            return attr == null && !hasJsonField(element, lvalue) ? element : null;
+            return attr == null ? element : null;
         }
         if (attr == null) {
             return null;
         }
+        rvalue = stripQuotes(rvalue);
         if (isNumeric(rvalue) && isNumeric(attr)) {
-            int l = Integer.parseInt(attr);
-            int r = Integer.parseInt(rvalue);
-            if (l == r) {
+            if (Double.parseDouble(attr) == Double.parseDouble(rvalue)) {
                 return element;
             }
             return null;
         }
-        rvalue = stripQuotes(rvalue);
         if (attr.compareTo(rvalue) == 0) {
             return element;
         }

@@ -169,12 +169,37 @@ class IndexEvaluator extends AbstractEvaluator {
         return (StructuredContent) elements.get(dim);
     }
 
+    /// Whether the whole string is digits, so parseInt cannot throw on it.
+    ///
+    /// - `text`: the predicate text
+    ///
+    /// #### Returns
+    ///
+    /// true when every character is a digit
+    private static boolean isDigits(String text) {
+        String trimmed = text.trim();
+        if (trimmed.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < trimmed.length(); i++) {
+            if (!Character.isDigit(trimmed.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateSingle(java.util.List, java.lang.String)
      */
     @Override
     protected Object evaluateSingle(List elements, String expr) {
-        if (isNumeric(expr)) {
+        // isDigits rather than the inherited isNumeric, which now accepts a
+        // sign and a decimal point: parseInt below would throw on either.
+        // EvaluatorFactory only routes a digits-only predicate here today, so
+        // this is the guard rather than a fix, and it keeps the two from
+        // drifting apart again.
+        if (isDigits(expr)) {
             int dim = Integer.parseInt(expr);
             if ((dim < 0) || (dim >= elements.size())) {
                 return null;

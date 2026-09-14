@@ -343,6 +343,46 @@ class MapContent implements StructuredContent {
         return null;
     }
 
+    /// The value an `@name` expression asks for, whatever the format holds it.
+    ///
+    /// XML keeps it in an attribute. JSON has no attributes at all -- the
+    /// method above answers null for every name -- and the field the
+    /// expression names is a child there, which is what the developer guide
+    /// has always said an attribute expression does on a JSON document.
+    ///
+    /// One place, because everything that reads an attribute has to agree:
+    /// the predicates that compare one, the predicate that tests for one, and
+    /// the step that reads one at the end of a path. They did not -- only the
+    /// existence test looked at the child -- so `/players[@rank]/name` found
+    /// both players while `/players[@rank='1']/name` and `/players/@id` found
+    /// none.
+    ///
+    /// - `element`: the element to read
+    ///
+    /// - `name`: the name, already stripped of its '@'
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when this element has none
+    static String attributeOrField(StructuredContent element, String name) {
+        String attribute = element.getAttribute(name);
+        if (attribute != null) {
+            return attribute;
+        }
+        // XML draws the distinction the expression language draws: "[@rank]"
+        // asks about an attribute and "[rank]" about a child element, so the
+        // child is only the answer where there are no attributes to be had.
+        if (!(element instanceof MapContent)) {
+            return null;
+        }
+        List children = element.getChildren(name);
+        if (children == null || children.isEmpty()) {
+            return null;
+        }
+        StructuredContent first = (StructuredContent) children.get(0);
+        return first == null ? null : first.getText();
+    }
+
     /*
      * (non-Javadoc)
      *
