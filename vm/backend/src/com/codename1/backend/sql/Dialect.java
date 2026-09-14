@@ -244,6 +244,23 @@ public abstract class Dialect {
     }
 
     /**
+     * How many rows an INSERT's VALUES clause writes, or -1 when the shape does
+     * not say -- an INSERT ... SELECT, or a statement with no VALUES at all.
+     *
+     * <p>{@link com.codename1.backend.Database#insert} answers with one key, and
+     * a multi-row insert has no single key that means the same thing on three
+     * engines. Counting the tuples is what lets it refuse BEFORE the rows are
+     * written rather than after.
+     */
+    public int countInsertRows(String sql) throws IOException {
+        if(sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.countInsertRows(sql, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings());
+    }
+
+    /**
      * Where {@code sql} stops being the statement and starts being its
      * terminator, its trailing comment or trailing space.
      *

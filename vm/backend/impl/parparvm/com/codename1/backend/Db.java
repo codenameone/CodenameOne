@@ -66,7 +66,19 @@ public final class Db {
         if(path != null && path.indexOf(0) >= 0) {
             throw new IOException("Could not open database at " + describeForMessage(path));
         }
-        long h = openImpl(path);
+        // THE SAME URL HAS TO MEAN THE SAME DATABASE ON BOTH ARMS. The Java SE
+        // twin hands a "jdbc:sqlite:" URL to the driver, which reads what follows
+        // the prefix -- so jdbc:sqlite::memory: is an in-memory database there.
+        // sqlite3_open has never heard of the prefix and would take the whole
+        // string as a FILE NAME, creating "jdbc:sqlite::memory:" in the working
+        // directory: the development loop gets an ephemeral database and the
+        // packaged binary gets a file, which is the divergence this class refuses
+        // jdbc:postgresql: to avoid.
+        String opened = path;
+        if(opened != null && opened.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
+            opened = opened.substring(12);
+        }
+        long h = openImpl(opened);
         if(h == 0) {
             throw new IOException("Could not open database at " + path);
         }

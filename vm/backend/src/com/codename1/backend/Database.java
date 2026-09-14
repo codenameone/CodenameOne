@@ -252,6 +252,21 @@ public final class Database {
         if(idColumn == null || idColumn.length() == 0) {
             throw new IOException("insert needs the name of the generated key column");
         }
+        // ONE ROW, OR THE ANSWER IS THREE DIFFERENT ANSWERS. A multi-row insert
+        // leaves SQLite reporting the LAST key, MySQL the FIRST, and PostgreSQL
+        // returning a row per insert -- which the single-row read below then
+        // refuses, AFTER the rows are committed, so the caller sees a failure for
+        // a mutation that happened. There is no key this method could return that
+        // means the same thing on all three, so the statement is refused instead,
+        // before it runs.
+        int tuples = dialect.countInsertRows(sql);
+        if(tuples > 1) {
+            throw new IOException("insert() answers with ONE generated key and this "
+                    + "statement inserts " + tuples + " rows, which the three engines key "
+                    + "differently (SQLite reports the last, MySQL the first, PostgreSQL "
+                    + "every one). Use execute() for a multi-row insert, or insert the rows "
+                    + "one at a time: [" + sql + "]");
+        }
         if(!dialect.generatedKeysThroughReturning()) {
             // THE ROW COUNT DECIDES. last_insert_rowid() and LAST_INSERT_ID()
             // answer for the CONNECTION, not for the statement: after an
@@ -260,19 +275,27 @@ public final class Database {
             // before, so the caller writes ANOTHER ROW'S key into the object it
             // believes it just stored. Zero is what PostgreSQL already answers
             // here -- a RETURNING that matched nothing -- so the three agree.
-            if(execute(sql, params) == 0) {
+            int changed = execute(sql, params);
+            if(changed == 0) {
                 return 0;
             }
+            requireOneRow(changed, sql);
             return lastInsertId();
         }
         // RETURNING makes this a statement that answers with rows, so it goes
         // through query rather than execute. Appended AFTER the portable form is
         // rendered would mean rendering twice; appending before costs nothing
         // because the clause holds no placeholder.
-        Map row = queryOne(withReturning(sql, idColumn), params);
-        if(row == null) {
+        // Not queryOne: a statement this could not see through -- INSERT ...
+        // SELECT, which has no VALUES to count -- would fail its "at most one
+        // row" check with a message about a query, for an insert that committed.
+        // The count says the same thing in the caller's terms.
+        List returned = query(withReturning(sql, idColumn), params);
+        if(returned.isEmpty()) {
             return 0;
         }
+        requireOneRow(returned.size(), sql);
+        Map row = (Map)returned.get(0);
         Object value = row.values().iterator().next();
         if(value instanceof Number) {
             // instanceof rather than a cast whose failure is caught: a failed cast
@@ -282,6 +305,25 @@ public final class Database {
         }
         throw new IOException("The generated key came back as something other than a "
                 + "number, so the column named is not the generated one: " + idColumn);
+    }
+
+    /**
+     * Refuses an insert that turned out to touch more than one row.
+     *
+     * <p>The count is checked BEFORE the statement runs wherever the shape can
+     * be seen -- see {@link com.codename1.backend.sql.Dialect#countInsertRows} --
+     * and this is the arm for the shapes it cannot: an INSERT ... SELECT names no
+     * tuples to count. The rows are committed by the time this throws, which is
+     * exactly why the message says so rather than reporting a query that returned
+     * too much.
+     */
+    private static void requireOneRow(int rows, String sql) throws IOException {
+        if(rows > 1) {
+            throw new IOException("insert() answers with ONE generated key and this "
+                    + "statement inserted " + rows + " rows, which are committed. The three "
+                    + "engines key a multi-row insert differently, so there is no one key to "
+                    + "answer with; use execute() for this statement: [" + sql + "]");
+        }
     }
 
     /**

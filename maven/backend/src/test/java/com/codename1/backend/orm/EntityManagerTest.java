@@ -34,6 +34,7 @@ import java.util.List;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
 import com.codename1.backend.orm.TestEntities.Note;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -185,6 +186,45 @@ class EntityManagerTest {
             assertTrue(second.id > first.id, "each insert gets its own key");
             assertEquals(2, tickets.count());
             assertNotNull(tickets.findById(Long.valueOf(first.id)));
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("exact decimal text reaches a long field unrounded")
+    void readsExactDecimalText() throws Exception {
+        // PostgreSQL's NUMERIC and MySQL's DECIMAL come back as exact TEXT --
+        // that is why those engines send text rather than a number -- and the
+        // previous fallback put it through a double: 9007199254740993 came back
+        // as ...992, and anything past the double range clamped silently.
+        assertEquals(9007199254740993L, Values.asLong("9007199254740993", 0));
+        assertEquals(9007199254740993L, Values.asLong("9007199254740993.00", 0));
+        assertEquals(-9007199254740993L, Values.asLong("-9007199254740993.000", 0));
+        assertEquals(12L, Values.asLong("12.", 0));
+        // A real fraction in an integer field is a disagreement between the
+        // entity and the table, and rounding it silently is how the wrong number
+        // gets stored back.
+        assertThrows(IOException.class, () -> Values.asLong("12.5", 0));
+        // And out of range says so rather than clamping to Long.MAX_VALUE.
+        assertThrows(IOException.class, () -> Values.asLong("92233720368547758080.00", 0));
+    }
+
+    @Test
+    @DisplayName("findOne asks the database for one row")
+    void findOneAsksForOneRow() throws Exception {
+        DataSource pool = DataSource.open(":memory:");
+        try {
+            EntityManager em = EntityManager.open(pool);
+            Dao<Note> notes = em.dao(Note.class);
+            notes.createTable();
+            for(int iter = 0 ; iter < 25 ; iter++) {
+                notes.insert(note("n" + iter, iter, false, iter));
+            }
+            // The predicate matches everything; only one row may come back.
+            Note one = notes.findOne("views >= ?", new Object[] {Integer.valueOf(0)});
+            assertNotNull(one);
+            assertTrue(one.title.startsWith("n"));
         } finally {
             pool.close();
         }

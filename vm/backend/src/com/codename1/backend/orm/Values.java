@@ -98,17 +98,17 @@ public final class Values {
             try {
                 return Long.valueOf(Long.parseLong(text));
             } catch (NumberFormatException notAnInteger) {
-                try {
-                    // A NUMERIC or DECIMAL column arrives as exact text, so
-                    // "12.00" is a perfectly ordinary integer that Long.parseLong
-                    // refuses. Going through double loses precision past 2^53 and
-                    // that is the trade this makes: a value that large in a
-                    // column being read into a long is already past what the
-                    // field can hold.
-                    return Long.valueOf((long)Double.parseDouble(text));
-                } catch (NumberFormatException err) {
-                    throw notANumber(value, "an integer");
-                }
+                // A NUMERIC or DECIMAL column arrives as EXACT TEXT -- that is
+                // the whole reason those two engines send it as text rather than
+                // as a number -- so "12.00" is an ordinary integer that
+                // Long.parseLong refuses for its fraction alone.
+                //
+                // Parsed exactly rather than through Double.parseDouble, which
+                // was the previous fallback and threw away the precision the
+                // engine took care to preserve: 9007199254740993.00 fits in a
+                // long and came back as ...992, and anything past the double
+                // range clamped to Long.MAX_VALUE without a word.
+                return Long.valueOf(integralText(text, value));
             }
         }
         throw notANumber(value, "an integer");
@@ -238,6 +238,40 @@ public final class Values {
         }
         throw new IOException("A column holding " + describe(value)
                 + " cannot be read as bytes");
+    }
+
+    /**
+     * {@code text} as a long, where it is an integer written with a fraction of
+     * zeros -- "12", "12.", "12.000".
+     *
+     * <p>A fraction that is NOT zero is refused rather than truncated. The field
+     * is an integer and the column is not, which is a disagreement between the
+     * entity and the table; rounding it silently is how the wrong number ends up
+     * stored back. Out of range is refused for the same reason: a clamp to
+     * Long.MAX_VALUE is a value nobody wrote.
+     */
+    private static long integralText(String text, Object value) throws IOException {
+        int dot = text.indexOf('.');
+        if(dot < 0) {
+            throw notANumber(value, "an integer");
+        }
+        for(int iter = dot + 1 ; iter < text.length() ; iter++) {
+            if(text.charAt(iter) != '0') {
+                throw new IOException("A column holding " + describe(value)
+                        + " has a fractional part and the field it is read into is an "
+                        + "integer; the value would have to be rounded to fit");
+            }
+        }
+        String whole = text.substring(0, dot);
+        if(whole.length() == 0 || "+".equals(whole) || "-".equals(whole)) {
+            whole = whole + "0";
+        }
+        try {
+            return Long.parseLong(whole);
+        } catch (NumberFormatException err) {
+            throw new IOException("A column holding " + describe(value)
+                    + " is outside the range of the integer field it is read into");
+        }
     }
 
     private static IOException notANumber(Object value, String wanted) {
