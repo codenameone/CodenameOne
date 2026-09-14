@@ -159,18 +159,10 @@ class DataSourceTest {
         } finally {
             pool.close();
         }
-        // And a PRIVATE in-memory database is still refused a pool.
+        // And a private in-memory database is still refused a pool. The file:
+        // spellings are refused earlier than this, by Database.open, because only
+        // one of the two runtimes parses a URI -- see refusesAFileUri.
         assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
-        assertThrows(IOException.class, () -> DataSource.open("file:app?mode=memory", 2));
-        // With cache=shared it is not private: every connection sees the same
-        // database, which is the one in-memory spelling a pool works over. This
-        // line asserted the opposite until the shared cache was understood.
-        DataSource shared = DataSource.open("file:app?mode=memory&cache=shared", 2);
-        try {
-            assertEquals(2, shared.getMaxSize());
-        } finally {
-            shared.close();
-        }
     }
 
     @Test
@@ -212,21 +204,25 @@ class DataSourceTest {
     }
 
     @Test
-    @DisplayName("every spelling of a private in-memory database is one")
-    void recognisesEveryMemorySpelling() throws Exception {
-        // Each of these gives a connection its OWN database, so a pool of them
-        // hands successive requests different empty ones.
+    @DisplayName("a SQLite file: URI is refused, because only one runtime reads it")
+    void refusesAFileUri() throws Exception {
+        // sqlite-jdbc parses it and gives the development loop an in-memory
+        // database; sqlite3_open reads the whole string as a FILE NAME, so a
+        // packaged binary persists where development was ephemeral. An earlier
+        // version of this test asserted that the shared-cache spelling could be
+        // POOLED, which was right about the JVM and silent about the binary.
+        assertThrows(IOException.class, () -> DataSource.open("file::memory:"));
+        assertThrows(IOException.class, () -> DataSource.open("file:app?mode=memory"));
+        assertThrows(IOException.class,
+                () -> DataSource.open("file:app?mode=memory&cache=shared", 2));
+        assertThrows(IOException.class, () -> DataSource.open("jdbc:sqlite:file::memory:"));
+        // The two spellings both runtimes agree about still work.
         assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
-        assertThrows(IOException.class, () -> DataSource.open("file::memory:", 2));
-        assertThrows(IOException.class, () -> DataSource.open("jdbc:sqlite:file::memory:", 2));
-        assertThrows(IOException.class, () -> DataSource.open("file:app?mode=memory", 2));
-        // The SHARED cache is the spelling where several connections see ONE
-        // database, so a pool over it is legitimate and is not refused.
-        DataSource shared = DataSource.open("file::memory:?cache=shared", 2);
+        DataSource pool = DataSource.open("jdbc:sqlite::memory:");
         try {
-            assertEquals(2, shared.getMaxSize());
+            assertEquals(1, pool.getMaxSize());
         } finally {
-            shared.close();
+            pool.close();
         }
     }
 

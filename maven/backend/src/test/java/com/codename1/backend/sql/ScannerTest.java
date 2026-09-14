@@ -102,6 +102,12 @@ class ScannerTest {
         assertEquals("SELECT a[1] FROM t WHERE id = $1",
                 Dialect.POSTGRES.bind("SELECT a[1] FROM t WHERE id = ?", 1));
 
+        // MySQL writes tuples as ROW(...) since 8.0.19, and the keyword is
+        // optional: requiring the parenthesis made this "cannot tell" and the
+        // multi-row insert ran.
+        rows("INSERT INTO t (a) VALUES ROW(?), ROW(?)", 2, 2, 2);
+        rows("INSERT INTO t (a) VALUES ROW(?)", 1, 1, 1);
+
         // MySQL's /*! ... */ is executable: what is inside RUNS, so the second
         // tuple here is a second row.
         rows("INSERT INTO t (a) VALUES (1) /*! , (2) */", 1, 1, 2);
