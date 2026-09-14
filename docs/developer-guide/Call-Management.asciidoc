@@ -212,12 +212,18 @@ different responses, not two. `EMERGENCY_CALL_IN_PROGRESS` and
 by design, because Telecom accepts a second call from the same account.
 `NOT_CONFIGURED` means `Calls.configure` hasn't run, which is yours to fix in
 code and not something a user can clear; prompting for it strands them in front
-of a dialog that changes nothing. `NOT_PERMITTED` is the one that wants the
-user, and it means a permission rather than a setting: Android answers it when
-`MANAGE_OWN_CALLS` was never granted, or when notifications are off or the
-incoming-call channel sits below high importance, and iOS never answers it at
-all. Send the user to the permission that's missing; the calling switch isn't
-what this value is about.
+of a dialog that changes nothing. `NOT_PERMITTED` is Android only -- iOS never
+answers it -- and it covers three conditions with three different fixes, none
+of which is the calling switch. `MANAGE_OWN_CALLS` missing: that one is a
+normal permission granted at install, so there's no prompt behind it and
+`Calls.requestPermissions` doesn't ask. The builder declares it for you
+whenever the app uses the call packages, so its absence means something
+rewrote the manifest, and the fix is in the build rather than on the device.
+`POST_NOTIFICATIONS` not yet granted on Android 13 and later: that one is a
+runtime permission, and asking for `PERMISSION_NOTIFICATIONS` is exactly right.
+Notifications switched off for the app, or the incoming-call channel dropped
+below high importance: no permission is missing, so only the system's own
+notification settings can clear it.
 Only `UNSUPPORTED` is permanent.
 
 `CallHandle` and `CallHandleType`:: who the call is with, and one of `GENERIC`,
@@ -270,10 +276,12 @@ capability that came back unsupported, not calling as a whole.
 `UNAUTHORIZED` comes from two places on Android and nowhere else: a
 `SecurityException` out of configure or a report, which means `MANAGE_OWN_CALLS`
 is missing, and an incoming report refused because notifications are off or the
-incoming-call channel sits below high importance. The second grants no
-permission at all, so an app that answers this code by re-requesting
-permissions asks for something the user already gave while the setting that
-stops the ringing goes untouched. A denied microphone grant or a declined
+incoming-call channel sits below high importance. Neither is cleared by
+re-requesting permissions -- the first has no prompt behind it, the second is a
+setting rather than a permission -- so an app that responds to this code by
+prompting asks for something the user already gave while what actually stopped
+the ringing goes untouched. The three-way split under `NOT_PERMITTED` above is
+the recovery here too. A denied microphone grant or a declined
 call-screening role doesn't arrive here -- `Calls.requestPermissions` resolves
 with the bitmask it got and `CallDirectory.requestScreeningRole` resolves
 `false`, so read those results rather than waiting for an error.
