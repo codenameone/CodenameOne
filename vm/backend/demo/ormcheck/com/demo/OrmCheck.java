@@ -80,6 +80,7 @@ public class OrmCheck {
                 anEntityThatIsOnlyAKey(em);
                 aTerminatedStatementStillAnswersItsKey(pool);
                 anUpsertThatUpdatesStillAnswers(pool);
+                anIgnoredInsertAnswersNoKey(pool);
                 aMultiRowInsertIsRefused(pool);
                 anExactNumericKeyIsStillAKey(pool);
                 aValueTheFieldCannotHoldIsRefused(em, pool);
@@ -371,6 +372,56 @@ public class OrmCheck {
      * UPDATE that changed a row, and reading that as "rows inserted" refused an
      * ordinary upsert AFTER it had committed.
      */
+    /**
+     * An insert that CONFLICTED and was ignored answers no key.
+     *
+     * <p>The other half of the upsert problem, and the one the row count can
+     * answer: last_insert_rowid() and LAST_INSERT_ID() belong to the CONNECTION,
+     * so after an ignored insert they still hold the id of whatever this
+     * connection wrote before. Reporting that would hand the caller a key
+     * belonging to a different row -- and it is the same number a successful
+     * insert would have returned, so nothing downstream could tell. Zero is what
+     * PostgreSQL's RETURNING already answers for a row it did not write, which
+     * is what makes the three agree.
+     *
+     * <p>Two rows are inserted first for the same reason the upsert check needs
+     * them: with one row on the connection the stale value is accidentally
+     * right, and a broken reading passes.
+     */
+    private static void anIgnoredInsertAnswersNoKey(DataSource pool) throws Exception {
+        String engine = pool.dialect().getName();
+        boolean mysql = "mysql".equals(engine);
+        pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
+        pool.execute("CREATE TABLE cn1_ignored (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
+                + " NOT NULL UNIQUE)", null);
+        try {
+            pool.insert("INSERT INTO cn1_ignored (name) VALUES (?)",
+                    new Object[] {"a"}, "id");
+            long second = pool.insert("INSERT INTO cn1_ignored (name) VALUES (?)",
+                    new Object[] {"b"}, "id");
+            check("the second fixture row has a key", "true", String.valueOf(second > 0));
+            String ignore;
+            if("postgresql".equals(engine)) {
+                ignore = "INSERT INTO cn1_ignored (name) VALUES (?) ON CONFLICT DO NOTHING";
+            } else if(mysql) {
+                ignore = "INSERT IGNORE INTO cn1_ignored (name) VALUES (?)";
+            } else {
+                ignore = "INSERT OR IGNORE INTO cn1_ignored (name) VALUES (?)";
+            }
+            // Zero, and specifically NOT the key of row b.
+            check("an insert that conflicted answers no key", "0",
+                    String.valueOf(pool.insert(ignore, new Object[] {"a"}, "id")));
+            check("and it wrote nothing", "2",
+                    String.valueOf(((java.util.Map)pool.query(
+                            "SELECT COUNT(*) AS c FROM cn1_ignored", null).get(0))
+                            .values().iterator().next()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
+        }
+    }
+
     private static void anUpsertThatUpdatesStillAnswers(DataSource pool) throws Exception {
         String engine = pool.dialect().getName();
         boolean mysql = "mysql".equals(engine);
