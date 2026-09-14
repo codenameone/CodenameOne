@@ -250,6 +250,45 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void removesTheBootstrapWhenTheLastEntityGoesAway() throws Exception {
+        // The generated entry point asks whether the bootstrap FILE exists --
+        // deliberately, because entities can come from a jar and then the file
+        // is the only answer. So a bootstrap left behind by the previous run
+        // made the server register definitions for entities that are gone:
+        // reopening the datasource, recreating tables the developer removed, or
+        // failing against fields that no longer exist, with mvn clean as the
+        // only cure.
+        File classes = compileFixture(
+                "com.example.Draft",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Draft {\n"
+                        + "    @Id public long id;\n"
+                        + "    public String title;\n"
+                        + "    public Draft() {}\n"
+                        + "}\n");
+        ProcessorContext first = runProcessor(classes, backendClasspath());
+        assertFalse("the first pass should not have reported errors: " + first.getErrors(),
+                first.hasErrors());
+        File bootstrap = new File(classes, "cn1app/BackendDaoBootstrap.class");
+        assertTrue("the first pass should have generated the bootstrap", bootstrap.exists());
+
+        // The SAME class without the annotation, compiled over the first one --
+        // which is what an incremental build sees after the developer removes it.
+        compileInto(classes, "com.example.Draft",
+                "package com.example;\n"
+                        + "public class Draft {\n"
+                        + "    public long id;\n"
+                        + "    public String title;\n"
+                        + "    public Draft() {}\n"
+                        + "}\n");
+        ProcessorContext second = runProcessor(classes, backendClasspath());
+        assertFalse("the second pass should not have reported errors: " + second.getErrors(),
+                second.hasErrors());
+        assertFalse("the stale bootstrap should have been removed", bootstrap.exists());
+    }
+
+    @Test
     public void refusesAnExplicitTypeOnAGeneratedKey() throws Exception {
         // A generated key's declaration is one indivisible form per engine --
         // SQLite's AUTOINCREMENT is legal only after the exact words INTEGER

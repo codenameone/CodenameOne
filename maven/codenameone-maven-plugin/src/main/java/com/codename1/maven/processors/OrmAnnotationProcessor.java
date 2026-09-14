@@ -389,7 +389,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             scanClasspathEntities(ctx);
         }
         if (ctx.hasErrors()) return;
-        if (accepted.isEmpty()) return;
+        if (accepted.isEmpty()) {
+            removeAStaleBootstrap(ctx);
+            return;
+        }
 
         Map<String, String> sources = new LinkedHashMap<String, String>();
         for (EntityClass ec : accepted.values()) {
@@ -1011,6 +1014,44 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 // on a build with no error in it. A crash names the field.
                 throw new IllegalStateException("no server-side binding for field "
                         + f.fieldName + " of kind " + f.kind.kind);
+        }
+    }
+
+    /// Deletes the bootstrap left behind when the last `@Entity` goes away.
+    ///
+    /// Returning early with nothing to generate leaves the bootstrap from the
+    /// PREVIOUS run in the output directory, and the generated entry point asks
+    /// whether that file exists -- deliberately, because entities can come from
+    /// a jar rather than from this module, so the file is the only answer for
+    /// them. The stale one then made a server register definitions for entities
+    /// that are gone: it reopens the datasource, recreates tables the developer
+    /// removed, or fails against fields that no longer exist, and only
+    /// `mvn clean` explains it.
+    ///
+    /// Only OUR output is removed, by the same marker the collision check reads.
+    /// A bootstrap written before that marker existed is left alone, which is
+    /// the behaviour this replaces and costs one clean.
+    ///
+    /// The generated DAOS are deliberately left: nothing references one once the
+    /// bootstrap that named it is gone, and the translator drops a class nothing
+    /// references. It is the bootstrap that gets INVOKED, so it is the one whose
+    /// staleness is visible at runtime.
+    ///
+    /// Backend flavour only. The client bootstrap has the same shape and has
+    /// shipped that way; changing it is a decision to make on its own.
+    private void removeAStaleBootstrap(ProcessorContext ctx) {
+        if (!backend) {
+            return;
+        }
+        AnnotatedClass existing = ctx.lookup(BACKEND_BOOTSTRAP_BINARY.replace('.', '/'));
+        if (existing == null || !existing.getClassAnnotations().containsKey(GENERATED_DESC)) {
+            return;
+        }
+        File stale = new File(ctx.getOutputClassDir(),
+                BACKEND_BOOTSTRAP_BINARY.replace('.', File.separatorChar) + ".class");
+        if (stale.isFile() && stale.delete()) {
+            ctx.getLog().info("cn1: removed " + BACKEND_BOOTSTRAP_BINARY
+                    + ", which this module no longer has any @Entity for");
         }
     }
 
