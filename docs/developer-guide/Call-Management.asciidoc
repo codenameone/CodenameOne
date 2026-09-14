@@ -210,9 +210,12 @@ different responses, not two. `EMERGENCY_CALL_IN_PROGRESS` and
 `OTHER_APP_IN_CALL` pass on their own, so a retry is the right move --
 `THIS_APP_IN_CALL` is in the same family, though Android's bridge never reports it
 by design, because Telecom accepts a second call from the same account.
-`NOT_CONFIGURED` means `Calls.configure` hasn't run, which is yours to fix in
-code and not something a user can clear; prompting for it strands them in front
-of a dialog that changes nothing. `NOT_PERMITTED` is Android only -- iOS never
+`NOT_CONFIGURED` means `Calls.configure` hasn't completed successfully, which
+is yours to fix in code and not something a user can clear; prompting for it
+strands them in front of a dialog that changes nothing. Read it as "not
+configured," not as "never called," because on Android a `configure` that threw
+answered `UNAUTHORIZED` and left the port without a registered account, so calling it again
+without fixing what it reported changes nothing. `NOT_PERMITTED` is Android only -- iOS never
 answers it -- and it covers three conditions with three different fixes, none
 of which is the calling switch. `MANAGE_OWN_CALLS` missing: that one is a
 normal permission granted at install, so there's no prompt behind it and
@@ -220,7 +223,8 @@ normal permission granted at install, so there's no prompt behind it and
 whenever the app uses the call packages, so its absence means something
 rewrote the manifest, and the fix is in the build rather than on the device.
 `POST_NOTIFICATIONS` not yet granted on Android 13 and later: that one is a
-runtime permission, and asking for `PERMISSION_NOTIFICATIONS` is exactly right.
+runtime permission, asking for `PERMISSION_NOTIFICATIONS` is exactly right, and
+it's the usual answer the first time an app rings.
 Notifications switched off for the app, or the incoming-call channel dropped
 below high importance: no permission is missing, so only the system's own
 notification settings can clear it.
@@ -276,12 +280,12 @@ capability that came back unsupported, not calling as a whole.
 `UNAUTHORIZED` comes from two places on Android and nowhere else: a
 `SecurityException` out of configure or a report, which means `MANAGE_OWN_CALLS`
 is missing, and an incoming report refused because notifications are off or the
-incoming-call channel sits below high importance. Neither is cleared by
-re-requesting permissions -- the first has no prompt behind it, the second is a
-setting rather than a permission -- so an app that responds to this code by
-prompting asks for something the user already gave while what actually stopped
-the ringing goes untouched. The three-way split under `NOT_PERMITTED` above is
-the recovery here too. A denied microphone grant or a declined
+incoming-call channel sits below high importance. That second one is two
+conditions wearing one code, and they part exactly as they do under
+`NOT_PERMITTED` above: a `POST_NOTIFICATIONS` the user hasn't granted is cleared by asking,
+while notifications switched off or a lowered channel is a setting no prompt
+reaches. Ask once, and if the code comes back with the permission already
+granted, stop asking -- the recovery is in settings. A denied microphone grant or a declined
 call-screening role doesn't arrive here -- `Calls.requestPermissions` resolves
 with the bitmask it got and `CallDirectory.requestScreeningRole` resolves
 `false`, so read those results rather than waiting for an error.

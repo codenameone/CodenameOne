@@ -61,7 +61,14 @@ public enum CallAvailability {
     /// The platform has no system call integration at all.
     UNSUPPORTED,
 
-    /// [Calls#configure] has not run, so a report would be refused.
+    /// [Calls#configure] has not completed successfully, so a report would
+    /// be refused.
+    ///
+    /// Not proof that it never ran: Android's configure answers
+    /// [CallError#UNAUTHORIZED] when registering the account throws, and
+    /// leaves the port unconfigured, so this value is what a caller sees
+    /// afterwards. Calling configure again changes nothing until the reason
+    /// it failed is fixed.
     ///
     /// Appended rather than inserted: the ordinals cross the SPI boundary.
     ///

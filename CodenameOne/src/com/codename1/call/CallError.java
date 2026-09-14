@@ -47,10 +47,13 @@ public enum CallError {
     /// Emitted in two places, both Android: a `SecurityException` out of
     /// configure or a report, which means `MANAGE_OWN_CALLS` was never granted,
     /// and an incoming report refused because notifications are off or the
-    /// incoming-call channel sits below high importance. Neither is cleared
-    /// by re-requesting permissions: the first is an install-time permission
-    /// with no prompt behind it, and the second is a setting rather than a
-    /// permission. See [CallAvailability#NOT_PERMITTED] for the split.
+    /// incoming-call channel sits below high importance -- which is two
+    /// conditions, not one. `POST_NOTIFICATIONS` not yet granted on API 33+ IS
+    /// cleared by asking for `PERMISSION_NOTIFICATIONS`, and is the usual
+    /// answer on a first call. Notifications switched off, or the channel
+    /// lowered, is a setting with no prompt behind it, and neither has
+    /// `MANAGE_OWN_CALLS`, which is granted at install. See
+    /// [CallAvailability#NOT_PERMITTED] for the same three-way split.
     ///
     /// A denied microphone grant and a declined call screening role do NOT
     /// arrive here: [com.codename1.call.session.Calls#requestPermissions(int)]
