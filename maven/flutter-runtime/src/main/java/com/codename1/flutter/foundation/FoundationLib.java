@@ -40,7 +40,40 @@ public final class FoundationLib {
     /** Flutter's {@code defaultTargetPlatform}. */
     public static final TargetPlatform defaultTargetPlatform = detect();
 
+    /**
+     * Overrides the detected platform, for a simulator standing in for a device.
+     *
+     * <p>{@code defaultTargetPlatform} decides a great deal of what the gallery draws --
+     * the back chevron against the arrow, page transitions, switches, scrollbars -- so it
+     * has to describe the device being SIMULATED, not the machine simulating it. The
+     * desktop simulator reports "SE", which falls through to android, while the skin it
+     * is wearing and the reference it is measured against are both an iPhone. Every one
+     * of those adaptive widgets then disagreed, and none of the disagreements were
+     * defects.</p>
+     */
+    public static final String PLATFORM_PROPERTY = "cn1.flutter.targetPlatform";
+
     private static TargetPlatform detect() {
+        String forced = null;
+        try {
+            forced = System.getProperty(PLATFORM_PROPERTY);
+        } catch (Throwable t) {
+            // no system properties on this platform
+        }
+        if (forced == null || forced.length() == 0) {
+            try {
+                forced = com.codename1.ui.Display.getInstance()
+                        .getProperty(PLATFORM_PROPERTY, null);
+            } catch (Throwable t) {
+                // no Display yet
+            }
+        }
+        if (forced != null) {
+            TargetPlatform named = byName(forced);
+            if (named != null) {
+                return named;
+            }
+        }
         try {
             String p = com.codename1.ui.Display.getInstance().getPlatformName();
             if (p != null) {
@@ -62,5 +95,29 @@ public final class FoundationLib {
             // fall through to a sensible default when no runtime is available
         }
         return TargetPlatform.android;
+    }
+
+    /// Flutter's own spelling of each platform, or null when the name is not one.
+    private static TargetPlatform byName(String name) {
+        String n = name.trim();
+        if ("ios".equalsIgnoreCase(n) || "iOS".equals(n)) {
+            return TargetPlatform.iOS;
+        }
+        if ("android".equalsIgnoreCase(n)) {
+            return TargetPlatform.android;
+        }
+        if ("macos".equalsIgnoreCase(n) || "macOS".equals(n)) {
+            return TargetPlatform.macOS;
+        }
+        if ("windows".equalsIgnoreCase(n)) {
+            return TargetPlatform.windows;
+        }
+        if ("linux".equalsIgnoreCase(n)) {
+            return TargetPlatform.linux;
+        }
+        if ("fuchsia".equalsIgnoreCase(n)) {
+            return TargetPlatform.fuchsia;
+        }
+        return null;
     }
 }

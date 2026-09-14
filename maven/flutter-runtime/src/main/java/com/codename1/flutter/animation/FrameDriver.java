@@ -212,6 +212,17 @@ final class FrameDriver {
         }
     }
 
+    /**
+     * Runs one animation frame now, instead of waiting for the clock to come round.
+     *
+     * <p>Reached through {@link MotionClock#advanceAndPump}: freeze the clock, advance
+     * it, pump. The controllers then see exactly the elapsed time the harness named. Does
+     * nothing an ordinary tick would not do -- it IS the ordinary tick.</p>
+     */
+    static void pump() {
+        frame();
+    }
+
     private static void frame() {
         AnimationController[] due;
         synchronized (FrameDriver.class) {

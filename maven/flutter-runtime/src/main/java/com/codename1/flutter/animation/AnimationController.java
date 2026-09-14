@@ -441,6 +441,10 @@ public class AnimationController extends Animation<Double> {
     }
 
     private static long now() {
-        return System.currentTimeMillis();
+        // Not System.currentTimeMillis() directly: a harness comparing this runtime's
+        // motion against another stack's has to be able to ask both for the same
+        // animation time. See MotionClock -- released, which is every application, this
+        // IS the wall clock.
+        return MotionClock.now();
     }
 }
