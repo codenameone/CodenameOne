@@ -149,9 +149,16 @@ public abstract class Dialect {
     /**
      * The declaration of a primary key column whose value the APPLICATION
      * assigns -- a UUID, a key issued by another service.
+     *
+     * <p>NOT NULL is not redundant, whatever the standard says. SQLite lets a
+     * PRIMARY KEY column that is not INTEGER PRIMARY KEY hold null, and even
+     * several nulls, where PostgreSQL and MySQL refuse: an insert that forgot
+     * its key succeeded in development and failed in production, and the row it
+     * wrote could not be found again by the generated id = ? predicate. The
+     * other two already imply the constraint, so saying it costs nothing there.
      */
     public String assignedKeyColumn(int kind) {
-        return columnType(kind) + " PRIMARY KEY";
+        return columnType(kind) + " NOT NULL PRIMARY KEY";
     }
 
     /**
@@ -233,6 +240,21 @@ public abstract class Dialect {
             throw new IOException("No statement");
         }
         return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments());
+    }
+
+    /**
+     * Where {@code sql} stops being the statement and starts being its
+     * terminator, its trailing comment or trailing space.
+     *
+     * <p>What {@link com.codename1.backend.Database#insert} needs to put
+     * RETURNING somewhere it will run. See {@link Placeholders#endOfStatement}.
+     */
+    public int endOfStatement(String sql) throws IOException {
+        if(sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.endOfStatement(sql, nestedBlockComments(),
                 backslashEscapesInLiterals(), hashLineComments());
     }
 
@@ -458,9 +480,9 @@ public abstract class Dialect {
          */
         public String assignedKeyColumn(int kind) {
             if(kind == TEXT) {
-                return "VARCHAR(255) PRIMARY KEY";
+                return "VARCHAR(255) NOT NULL PRIMARY KEY";
             }
-            return columnType(kind) + " PRIMARY KEY";
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
         }
 
         /**

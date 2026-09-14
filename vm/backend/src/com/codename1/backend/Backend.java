@@ -327,7 +327,11 @@ public final class Backend {
                 //
                 // Only a pool this builder OPENED. One handed in belongs to the
                 // caller and is theirs to close.
-                if(pool != null && !dataSourceGiven) {
+                // Ownership is whether THIS BUILDER opened it, which is not the
+                // same as whether anything was configured: .dataSource(url)
+                // makes the builder open one, and reading dataSourceGiven here
+                // left exactly that case leaking on a failed start.
+                if(pool != null && dataSource == null) {
                     pool.close();
                 }
                 throw err;

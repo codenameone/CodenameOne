@@ -280,17 +280,19 @@ public final class Database {
      * <p>A trailing semicolon is where this goes wrong if nobody looks for it:
      * appending to "INSERT INTO t (a) VALUES (?);" gives
      * "INSERT INTO t (a) VALUES (?); RETURNING id", which is two statements, the
-     * second of which is not SQL. The same call works on SQLite and MySQL, which
-     * never append anything, so it would be a portability hole in exactly the
-     * engine this method exists for. The terminator is dropped rather than moved:
-     * the statement ends where the clause does.
+     * second of which is not SQL. A trailing comment is the same defect wearing
+     * a different hat -- "INSERT ... VALUES (?) -- why" swallows the clause and
+     * the insert then reports a key of zero for a row it wrote. The same call
+     * works on SQLite and MySQL, which never append anything, so either one is a
+     * portability hole in exactly the engine this method exists for.
+     *
+     * <p>Whatever followed the statement is kept and follows the clause, so the
+     * terminator still terminates and the comment still explains.
      */
-    private String withReturning(String sql, String idColumn) {
-        int end = sql.length();
-        while(end > 0 && (sql.charAt(end - 1) == ';' || sql.charAt(end - 1) <= ' ')) {
-            end--;
-        }
-        return sql.substring(0, end) + " RETURNING " + dialect.quote(idColumn);
+    private String withReturning(String sql, String idColumn) throws IOException {
+        int end = dialect.endOfStatement(sql);
+        return sql.substring(0, end) + " RETURNING " + dialect.quote(idColumn)
+                + sql.substring(end);
     }
 
     /**

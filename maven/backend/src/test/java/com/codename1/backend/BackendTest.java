@@ -299,6 +299,67 @@ class BackendTest {
         assertThrows(IOException.class, () -> opened[0].borrow());
     }
 
+    @Test
+    @DisplayName("a pool the builder opened from a URL is closed when the start fails")
+    void closesAUrlBuiltPoolOnFailure() throws Exception {
+        // Ownership is whether the BUILDER opened it, not whether anything was
+        // configured. .dataSource(url) makes the builder open one, and the first
+        // version of this cleanup read a flag that both overloads set -- so
+        // exactly this case went on leaking.
+        final DataSource[] opened = new DataSource[1];
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        assertThrows(IllegalStateException.class, () -> Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .dataSource(":memory:")
+                .handlers(new Backend.Handlers() {
+                    public HttpServer.Handler[] create(DataSource dataSource,
+                            com.codename1.backend.orm.EntityManager entities) {
+                        opened[0] = dataSource;
+                        throw new IllegalStateException("this controller refuses to start");
+                    }
+                })
+                .start());
+        assertNotNull(opened[0]);
+        assertThrows(IOException.class, () -> opened[0].borrow());
+    }
+
+    @Test
+    @DisplayName("a pool the caller handed in survives a failed start")
+    void leavesACallerOwnedPoolAlone() throws Exception {
+        // The other side of the same rule: what the caller opened is the
+        // caller's to close, and a builder that closed it would break the retry
+        // it was handed for.
+        DataSource mine = DataSource.open(":memory:");
+        try {
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+            assertThrows(IllegalStateException.class,
+                    () -> Backend.builder(Config.of(settings, "test"))
+                            .quiet()
+                            .dataSource(mine)
+                            .handlers(new Backend.Handlers() {
+                                public HttpServer.Handler[] create(DataSource dataSource,
+                                        com.codename1.backend.orm.EntityManager entities) {
+                                    throw new IllegalStateException("refused");
+                                }
+                            })
+                            .start());
+            pooledStillWorks(mine);
+        } finally {
+            mine.close();
+        }
+    }
+
+    private static void pooledStillWorks(DataSource pool) throws Exception {
+        Database db = pool.borrow();
+        try {
+            assertTrue(db.isOpen());
+        } finally {
+            pool.release(db);
+        }
+    }
+
     private static HttpServer.Handler ok() {
         return new HttpServer.Handler() {
             public HttpServer.Response handle(HttpServer.Request request) throws Exception {
