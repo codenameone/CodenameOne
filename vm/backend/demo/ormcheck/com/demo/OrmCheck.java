@@ -123,6 +123,15 @@ public class OrmCheck {
         note.revision = null;
         note.initial = 'x';
         note.grade = null;
+        note.rank = (short)-32768;
+        note.flags = (byte)127;
+        note.weight = 0.5f;
+        note.priority = null;
+        note.archived = null;
+        note.weightAgain = null;
+        note.rankAgain = null;
+        note.flagsAgain = null;
+        note.weightNarrow = null;
         note.cached = "never stored";
         notes.insert(note);
         check("the generated key is written back", "true", String.valueOf(note.id > 0));
@@ -146,16 +155,43 @@ public class OrmCheck {
         // A nullable char has no default to fall back on, so it is read through
         // a conversion of its own rather than through the primitive one.
         check("a null boxed char stays null", "null", String.valueOf(back.grade));
+        // The narrow integrals at their extremes, which is where a column that
+        // is too wide on one engine and a narrowing read disagree.
+        check("short", "-32768", String.valueOf(back.rank));
+        check("byte", "127", String.valueOf(back.flags));
+        check("float", "0.5", String.valueOf(back.weight));
+        check("a null Integer stays null", "null", String.valueOf(back.priority));
+        check("a null Boolean stays null", "null", String.valueOf(back.archived));
+        check("a null Double stays null", "null", String.valueOf(back.weightAgain));
+        check("a null Short stays null", "null", String.valueOf(back.rankAgain));
+        check("a null Byte stays null", "null", String.valueOf(back.flagsAgain));
+        check("a null Float stays null", "null", String.valueOf(back.weightNarrow));
         check("@DbTransient is not stored", "null", String.valueOf(back.cached));
 
         // And a value in the boxed column comes back as that value.
         back.revision = Long.valueOf(7);
         back.grade = Character.valueOf('A');
+        back.priority = Integer.valueOf(-2147483648);
+        back.archived = Boolean.TRUE;
+        back.weightAgain = Double.valueOf(-0.25);
+        back.rankAgain = Short.valueOf((short)32767);
+        back.flagsAgain = Byte.valueOf((byte)-128);
+        back.weightNarrow = Float.valueOf(0.25f);
         notes.update(back);
         check("a boxed field round trips", "7",
                 String.valueOf(notes.findById(Long.valueOf(note.id)).revision));
         check("a boxed char round trips", "A",
                 String.valueOf(notes.findById(Long.valueOf(note.id)).grade));
+        Note filled = notes.findById(Long.valueOf(note.id));
+        check("a boxed int round trips at its minimum", "-2147483648",
+                String.valueOf(filled.priority));
+        check("a boxed boolean round trips", "true", String.valueOf(filled.archived));
+        check("a boxed double round trips", "-0.25", String.valueOf(filled.weightAgain));
+        check("a boxed short round trips at its maximum", "32767",
+                String.valueOf(filled.rankAgain));
+        check("a boxed byte round trips at its minimum", "-128",
+                String.valueOf(filled.flagsAgain));
+        check("a boxed float round trips", "0.25", String.valueOf(filled.weightNarrow));
     }
 
     private static void updatesAndDeletes(Dao<Note> notes) throws Exception {
