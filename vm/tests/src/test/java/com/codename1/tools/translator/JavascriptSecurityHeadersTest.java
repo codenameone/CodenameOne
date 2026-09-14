@@ -111,6 +111,37 @@ class JavascriptSecurityHeadersTest {
     }
 
     @Test
+    void thePolicyCoversOnlyTheDocumentItsHashesCameFrom() throws Exception {
+        java.io.File out = java.nio.file.Files.createTempDirectory("cn1-csp").toFile();
+        java.nio.file.Files.write(new java.io.File(out, "index.html").toPath(),
+                indexTemplate().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        JavascriptSecurityHeaders.write(out);
+
+        java.io.File guidance = new java.io.File(out, "cn1-security");
+        String netlify = new String(java.nio.file.Files.readAllBytes(
+                new java.io.File(guidance, "_headers").toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        // The hashes are computed from index.html and from nothing else, so a site-wide policy
+        // governs documents whose inline code was never hashed -- a BrowserComponent page on the
+        // same origin -- and blocks script the build itself emitted.
+        int siteWide = netlify.indexOf("/*");
+        int policy = netlify.indexOf("Content-Security-Policy");
+        assertTrue(siteWide >= 0, "the transport headers are still site wide");
+        assertTrue(policy > siteWide,
+                "the policy must come after the site-wide block, not inside it: " + netlify);
+        assertTrue(netlify.indexOf("/index.html") >= 0,
+                "the policy must be scoped to the document it was computed from: " + netlify);
+
+        // And the headers that describe the ORIGIN rather than a document stay everywhere.
+        String siteWideBlock = netlify.substring(siteWide, policy);
+        assertTrue(siteWideBlock.indexOf("Strict-Transport-Security") >= 0, siteWideBlock);
+        assertTrue(siteWideBlock.indexOf("X-Frame-Options") >= 0, siteWideBlock);
+        assertTrue(siteWideBlock.indexOf("Content-Security-Policy") < 0,
+                "the policy must not be in the site-wide block: " + siteWideBlock);
+    }
+
+    @Test
     void thePolicyDeniesTheThingsThatMatter() throws Exception {
         String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate());
         assertTrue(csp.indexOf("object-src 'none'") >= 0);

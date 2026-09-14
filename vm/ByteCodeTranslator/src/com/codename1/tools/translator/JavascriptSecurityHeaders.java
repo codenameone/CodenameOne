@@ -234,9 +234,15 @@ final class JavascriptSecurityHeaders {
         return out.toString();
     }
 
-    private static String commonHeaders(String csp) {
-        return "Content-Security-Policy: " + csp + "\n"
-                + "Strict-Transport-Security: max-age=63072000; includeSubDomains\n"
+    /// The headers that describe the ORIGIN rather than a document, so every path gets them.
+    ///
+    /// The Content-Security-Policy is deliberately not among them. Its hashes are computed from
+    /// `index.html` and from nothing else, so applying it site-wide governed documents whose
+    /// inline code was never hashed -- a BrowserComponent page served from the same origin, for
+    /// instance -- and blocked script the build itself emitted. The policy is attached to the
+    /// document it was computed from; these are not document specific and stay everywhere.
+    private static String commonHeaders() {
+        return "Strict-Transport-Security: max-age=63072000; includeSubDomains\n"
                 + "X-Content-Type-Options: nosniff\n"
                 + "X-Frame-Options: DENY\n"
                 + "Referrer-Policy: no-referrer\n"
@@ -251,10 +257,18 @@ final class JavascriptSecurityHeaders {
         b.append("# Netlify and Cloudflare Pages read this file verbatim; see "
                 + "cn1-security/README.md.\n");
         b.append("/*\n");
-        String[] lines = commonHeaders(csp).split("\n");
+        String[] lines = commonHeaders().split("\n");
         for (int iter = 0; iter < lines.length; iter++) {
             b.append("  ").append(lines[iter]).append('\n');
         }
+        b.append("\n");
+        b.append("# The policy is scoped to the document its hashes came from. Another HTML\n");
+        b.append("# document on this origin -- a BrowserComponent page, say -- carries inline\n");
+        b.append("# code this build never hashed, and a site-wide policy would block it.\n");
+        b.append("/\n");
+        b.append("  Content-Security-Policy: ").append(csp).append('\n');
+        b.append("/index.html\n");
+        b.append("  Content-Security-Policy: ").append(csp).append('\n');
         b.append("\n");
         b.append("# The service worker must never be served from a stale cache: a pinned old\n");
         b.append("# worker keeps serving old application code, and old application code is how a\n");
@@ -269,7 +283,14 @@ final class JavascriptSecurityHeaders {
                 + "# Include inside the server{} or location{} block that serves the app.\n"
                 + "# 'always' matters: without it nginx omits the header on error responses,\n"
                 + "# and an error page in the app's origin is a page in the app's origin.\n"
-                + "add_header Content-Security-Policy \"" + csp + "\" always;\n"
+                + "# The policy is scoped to the document its hashes came from; another HTML\n"
+                + "# document on this origin carries inline code this build never hashed.\n"
+                + "location = /index.html {\n"
+                + "    add_header Content-Security-Policy \"" + csp + "\" always;\n"
+                + "}\n"
+                + "location = / {\n"
+                + "    add_header Content-Security-Policy \"" + csp + "\" always;\n"
+                + "}\n"
                 + "add_header Strict-Transport-Security \"max-age=63072000; includeSubDomains\" always;\n"
                 + "add_header X-Content-Type-Options \"nosniff\" always;\n"
                 + "add_header X-Frame-Options \"DENY\" always;\n"
@@ -287,7 +308,11 @@ final class JavascriptSecurityHeaders {
         return "# Codename One JavaScript port -- security headers for Apache.\n"
                 + "# Rename to .htaccess, or paste into the matching <Directory> block.\n"
                 + "<IfModule mod_headers.c>\n"
-                + "  Header always set Content-Security-Policy \"" + csp + "\"\n"
+                + "  # The policy is scoped to the document its hashes came from; another HTML\n"
+                + "  # document on this origin carries inline code this build never hashed.\n"
+                + "  <Files \"index.html\">\n"
+                + "    Header always set Content-Security-Policy \"" + csp + "\"\n"
+                + "  </Files>\n"
                 + "  Header always set Strict-Transport-Security \"max-age=63072000; includeSubDomains\"\n"
                 + "  Header always set X-Content-Type-Options \"nosniff\"\n"
                 + "  Header always set X-Frame-Options \"DENY\"\n"

@@ -228,6 +228,51 @@ public final class AndroidSecureStorage extends SecureStorage {
     /// `HARDWARE_BACKED` stays `UNKNOWN` even on a modern device: whether the keystore key lives
     /// in a TEE or StrongBox is a property of the hardware, and this class does not query the key
     /// attestation that would establish it.
+    /// What protects one entry, which on an upgraded device is not what the store can provide.
+    ///
+    /// The store-wide answer is about the API level: from 23 there is a keystore and entries
+    /// written since are encrypted with it. An entry written by `legacyPlainSet` on API 22 and
+    /// left behind by an OS upgrade is still Base64 in preferences, and the store-wide report
+    /// called it encrypted -- so `SecureStorage.get(account, required)` accepted an
+    /// ENCRYPTED_AT_REST requirement and then handed back the plaintext, including when the
+    /// rewrite that was supposed to fix it failed.
+    ///
+    /// Recognised the same way `get` recognises it: no IV separator. That is the format itself
+    /// rather than a flag beside it, so an entry cannot be described as migrated while it is not.
+    @Override
+    public ProtectionReport protectionOf(String account) {
+        if (account != null && isLegacyPlaintext(account)) {
+            return ProtectionReport.builder()
+                    .set(Protection.PERSISTENT, true)
+                    .set(Protection.ENCRYPTED_AT_REST, false)
+                    .set(Protection.NON_EXTRACTABLE_KEY, false)
+                    .set(Protection.OS_PROTECTED, false)
+                    .set(Protection.HARDWARE_BACKED, false)
+                    .set(Protection.USER_VERIFICATION, false)
+                    .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                    .build();
+        }
+        return protection();
+    }
+
+    /// Whether this entry is still in the pre-keystore format, read without decrypting anything.
+    private boolean isLegacyPlaintext(String account) {
+        try {
+            SharedPreferences prefs = AndroidNativeUtil.getActivity()
+                    .getApplicationContext()
+                    .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            if (prefs == null) {
+                return false;
+            }
+            String stored = prefs.getString(account, null);
+            return stored != null && stored.indexOf(':') < 0;
+        } catch (Throwable cannotAsk) {
+            // Cannot establish that it is legacy, and guessing either way is worse than the
+            // store-wide answer the caller would otherwise have had.
+            return false;
+        }
+    }
+
     @Override
     public ProtectionReport protection() {
         boolean keystore = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M;
