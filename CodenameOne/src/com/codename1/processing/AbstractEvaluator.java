@@ -387,6 +387,57 @@ abstract class AbstractEvaluator implements Evaluator {
         return at == length;
     }
 
+    /// Compares two numeric strings, exactly where the values allow it.
+    ///
+    /// Integers go through `long`. Coercing them to `double` loses precision
+    /// above 2^53, which is inside the range of an ordinary 64-bit id: the
+    /// literals 9007199254740992 and 9007199254740993 round to the same
+    /// double, so a predicate written for one of them selected both. Anything
+    /// with a decimal point or an exponent is a `double` and has no exact
+    /// alternative.
+    ///
+    /// - `left`: the value read from the document
+    ///
+    /// - `right`: the value written in the predicate
+    ///
+    /// #### Returns
+    ///
+    /// negative, zero or positive, as `compareTo` does
+    protected int compareNumbers(String left, String right) {
+        if (isInteger(left) && isInteger(right)) {
+            try {
+                long l = Long.parseLong(left.trim());
+                long r = Long.parseLong(right.trim());
+                return l < r ? -1 : (l > r ? 1 : 0);
+            } catch (NumberFormatException tooBigForALong) {
+                // Falls through to the double comparison below, which is the
+                // best available answer for a value no integer type holds.
+            }
+        }
+        double l = Double.parseDouble(left.trim());
+        double r = Double.parseDouble(right.trim());
+        return l < r ? -1 : (l > r ? 1 : 0);
+    }
+
+    /// Whether this number is written as a whole number, with no point or
+    /// exponent, so it can be compared exactly.
+    ///
+    /// - `text`: a value [#isNumeric] already accepted
+    ///
+    /// #### Returns
+    ///
+    /// true when the value is an integer literal
+    private boolean isInteger(String text) {
+        String value = text.trim();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '.' || c == 'e' || c == 'E') {
+                return false;
+            }
+        }
+        return value.length() > 0;
+    }
+
     /// Utility method for subclasses to determine strip single/double quotes
     /// from a string
     ///

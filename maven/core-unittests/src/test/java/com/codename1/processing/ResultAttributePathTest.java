@@ -269,6 +269,34 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void everyChildOfThatNameIsConsidered() {
+        // An element can carry several children of one name, and the numeric
+        // branch returned after the first instead of walking them the way the
+        // text branch always has -- so <price>1.5</price> hid the 2.5 behind
+        // it. Invisible while a decimal was not a number at all.
+        Result r = Result.fromContent(
+                "<t><item><price>1.5</price><price>2.5</price><n>A</n></item></t>",
+                Result.XML);
+        assertEquals(1, r.getAsStringArray("/t/item[price=2.5]/n").length,
+                "the second price was never looked at");
+        assertEquals(1, r.getAsStringArray("/t/item[price=1.5]/n").length,
+                "the first price stopped matching");
+    }
+
+    @Test
+    void anIdTooBigForADoubleStaysExact() {
+        // 9007199254740992 and 9007199254740993 are the same double, and an
+        // id of that size is ordinary. Comparing them as doubles made a
+        // predicate written for one select both.
+        Result r = Result.fromContent(
+                "<t><p id='9007199254740992' n='X'/>"
+                + "<p id='9007199254740993' n='Y'/></t>", Result.XML);
+        String[] found = r.getAsStringArray("/t/p[@id='9007199254740993']/@n");
+        assertEquals(1, found.length, "two distinct ids compared equal");
+        assertEquals("Y", found[0]);
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for

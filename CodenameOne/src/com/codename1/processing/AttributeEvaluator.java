@@ -95,7 +95,7 @@ class AttributeEvaluator extends AbstractEvaluator {
         // compared "1.0" with "1" and matched nothing.
         rvalue = stripQuotes(rvalue);
         if (isNumeric(rvalue) && isNumeric(attr)) {
-            if (Double.parseDouble(attr) < Double.parseDouble(rvalue)) {
+            if (compareNumbers(attr, rvalue) < 0) {
                 return element;
             }
             return null;
@@ -122,7 +122,7 @@ class AttributeEvaluator extends AbstractEvaluator {
         }
         rvalue = stripQuotes(rvalue);
         if (isNumeric(rvalue) && isNumeric(attr)) {
-            if (Double.parseDouble(attr) > Double.parseDouble(rvalue)) {
+            if (compareNumbers(attr, rvalue) > 0) {
                 return element;
             }
             return null;
@@ -163,7 +163,7 @@ class AttributeEvaluator extends AbstractEvaluator {
         }
         rvalue = stripQuotes(rvalue);
         if (isNumeric(rvalue) && isNumeric(attr)) {
-            if (Double.parseDouble(attr) == Double.parseDouble(rvalue)) {
+            if (compareNumbers(attr, rvalue) == 0) {
                 return element;
             }
             return null;

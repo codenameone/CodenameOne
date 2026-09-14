@@ -85,10 +85,15 @@ class TextEvaluator extends AbstractEvaluator {
         rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {
-                if (Double.parseDouble(v[i]) < Double.parseDouble(rvalue)) {
+                if (compareNumbers(v[i], rvalue) < 0) {
                     return element;
                 }
-                return null;
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant <price>1.5</price> hid
+                // <price>2.5</price> from [price=2.5].
+                continue;
             }
             // Backwards: this is the LESS-than method and it answered when the
             // value sorted AFTER the operand.
@@ -115,10 +120,15 @@ class TextEvaluator extends AbstractEvaluator {
         rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {
-                if (Double.parseDouble(v[i]) > Double.parseDouble(rvalue)) {
+                if (compareNumbers(v[i], rvalue) > 0) {
                     return element;
                 }
-                return null;
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant <price>1.5</price> hid
+                // <price>2.5</price> from [price=2.5].
+                continue;
             }
             // Backwards, the same way the less-than method was.
             if (v[i].compareTo(rvalue) > 0) {
@@ -144,10 +154,15 @@ class TextEvaluator extends AbstractEvaluator {
         rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {
-                if (Double.parseDouble(v[i]) == Double.parseDouble(rvalue)) {
+                if (compareNumbers(v[i], rvalue) == 0) {
                     return element;
                 }
-                return null;
+                // On to the next value rather than out: an element
+                // can carry several children of one name, and the
+                // text branch below has always walked all of them.
+                // Returning here meant <price>1.5</price> hid
+                // <price>2.5</price> from [price=2.5].
+                continue;
             }
             if (v[i].compareTo(rvalue) == 0) {
                 return element;
