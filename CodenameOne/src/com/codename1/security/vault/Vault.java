@@ -775,19 +775,40 @@ public final class Vault {
             public void run() {
                 try {
                     Storage storage = Storage.getInstance();
+                    // Enumerated BEFORE anything is removed, and a store that cannot enumerate
+                    // stops the call here rather than skipping to the end of it. The branch used
+                    // to treat an unavailable listing as an empty one -- every secret left on
+                    // disk, the record and the device key deleted anyway, and TRUE reported for
+                    // "delete everything this vault stores on this device". It is reachable:
+                    // JavaSE answers getStorageDir().list(), and File.list() is null for a
+                    // directory that does not exist or cannot be read.
                     String[] entries = storage.listEntries();
+                    if (entries == null) {
+                        throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                "this device's storage cannot be enumerated, so the secrets in "
+                                + "this vault cannot be found to delete; nothing was removed");
+                    }
                     String prefix = secretKey("");
-                    if (entries != null) {
+                    try {
                         for (String entry : entries) {
                             if (entry != null && entry.startsWith(prefix)) {
                                 storage.deleteStorageFile(entry);
                             }
                         }
+                        storage.deleteStorageFile(deviceRecordKey());
+                        storage.deleteStorageFile(metadataKey());
+                        forgetEveryMechanism();
+                    } finally {
+                        // In a finally, because once ANY of that has happened the live key and
+                        // cached record describe a vault that is no longer on disk. A device key
+                        // that refuses to be deleted makes forgetEveryMechanism throw, and the
+                        // lock that used to sit after it was skipped -- leaving the vault open,
+                        // so a caller that caught the error and carried on sealed records under
+                        // a key nothing would hold after a restart. Failing to delete is
+                        // recoverable; writing more data into a vault that no longer exists is
+                        // not.
+                        lock();
                     }
-                    storage.deleteStorageFile(deviceRecordKey());
-                    storage.deleteStorageFile(metadataKey());
-                    forgetEveryMechanism();
-                    lock();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -841,10 +862,28 @@ public final class Vault {
                     // during the seal leaves ciphertext made with a key of zeroes. Refusing here
                     // means that is discarded rather than stored as if it were the secret.
                     requireSameGeneration(generation);
-                    if (!Storage.getInstance().writeObject(secretKey(secretName),
-                            Bytes.toHex(sealed))) {
+                    String entry = secretKey(secretName);
+                    // Kept so the write can be undone. The check above is before a storage write
+                    // and a lock can land inside one, and this call REPLACES whatever was stored
+                    // under the name -- so refusing without putting the old value back would
+                    // discard a secret the caller still believes is there, on an operation that
+                    // reported failure.
+                    Object previous = Storage.getInstance().readObject(entry);
+                    if (!Storage.getInstance().writeObject(entry, Bytes.toHex(sealed))) {
                         throw new VaultException(VaultError.QUOTA_EXCEEDED,
                                 "the secret could not be written to storage");
+                    }
+                    if (generation != lockGeneration) {
+                        // Asked again after the write, like createRecoveryCode. Completing here
+                        // would let a screen that was already stale when the user touched it
+                        // change what the vault holds after lock() had returned.
+                        if (previous instanceof String) {
+                            Storage.getInstance().writeObject(entry, previous);
+                        } else {
+                            Storage.getInstance().deleteStorageFile(entry);
+                        }
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this secret was being stored");
                     }
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {

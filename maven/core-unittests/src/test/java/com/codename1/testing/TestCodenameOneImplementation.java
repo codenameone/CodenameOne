@@ -3368,8 +3368,46 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * Runs {@code action} once, inside the next storage write to {@code name}.
+     *
+     * <p>A test cannot otherwise land anything in the middle of a storage write, and the window
+     * between an operation's last pre-write check and the write returning is where a concurrent
+     * {@code lock()} has to be exercised. Fired once and then cleared, so it cannot leak into a
+     * later write.</p>
+     *
+     * @param name the storage entry whose write should be interrupted, or null to cancel
+     * @param action what to do inside it
+     */
+    public void setDuringStorageWrite(String name, Runnable action) {
+        duringStorageWriteFor = name;
+        duringStorageWrite = action;
+    }
+
+    private String duringStorageWriteFor;
+    private Runnable duringStorageWrite;
+
+    /**
+     * Makes {@link #listStorageEntries()} answer null, which is what JavaSE does: it returns
+     * {@code getStorageDir().list()}, and {@code File.list()} is null for a directory that does
+     * not exist or that cannot be read.
+     *
+     * @param unavailable whether enumeration should report itself unavailable
+     */
+    public void setStorageEnumerationUnavailable(boolean unavailable) {
+        storageEnumerationUnavailable = unavailable;
+    }
+
+    private boolean storageEnumerationUnavailable;
+
     @Override
     public OutputStream createStorageOutputStream(String name) {
+        if (duringStorageWrite != null && name != null && name.equals(duringStorageWriteFor)) {
+            Runnable once = duringStorageWrite;
+            duringStorageWrite = null;
+            duringStorageWriteFor = null;
+            once.run();
+        }
         return new StorageOutput(name);
     }
 
@@ -3395,6 +3433,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public String[] listStorageEntries() {
+        if (storageEnumerationUnavailable) {
+            return null;
+        }
         return storageEntries.keySet().toArray(new String[0]);
     }
 

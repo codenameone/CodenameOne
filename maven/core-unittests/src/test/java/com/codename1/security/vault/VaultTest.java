@@ -22,7 +22,9 @@
  */
 package com.codename1.security.vault;
 
+import com.codename1.io.Storage;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.security.vault.spi.DeviceProtection;
 import com.codename1.util.AsyncResource;
 import org.junit.jupiter.api.BeforeEach;
@@ -1290,6 +1292,110 @@ class VaultTest extends UITestBase {
         Vault retry = Vault.named(name).configure(fast());
         assertTrue(retry.enroll(pw("p"), fast()).get().booleanValue(),
                 "a rolled-back enrolment must leave nothing in the way of the next attempt");
+    }
+
+    @Test
+    void aDestructionThatCannotEnumerateStorageRemovesNothing() {
+        // "Delete everything this vault stores on this device" cannot be reported for a call that
+        // could not find out what it stores. The branch treated an unavailable listing as an
+        // empty one: every secret stayed on disk, the record and the device key went anyway, and
+        // the call answered TRUE. Reachable rather than theoretical -- JavaSE answers
+        // getStorageDir().list(), and File.list() is null for a directory it cannot read.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertTrue(vault.putSecret("token", pw("abc123")).get().booleanValue());
+
+        TestCodenameOneImplementation.getInstance().setStorageEnumerationUnavailable(true);
+        try {
+            assertEquals(VaultError.STORAGE_UNAVAILABLE, errorOf(vault.destroyLocalData()),
+                    "a destruction that cannot enumerate must refuse, not report success");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageEnumerationUnavailable(false);
+        }
+
+        // Nothing was removed, so the vault and its secret are both still here.
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals(pw("abc123"), reopened.getSecret("token").get());
+    }
+
+    @Test
+    void aPartialDestructionStillLeavesTheVaultLocked() {
+        // The records are deleted and THEN the device key is, so a store that refuses the delete
+        // throws after the vault is already gone from disk. lock() sat after that call and was
+        // skipped, leaving the live key and the cached record in hand -- and a caller that caught
+        // the error and carried on sealed records under a key nothing holds after a restart.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        assertTrue(vault.isUnlocked());
+
+        device.refuseDeletes = true;
+        try {
+            assertNotNull(errorOf(vault.destroyLocalData()),
+                    "a device key that will not be deleted must be reported");
+        } finally {
+            device.refuseDeletes = false;
+        }
+
+        assertFalse(vault.isUnlocked(),
+                "a vault whose record has been deleted must not be left open");
+        assertEquals(VaultError.LOCKED, errorOf(vault.seal("note", "contents".getBytes())),
+                "and it must refuse to seal anything more");
+    }
+
+    @Test
+    void aVaultLockedWhileASecretIsWrittenStoresNothing() {
+        // The generation is checked before the write and the write is where a lock lands. The
+        // secret was persisted and the call reported success after lock() had returned, so a
+        // screen that was already stale when the user touched it could still change what the
+        // vault holds.
+        String name = freshName();
+        final Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        // Resolved before the value under test is stored: finding the name costs a write, and
+        // running it afterwards would leave the probe's value as the one restored.
+        String entry = secretEntryName(vault, "token");
+        assertTrue(vault.putSecret("token", pw("first")).get().booleanValue());
+
+        TestCodenameOneImplementation.getInstance().setDuringStorageWrite(entry,
+                new Runnable() {
+                    public void run() {
+                        vault.lock();
+                    }
+                });
+        try {
+            assertEquals(VaultError.LOCKED, errorOf(vault.putSecret("token", pw("second"))),
+                    "a secret written while lock() ran must not be reported as stored");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setDuringStorageWrite(null, null);
+        }
+
+        // And the value it replaced is back, rather than the half-applied new one: a call that
+        // reports failure must not have changed what the vault holds.
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals(pw("first"), reopened.getSecret("token").get());
+    }
+
+    /// The storage entry a secret lands in, derived the way the vault derives it rather than
+    /// copied -- a hand-written copy of that scheme would go stale without failing.
+    private static String secretEntryName(Vault vault, String secretName) {
+        String[] before = Storage.getInstance().listEntries();
+        java.util.HashSet<String> known = new java.util.HashSet<String>();
+        for (String entry : before) {
+            known.add(entry);
+        }
+        vault.putSecret(secretName, pw("probe")).get();
+        for (String entry : Storage.getInstance().listEntries()) {
+            if (!known.contains(entry)) {
+                return entry;
+            }
+        }
+        throw new IllegalStateException("could not find the storage entry for " + secretName
+                + "; call this before the secret exists, so its entry is the new one");
     }
 
     @Test
