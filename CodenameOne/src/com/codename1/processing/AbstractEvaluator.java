@@ -389,12 +389,13 @@ abstract class AbstractEvaluator implements Evaluator {
 
     /// Compares two numeric strings, exactly where the values allow it.
     ///
-    /// Integers go through `long`. Coercing them to `double` loses precision
-    /// above 2^53, which is inside the range of an ordinary 64-bit id: the
-    /// literals 9007199254740992 and 9007199254740993 round to the same
-    /// double, so a predicate written for one of them selected both. Anything
-    /// with a decimal point or an exponent is a `double` and has no exact
-    /// alternative.
+    /// Whole numbers are compared digit by digit, at any size. Coercing them
+    /// to `double` loses precision above 2^53, which is inside the range of an
+    /// ordinary 64-bit id -- 9007199254740992 and 9007199254740993 are the
+    /// same double, so a predicate written for one selected both -- and a
+    /// `long` only moves the edge to 2^63 rather than removing it. Digits have
+    /// no edge. Anything with a decimal point or an exponent is a `double`,
+    /// which is what it was parsed as and what it has to be compared as.
     ///
     /// - `left`: the value read from the document
     ///
@@ -404,19 +405,73 @@ abstract class AbstractEvaluator implements Evaluator {
     ///
     /// negative, zero or positive, as `compareTo` does
     protected int compareNumbers(String left, String right) {
-        if (isInteger(left) && isInteger(right)) {
-            try {
-                long l = Long.parseLong(left.trim());
-                long r = Long.parseLong(right.trim());
-                return l < r ? -1 : (l > r ? 1 : 0);
-            } catch (NumberFormatException tooBigForALong) {
-                // Falls through to the double comparison below, which is the
-                // best available answer for a value no integer type holds.
-            }
+        String l = left.trim();
+        String r = right.trim();
+        if (isInteger(l) && isInteger(r)) {
+            return compareIntegers(l, r);
         }
-        double l = Double.parseDouble(left.trim());
-        double r = Double.parseDouble(right.trim());
-        return l < r ? -1 : (l > r ? 1 : 0);
+        double dl = Double.parseDouble(l);
+        double dr = Double.parseDouble(r);
+        return dl < dr ? -1 : (dl > dr ? 1 : 0);
+    }
+
+    /// Compares two whole numbers written as text, at any size.
+    ///
+    /// - `left`: an integer literal, possibly signed
+    ///
+    /// - `right`: an integer literal, possibly signed
+    ///
+    /// #### Returns
+    ///
+    /// negative, zero or positive
+    private int compareIntegers(String left, String right) {
+        String leftDigits = significantDigits(left);
+        String rightDigits = significantDigits(right);
+        boolean leftNegative = left.charAt(0) == '-' && leftDigits.length() > 0;
+        boolean rightNegative = right.charAt(0) == '-'
+                && rightDigits.length() > 0;
+        if (leftDigits.length() == 0 && rightDigits.length() == 0) {
+            // Both zero, however each was spelled: 0, -0, 000.
+            return 0;
+        }
+        if (leftDigits.length() == 0) {
+            return rightNegative ? 1 : -1;
+        }
+        if (rightDigits.length() == 0) {
+            return leftNegative ? -1 : 1;
+        }
+        if (leftNegative != rightNegative) {
+            return leftNegative ? -1 : 1;
+        }
+        int magnitude;
+        if (leftDigits.length() != rightDigits.length()) {
+            magnitude = leftDigits.length() < rightDigits.length() ? -1 : 1;
+        } else {
+            magnitude = leftDigits.compareTo(rightDigits);
+            magnitude = magnitude < 0 ? -1 : (magnitude > 0 ? 1 : 0);
+        }
+        return leftNegative ? -magnitude : magnitude;
+    }
+
+    /// The digits of an integer literal, without its sign or leading zeros.
+    ///
+    /// Empty when the value is zero, whichever way it was written.
+    ///
+    /// - `text`: a trimmed integer literal
+    ///
+    /// #### Returns
+    ///
+    /// the significant digits
+    private String significantDigits(String text) {
+        int at = 0;
+        if (at < text.length()
+                && (text.charAt(at) == '-' || text.charAt(at) == '+')) {
+            at++;
+        }
+        while (at < text.length() && text.charAt(at) == '0') {
+            at++;
+        }
+        return text.substring(at);
     }
 
     /// Whether this number is written as a whole number, with no point or
@@ -428,14 +483,16 @@ abstract class AbstractEvaluator implements Evaluator {
     ///
     /// true when the value is an integer literal
     private boolean isInteger(String text) {
-        String value = text.trim();
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
+        if (text.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
             if (c == '.' || c == 'e' || c == 'E') {
                 return false;
             }
         }
-        return value.length() > 0;
+        return true;
     }
 
     /// Utility method for subclasses to determine strip single/double quotes

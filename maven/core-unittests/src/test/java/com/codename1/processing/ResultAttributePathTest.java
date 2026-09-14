@@ -284,6 +284,34 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void anIdTooBigForAnyIntegerTypeStaysExact() {
+        // Past Long.MAX_VALUE as well: a long only moves the edge from 2^53 to
+        // 2^63 rather than removing it, and digits have no edge at all.
+        Result r = Result.fromContent(
+                "<t><p id='9223372036854775808' n='X'/>"
+                + "<p id='9223372036854775809' n='Y'/></t>", Result.XML);
+        String[] found = r.getAsStringArray("/t/p[@id='9223372036854775809']/@n");
+        assertEquals(1, found.length, "two ids beyond long range compared equal");
+        assertEquals("Y", found[0]);
+    }
+
+    @Test
+    void zeroIsZeroHoweverItIsWritten() {
+        // The digit comparison strips a sign and leading zeros, so it has to
+        // get the spellings of zero right.
+        Result r = Result.fromContent(
+                "<t><p id='0' n='plain'/><p id='-0' n='signed'/>"
+                + "<p id='007' n='padded'/></t>", Result.XML);
+        assertEquals(2, r.getAsStringArray("/t/p[@id='0']/@n").length,
+                "0 and -0 are the same number");
+        String[] padded = r.getAsStringArray("/t/p[@id='7']/@n");
+        assertEquals(1, padded.length, "leading zeros changed the value");
+        assertEquals("padded", padded[0]);
+        assertEquals(3, r.getAsStringArray("/t/p[@id > '-1']/@n").length,
+                "a negative bound excluded numbers above it");
+    }
+
+    @Test
     void anIdTooBigForADoubleStaysExact() {
         // 9007199254740992 and 9007199254740993 are the same double, and an
         // id of that size is ordinary. Comparing them as doubles made a
