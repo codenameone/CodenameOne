@@ -159,10 +159,18 @@ class DataSourceTest {
         } finally {
             pool.close();
         }
-        // And the real thing is still refused, spelled either way.
+        // And a PRIVATE in-memory database is still refused a pool.
         assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
-        assertThrows(IOException.class,
-                () -> DataSource.open("file:app?mode=memory&cache=shared", 2));
+        assertThrows(IOException.class, () -> DataSource.open("file:app?mode=memory", 2));
+        // With cache=shared it is not private: every connection sees the same
+        // database, which is the one in-memory spelling a pool works over. This
+        // line asserted the opposite until the shared cache was understood.
+        DataSource shared = DataSource.open("file:app?mode=memory&cache=shared", 2);
+        try {
+            assertEquals(2, shared.getMaxSize());
+        } finally {
+            shared.close();
+        }
     }
 
     @Test
@@ -201,6 +209,44 @@ class DataSourceTest {
         pool.release(borrowed);
         IOException err = assertThrows(IOException.class, () -> pool.borrow());
         assertTrue(err.getMessage().contains("no URL to open another from"), err.getMessage());
+    }
+
+    @Test
+    @DisplayName("every spelling of a private in-memory database is one")
+    void recognisesEveryMemorySpelling() throws Exception {
+        // Each of these gives a connection its OWN database, so a pool of them
+        // hands successive requests different empty ones.
+        assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
+        assertThrows(IOException.class, () -> DataSource.open("file::memory:", 2));
+        assertThrows(IOException.class, () -> DataSource.open("jdbc:sqlite:file::memory:", 2));
+        assertThrows(IOException.class, () -> DataSource.open("file:app?mode=memory", 2));
+        // The SHARED cache is the spelling where several connections see ONE
+        // database, so a pool over it is legitimate and is not refused.
+        DataSource shared = DataSource.open("file::memory:?cache=shared", 2);
+        try {
+            assertEquals(2, shared.getMaxSize());
+        } finally {
+            shared.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a negative busy timeout is refused, and zero still means no wait")
+    void refusesANegativeBusyTimeout(@TempDir File dir) throws Exception {
+        // SQLite reads PRAGMA busy_timeout=-1 as zero, so a mistyped setting
+        // silently disabled the busy handler and made a pool of connections to
+        // one file fail immediately with SQLITE_BUSY.
+        String path = new File(dir, "timeout.db").getAbsolutePath();
+        IOException err = assertThrows(IOException.class,
+                () -> DataSource.open(path, 2, -1, 1000));
+        assertTrue(err.getMessage().contains("cannot "), err.getMessage());
+        // Zero is a value, not a mistake.
+        DataSource pool = DataSource.open(path, 2, 0, 1000);
+        try {
+            pool.execute("CREATE TABLE t (a INTEGER)", null);
+        } finally {
+            pool.close();
+        }
     }
 
     @Test

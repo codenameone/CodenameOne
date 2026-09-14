@@ -137,8 +137,15 @@ public final class DataSource {
         if(url == null || url.length() == 0) {
             throw new IOException("No database URL");
         }
-        if(size < 0 || borrowTimeoutMillis < 0) {
-            throw new IOException("A pool size and a borrow timeout cannot be negative");
+        if(size < 0 || borrowTimeoutMillis < 0 || busyTimeoutMillis < 0) {
+            // A NEGATIVE BUSY TIMEOUT reaches SQLite as PRAGMA busy_timeout=-1,
+            // which it reads as zero: the busy handler is disabled and a pool of
+            // connections to one file fails immediately with SQLITE_BUSY instead
+            // of waiting. A mistyped setting should say so rather than quietly
+            // becoming the opposite of what it looks like. Zero is still the
+            // documented "do not wait".
+            throw new IOException("A pool size, a borrow timeout and a busy timeout cannot "
+                    + "be negative; use 0 for no wait");
         }
         // The FIRST connection is opened here, and it is what decides the engine:
         // the alternative is parsing the URL a second time in this class and
@@ -526,8 +533,21 @@ public final class DataSource {
             return true;
         }
         int query = path.indexOf('?');
+        // SQLite's URI spelling of the same thing. "file::memory:" is a PRIVATE
+        // in-memory database, one per connection, exactly like ":memory:".
+        String withoutQuery = query < 0 ? path : path.substring(0, query);
+        boolean fileMemory = "file::memory:".equals(withoutQuery);
         if(query < 0) {
+            return fileMemory;
+        }
+        // ...unless the URI asks for the shared cache, which is what makes
+        // several connections see ONE in-memory database. That is a pool that
+        // works, so it is not refused.
+        if(hasSharedCache(path, query)) {
             return false;
+        }
+        if(fileMemory) {
+            return true;
         }
         int at = query + 1;
         while(at < path.length()) {
@@ -536,6 +556,32 @@ public final class DataSource {
                 end = path.length();
             }
             if(end - at == 11 && path.regionMatches(at, "mode=memory", 0, 11)) {
+                return true;
+            }
+            at = end + 1;
+        }
+        return false;
+    }
+
+    /**
+     * Whether a SQLite URI asks for the shared cache, which is what lets several
+     * connections open the SAME in-memory database.
+     *
+     * <p>Worth the extra look: without it every file::memory: URL would be
+     * refused a pool, including the one spelling that genuinely supports one.
+     *
+     * <p>The translated arm hands the whole string to sqlite3_open, which parses
+     * a URI only when the build asks it to -- so there such a URL is a file with
+     * a startling name, and a pool of one over it loses nothing.
+     */
+    private static boolean hasSharedCache(String path, int query) {
+        int at = query + 1;
+        while(at < path.length()) {
+            int end = path.indexOf('&', at);
+            if(end < 0) {
+                end = path.length();
+            }
+            if(end - at == 12 && path.regionMatches(at, "cache=shared", 0, 12)) {
                 return true;
             }
             at = end + 1;

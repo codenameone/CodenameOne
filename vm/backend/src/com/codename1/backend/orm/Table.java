@@ -71,7 +71,15 @@ final class Table {
         for(int iter = 0 ; iter < columns.length ; iter++) {
             quotedColumns[iter] = dialect.quote(columns[iter].getColumn());
             for(int earlier = 0 ; earlier < iter ; earlier++) {
-                if(columns[earlier].getColumn().equals(columns[iter].getColumn())) {
+                // IGNORING CASE, because the strictest engine decides: SQLite
+                // and MySQL treat "name" and "NAME" as one column even when both
+                // are quoted, while PostgreSQL keeps them apart. A mapping only
+                // PostgreSQL accepts is not a portable mapping.
+                //
+                // equalsIgnoreCase, never toLowerCase: this runtime has no
+                // Locale to ask for the root one, and on a Turkish device an I
+                // folds to a dotless i.
+                if(columns[earlier].getColumn().equalsIgnoreCase(columns[iter].getColumn())) {
                     // Two fields on one column. Every statement would name it
                     // twice: the CREATE TABLE is refused outright, and against a
                     // schema the ORM did not create, a read puts the same value
