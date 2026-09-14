@@ -38,27 +38,19 @@ import com.codename1.io.rest.Response;
 import com.codename1.io.rest.RestClients;
 import com.codename1.util.OnComplete;
 
-// tag::appendix-goal-generate-openapi-java-001[]
 @RestClient
-public interface PetApi {
+public interface StoreApi {
 
-    @POST("/pet")
-    void addPet(@Body com.example.petstore.model.Pet body, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Pet>> callback);
+    @POST("/store/order")
+    void placeOrder(@Body com.example.petstore.model.Order body, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Order>> callback);
 
-    @PUT("/pet")
-    void updatePet(@Body com.example.petstore.model.Pet body, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Pet>> callback);
+    @GET("/store/order/{orderId}")
+    void getOrderById(@Path("orderId") Long orderId, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Order>> callback);
 
-    @GET("/pet/findByStatus")
-    void findPetsByStatus(@Query("status") String status, @Header("Authorization") String bearerToken, OnComplete<Response<java.util.List<com.example.petstore.model.Pet>>> callback);
+    @DELETE("/store/order/{orderId}")
+    void deleteOrder(@Path("orderId") Long orderId, @Header("Authorization") String bearerToken, OnComplete<Response<String>> callback);
 
-    @GET("/pet/{petId}")
-    void getPetById(@Path("petId") Long petId, @Header("Authorization") String bearerToken, OnComplete<Response<com.example.petstore.model.Pet>> callback);
-
-    @DELETE("/pet/{petId}")
-    void deletePet(@Path("petId") Long petId, @Header("Authorization") String bearerToken, OnComplete<Response<String>> callback);
-
-    static PetApi of(String baseUrl) {
-        return RestClients.create(PetApi.class, baseUrl);
+    static StoreApi of(String baseUrl) {
+        return RestClients.create(StoreApi.class, baseUrl);
     }
 }
-// end::appendix-goal-generate-openapi-java-001[]

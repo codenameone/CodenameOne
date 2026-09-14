@@ -26,7 +26,5 @@ package com.example.petstore.model;
 import com.codename1.annotations.JsonProperty;
 import com.codename1.annotations.Mapped;
 
-// tag::appendix-goal-generate-openapi-java-002[]
 @Mapped
-public record Pet(@JsonProperty("id") Long id, @JsonProperty("name") String name, @JsonProperty("category") com.example.petstore.model.Category category, @JsonProperty("photoUrls") java.util.List<String> photoUrls, @JsonProperty("tags") java.util.List<com.example.petstore.model.Category> tags, @JsonProperty("status") String status) {}
-// end::appendix-goal-generate-openapi-java-002[]
+public record Category(@JsonProperty("id") Long id, @JsonProperty("name") String name) {}
