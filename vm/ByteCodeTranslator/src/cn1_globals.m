@@ -5579,14 +5579,23 @@ static void cn1BibopExitReport(void) {
     // reclaimed legacy object -- in the batch-program exit case it exists to
     // measure, which is the one case where it would be believed.
     //
-    // Waiting the cycle OUT is the established shape here (see the ablation arm in
-    // the pending-table stall) and is what this needs: gcCurrentlyRunning covers
-    // mark and sweep, so once it clears, allObjectsInHeap and the page fields are
-    // nobody else's. The wait is BOUNDED -- a diagnostic must not turn a hung
-    // collector into a hung exit -- and on expiry the census is SKIPPED rather than
-    // run anyway, because a report read off a heap being swept is worse than no
-    // report: it looks like data.
+    // STOP the loop before waiting on it. Waiting for gcCurrentlyRunning to fall was
+    // check-then-act and did not close the race: System's GC thread runs
+    // `while(gcShouldLoop) { gcMarkSweep(); wait(idle); }`, so it can raise the flag
+    // again the instant the wait expires -- during the gap before these walks start,
+    // or while they run. Clearing gcShouldLoop first means no NEW cycle can begin,
+    // and only then is waiting out the in-flight one sufficient.
+    //
+    // The flag is set directly rather than through System.stopGC(): this runs from
+    // atexit, where calling back into Java is a larger promise than a diagnostic
+    // should make. The GC thread observes it on its next loop test -- immediately if
+    // it is idling, after the current cycle if it is collecting -- and exits, which
+    // is exactly the ordering needed here.
+    set_static_java_lang_System_gcShouldLoop(JAVA_FALSE);
     {
+        // BOUNDED: a diagnostic must not turn a hung collector into a hung exit. On
+        // expiry the census is SKIPPED rather than run anyway, because a report read
+        // off a heap being swept is worse than no report -- it looks like data.
         int waitMs = 0;
         while(gcCurrentlyRunning && waitMs < 2000) {
             usleep(1000);
