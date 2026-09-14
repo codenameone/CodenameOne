@@ -277,4 +277,42 @@ class ConfigTest {
             properties.setReadable(true, true);
         }
     }
+
+    @Test
+    @DisplayName("the profile named in the base file is expanded before it picks a file")
+    void theBaseFileProfileIsExpanded(@TempDir File dir) throws Exception {
+        // A project whose default is development says so once, in the file --
+        // and says it with a placeholder so one deployment can override it.
+        // Without the expansion the literal text became the profile name, the
+        // server looked for a file called
+        // application-${CN1_TEST_ABSENT_PROFILE:dev}.properties, found none, and
+        // ran on a profile that is not a development one: no in-memory
+        // datasource, no table creation, and a filename nobody reads as the
+        // only clue.
+        //
+        // The placeholder resolves through its FALLBACK, so this needs no
+        // environment variable and cannot be disturbed by one.
+        write(dir, "application.properties",
+                "cn1.profile=${CN1_TEST_ABSENT_PROFILE:dev}\n");
+        write(dir, "application-dev.properties", "cn1.server.port=4321\n");
+        Config config = Config.load(dir.getAbsolutePath());
+        assertEquals("dev", config.getProfile());
+        // And the file that name selects was actually read.
+        assertEquals(4321, config.getInt(Config.SERVER_PORT, 0));
+        assertTrue(config.isDevelopmentProfile());
+    }
+
+    @Test
+    @DisplayName("a directory where the properties file belongs is a configuration error")
+    void aDirectoryIsNotAnAbsentFile(@TempDir File dir) throws Exception {
+        // openRead gives a descriptor for a directory -- StaticFiles needs that,
+        // to stat it and retry at the index -- so a bad ConfigMap or volume
+        // mount that put a directory here read as "no such file" and every
+        // file-based setting silently became an environment default.
+        assertTrue(new File(dir, "application.properties").mkdirs());
+        IOException err = assertThrows(IOException.class,
+                () -> Config.load(dir.getAbsolutePath()));
+        assertTrue(err.getMessage().indexOf("application.properties") >= 0, err.getMessage());
+        assertTrue(err.getMessage().indexOf("directory") >= 0, err.getMessage());
+    }
 }

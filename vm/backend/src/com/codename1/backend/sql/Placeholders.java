@@ -260,7 +260,27 @@ final class Placeholders {
                 // on every dialect: the other two reject the word outright, so
                 // counting the tuples of a statement they will refuse anyway
                 // changes nothing.
-                valuesAt = at + (isWord(sql, at, "values") ? 6 : 5);
+                int afterWord = at + (isWord(sql, at, "values") ? 6 : 5);
+                int tuple = skipBlanks(sql, afterWord, nestedComments, backslashEscapes,
+                        hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                        bracketIdentifiers, executableComments);
+                // A TUPLE HAS TO FOLLOW, or this is not the row clause.
+                //
+                // PostgreSQL's "OVERRIDING USER VALUE" and "OVERRIDING SYSTEM
+                // VALUE" put the singular keyword in front of the real VALUES,
+                // and latching the first match made
+                // "INSERT INTO t(id, a) OVERRIDING USER VALUE VALUES (?,?), (?,?)"
+                // count one row for a statement that writes two -- so the
+                // multi-row check passed and PostgreSQL only objected after both
+                // rows had committed, from the number of RETURNING rows.
+                //
+                // "DEFAULT VALUES" has nothing after it and still reaches
+                // withoutATupleList, which answers one for it.
+                if(tuple < length && (sql.charAt(tuple) == '('
+                        || ((sql.charAt(tuple) == 'r' || sql.charAt(tuple) == 'R')
+                                && isWord(sql, tuple, "row")))) {
+                    valuesAt = afterWord;
+                }
             }
             at++;
         }
