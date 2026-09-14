@@ -105,11 +105,19 @@ public final class Postgres {
      * that means anything against an attacker.
      */
     public static Postgres connect(String host, int port, String database, String user,
-            String password, String sslMode, String caFile, int timeoutMillis) throws IOException {
+            String password, String sslMode, String caFile, int timeoutMillis,
+            int socketTimeoutMillis) throws IOException {
         // BEFORE THE SOCKET: a mode this code does not implement is a typo, and
         // reading it as prefer is how "require" spelled wrong accepts plaintext.
         SqlLimits.requireSslMode(sslMode);
         Tcp connection = Tcp.connect(host, port <= 0 ? 5432 : port, timeoutMillis);
+        // AFTER THE CONNECT, and before anything is said on it: the deadline
+        // governs the conversation, which is where a peer can stall a worker.
+        // A TLS upgrade replaces the Java SE socket, and Tcp.rebind carries the
+        // deadline across, so this is set once and stays set.
+        if(socketTimeoutMillis > 0) {
+            connection.setReadTimeout(socketTimeoutMillis);
+        }
         try {
             Wire wire = new Wire(connection);
             boolean plaintextByChoice = "disable".equals(sslMode);

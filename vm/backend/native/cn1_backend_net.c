@@ -252,6 +252,43 @@ JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_lon
  * that is a different runtime: a keepalive here would be cargo from a VM with
  * different roots.
  */
+/*
+ * A receive and send deadline for this connection, in milliseconds.
+ *
+ * Set ONCE, after connecting, and left in place -- which is what SO_RCVTIMEO is
+ * for and how ServerSocket_setTimeoutImpl already uses it. The alternative this
+ * file rejects elsewhere is setting and restoring it around every wait, and that
+ * argument is about a poll between requests rather than about a standing
+ * deadline on a connection.
+ *
+ * Without one, a peer that finishes connecting and then stops answering holds
+ * the calling thread for as long as it likes: recv() on a blocking descriptor
+ * has no deadline of its own. For a database connection that thread is a request
+ * worker, or a virtual thread's carrier, so a handful of stalled connections is
+ * the whole server.
+ *
+ * Zero means no deadline, which is what every mainstream database client
+ * defaults to and why nothing here imposes one uninvited.
+ */
+JAVA_INT com_codename1_backend_Tcp_setReadTimeoutImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT millis) {
+    int fd = cn1BackendFd(handle);
+    struct timeval tv;
+    if(fd < 0) {
+        return -1;
+    }
+    tv.tv_sec = millis / 1000;
+    tv.tv_usec = (millis % 1000) * 1000;
+    if(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)) != 0) {
+        return -1;
+    }
+    /* The send side too: a peer that stops reading stalls a write just as a peer
+       that stops writing stalls a read. */
+    if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv)) != 0) {
+        return -1;
+    }
+    return 0;
+}
+
 JAVA_INT com_codename1_backend_Tcp_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
     int fd = cn1BackendFd(handle);
     JAVA_ARRAY_BYTE* data;

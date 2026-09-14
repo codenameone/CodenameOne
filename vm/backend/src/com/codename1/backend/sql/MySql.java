@@ -85,10 +85,18 @@ public final class MySql {
      * `sslMode` is "require", "prefer" or "disable", as in {@link Postgres}.
      */
     public static MySql connect(String host, int port, String database, String user,
-            String password, String sslMode, String caFile, int timeoutMillis) throws IOException {
+            String password, String sslMode, String caFile, int timeoutMillis,
+            int socketTimeoutMillis) throws IOException {
         // BEFORE THE SOCKET, for the reason Postgres gives one engine over.
         SqlLimits.requireSslMode(sslMode);
         Tcp connection = Tcp.connect(host, port <= 0 ? 3306 : port, timeoutMillis);
+        // AFTER THE CONNECT, and before anything is said on it: the deadline
+        // governs the conversation, which is where a peer can stall a worker.
+        // A TLS upgrade replaces the Java SE socket, and Tcp.rebind carries the
+        // deadline across, so this is set once and stays set.
+        if(socketTimeoutMillis > 0) {
+            connection.setReadTimeout(socketTimeoutMillis);
+        }
         try {
             MySql session = new MySql(new Wire(connection));
             session.handshake(host, database, user, password, sslMode, caFile);

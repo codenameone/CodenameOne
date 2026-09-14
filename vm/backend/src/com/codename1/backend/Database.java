@@ -130,13 +130,15 @@ public final class Database {
             Url parsed = Url.parse(url, 5432);
             return new Database(null, Postgres.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
-                    parsed.caFile, parsed.timeoutMillis), null, parsed.describe("postgres"));
+                    parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
+                    null, parsed.describe("postgres"));
         }
         if(hasScheme(url, "mysql://") || hasScheme(url, "mariadb://")) {
             Url parsed = Url.parse(url, 3306);
             return new Database(null, null, MySql.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
-                    parsed.caFile, parsed.timeoutMillis), parsed.describe("mysql"));
+                    parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
+                    parsed.describe("mysql"));
         }
         return new Database(Db.open(url), null, null, "sqlite:" + url);
     }
@@ -332,6 +334,7 @@ public final class Database {
         String sslMode = "prefer";
         String caFile;
         int timeoutMillis = 10000;
+        int socketTimeoutMillis;
 
         static Url parse(String url, int defaultPort) throws IOException {
             Url out = new Url();
@@ -461,6 +464,29 @@ public final class Database {
                     if(out.timeoutMillis < 0) {
                         throw new IOException("connectTimeout must not be negative: '"
                                 + value + "'. Use 0 for the platform default.");
+                    }
+                } else if("socketTimeout".equals(key)) {
+                    // A DEADLINE ON THE CONVERSATION, not on reaching the host.
+                    // connectTimeout is spent by the time a query goes out, and a
+                    // peer that answers the handshake and then stops replying
+                    // holds the calling thread for as long as it likes -- a
+                    // request worker, or a virtual thread's carrier, so a few
+                    // stalled connections are the whole server.
+                    //
+                    // Default 0, meaning none, because that is what pgjdbc and
+                    // MySQL's own client default to, for a reason worth keeping:
+                    // a legitimate query can take longer than any number picked
+                    // here, and aborting one is a worse failure than the hang it
+                    // prevents. A deployment that knows its queries sets it.
+                    try {
+                        out.socketTimeoutMillis = Integer.parseInt(value.trim());
+                    } catch (NumberFormatException err) {
+                        throw new IOException("socketTimeout must be a number of "
+                                + "milliseconds, not '" + value + "'");
+                    }
+                    if(out.socketTimeoutMillis < 0) {
+                        throw new IOException("socketTimeout must not be negative: '"
+                                + value + "'. Use 0 for no deadline.");
                     }
                 }
             }

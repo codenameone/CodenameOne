@@ -239,6 +239,37 @@ public final class Tcp {
     /**
      * Reads up to length bytes. Returns -1 at end of stream, matching InputStream.
      */
+    /**
+     * A receive and send deadline for this connection, in milliseconds; 0 for
+     * none.
+     *
+     * <p>Set after connecting and left in place. Without one, a peer that
+     * finishes connecting and then stops answering holds the calling thread for
+     * as long as it likes -- recv() on a blocking descriptor has no deadline of
+     * its own -- and for a database connection that thread is a request worker,
+     * or a virtual thread's carrier. A few stalled connections are then the whole
+     * server.
+     *
+     * <p>Claimed like any other operation, so a close() during it cannot hand the
+     * descriptor number to somebody else while setsockopt is looking at it.
+     */
+    public void setReadTimeout(int millis) throws IOException {
+        if(millis < 0) {
+            throw new IllegalArgumentException("read timeout must not be negative: "
+                    + millis);
+        }
+        checkOpen();
+        long[] claimed = new long[1];
+        claim(claimed);
+        try {
+            if(setReadTimeoutImpl(claimed[0], millis) != 0) {
+                throw new IOException("Could not set the connection's read timeout");
+            }
+        } finally {
+            release();
+        }
+    }
+
     public int read(byte[] buffer, int offset, int length) throws IOException {
         checkOpen();
         checkRange(buffer, offset, length);
@@ -348,6 +379,8 @@ public final class Tcp {
 
     private static native long connectImpl(String host, int port, int timeoutMillis);
     private static native int readImpl(long handle, byte[] buffer, int offset, int length);
+
+    private static native int setReadTimeoutImpl(long handle, int millis);
     private static native int writeImpl(long handle, byte[] buffer, int offset, int length);
     private static native int closeImpl(long handle);
     private static native long startTlsImpl(long handle, String host, String caFile);

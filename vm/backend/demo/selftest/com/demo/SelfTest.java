@@ -2732,6 +2732,58 @@ public class SelfTest {
     }
 
     /**
+     * A database peer that answers the handshake and then stops does not hold the
+     * caller for ever.
+     *
+     * <p>connectTimeout is spent by the time a query goes out. Past that, a read
+     * on a blocking descriptor has no deadline of its own, so a peer that stalls
+     * mid-conversation holds the calling thread -- a request worker, or a virtual
+     * thread's carrier -- until the process ends. socketTimeout is the deadline
+     * for the conversation, and it defaults to none because a legitimate query
+     * can outlast any number picked here.
+     *
+     * <p>The stub accepts and says nothing at all, so the driver stalls waiting
+     * for the server's first word. What is asserted is that the wait ENDS, and
+     * roughly when: a failure that takes the stub's whole twenty seconds is the
+     * thing being ruled out.
+     */
+    private static void aStalledDatabasePeerDoesNotHoldTheCaller() throws Exception {
+        final ServerSocket silent = ServerSocket.bind("127.0.0.1", 0, 1);
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = silent.accept();
+                    Thread.sleep(20000);
+                } catch (Exception ignored) {
+                    // The client giving up is the expected ending.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        long started = System.currentTimeMillis();
+        String outcome;
+        try {
+            Database db = Database.open("postgres://u:pw@127.0.0.1:" + silent.getPort()
+                    + "/db?sslmode=disable&connectTimeout=5000&socketTimeout=1500");
+            db.close();
+            outcome = "connected to a peer that said nothing";
+        } catch (Exception expected) {
+            long spent = System.currentTimeMillis() - started;
+            outcome = spent < 8000 ? "gave up in time" : "gave up after " + spent + "ms";
+        } finally {
+            silent.close();
+        }
+        stub.join(5000);
+        check("a stalled database peer does not hold the caller", "gave up in time",
+                outcome);
+    }
+
+    /**
      * A peer that accepts and then says nothing does not hold a handler for ever.
      *
      * <p>connectTimeout is spent reaching the port. The handshake after it had no
@@ -4658,7 +4710,7 @@ public class SelfTest {
     private static String sslModeRefused(String mode) {
         try {
             com.codename1.backend.sql.Postgres.connect("127.0.0.1", 1, "db", "u", "pw",
-                    mode, null, 1000).close();
+                    mode, null, 1000, 0).close();
             return "accepted";
         } catch (Exception err) {
             String message = String.valueOf(err.getMessage());
@@ -5507,6 +5559,7 @@ public class SelfTest {
         oneReadyDescriptorIsOneSlot();
         aTunableBelowItsFloorTakesTheDefault();
         aStalledPeerDoesNotHoldTheHandshake();
+        aStalledDatabasePeerDoesNotHoldTheCaller();
         aResponsePastTheClientCeilingIsRefused();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();

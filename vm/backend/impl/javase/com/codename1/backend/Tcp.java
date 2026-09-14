@@ -62,7 +62,17 @@ public final class Tcp {
     }
 
     private void rebind(Socket replacement) throws IOException {
+        // THE DEADLINE COMES ACROSS. A TLS upgrade replaces the socket, and a
+        // read deadline set before it would have been left on the plaintext one
+        // that nothing reads from again -- so a connection that asked to be
+        // bounded silently stopped being, at exactly the point it started
+        // carrying anything worth protecting. Carried here rather than re-applied
+        // by each caller, so a caller that upgrades cannot forget.
+        int deadline = socket == null ? 0 : socket.getSoTimeout();
         this.socket = replacement;
+        if(deadline > 0) {
+            replacement.setSoTimeout(deadline);
+        }
         this.in = replacement.getInputStream();
         this.out = replacement.getOutputStream();
     }
@@ -217,6 +227,22 @@ public final class Tcp {
             throw new IOException("Could not build a trust store from " + caFile
                     + ": " + err.getMessage());
         }
+    }
+
+    /**
+     * A receive deadline for this connection, in milliseconds; 0 for none.
+     *
+     * <p>The packaged arm sets SO_RCVTIMEO and SO_SNDTIMEO; an SSLSocket here
+     * expresses only the receive half, through setSoTimeout, and that is said
+     * rather than implied. Without one, a peer that finishes connecting and then
+     * stops answering holds the calling thread indefinitely.
+     */
+    public void setReadTimeout(int millis) throws IOException {
+        if(millis < 0) {
+            throw new IllegalArgumentException("read timeout must not be negative: "
+                    + millis);
+        }
+        socket.setSoTimeout(millis);
     }
 
     public int read(byte[] buffer, int offset, int length) throws IOException {
