@@ -70,23 +70,24 @@ class AttributeEvaluator extends AbstractEvaluator {
         // "[@rank]", the documented way to select the elements that carry an
         // attribute, matched nothing at all and said nothing about it.
         String name = expr.startsWith("@") ? expr.substring(1) : expr;
-        // The child counts as well, for the reason the absence test looks at
-        // one: a JSON document has no attributes, and the field an attribute
-        // expression names is a child there. Without this, "[@rank]" and
-        // "[@rank=null]" -- which are complements -- disagreed on JSON, one
-        // matching nothing and the other matching correctly.
-        if (element.getAttribute(name) != null || hasChild(element, name)) {
+        if (element.getAttribute(name) != null || hasJsonField(element, name)) {
             return element;
         }
         return super.evaluateSingle(element, expr);
     }
 
 
-    /// Whether `element` carries a child of this name.
+    /// Whether this JSON element carries a field of this name.
     ///
-    /// The JSON half of "does this element have it?": a document parsed from
-    /// JSON has no attributes at all, and the field an attribute expression
-    /// names is a child there.
+    /// The JSON half of "does this element have it?". A document parsed from
+    /// JSON has no attributes at all -- MapContent.getAttribute() answers null
+    /// for every name -- and the field an attribute expression names is a
+    /// child there.
+    ///
+    /// Restricted to JSON on purpose. XML draws the distinction the expression
+    /// language does: `[@rank]` asks about an attribute and `[rank]` asks
+    /// about a child element, and reading a child here would make the first
+    /// match an element that only has the second.
     ///
     /// - `element`: the element to ask
     ///
@@ -94,8 +95,11 @@ class AttributeEvaluator extends AbstractEvaluator {
     ///
     /// #### Returns
     ///
-    /// true when a child of that name exists
-    private static boolean hasChild(StructuredContent element, String name) {
+    /// true when this is a JSON element carrying a field of that name
+    private static boolean hasJsonField(StructuredContent element, String name) {
+        if (!(element instanceof MapContent)) {
+            return false;
+        }
         java.util.List children = element.getChildren(name);
         return children != null && !children.isEmpty();
     }
@@ -168,13 +172,13 @@ class AttributeEvaluator extends AbstractEvaluator {
         // Unquoted, because 'null' in quotes is a string the attribute might
         // really hold.
         //
-        // A JSON document has no attributes: HashtableContent.getAttribute()
-        // answers null for every name, and the guide says so -- an attribute
-        // selects the child under that name there. Absence therefore has to
-        // mean no attribute AND no such child, or this predicate matched every
-        // object in a JSON document, including the ones that carry the field.
+        // A JSON document has no attributes: MapContent.getAttribute() answers
+        // null for every name, and the field an attribute expression names is
+        // a child there. Absence therefore has to mean no attribute AND no
+        // such field, or this predicate matched every object in a JSON
+        // document, including the ones that carry the field.
         if ("null".equals(rvalue)) {
-            return attr == null && !hasChild(element, lvalue) ? element : null;
+            return attr == null && !hasJsonField(element, lvalue) ? element : null;
         }
         if (attr == null) {
             return null;

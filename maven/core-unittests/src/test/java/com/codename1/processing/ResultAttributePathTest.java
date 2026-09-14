@@ -124,6 +124,31 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void xmlKeepsAttributesAndChildrenApart() {
+        // The JSON fallback must not reach XML: an element there can carry a
+        // "rank" child and no rank attribute, and "[@rank]" asks about the
+        // attribute.
+        Result r = Result.fromContent(
+                "<t><player id='1'><rank>1</rank></player>"
+                + "<player id='2' rank='2'/></t>", Result.XML);
+
+        String[] byAttribute = r.getAsStringArray("//player[@rank]/@id");
+        assertEquals(1, byAttribute.length, "[@rank] matched an element whose rank is a child");
+        assertEquals("2", byAttribute[0]);
+
+        // And a bare "[rank]" is not the other half of the pair: the factory
+        // has no branch for a name with no comparison in it, so the child
+        // existence form the guide once promised does not exist.
+        try {
+            r.getAsStringArray("//player[rank]/@id");
+            fail("a bare child name was accepted");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage().indexOf("comparator") >= 0,
+                    "wrong diagnosis: " + expected.getMessage());
+        }
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for

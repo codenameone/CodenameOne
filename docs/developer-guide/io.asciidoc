@@ -706,7 +706,7 @@ Here you can extract the headers one by one to handle complex headers such as co
 
 ===== Error handling
 
-As you noticed above practically all the methods in the `ConectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
+As you noticed above practically all the methods in the `ConnectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
 
 There are two distinct places where you can handle a networking error:
 
@@ -1033,8 +1033,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 NOTE: Logical not (`!`) operators aren't implemented.
 
-A child node's existence is tested the same way, by naming it with no
-comparison: `+//player[middlename]/@id+` selects the players that have one.
+There's no matching test for a child node. A predicate that names one with no
+comparison in it -- `+//player[middlename]+` -- is rejected with
+`Could not create a comparator`, so test for a child by comparing it to
+something, or select the child and work from what comes back.
 
 Keep in mind that the Codename One path expression language isn't a full implementation of XPath 1.0, but does already handle many of the most useful features of the specification.
 
