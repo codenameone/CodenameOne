@@ -82,6 +82,7 @@ public class OrmCheck {
                 anUpsertThatUpdatesStillAnswers(pool);
                 aMultiRowInsertIsRefused(pool);
                 anExactNumericKeyIsStillAKey(pool);
+                aValueTheFieldCannotHoldIsRefused(em, pool);
             } finally {
                 notes.dropTable();
             }
@@ -405,6 +406,53 @@ public class OrmCheck {
             pool.execute("DROP TABLE IF EXISTS cn1_numeric_key", null);
             pool.execute("DROP SEQUENCE IF EXISTS cn1_numeric_seq", null);
         }
+    }
+
+    /**
+     * A row the entity cannot represent is refused rather than rounded, read
+     * through the generated dao.
+     *
+     * <p>SQLite only, and not for want of trying: it is the engine with
+     * AFFINITIES rather than types, so an INTEGER column accepts 12.5 and a
+     * value past an int, and another client or a migration can put either there
+     * any day. PostgreSQL and MySQL reject both at the insert, which is the same
+     * outcome one step earlier.
+     */
+    private static void aValueTheFieldCannotHoldIsRefused(EntityManager em, DataSource pool)
+            throws Exception {
+        if(!"sqlite".equals(pool.dialect().getName())) {
+            return;
+        }
+        Dao<Note> notes = em.dao(Note.class);
+        notes.query().delete();
+        // Written as raw SQL, the way a migration or another client would.
+        pool.execute("INSERT INTO cn1_notes (title, views, pinned, score, \"createdAt\") "
+                + "VALUES (?, 12.5, 0, 0, 0)", new Object[] {"fractional"});
+        String refusedFraction;
+        try {
+            notes.findAll();
+            refusedFraction = "accepted";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            refusedFraction = message.indexOf("fractional part") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("a fractional value in an int field is refused", "refused", refusedFraction);
+
+        notes.query().delete();
+        pool.execute("INSERT INTO cn1_notes (title, views, pinned, score, \"createdAt\") "
+                + "VALUES (?, 2147483648, 0, 0, 0)", new Object[] {"oversized"});
+        String refusedRange;
+        try {
+            notes.findAll();
+            refusedRange = "accepted";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            refusedRange = message.indexOf("outside the range") >= 0
+                    ? "refused" : "other: " + message;
+        }
+        check("a value past an int field is refused, not wrapped", "refused", refusedRange);
+        notes.query().delete();
     }
 
     /**
