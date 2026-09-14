@@ -169,6 +169,26 @@ class GcHeapIntegrityIntegrationTest {
         assertTrue(!clean.output.contains("DANGLING REFERENCE"),
                 "The sweep left a surviving object pointing at reclaimed memory.\n"
                         + violationExcerpt(clean.output));
+        // A recycled slot is NOT dangling: it holds a live, valid object, just not
+        // the one the field pointed at. That is why the dangling check above passed
+        // through the failure a Linux core caught -- ArrayList.add running on a
+        // charts.compat.Canvas. cn1GcVerifyFieldType asks the other question, whether
+        // what a field HOLDS is assignable to what it was DECLARED as.
+        assertTrue(!clean.output.contains("TYPE CONFUSION"),
+                "A reference field holds an object of an unrelated type -- a live "
+                        + "object was reclaimed and its slot recycled.\n"
+                        + violationExcerpt(clean.output));
+        // And prove that detector RAN. Inverting its condition on the first version
+        // produced no output whatever, which is how it was found to be checking
+        // nothing; silence from a detector that never executes is indistinguishable
+        // from silence from a clean heap.
+        java.util.regex.Matcher ft = java.util.regex.Pattern
+                .compile("FIELDTYPE checks=(\\d+) findings=(\\d+)").matcher(clean.output);
+        assertTrue(ft.find(),
+                "the field-type verifier never reported, so it did not run: " + clean.output);
+        assertTrue(Long.parseLong(ft.group(1)) > 0,
+                "the field-type verifier ran but checked no field, which is not a pass: "
+                        + ft.group(0));
         assertTrue(clean.output.contains("GC_VERIFY_APP_DONE"),
                 "The workload should run to completion. Output: " + clean.output);
         // A workload that never finishes a collection cycle never runs the

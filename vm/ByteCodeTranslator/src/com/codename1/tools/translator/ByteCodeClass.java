@@ -1227,6 +1227,36 @@ public class ByteCodeClass {
                     b.append(", objInstance->").append(REFERENCE_CLASS).append("_cn1Strength);\n");
                     continue;
                 }
+                // TYPE-IDENTITY CHECK, verifier builds only.
+                //
+                // CN1_GC_VERIFY already proves every traced reference RESOLVES, which
+                // is why a reclaimed-and-recycled slot slips past it: the slot holds a
+                // perfectly valid object, just not the one the field was pointing at.
+                // A Linux suite core caught the consequence -- ArrayList.add running on
+                // an object whose class word said charts.compat.Canvas, reading the
+                // list's backing-array slot out of two of Canvas's int fields.
+                //
+                // The field's DECLARED type is known here and thrown away, so the
+                // collector has no way to notice. Passing it lets the verifier ask
+                // whether what the field holds is assignable to what it was declared
+                // as, which is exactly the question a recycled slot answers wrongly --
+                // and it names the field, instead of leaving a SIGSEGV in an unrelated
+                // method a whole cycle later.
+                //
+                // Arrays are skipped for now: their id mapping is dimensional and the
+                // failure this was written for was a plain object field.
+                // getRuntimeDescriptor() is the mangled type for a plain object field
+                // and carries "[]" for an array, which is how arrays are excluded.
+                String fldType = fld.getRuntimeDescriptor();
+                if (fldType != null && fldType.indexOf('[') < 0
+                        && Parser.getClassObject(fldType) != null) {
+                    b.append("#ifdef CN1_GC_VERIFY\n");
+                    b.append("    cn1GcVerifyFieldType(threadStateData, objToMark, objInstance->");
+                    b.append(fld.getClsName()).append("_").append(fld.getFieldName());
+                    b.append(", cn1_class_id_").append(fldType);
+                    b.append(", \"").append(clsName).append(".").append(fld.getFieldName()).append("\");\n");
+                    b.append("#endif\n");
+                }
                 b.append("    gcMarkObject(threadStateData, ");
                 if (fld.isVolatile()) {
                     b.append("atomic_load_explicit(&objInstance->");

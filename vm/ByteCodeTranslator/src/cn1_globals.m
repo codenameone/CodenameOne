@@ -5567,6 +5567,16 @@ static void cn1BibopDoInit() {
 #endif
 }
 
+// Set by the exit census to stop the collector for good. Read by
+// java_lang_System_gcMarkSweep__, which refuses to begin a cycle while it is set --
+// see the note there for why clearing System.gcShouldLoop alone leaves a window.
+//
+// Defined UNCONDITIONALLY although only the census raises it: nativeMethods.m tests
+// it on every cycle, so a build without CN1_ALLOC_CENSUS must still link. The cost
+// is one relaxed-path atomic load per collection, against a flag that is always 0
+// in a shipping build.
+_Atomic int cn1GcFrozenForCensus = 0;
+
 #ifdef CN1_ALLOC_CENSUS
 // Registered from cn1BibopDoInit under CN1_HEAP_REPORT. A batch program usually
 // ends between collections, so the post-sweep reports alone never show the state
@@ -5591,6 +5601,11 @@ static void cn1BibopExitReport(void) {
     // should make. The GC thread observes it on its next loop test -- immediately if
     // it is idling, after the current cycle if it is collecting -- and exits, which
     // is exactly the ordering needed here.
+    // Order matters: raise the freeze BEFORE clearing the loop flag. The freeze is
+    // what a cycle already in flight -- or one whose thread is between the loop test
+    // and gcMarkSweep -- will actually honour; gcShouldLoop only stops the thread
+    // looping round again, and System re-raises it on its start-up path.
+    atomic_store_explicit(&cn1GcFrozenForCensus, 1, memory_order_release);
     set_static_java_lang_System_gcShouldLoop(JAVA_FALSE);
     {
         // BOUNDED: a diagnostic must not turn a hung collector into a hung exit. On
@@ -10012,7 +10027,13 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
 // after the sweep, before the collector hands the world back, so the freed
 // memory it is looking for has had the least possible chance of being
 // recycled into something plausible again.
+static _Atomic long cn1GcFieldTypeChecks = 0;
+static _Atomic long cn1GcFieldTypeFindings = 0;
+
 static void cn1GcVerifySummary(void) {
+    fprintf(stderr, "[GC-VERIFY] FIELDTYPE checks=%ld findings=%ld\n",
+            atomic_load_explicit(&cn1GcFieldTypeChecks, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcFieldTypeFindings, memory_order_relaxed));
     fprintf(stderr, "[GC-VERIFY] SUMMARY passes=%ld refs=%ld violations=%ld earlyFreed=%ld resurrected=%ld resurrectedDangling=%ld\n",
             cn1GcVerifyPasses, cn1GcVerifyTotalRefs, cn1GcVerifyTotalViolations,
             cn1GcVerifyEarlyFreed, cn1GcResTotal, cn1GcResDangling);
@@ -11645,6 +11666,51 @@ static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal, int graceOn
 #else
 #define CN1_BIBOP_STAMP_MARKED(o, m) do {} while(0)
 #define CN1_BIBOP_STAMP_MARKED_GRACE(o, m, snap) do {} while(0)
+#endif
+
+#ifdef CN1_GC_VERIFY
+/**
+ * Verifier builds only: is what this reference field HOLDS assignable to what it was
+ * DECLARED as?
+ *
+ * The existing verifier proves every traced reference resolves, and that is precisely
+ * why a reclaimed-then-recycled slot walks past it -- the slot holds a valid, live
+ * object, just not the one the field pointed at. The observed consequence was
+ * ArrayList.add running on a charts.compat.Canvas and faulting on the backing-array
+ * length load, a whole cycle and a thread away from the reclaim that caused it.
+ *
+ * Reported, not fatal: this runs inside the mark, where aborting would lose the rest
+ * of the census, and one line naming the field is what the failure has always
+ * lacked. Tagged values and null carry no header and are skipped.
+ */
+void cn1GcVerifyFieldType(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJECT value,
+                          int declaredClassId, const char* fieldName) {
+    // COUNTED, and the count is printed with the summary. A detector that silently
+    // never runs is indistinguishable from a clean heap -- an inverted-condition
+    // probe of the first version of this function produced no output at all, which
+    // is how that was discovered rather than shipped.
+    atomic_fetch_add_explicit(&cn1GcFieldTypeChecks, 1, memory_order_relaxed);
+    if(value == JAVA_NULL || CN1_IS_TAGGED(value)) {
+        return;
+    }
+    // Only ask about a pointer the collector already believes in; an unresolvable one
+    // is the OTHER verifier's finding and reporting it twice helps nobody.
+    if(cn1ConservativeResolve((void*)value) != value && !cn1GcImmortalObjContains(value)) {
+        return;
+    }
+    struct clazz* actual = CN1_CLASS_OF(value);
+    if(actual == 0) {
+        return;
+    }
+    if(!instanceofFunction(declaredClassId, actual->classId)) {
+        fprintf(stderr,
+            "[GC-VERIFY] TYPE CONFUSION: %s holds a %s, which is not assignable to its "
+            "declared type (owner %p, value %p). A live object was reclaimed and its slot "
+            "recycled.\n",
+            fieldName, actual->clsName ? actual->clsName : "?", (void*)owner, (void*)value);
+        atomic_fetch_add_explicit(&cn1GcFieldTypeFindings, 1, memory_order_relaxed);
+    }
+}
 #endif
 
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {

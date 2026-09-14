@@ -2537,6 +2537,16 @@ double cn1GcProbeMarkMs = 0, cn1GcProbeSweepMs = 0;
 int cn1GcProbeThrew = 0;
 #endif
 JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
+    // FREEZE: refuse to start a cycle at all once the exit census has claimed the
+    // heap. Clearing System.gcShouldLoop is not sufficient on its own -- the GC
+    // thread may already have evaluated `while(gcShouldLoop)` and be on its way
+    // here, and System's start-up path re-raises that flag after its initial wait.
+    // Either way the census would see gcCurrentlyRunning false, start walking, and
+    // have the pending cycle resume and sweep underneath it. Checked here because
+    // this is the one door every cycle comes through.
+    if(atomic_load_explicit(&cn1GcFrozenForCensus, memory_order_acquire)) {
+        return;
+    }
     gcCurrentlyRunning = JAVA_TRUE;
     if(firstTimeGcThread) {
         firstTimeGcThread = JAVA_FALSE;

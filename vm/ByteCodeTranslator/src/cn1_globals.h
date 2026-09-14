@@ -2860,6 +2860,11 @@ extern struct clazz class_array1__JAVA_DOUBLE;
 extern struct clazz class_array2__JAVA_DOUBLE;
 extern struct clazz class_array3__JAVA_DOUBLE;
 
+#ifdef CN1_GC_VERIFY
+extern void cn1GcVerifyFieldType(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJECT value,
+                                 int declaredClassId, const char* fieldName);
+#endif
+extern _Atomic int cn1GcFrozenForCensus;
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
 /**
  * Like newStringFromCString but DECODES, in the PLATFORM's encoding, instead of
