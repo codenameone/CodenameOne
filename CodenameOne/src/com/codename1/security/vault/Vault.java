@@ -338,6 +338,7 @@ public final class Vault {
             fresh.passwordWrap = SecureEnvelope.sealWithPassword(password, options.getKdf(),
                     fresh.dataKeyId, fresh.dataKeyVersion,
                     wrapBinding(fresh, PURPOSE_PASSWORD), key);
+            stampMac(fresh, key);
             // base null: this must be a creation, so a record appearing between the
             // NOT_ENROLLED check above and here is a losing race rather than something to
             // overwrite. As close to create-if-absent as Storage can express.
@@ -1116,6 +1117,7 @@ public final class Vault {
                     VaultMetadata next = meta.copy();
                     next.passwordWrap = rewrapped;
                     next.counter = meta.counter + 1;
+                    stampMac(next, key);
                     commitMetadata(meta, next);
                     metadata = next;
                     passwordNeedsRewrap = false;
@@ -1170,6 +1172,7 @@ public final class Vault {
                     next.counter = metadata.counter + 1;
                     // Checked before the write: a recovery code refused after persisting its
                     // wrap would be a code the vault accepts and the caller never received.
+                    stampMac(next, dataKey);
                     requireSameGeneration(generation);
                     commitMetadata(metadata, next);
                     metadata = next;
@@ -1320,6 +1323,7 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the key was being rotated");
                     }
+                    stampMac(next, fresh);
                     commitMetadata(meta, next);
                     // Read back and confirm the record on disk is the one just written, BEFORE
                     // the new key is adopted. Two tabs unlocking the same version-N vault both
@@ -1491,6 +1495,9 @@ public final class Vault {
                     // password would replace a working local record with one that cannot be used.
                     byte[] key = SecureEnvelope.parse(incoming.passwordWrap).openWithPassword(
                             password, wrapBinding(incoming, PURPOSE_PASSWORD));
+                    // Checked against the key this record itself describes, which is the only
+                    // point at which the counter it claims can be believed.
+                    requireAuthenticRecord(incoming, key);
                     if (generation != lockGeneration) {
                         // The record is still written -- enrolling this device is the point of the
                         // call and it succeeded. What is refused is leaving the vault unlocked
@@ -1677,6 +1684,51 @@ public final class Vault {
             return deriveSubkey(source, purpose);
         } finally {
             Bytes.zero(source);
+        }
+    }
+
+    /// Stamps the record's authentication tag, under the key that record describes.
+    ///
+    /// Taken as a parameter rather than read from the field, because rotation writes the record
+    /// for its NEW key while the vault is still holding the old one.
+    private void stampMac(VaultMetadata meta, byte[] key) {
+        meta.mac = null;
+        meta.mac = recordMac(meta, key);
+    }
+
+    /// Verifies the tag, refusing a record whose counter or contents were edited.
+    ///
+    /// This is what makes the rollback check mean anything. The counter is plaintext, so a server
+    /// serving sync state could take an OLD record, raise its counter above the local one, and
+    /// still pass the password wrap -- the wrap authenticates the vault id, the key version and
+    /// the purpose, and says nothing about the counter or the retired chain. The newer key was
+    /// then overwritten and every record sealed after the rotation became unreadable.
+    ///
+    /// A missing tag is refused too. Accepting one would leave the whole check optional for
+    /// anyone able to delete a line.
+    private void requireAuthenticRecord(VaultMetadata meta, byte[] key) {
+        byte[] expected = recordMac(meta, key);
+        try {
+            if (meta.mac == null || !Bytes.constantTimeEquals(expected, meta.mac)) {
+                throw new VaultException(VaultError.AUTHENTICATION_FAILED,
+                        "the vault record does not authenticate under this password; its "
+                        + "contents have been altered");
+            }
+        } finally {
+            Bytes.zero(expected);
+        }
+    }
+
+    private byte[] recordMac(VaultMetadata meta, byte[] key) {
+        byte[] saved = meta.mac;
+        meta.mac = null;
+        try {
+            Hmac mac = Hmac.create(Hash.SHA256, key);
+            mac.update(Bytes.utf8("cn1.vault.record.v1"));
+            mac.update(Bytes.utf8(meta.serializeForMac()));
+            return mac.doFinal();
+        } finally {
+            meta.mac = saved;
         }
     }
 

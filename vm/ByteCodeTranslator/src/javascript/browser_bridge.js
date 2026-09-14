@@ -556,11 +556,21 @@
         return;
       }
       request.onsuccess = function() { resolve(request.result); };
-      request.onerror = function() {
+      request.onerror = function(event) {
         // Stopped here rather than left to bubble: an unhandled IndexedDB
         // request error aborts its transaction, which would turn a benign
         // "this key already exists" into a failed write of everything else.
         if (request.error && request.error.name === 'ConstraintError') {
+          // preventDefault is what actually stops it. Settling this promise says
+          // nothing to the DOM, so without this the error goes on to abort the
+          // transaction anyway -- which nothing noticed until the commit wait
+          // started observing the outcome, and then the LOSER of two racing
+          // ensureKey calls reported STORAGE_UNAVAILABLE instead of adopting the
+          // winner's key. The comment above described the intent; this line is
+          // the part that carries it out.
+          if (event && event.preventDefault) {
+            event.preventDefault();
+          }
           resolve(undefined);
         } else {
           reject(request.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
@@ -846,6 +856,18 @@
     }
   }
 
+  /// Whether a stored credential satisfies a device-bound requirement.
+  ///
+  /// Both halves matter and they are different questions. ``backupEligible`` is the BE flag the
+  /// authenticator set: 1 means the credential may sync, and it is also what this port stores
+  /// when the authenticator would not say. ``deviceBound`` records that the credential was
+  /// CREATED under the platform constraint -- without it a roaming security key qualifies, since
+  /// it never syncs to a cloud and so reports backupEligible 0 while being physically carried
+  /// from device to device. Requiring only the flag accepted exactly that.
+  function cn1VaultRecordIsDeviceBound(record) {
+    return !!record && record.backupEligible === 0 && record.deviceBound === 1;
+  }
+
   /// Creates a passkey and confirms the authenticator will actually evaluate a PRF.
   ///
   /// ``prf.enabled`` from the creation ceremony is the only honest signal here:
@@ -867,7 +889,7 @@
         // is the one outcome that option exists to prevent. backupEligible is stored
         // as 1 both for "may leave this device" and for "would not say", and neither
         // is device bound, so compliance is exactly backupEligible === 0.
-        if (deviceBound && existing.backupEligible !== 0) {
+        if (deviceBound && !cn1VaultRecordIsDeviceBound(existing)) {
           return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
         }
         return cn1VaultReply(CN1V_OK, null);
@@ -931,7 +953,7 @@
           if (!settled || !settled.credentialId) {
             return cn1VaultReply(CN1V_STORAGE_UNAVAILABLE, null);
           }
-          if (deviceBound && settled.backupEligible !== 0) {
+          if (deviceBound && !cn1VaultRecordIsDeviceBound(settled)) {
             return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
           }
           return cn1VaultReply(CN1V_OK, null);

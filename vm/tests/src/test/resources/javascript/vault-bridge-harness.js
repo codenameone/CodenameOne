@@ -37,6 +37,17 @@
 
 const results = {};
 
+// A rejection nobody awaited kills node with an empty stdout, and the Java side then reports
+// only "the harness produced no results" -- which is what a genuine bridge bug looked like when
+// the transaction-abort rule was first modelled here. Reported as a result instead, so the next
+// one says what happened.
+process.on('unhandledRejection', (reason) => {
+  console.log(JSON.stringify({
+    harnessError: 'unhandled rejection: ' + String(reason && reason.stack ? reason.stack : reason)
+  }));
+  process.exit(1);
+});
+
 function fail(name, detail) {
   results[name] = 'FAILED: ' + detail;
 }
@@ -58,7 +69,12 @@ function makeIndexedDb() {
   // succeeded" and "the write is durable" could not be expressed here.
   let failEveryCommit = false;
 
-  function request(run) {
+  // onAbort is how the stub models the rule that cost a CI round: an IndexedDB request error
+  // that is not cancelled with preventDefault() goes on to ABORT its transaction. Settling a
+  // promise in onerror says nothing to the DOM, so a handler that only resolved still lost the
+  // whole transaction -- which nothing here could see, because this stub simply had no such
+  // rule and the Chromium suite was the first thing to notice.
+  function request(run, onAbort) {
     const req = { onsuccess: null, onerror: null, result: undefined, error: null };
     queueMicrotask(() => {
       try {
@@ -66,7 +82,12 @@ function makeIndexedDb() {
         if (req.onsuccess) req.onsuccess();
       } catch (e) {
         req.error = e;
-        if (req.onerror) req.onerror();
+        let prevented = false;
+        const event = { preventDefault() { prevented = true; } };
+        if (req.onerror) req.onerror(event);
+        if (!prevented && onAbort) {
+          onAbort(e);
+        }
       }
     });
     return req;
@@ -97,27 +118,52 @@ function makeIndexedDb() {
       const remember = (key) => {
         undo.push({ key: key, had: data.has(key), prev: data.get(key) });
       };
+      const rollback = () => {
+        for (let i = undo.length - 1; i >= 0; i--) {
+          const entry = undo[i];
+          if (entry.had) {
+            data.set(entry.key, entry.prev);
+          } else {
+            data.delete(entry.key);
+          }
+        }
+        undo.length = 0;
+      };
       // Settles after the requests queued on it, the way a real one does: the handlers are
       // attached during this turn, so the completion has to be scheduled behind them.
       const tx = { oncomplete: null, onabort: null, onerror: null, error: null };
       setTimeout(() => {
+        if (aborted) {
+          return;
+        }
         if (failEveryCommit) {
-          for (let i = undo.length - 1; i >= 0; i--) {
-            const entry = undo[i];
-            if (entry.had) {
-              data.set(entry.key, entry.prev);
-            } else {
-              data.delete(entry.key);
-            }
-          }
+          aborted = true;
+          rollback();
           tx.error = Object.assign(new Error('quota exceeded'), { name: 'QuotaExceededError' });
           if (tx.onabort) tx.onabort();
           return;
         }
         if (tx.oncomplete) tx.oncomplete();
       }, 0);
+      // Rolls the transaction back and fires onabort, exactly as an uncancelled request error
+      // does in a browser.
+      let aborted = false;
+      const abort = (cause) => {
+        if (aborted) {
+          return;
+        }
+        aborted = true;
+        rollback();
+        tx.error = cause || null;
+        // DISPATCHED as a task, not inline. A browser fires abort as an event, so handlers
+        // attached later in the same turn still see it -- and cn1VaultCommit attaches its
+        // handler in the .then AFTER the request settles. Calling tx.onabort inline found it
+        // still null, nothing ever settled the commit promise, and the harness exited zero with
+        // empty stdout: a hang dressed as a pass.
+        setTimeout(() => { if (tx.onabort) tx.onabort(); }, 0);
+      };
       const store = {
-        get: (key) => request(() => data.get(key)),
+        get: (key) => request(() => data.get(key), abort),
         add: (record) => request(() => {
           if (data.has(record.id)) {
             constraintErrors++;
@@ -141,8 +187,9 @@ function makeIndexedDb() {
           remember(record.id);
           data.set(record.id, stored);
           return record.id;
-        }),
-        delete: (key) => request(() => { remember(key); data.delete(key); return undefined; })
+        }, abort),
+        delete: (key) => request(() => { remember(key); data.delete(key); return undefined; },
+            abort)
       };
       tx.objectStore = () => store;
       return tx;

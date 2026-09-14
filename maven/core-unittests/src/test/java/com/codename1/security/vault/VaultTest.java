@@ -996,6 +996,59 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anOldRecordWithItsCounterRaisedIsRefused() {
+        // The counter is the whole of the rollback defence and it is plaintext, so a server that
+        // serves sync state can edit it. Raising it on an OLD record makes that record look newer
+        // while its password wrap still opens -- the wrap authenticates the vault id, the key
+        // version and the purpose, and says nothing about the counter or the retired chain. The
+        // newer key was then overwritten and everything sealed since the rotation became
+        // unreadable.
+        String name = freshName();
+        Vault first = Vault.named(name).configure(fast());
+        first.enroll(pw("p"), fast()).get();
+        byte[] early = first.exportSyncState();
+
+        // The vault moves on, and seals something under the key it now has.
+        assertTrue(first.rotateDataKey(pw("p")).get().booleanValue());
+        byte[] afterRotation = first.seal("note", "contents".getBytes()).get();
+        byte[] later = first.exportSyncState();
+
+        String otherName = freshName();
+        Vault other = Vault.named(otherName).configure(fast());
+        assertTrue(other.importSyncState(later, pw("p")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), other.open("note", afterRotation).get());
+
+        // Now forge: take the old record and raise its counter past the local one. The password
+        // is unchanged, so the wrap still opens; only the tag stands between this and a rollback.
+        String forged = rewriteCounter(new String(early, java.nio.charset.StandardCharsets.UTF_8),
+                999999L);
+        assertEquals(VaultError.AUTHENTICATION_FAILED,
+                errorOf(other.importSyncState(
+                        forged.getBytes(java.nio.charset.StandardCharsets.UTF_8), pw("p"))));
+
+        // And the vault still holds the post-rotation key, so what it sealed is still readable.
+        assertArrayEquals("contents".getBytes(), other.open("note", afterRotation).get());
+    }
+
+    /// Rewrites just the counter line, the way a server serving this record could.
+    private static String rewriteCounter(String record, long counter) {
+        StringBuilder out = new StringBuilder();
+        String[] lines = com.codename1.util.StringUtil.tokenize(record, '\n')
+                .toArray(new String[0]);
+        boolean replaced = false;
+        for (int iter = 0; iter < lines.length; iter++) {
+            if (lines[iter].startsWith("counter=")) {
+                out.append("counter=").append(counter).append('\n');
+                replaced = true;
+            } else {
+                out.append(lines[iter]).append('\n');
+            }
+        }
+        assertTrue(replaced, "the record must carry a counter line to forge");
+        return out.toString();
+    }
+
+    @Test
     void aWrapSplicedIntoARecordClaimingAnotherVersionWillNotOpen() {
         // A sync server hands out the vault record, so it can edit the parts of it that are not
         // ciphertext. Opening the password wrap proves the wrap is genuine and says nothing about

@@ -75,6 +75,14 @@ final class VaultMetadata {
     byte[] passwordWrap;
     byte[] recoveryWrap;
 
+    /// Authentication tag over [#serializeForMac()], keyed by this record's own data key.
+    ///
+    /// Keyed by the data key and not by anything derived from the password directly, because the
+    /// key is what a reader recovers by opening the password wrap -- so a reader can verify this
+    /// exactly when it is entitled to, and an attacker who can edit the record cannot recompute
+    /// it without the password.
+    byte[] mac;
+
     /// Version to envelope, each holding data key version n sealed under version n+1.
     final java.util.Hashtable<Integer, byte[]> retired = new java.util.Hashtable<Integer, byte[]>();
 
@@ -104,10 +112,30 @@ final class VaultMetadata {
         out.recoveryWrap = recoveryWrap;
         out.retired.putAll(retired);
         out.unknown = unknown;
+        out.mac = mac;
         return out;
     }
 
+    /// The record as it is authenticated: everything except the tag itself.
+    ///
+    /// Everything else in here is either ciphertext or is covered by a wrap's associated data --
+    /// the counter is neither. It is plaintext an attacker who serves sync state can edit, and
+    /// raising it on an OLD record makes that record look newer while its password wrap still
+    /// opens, so the newer key and retired chain are overwritten and everything sealed since
+    /// becomes unreadable. A tag over these bytes is what makes the counter unforgeable.
+    String serializeForMac() {
+        return serializeBody();
+    }
+
     String serialize() {
+        StringBuilder b = new StringBuilder(serializeBody());
+        if (mac != null) {
+            b.append("mac=").append(Bytes.toHex(mac)).append('\n');
+        }
+        return b.toString();
+    }
+
+    private String serializeBody() {
         StringBuilder b = new StringBuilder();
         b.append(MAGIC).append('\n');
         b.append("vault=").append(vaultId).append('\n');
@@ -171,6 +199,8 @@ final class VaultMetadata {
                 out.dataKeyId = value;
             } else if ("key.version".equals(key)) {
                 out.dataKeyVersion = parseInt(value);
+            } else if ("mac".equals(key)) {
+                out.mac = Bytes.fromHex(value);
             } else if ("counter".equals(key)) {
                 out.counter = parseLong(value);
             } else if ("wrap.password".equals(key)) {
