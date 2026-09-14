@@ -96,7 +96,7 @@ and the `Command.DESKTOP_MENU_*` constants:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava002Snippet.java[tag=desktop-integration-java-002,indent=0]
 -----
 
-The recognised values are (case-insensitive):
+The recognized values are (case-insensitive):
 
 [cols="1,3"]
 |===
