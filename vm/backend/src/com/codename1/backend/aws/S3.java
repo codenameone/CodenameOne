@@ -139,6 +139,7 @@ public final class S3 {
             throw new IOException("No AWS region: pass one, or set AWS_REGION");
         }
         requireRegionName(resolved);
+        requireSupportedPartition(resolved);
         return new S3(Credentials.resolve(), resolved, endpointFor(resolved),
                 false, true, true);
     }
@@ -159,6 +160,38 @@ public final class S3 {
      * to reach, so they are deliberately not guessed at -- a wrong suffix there
      * would be a silent misdirection of the same kind this fixes.
      */
+    /**
+     * Refuses a region whose partition this cannot build an endpoint for.
+     *
+     * <p>The ISO partitions -- us-iso, us-isob, us-isof, eu-isoe -- have DNS
+     * suffixes of their own, and endpointFor's comment says they are deliberately
+     * not guessed at because a wrong suffix is a silent misdirection. It then
+     * guessed at them anyway, by falling through to the commercial suffix: every
+     * request and every presigned URL for such a region named a host in the wrong
+     * partition, which is exactly the failure that comment describes.
+     *
+     * <p>Refused HERE rather than in endpointFor, because this is the path that
+     * infers a host from a region name. forEndpoint takes the host from its
+     * caller, so somebody who can reach one of those networks can still name it
+     * and is not blocked by a guess this method declines to make.
+     */
+    static void requireSupportedPartition(String region) throws IOException {
+        int firstDash = region.indexOf('-');
+        if(firstDash < 0) {
+            return;
+        }
+        int secondDash = region.indexOf('-', firstDash + 1);
+        String area = secondDash < 0 ? region.substring(firstDash + 1)
+                                     : region.substring(firstDash + 1, secondDash);
+        if(area.length() >= 3 && area.charAt(0) == 'i' && area.charAt(1) == 's'
+                && area.charAt(2) == 'o') {
+            throw new IOException("The region " + region + " is in an ISO partition, "
+                    + "whose S3 endpoints do not end in amazonaws.com. This runtime "
+                    + "will not guess that suffix; reach it with forEndpoint and the "
+                    + "host your network actually uses");
+        }
+    }
+
     static String endpointFor(String region) {
         boolean china = region.length() >= 3 && region.charAt(0) == 'c'
                 && region.charAt(1) == 'n' && region.charAt(2) == '-';
@@ -316,6 +349,19 @@ public final class S3 {
      * reached.
      */
     public List listObjects(String bucket, String prefix, int max) throws IOException {
+        // UP TO MAX MEANS UP TO MAX. The loop below stops at the limit only while
+        // it is positive, so zero and below meant "follow every continuation token
+        // to the end of the bucket" -- the opposite of what was asked, and on a
+        // large bucket a request for nothing became many round trips and a list
+        // of everything in the heap. There is no documented unlimited mode to
+        // preserve: the contract above is "lists up to max objects".
+        if(max == 0) {
+            return new ArrayList();
+        }
+        if(max < 0) {
+            throw new IllegalArgumentException("listObjects max must not be negative: "
+                    + max);
+        }
         List keys = new ArrayList();
         String token = null;
         while(true) {

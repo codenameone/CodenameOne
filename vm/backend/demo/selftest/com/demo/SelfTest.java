@@ -3318,6 +3318,94 @@ public class SelfTest {
     }
 
     /**
+     * A partition whose endpoint cannot be named is refused, not guessed at.
+     *
+     * <p>endpointFor's comment says the ISO partitions are deliberately not
+     * guessed at, because a wrong DNS suffix is a silent misdirection -- and then
+     * the commercial suffix was returned for them anyway, which is that
+     * misdirection. forRegion refuses them now; forEndpoint still takes a host
+     * from its caller, so somebody on one of those networks can name it.
+     */
+    private static void anUnnameablePartitionIsRefused() throws Exception {
+        // THROUGH forRegion, not through the rule on its own. A check that calls
+        // the rule directly passes whether or not anything calls it -- measured:
+        // removing the call from forRegion left such a check green -- so these go
+        // in at the door a caller actually uses. The refusal happens before
+        // credentials are resolved, which is what lets this run without any.
+        check("an ISO region is refused", "refused", regionVerdict("us-iso-east-1"));
+        check("and the other ISO partition too", "refused",
+                regionVerdict("us-isob-east-1"));
+        check("and the European one", "refused", regionVerdict("eu-isoe-west-1"));
+        // The controls: the partitions this runtime CAN name are not refused here,
+        // so the rule cannot pass by turning everything away.
+        check("a commercial region is not", "not refused", regionVerdict("us-east-1"));
+        check("nor is China", "not refused", regionVerdict("cn-north-1"));
+        check("nor GovCloud", "not refused", regionVerdict("us-gov-west-1"));
+        // And a region whose middle label merely begins with the same letters.
+        check("nor one that only looks ISO", "not refused",
+                regionVerdict("us-isle-east-1"));
+    }
+
+    /**
+     * "refused" when forRegion turns the region away for its partition, and
+     * "not refused" for anything else -- including the missing-credentials
+     * failure that a region this runtime CAN name reaches next.
+     */
+    private static String regionVerdict(String region) {
+        try {
+            com.codename1.backend.aws.S3.forRegion(region);
+            return "not refused";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            return message.indexOf("ISO partition") >= 0 ? "refused" : "not refused";
+        }
+    }
+
+    /**
+     * Listing up to nothing does not list everything.
+     *
+     * <p>The page loop stopped at the limit only while it was positive, so a max
+     * of zero or below followed every continuation token to the end of the
+     * bucket: the opposite of what was asked, and on a large bucket many round
+     * trips and a list of everything in the heap. The endpoint here is a port
+     * nothing listens on, so a request that IS made fails -- which is what
+     * separates "returned early" from "returned empty after asking".
+     */
+    private static void listingUpToNothingListsNothing() throws Exception {
+        com.codename1.backend.aws.Credentials creds =
+                new com.codename1.backend.aws.Credentials("AKIAEXAMPLE", "s3cret", null);
+        com.codename1.backend.aws.S3 s3 = com.codename1.backend.aws.S3.forEndpoint(
+                creds, "us-east-1", "http://127.0.0.1:1");
+        String zero;
+        try {
+            zero = "listed " + s3.listObjects("bucket", null, 0).size();
+        } catch (Exception err) {
+            zero = "asked anyway: " + err.getMessage();
+        }
+        String negative;
+        try {
+            s3.listObjects("bucket", null, -1);
+            negative = "listed";
+        } catch (IllegalArgumentException refused) {
+            negative = "refused";
+        } catch (Exception other) {
+            negative = "asked anyway: " + other.getMessage();
+        }
+        // The control: a positive max DOES go to the network, so the two answers
+        // above are about the limit rather than about the method being inert.
+        String positive;
+        try {
+            s3.listObjects("bucket", null, 5);
+            positive = "listed";
+        } catch (Exception expected) {
+            positive = "asked";
+        }
+        check("a max of zero lists nothing without asking", "listed 0", zero);
+        check("a negative max is refused", "refused", negative);
+        check("and a positive max still asks", "asked", positive);
+    }
+
+    /**
      * A region is resolved in its own AWS partition.
      *
      * <p>AWS China is a separate partition whose S3 endpoints end in
@@ -5422,6 +5510,8 @@ public class SelfTest {
         aResponsePastTheClientCeilingIsRefused();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
+        anUnnameablePartitionIsRefused();
+        listingUpToNothingListsNothing();
         halfACredentialPairIsRefused();
         aRemoteCredentialEndpointMustBeEncrypted();
         anEndlessResponseIsRefused();

@@ -39,6 +39,16 @@ public final class CredentialEndpointProbe {
     private CredentialEndpointProbe() {
     }
 
+    /** "allowed", or "refused" when the region's partition cannot be named. */
+    public static String partitionVerdictFor(String region) {
+        try {
+            S3.requireSupportedPartition(region);
+            return "allowed";
+        } catch (IOException refused) {
+            return "refused";
+        }
+    }
+
     /** The S3 endpoint this region resolves to; see S3.endpointFor. */
     public static String s3EndpointFor(String region) {
         return S3.endpointFor(region);
