@@ -345,7 +345,7 @@ public final class Vault {
             fresh.passwordWrap = SecureEnvelope.sealWithPassword(password, options.getKdf(),
                     fresh.dataKeyId, fresh.dataKeyVersion,
                     wrapBinding(fresh, PURPOSE_PASSWORD), key);
-            stampMac(fresh, key);
+            stampMac(fresh, null, key);
             // base null: this must be a creation, so a record appearing between the
             // NOT_ENROLLED check above and here is a losing race rather than something to
             // overwrite. As close to create-if-absent as Storage can express.
@@ -411,14 +411,27 @@ public final class Vault {
                     // is to try again with a weaker policy, and that attempt then hit CONFLICT
                     // against the record this call had quietly left behind.
                     //
-                    // Safe to roll back precisely here: enrolment is the one moment when the
-                    // vault protects nothing yet, so removing the record destroys no data.
-                    Storage.getInstance().deleteStorageFile(metadataKey());
-                    try {
-                        forgetEveryMechanism();
-                    } catch (RuntimeException alsoFailed) {
-                        // The mechanism may hold a half-made key. Nothing here can reach it, and
-                        // reporting this instead of the original would name the wrong failure.
+                    // Safe to roll back only while the vault still protects nothing, and that is
+                    // a claim about the DEVICE rather than about this call. The record has been
+                    // readable by every session on this origin since it was committed above, and
+                    // the step that failed is a passkey prompt -- seconds or minutes of it -- so
+                    // another tab can unlock this vault and store secrets inside that window.
+                    // Deleting the record then takes the only password wrap with it and orphans
+                    // them permanently, on a call that was merely tidying up after itself.
+                    //
+                    // So the rollback asks first, and keeps the record when the answer is no. A
+                    // retry with a weaker policy then reports CONFLICT rather than succeeding,
+                    // which is the correct outcome once someone else is using the vault: unlock
+                    // it, do not enrol it again.
+                    if (vaultIsStillUntouched(verified)) {
+                        Storage.getInstance().deleteStorageFile(metadataKey());
+                        try {
+                            forgetEveryMechanism();
+                        } catch (RuntimeException alsoFailed) {
+                            // The mechanism may hold a half-made key. Nothing here can reach it,
+                            // and reporting this instead of the original would name the wrong
+                            // failure.
+                        }
                     }
                     lock();
                     throw rememberFailed;
@@ -600,6 +613,8 @@ public final class Vault {
     /// that policy exists to prevent.
     public AsyncResource<Boolean> rememberDevice() {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -631,6 +646,7 @@ public final class Vault {
                                 Protection.PERSISTENT, null);
                     }
                     rememberNow(options.getPolicy());
+                    requireDeviceRecordStillWanted(generation);
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -657,6 +673,18 @@ public final class Vault {
     /// configured, and a rewrap that read the configured one would replace the gated wrap with an
     /// unattended one -- silently turning off the prompt the user asked for.
     private void rememberNow(UnlockPolicy policy) {
+        // Snapshotted, not re-read, for the reason rotateDataKey gives: the store below prompts,
+        // so this method runs for as long as the user takes, and lock() nulls both of these. Read
+        // afterwards they are null and the worker dies on a NullPointerException, which the
+        // catch-all reports as "this vault operation could not complete" -- a lock described as an
+        // unknown fault. With the snapshot the write finishes and the caller is told it was LOCKED,
+        // by the generation check the two public entry points make after this returns.
+        VaultMetadata meta = metadata;
+        byte[] key = dataKey;
+        if (meta == null || key == null) {
+            throw new VaultException(VaultError.LOCKED,
+                    "the vault was locked before this device could be remembered");
+        }
         DeviceProtection device = deviceProtection(policy);
         // Set before ensureKey, because it changes how the key is created rather than how it is
         // used. A port that cannot honour it refuses there.
@@ -673,20 +701,20 @@ public final class Vault {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                     "the device key could not be created");
         }
-        byte[] aad = wrapBinding(metadata, PURPOSE_DEVICE).serialize();
-        byte[] wrapped = await(device.wrap(deviceKeyId(), dataKey, aad),
+        byte[] aad = wrapBinding(meta, PURPOSE_DEVICE).serialize();
+        byte[] wrapped = await(device.wrap(deviceKeyId(), key, aad),
                 "the data key could not be wrapped for this device");
         // Proven before it is trusted, same reasoning as enrolment: a wrap that cannot be
         // unwrapped is a "remember me" that silently does not.
         byte[] proof = await(device.unwrap(deviceKeyId(), wrapped, aad),
                 "the device wrap could not be read back");
-        boolean good = Bytes.constantTimeEquals(proof, dataKey);
+        boolean good = Bytes.constantTimeEquals(proof, key);
         Bytes.zero(proof);
         if (!good) {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                     "the device wrap did not read back as it was written");
         }
-        writeDeviceRecord(new DeviceRecord(policy, wrapped, metadata.dataKeyVersion));
+        writeDeviceRecord(new DeviceRecord(policy, wrapped, meta.dataKeyVersion));
     }
 
     /// Forgets this device: the local wrap is deleted and so is the device key behind it.
@@ -1207,7 +1235,7 @@ public final class Vault {
                     VaultMetadata next = meta.copy();
                     next.passwordWrap = rewrapped;
                     next.counter = meta.counter + 1;
-                    stampMac(next, key);
+                    stampMac(next, meta, key);
                     commitMetadata(meta, next);
                     metadata = next;
                     passwordNeedsRewrap = false;
@@ -1262,7 +1290,7 @@ public final class Vault {
                     next.counter = metadata.counter + 1;
                     // Checked before the write: a recovery code refused after persisting its
                     // wrap would be a code the vault accepts and the caller never received.
-                    stampMac(next, dataKey);
+                    stampMac(next, metadata, dataKey);
                     requireSameGeneration(generation);
                     VaultMetadata previous = metadata;
                     commitMetadata(previous, next);
@@ -1429,7 +1457,7 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the key was being rotated");
                     }
-                    stampMac(next, fresh);
+                    stampMac(next, meta, fresh);
                     commitMetadata(meta, next);
                     // Read back and confirm the record on disk is the one just written, BEFORE
                     // the new key is adopted. Two tabs unlocking the same version-N vault both
@@ -1626,6 +1654,7 @@ public final class Vault {
                     try {
                         requireAuthenticRecord(incoming, key);
                         if (local != null) {
+                            requireMetadataAncestry(local, incoming);
                             requireKeyContinuity(local, incoming, key);
                         }
                     } catch (RuntimeException refused) {
@@ -1730,6 +1759,8 @@ public final class Vault {
     /// prompt while an alternative unlock sits beside it promises nothing.
     public AsyncResource<Boolean> setPolicy(final UnlockPolicy policy) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -1787,6 +1818,7 @@ public final class Vault {
                             requireKeyDeleted(outgoing,
                                     "the previous device key could not be deleted");
                         }
+                        requireDeviceRecordStillWanted(generation);
                     }
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -1891,9 +1923,36 @@ public final class Vault {
     ///
     /// Taken as a parameter rather than read from the field, because rotation writes the record
     /// for its NEW key while the vault is still holding the old one.
-    private void stampMac(VaultMetadata meta, byte[] key) {
+    /// Signs `meta` and records that it descends from `base`.
+    ///
+    /// One place, because every mutation of the record goes through here on its way to storage,
+    /// and ancestry that is stamped at some of them is worse than none: an import would read a
+    /// missing link as a fork and refuse a sync that was perfectly ordinary. `base` is null only
+    /// for enrolment, which descends from nothing.
+    private void stampMac(VaultMetadata meta, VaultMetadata base, byte[] key) {
+        meta.ancestors.clear();
+        if (base != null) {
+            meta.ancestors.addAll(base.ancestors);
+            String parent = fingerprint(base.mac);
+            if (parent != null) {
+                meta.ancestors.add(parent);
+            }
+            while (meta.ancestors.size() > VaultMetadata.MAX_ANCESTORS) {
+                meta.ancestors.remove(0);
+            }
+        }
         meta.mac = null;
         meta.mac = recordMac(meta, key);
+    }
+
+    /// How a record is named in another record's ancestry, or null when it has no tag to name.
+    private static String fingerprint(byte[] mac) {
+        if (mac == null || mac.length < VaultMetadata.FINGERPRINT_BYTES) {
+            return null;
+        }
+        byte[] head = new byte[VaultMetadata.FINGERPRINT_BYTES];
+        System.arraycopy(mac, 0, head, 0, head.length);
+        return Bytes.toHex(head);
     }
 
     /// Verifies the tag, refusing a record whose counter or contents were edited.
@@ -1917,6 +1976,49 @@ public final class Vault {
         } finally {
             Bytes.zero(expected);
         }
+    }
+
+    /// Refuses an incoming sync record that is not a descendant of the one already here.
+    ///
+    /// Key continuity below is the half of this that protects readability, and it is not the whole
+    /// question. A fork that never rotated keeps the same data key on both sides, so it passes
+    /// that check while its metadata changes are still unrelated: one device changes its password
+    /// once and reaches counter 2, the other replaces its recovery code twice and reaches counter
+    /// 3, and importing the second silently restores the first device's OLD password wrap. The
+    /// user's password change is gone, with no error anywhere -- and again the counters cannot
+    /// say so, because counting mutations is not the same as ordering them.
+    ///
+    /// So each record carries the fingerprints of the records it came from, and the test is
+    /// whether the incoming one names the local one among them. That is a real causal test rather
+    /// than a comparison of two integers: a device that is simply ahead always names what it
+    /// passed through, and a device that diverged never does, whichever way its counter went.
+    ///
+    /// Two records that are byte-identical are the same record, not a fork -- a refresh of a
+    /// device that is already up to date arrives that way and has to keep working.
+    private void requireMetadataAncestry(VaultMetadata local, VaultMetadata incoming) {
+        String here = fingerprint(local.mac);
+        if (here == null) {
+            // No tag to be named by, so ancestry cannot be established either way. The counter and
+            // key-continuity checks are what is left; both are weaker, and neither is new.
+            return;
+        }
+        if (incoming.serialize().equals(local.serialize())) {
+            return;
+        }
+        if (incoming.ancestors.contains(here)) {
+            return;
+        }
+        String there = fingerprint(incoming.mac);
+        if (there != null && local.ancestors.contains(there)) {
+            throw new VaultException(VaultError.CONFLICT,
+                    "the sync state is an earlier version of the vault already on this device; "
+                    + "refusing to roll back");
+        }
+        throw new VaultException(VaultError.CONFLICT,
+                "this device and the sync state have both changed since they last agreed; the "
+                + "vault cannot choose between them. This is also what a device more than "
+                + VaultMetadata.MAX_ANCESTORS + " changes behind looks like, because a record "
+                + "carries no more ancestry than that");
     }
 
     /// Refuses an incoming sync record whose key lineage does not contain the one this device
@@ -1956,8 +2058,10 @@ public final class Vault {
         } catch (VaultException noChain) {
             // Either the incoming record never reached the local version, or its chain is
             // incomplete. Both mean the same thing here, and neither is the error the walk
-            // reports to a reader opening an old record.
-            throw new VaultException(VaultError.CONFLICT, CONTINUITY_MESSAGE);
+            // reports to a reader opening an old record. The original is kept as the cause: it
+            // says WHICH of the two happened, which is the only thing that would diagnose a
+            // genuinely damaged record rather than an ordinary fork.
+            throw new VaultException(VaultError.CONFLICT, CONTINUITY_MESSAGE, noChain);
         }
         try {
             byte[] expected = recordMac(local, ancestor);
@@ -2306,6 +2410,32 @@ public final class Vault {
     /// callback can land squarely inside it. The generation has to be captured on the CALLING
     /// thread: read inside the worker it can already be the post-lock value, and the check then
     /// passes for the very interleaving it exists to catch.
+    /// Withdraws a device record that a lock landed on top of, and reports the lock.
+    ///
+    /// The device wrap is a way back into this vault without a password, and establishing one runs
+    /// through a store that prompts -- a passkey, a keystore with user verification -- so the write
+    /// takes as long as the user takes. `lock()` can land anywhere inside that. Every other path
+    /// that publishes something reopenable already checks the generation it started on; these two
+    /// did not, so a vault the application had asked to close was left with a fresh passwordless
+    /// unlock on disk, and the call reported success.
+    ///
+    /// Deleting is the rollback, because there was nothing here to put back: this branch runs only
+    /// when the record is new or its policy is changing, and the change-of-policy case saves and
+    /// restores the previous record on its own failure path already.
+    ///
+    /// Not every path needs this. `forgetDevice` and `destroyLocalData` only ever remove, so a lock
+    /// landing inside one leaves less behind rather than more, and `changePassword` is documented
+    /// to work on a locked instance and publishes no key at all.
+    private void requireDeviceRecordStillWanted(int generation) {
+        if (generation == lockGeneration) {
+            return;
+        }
+        Storage.getInstance().deleteStorageFile(deviceRecordKey());
+        throw new VaultException(VaultError.LOCKED,
+                "the vault was locked while this device was being remembered; nothing that can "
+                + "reopen it without a password was left behind");
+    }
+
     private void requireSameGeneration(int generation) {
         if (generation != lockGeneration) {
             throw new VaultException(VaultError.LOCKED,
@@ -2320,6 +2450,40 @@ public final class Vault {
 
     private AssociatedData binding(VaultMetadata meta, String record, String purpose) {
         return AssociatedData.of(application, meta.vaultId, record, purpose);
+    }
+
+    /// Whether the record this call wrote is still exactly as it wrote it and nothing has been
+    /// stored under it.
+    ///
+    /// Two questions, because a session that adopted this vault leaves two different traces. It
+    /// may have changed the record -- a password change, a rotation, a recovery code, or its own
+    /// enrolment winning a race -- which the byte comparison catches. Or it may have left the
+    /// record alone and put secrets under it, which only the storage listing catches.
+    ///
+    /// What this cannot see is a session that called [#seal] and kept the ciphertext in the
+    /// application's own storage. Those bytes are bound to this record's vault id, so they would
+    /// be dead after the record is removed. It is a real residue and a much narrower one than
+    /// deleting unconditionally, and a caller that cannot tolerate it should enrol before handing
+    /// the vault to other sessions.
+    private boolean vaultIsStillUntouched(VaultMetadata written) {
+        Storage storage = Storage.getInstance();
+        VaultMetadata current = loadMetadataFresh();
+        if (current == null || !current.serialize().equals(written.serialize())) {
+            return false;
+        }
+        String[] entries = storage.listEntries();
+        if (entries == null) {
+            // Cannot establish that it is untouched, and the direction to err in is keeping a
+            // record that protects something rather than deleting one that protects nothing.
+            return false;
+        }
+        String prefix = secretKey("");
+        for (String entry : entries) {
+            if (entry != null && entry.startsWith(prefix)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String metadataKey() {

@@ -61,6 +61,11 @@ class VaultTest extends UITestBase {
         /// it also drives protection(), so a vault configured with it is refused before it ever
         /// reaches the remembering step this is meant to exercise.
         boolean refuseEnsure;
+        /// Counted down as ensureKey is entered, and awaited before it answers. Together these
+        /// stand in for a passkey prompt: the caller can act while the store is still asking the
+        /// user, which is the window every mid-operation lock test needs.
+        java.util.concurrent.CountDownLatch ensureEntered;
+        java.util.concurrent.CountDownLatch releaseEnsure;
         DeviceProtection gatedVariant;
 
         @Override
@@ -96,6 +101,16 @@ class VaultTest extends UITestBase {
 
         public AsyncResource<Boolean> ensureKey(String keyId) {
             AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            if (ensureEntered != null) {
+                ensureEntered.countDown();
+            }
+            if (releaseEnsure != null) {
+                try {
+                    releaseEnsure.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             if (throwOnEnsure) {
                 // Thrown, not completed with an error: this is what a port does when something
                 // unexpected goes wrong inside it, and it used to end the vault's worker.
@@ -1119,6 +1134,196 @@ class VaultTest extends UITestBase {
         // Refused before anything moved: no device wrap, and the policy is unchanged.
         assertTrue(device.keys.isEmpty());
         assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+    }
+
+    /// Runs `body` on its own thread while the device store is held inside ensureKey, releases it
+    /// once `between` has run, and answers what `body` reported.
+    private VaultError whileTheDeviceStoreIsPrompting(final java.util.concurrent.Callable<VaultError> body,
+            Runnable between) throws Exception {
+        device.ensureEntered = new java.util.concurrent.CountDownLatch(1);
+        device.releaseEnsure = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicReference<VaultError> outcome =
+                new java.util.concurrent.atomic.AtomicReference<VaultError>();
+        final java.util.concurrent.atomic.AtomicReference<Exception> broke =
+                new java.util.concurrent.atomic.AtomicReference<Exception>();
+        Thread worker = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    outcome.set(body.call());
+                } catch (Exception e) {
+                    broke.set(e);
+                }
+            }
+        });
+        worker.start();
+        assertTrue(device.ensureEntered.await(60, java.util.concurrent.TimeUnit.SECONDS),
+                "the device store was never asked for a key, so nothing was exercised");
+        try {
+            between.run();
+        } finally {
+            device.releaseEnsure.countDown();
+        }
+        worker.join(60000);
+        device.ensureEntered = null;
+        device.releaseEnsure = null;
+        if (broke.get() != null) {
+            throw broke.get();
+        }
+        return outcome.get();
+    }
+
+    @Test
+    void aVaultLockedWhileRememberDeviceRunsRemembersNothing() throws Exception {
+        // Establishing a device wrap runs through a store that prompts, so the write takes as long
+        // as the user takes and lock() can land anywhere inside it. Every other path that
+        // publishes something reopenable checks the generation it started on; this one did not, so
+        // a vault the application had asked to close was left with a fresh passwordless unlock on
+        // disk and the call reported success.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        assertTrue(vault.forgetDevice().get().booleanValue());
+
+        VaultError outcome = whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        return errorOf(vault.rememberDevice());
+                    }
+                },
+                new Runnable() {
+                    public void run() {
+                        vault.lock();
+                    }
+                });
+
+        assertEquals(VaultError.LOCKED, outcome,
+                "remembering a device that was locked mid-write must be refused");
+        assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+        // And nothing was left that reopens it without the password, which is the whole point.
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()));
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+    }
+
+    @Test
+    void aVaultLockedWhileSetPolicyRunsRemembersNothing() throws Exception {
+        // The same hole, in the other method that establishes one. Codex reported rememberDevice;
+        // setPolicy reaches the identical write through rememberNow and had no generation either.
+        String name = freshName();
+        final Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+
+        VaultError outcome = whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        return errorOf(vault.setPolicy(UnlockPolicy.REMEMBER_DEVICE));
+                    }
+                },
+                new Runnable() {
+                    public void run() {
+                        vault.lock();
+                    }
+                });
+
+        assertEquals(VaultError.LOCKED, outcome);
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()));
+    }
+
+    @Test
+    void aFailedEnrolmentDoesNotDeleteAVaultAnotherSessionIsUsing() throws Exception {
+        // Enrolment commits the record and THEN establishes the policy, and the second step is a
+        // prompt -- seconds or minutes of it. The record is readable by every session on this
+        // origin for that whole window, so another tab can unlock the vault and store secrets
+        // inside it. Deleting the record when the prompt is cancelled took the only password wrap
+        // with it and orphaned them permanently, on a call that was merely tidying up after
+        // itself.
+        final String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault enrolling = Vault.named(name).configure(remember);
+
+        VaultError outcome = whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        return errorOf(enrolling.enroll(pw("p"), fast()
+                                .policy(UnlockPolicy.REMEMBER_DEVICE)));
+                    }
+                },
+                new Runnable() {
+                    public void run() {
+                        // Another session, which has only the record this enrolment already
+                        // committed to go on.
+                        Vault other = Vault.named(name).configure(fast());
+                        assertTrue(other.unlockWithPassword(pw("p")).get().booleanValue(),
+                                "the record is already readable by other sessions here");
+                        assertTrue(other.putSecret("token", pw("abc123")).get().booleanValue());
+                        // And the enrolment is about to fail.
+                        device.refuseEnsure = true;
+                    }
+                });
+        device.refuseEnsure = false;
+
+        assertNotNull(outcome, "the enrolment failed, and must still report that");
+        // The vault is still here, and so is what the other session put in it.
+        Vault survivor = Vault.named(name).configure(fast());
+        assertTrue(survivor.unlockWithPassword(pw("p")).get().booleanValue(),
+                "the record another session was using must not have been deleted");
+        assertArrayEquals(pw("abc123"), survivor.getSecret("token").get());
+    }
+
+    @Test
+    void aFailedEnrolmentNobodyElseTouchedIsStillRolledBack() throws Exception {
+        // The other direction, which is what the rollback was for: with no other session involved
+        // the record protects nothing, and leaving it makes the documented retry with a weaker
+        // policy fail with CONFLICT against a record this same call left behind.
+        final String name = freshName();
+        final Vault enrolling = Vault.named(name).configure(
+                fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+
+        device.refuseEnsure = true;
+        assertNotNull(errorOf(enrolling.enroll(pw("p"),
+                fast().policy(UnlockPolicy.REMEMBER_DEVICE))));
+        device.refuseEnsure = false;
+
+        // Retried with a weaker policy, which is the documented answer and has to work.
+        Vault retry = Vault.named(name).configure(fast());
+        assertTrue(retry.enroll(pw("p"), fast()).get().booleanValue(),
+                "a rolled-back enrolment must leave nothing in the way of the next attempt");
+    }
+
+    @Test
+    void aForkThatNeverRotatedIsRefused() {
+        // Key continuity is only half the question. A fork that never rotated keeps the same data
+        // key on both sides, so it passes that check while its metadata changes are unrelated:
+        // one device changes its password once and reaches counter 2, the other replaces its
+        // recovery code twice and reaches counter 3, and importing the second silently restores
+        // the first device's OLD password wrap. The password change is gone with no error.
+        VaultOptions options = fast();
+        String mine = freshName();
+        Vault first = Vault.named(mine).configure(options);
+        first.enroll(pw("p"), options).get();
+        byte[] base = first.exportSyncState();
+
+        String theirs = freshName();
+        Vault second = Vault.named(theirs).configure(options);
+        assertTrue(second.importSyncState(base, pw("p")).get().booleanValue());
+
+        // One change here, two there. Same data key throughout -- neither device rotated.
+        assertTrue(first.changePassword(pw("p"), pw("p2")).get().booleanValue());
+        second.createRecoveryCode().get();
+        second.createRecoveryCode().get();
+        byte[] higherCounterSameKey = second.exportSyncState();
+
+        assertEquals(VaultError.CONFLICT,
+                errorOf(first.importSyncState(higherCounterSameKey, pw("p"))),
+                "two devices that changed independently are a fork, whatever their counters say");
+
+        // And the password change survived, which is what the import would have thrown away.
+        Vault reopened = Vault.named(mine).configure(options);
+        assertEquals(VaultError.AUTHENTICATION_FAILED,
+                errorOf(reopened.unlockWithPassword(pw("p"))));
+        assertTrue(reopened.unlockWithPassword(pw("p2")).get().booleanValue());
     }
 
     @Test

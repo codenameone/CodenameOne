@@ -86,6 +86,28 @@ final class VaultMetadata {
     /// Version to envelope, each holding data key version n sealed under version n+1.
     final java.util.Hashtable<Integer, byte[]> retired = new java.util.Hashtable<Integer, byte[]>();
 
+    /// Fingerprints of the records this one descends from, oldest first.
+    ///
+    /// Each is the first [#FINGERPRINT_BYTES] bytes of that record's own tag, in hex. This is what
+    /// makes ancestry decidable: the counter counts mutations on whichever device made them, so
+    /// two devices that diverge from the same base both raise it and neither is newer, and no
+    /// comparison of two integers can tell that apart from one device simply being ahead. A list
+    /// of what a record came from can.
+    ///
+    /// Bounded at [#MAX_ANCESTORS], so a record cannot grow without limit. Past that the oldest
+    /// entries are dropped and a device more than that many changes behind can no longer be shown
+    /// to be an ancestor -- the import is refused rather than guessed at, which is the safe
+    /// direction: the application resolves it, and nothing is silently overwritten.
+    final java.util.ArrayList<String> ancestors = new java.util.ArrayList<String>();
+
+    /// How much of a record's tag identifies it. Eight bytes is far past any accidental collision
+    /// for a list this short, and a deliberate one is not available: the list is inside the tagged
+    /// body, so it cannot be edited without the data key.
+    static final int FINGERPRINT_BYTES = 8;
+
+    /// How many generations of ancestry a record carries.
+    static final int MAX_ANCESTORS = 64;
+
     /// Lines this build did not recognise, kept so they survive a round trip.
     String unknown = "";
 
@@ -113,6 +135,7 @@ final class VaultMetadata {
         out.retired.putAll(retired);
         out.unknown = unknown;
         out.mac = mac;
+        out.ancestors.addAll(ancestors);
         return out;
     }
 
@@ -156,6 +179,16 @@ final class VaultMetadata {
                 b.append("retired.").append(version).append('=')
                         .append(Bytes.toHex(envelope)).append('\n');
             }
+        }
+        if (!ancestors.isEmpty()) {
+            b.append("ancestors=");
+            for (int iter = 0; iter < ancestors.size(); iter++) {
+                if (iter > 0) {
+                    b.append(',');
+                }
+                b.append(ancestors.get(iter));
+            }
+            b.append('\n');
         }
         b.append(unknown);
         return b.toString();
@@ -207,6 +240,19 @@ final class VaultMetadata {
                 out.passwordWrap = hex(value);
             } else if ("wrap.recovery".equals(key)) {
                 out.recoveryWrap = hex(value);
+            } else if ("ancestors".equals(key)) {
+                int from = 0;
+                while (from < value.length()) {
+                    int comma = value.indexOf(',', from);
+                    if (comma < 0) {
+                        comma = value.length();
+                    }
+                    String one = value.substring(from, comma);
+                    if (one.length() > 0) {
+                        out.ancestors.add(one);
+                    }
+                    from = comma + 1;
+                }
             } else if (key.startsWith("retired.")) {
                 out.retired.put(Integer.valueOf(parseInt(key.substring(8))), hex(value));
             } else {
