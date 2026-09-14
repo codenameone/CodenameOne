@@ -2547,6 +2547,70 @@ public class SelfTest {
     }
 
     /**
+     * A null method is GET, and an empty array is not a body.
+     *
+     * <p>The packaged client copies the body into one byte even when there are
+     * none, so that a failed allocation stays distinguishable from an empty one.
+     * That made the copy non-null for request(null, url, null, new byte[0]), and
+     * handing it to libcurl put the transfer into POST mode -- with no method
+     * supplied, which means GET everywhere else including the Java SE twin. The
+     * same public call reached a different route, or performed a state change,
+     * only once packaged.
+     */
+    private static void aNullMethodWithAnEmptyBodyIsStillAGet() throws Exception {
+        check("a null method and an empty body is a GET", "GET",
+                methodSeenBy(null, new byte[0]));
+        // The control: an explicit verb keeps its meaning, empty body and all.
+        check("and an explicit POST is still a POST", "POST",
+                methodSeenBy("POST", new byte[0]));
+    }
+
+    /** The method a listener actually sees for one Web.request call. */
+    private static String methodSeenBy(String method, byte[] body) throws Exception {
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final String[] seen = new String[1];
+        seen[0] = "nothing";
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 5000);
+                    byte[] in = new byte[4096];
+                    int n = ServerSocket.read(client, in, 0, in.length);
+                    String text = n > 0 ? new String(in, 0, n, "UTF-8") : "";
+                    int space = text.indexOf(' ');
+                    seen[0] = space > 0 ? text.substring(0, space) : "unreadable";
+                    byte[] ok = ("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n"
+                            + "Connection: close\r\n\r\nok").getBytes("UTF-8");
+                    ServerSocket.write(client, ok, 0, ok.length);
+                } catch (Exception ignored) {
+                    // Reported through seen[0], which stays "nothing".
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        try {
+            Web.request(method, "http://127.0.0.1:" + listener.getPort() + "/probe",
+                    null, body);
+        } catch (Exception ignored) {
+            // The method the peer saw is the answer, not whether the call
+            // succeeded.
+        } finally {
+            listener.close();
+        }
+        stub.join(5000);
+        return seen[0];
+    }
+
+    /**
      * A redirect does not carry the caller's BODY to another host.
      *
      * <p>Redirects are followed freely when the caller supplied no headers, on the
@@ -5351,6 +5415,7 @@ public class SelfTest {
         aFramedResponseEndsAtItsFraming();
         aChunkSizeCannotWrapTheWalk();
         aRedirectDoesNotCarryTheBodyOffHost();
+        aNullMethodWithAnEmptyBodyIsStillAGet();
         oneReadyDescriptorIsOneSlot();
         aTunableBelowItsFloorTakesTheDefault();
         aStalledPeerDoesNotHoldTheHandshake();

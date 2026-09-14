@@ -234,18 +234,28 @@ public final class StaticFiles implements HttpServer.Handler {
                 // and back inside for the resolve, and what gets served is the
                 // outside file that the check never looked at.
                 //
-                // Binding the two by IDENTITY closes that. The descriptor's inode
-                // came back in the stat above, so opening the resolved path and
-                // comparing says whether the file this response will send is the
-                // file that was proven contained. A swap in either direction makes
-                // the two differ and is refused. What it cannot distinguish is a
-                // hard link inside the root to a file outside it -- and that file
-                // does have a name inside the document root, which is the thing
-                // the root is a statement about.
+                // Binding the two by IDENTITY NARROWS it. It does not close it,
+                // and openBeneathImpl says why in its own comment: the second
+                // lookup is racy in the same way as the first. What the comparison
+                // buys is that the final component can no longer be swapped
+                // unseen -- the resolved path has no symlinks left in it, so an
+                // attacker has to swap a DIRECTORY component of it between the
+                // resolve and this open to still win. Closing it outright is what
+                // openat2 is for, which is why the open above is preferred
+                // wherever the kernel has it.
                 //
-                // Only where openBeneath could not settle it, which is the Java SE
-                // arm and any kernel without openat2; a proven open needs none of
-                // this and pays for none of it.
+                // TWO MORE LIMITS, both worth naming rather than implying. A hard
+                // link inside the root to a file outside it cannot be told apart
+                // -- and that file does have a name inside the document root,
+                // which is what the root is a statement about. And the comparison
+                // is only as good as the identity: the packaged arm reads it from
+                // an fstat of the open descriptor, so it describes the served
+                // bytes, while the Java SE arm has no fstat for a channel and
+                // reads it from the pathname, so there it is one more statement
+                // about the path rather than about what was opened.
+                //
+                // Only where openBeneath could not settle it; a proven open needs
+                // none of this and pays for none of it.
                 if(info[3] != 0) {
                     int verify = FileIo.openRead(real);
                     if(verify < 0) {

@@ -498,7 +498,17 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
             curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
         }
     }
-    if(bodyCopy != NULL) {
+    /* AND ONLY WHEN THERE IS SOMETHING TO SEND, or a verb that asked for it.
+       An empty byte array is not null, and the copy above allocates one byte for
+       a zero-length body so that a failed malloc stays distinguishable -- so
+       bodyCopy was non-null for request(null, url, null, new byte[0]) and setting
+       POSTFIELDS put libcurl into POST mode. The caller supplied no method, which
+       means GET on the Java SE twin and on every reading of this API: the same
+       call reached a different route, or performed a state change, only once
+       packaged. An explicit verb keeps the old behaviour, empty body and all,
+       because CUSTOMREQUEST has already said what it is and a Content-Length of
+       zero is part of what it means. */
+    if(bodyCopy != NULL && (bodyLength > 0 || methodCopy != NULL)) {
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bodyCopy);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)bodyLength);
     }

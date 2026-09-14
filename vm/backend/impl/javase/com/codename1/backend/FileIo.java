@@ -67,7 +67,18 @@ public final class FileIo {
         final boolean directory;
         /** Whether the descriptor and the path agreed; see openRead. */
         final boolean consistent;
-        /** The file's identity as the path saw it, or null where unsupported. */
+        /**
+     * The file's identity as the PATH saw it, or null where unsupported.
+     *
+     * <p>As the path saw it, not as the descriptor did, and that is the whole of
+     * what this arm can say: there is no fstat for a FileChannel in public Java,
+     * so every attribute here comes from a pathname lookup. A caller binding a
+     * served descriptor to a verified path with this -- StaticFiles does -- gets
+     * a weaker answer here than on the packaged arm, where the same number comes
+     * from an fstat of the open descriptor. Said out loud because the number
+     * looks identical on both sides of the API and only one of them describes
+     * the bytes.
+     */
         final Object fileKey;
         /**
          * The same identity as a number, for the ETag's third component. See the
