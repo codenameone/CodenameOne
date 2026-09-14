@@ -162,22 +162,31 @@ do.
 === The Values These APIs Hand You
 
 Everything above takes or returns a handful of small types from
-`com.codename1.call`. They're enumerations rather than integer constants, so the
-compiler catches a state you forgot, and every one of them has a value that matters more
-than the rest.
+`com.codename1.call`. They're enumerations rather than integer constants, so a
+value that isn't one of them won't compile -- though a `switch` over one still
+isn't required to cover every constant, so a state you don't handle is a
+silent default rather than a compiler error. Each of them has a value that
+matters more than the rest.
 
-`CallState`:: `RINGING`, `DIALING`, `ACTIVE`, `HELD`, `ENDED`. A session moves
-through these in one direction and never leaves `ENDED`, so treat that as the
-point where you release whatever the call was holding.
+`CallState`:: `RINGING`, `DIALING`, `ACTIVE`, `HELD`, `ENDED`. Incoming calls
+start at `RINGING` and outgoing ones at `DIALING`, but `ACTIVE` and `HELD`
+cycle in both directions -- `CallSession.setHeld(false)` and a fulfilled resume
+request both put a held call back to `ACTIVE`, so code that treats `HELD` as
+one-way rejects a legitimate resume or leaves media paused. `ENDED` is the only
+terminal state: a call never leaves it, acting on one that has reports
+`CallError.INVALID_ID`, and it's where you release whatever the call held.
 
 `CallDirection`:: `INCOMING` or `OUTGOING`. Worth reading rather than inferring
 from which method you called: a call your app reported can be re-delivered to
 you after a process restart, and the direction is how you tell the two apart.
 
 `CallEndReason`:: `REMOTE_ENDED`, `LOCAL_ENDED`, `UNANSWERED`, `BUSY`, `FAILED`,
-`FILTERED`. `FILTERED` is the one to treat on its own -- it means the call
-never rang because a directory extension blocked it, so there's nothing to
-report to the user and nothing went wrong.
+// vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
+`FILTERED`. `FILTERED` is the one to treat on its own: the system declined the
+call rather than the user, through Do Not Disturb or a blocked number, and it
+is distinct from `UNANSWERED` because the call never rang at all. Don't read it
+as "the user rejected this" -- that's `LOCAL_ENDED`, and conflating the two
+sends the wrong status back to whatever placed the call.
 
 `CallAvailability`:: what `Calls.getAvailability()` answers before you report a
 call. `AVAILABLE` is the only value that lets a call ring.
