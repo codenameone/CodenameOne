@@ -2947,6 +2947,39 @@ public class SelfTest {
     }
 
     /**
+     * A removed descriptor is removed, even when only one filter was on it.
+     *
+     * <p>kqueue takes one change per filter, and the removal asked for both in a
+     * single call. A descriptor registered for WRITE alone has no read filter, so
+     * the first change answered ENOENT -- and with no eventlist to report
+     * per-change errors into, kevent() stops there and never applies the second.
+     * The write filter stayed, remove() reported success, and await() went on
+     * handing the caller a descriptor it had deregistered.
+     */
+    private static void removingADescriptorRemovesEveryFilter() throws Exception {
+        Reactor reactor = Reactor.create();
+        ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 5000);
+        int peer = listener.accept();
+        int[] ready = new int[8];
+        try {
+            // WRITE only, which is what leaves the read filter absent.
+            reactor.add(peer, Reactor.WRITE);
+            int before = reactor.await(ready, 1000);
+            reactor.remove(peer);
+            int after = reactor.await(ready, 300);
+            check("a writable descriptor is reported while it is watched", "1",
+                    String.valueOf(before));
+            check("and not after it is removed", "0", String.valueOf(after));
+        } finally {
+            reactor.close();
+            ServerSocket.closeFd(peer);
+            conn.close();
+            listener.close();
+        }
+    }
+
+    /**
      * A modify REPLACES a descriptor's interest; it does not add to it.
      *
      * <p>That is what EPOLL_CTL_MOD does with its mask and what interestOps() does
@@ -5270,6 +5303,7 @@ public class SelfTest {
         theReactorProbesAndFiresOnce();
         modifyingIntoOneShotDisarms();
         modifyReplacesTheInterestRatherThanAddingToIt();
+        removingADescriptorRemovesEveryFilter();
         aFramedResponseEndsAtItsFraming();
         aChunkSizeCannotWrapTheWalk();
         aRedirectDoesNotCarryTheBodyOffHost();

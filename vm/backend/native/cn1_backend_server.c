@@ -886,11 +886,20 @@ JAVA_INT com_codename1_backend_Reactor_unregisterImpl___int_int_R_int(CODENAME_O
 #if defined(CN1_HAVE_EPOLL)
     return epoll_ctl(poller, EPOLL_CTL_DEL, fd, NULL) == 0 ? 0 : -1;
 #elif defined(CN1_HAVE_KQUEUE)
-    struct kevent ev[2];
-    EV_SET(&ev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-    EV_SET(&ev[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-    /* ENOENT here just means it was not registered for that filter. */
-    kevent(poller, ev, 2, NULL, 0, NULL);
+    /* ONE CALL EACH, because a batch stops at its first failure. An absent
+       filter answers ENOENT -- which is fine in itself, and the comment here used
+       to say so and leave it there -- but with no eventlist to report per-change
+       errors into, kevent() returns at that point and does not apply what
+       follows. A descriptor registered for WRITE alone therefore kept its write
+       filter: the read delete failed first, the write delete was never reached,
+       and remove() reported success while await() went on returning a descriptor
+       its caller believes is gone. The modify path above splits its deletes for
+       exactly this reason; this one did not. */
+    struct kevent drop;
+    EV_SET(&drop, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+    kevent(poller, &drop, 1, NULL, 0, NULL);
+    EV_SET(&drop, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+    kevent(poller, &drop, 1, NULL, 0, NULL);
     return 0;
 #else
     (void)poller; (void)fd;
