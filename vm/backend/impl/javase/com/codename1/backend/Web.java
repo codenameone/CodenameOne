@@ -239,7 +239,17 @@ public final class Web {
             // must not disagree about it: whatever is unsafe there is unsafe
             // here, and a difference between the arms is one more thing that
             // only shows up after packaging.
-            connection.setInstanceFollowRedirects(headers == null || headers.isEmpty());
+            //
+            // AND A BODY IS A SECRET TOO. "No headers, nothing to leak" reads as
+            // though only a header field can carry one: a 307 or a 308 preserves
+            // the method AND the payload, so a POST redirected off-domain arrives
+            // at the new host complete -- a form with a password in it, a token
+            // exchange, a signed document -- and a bodied request is also the
+            // state-changing kind, so following blindly can perform it twice, the
+            // second time somewhere the caller never named. Both arms take the
+            // restricted path for one.
+            connection.setInstanceFollowRedirects((headers == null || headers.isEmpty())
+                    && (body == null || body.length == 0));
             connection.setRequestProperty("User-Agent", "codenameone-backend");
             if(headers != null) {
                 for(int iter = 0 ; iter < headers.size() ; iter++) {

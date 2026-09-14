@@ -2476,6 +2476,116 @@ public class SelfTest {
     }
 
     /**
+     * A redirect does not carry the caller's BODY to another host.
+     *
+     * <p>Redirects are followed freely when the caller supplied no headers, on the
+     * reasoning that there is then nothing to leak. A body is something to leak: a
+     * 307 and a 308 preserve the method and the payload -- that is exactly what
+     * separates them from a 301 or 302, which become a GET -- so a POST redirected
+     * off-domain arrives at the new host complete. libcurl drops Authorization
+     * when the host changes and has never done the equivalent for a body, because
+     * nothing can know what is in one. A bodied request is also the
+     * state-changing kind, so following one blindly can perform it twice, the
+     * second time somewhere the caller never named.
+     *
+     * <p>The destination is named "localhost" while the origin is "127.0.0.1", so
+     * this is a different host by name on either arm, whichever way each expresses
+     * "same host only". The control is a bodiless GET through a 302, which both
+     * arms follow: without it this check would pass just as well with redirects
+     * switched off altogether.
+     */
+    private static void aRedirectDoesNotCarryTheBodyOffHost() throws Exception {
+        check("a 307 with a body is not followed off-host", "307 nothing",
+                redirectOutcome("POST", "307 Temporary Redirect",
+                        "s3cret-payload".getBytes("UTF-8")));
+        check("and a bodiless request still follows one", "200 a request arrived",
+                redirectOutcome("GET", "302 Found", null));
+    }
+
+    /**
+     * Runs one redirect scenario and answers "status what-the-second-host-saw".
+     *
+     * <p>Two listeners: the first answers the named 3xx pointing at the second,
+     * and the second records whether anything reached it at all.
+     */
+    private static String redirectOutcome(String method, String status, byte[] body)
+            throws Exception {
+        final ServerSocket target = ServerSocket.bind("127.0.0.1", 0, 1);
+        final ServerSocket origin = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int targetPort = target.getPort();
+        final String[] atTarget = new String[1];
+        atTarget[0] = "nothing";
+        final String line = status;
+        Thread targetStub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = target.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 5000);
+                    byte[] in = new byte[8192];
+                    int n = ServerSocket.read(client, in, 0, in.length);
+                    String text = n > 0 ? new String(in, 0, n, "UTF-8") : "";
+                    atTarget[0] = text.indexOf("s3cret-payload") >= 0
+                            ? "the body arrived" : "a request arrived";
+                    byte[] ok = ("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n"
+                            + "Connection: close\r\n\r\nok").getBytes("UTF-8");
+                    ServerSocket.write(client, ok, 0, ok.length);
+                } catch (Exception ignored) {
+                    // Never contacted is the answer this check is looking for.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        Thread originStub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = origin.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 5000);
+                    byte[] in = new byte[8192];
+                    ServerSocket.read(client, in, 0, in.length);
+                    byte[] moved = ("HTTP/1.1 " + line + "\r\nLocation: http://localhost:"
+                            + targetPort + "/moved\r\nContent-Length: 0\r\n"
+                            + "Connection: close\r\n\r\n").getBytes("UTF-8");
+                    ServerSocket.write(client, moved, 0, moved.length);
+                } catch (Exception ignored) {
+                    // Reported through the result the caller gets.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        targetStub.start();
+        originStub.start();
+        String outcome;
+        try {
+            Web.Result r = Web.request(method, "http://127.0.0.1:" + origin.getPort()
+                    + "/start", null, body);
+            outcome = (r == null ? "no result" : String.valueOf(r.getStatus()))
+                    + " " + atTarget[0];
+        } catch (Exception err) {
+            outcome = "failed: " + err.getMessage();
+        } finally {
+            origin.close();
+            target.close();
+        }
+        originStub.join(5000);
+        targetStub.join(5000);
+        return outcome;
+    }
+
+    /**
      * A chunk size the peer chose cannot be made to wrap this client's arithmetic.
      *
      * <p>parseChunkSize refuses only what overflows its own accumulator, so a peer
@@ -4905,6 +5015,7 @@ public class SelfTest {
         modifyReplacesTheInterestRatherThanAddingToIt();
         aFramedResponseEndsAtItsFraming();
         aChunkSizeCannotWrapTheWalk();
+        aRedirectDoesNotCarryTheBodyOffHost();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
         halfACredentialPairIsRefused();

@@ -407,8 +407,20 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
        where there is nothing to leak. With headers, following is restricted to
        the same host where libcurl can express that, and otherwise not done at
        all: the 3xx and its Location are returned as the response, which the
-       caller can act on deliberately. */
-    if(headers == NULL) {
+       caller can act on deliberately.
+
+       AND A BODY IS A SECRET TOO, which "nothing to leak" was reading as though
+       only header fields could carry one. A 307 or a 308 preserves the method
+       AND the payload -- that is the whole difference between them and a 301 or
+       302, which libcurl turns into a GET -- so a POST redirected off-domain
+       arrives at the new host complete: a form with a password in it, a token
+       exchange, a signed document. libcurl drops Authorization when the host
+       changes and has never done anything of the kind for the body, because
+       there is no general way to know what is in one. A bodied request is also
+       the state-changing kind, so following blindly can mean performing it twice,
+       the second time somewhere the caller never named. It therefore takes the
+       same restricted path a headered one does. */
+    if(headers == NULL && bodyLength == 0) {
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     } else {
         /* This #ifdef may never fire, for the same reason the PATH_AS_IS one
