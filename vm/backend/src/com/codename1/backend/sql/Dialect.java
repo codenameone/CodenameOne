@@ -240,7 +240,8 @@ public abstract class Dialect {
             throw new IOException("No statement");
         }
         return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments(),
-                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings());
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace());
     }
 
     /**
@@ -257,7 +258,8 @@ public abstract class Dialect {
             throw new IOException("No statement");
         }
         return Placeholders.countInsertRows(sql, nestedBlockComments(),
-                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings());
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace());
     }
 
     /**
@@ -272,7 +274,8 @@ public abstract class Dialect {
             throw new IOException("No statement");
         }
         return Placeholders.endOfStatement(sql, nestedBlockComments(),
-                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings());
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace());
     }
 
     /** Whether this engine's parameters are written $1, $2 rather than ?. */
@@ -311,6 +314,19 @@ public abstract class Dialect {
      * the server saw it.
      */
     boolean dollarQuotedStrings() {
+        return false;
+    }
+
+    /**
+     * Whether a double dash begins a comment only when whitespace follows it.
+     *
+     * <p>MySQL alone. There, "5--1" is five minus minus-one and only "-- " opens
+     * a comment; SQLite and PostgreSQL take the two dashes whatever follows. Read
+     * MySQL the other way, "VALUES (5--1), (2)" looked like one row with a
+     * comment after it instead of the two rows it is -- which is exactly what the
+     * multi-row insert check was reading.
+     */
+    boolean dashCommentNeedsSpace() {
         return false;
     }
 
@@ -496,6 +512,10 @@ public abstract class Dialect {
         }
 
         boolean hashLineComments() {
+            return true;
+        }
+
+        boolean dashCommentNeedsSpace() {
             return true;
         }
 

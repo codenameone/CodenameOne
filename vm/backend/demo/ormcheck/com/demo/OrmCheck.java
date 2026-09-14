@@ -81,6 +81,7 @@ public class OrmCheck {
                 aTerminatedStatementStillAnswersItsKey(pool);
                 anUpsertThatUpdatesStillAnswers(pool);
                 aMultiRowInsertIsRefused(pool);
+                anExactNumericKeyIsStillAKey(pool);
             } finally {
                 notes.dropTable();
             }
@@ -372,6 +373,37 @@ public class OrmCheck {
                     String.valueOf(pool.query("SELECT name FROM cn1_multi", null).size()));
         } finally {
             pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
+        }
+    }
+
+    /**
+     * A generated key declared NUMERIC still answers, on PostgreSQL.
+     *
+     * <p>PostgreSQL alone, because it is the only engine that returns a value as
+     * exact TEXT rather than as a number -- deliberately, since an
+     * arbitrary-precision value does not survive a double. "numeric(19,0) DEFAULT
+     * nextval(...)" is an ordinary way to spell a key, and a check that insisted
+     * the key be a Number threw after the insert had committed.
+     */
+    private static void anExactNumericKeyIsStillAKey(DataSource pool) throws Exception {
+        if(!"postgresql".equals(pool.dialect().getName())) {
+            return;
+        }
+        pool.execute("DROP TABLE IF EXISTS cn1_numeric_key", null);
+        pool.execute("DROP SEQUENCE IF EXISTS cn1_numeric_seq", null);
+        pool.execute("CREATE SEQUENCE cn1_numeric_seq", null);
+        pool.execute("CREATE TABLE cn1_numeric_key (id numeric(19,0) PRIMARY KEY "
+                + "DEFAULT nextval('cn1_numeric_seq'), name TEXT)", null);
+        try {
+            long key = pool.insert("INSERT INTO cn1_numeric_key (name) VALUES (?)",
+                    new Object[] {"exact"}, "id");
+            check("a numeric generated key answers", "true", String.valueOf(key > 0));
+            check("and the row is there", "1", String.valueOf(pool.query(
+                    "SELECT name FROM cn1_numeric_key WHERE id = ?",
+                    new Object[] {Long.valueOf(key)}).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_numeric_key", null);
+            pool.execute("DROP SEQUENCE IF EXISTS cn1_numeric_seq", null);
         }
     }
 

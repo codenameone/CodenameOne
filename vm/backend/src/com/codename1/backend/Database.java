@@ -329,8 +329,18 @@ public final class Database {
             // next instruction reads a native crash out of it.
             return ((Number)value).longValue();
         }
-        throw new IOException("The generated key came back as something other than a "
-                + "number, so the column named is not the generated one: " + idColumn);
+        // A NUMERIC key comes back as exact TEXT, on purpose: PostgreSQL's decoder
+        // will not put an arbitrary-precision value through a double, and
+        // "numeric(19,0) DEFAULT nextval(...)" is an ordinary way to spell a key.
+        // Refusing it here threw after the insert had committed. Values is the one
+        // place that parses such text exactly -- it is a leaf converter with no
+        // reference back to this class, so using it here adds no cycle.
+        Long parsed = com.codename1.backend.orm.Values.asLongObject(value);
+        if(parsed != null) {
+            return parsed.longValue();
+        }
+        throw new IOException("The generated key came back as null, so the column named is "
+                + "not the generated one: " + idColumn);
     }
 
     /**
