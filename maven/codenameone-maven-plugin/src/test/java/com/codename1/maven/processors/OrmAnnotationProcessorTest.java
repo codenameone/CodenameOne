@@ -199,8 +199,12 @@ public class OrmAnnotationProcessorTest {
         // commits the insert and then throws reading the generated Long back, and
         // a boolean key turns every generated value into true -- so the first
         // row's id is 1 and every later update and delete targets it.
+        // byte and short are integers and were accepted by the first version of
+        // this check, but a generated key leaves their range after 127 and
+        // 32,767 rows and the setter then narrows it to a negative number.
         String[] fields = {"public byte[] id;", "public boolean id;", "public double id;",
-                "public java.util.Date id;"};
+                "public java.util.Date id;", "public byte id;", "public short id;",
+                "public Short id;"};
         for (String field : fields) {
             File classes = compileFixture(
                     "com.example.Bad",

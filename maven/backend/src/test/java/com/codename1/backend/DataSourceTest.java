@@ -257,6 +257,29 @@ class DataSourceTest {
     }
 
     @Test
+    @DisplayName("an insert that inserted nothing answers no key")
+    void anIgnoredInsertHasNoKey() throws Exception {
+        // last_insert_rowid() answers for the CONNECTION, not the statement, so
+        // after a conflict that was ignored it still holds the previous row's
+        // id. Reported as this insert's key, it makes the caller write another
+        // row's id into the object it believes it just stored.
+        DataSource pool = DataSource.open(":memory:");
+        try {
+            pool.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "name TEXT UNIQUE)", null);
+            long first = pool.insert("INSERT INTO t (name) VALUES (?)",
+                    new Object[] {"once"}, "id");
+            assertTrue(first > 0);
+            long ignored = pool.insert("INSERT OR IGNORE INTO t (name) VALUES (?)",
+                    new Object[] {"once"}, "id");
+            assertEquals(0L, ignored, "the conflicting insert reported an earlier row's key");
+            assertEquals(1, pool.query("SELECT id FROM t", null).size());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     @DisplayName("a pool describes itself without its password")
     void describesWithoutTheUrl() throws Exception {
         DataSource pool = DataSource.open(":memory:");

@@ -244,7 +244,8 @@ public final class Database {
      * case matters is spelled correctly rather than folded.
      *
      * @param sql an INSERT in the portable form, with no RETURNING of its own
-     * @return the generated key, or 0 where the statement generated none
+     * @return the generated key, or 0 where the statement inserted no row -- an
+     *         ignored conflict, most often -- or where the engine generated none
      */
     public synchronized long insert(String sql, Object[] params, String idColumn)
             throws IOException {
@@ -252,7 +253,16 @@ public final class Database {
             throw new IOException("insert needs the name of the generated key column");
         }
         if(!dialect.generatedKeysThroughReturning()) {
-            execute(sql, params);
+            // THE ROW COUNT DECIDES. last_insert_rowid() and LAST_INSERT_ID()
+            // answer for the CONNECTION, not for the statement: after an
+            // "INSERT OR IGNORE" (or MySQL's "INSERT IGNORE") that conflicted,
+            // they still hold the id of whatever this connection inserted
+            // before, so the caller writes ANOTHER ROW'S key into the object it
+            // believes it just stored. Zero is what PostgreSQL already answers
+            // here -- a RETURNING that matched nothing -- so the three agree.
+            if(execute(sql, params) == 0) {
+                return 0;
+            }
             return lastInsertId();
         }
         // RETURNING makes this a statement that answers with rows, so it goes
