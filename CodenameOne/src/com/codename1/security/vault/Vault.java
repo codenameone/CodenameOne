@@ -324,7 +324,7 @@ public final class Vault {
         try {
             fresh.passwordWrap = SecureEnvelope.sealWithPassword(password, options.getKdf(),
                     fresh.dataKeyId, fresh.dataKeyVersion,
-                    binding(fresh, DATA_KEY_RECORD, PURPOSE_PASSWORD), key);
+                    wrapBinding(fresh, PURPOSE_PASSWORD), key);
             writeMetadata(fresh);
             // Read back and open. A store that accepted a write and did not keep it -- an evicted
             // origin, a full disk, a quota refusal reported as success -- would otherwise be
@@ -335,7 +335,7 @@ public final class Vault {
                         "the vault record did not survive being written");
             }
             byte[] proof = SecureEnvelope.parse(verified.passwordWrap)
-                    .openWithPassword(password, binding(verified, DATA_KEY_RECORD, PURPOSE_PASSWORD));
+                    .openWithPassword(password, wrapBinding(verified, PURPOSE_PASSWORD));
             if (!Bytes.constantTimeEquals(proof, key)) {
                 Bytes.zero(proof);
                 throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
@@ -388,7 +388,7 @@ public final class Vault {
                     }
                     SecureEnvelope envelope = SecureEnvelope.parse(meta.passwordWrap);
                     byte[] key = envelope.openWithPassword(password,
-                            binding(meta, DATA_KEY_RECORD, PURPOSE_PASSWORD));
+                            wrapBinding(meta, PURPOSE_PASSWORD));
                     if (generation != lockGeneration) {
                         Bytes.zero(key);
                         throw new VaultException(VaultError.LOCKED,
@@ -454,7 +454,7 @@ public final class Vault {
                                 + "again");
                     }
                     key = await(deviceProtection().unwrap(deviceKeyId(), record.wrap,
-                                    binding(meta, DATA_KEY_RECORD, PURPOSE_DEVICE).serialize()),
+                                    wrapBinding(meta, PURPOSE_DEVICE).serialize()),
                             "the remembered device key could not be used");
                     if (generation != lockGeneration) {
                         throw new VaultException(VaultError.LOCKED,
@@ -541,7 +541,7 @@ public final class Vault {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                     "the device key could not be created");
         }
-        byte[] aad = binding(metadata, DATA_KEY_RECORD, PURPOSE_DEVICE).serialize();
+        byte[] aad = wrapBinding(metadata, PURPOSE_DEVICE).serialize();
         byte[] wrapped = await(device.wrap(deviceKeyId(), dataKey, aad),
                 "the data key could not be wrapped for this device");
         // Proven before it is trusted, same reasoning as enrolment: a wrap that cannot be
@@ -878,10 +878,10 @@ public final class Vault {
                                 "this vault has no password wrap to change");
                     }
                     key = SecureEnvelope.parse(meta.passwordWrap).openWithPassword(oldPassword,
-                            binding(meta, DATA_KEY_RECORD, PURPOSE_PASSWORD));
+                            wrapBinding(meta, PURPOSE_PASSWORD));
                     byte[] rewrapped = SecureEnvelope.sealWithPassword(newPassword,
                             options.getKdf(), meta.dataKeyId, meta.dataKeyVersion,
-                            binding(meta, DATA_KEY_RECORD, PURPOSE_PASSWORD), key);
+                            wrapBinding(meta, PURPOSE_PASSWORD), key);
                     // Same discipline as rotation: a copy is written and then adopted, so a failed
                     // write leaves the vault on the record that is actually stored rather than on
                     // one holding a password wrap nobody can find.
@@ -927,7 +927,7 @@ public final class Vault {
                     VaultMetadata next = metadata.copy();
                     next.recoveryWrap = SecureEnvelope.seal(derived, next.dataKeyId,
                             next.dataKeyVersion,
-                            binding(next, DATA_KEY_RECORD, PURPOSE_RECOVERY), dataKey);
+                            wrapBinding(next, PURPOSE_RECOVERY), dataKey);
                     Bytes.zero(derived);
                     next.counter = metadata.counter + 1;
                     writeMetadata(next);
@@ -958,7 +958,7 @@ public final class Vault {
                     }
                     derived = recoveryKey(code);
                     byte[] key = SecureEnvelope.parse(meta.recoveryWrap).open(derived,
-                            binding(meta, DATA_KEY_RECORD, PURPOSE_RECOVERY));
+                            wrapBinding(meta, PURPOSE_RECOVERY));
                     if (generation != lockGeneration) {
                         Bytes.zero(key);
                         throw new VaultException(VaultError.LOCKED,
@@ -996,6 +996,10 @@ public final class Vault {
     /// find out when they need it.
     public AsyncResource<Boolean> rotateDataKey(final char[] password) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // Rotation derives from the password twice -- once to prove it, once to wrap the new key
+        // -- so at the default profile it holds the vault open for well over a second. A lock that
+        // lands in there must not be undone by the publish at the end.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -1003,11 +1007,25 @@ public final class Vault {
                 try {
                     requireUnlocked();
                     VaultMetadata meta = metadata;
+                    // Snapshotted, not re-read. lock() sets dataKey to null, and the derivation
+                    // below runs for seconds -- so comparing against the field afterwards compared
+                    // against null and reported AUTHENTICATION_FAILED, telling the user their
+                    // password was wrong when it was fine and the vault had simply been locked.
+                    // Measured: the lock-race test produced exactly that before this snapshot.
+                    byte[] currentKey = dataKey;
                     // Proven before anything changes: a rotation that leaves the password unable
                     // to unwrap the new key is a vault nobody can open on another device.
                     byte[] check = SecureEnvelope.parse(meta.passwordWrap).openWithPassword(
-                            password, binding(meta, DATA_KEY_RECORD, PURPOSE_PASSWORD));
-                    boolean same = Bytes.constantTimeEquals(check, dataKey);
+                            password, wrapBinding(meta, PURPOSE_PASSWORD));
+                    if (generation != lockGeneration) {
+                        // Asked before the comparison, so a lock is reported as a lock rather than
+                        // as whatever the comparison happens to conclude about a key that is no
+                        // longer there.
+                        Bytes.zero(check);
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while the key was being rotated");
+                    }
+                    boolean same = Bytes.constantTimeEquals(check, currentKey);
                     Bytes.zero(check);
                     if (!same) {
                         throw new VaultException(VaultError.AUTHENTICATION_FAILED,
@@ -1026,13 +1044,25 @@ public final class Vault {
                             SecureEnvelope.seal(fresh, meta.dataKeyId, newVersion,
                                     binding(meta, DATA_KEY_RECORD,
                                             PURPOSE_RETIRED + "." + meta.dataKeyVersion),
-                                    dataKey));
+                                    currentKey));
                     next.dataKeyVersion = newVersion;
                     next.passwordWrap = SecureEnvelope.sealWithPassword(password, options.getKdf(),
                             next.dataKeyId, newVersion,
-                            binding(next, DATA_KEY_RECORD, PURPOSE_PASSWORD), fresh);
+                            wrapBinding(next, PURPOSE_PASSWORD), fresh);
                     next.recoveryWrap = null;
                     next.counter = meta.counter + 1;
+                    if (generation != lockGeneration) {
+                        // Checked before the write, so a rotation interrupted by a lock simply did
+                        // not happen: nothing is persisted and nothing is published. Refusing
+                        // after the write would leave a rotated record on disk that the caller was
+                        // told had failed.
+                        //
+                        // changePassword deliberately has no such check. It publishes metadata and
+                        // never a data key, and metadata with no key in hand is exactly the locked
+                        // state, so there is nothing there for a lock to undo.
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while the key was being rotated");
+                    }
                     writeMetadata(next);
                     Bytes.zero(dataKey);
                     dataKey = fresh;
@@ -1132,6 +1162,22 @@ public final class Vault {
                                     "the sync state is older than the record already on this "
                                     + "device; refusing to roll back");
                         }
+                        if (incoming.counter == local.counter
+                                && !incoming.serialize().equals(local.serialize())) {
+                            // Same counter, different content: two devices changed from the same
+                            // base and neither is newer. Accepting either silently discards the
+                            // other -- and when both rotated, the local records sealed under the
+                            // local version-N key can never be opened again, because the imported
+                            // key of the same version is a different key.
+                            //
+                            // There is no merge to perform here. Whichever the user keeps, the
+                            // other device's changes since the fork are lost, and that is a
+                            // decision for the application and its sync layer rather than for a
+                            // comparison of two integers.
+                            throw new VaultException(VaultError.CONFLICT,
+                                    "this device and the sync state have both changed since they "
+                                    + "last agreed; the vault cannot choose between them");
+                        }
                     }
                     if (incoming.passwordWrap == null) {
                         throw new VaultException(VaultError.KEY_MISSING,
@@ -1141,7 +1187,7 @@ public final class Vault {
                     // Opened before it is stored. A record that does not unwrap under this
                     // password would replace a working local record with one that cannot be used.
                     byte[] key = SecureEnvelope.parse(incoming.passwordWrap).openWithPassword(
-                            password, binding(incoming, DATA_KEY_RECORD, PURPOSE_PASSWORD));
+                            password, wrapBinding(incoming, PURPOSE_PASSWORD));
                     if (generation != lockGeneration) {
                         // The record is still written -- enrolling this device is the point of the
                         // call and it succeeded. What is refused is leaving the vault unlocked
@@ -1411,6 +1457,27 @@ public final class Vault {
             // round trip on those ports and the correct one on the ports that have two stores.
             await(gated.deleteKey(deviceKeyId()), "the device key could not be deleted");
         }
+    }
+
+    /// The binding for a wrap of the data key, which includes the version that key is.
+    ///
+    /// Without the version in here, opening a wrap authenticates the envelope and its binding and
+    /// says nothing about the record around it -- so a server that serves sync state can splice a
+    /// still-valid wrap of an OLD key into a record claiming a new version. Unlocking then yields
+    /// the old key while the vault labels everything it seals with the new one, and it can restore
+    /// a password the user has since changed away from. Both are the same trick: the wrap was
+    /// genuine, the context was not.
+    ///
+    /// Binding the version makes the context part of what the tag covers, so a spliced wrap fails
+    /// to open instead of opening into the wrong state.
+    ///
+    /// What this does not fix, and cannot: replaying a whole consistent older record with the
+    /// counter raised. Everything inside such a record agrees with itself, and an offline client
+    /// has nothing to compare it against. That is the freshness limit documented on
+    /// [#importSyncState].
+    private AssociatedData wrapBinding(VaultMetadata meta, String purpose) {
+        return AssociatedData.of(application, meta.vaultId, DATA_KEY_RECORD,
+                purpose + "." + meta.dataKeyVersion);
     }
 
     private AssociatedData binding(VaultMetadata meta, String record, String purpose) {

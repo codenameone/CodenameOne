@@ -742,6 +742,115 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aWrapSplicedIntoARecordClaimingAnotherVersionWillNotOpen() {
+        // A sync server hands out the vault record, so it can edit the parts of it that are not
+        // ciphertext. Opening the password wrap proves the wrap is genuine and says nothing about
+        // the record around it -- so without the key version inside the wrap's associated data, a
+        // server can splice a still-valid wrap of an OLD key into a record claiming a new version.
+        // The unlock then yields the old key while the vault labels what it seals with the new
+        // one, and a password the user has since changed away from starts working again.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] versionOne = vault.exportSyncState();
+        vault.rotateDataKey(pw("p")).get();
+        byte[] versionTwo = vault.exportSyncState();
+
+        String oldRecord = new String(versionOne);
+        String newRecord = new String(versionTwo);
+        String oldWrap = lineValue(oldRecord, "wrap.password=");
+        String newWrap = lineValue(newRecord, "wrap.password=");
+        assertNotEquals(oldWrap, newWrap, "the rotation should have rewrapped");
+
+        // The splice: version 2's record, carrying version 1's password wrap.
+        byte[] spliced = newRecord.replace(newWrap, oldWrap).getBytes();
+
+        Vault victim = Vault.named(freshName()).configure(fast());
+        assertEquals(VaultError.AUTHENTICATION_FAILED,
+                errorOf(victim.importSyncState(spliced, pw("p"))),
+                "a wrap bound to version 1 must not open inside a record claiming version 2");
+    }
+
+    /// The value of a `key=value` line in a serialized vault record.
+    private static String lineValue(String record, String prefix) {
+        int at = record.indexOf(prefix);
+        assertTrue(at >= 0, "no " + prefix + " line in the record");
+        int end = record.indexOf('\n', at);
+        return record.substring(at + prefix.length(), end < 0 ? record.length() : end);
+    }
+
+    @Test
+    void twoDevicesThatBothChangedAtTheSameCounterAreAConflict() {
+        // Both devices rotate from the same base, so both produce counter N+1 -- and two different
+        // version-2 data keys. Accepting either on a "not older" test discards the other, and the
+        // local records sealed under the local version-2 key can never be opened again.
+        String name = freshName();
+        Vault local = Vault.named(name).configure(fast());
+        local.enroll(pw("p"), fast()).get();
+        byte[] base = local.exportSyncState();
+
+        // The other device, from the same starting record.
+        Vault other = Vault.named(freshName()).configure(fast());
+        other.importSyncState(base, pw("p")).get();
+
+        local.rotateDataKey(pw("p")).get();
+        other.rotateDataKey(pw("p")).get();
+        byte[] otherState = other.exportSyncState();
+
+        // Same counter, different content. Refused rather than silently chosen between.
+        assertEquals(VaultError.CONFLICT, errorOf(local.importSyncState(otherState, pw("p"))));
+
+        // And the local vault is untouched: what it sealed still opens.
+        byte[] sealed = local.seal("note", "mine".getBytes()).get();
+        assertArrayEquals("mine".getBytes(), local.open("note", sealed).get());
+    }
+
+    @Test
+    void importingTheIdenticalStateAtTheSameCounterIsNotAConflict() {
+        // The conflict test must not have made re-importing what you already have an error --
+        // that is the ordinary case when a sync layer hands back an unchanged record.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] state = vault.exportSyncState();
+        vault.lock();
+        assertTrue(vault.importSyncState(state, pw("p")).get().booleanValue());
+    }
+
+    @Test
+    void aRotationInterruptedByALockDoesNotReopenTheVault() throws Exception {
+        // Rotation derives from the password twice, so it holds the vault open for longer than any
+        // other operation. Every unlock path checks the lock generation; this one did not, and
+        // published the new key straight over a lock that had already happened.
+        String name = freshName();
+        VaultOptions slow = new VaultOptions()
+                .kdf(KdfProfile.pbkdf2(2000000))
+                .deviceProtection(device);
+        final Vault vault = Vault.named(name).configure(slow);
+        vault.enroll(pw("p"), slow).get();
+
+        final java.util.concurrent.CountDownLatch called =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicReference<VaultError> outcome =
+                new java.util.concurrent.atomic.AtomicReference<VaultError>();
+        Thread rotating = new Thread(new Runnable() {
+            public void run() {
+                called.countDown();
+                outcome.set(errorOf(vault.rotateDataKey(pw("p"))));
+            }
+        });
+        rotating.start();
+        called.await();
+        Thread.sleep(100);
+        vault.lock();
+        rotating.join(60000);
+
+        assertEquals(VaultError.LOCKED, outcome.get(),
+                "a rotation running when lock() arrived must be refused");
+        assertFalse(vault.isUnlocked(), "lock() must leave the vault closed");
+    }
+
+    @Test
     void syncStateFromAnotherVaultIsRefused() {
         Vault a = Vault.named(freshName()).configure(fast());
         a.enroll(pw("p"), fast()).get();

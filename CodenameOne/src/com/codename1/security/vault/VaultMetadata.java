@@ -83,6 +83,13 @@ final class VaultMetadata {
 
     /// A detached copy, for building the next state without touching the one in use.
     ///
+    /// The wrap arrays are shared with the original rather than cloned, and that is safe for one
+    /// reason only: every write in this package **replaces** a wrap, never edits one in place. No
+    /// caller zeroes `passwordWrap`, `recoveryWrap` or a retired envelope -- they are ciphertext,
+    /// not key material, so there is nothing in them worth clearing. A change that started editing
+    /// a wrap's bytes would silently reach through every copy ever taken, so clone there rather
+    /// than here if that day comes.
+    ///
     /// Mutating the live record in place and writing it afterwards means a failed write leaves the
     /// vault holding a record it never persisted -- and, during a rotation, one whose key version
     /// has advanced past the key actually in hand. Everything sealed after that is labelled with a
