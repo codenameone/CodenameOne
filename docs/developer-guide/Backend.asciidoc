@@ -384,6 +384,10 @@ engine -- 0 or 1, epoch milliseconds, and the UTF-16 code unit -- because a
 native timestamp comes back as text whose format follows the server's own time
 zone and would not round-trip the same way on three engines, and because a char
 that was never assigned holds NUL, which PostgreSQL refuses inside a text value.
+A field declared as a primitive gets a `NOT NULL` column, because a primitive has
+no null to read: a nullable column would load as `0`, `false` or `\0`, which is
+indistinguishable from a row that holds those. Declare the field as its boxed
+type -- `Integer` rather than `int` -- when the column can be empty.
 
 === Sharing the contract with the app
 
