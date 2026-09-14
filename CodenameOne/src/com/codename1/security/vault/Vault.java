@@ -1455,7 +1455,14 @@ public final class Vault {
                     if (incoming == null) {
                         throw new VaultException(VaultError.CORRUPT, "the sync state is empty");
                     }
-                    VaultMetadata local = loadMetadata();
+                    // FRESH, not the cached record. loadMetadata answers the in-memory copy
+                    // once the vault is open, so this compared an incoming record against
+                    // whatever this instance happened to be holding: another tab that had
+                    // already rotated the shared vault to N+1 was invisible, an authentic copy
+                    // of N passed the equal-counter check against the stale N, and the write
+                    // below then put N back over the persisted N+1 -- losing the rotation and
+                    // with it every record the other tab had sealed under the new key.
+                    VaultMetadata local = loadMetadataFresh();
                     if (local != null) {
                         if (!local.vaultId.equals(incoming.vaultId)) {
                             throw new VaultException(VaultError.CONFLICT,
@@ -1500,12 +1507,14 @@ public final class Vault {
                         // The record is still written -- enrolling this device is the point of the
                         // call and it succeeded. What is refused is leaving the vault unlocked
                         // afterwards, because the application asked for it to be locked.
-                        writeMetadata(incoming);
+                        commitMetadata(local, incoming);
                         Bytes.zero(key);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the sync state was being imported");
                     }
-                    writeMetadata(incoming);
+                    // Committed against the record that was read above, so a tab that wrote
+                    // between the comparison and here loses rather than being overwritten.
+                    commitMetadata(local, incoming);
                     metadata = incoming;
                     Bytes.zero(dataKey);
                     dataKey = key;

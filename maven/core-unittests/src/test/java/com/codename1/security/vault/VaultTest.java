@@ -1035,6 +1035,37 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anAuthenticButSupersededImportCannotOverwriteARotation() {
+        // Two handles on one vault, which is two browser tabs. The importing one is holding a
+        // cached record that another has already rotated past -- and the record being imported
+        // is genuine, so the tag says nothing against it. Comparing against the cache instead of
+        // against storage let version N go back over the persisted N+1, losing the rotation and
+        // every record the other tab had sealed under the new key.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault first = Vault.named(name).configure(options);
+        first.enroll(pw("p"), options).get();
+        byte[] atVersionOne = first.exportSyncState();
+
+        // A second handle caches that same state.
+        Vault second = Vault.named(name).configure(options);
+        assertTrue(second.unlockWithPassword(pw("p")).get().booleanValue());
+
+        // The first rotates. The second's cache is now stale.
+        assertTrue(first.rotateDataKey(pw("p")).get().booleanValue());
+        byte[] afterRotation = first.seal("note", "contents".getBytes()).get();
+
+        assertEquals(VaultError.CONFLICT,
+                errorOf(second.importSyncState(atVersionOne, pw("p"))),
+                "an import older than what is stored must be refused, cache or no cache");
+
+        // And the rotation survived: what the other handle sealed under the new key still opens.
+        Vault reopened = Vault.named(name).configure(options);
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", afterRotation).get());
+    }
+
+    @Test
     void anOldRecordWithItsCounterRaisedIsRefused() {
         // The counter is the whole of the rollback defence and it is plaintext, so a server that
         // serves sync state can edit it. Raising it on an OLD record makes that record look newer

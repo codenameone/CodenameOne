@@ -285,11 +285,19 @@ final class JavascriptSecurityHeaders {
                 + "# and an error page in the app's origin is a page in the app's origin.\n"
                 + "# The policy is scoped to the document its hashes came from; another HTML\n"
                 + "# document on this origin carries inline code this build never hashed.\n"
+                + "#\n"
+                + "# The common headers are REPEATED inside each location, and that is not\n"
+                + "# redundancy. nginx inherits add_header from an outer level only when the\n"
+                + "# current level defines none of its own, so a location that adds the policy\n"
+                + "# silently drops HSTS, nosniff and the rest -- and it would be the main\n"
+                + "# application document that lost them.\n"
                 + "location = /index.html {\n"
                 + "    add_header Content-Security-Policy \"" + csp + "\" always;\n"
+                + nginxCommon("    ")
                 + "}\n"
                 + "location = / {\n"
                 + "    add_header Content-Security-Policy \"" + csp + "\" always;\n"
+                + nginxCommon("    ")
                 + "}\n"
                 + "add_header Strict-Transport-Security \"max-age=63072000; includeSubDomains\" always;\n"
                 + "add_header X-Content-Type-Options \"nosniff\" always;\n"
@@ -301,7 +309,23 @@ final class JavascriptSecurityHeaders {
                 + "\n"
                 + "location = /sw.js {\n"
                 + "    add_header Cache-Control \"no-cache\" always;\n"
+                + nginxCommon("    ")
                 + "}\n";
+    }
+
+    /// The origin-wide headers, for a level that has to restate them.
+    ///
+    /// nginx's add_header inheritance is all-or-nothing per level: define one here and every one
+    /// from the enclosing level is dropped. A location that sets only the policy, or only a
+    /// cache directive, therefore serves a document with none of the transport headers.
+    private static String nginxCommon(String indent) {
+        return indent + "add_header Strict-Transport-Security \"max-age=63072000; includeSubDomains\" always;\n"
+                + indent + "add_header X-Content-Type-Options \"nosniff\" always;\n"
+                + indent + "add_header X-Frame-Options \"DENY\" always;\n"
+                + indent + "add_header Referrer-Policy \"no-referrer\" always;\n"
+                + indent + "add_header Permissions-Policy \"geolocation=(self), camera=(self), "
+                + "microphone=(self), payment=(), usb=(), interest-cohort=()\" always;\n"
+                + indent + "add_header Cross-Origin-Resource-Policy \"same-origin\" always;\n";
     }
 
     private static String apacheHeaders(String csp) {

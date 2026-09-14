@@ -142,6 +142,48 @@ class JavascriptSecurityHeadersTest {
     }
 
     @Test
+    void everyNginxLocationCarriesTheCommonHeaders() throws Exception {
+        java.io.File out = java.nio.file.Files.createTempDirectory("cn1-nginx").toFile();
+        java.nio.file.Files.write(new java.io.File(out, "index.html").toPath(),
+                indexTemplate().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        JavascriptSecurityHeaders.write(out);
+        java.io.File guidance = new java.io.File(out, "cn1-security");
+        String nginx = null;
+        java.io.File[] files = guidance.listFiles();
+        for (int iter = 0; files != null && iter < files.length; iter++) {
+            if (files[iter].getName().indexOf("nginx") >= 0) {
+                nginx = new String(java.nio.file.Files.readAllBytes(files[iter].toPath()),
+                        java.nio.charset.StandardCharsets.UTF_8);
+            }
+        }
+        assertNotNull(nginx, "the nginx fragment must be generated");
+
+        // nginx inherits add_header from an outer level ONLY when the current level defines
+        // none of its own. A location that sets just the policy therefore serves the main
+        // application document with no HSTS, no nosniff and no frame protection at all -- which
+        // is what scoping the policy to a location introduced.
+        String[] blocks = nginx.split("location ");
+        int checked = 0;
+        for (int iter = 1; iter < blocks.length; iter++) {
+            String block = blocks[iter];
+            int close = block.indexOf('}');
+            String body = close < 0 ? block : block.substring(0, close);
+            if (body.indexOf("add_header") < 0) {
+                continue;
+            }
+            checked++;
+            assertTrue(body.indexOf("Strict-Transport-Security") >= 0,
+                    "location block defines add_header but loses HSTS: " + body);
+            assertTrue(body.indexOf("X-Content-Type-Options") >= 0,
+                    "location block defines add_header but loses nosniff: " + body);
+            assertTrue(body.indexOf("X-Frame-Options") >= 0,
+                    "location block defines add_header but loses frame protection: " + body);
+        }
+        // Guards against the assertion passing because nothing was found to check.
+        assertTrue(checked >= 3, "expected the policy and service-worker locations, saw " + checked);
+    }
+
+    @Test
     void thePolicyDeniesTheThingsThatMatter() throws Exception {
         String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate());
         assertTrue(csp.indexOf("object-src 'none'") >= 0);
