@@ -184,12 +184,46 @@ public final class Database {
         if(path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
             path = path.substring(12);
         }
+        // EVERY FORM THE DRIVER PARSES, not just the first one anybody reported.
+        // The rule behind all three is one fact: the local Java SE loop hands the
+        // string to sqlite-jdbc, which INTERPRETS it, and a packaged binary hands
+        // it to sqlite3_open, which reads the whole thing as a FILE NAME -- the C
+        // call takes no URI flag. So each of these is a different database, or
+        // different settings, before and after packaging. Measured against the
+        // bundled driver rather than assumed:
+        //
+        //   file:/tmp/x.db          opens /tmp/x.db          (native: a file called "file:/tmp/x.db")
+        //   /tmp/x.db?foreign_keys=on  opens /tmp/x.db, foreign keys ON
+        //                                                    (native: a file called "x.db?foreign_keys=on", no pragma)
+        //   :resource:a/b.db        read from the classpath   (native: a file called ":resource:a/b.db")
+        //
+        // The second is the one that bites hardest: it opens a real database on
+        // both arms, so nothing fails -- they are just different files with
+        // different integrity rules.
+        //
+        // This is Database's door rather than Db's on purpose: Db is the
+        // per-arm primitive and its two implementations are ALLOWED to differ,
+        // while Database is the one API that promises the same answer on both.
         if(path.regionMatches(true, 0, "file:", 0, 5)) {
             throw new IOException("A SQLite file: URI is not portable here: the local Java SE "
                     + "loop hands it to a driver that parses it, and a packaged binary hands "
                     + "it to sqlite3_open, which reads the whole string as a FILE NAME -- so "
                     + "the same URL is an in-memory database in development and a file on "
                     + "disk in production. Use a plain path, or \":memory:\".");
+        }
+        if(path.regionMatches(true, 0, ":resource:", 0, 10)) {
+            throw new IOException("A SQLite :resource: URL is not portable here: the local "
+                    + "Java SE loop reads it from the classpath and a packaged binary opens a "
+                    + "FILE of that name. Use a plain path, or \":memory:\".");
+        }
+        int query = path.indexOf('?');
+        if(query >= 0) {
+            throw new IOException("A SQLite URL cannot carry " + path.substring(query)
+                    + ": the local Java SE loop reads it as driver settings and opens "
+                    + path.substring(0, query) + ", while a packaged binary opens a FILE "
+                    + "whose name includes it and applies no settings at all -- two "
+                    + "different databases, neither of which fails. Set pragmas with "
+                    + "execute() after opening, which runs on both.");
         }
     }
 

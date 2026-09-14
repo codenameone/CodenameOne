@@ -251,6 +251,21 @@ class DataSourceTest {
         assertThrows(IOException.class,
                 () -> DataSource.open("file:app?mode=memory&cache=shared", 2));
         assertThrows(IOException.class, () -> DataSource.open("jdbc:sqlite:file::memory:"));
+
+        // THE WHOLE CLASS, not the one spelling that was reported first. Every
+        // form sqlite-jdbc interprets is a form sqlite3_open reads as a file
+        // name, and each was measured against the bundled driver: a query
+        // suffix opens the file WITHOUT it and applies the settings, while the
+        // binary opens a file whose name includes it and applies none -- two
+        // real databases, neither of which fails, which is why this one matters
+        // more than the URI spellings that at least look wrong.
+        assertThrows(IOException.class, () -> DataSource.open("app.db?foreign_keys=on"));
+        assertThrows(IOException.class,
+                () -> DataSource.open("jdbc:sqlite:app.db?foreign_keys=on"));
+        assertThrows(IOException.class,
+                () -> DataSource.open("jdbc:sqlite::resource:some/where.db"));
+        assertThrows(IOException.class, () -> DataSource.open(":resource:some/where.db"));
+
         // The two spellings both runtimes agree about still work.
         assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
         DataSource pool = DataSource.open("jdbc:sqlite::memory:");
