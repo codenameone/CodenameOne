@@ -67,6 +67,22 @@ class SeriesTransitionTest extends UITestBase {
     }
 
     @Test
+    void cleanupRunsOnceWhenAnImmediateUpdateEndsAnAnimation() {
+        // cleanup() is overridable and a subclass can release something in it.
+        // updateChart() ends the transition itself, and a frame already queued
+        // behind it reaches animate()'s terminal branch, which called cleanup()
+        // a second time on the same pass.
+        TestSeriesTransition transition = new TestSeriesTransition(chartComponent, SeriesTransition.EASING_LINEAR, 10000);
+
+        transition.animateChart();
+        transition.updateChart();
+        assertEquals(1, transition.cleanupCount, "the immediate update did not clean up");
+
+        assertFalse(transition.animate(), "the transition is still animating");
+        assertEquals(1, transition.cleanupCount, "a queued frame cleaned up a second time");
+    }
+
+    @Test
     void settersUpdateConfiguration() {
         TestSeriesTransition transition = new TestSeriesTransition(chartComponent, SeriesTransition.EASING_LINEAR, 10);
         ChartComponent otherComponent = new TestChartComponent(new RecordingChart());
@@ -164,6 +180,7 @@ class SeriesTransitionTest extends UITestBase {
     private static class TestSeriesTransition extends SeriesTransition {
         private final List<Integer> progressUpdates = new ArrayList<>();
         private boolean cleanupCalled;
+        private int cleanupCount;
 
         TestSeriesTransition(ChartComponent chart, int easing, int duration) {
             super(chart, easing, duration);
@@ -177,6 +194,7 @@ class SeriesTransitionTest extends UITestBase {
         @Override
         protected void cleanup() {
             cleanupCalled = true;
+            cleanupCount++;
         }
     }
 }

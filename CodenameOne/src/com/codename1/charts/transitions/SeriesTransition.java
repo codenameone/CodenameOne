@@ -42,6 +42,14 @@ public abstract class SeriesTransition implements Animation {
     /// The top level this transition registered on, so it is removed from that one
     /// rather than from wherever the chart resolves to when the motion ends.
     private com.codename1.ui.TopLevelContainer animationHost;
+    /// Whether cleanup() has run for the current pass.
+    ///
+    /// cleanup() is overridable and a subclass can release something in
+    /// it, so it has to run once per transition rather than once per
+    /// route out. An immediate update that interrupts an animation ends
+    /// the transition itself, and a frame already queued behind it then
+    /// reaches the same terminal branch.
+    private boolean cleanedUp;
 
 
     public static final int EASING_LINEAR = 1;
@@ -88,6 +96,7 @@ public abstract class SeriesTransition implements Animation {
     /// so that the animation will be initialized properly.
     protected void initTransition() {
         finished = false;
+        cleanedUp = false;
         switch (getEasing()) {
             case EASING_IN:
                 motion = Motion.createEaseInMotion(0, 100, getDuration());
@@ -111,6 +120,15 @@ public abstract class SeriesTransition implements Animation {
 
     }
 
+    /// Runs [#cleanup] unless this pass has already been cleaned up.
+    private void cleanupOnce() {
+        if (cleanedUp) {
+            return;
+        }
+        cleanedUp = true;
+        cleanup();
+    }
+
     /// Updates the renderer and model at the specified progress position of
     /// the animation.  Meant to be overridden by subclasses.
     ///
@@ -122,7 +140,7 @@ public abstract class SeriesTransition implements Animation {
     @Override
     public boolean animate() {
         if (finished) {
-            cleanup();
+            cleanupOnce();
             if (animationHost != null) {
                 animationHost.deregisterAnimated(this);
                 animationHost = null;
@@ -238,7 +256,7 @@ public abstract class SeriesTransition implements Animation {
         initTransition();
         update(100);
         finished = true;
-        cleanup();
+        cleanupOnce();
         chart.repaint();
     }
 
