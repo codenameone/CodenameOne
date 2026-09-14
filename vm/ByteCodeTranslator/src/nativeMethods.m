@@ -2544,8 +2544,23 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     // Either way the census would see gcCurrentlyRunning false, start walking, and
     // have the pending cycle resume and sweep underneath it. Checked here because
     // this is the one door every cycle comes through.
-    if(atomic_load_explicit(&cn1GcFrozenForCensus, memory_order_acquire)) {
-        return;
+    // CLAIM the cycle, do not merely check a flag. Loading a freeze flag and then
+    // setting gcCurrentlyRunning is two steps, and the collector can be preempted
+    // between them: the census would raise the freeze, see gcCurrentlyRunning still
+    // false, and start walking a heap this thread is about to sweep. The claim below
+    // is a single compare-exchange, so a cycle is either started or refused with
+    // nothing observable in between.
+    {
+        int cn1Expected = CN1_GC_CYCLE_IDLE;
+        if(!atomic_compare_exchange_strong_explicit(&cn1GcCycleState, &cn1Expected,
+                CN1_GC_CYCLE_RUNNING, memory_order_acq_rel, memory_order_acquire)) {
+            // In practice only the FROZEN case can be taken: System's GC thread is
+            // the sole caller (System.java's `while(gcShouldLoop)` loop), so no second
+            // entrant can observe RUNNING. Refusing on RUNNING too is defence rather
+            // than policy -- two concurrent cycles would be worse than a skipped one --
+            // and it means this is not a behaviour change for any existing caller.
+            return;
+        }
     }
     gcCurrentlyRunning = JAVA_TRUE;
     if(firstTimeGcThread) {
@@ -2672,6 +2687,14 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     // of malloc entirely for exactly this reason.
     lowMemoryMode = JAVA_FALSE;
     gcCurrentlyRunning = JAVA_FALSE;
+    // Release the claim. Only ever RUNNING -> IDLE: a census that froze while this
+    // cycle ran holds the state at FROZEN and this must not clobber it, which is why
+    // the transition is a compare-exchange rather than a store.
+    {
+        int cn1Running = CN1_GC_CYCLE_RUNNING;
+        atomic_compare_exchange_strong_explicit(&cn1GcCycleState, &cn1Running,
+                CN1_GC_CYCLE_IDLE, memory_order_acq_rel, memory_order_relaxed);
+    }
 }
 
 JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {

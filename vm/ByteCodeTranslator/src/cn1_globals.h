@@ -2864,7 +2864,10 @@ extern struct clazz class_array3__JAVA_DOUBLE;
 extern void cn1GcVerifyFieldType(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT owner, JAVA_OBJECT value,
                                  int declaredClassId, const char* fieldName);
 #endif
-extern _Atomic int cn1GcFrozenForCensus;
+#define CN1_GC_CYCLE_IDLE    0
+#define CN1_GC_CYCLE_RUNNING 1
+#define CN1_GC_CYCLE_FROZEN  2
+extern _Atomic int cn1GcCycleState;
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
 /**
  * Like newStringFromCString but DECODES, in the PLATFORM's encoding, instead of

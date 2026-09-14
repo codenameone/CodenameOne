@@ -5567,15 +5567,16 @@ static void cn1BibopDoInit() {
 #endif
 }
 
-// Set by the exit census to stop the collector for good. Read by
-// java_lang_System_gcMarkSweep__, which refuses to begin a cycle while it is set --
-// see the note there for why clearing System.gcShouldLoop alone leaves a window.
+// The collector's cycle claim: IDLE -> RUNNING by the collector, IDLE -> FROZEN by
+// the exit census, and RUNNING -> IDLE when a cycle finishes. Every transition is a
+// compare-exchange, so the two participants can never both believe they hold the
+// heap -- which a freeze flag read separately from gcCurrentlyRunning could not
+// guarantee, because the collector can be preempted between the two.
 //
-// Defined UNCONDITIONALLY although only the census raises it: nativeMethods.m tests
-// it on every cycle, so a build without CN1_ALLOC_CENSUS must still link. The cost
-// is one relaxed-path atomic load per collection, against a flag that is always 0
-// in a shipping build.
-_Atomic int cn1GcFrozenForCensus = 0;
+// Defined UNCONDITIONALLY although only the census freezes: nativeMethods.m claims
+// on every cycle, so a build without CN1_ALLOC_CENSUS must still link. The cost is
+// one uncontended CAS per collection.
+_Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 
 #ifdef CN1_ALLOC_CENSUS
 // Registered from cn1BibopDoInit under CN1_HEAP_REPORT. A batch program usually
@@ -5605,19 +5606,30 @@ static void cn1BibopExitReport(void) {
     // what a cycle already in flight -- or one whose thread is between the loop test
     // and gcMarkSweep -- will actually honour; gcShouldLoop only stops the thread
     // looping round again, and System re-raises it on its start-up path.
-    atomic_store_explicit(&cn1GcFrozenForCensus, 1, memory_order_release);
+    // Stop the loop re-arming, then WIN the heap rather than wait for a flag. The
+    // census may only walk once it has moved the state IDLE -> FROZEN itself: after
+    // that no cycle can start, because starting one means winning IDLE -> RUNNING.
+    // Polling gcCurrentlyRunning instead left the window this replaces -- a collector
+    // preempted between its check and setting that flag.
     set_static_java_lang_System_gcShouldLoop(JAVA_FALSE);
     {
         // BOUNDED: a diagnostic must not turn a hung collector into a hung exit. On
         // expiry the census is SKIPPED rather than run anyway, because a report read
         // off a heap being swept is worse than no report -- it looks like data.
         int waitMs = 0;
-        while(gcCurrentlyRunning && waitMs < 2000) {
+        int frozen = 0;
+        while(waitMs < 2000) {
+            int expected = CN1_GC_CYCLE_IDLE;
+            if(atomic_compare_exchange_strong_explicit(&cn1GcCycleState, &expected,
+                    CN1_GC_CYCLE_FROZEN, memory_order_acq_rel, memory_order_acquire)) {
+                frozen = 1;
+                break;
+            }
             usleep(1000);
             waitMs++;
         }
-        if(gcCurrentlyRunning) {
-            fprintf(stderr, "[HEAP] exit census SKIPPED: collector still running after %dms\n",
+        if(!frozen) {
+            fprintf(stderr, "[HEAP] exit census SKIPPED: could not freeze the collector in %dms\n",
                     waitMs);
             return;
         }
