@@ -128,10 +128,111 @@ Host count follows cores rather than the `workers` argument. On two pinned cores
 they compete for the cores the server needs. In this mode `workers` stops meaning
 "requests in flight," because the virtual threads supply that.
 
+=== Configuration and profiles
+
+A server runs against a file on a laptop and a managed database in production,
+and the difference between those two can't live in the source. It lives in
+properties files beside the binary and in the environment:
+
+`application.properties`, committed:
+
+[source,properties]
+----
+include::../demos/backend/src/main/resources/application.properties[tag=backend-config-base,indent=0]
+----
+
+`application-dev.properties`, also committed:
+
+[source,properties]
+----
+include::../demos/backend/src/main/resources/application-dev.properties[tag=backend-config-dev,indent=0]
+----
+
+----
+CN1_PROFILE=dev ./server                         # SQLite, nothing installed
+DATABASE_URL=postgres://app:secret@db/app ./server   # production
+----
+
+A key is resolved in one order, and the first layer that has it wins: a system
+property of that exact name, then the environment variable it maps to
+(`cn1.datasource.url` becomes `CN1_DATASOURCE_URL`), then the environment
+variable a platform already sets for it, then
+`application-<profile>.properties`, then `application.properties`.
+
+The third layer is worth spelling out. `PORT` and `DATABASE_URL` are set for you
+by every platform-as-a-service worth the name, and a server that ignored them
+would need a wrapper script to start at all, so they're read where those two
+keys are read.
+
+A value may name an environment variable as `${NAME}` or `${NAME:fallback}`, and
+that reference resolves when the value is READ rather than when the file loads.
+That's what lets the committed `application.properties` above name a variable
+only production sets: the development profile overrides the key, so the unset
+variable is never read. A reference that's read and can't be resolved fails
+with a message naming it, because the alternative is a server that opens a SQLite file
+called `${DATABASE_URL}` and finds it empty.
+
+Nothing here is required. A binary with no properties file beside it reads its
+whole configuration from the environment, which is the normal shape for a
+container built `FROM scratch`: there is no file next to the binary because
+there is nothing next to the binary.
+
+[cols="2,3", options="header"]
+|===
+| Key | What it sets
+
+| `cn1.profile`
+| The active profile. `dev`, `development`, `test` and `local` are development
+  profiles, which changes two defaults and nothing else.
+
+| `cn1.datasource.url`
+| A SQLite path, or a `postgres://` or `mysql://` URL. Also read from
+  `DATABASE_URL`. On a development profile an unset value means an in-memory
+  SQLite database; on any other profile it's an error, because a service that
+  writes into a database inside its own process, with nothing saying so, loses
+  everything at the next deploy.
+
+| `cn1.datasource.pool.size`
+| How many connections to hold. The default is eight for a server engine, four
+  for a SQLite file and one for an in-memory database.
+
+| `cn1.server.port`
+| The port. Also read from `PORT`.
+
+| `cn1.server.workers`
+| The size of the request thread pool.
+
+| `cn1.server.tls.certificate`, `cn1.server.tls.key`
+| A PEM certificate and key to terminate TLS with. One without the other is
+  refused rather than serving plaintext under a name that promises otherwise.
+
+| `cn1.static.root`
+| A directory to serve files from, after every route.
+
+| `cn1.orm.createTables`
+| Whether the generated daos create their tables at start-up. True on a
+  development profile, false everywhere else.
+|===
+
+Handlers that need any of this get it from the entry point the build writes.
+Only a server that writes its own `main` names the builder behind it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ServerSnippets.java[tag=backend-builder,indent=0]
+----
+
+`run()` reads the configuration, opens the database, binds, installs a shutdown
+handler that drains what's in flight, and blocks. Anything the builder is told
+is used as given, and anything it isn't told comes from the configuration --
+so a port written in the source is the port, and a port that should follow the
+deployment is one nobody writes there.
+
 === Talking to a database
 
-`Database.open` takes a SQLite path or a PostgreSQL or MySQL URL, and the rows
-come back as the same Java types either way:
+`DataSource.open` takes a SQLite path or a PostgreSQL or MySQL URL, pools
+connections to it, and returns rows as the same Java types whichever engine
+answered:
 
 [source,java]
 ----
@@ -141,22 +242,145 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/D
 There is no JDBC driver involved. SQLite is linked into the binary, and the
 PostgreSQL and MySQL clients speak their wire protocols directly.
 
-`DbPool` pools SQLite connections, and only those: it opens them from a file
-path. There is no pool for the server engines.
+Statements are written once, in one portable form: `?` for every parameter, and
+plain unquoted names. PostgreSQL binds `$1` rather than `?`, and that difference
+stops inside `execute` and `query` rather than at every call site. SQL already
+written for one engine keeps working, because a statement carrying no `?` at all
+is passed through untouched -- so hand-written `$1` is left alone. A literal
+question mark that isn't a parameter is written `??`, which matters on
+PostgreSQL, whose `jsonb` operators are spelled `?`, `?|` and `?&`.
 
-A `Database` over PostgreSQL or MySQL owns one wire connection, and every
-operation on it -- `execute`, `query`, `transaction` and `close` -- is
-synchronized. Sharing one across handlers is therefore safe, and serialized:
-concurrent requests queue behind whichever exchange is on the socket. A
-transaction holds the lock for its whole body, so keep the work inside one
-short.
+A parameter count that doesn't match the statement is refused before the
+statement is sent. The three engines answer a mismatch three different ways, and
+SQLite's answer is to bind the missing parameters to NULL and commit the row.
 
-Share one `Database` unless the queueing is what limits you. When it does, open
-a few -- one per worker, say -- and hand each request one of those. What to avoid
-is opening one per request: every `Database.open` against a server engine is a
-fresh TCP connection and a fresh authentication handshake, which costs a round
-trip or several before any statement runs, and enough concurrent requests doing
-it will reach the server's own connection limit.
+The other thing the engines disagree about is the key an insert generated.
+`insert` asks whichever way this engine answers -- `last_insert_rowid()` on
+SQLite, `LAST_INSERT_ID()` on MySQL, and `INSERT ... RETURNING` on PostgreSQL,
+which has no last-insert-id concept at all:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database-insert,indent=0]
+----
+
+Several statements that have to be one go through `inTransaction`, which holds a
+single connection for the whole body and rolls back if it throws:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database-transaction,indent=0]
+----
+
+Everything each engine spells differently is reachable through `db.dialect()`,
+which is what code that generates schema needs:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DatabaseSnippets.java[tag=backend-database-dialect,indent=0]
+----
+
+Quoting every identifier isn't caution. PostgreSQL folds an unquoted name to
+lower case while SQLite and MySQL preserve it, so a column called `createdAt`
+becomes `createdat` on one engine of the three, and code that reads rows by name
+stops finding it there.
+
+A `Database` -- one connection rather than a pool -- is still available through
+`Database.open` for code that wants exactly one, and every one of its operations
+is synchronized, so sharing one across handlers is safe and serialized. That's the
+right shape for a single-file SQLite server and the wrong one for a database
+that's a machine across a network: there the single connection isn't a safety
+property, it's the bottleneck. The pool is the default for that reason.
+
+=== Storing objects
+
+A class with `@Entity` on it gets a data access object written for it at build
+time. The annotations are the ones the SQLite ORM chapter documents, and they
+are the same annotations in the same package, because an entity is the one class
+both halves of an application own:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Reminder.java[tag=backend-orm-entity,indent=0]
+----
+
+What differs between the app's copy and the server's is what the build generates
+from it: a module compiled against the Codename One core gets a dao over the
+local SQLite database, and a module compiled against this runtime gets one whose
+statements are built for whichever engine the connection turns out to be. The
+class says what the data is; the module says where its rows live.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-dao,indent=0]
+----
+
+The entity manager comes from the entry point, which opens one when the build
+generated at least one entity. A controller asks for it by declaring a
+constructor that takes one, and the generated entry point calls that constructor:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ReminderApi.java[tag=backend-orm-controller,indent=0]
+----
+
+That's the whole of the injection. A constructor taking a `DataSource` gets the
+pool instead, a constructor taking no arguments is called with none, and a
+controller that needs something else builds it itself -- there's no container, and the generated entry
+point holds a `new` with the argument written into it.
+
+A hand-written `main` opens its own entity manager and registers the generated
+daos first:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-open,indent=0]
+----
+
+----
+new cn1app.BackendDaoBootstrap();
+----
+
+That line isn't ceremony. This runtime has no reflection and the translator
+drops a class nothing references, so a registry populated by scanning or by
+`Class.forName` would be empty in exactly the builds that ship. The generated
+bootstrap holds a direct reference to every generated dao, which is what keeps
+them in the binary.
+
+Queries name JAVA FIELDS rather than columns, and the builder quotes the column
+each one maps to:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-query,indent=0]
+----
+
+A name that isn't a field of the entity is refused at once, listing the
+ones that are, rather than reaching the server as a column it doesn't have.
+`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `in`, `isNull` and `isNotNull` are
+joined with AND in the order they were added, and `list`, `first`, `count` and
+`delete` end the chain. A query the builder can't express takes SQL instead,
+through `dao.find(where, params)`, which is the point at which portability
+becomes yours to keep.
+
+Transactions take the same shape as everywhere else: the entity manager the body
+is handed is pinned to one connection, so every dao reached through it runs inside
+the transaction.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-transaction,indent=0]
+----
+
+Three things this doesn't do, on purpose. Relationships aren't supported --
+`@OneToMany` and friends don't exist, and a field referencing another entity
+fails the build with a message saying to persist the foreign key as a scalar.
+`createTable` creates a table that isn't there and does nothing at all to one
+that is, so it's a convenience for development and for tests rather than a
+migration tool. And a boolean and a date are stored as integers on every engine,
+0 or 1 and epoch milliseconds, because a native timestamp comes back as text
+whose format follows the server's own time zone and would not round-trip the
+same way on three engines.
 
 === Sharing the contract with the app
 
@@ -325,9 +549,11 @@ no TLS, and what it does need is exactly what a translated binary is good at.
 * The class library is the Codename One runtime, not Java SE. A server dependency
   that assumes the full JDK won't translate, and Maven Central isn't the
   ecosystem this draws on.
-* Routing is the whole of the framework. There is no dependency injection, no
-  configuration model, no aspect layer, no starter ecosystem; validation and error
-  mapping are written by hand or generated from the REST contract.
+* Routing, configuration, a connection pool and a build-time ORM are the whole of
+  the framework. What a controller can be handed is the pool or the entity
+  manager, by declaring a constructor that takes one; there is no container, no
+  aspect layer and no starter ecosystem, and validation and error mapping are
+  written by hand or generated from the REST contract.
 * The packaging goal compiles Java. It recompiles the module's sources against the
   backend's class library instead of reusing the jar Maven built, which is what
   keeps a server off classes the runtime doesn't have, and is also why Kotlin is

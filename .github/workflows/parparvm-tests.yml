@@ -45,6 +45,44 @@ jobs:
   vm-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # The two database engines the backend speaks a wire protocol to.
+    #
+    # BackendDatabaseTest and BackendOrmTest run one body of assertions against
+    # SQLite, PostgreSQL and MySQL and require the same answers from all three --
+    # that is the whole of the claim that a handler cannot tell which engine
+    # answered it, and that one entity class is stored by any of them. SQLite
+    # needs nothing installed, so without these two services the tests ran their
+    # easiest arm and reported green: the engines with a wire protocol, a
+    # different schema syntax and a different way of generating a key are exactly
+    # the ones worth running.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cn1
+          POSTGRES_PASSWORD: cn1secret
+          POSTGRES_DB: cn1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cn1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: cn1secret
+          MYSQL_USER: cn1
+          MYSQL_PASSWORD: cn1secret
+          MYSQL_DATABASE: cn1
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ucn1 -pcn1secret"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -130,6 +168,12 @@ jobs:
           JDK_17_HOME: ${{ env.JDK_17_HOME }}
           JDK_21_HOME: ${{ env.JDK_21_HOME }}
           JDK_25_HOME: ${{ env.JDK_25_HOME }}
+          # The services above. sslmode=disable because these are loopback
+          # containers with no certificate: the default, prefer, would attempt
+          # TLS and fail verification rather than quietly downgrading, which is
+          # the behaviour the database layer is supposed to have.
+          CN1_DBCHECK_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+          CN1_DBCHECK_MYSQL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
 
       - name: Run ParparVM Benchmark
         working-directory: vm

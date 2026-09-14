@@ -269,6 +269,21 @@
             <include>**/*.java</include>
           </includes>
         </fileSet>
+        <!--
+             The configuration the server reads at start-up.
+
+             Not packaged, because these are resources rather than classes and
+             keep the path they have here; and not filtered, because a properties
+             file is full of ${...} references that the server resolves from the
+             environment and the archetype's own filter would try to resolve
+             first.
+        -->
+        <fileSet filtered="false" encoding="UTF-8">
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**/*.properties</include>
+          </includes>
+        </fileSet>
       </fileSets>
     </module>
   </modules>

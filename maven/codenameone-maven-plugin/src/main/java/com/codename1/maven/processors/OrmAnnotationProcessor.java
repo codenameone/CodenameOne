@@ -24,6 +24,7 @@ package com.codename1.maven.processors;
 
 import com.codename1.maven.annotations.AbstractAnnotationProcessor;
 import com.codename1.maven.annotations.AnnotatedClass;
+import com.codename1.maven.annotations.ClassScanner;
 import com.codename1.maven.annotations.AnnotationValues;
 import com.codename1.maven.annotations.FieldInfo;
 import com.codename1.maven.annotations.JavaSourceCompiler;
@@ -31,22 +32,41 @@ import com.codename1.maven.annotations.MethodInfo;
 import com.codename1.maven.annotations.ProcessingException;
 import com.codename1.maven.annotations.ProcessorContext;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /// Build-time `@Entity` processor. For every entity class it generates one
-/// `XxxDao` and registers it with `EntityManager` through a generated
-/// `DaosIndex`. Generated daos issue prepared SQL through
-/// `com.codename1.db.Database` and read columns through `Row` / `Cursor` --
-/// the same surface `SQLMap` uses internally, but without runtime
-/// `putClientProperty` plumbing.
+/// `XxxCn1Dao` and registers it through a generated `cn1app.DaoBootstrap`.
+///
+/// It has TWO flavours, because the same annotations describe the same entity
+/// on both sides of an application and the two sides have different databases
+/// under them:
+///
+/// - a module compiled against the Codename One core gets a dao over
+///   `com.codename1.db.Database`, reading columns through `Row` / `Cursor` --
+///   the same surface `SQLMap` uses internally, but without runtime
+///   `putClientProperty` plumbing;
+/// - a module compiled against the server-side backend runtime gets a
+///   `com.codename1.backend.orm.EntityDefinition`, from which the runtime
+///   builds statements for whichever of SQLite, PostgreSQL or MySQL the
+///   connection turns out to be.
+///
+/// The flavour is detected from the compile classpath and can be forced with
+/// `-Dcn1.backendOrm=true|false`. The entity source is identical either way,
+/// which is the point: one class, stored in the app's SQLite file and in the
+/// server's PostgreSQL.
 public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     public static final String ENTITY_DESC = "Lcom/codename1/annotations/Entity;";
@@ -58,6 +78,19 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     static final String BOOTSTRAP_SIMPLE = "DaoBootstrap";
     static final String BOOTSTRAP_PACKAGE = "cn1app";
 
+    /// The server-side names, which are deliberately NOT the client's.
+    ///
+    /// An entity can live in a module both halves of an application depend on,
+    /// and that module's own build generates the CLIENT dao into its jar. If the
+    /// backend flavour reused the name, that jar and this module's output would
+    /// each hold a class of the same name -- and the one javac happened to pick
+    /// references `com.codename1.db.Database`, which the server runtime does not
+    /// have. Different names mean both daos can sit on one classpath, which is
+    /// exactly what a shared entity produces.
+    static final String BACKEND_DAO_SUFFIX = "Cn1BackendDao";
+    static final String BACKEND_BOOTSTRAP_BINARY = "cn1app.BackendDaoBootstrap";
+    static final String BACKEND_BOOTSTRAP_SIMPLE = "BackendDaoBootstrap";
+
     private static final Set<String> DESCRIPTORS;
     static {
         Set<String> s = new LinkedHashSet<String>();
@@ -67,6 +100,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     private final TreeMap<String, EntityClass> accepted = new TreeMap<String, EntityClass>();
 
+    /// Whether this module's daos go over the server-side backend runtime
+    /// rather than over the Codename One core. Settled once in [#start].
+    private boolean backend;
+
     @Override
     public Set<String> getAnnotationDescriptors() {
         return DESCRIPTORS;
@@ -75,6 +112,61 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
+        backend = isBackendModule(ctx);
+    }
+
+    /// Which runtime this module's entities are stored through.
+    ///
+    /// `-Dcn1.backendOrm` settles it outright, which is what a module carrying
+    /// BOTH runtimes needs -- the shared-contract module in this repository is
+    /// compiled against the core and the backend at once, so the classpath
+    /// cannot answer for it.
+    ///
+    /// Otherwise: the backend flavour when the backend's `Database` is on the
+    /// compile classpath and the core's is not. A client module has the core
+    /// and not the backend, so it takes the other branch and nothing about
+    /// existing projects changes.
+    private static boolean isBackendModule(ProcessorContext ctx) {
+        String forced = System.getProperty("cn1.backendOrm");
+        if (forced != null && forced.length() > 0) {
+            return "true".equalsIgnoreCase(forced);
+        }
+        return onCompileClasspath(ctx, "com/codename1/backend/Database.class")
+                && !onCompileClasspath(ctx, "com/codename1/db/Database.class");
+    }
+
+    /// Whether a class file is on the compile classpath, as a directory entry or
+    /// a jar entry. Nothing is loaded and nothing is parsed: a build must not run
+    /// a dependency's static initialisers to answer a question about its shape.
+    private static boolean onCompileClasspath(ProcessorContext ctx, String entryName) {
+        for (String element : ctx.getCompileClasspath()) {
+            File file = new File(element);
+            if (file.isDirectory()) {
+                if (new File(file, entryName.replace('/', File.separatorChar)).isFile()) {
+                    return true;
+                }
+                continue;
+            }
+            if (!file.isFile()) {
+                continue;
+            }
+            try {
+                ZipFile zip = new ZipFile(file);
+                try {
+                    if (zip.getEntry(entryName) != null) {
+                        return true;
+                    }
+                } finally {
+                    zip.close();
+                }
+            } catch (IOException unreadable) {
+                // An unreadable entry is not an answer. Nothing to report: this
+                // question is asked of every classpath element, and most of them
+                // are legitimately not archives.
+                continue;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -97,7 +189,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         ec.binaryName = cls.getBinaryName();
         ec.simpleName = simpleName(cls.getBinaryName());
         ec.packageName = packageOf(cls.getBinaryName());
-        ec.daoSimpleName = ec.simpleName + "Cn1Dao";
+        ec.daoSimpleName = ec.simpleName + (backend ? BACKEND_DAO_SUFFIX : "Cn1Dao");
         ec.daoBinaryName = (ec.packageName.length() == 0)
                 ? ec.daoSimpleName
                 : ec.packageName + "." + ec.daoSimpleName;
@@ -126,6 +218,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                         + " has an unsupported type (descriptor " + f.getDescriptor() + ")");
                 continue;
             }
+            if (backend && pf.kind.kind == PropertyTypeKind.Kind.PROPERTY) {
+                // Property lives in com.codename1.properties, which is part of
+                // the client core and not of the server runtime. Saying so here
+                // beats a generated class that does not compile.
+                ctx.error(cls, "@Entity field " + ec.binaryName + "." + f.getName()
+                        + " is a Property, which the server-side runtime does not have. "
+                        + "Use a plain field for an entity a backend module stores.");
+                continue;
+            }
             AnnotationValues col = f.getAnnotation(COLUMN_DESC);
             String colName = null;
             String colType = null;
@@ -137,12 +238,31 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             }
             pf.columnName = (colName == null || colName.length() == 0) ? pf.fieldName : colName;
             pf.sqlType = (colType == null || colType.length() == 0) ? defaultSqlType(pf.kind) : colType;
+            // The EXPLICIT type, separately: the client flavour needs a type for
+            // every column and defaults it to SQLite's, while the backend one
+            // needs to know whether the developer named one at all -- a column
+            // with no @Column(type) is typed by the dialect, which is what keeps
+            // the entity portable.
+            pf.explicitSqlType = (colType == null || colType.length() == 0) ? null : colType;
             pf.nullable = nullable;
+
+            pf.dialectKind = dialectKind(pf.kind);
+            pf.boxed = isBoxed(pf.kind);
 
             AnnotationValues idAnn = f.getAnnotation(ID_DESC);
             if (idAnn != null) {
                 pf.isId = true;
                 pf.autoIncrement = idAnn.getBoolOrDefault("autoIncrement", true);
+                if (backend && pf.autoIncrement && pf.dialectKind == KIND_TEXT) {
+                    // No engine generates a string key. SQLite's AUTOINCREMENT
+                    // is legal only after INTEGER PRIMARY KEY, and the other two
+                    // count. Refusing here beats a CREATE TABLE the server
+                    // rejects at start-up with a message about its own syntax.
+                    ctx.error(cls, "@Id on " + ec.binaryName + "." + f.getName()
+                            + " is autoIncrement and the field is a String; a database "
+                            + "generates integer keys. Use @Id(autoIncrement = false) and "
+                            + "assign the key yourself.");
+                }
                 if (ec.idField != null) {
                     ctx.error(cls, "@Entity " + ec.binaryName
                             + " has more than one @Id field");
@@ -162,24 +282,43 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
+        if (backend) {
+            // BEFORE the emptiness check, because the entities need not be in
+            // this module at all. An entity is the one class both halves of an
+            // application own, so the natural place for it is a module the app
+            // and the server both depend on -- and then the backend module's own
+            // compiled classes hold none of them.
+            scanClasspathEntities(ctx);
+        }
         if (ctx.hasErrors()) return;
         if (accepted.isEmpty()) return;
 
         Map<String, String> sources = new LinkedHashMap<String, String>();
         for (EntityClass ec : accepted.values()) {
-            sources.put(ec.daoBinaryName, generateDaoSource(ec));
+            sources.put(ec.daoBinaryName,
+                    backend ? generateBackendDaoSource(ec) : generateDaoSource(ec));
         }
-        sources.put(BOOTSTRAP_BINARY, generateBootstrapSource(accepted.values()));
+        sources.put(backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY,
+                generateBootstrapSource(accepted.values(), backend));
         try {
             java.util.List<java.io.File> cp = new java.util.ArrayList<java.io.File>();
             cp.add(ctx.getOutputClassDir());
+            // AND THE COMPILE CLASSPATH. The dao names its entity, and the entity
+            // need not be in this module: a class both halves of an application
+            // share lives in a module both depend on, and then it is only ever on
+            // the classpath. With the output directory alone the generated source
+            // failed to compile on "cannot find symbol" naming the entity.
+            for (String element : ctx.getCompileClasspath()) {
+                cp.add(new java.io.File(element));
+            }
             JavaSourceCompiler.compile(sources, ctx.getOutputClassDir(), cp);
         } catch (IOException ioe) {
             throw new ProcessingException("Could not compile generated dao sources: "
                     + ioe.getMessage(), ioe);
         }
-        ctx.getLog().info("cn1: generated " + accepted.size()
-                + " @Entity dao(s) + " + BOOTSTRAP_BINARY);
+        ctx.getLog().info("cn1: generated " + accepted.size() + " @Entity "
+                + (backend ? "server-side " : "") + "dao(s) + "
+                + (backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY));
     }
 
     // ---------------------------------------------------------------
@@ -353,19 +492,432 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         return sb.toString();
     }
 
-    private static String generateBootstrapSource(Iterable<EntityClass> classes) {
+    /// Reads the compile classpath for `@Entity` classes and processes them as
+    /// though they were this module's own.
+    ///
+    /// Only in the backend flavour. A client module's classpath is the whole
+    /// Codename One core and then some, and its entities are its own; a backend
+    /// module's is the runtime plus whatever the application shares between its
+    /// halves, which is measured in hundreds of classes.
+    ///
+    /// The dao is generated into THIS module either way. The jar it was read
+    /// from is somebody else's build output and is not written to.
+    private void scanClasspathEntities(ProcessorContext ctx) throws ProcessingException {
+        for (String element : ctx.getCompileClasspath()) {
+            File file = new File(element);
+            if (file.isDirectory()) {
+                scanDirectoryForEntities(file, file, ctx);
+            } else if (file.isFile()) {
+                scanArchiveForEntities(file, ctx);
+            }
+        }
+    }
+
+    private void scanDirectoryForEntities(File root, File dir, ProcessorContext ctx)
+            throws ProcessingException {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                scanDirectoryForEntities(root, child, ctx);
+                continue;
+            }
+            if (!child.getName().endsWith(".class") || skipPackage(child.getName())) {
+                continue;
+            }
+            AnnotatedClass cls;
+            try {
+                cls = ClassScanner.readClass(child);
+            } catch (ProcessingException unreadable) {
+                // A class file this cannot parse is not an entity. Said out loud
+                // rather than swallowed, because the OTHER reading -- that an
+                // entity was skipped -- would be invisible.
+                ctx.getLog().debug("cn1: skipping unreadable class " + child + ": "
+                        + unreadable.getMessage());
+                continue;
+            }
+            // OUTSIDE the catch: an error while ACCEPTING an entity is the
+            // build's business, and catching it here would drop an entity with a
+            // message nobody sees.
+            consider(cls, ctx);
+        }
+    }
+
+    private void scanArchiveForEntities(File archive, ProcessorContext ctx)
+            throws ProcessingException {
+        ZipFile zip;
+        try {
+            zip = new ZipFile(archive);
+        } catch (IOException notAnArchive) {
+            // A classpath entry that is not a readable archive -- a missing jar,
+            // a resources directory named like one. Not an error here: javac
+            // already has an opinion about it.
+            ctx.getLog().debug("cn1: not a readable archive, not scanned for entities: "
+                    + archive);
+            return;
+        }
+        try {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (!name.endsWith(".class") || skipPackage(name)) {
+                    continue;
+                }
+                AnnotatedClass cls = readEntry(zip, entry, archive, ctx);
+                if (cls != null) {
+                    // Outside the read, for the reason the directory scan gives.
+                    consider(cls, ctx);
+                }
+            }
+        } finally {
+            try {
+                zip.close();
+            } catch (IOException err) {
+                ctx.getLog().debug("cn1: could not close " + archive + ": " + err.getMessage());
+            }
+        }
+    }
+
+    /// One class out of an archive, or null when it cannot be read.
+    private static AnnotatedClass readEntry(ZipFile zip, ZipEntry entry, File archive,
+                                            ProcessorContext ctx) {
+        InputStream in = null;
+        try {
+            in = zip.getInputStream(entry);
+            return ClassScanner.readClass(in, archive);
+        } catch (IOException unreadable) {
+            ctx.getLog().debug("cn1: skipping unreadable entry " + entry.getName() + " in "
+                    + archive + ": " + unreadable.getMessage());
+            return null;
+        } catch (ProcessingException unreadable) {
+            ctx.getLog().debug("cn1: skipping unparseable entry " + entry.getName() + " in "
+                    + archive + ": " + unreadable.getMessage());
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException err) {
+                    ctx.getLog().debug("cn1: could not close " + entry.getName() + ": "
+                            + err.getMessage());
+                }
+            }
+        }
+    }
+
+    /// Packages no application entity is in, skipped so a scan does not read
+    /// every class of the runtime to learn it has no annotations.
+    private static boolean skipPackage(String entryName) {
+        return entryName.startsWith("java/") || entryName.startsWith("javax/")
+                || entryName.startsWith("com/codename1/backend/")
+                || entryName.startsWith("com/codename1/annotations/")
+                || entryName.startsWith("org/") || entryName.startsWith("kotlin/");
+    }
+
+    /// Runs one class found on the classpath through the same acceptance the
+    /// module's own classes get. Classes without `@Entity` fall out inside.
+    private void consider(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        if (cls == null || accepted.containsKey(cls.getBinaryName())) {
+            return;
+        }
+        processClass(cls, ctx);
+    }
+
+    /// The kind constants on `com.codename1.backend.sql.Dialect`, mirrored here
+    /// because the plugin cannot depend on the backend runtime: it GENERATES
+    /// against it. The generated source names the constants rather than these
+    /// numbers, so a change on that side is a compile error in the generated
+    /// code rather than a silently wrong column type -- these are only what the
+    /// processor's own validation compares.
+    static final int KIND_TEXT = 0;
+    static final int KIND_INTEGER = 1;
+    static final int KIND_BIGINT = 2;
+    static final int KIND_REAL = 3;
+    static final int KIND_BLOB = 4;
+    static final int KIND_BOOLEAN = 5;
+    static final int KIND_TIMESTAMP = 6;
+
+    private static final String ORM = "com.codename1.backend.orm.";
+
+    /// The portable column kind for a field's Java type.
+    ///
+    /// Note what is NOT here: a date is a `TIMESTAMP` kind, which every engine
+    /// stores as epoch milliseconds in an integer column rather than as its own
+    /// timestamp type. A native timestamp comes back as text in the server's own
+    /// DateStyle and time zone, so the column that looked more correct is the one
+    /// that does not round-trip the same way on three engines.
+    private static int dialectKind(PropertyTypeKind k) {
+        switch (k.kind) {
+            case INT: case SHORT: case BYTE:
+                return KIND_INTEGER;
+            case LONG:
+                return KIND_BIGINT;
+            case DOUBLE: case FLOAT:
+                return KIND_REAL;
+            case BOOLEAN:
+                return KIND_BOOLEAN;
+            case DATE:
+                return KIND_TIMESTAMP;
+            case BYTE_ARRAY:
+                return KIND_BLOB;
+            case CHAR: case STRING:
+            default:
+                return KIND_TEXT;
+        }
+    }
+
+    /// The source spelling of a kind, so the generated class references the
+    /// constant instead of the number behind it.
+    private static String kindConstant(int kind) {
+        switch (kind) {
+            case KIND_INTEGER: return "com.codename1.backend.sql.Dialect.INTEGER";
+            case KIND_BIGINT: return "com.codename1.backend.sql.Dialect.BIGINT";
+            case KIND_REAL: return "com.codename1.backend.sql.Dialect.REAL";
+            case KIND_BLOB: return "com.codename1.backend.sql.Dialect.BLOB";
+            case KIND_BOOLEAN: return "com.codename1.backend.sql.Dialect.BOOLEAN";
+            case KIND_TIMESTAMP: return "com.codename1.backend.sql.Dialect.TIMESTAMP";
+            default: return "com.codename1.backend.sql.Dialect.TEXT";
+        }
+    }
+
+    /// Whether a field can hold null, which is what separates `int` from
+    /// `Integer` and decides both halves of the generated access.
+    private static boolean isBoxed(PropertyTypeKind k) {
+        String binary = k.binaryName;
+        if (binary == null) {
+            return false;
+        }
+        return binary.indexOf('.') >= 0;
+    }
+
+    /// The server-side dao: an `EntityDefinition` describing the table and
+    /// reading and writing the entity's fields by index.
+    ///
+    /// There is no SQL in here, which is the difference that matters. The
+    /// statements are built by the runtime from this description and the
+    /// connection's dialect, so ONE generated class serves SQLite, PostgreSQL
+    /// and MySQL -- and the development loop against a file and the production
+    /// deployment against a server run the same generated code.
+    private static String generateBackendDaoSource(EntityClass ec) {
+        StringBuilder sb = new StringBuilder(4096);
+        if (ec.packageName.length() > 0) {
+            sb.append("package ").append(ec.packageName).append(";\n\n");
+        }
+        sb.append("// Auto-generated by cn1:process-annotations. Do not edit.\n");
+        sb.append("@SuppressWarnings({\"all\"})\n");
+        sb.append("@com.codename1.backend.annotations.Generated\n");
+        sb.append("public final class ").append(ec.daoSimpleName)
+          .append(" extends ").append(ORM).append("EntityDefinition {\n\n");
+
+        sb.append("    private static final ").append(ORM).append("ColumnDefinition[] COLUMNS = {\n");
+        for (int i = 0; i < ec.fields.size(); i++) {
+            PersistedField f = ec.fields.get(i);
+            sb.append("        new ").append(ORM).append("ColumnDefinition(\"")
+              .append(escape(f.fieldName)).append("\", \"").append(escape(f.columnName))
+              .append("\", ").append(kindConstant(f.dialectKind)).append(", ")
+              .append(f.nullable).append(", ");
+            if (f.explicitSqlType == null) {
+                sb.append("null");
+            } else {
+                sb.append('"').append(escape(f.explicitSqlType)).append('"');
+            }
+            sb.append(", ").append(f.isId).append(", ")
+              .append(f.isId && f.autoIncrement).append(")")
+              .append(i + 1 < ec.fields.size() ? ",\n" : "\n");
+        }
+        sb.append("    };\n\n");
+
+        // The hook the generated bootstrap calls. Same name and same shape as
+        // the client flavour's, so one bootstrap source serves both.
+        sb.append("    public static void register() {\n");
+        sb.append("        ").append(ORM).append("EntityManager.register(new ")
+          .append(ec.daoSimpleName).append("());\n");
+        sb.append("    }\n\n");
+
+        sb.append("    public ").append(ec.daoSimpleName).append("() {\n    }\n\n");
+
+        sb.append("    public Class type() {\n");
+        sb.append("        return ").append(ec.binaryName).append(".class;\n");
+        sb.append("    }\n\n");
+
+        sb.append("    public String table() {\n");
+        sb.append("        return \"").append(escape(ec.tableName)).append("\";\n");
+        sb.append("    }\n\n");
+
+        sb.append("    public ").append(ORM).append("ColumnDefinition[] columns() {\n");
+        sb.append("        return COLUMNS;\n");
+        sb.append("    }\n\n");
+
+        sb.append("    public Object newInstance() {\n");
+        sb.append("        return new ").append(ec.binaryName).append("();\n");
+        sb.append("    }\n\n");
+
+        sb.append("    public Object get(Object entity, int index) {\n");
+        sb.append("        ").append(ec.binaryName).append(" e = (").append(ec.binaryName)
+          .append(")entity;\n");
+        sb.append("        switch(index) {\n");
+        for (int i = 0; i < ec.fields.size(); i++) {
+            sb.append("            case ").append(i).append(": return ");
+            emitBackendRead(sb, ec.fields.get(i));
+            sb.append(";\n");
+        }
+        sb.append("        }\n");
+        sb.append("        return null;\n");
+        sb.append("    }\n\n");
+
+        sb.append("    public void set(Object entity, int index, Object value)\n");
+        sb.append("            throws java.io.IOException {\n");
+        sb.append("        ").append(ec.binaryName).append(" e = (").append(ec.binaryName)
+          .append(")entity;\n");
+        sb.append("        switch(index) {\n");
+        for (int i = 0; i < ec.fields.size(); i++) {
+            sb.append("            case ").append(i).append(": ");
+            emitBackendWrite(sb, ec.fields.get(i));
+            sb.append(" return;\n");
+        }
+        sb.append("        }\n");
+        sb.append("    }\n");
+
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    /// A field as a bound parameter: Long, Double, String, byte[] or null,
+    /// which is the set `Database` binds and returns on every engine.
+    private static void emitBackendRead(StringBuilder sb, PersistedField f) {
+        String field = "e." + f.fieldName;
+        switch (f.kind.kind) {
+            case STRING:
+            case BYTE_ARRAY:
+                sb.append(field);
+                return;
+            case INT: case LONG: case SHORT: case BYTE:
+                if (f.boxed) {
+                    sb.append(field).append(" == null ? null : Long.valueOf(")
+                      .append(field).append(".longValue())");
+                } else {
+                    sb.append("Long.valueOf(").append(field).append(")");
+                }
+                return;
+            case DOUBLE: case FLOAT:
+                if (f.boxed) {
+                    sb.append(field).append(" == null ? null : Double.valueOf(")
+                      .append(field).append(".doubleValue())");
+                } else {
+                    sb.append("Double.valueOf(").append(field).append(")");
+                }
+                return;
+            case BOOLEAN:
+                if (f.boxed) {
+                    sb.append(field).append(" == null ? null : Long.valueOf(")
+                      .append(field).append(".booleanValue() ? 1L : 0L)");
+                } else {
+                    sb.append("Long.valueOf(").append(field).append(" ? 1L : 0L)");
+                }
+                return;
+            case CHAR:
+                if (f.boxed) {
+                    sb.append(field).append(" == null ? null : String.valueOf(")
+                      .append(field).append(".charValue())");
+                } else {
+                    sb.append("String.valueOf(").append(field).append(")");
+                }
+                return;
+            case DATE:
+                sb.append(field).append(" == null ? null : Long.valueOf(")
+                  .append(field).append(".getTime())");
+                return;
+            default:
+                sb.append("null");
+        }
+    }
+
+    /// A column value into a field, through the tolerant conversions in
+    /// `Values`: the same column is a Long from one engine and exact text from
+    /// another, and neither is the field's type.
+    private static void emitBackendWrite(StringBuilder sb, PersistedField f) {
+        String field = "e." + f.fieldName;
+        String values = ORM + "Values.";
+        switch (f.kind.kind) {
+            case STRING:
+                sb.append(field).append(" = ").append(values).append("asString(value);");
+                return;
+            case INT:
+                sb.append(field).append(" = ").append(values)
+                  .append(f.boxed ? "asIntObject(value);" : "asInt(value, 0);");
+                return;
+            case LONG:
+                sb.append(field).append(" = ").append(values)
+                  .append(f.boxed ? "asLongObject(value);" : "asLong(value, 0L);");
+                return;
+            case SHORT:
+                sb.append(field).append(" = ").append(values)
+                  .append(f.boxed ? "asShortObject(value);" : "asShort(value, (short)0);");
+                return;
+            case BYTE:
+                sb.append(field).append(" = ").append(values)
+                  .append(f.boxed ? "asByteObject(value);" : "asByte(value, (byte)0);");
+                return;
+            case DOUBLE:
+                sb.append(field).append(" = ").append(values)
+                  .append(f.boxed ? "asDoubleObject(value);" : "asDouble(value, 0);");
+                return;
+            case FLOAT:
+                sb.append(field).append(" = ").append(values)
+                  .append(f.boxed ? "asFloatObject(value);" : "asFloat(value, 0);");
+                return;
+            case BOOLEAN:
+                sb.append(field).append(" = ").append(values)
+                  .append(f.boxed ? "asBooleanObject(value);" : "asBoolean(value, false);");
+                return;
+            case CHAR:
+                if (f.boxed) {
+                    sb.append("{ String _c = ").append(values).append("asString(value); ")
+                      .append(field).append(" = _c == null || _c.length() == 0 ? null ")
+                      .append(": Character.valueOf(_c.charAt(0)); }");
+                } else {
+                    sb.append(field).append(" = ").append(values)
+                      .append("asChar(value, '\\0');");
+                }
+                return;
+            case DATE:
+                sb.append(field).append(" = ").append(values).append("asDate(value);");
+                return;
+            case BYTE_ARRAY:
+                sb.append(field).append(" = ").append(values).append("asBytes(value);");
+                return;
+            default:
+                sb.append(";");
+        }
+    }
+
+    private static String generateBootstrapSource(Iterable<EntityClass> classes, boolean backend) {
         StringBuilder sb = new StringBuilder(1024);
         sb.append("package ").append(BOOTSTRAP_PACKAGE).append(";\n\n");
         sb.append("// Auto-generated by cn1:process-annotations. Do not edit.\n");
         sb.append("///\n");
-        sb.append("/// SQLite dao bootstrap. The iOS / Android per-build application\n");
-        sb.append("/// stub instantiates this class before Display.init (the build\n");
-        sb.append("/// server probes the project zip for it and emits the install line\n");
-        sb.append("/// conditionally); JavaSEPort.postInit picks it up via\n");
-        sb.append("/// Class.forName for the simulator and desktop runs.\n");
+        if (backend) {
+            sb.append("/// Server-side dao bootstrap. The generated entry point\n");
+            sb.append("/// constructs this before it starts listening; a hand-written\n");
+            sb.append("/// main writes `new cn1app.BackendDaoBootstrap();` itself.\n");
+            sb.append("///\n");
+            sb.append("/// It exists because nothing may look a dao up by name: the\n");
+            sb.append("/// translator drops a class nothing references, so the direct\n");
+            sb.append("/// references below are what keep the generated daos alive.\n");
+        } else {
+            sb.append("/// SQLite dao bootstrap. The iOS / Android per-build application\n");
+            sb.append("/// stub instantiates this class before Display.init (the build\n");
+            sb.append("/// server probes the project zip for it and emits the install line\n");
+            sb.append("/// conditionally); JavaSEPort.postInit picks it up via\n");
+            sb.append("/// Class.forName for the simulator and desktop runs.\n");
+        }
         sb.append("@SuppressWarnings({\"all\"})\n");
-        sb.append("public final class ").append(BOOTSTRAP_SIMPLE).append(" {\n");
-        sb.append("    public ").append(BOOTSTRAP_SIMPLE).append("() {\n");
+        String simple = backend ? BACKEND_BOOTSTRAP_SIMPLE : BOOTSTRAP_SIMPLE;
+        sb.append("public final class ").append(simple).append(" {\n");
+        sb.append("    public ").append(simple).append("() {\n");
         for (EntityClass ec : classes) {
             sb.append("        ").append(ec.daoBinaryName).append(".register();\n");
         }
@@ -665,5 +1217,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         boolean isId;
         boolean autoIncrement;
         PropertyTypeKind kind;
+        /// @Column(type) as the developer wrote it, or null when absent.
+        String explicitSqlType;
+        /// The portable column kind, as one of the constants on
+        /// `com.codename1.backend.sql.Dialect`. Backend flavour only.
+        int dialectKind;
+        /// Whether the field's type is a boxed reference rather than a
+        /// primitive, which is what decides whether it can hold null.
+        boolean boxed;
     }
 }
