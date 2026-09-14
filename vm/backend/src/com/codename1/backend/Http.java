@@ -188,7 +188,12 @@ public final class Http {
         // length, or a chunk walk, or neither -- in which case end-of-stream is
         // the framing and this reads exactly as it used to.
         boolean framingKnown = false;
-        int total = -1;
+        // A LONG for the same reason chunkedEnd uses one: a peer may declare a
+        // Content-Length up to Integer.MAX_VALUE, and bodyStart + declared then
+        // wrapped negative -- which did not spin, but did leave total < 0, so the
+        // framing this loop had just worked out was silently ignored and the read
+        // went back to waiting for end of stream.
+        long total = -1;
         boolean chunked = false;
         int[] chunkCursor = new int[1];
         int frameStart = 0;
@@ -231,7 +236,7 @@ public final class Http {
                         chunkCursor[0] = bodyStart;
                     } else {
                         int declared = declaredLength(headNames, headValues);
-                        total = declared >= 0 ? bodyStart + declared : -1;
+                        total = declared >= 0 ? (long)bodyStart + (long)declared : -1;
                     }
                 }
             }
@@ -663,11 +668,25 @@ public final class Http {
                     scan = lineEnd + 2;
                 }
             }
-            int next = after + chunk + 2;   // the chunk's bytes and its own CRLF
+            // IN A WIDER TYPE, because the size is the PEER's number and it goes up
+            // to Integer.MAX_VALUE -- parseChunkSize refuses only what overflows
+            // its own accumulator. "7fffffff" made after + chunk + 2 wrap negative,
+            // which passed the bound below as though the chunk had already arrived
+            // and put a NEGATIVE cursor back for the next pass. Measured from
+            // there: the scan resumes at zero, because indexOfCrLf clamps its
+            // start, but `end` below begins at the unclamped cursor, so the walk
+            // indexes the buffer at -2147483590 and the caller is handed a failure
+            // whose whole message is that number. Without the clamp it is the
+            // endless re-parse of one size line instead. Neither is a reading of
+            // the peer's framing, and the arithmetic is what is wrong with both: a
+            // long cannot wrap here, and a chunk that big simply never fits, so
+            // this answers "not yet" until the read loop's response ceiling
+            // refuses it.
+            long next = (long)after + (long)chunk + 2L;   // the chunk and its CRLF
             if(next > size) {
                 return -1;
             }
-            pos = next;
+            pos = (int)next;
             cursor[0] = pos;
         }
     }

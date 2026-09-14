@@ -839,15 +839,19 @@ JAVA_INT com_codename1_backend_Reactor_registerImpl___int_int_int_boolean_R_int(
          * readiness, so a socket that is still readable or writable is reported
          * again the moment it is re-added.
          */
+        // BOTH FILTERS, not the ones the new set happens to name. A modify
+        // REPLACES a descriptor's interest -- that is what EPOLL_CTL_MOD does with
+        // its mask, and what interestOps() does on a Selector -- so dropping only
+        // the filters being re-added left the previous ones in place: changing
+        // READ to WRITE kept EVFILT_READ armed, and await() went on reporting the
+        // descriptor readable for an interest the caller had explicitly replaced.
+        // On a kqueue several hosts wait on, that hands the connection to a host
+        // that was never told to expect it.
         struct kevent drop;
-        if(events & CN1_EVENT_READ) {
-            EV_SET(&drop, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-            kevent(poller, &drop, 1, NULL, 0, NULL);
-        }
-        if(events & CN1_EVENT_WRITE) {
-            EV_SET(&drop, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-            kevent(poller, &drop, 1, NULL, 0, NULL);
-        }
+        EV_SET(&drop, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+        kevent(poller, &drop, 1, NULL, 0, NULL);
+        EV_SET(&drop, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+        kevent(poller, &drop, 1, NULL, 0, NULL);
     }
     if(events & CN1_EVENT_READ) {
         // EV_DISPATCH is kqueue's EPOLLONESHOT: deliver once, then disable the

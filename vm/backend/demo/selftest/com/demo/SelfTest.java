@@ -2476,13 +2476,55 @@ public class SelfTest {
     }
 
     /**
+     * A chunk size the peer chose cannot be made to wrap this client's arithmetic.
+     *
+     * <p>parseChunkSize refuses only what overflows its own accumulator, so a peer
+     * may legally name 7fffffff. The walk that decides where a chunked message
+     * ends added that to the position of the chunk's first byte, wrapped negative,
+     * and read the wrap as "the chunk has not arrived yet" -- then put the
+     * negative back as its cursor. Measured with the fix removed, the next pass
+     * indexes the buffer at -2147483590 and the request fails with that number as
+     * its entire message; a review reading the same code predicted an endless
+     * re-parse of the one size line, which is what it would be if the scan did not
+     * clamp its start. Either way the peer chose a number that broke this client's
+     * arithmetic, which is the part worth refusing.
+     *
+     * <p>The stub hangs up after the size line, so with the arithmetic fixed the
+     * message is simply truncated and says so. The assertion is that sentence
+     * rather than "it failed", because the failure it replaces IS a failure and
+     * would satisfy a weaker check while proving nothing.
+     */
+    private static void aChunkSizeCannotWrapTheWalk() throws Exception {
+        check("a chunk size near the int ceiling does not break the walk",
+                "failed: Truncated chunked response: chunk runs past the body",
+                heldOpenResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n"
+                        + "\r\n7fffffff\r\n", false));
+        // The control: an ordinary size through the same path, truncated the same
+        // way, so this cannot pass by refusing every chunked response.
+        check("and an ordinary truncated chunk still says the same thing",
+                "failed: Truncated chunked response: chunk runs past the body",
+                heldOpenResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n"
+                        + "\r\n5\r\nhel", false));
+    }
+
+    /**
      * Sends exactly this response to one request and then holds the connection
      * open, and answers what the client made of it within a generous bound.
      */
     private static String heldOpenResponse(String response) throws Exception {
+        return heldOpenResponse(response, true);
+    }
+
+    /**
+     * The same, with a choice about the ending: hold the connection open, or hang
+     * up once the bytes are out.
+     */
+    private static String heldOpenResponse(String response, boolean hold)
+            throws Exception {
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         final String payload = response;
+        final boolean holdOpen = hold;
         final boolean[] holding = new boolean[1];
         Thread stub = new Thread(new Runnable() {
             public void run() {
@@ -2498,9 +2540,13 @@ public class SelfTest {
                     ServerSocket.read(client, in, 0, in.length);
                     byte[] out = payload.getBytes("UTF-8");
                     ServerSocket.write(client, out, 0, out.length);
-                    // AND THEN NOTHING. No close, which is the whole point.
+                    // AND THEN NOTHING. No close, which is the whole point --
+                    // except where the case under test is what happens at the end
+                    // of a truncated message.
                     holding[0] = true;
-                    Thread.sleep(4000);
+                    if(holdOpen) {
+                        Thread.sleep(4000);
+                    }
                 } catch (Exception ignored) {
                     // The client hanging up first is a perfectly good ending.
                 } finally {
@@ -2531,6 +2577,51 @@ public class SelfTest {
         stub.join(6000);
         caller.join(6000);
         return outcome;
+    }
+
+    /**
+     * A modify REPLACES a descriptor's interest; it does not add to it.
+     *
+     * <p>That is what EPOLL_CTL_MOD does with its mask and what interestOps() does
+     * on a Selector, and kqueue has no equivalent: each filter is registered on
+     * its own, so changing READ to WRITE left EVFILT_READ exactly where it was.
+     * The descriptor then came back for readability the caller had explicitly
+     * stopped asking about -- and since kevent reports one event per FILTER, the
+     * same descriptor arrived twice in one await, which on a kqueue several hosts
+     * share hands a connection to a host that was never told to expect it.
+     *
+     * <p>Counted rather than inspected because await() answers with descriptors
+     * and not with what made them ready: one ready descriptor reported twice is
+     * the shape of the defect, and the count is where it shows.
+     */
+    private static void modifyReplacesTheInterestRatherThanAddingToIt()
+            throws Exception {
+        Reactor reactor = Reactor.create();
+        ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        Tcp conn = Tcp.connect("127.0.0.1", listener.getPort(), 5000);
+        int peer = listener.accept();
+        int[] ready = new int[8];
+        try {
+            // Readable AND writable at once, which is what makes the leak visible.
+            byte[] hello = "hi".getBytes("UTF-8");
+            conn.write(hello, 0, hello.length);
+            reactor.add(peer, Reactor.READ);
+            int readable = reactor.await(ready, 1000);
+            reactor.modify(peer, Reactor.WRITE);
+            int afterModify = reactor.await(ready, 1000);
+            check("a descriptor watched for READ is reported", "1",
+                    String.valueOf(readable));
+            // Two would mean both filters fired: the WRITE that was asked for and
+            // the READ that should have been replaced.
+            check("and after modify it is reported once, for one interest", "1",
+                    String.valueOf(afterModify));
+        } finally {
+            reactor.remove(peer);
+            reactor.close();
+            ServerSocket.closeFd(peer);
+            conn.close();
+            listener.close();
+        }
     }
 
     /**
@@ -4811,7 +4902,9 @@ public class SelfTest {
         aClosedSocketWakesItsBlockedReader();
         theReactorProbesAndFiresOnce();
         modifyingIntoOneShotDisarms();
+        modifyReplacesTheInterestRatherThanAddingToIt();
         aFramedResponseEndsAtItsFraming();
+        aChunkSizeCannotWrapTheWalk();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
         halfACredentialPairIsRefused();
