@@ -67,17 +67,17 @@ class IoJava200Snippet {
 
     // tag::io-java-200[]
     void openDatabase() throws IOException {
-        // Creates the file on first use and opens it afterwards. The name is a
-        // plain identifier, not a path -- the platform decides where it lands.
-        // A database of its own, not the propertiesdemo.db the SQLMap
-        // walkthrough later in this chapter builds. That one is created by
-        // SQLMap.createTable from a Contact with several more columns, and
-        // createTable does not migrate a table that already exists -- so a
-        // two-column Contact left here would make its inserts fail.
+        // A plain identifier is the portable form: it creates the file on first
+        // use and every platform decides where it lands. Where
+        // Database.isCustomPathSupported() answers true a "file://" path works
+        // instead; where it does not, a name with a separator in it throws.
+        //
+        // Its own database, not the propertiesdemo.db the SQLMap walkthrough
+        // later in this chapter creates -- SQLMap.createTable will not migrate
+        // a Contact table this left behind with fewer columns.
         Database db = Database.openOrCreate("opendemo.db");
         try {
-            // A fresh database is empty, so anything that reads or writes a
-            // table has to create it first.
+            // A fresh database is empty, so create before reading or writing.
             db.execute("CREATE TABLE IF NOT EXISTS Person ("
                     + "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
             db.execute("INSERT INTO Person (name) VALUES (?)", new String[] { "Ada" });
