@@ -179,8 +179,24 @@ public final class StaticFiles implements HttpServer.Handler {
                     // every relative reference in an otherwise valid site points one
                     // level too high. The query is carried across because it was
                     // addressed to this resource.
+                    // ONE LEADING SLASH, because two make it somebody else's
+                    // site. "//attacker.example" is an origin-form target a
+                    // browser reads back as a scheme-relative URL whose AUTHORITY
+                    // is attacker.example, so echoing the request's own leading
+                    // run turned a directory redirect into an open redirect. A
+                    // backslash counts, since the URL parsers browsers use treat
+                    // it as a separator here even though the path grammar does
+                    // not. What this means to say is an absolute-path reference
+                    // on this origin, and that has exactly one slash in front.
+                    String location = rawPath;
+                    int lead = 0;
+                    while(lead < location.length()
+                            && (location.charAt(lead) == '/' || location.charAt(lead) == '\\')) {
+                        lead++;
+                    }
+                    location = "/" + location.substring(lead);
                     Map moved = new LinkedHashMap();
-                    moved.put("Location", rawPath + "/"
+                    moved.put("Location", location + "/"
                             + (queryAt < 0 ? "" : rawTarget.substring(queryAt)));
                     return HttpServer.Response.empty(301, "text/plain", moved);
                 }
@@ -211,6 +227,40 @@ public final class StaticFiles implements HttpServer.Handler {
                 if(real == null || !isInsideRoot(real)) {
                     return HttpServer.Response.text(403, "forbidden");
                 }
+                // AND THE DESCRIPTOR HAS TO BE THAT FILE. The check above is a
+                // second lookup, so on its own it answers a question about the
+                // path rather than about the bytes: an attacker who can write
+                // symlinks into the document root points one outside for the open
+                // and back inside for the resolve, and what gets served is the
+                // outside file that the check never looked at.
+                //
+                // Binding the two by IDENTITY closes that. The descriptor's inode
+                // came back in the stat above, so opening the resolved path and
+                // comparing says whether the file this response will send is the
+                // file that was proven contained. A swap in either direction makes
+                // the two differ and is refused. What it cannot distinguish is a
+                // hard link inside the root to a file outside it -- and that file
+                // does have a name inside the document root, which is the thing
+                // the root is a statement about.
+                //
+                // Only where openBeneath could not settle it, which is the Java SE
+                // arm and any kernel without openat2; a proven open needs none of
+                // this and pays for none of it.
+                if(info[3] != 0) {
+                    int verify = FileIo.openRead(real);
+                    if(verify < 0) {
+                        return HttpServer.Response.text(403, "forbidden");
+                    }
+                    long[] resolved = new long[4];
+                    int rc = FileIo.stat(verify, resolved);
+                    FileIo.close(verify);
+                    if(rc != 0 || resolved[3] != info[3]) {
+                        return HttpServer.Response.text(403, "forbidden");
+                    }
+                }
+                // A platform that reports no identity at all -- a filesystem with
+                // no file key behind it -- keeps the older, weaker answer rather
+                // than refusing every request it cannot bind.
             }
 
             long size = info[0];

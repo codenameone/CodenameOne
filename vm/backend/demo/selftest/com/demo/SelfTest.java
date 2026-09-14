@@ -2315,6 +2315,49 @@ public class SelfTest {
         check("a later If-Range date does not", "200", later);
     }
 
+    /**
+     * A directory redirect names this origin, whatever the request spelled.
+     *
+     * <p>The Location was built from the request's own path, leading run and all,
+     * so a target of "//name" produced "Location: //name/" -- which a browser
+     * reads back as a scheme-relative URL whose AUTHORITY is "name". A static
+     * file server's tidy-up redirect became an open redirect to somebody else's
+     * site. Backslash counts as the same trap, because the URL parsers browsers
+     * use treat it as a separator even though the path grammar does not.
+     */
+    private static void aDirectoryRedirectStaysOnThisOrigin() throws Exception {
+        String dir = System.getProperty("java.io.tmpdir") + "/cn1-redirect-"
+                + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        new java.io.File(dir + "/evil.example").mkdirs();
+        final StaticFiles files = new StaticFiles(dir, "", null, null);
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = files.handle(request);
+                return served == null ? HttpServer.Response.text(404, "not ours") : served;
+            }
+        });
+        String doubled;
+        String single;
+        try {
+            doubled = headerOf(httpRaw(server.getPort(),
+                    "GET //evil.example HTTP/1.1\r\nHost: x\r\n"
+                    + "Connection: close\r\n\r\n"), "Location");
+            // The control: an ordinary directory redirect is unchanged.
+            single = headerOf(httpRaw(server.getPort(),
+                    "GET /evil.example HTTP/1.1\r\nHost: x\r\n"
+                    + "Connection: close\r\n\r\n"), "Location");
+        } finally {
+            server.stop(2000);
+            new java.io.File(dir + "/evil.example").delete();
+            new java.io.File(dir).delete();
+        }
+        check("a doubled leading slash does not become an authority",
+                "/evil.example/", doubled);
+        check("and an ordinary directory redirect is unchanged",
+                "/evil.example/", single);
+    }
+
     private static String httpHead(int port, String target) throws Exception {
         return httpRaw(port, "HEAD " + target + " HTTP/1.1\r\nHost: x\r\n"
                 + "Connection: close\r\n\r\n");
@@ -5304,6 +5347,7 @@ public class SelfTest {
         modifyingIntoOneShotDisarms();
         modifyReplacesTheInterestRatherThanAddingToIt();
         removingADescriptorRemovesEveryFilter();
+        aDirectoryRedirectStaysOnThisOrigin();
         aFramedResponseEndsAtItsFraming();
         aChunkSizeCannotWrapTheWalk();
         aRedirectDoesNotCarryTheBodyOffHost();
