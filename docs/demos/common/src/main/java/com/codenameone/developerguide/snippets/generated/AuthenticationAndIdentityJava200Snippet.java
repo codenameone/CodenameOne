@@ -67,11 +67,16 @@ class AuthenticationAndIdentityJava200Snippet {
         FirebaseAuth auth = FirebaseAuth.getInstance().withApiKey("YOUR_WEB_API_KEY");
         auth.signInWithEmailAndPassword(email, password)
             .ready(user -> {
-                // A Firebase token, not an OIDC one -- it is what your
-                // Firebase-backed services expect.
-                System.out.println(user.getIdToken());
+                // user.getIdToken() is a Firebase token rather than an OIDC
+                // one, and it is a bearer credential: send it to your service,
+                // never to the log. Anything written with Log or println ends
+                // up in logcat and in device diagnostics.
+                callMyBackend(user.getIdToken());
             })
             .except(err -> ToastBar.showErrorMessage(err.getMessage()));
     }
     // end::authentication-and-identity-java-200[]
+
+    void callMyBackend(String idToken) {
+    }
 }
