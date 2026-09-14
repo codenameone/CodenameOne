@@ -1646,21 +1646,35 @@ public final class Vault {
                         try {
                             rememberNow(options.getPolicy());
                         } catch (RuntimeException rememberFailed) {
-                            // The same rollback enroll() does, and for the same reason -- this
-                            // round added the remembering step here without mirroring it, so a
-                            // cancelled passkey prompt left the device enrolled and unlocked
-                            // under session-only access while the import reported failure.
-                            //
-                            // Safe here too: an import that has just joined this device to the
-                            // vault has sealed nothing of its own yet, so removing the record
-                            // destroys no data. The record being removed is this device's copy,
-                            // not the sync state it came from.
-                            Storage.getInstance().deleteStorageFile(metadataKey());
-                            try {
-                                forgetEveryMechanism();
-                            } catch (RuntimeException alsoFailed) {
-                                // Nothing here can reach a half-made key, and reporting this
-                                // instead of the original would name the wrong failure.
+                            // Rolled back to whatever was here BEFORE, which is not always
+                            // nothing. The first version of this deleted the record outright, on
+                            // the reasoning that a device which has just joined has sealed
+                            // nothing of its own -- true for a first import, and false for the
+                            // refresh of a device that already had a vault. There, deleting
+                            // threw away the local password and recovery wraps and made every
+                            // secret already on the device unreadable, on a call that reported
+                            // failure.
+                            if (local == null) {
+                                Storage.getInstance().deleteStorageFile(metadataKey());
+                                try {
+                                    forgetEveryMechanism();
+                                } catch (RuntimeException alsoFailed) {
+                                    // Nothing here can reach a half-made key, and reporting this
+                                    // instead of the original would name the wrong failure.
+                                }
+                            } else {
+                                // Put the previous record back and leave the mechanisms alone:
+                                // rememberNow writes the device record last, so a failure inside
+                                // it leaves the existing record standing, and forgetting every
+                                // mechanism here would destroy a remembered unlock this device
+                                // already had and the caller never asked to give up.
+                                //
+                                // What cannot be undone is ensureKey having replaced the stored
+                                // key under the same id before failing later; the device record
+                                // then no longer unwraps, and a password unlock is the way back.
+                                // That is narrower than losing the vault, which is what the
+                                // delete did.
+                                commitMetadata(incoming, local);
                             }
                             lock();
                             throw rememberFailed;

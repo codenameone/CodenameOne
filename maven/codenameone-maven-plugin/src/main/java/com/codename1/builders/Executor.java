@@ -1270,7 +1270,11 @@ public abstract class Executor {
     /// encrypted, and treating a reference to it as encryption costs that application the cipher
     /// library and, on Android, every device below API 23.
     private static final String[] ENCRYPTING_CONFIG_FACTORIES = {
-        "passphrase", "rawKey", "managed"
+        // `vault` is one of these. An application that keys its database from a vault encrypts
+        // exactly as much as one calling managed() -- but it was absent here, so the scanner saw
+        // the database and pruned the cipher anyway: Android dropped its implementation and the
+        // native builders passed cn1.sqlcipher=false, leaving a database that cannot open.
+        "passphrase", "rawKey", "managed", "vault"
     };
 
     /// Whether this class file is one of the framework's own, by exact name.

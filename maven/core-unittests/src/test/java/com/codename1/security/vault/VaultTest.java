@@ -933,6 +933,37 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aFailedImportRefreshKeepsTheVaultAlreadyOnThisDevice() {
+        // The rollback added last round deleted the record outright, on the reasoning that a
+        // device which has just joined has sealed nothing of its own. True for a FIRST import;
+        // false for the refresh of a device that already had a vault, where deleting threw away
+        // the local password wrap and made every secret on the device unreadable -- on a call
+        // that reported failure.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        vault.putSecret("api.token", pw("t0ken")).get();
+        byte[] ownState = vault.exportSyncState();
+        vault.lock();
+
+        // The same vault, refreshed from its own exported state, while asking to be remembered
+        // by a store that will refuse.
+        device.refuseEnsure = true;
+        VaultOptions remembering = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault refreshing = Vault.named(name).configure(remembering);
+        assertEquals(VaultError.STORAGE_UNAVAILABLE,
+                errorOf(refreshing.importSyncState(ownState, pw("p"))));
+        device.refuseEnsure = false;
+
+        // The vault is still here, and so is what it was protecting.
+        assertEquals(Vault.LOCKED, Vault.named(name).configure(fast()).state(),
+                "a failed refresh must not delete the vault already on this device");
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals(pw("t0ken"), reopened.getSecret("api.token").get());
+    }
+
+    @Test
     void anImportThatCannotRememberLeavesNothingBehind() {
         // The remembering step was added to import in the round before this one without the
         // rollback enroll() already had, so a refused device store left this device enrolled and
