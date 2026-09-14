@@ -159,6 +159,48 @@ call yourself and reporting that as a single call -- that needs no permission
 from either platform, and it's what apps that offer conferencing actually
 do.
 
+=== The Values These APIs Hand You
+
+Everything above takes or returns a handful of small types from
+`com.codename1.call`. They're enumerations rather than integer constants, so the
+compiler catches a state you forgot, and every one of them has a value that matters more
+than the rest.
+
+`CallState`:: `RINGING`, `DIALING`, `ACTIVE`, `HELD`, `ENDED`. A session moves
+through these in one direction and never leaves `ENDED`, so treat that as the
+point where you release whatever the call was holding.
+
+`CallDirection`:: `INCOMING` or `OUTGOING`. Worth reading rather than inferring
+from which method you called: a call your app reported can be re-delivered to
+you after a process restart, and the direction is how you tell the two apart.
+
+`CallEndReason`:: `REMOTE_ENDED`, `LOCAL_ENDED`, `UNANSWERED`, `BUSY`, `FAILED`,
+`FILTERED`. `FILTERED` is the one to treat on its own -- it means the call
+never rang because a directory extension blocked it, so there's nothing to
+report to the user and nothing went wrong.
+
+`CallAvailability`:: what `Calls.getAvailability()` answers before you report a
+call. `AVAILABLE` is the only value that lets a call ring.
+`EMERGENCY_CALL_IN_PROGRESS`, `OTHER_APP_IN_CALL` and `THIS_APP_IN_CALL` are
+temporary and worth retrying; `NOT_PERMITTED`, `UNSUPPORTED` and
+`NOT_CONFIGURED` aren't, and the last of those usually means `Calls.configure`
+hasn't run.
+
+`CallHandle` and `CallHandleType`:: who the call is with. Build one with
+`CallHandle.phone(...)`, `CallHandle.email(...)` or `CallHandle.generic(...)`
+rather than by hand; the type travels with the value and decides how the system
+displays and dials it.
+
+`CallId`:: the identifier both ends of a call have to agree on. `CallId.random()`
+mints one, `CallId.isValid(...)` checks one that arrived over your own
+connection, and `CallId.normalize(...)` puts it in the form the platform expects.
+
+`CallError` and `CallException`:: why an action failed. The codes divide the same
+way as availability -- `CALL_REFUSED`, `CALL_FILTERED`, `DUPLICATE_CALL` and
+`BUSY` describe this call, while `NOT_SUPPORTED`, `UNAUTHORIZED` and
+`PROVIDER_RESET` describe the app or the platform and will keep failing until
+something changes.
+
 === Actions, And Why They Have To Be Answered
 
 image::img/call-action-contract.svg["How a CallAction is answered, and what an unanswered one costs",scaledwidth=90%]
