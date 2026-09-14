@@ -24,6 +24,11 @@ package com.codename1.processing;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /// The attribute half of the path language, which the developer guide has
@@ -146,6 +151,40 @@ class ResultAttributePathTest {
             assertTrue(expected.getMessage().indexOf("comparator") >= 0,
                     "wrong diagnosis: " + expected.getMessage());
         }
+    }
+
+    @Test
+    void aJsonFieldSetToNullCountsAsNotHavingOne() {
+        // Three cases, and the pair has to partition them: no key at all, a
+        // key whose value is null, and a real value. A null value counts as
+        // not having one, which is what reading the field answers anyway and
+        // the only reading XML can share -- an attribute there cannot be
+        // present and null at once. Key presence is a different question and
+        // the expression language cannot ask it.
+        Map<String, Object> nullValued = new HashMap<String, Object>();
+        nullValued.put("rank", null);
+        nullValued.put("name", "A");
+        Map<String, Object> absent = new HashMap<String, Object>();
+        absent.put("name", "B");
+        Map<String, Object> real = new HashMap<String, Object>();
+        real.put("rank", Integer.valueOf(3));
+        real.put("name", "C");
+        List<Object> players = new ArrayList<Object>();
+        players.add(nullValued);
+        players.add(absent);
+        players.add(real);
+        Map<String, Object> root = new HashMap<String, Object>();
+        root.put("players", players);
+
+        Result r = Result.fromContent(root);
+        String[] ranked = r.getAsStringArray("/players[@rank]/name");
+        assertEquals(1, ranked.length, "[@rank] matched a player with no usable rank");
+        assertEquals("C", ranked[0]);
+
+        String[] unranked = r.getAsStringArray("/players[@rank=null]/name");
+        assertEquals(2, unranked.length, "[@rank=null] is not the complement of [@rank]");
+        assertEquals("A", unranked[0]);
+        assertEquals("B", unranked[1]);
     }
 
     @Test

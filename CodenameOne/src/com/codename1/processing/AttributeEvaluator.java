@@ -77,12 +77,21 @@ class AttributeEvaluator extends AbstractEvaluator {
     }
 
 
-    /// Whether this JSON element carries a field of this name.
+    /// Whether this JSON element has a usable value under this name.
     ///
     /// The JSON half of "does this element have it?". A document parsed from
     /// JSON has no attributes at all -- MapContent.getAttribute() answers null
     /// for every name -- and the field an attribute expression names is a
     /// child there.
+    ///
+    /// A field explicitly set to null counts as NOT having one, which makes
+    /// `[@rank]` and `[@rank=null]` exact complements over three cases --
+    /// no key, a null value, a real value -- and matches what the path
+    /// answers on its own: reading that field gives null either way. It is
+    /// also the only reading XML can share, since an attribute there cannot
+    /// be present and null at once, and these two predicates have to mean the
+    /// same thing in both formats. Key presence would be a different question
+    /// and the expression language has no way to ask it.
     ///
     /// Restricted to JSON on purpose. XML draws the distinction the expression
     /// language does: `[@rank]` asks about an attribute and `[rank]` asks
