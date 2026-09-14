@@ -191,7 +191,7 @@ public class Image implements ActionSource {
         }
     }
 
-    /// creates an image from the given native image (e.g. MIDP image object)
+    /// creates an image from the given platform native image object
     ///
     /// #### Parameters
     ///

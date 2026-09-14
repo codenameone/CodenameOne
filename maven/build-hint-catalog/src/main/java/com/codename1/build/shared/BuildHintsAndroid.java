@@ -633,7 +633,11 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.java8")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
-                .platform("android"));
+                .platform("android")
+                .doc("Accepted and ignored. A Java 6 source level was produced by running "
+                        + "retrolambda over the compiled classes; retrolambda has been removed, "
+                        + "so Android builds always use a Java 8 source level. Setting this to "
+                        + "false logs a notice and changes nothing."));
 
         h.add(new Hint("android.keyboardOpen")
                 .group(HintGroup.ANDROID)

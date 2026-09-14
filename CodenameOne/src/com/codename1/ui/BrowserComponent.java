@@ -59,8 +59,7 @@ import java.util.Vector;
 /// you should check out the HTMLComponent which provides a lightweight 100% cross platform
 /// web component.
 ///
-/// This component will only work on platforms that support embedding a native browser which
-/// exclude earlier versions of Blackberry devices and J2ME devices.
+/// This component will only work on platforms that support embedding a native browser.
 ///
 /// Its recommended that you place this component in a fixed position (none scrollable) on the screen without other
 /// focusable components to prevent confusion between focus authority and allow the component to scroll
@@ -1707,9 +1706,7 @@ public class BrowserComponent extends Container {
     }
 
     /// Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
-    /// and access fields on the given object. Notice that on RIM devices which don't support reflection
-    /// this object must implement the propriatery Scriptable interface
-    /// http://www.blackberry.com/developers/docs/5.0.0api/net/rim/device/api/script/Scriptable.html
+    /// and access fields on the given object.
     ///
     /// #### Parameters
     ///

@@ -452,7 +452,7 @@ public interface Media {
     void setFullScreen(boolean fullScreen);
 
     /// Returns true if this Video Media is in Native player mode.
-    /// Some platforms such as BlackBerry is able to play video only on the native
+    /// Some platforms are able to play video only on the native
     /// player on those platforms isNativePlayerMode() will always return true
     /// If Media supports native playing by calling to play() the video will start
     /// playing in the native player in full screen.
@@ -467,7 +467,7 @@ public interface Media {
     /// Native playing assumes getVideoComponent() hasn't been called on this Media
     /// unexpected behaviour may occur if getVideoComponent() has been called
     /// and the Component is placed on a Form.
-    /// Some platforms such as BlackBerry is able to play video only on the native
+    /// Some platforms are able to play video only on the native
     /// player on those platforms isNativePlayerMode() will always return true
     void setNativePlayerMode(boolean nativePlayer);
 

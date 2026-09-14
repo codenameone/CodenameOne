@@ -17,8 +17,8 @@ calls out the parts that differ.
 === Motivation
 
 Codename One's older `Image.createSVG()` API depends on a per-platform
-native SVG renderer that ships only on a couple of backends (J2ME and
-the JavaSE simulator); iOS and Android applications fall back to PNG
+native SVG renderer that ships only on the JavaSE simulator; iOS and
+Android applications fall back to PNG
 multi-image buckets, giving up the resolution-independence that SVG was
 designed for. The
 https://github.com/codenameone/flamingo-svg-transcoder[legacy Flamingo

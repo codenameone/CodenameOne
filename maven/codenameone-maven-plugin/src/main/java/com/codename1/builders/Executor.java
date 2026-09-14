@@ -239,141 +239,8 @@ public abstract class Executor {
 
 
 
-    protected File retrolambdaDontRename(File userDir, BuildRequest request, File classDir) throws Exception {
-        return retrolambda(userDir, request, classDir, false);
-    }
-
     protected String defaultJavaVersion() {
         return "8";
-    }
-
-    protected boolean retrolambda(File userDir, BuildRequest request, File classDir) throws Exception {
-        return retrolambda(userDir, request, classDir, true) != null;
-    }
-
-    private File retrolambda(File userDir, BuildRequest request, File classDir, boolean rename) throws Exception {
-
-
-        File output = new File(classDir.getParentFile(), classDir.getName()+"_retrolamda");
-        output.mkdir();
-
-
-        HashMap<String, String> env = new HashMap<String, String>();
-
-
-        String retrolambda = System.getProperty("retrolambdaJarPath", null);
-        if (retrolambda == null) {
-            getResourceAsFile("/com/codename1/builder/retrolambda.jar", ".jar").getAbsolutePath();
-        }
-
-
-        if (codenameOneJar == null) {
-            throw new IllegalStateException("CodenameOne jar is not set");
-        }
-        if (!codenameOneJar.exists()) {
-            throw new IOException("Cannot find codename one jar at "+ codenameOneJar);
-        }
-        String codenameOneJarPath = codenameOneJar.getAbsolutePath();
-        File java8Home = new File(System.getProperty("java.home"));
-        String java = new File(java8Home, "bin" + File.separator + "java").getAbsolutePath();
-        String defaultMethods = "-Dretrolambda.defaultMethods=true";;
-
-
-        if (!exec(userDir, env, java,
-                "-Dretrolambda.inputDir="+classDir.getAbsolutePath(),
-                //"-Dretrolambda.classpath="+classDir.getAbsolutePath()+":src/iOSPort.jar:JavaAPI.jar",
-                "-Dretrolambda.classpath="+classDir.getAbsolutePath()+File.pathSeparator+codenameOneJarPath,
-                "-Dretrolambda.outputDir="+output.getAbsolutePath(),
-                "-Dretrolambda.bytecodeVersion=49", defaultMethods,
-                "-jar", retrolambda
-
-        )
-        ) {
-            return null;
-        }
-        // Remove stale references to java/lang/invoke classes.
-        stripInvokeClassConstantsRecursive(output);
-        if(rename) {
-            delTree(classDir, true);
-            if(is_windows) {
-                Files.move(output.toPath(), classDir.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            } else {
-                output.renameTo(classDir);
-            }
-            remapClasses(classDir, getDefaultClassMapping());
-        } else {
-            remapClasses(output, getDefaultClassMapping());
-        }
-
-        return output;
-    }
-
-
-    /**
-     * Retrolambda seems to leave class constants for java/lang/invoke classes
-     * in the constant pool even though they aren't used.  Strips these
-     * constants out.
-     * @param dir Directory containing classes to be converted.  Recursively.
-     * @throws IOException
-     */
-    private void stripInvokeClassConstantsRecursive(File dir) throws IOException {
-        if (dir.isFile() && dir.getName().endsWith(".class")) {
-            stripInvokeClassConstants(dir);
-        } else if (dir.isDirectory()){
-            for (File f : dir.listFiles()) {
-                if (!f.getName().startsWith(".")) {
-                    stripInvokeClassConstantsRecursive(f);
-                }
-            }
-        }
-    }
-
-    /**
-     * Retrolambda seems to leave class constants for java/lang/invoke classes
-     * in the constant pool even though they aren't used.  This will strip
-     * them out.
-     * @param classFile
-     * @throws IOException
-     */
-    private void stripInvokeClassConstants(File classFile) throws IOException {
-        FileInputStream fis = null;
-        try {
-            final boolean[] found = new boolean[1];
-            fis = new FileInputStream(classFile);
-            ClassReader r = new ClassReader(fis) {
-
-            };
-            ClassVisitor v = new ClassVisitor(Opcodes.ASM9) {
-                @Override
-                public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                    super.visit(version, access, name, signature, superName, interfaces);
-                }
-                @Override
-                public void visitInnerClass(String name, String outerName, String innerName, int access) {//(String string, String string1, String string2, int i) {
-                    if (!name.startsWith("java/lang/invoke")) {
-                        super.visitInnerClass(name, outerName, innerName, access);
-                    } else {
-                        found[0] = true;
-                    }
-                }
-            };
-
-            ClassWriter w = new ClassWriter(r, ClassWriter.COMPUTE_MAXS);
-            r.accept(v, 0);
-
-            if (!found[0]) {
-                // If nothing was stripped, we don't need to write the file.
-                return;
-            }
-            File out = //new File(classFile.getParentFile(), classFile.getName()+".stripped");
-                    classFile;
-            createFile(out, w.toByteArray());
-
-        } finally {
-            if (fis != null) {
-                try { fis.close();} catch(Throwable t){}
-            }
-        }
     }
 
     protected String createStartInvocation(BuildRequest request, String mainObject) {
@@ -2376,15 +2243,6 @@ public abstract class Executor {
     }
 
     /**
-     * The {@code -source} / {@code -target} pair to compile the generated
-     * application stub with.
-     *
-     * <p>Shared by both Apple builders, which generate the same shape of stub.
-     * The default is 1.6 because ParparVM targets Java 5 with Java 8 syntax via
-     * retrolambda; a JDK 9 or later javac refuses 1.6 outright, so those compile
-     * the stub as 8 instead.</p>
-     */
-    /**
      * The leading integer of a version string, or {@code defaultVal} when it has
      * none.
      */
@@ -2400,6 +2258,14 @@ public abstract class Executor {
         }
     }
 
+    /**
+     * The {@code -source} / {@code -target} pair to compile the generated
+     * application stub with.
+     *
+     * <p>Shared by both Apple builders, which generate the same shape of stub.
+     * The default is 1.6 because ParparVM targets Java 5; a JDK 9 or later javac
+     * refuses 1.6 outright, so those compile the stub as 8 instead.</p>
+     */
     protected String[] getStubCompileSourceTarget(String javacPath) {
         String source = "1.6";
         String target = "1.6";

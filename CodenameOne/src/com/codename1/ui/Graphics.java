@@ -30,7 +30,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 
 /// Abstracts the underlying platform graphics context thus allowing us to achieve
-/// portability between MIDP devices and CDC devices. This abstaction simplifies
+/// portability across platforms. This abstaction simplifies
 /// and unifies the Graphics implementations of various platforms.
 ///
 /// A graphics instance should never be created by the developer and is always accessed
@@ -1015,7 +1015,7 @@ public final class Graphics {
             // called impl.drawImageRounded for any image with a peer, and the
             // inherited implementation forwards to the six-argument drawImage,
             // whose body in CodenameOneImplementation is EMPTY -- so on a port
-            // that does not override it (J2ME, Windows, Linux, BlackBerry) the
+            // that does not override it (Windows, Linux) the
             // image was not drawn square, it was not drawn at all. drawImage
             // below is what knows to pre-scale when the port cannot draw a
             // scaled image itself.
@@ -1047,7 +1047,7 @@ public final class Graphics {
         impl.drawImage(nativeGraphics, img, x + xTranslate, y + yTranslate);
     }
 
-    /// Draws an image with a MIDP trasnform for fast rotation
+    /// Draws an image with a native transform for fast rotation
     void drawImage(Object img, int x, int y, int transform) {
         if (transform != 0) {
             impl.drawImageRotated(nativeGraphics, img, x + xTranslate, y + yTranslate, transform);
@@ -1464,7 +1464,7 @@ public final class Graphics {
         impl.fillTriangle(nativeGraphics, xTranslate + x1, yTranslate + y1, xTranslate + x2, yTranslate + y2, xTranslate + x3, yTranslate + y3);
     }
 
-    /// Draws the RGB values based on the MIDP API of a similar name. Renders a
+    /// Draws the RGB values from a packed ARGB array. Renders a
     /// series of device-independent RGB+transparency values in a specified
     /// region. The values are stored in rgbData in a format with 24 bits of
     /// RGB and an eight-bit alpha value (0xAARRGGBB), with the first value

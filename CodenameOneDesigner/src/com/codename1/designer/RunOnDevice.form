@@ -104,7 +104,7 @@
             </Component>
             <Component class="javax.swing.JLabel" name="informationLine">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Blackberry users please be advised that only OS&apos;s 4.7 or newer are supported!"/>
+                <Property name="text" type="java.lang.String" value=""/>
                 <Property name="name" type="java.lang.String" value="informationLine" noResource="true"/>
               </Properties>
             </Component>

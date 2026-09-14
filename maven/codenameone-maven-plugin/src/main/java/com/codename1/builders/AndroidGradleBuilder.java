@@ -120,8 +120,6 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean extendAppCompatActivity = false;
 
-    private boolean useJava8SourceLevel = true;
-
     private File gradleProjectDirectory;
 
     private boolean playServicesVersionSetInBuildHint = false;
@@ -1621,7 +1619,15 @@ public class AndroidGradleBuilder extends Executor {
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
-        useJava8SourceLevel = request.getArg("android.java8", ""+useJava8SourceLevel).equals("true");
+        if (!request.getArg("android.java8", "true").equals("true")) {
+            // Java 6 source level was produced by running retrolambda over the compiled
+            // classes. Retrolambda is gone (it never supported the JDK 17 that Gradle 8
+            // requires), so this hint no longer has an implementation behind it. It stays
+            // accepted rather than fatal because it is still present in older
+            // codenameone_settings.properties files.
+            log("NOTICE: android.java8=false is no longer supported and is ignored -- "
+                    + "Android builds always use a Java 8 source level.");
+        }
 
         // R8 configuration - disable full mode by default to prevent issues with reflection
         disableR8 = request.getArg("android.disableR8", "false").equals("true");
@@ -1678,10 +1684,6 @@ public class AndroidGradleBuilder extends Executor {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
             minimumGradleVersion = GRADLE_8_VERSION;
             gradleDistributionUrl = gradle8DistributionUrl;
-            if (!useJava8SourceLevel) {
-                log("NOTICE: Enabling Java 8 source level for Gradle 8 build because RetroLambda is not supported on Java 17, which is required for gradle 8.");
-                useJava8SourceLevel = true;
-            }
         }
         if (newFirebaseMessaging && !useGradle8) {
             throw new BuildException("android.newFirebaseMessaging requires Gradle 8.13 or higher. Please remove the android.gradleVersion build hint");
@@ -2238,17 +2240,6 @@ public class AndroidGradleBuilder extends Executor {
 
         googleServicesJson = new File(libsDir.getParentFile(), "google-services.json");
         File agconnectServicesJson = new File(libsDir.getParentFile(), "agconnect-services.json");
-        if (!useJava8SourceLevel) {
-            log("Running retrolambda on classes to support Java 6 source level.  Use the android.java8=true build hint to use Java 8 source level directly on Android, and avoid this step.");
-            try {
-                if (!retrolambda(new File(System.getProperty("user.dir")), request, dummyClassesDir)) {
-                    return false;
-                }
-            } catch (Exception ex) {
-                throw new BuildException("Failed to run retrolambda on classes", ex);
-            }
-        }
-
         String additionalImports = request.getArg("android.activityClassImports", "");
         String additionalMembers = request.getArg("android.activityClassBody", "");
         String additionalKeyVals = "";
@@ -7975,7 +7966,7 @@ public class AndroidGradleBuilder extends Executor {
                     "        sourceCompatibility JavaVersion.toVersion(17)\n" +
                     "        targetCompatibility JavaVersion.toVersion(17)\n" +
                     "    }\n";
-        } else if(useJava8SourceLevel) {
+        } else {
             javaCompileOptions = "    compileOptions {\n" +
                     coreLibraryDesugaringOption +
                     "        sourceCompatibility JavaVersion.VERSION_1_8\n" +
