@@ -833,7 +833,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 <3> Notice that the "titles" and "aliases" entries are both lists of elements. You use `java.util.List` to avoid a clash with `com.codename1.ui.List`.
 
 .Parsed JSON result, clicking the elements opens the URL from the JSON
-image::img/json-parsing.png[Parsed JSON result, clicking the elements opens the URL from the JSON,scaledwidth=20%]
+image::img/json-parsing.png["Parsed JSON result, clicking the elements opens the URL from the JSON",scaledwidth=20%]
 
 TIP: The structure of the returned map is sometimes unintuitive when looking at the raw JSON. The easiest thing to do is set a breakpoint on the method and use the inspect variables capability of your IDE to inspect the returned element hierarchy while writing the code to extract that data
 

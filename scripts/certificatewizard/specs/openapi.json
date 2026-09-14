@@ -659,6 +659,46 @@
         }
       }
     },
+    "/appsec/7.0/apple/profiles/reconcile": {
+      "post": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Reconcile local state with Apple",
+        "description": "Imports every provisioning profile Apple lists that we do not have, and removes rows whose Apple resource is gone. Paired with the certificate reconcile behind \"Sync with Apple\": without it the profile list only ever held profiles this wizard created.",
+        "operationId": "reconcileProfiles",
+        "responses": {
+          "200": {
+            "description": "Profiles after reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileDTO"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
     "/appsec/7.0/apple/profiles/{id}/download": {
       "get": {
         "tags": [

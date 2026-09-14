@@ -330,6 +330,10 @@ jobs:
           python3 scripts/developer-guide/check-guide-structure.py
           python3 scripts/developer-guide/check-guide-xrefs.py
           python3 scripts/developer-guide/check-missing-code-blocks.py
+          # An unquoted comma in alt text silently truncates it and puts the rest
+          # in the width slot. Asciidoctor accepts it and the image renders, so
+          # nothing else in this job notices.
+          python3 scripts/developer-guide/check-image-alt-text.py
           # Note this only catches a link the GUIDE breaks. When the website
           # moves the route instead -- a page renamed, deleted or re-slugged --
           # the same script runs from website-docs.yml, which triggers on

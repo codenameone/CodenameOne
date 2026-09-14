@@ -78,6 +78,122 @@ class CertificateWizardModelTest {
         assertEquals("APPLE_EXPORTABLE", compatible.get(0).appleCertId());
     }
 
+    /**
+     * Issue #5773: the overview card headed "Apple distribution certificate" showed
+     * {@code certificates.get(0)} -- the first row of an unfiltered list -- and so announced
+     * "Ready" beside a MAC APP DISTRIBUTION certificate on an account that had no iOS
+     * distribution certificate at all. The wizard never used that certificate for an iOS build
+     * (compatibleCertificates has always been strict), but a readiness panel that reports
+     * readiness it does not have is why the reporter concluded it did.
+     */
+    @Test
+    void overviewDistributionCardIgnoresAMacCertificate() {
+        long now = System.currentTimeMillis();
+        List<SigningState.Certificate> certs = new ArrayList<SigningState.Certificate>();
+        certs.add(new SigningState.Certificate(1L, "APPLE_MAC", "MAC_APP_DISTRIBUTION",
+                "dtest11 MAC APP DISTRIBUTION", "SER1", now + 300L * 86400000L, "ACTIVE", true));
+        SigningState macOnly = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                certs, null, null, null, null, null);
+
+        assertNull(WizardDecisions.distributionCertificateForOverview(macOnly));
+
+        certs.add(new SigningState.Certificate(2L, "APPLE_IOS", "IOS_DISTRIBUTION",
+                "dtest11 Apple Distribution", "SER2", now + 300L * 86400000L, "ACTIVE", true));
+        SigningState both = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                certs, null, null, null, null, null);
+
+        assertEquals("APPLE_IOS", WizardDecisions.distributionCertificateForOverview(both).appleCertId());
+    }
+
+    /**
+     * The other half of the same card row: "App Store profile: Ready -- dtest11 Development".
+     * A development profile is not an App Store profile, and a profile Apple has marked INVALID
+     * is not one the next build can sign with either.
+     */
+    @Test
+    void overviewAppStoreCardIgnoresOtherProfiles() {
+        List<SigningState.Profile> profiles = new ArrayList<SigningState.Profile>();
+        profiles.add(new SigningState.Profile(1L, "P_DEV", "dtest11 Development",
+                "IOS_APP_DEVELOPMENT", "com.example.app", "u1", null, "ACTIVE"));
+        SigningState devOnly = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, null, profiles, null, null);
+
+        assertNull(WizardDecisions.appStoreProfileForOverview(devOnly, "com.example.app"));
+
+        profiles.add(new SigningState.Profile(2L, "P_STALE", "dtest11 App Store",
+                "IOS_APP_STORE", "com.example.app", "u2", null, "INVALID"));
+        SigningState stale = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, null, profiles, null, null);
+
+        assertNull(WizardDecisions.appStoreProfileForOverview(stale, "com.example.app"));
+
+        profiles.add(new SigningState.Profile(3L, "P_STORE", "dtest11 App Store",
+                "IOS_APP_STORE", "com.example.app", "u3", null, "ACTIVE"));
+        SigningState ready = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, null, profiles, null, null);
+
+        assertEquals("P_STORE", WizardDecisions.appStoreProfileForOverview(ready, "com.example.app").appleProfileId());
+    }
+
+    /**
+     * The card speaks for THIS project. Once "Sync with Apple" imports the whole account rather
+     * than only what this wizard created, another app's App Store profile is the likely first
+     * match -- and announcing it "Ready" here is the same false assurance as before, with the
+     * added twist that IOSProvisioningPreflight then refuses that very profile.
+     */
+    @Test
+    void overviewAppStoreCardIgnoresAnotherAppsProfile() {
+        List<SigningState.Profile> profiles = new ArrayList<SigningState.Profile>();
+        profiles.add(new SigningState.Profile(1L, "P_OTHER", "Someone Else App Store",
+                "IOS_APP_STORE", "com.example.other", "u1", null, "ACTIVE"));
+        SigningState other = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, null, profiles, null, null);
+
+        assertNull(WizardDecisions.appStoreProfileForOverview(other, "com.example.app"));
+
+        // Unknown project identifier: skipped rather than guessed, the same rule the build
+        // preflight follows. "None yet" beside a good profile is its own kind of wrong.
+        assertEquals("P_OTHER",
+                WizardDecisions.appStoreProfileForOverview(other, null).appleProfileId());
+        assertEquals("P_OTHER",
+                WizardDecisions.appStoreProfileForOverview(other, "  ").appleProfileId());
+
+        profiles.add(new SigningState.Profile(2L, "P_MINE", "My App Store",
+                "IOS_APP_STORE", "com.example.app", "u2", null, "ACTIVE"));
+        SigningState both = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, null, profiles, null, null);
+
+        assertEquals("P_MINE",
+                WizardDecisions.appStoreProfileForOverview(both, "com.example.app").appleProfileId());
+    }
+
+    /**
+     * A Mac has to be registrable or the Mac profile types the wizard offers cannot be created:
+     * isUsableDevice correctly refuses an iOS device for a Mac profile, and the registration
+     * dialog hardcoded IOS, so the picker for a Mac Development profile was always empty
+     * (issue #5773).
+     */
+    @Test
+    void aMacCanBeRegisteredAndIsOfferedToMacProfilesOnly() {
+        MockSigningService service = new MockSigningService();
+        service.registerDevice("Build Mac", "11111111-2222-3333-4444-555555555555", "MAC_OS",
+                r -> assertTrue(r.ok));
+        final SigningState[] state = new SigningState[1];
+        service.refresh(r -> state[0] = r.value);
+
+        SigningState.Device mac = null;
+        for (SigningState.Device d : state[0].devices) {
+            if ("Build Mac".equals(d.name())) {
+                mac = d;
+            }
+        }
+        assertNotNull(mac);
+        assertEquals("MAC_OS", mac.platform());
+        assertTrue(WizardDecisions.isUsableDevice(mac, "MAC_APP_DEVELOPMENT"));
+        assertFalse(WizardDecisions.isUsableDevice(mac, "IOS_APP_DEVELOPMENT"));
+        assertFalse(WizardDecisions.usableDevices(state[0], "MAC_APP_DEVELOPMENT").isEmpty());
+    }
+
     @Test
     void createProfileValidationRequiresDevicesOnlyWhenNeeded() {
         List<String> certs = new ArrayList<String>();
@@ -335,7 +451,7 @@ class CertificateWizardModelTest {
         assertEquals(certCount + 1, after[0].certificates.size());
 
         service.createBundleId("com.example.newapp", "New App", true, r -> assertTrue(r.ok));
-        service.registerDevice("QA", "00008120-000A1C3E0C68201E", r -> assertTrue(r.ok));
+        service.registerDevice("QA", "00008120-000A1C3E0C68201E", "IOS", r -> assertTrue(r.ok));
         service.refresh(r -> after[0] = r.value);
         assertTrue(after[0].bundleIds.size() >= 3);
         assertTrue(after[0].devices.size() >= 3);

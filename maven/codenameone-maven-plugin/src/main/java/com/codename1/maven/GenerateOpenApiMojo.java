@@ -379,6 +379,9 @@ public class GenerateOpenApiMojo extends AbstractMojo {
         /// emitted record/class. We keep the first-encountered name and alias
         /// the duplicates to it.
         private void unifyShapes() {
+            // Java type name of a schema that gets unified away -> the name of
+            // the schema it collapsed into.
+            Map<String, String> renamed = new LinkedHashMap<String, String>();
             for (Map.Entry<String, SchemaInfo> e : schemaByName.entrySet()) {
                 SchemaInfo info = e.getValue();
                 String shape = shapeOf(info);
@@ -388,10 +391,57 @@ public class GenerateOpenApiMojo extends AbstractMojo {
                     nameAliases.put(info.specName, info.javaName);
                 } else {
                     info.isCanonical = false;
+                    if (!info.javaName.equals(prior.javaName)) {
+                        renamed.put(info.javaName, prior.javaName);
+                    }
                     info.javaName = prior.javaName;
                     nameAliases.put(info.specName, prior.javaName);
                 }
             }
+            if (renamed.isEmpty()) {
+                return;
+            }
+            // Property types were resolved in pass 2, before any of this was
+            // known, so a property pointing at a schema that has just been
+            // unified away still names a class nothing emits. Left alone that
+            // is a generated model which does not compile -- the Swagger
+            // Petstore hits it, where Tag and Category have the same shape and
+            // Pet references both.
+            for (SchemaInfo info : schemaByName.values()) {
+                for (PropInfo p : info.props) {
+                    p.javaType = retypeModelReferences(p.javaType, renamed);
+                }
+            }
+        }
+
+        /// Rewrites every `<modelPackage>.<stale>` occurrence in a resolved
+        /// Java type to the canonical name it was unified into. The match has
+        /// to end on a non-identifier character so `model.Tag` inside
+        /// `model.TagSummary` is left alone.
+        private String retypeModelReferences(String javaType, Map<String, String> renamed) {
+            if (javaType == null) {
+                return null;
+            }
+            String out = javaType;
+            for (Map.Entry<String, String> e : renamed.entrySet()) {
+                String stale = modelPackage + "." + e.getKey();
+                String canonical = modelPackage + "." + e.getValue();
+                int from = 0;
+                for (;;) {
+                    int at = out.indexOf(stale, from);
+                    if (at < 0) {
+                        break;
+                    }
+                    int after = at + stale.length();
+                    if (after < out.length() && Character.isJavaIdentifierPart(out.charAt(after))) {
+                        from = after;
+                        continue;
+                    }
+                    out = out.substring(0, at) + canonical + out.substring(after);
+                    from = at + canonical.length();
+                }
+            }
+            return out;
         }
 
         private static String shapeOf(SchemaInfo s) {

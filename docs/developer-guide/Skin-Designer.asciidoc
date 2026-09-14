@@ -44,7 +44,7 @@ the grid tells you when you're looking at a clamped subset.
 
 === Stage 2 — pick a starting source
 
-image::img/skin-designer/skin-designer-stage-2-source.png[Source picker with three large cards: Pick a shape, Upload an image, Blank rectangle,role="text-center"]
+image::img/skin-designer/skin-designer-stage-2-source.png["Source picker with three large cards: Pick a shape, Upload an image, Blank rectangle",role="text-center"]
 
 Three ways exist to seed the skin's body image:
 
@@ -160,7 +160,7 @@ written into `skin.properties`:
 
 === Stage 4 — finish and download
 
-image::img/skin-designer/skin-designer-stage-4-done.png[Done page showing the green check, summary of the generated skin, and a Download skin button,role="text-center"]
+image::img/skin-designer/skin-designer-stage-4-done.png["Done page showing the green check, summary of the generated skin, and a Download skin button",role="text-center"]
 
 Clicking *Finish* in the editor's footer:
 

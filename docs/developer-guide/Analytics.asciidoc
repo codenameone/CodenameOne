@@ -96,6 +96,9 @@ Codename One emits a few events for you, so the common funnels work without any 
 
 | `share`
 | The native share sheet is invoked.
+
+| `invite_created`, `invite_shared`, `invite_share_dismissed`, `invite_opened`, `invite_install`, `invite_converted`
+| The invite funnel, under the `referral` category. See <<analytics-invites>>.
 |===
 
 You can add your own events at any time with `Analytics.event(...)`; these built-ins simply save you the boilerplate for the most common funnels.
@@ -170,6 +173,89 @@ Implement `AnalyticsProvider`, or extend `AbstractAnalyticsProvider` and overrid
 
 
 The `init(AnalyticsContext)` callback hands you the app name, version, platform, locale and the pseudonymous client id. `onConsentChanged(AnalyticsConsent)` lets a provider reconfigure when the user updates consent. `supports(AnalyticsCapability)` lets tooling introspect which features a provider offers.
+
+[[analytics-invites]]
+=== Invite a friend
+
+`com.codename1.analytics.invite` follows an invitation through to what it caused: who sent it, who installed because of it, and what that invited cohort went on to spend. It replaces what Firebase Dynamic Links and Firebase Invites used to do, both of which have been shut down.
+
+==== Sending an invite
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnalyticsJava010Snippet.java[tag=analytics-java-010,indent=0]
+----
+
+`Invites.create` returns immediately and works with no network at all, so the share sheet never waits on a server -- the code is generated on the device and registered with the link service in the background. `title` and `description` drive the preview card the link shows in a messaging app.
+
+`Invites.share` reports `invite_shared` only when the platform confirms the user shared; a dismissed sheet reports `invite_share_dismissed`. If you send the invite through your own user interface instead, call `Invites.reportShareResult` from your share callback so the funnel still records it.
+
+==== Receiving an invite
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnalyticsJava011Snippet.java[tag=analytics-java-011,indent=0]
+----
+
+Call `checkForInvite()` from `start()`. It's a pull rather than a callback on purpose: Android delivers a link by replacing the activity intent and iOS by setting a property, and reading the launch argument is the one path that behaves the same on both. An answer that arrives before you register a listener -- which happens routinely on a cold launch from a link -- is held and delivered when you register.
+
+Exactly one of the two listener methods is called per install, and neither is called again on later launches.
+
+==== Closing the funnel
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnalyticsJava012Snippet.java[tag=analytics-java-012,indent=0]
+----
+
+When attribution resolves it's also written as persistent analytics dimensions (`cn1_campaign`, `cn1_channel`, `cn1_invite_code`, `cn1_invite_match`). Every later event carries them, including the `purchase` event the framework already emits for you, so revenue and lifetime value per campaign come out of the reports you already have without any extra wiring. The `cn1_` prefix is reserved -- don't use it for your own dimensions.
+
+==== How exact the answer is
+
+`InviteAttribution.getMatchType()` tells you how the attribution was made, and the three answers aren't equally trustworthy:
+
+[options="header",cols="1,3"]
+|===
+| Match type | What it means
+
+| `MATCH_DIRECT`
+| The link opened an app that was already installed. Exact.
+
+| `MATCH_REFERRER`
+| The invite code travelled through the app store and came back verbatim. Exact. This is the Android path.
+
+| `MATCH_APP_CLIP`
+| An iOS App Clip received the invite link and handed the code to the app the person then installed. Exact. This is the iOS path.
+|===
+
+Every match type is exact. The App Store carries no referrer parameter of its own, so on iOS the code travels a different road than it does on Android: tapping the invite link offers an App Clip, the clip is launched by the link itself and so receives the code exactly, and it leaves that code where the full app can read it after installation. Nothing is matched, estimated or guessed, and a referral bounty can be paid on any of these.
+
+`Invites.setAttributionWindow(0)` stops a deferred lookup being started at all -- neither the Play install referrer nor the App Clip handoff is read. An exact code the device is already holding, one that arrived on a link, is still claimed: there is nothing to defer about it.
+
+==== Consent
+
+Everything reported here is gated on the analytics consent category, and nothing is transmitted until consent is granted.
+
+Nothing at all is collected about someone who only taps a link. An earlier design wrote a coarse device profile to local storage on first launch -- OS version, hardware model, language, screen size -- so an iOS install could be matched to a click, and the server kept a hashed fingerprint of the visitor's address for seven days to match it against. App Clips made all that unnecessary: the clip is handed the code by the link, so there is nothing to match and nothing to keep.
+
+`Analytics.resetClientId()` erases the invite attribution along with the identity, so an erasure request can't leave a fresh pseudonymous id linked to the same inviter.
+
+==== What the build does for you
+
+Referencing this package makes the build wire the platform side: an `autoVerify` App Links intent filter on Android, an associated domain on iOS, and the Play Install Referrer dependency. An app that only reports analytics gets none of it.
+
+On iOS it also generates the App Clip, because there is no attribution without one. The clip is a separate binary embedded in your app: a few hundred lines of UIKit that show your app's name, offer to install it, and record the invite code the link handed them. It's not a Codename One application and doesn't run your code. You don't write it, open it or maintain it.
+
+Three things the generated clip needs from you, and each fails in its own way:
+
+* The App Store identifier of your app, in `ios.invite.appStoreId`. Without it the clip still records the code, it simply shows no install sheet -- which is the right behavior before your first release, when the app doesn't exist in the store yet.
+* An App Group registered on your developer account. The build derives one from your package name and adds it to `ios.app_groups`; override it with `ios.invite.appGroup` if you already have one. A group that isn't registered signs cleanly and the clip and the app can then never reach each other, which is the failure with no symptom.
+* An App Clip enabled on your App ID, alongside Associated Domains.
+* An Advanced App Clip Experience registered in App Store Connect for your invite link prefix. Codename One authorizes your clip for the domain; what maps a particular link to a particular clip is that experience, and until it exists tapping the invite link shows no clip card at all. The console shows the prefix to register once invites are switched on.
+
+Set `ios.invite.appClip` to `false` only if you ship an App Clip of your own. The build then generates no clip, but your app still gets the shared App Group and the reader, so a clip of yours that writes the handoff is still picked up.
+
+WARNING: On Android, App Links verification checks the certificate the installed APK is signed with. Under Play App Signing that's Google's key, not your upload key, so add the app-signing SHA-256 from the Play Console to `android.invite.signingFingerprint`. Without it verification fails on every Play install, the link opens the browser instead of your app, and nothing reports an error.
 
 [[analytics-migration]]
 === Migrating from AnalyticsService

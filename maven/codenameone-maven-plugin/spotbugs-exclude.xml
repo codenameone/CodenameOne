@@ -176,6 +176,33 @@
     </Match>
 
     <!--
+    installUpdater() reads an optional bundled resource through
+    try-with-resources and returns early when it is present:
+
+        try (InputStream bundled = ...getResourceAsStream(...)) {
+            if (bundled != null) { ...; return; }
+        }
+
+    getResourceAsStream returns null when the resource is absent, which is the
+    case this is written for, and try-with-resources is specified to skip
+    close() on a null resource. SpotBugs analyses the compiled finally block,
+    where the synthetic null guard sits on a path its dataflow has already
+    concluded is null, and reports the guard as a redundant check and the load
+    as a load of a known null value. Both describe javac's generated code
+    rather than anything this method does. The alternatives (dropping
+    try-with-resources, or nesting the null check outside it) would make the
+    source worse to silence a finding about code nobody wrote.
+    -->
+    <Match>
+        <Class name="com.codename1.maven.AbstractCN1Mojo" />
+        <Method name="installUpdater" />
+        <Or>
+            <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE" />
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE" />
+        </Or>
+    </Match>
+
+    <!--
     StubGenerator emits source files at build time; its per-method String
     concatenation runs once per native interface on the developer's machine
     and the outputs are small. Rewriting the five generators to StringBuilder

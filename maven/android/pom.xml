@@ -124,6 +124,16 @@
                                      the builder deletes whichever halves the
                                      app did not ask for. -->
                                 <exclude>com/codename1/impl/android/nearby/**</exclude>
+                                <!-- The Play Install Referrer implementation
+                                     names com.android.installreferrer, which
+                                     PlatformFeatureCatalog adds only for an app
+                                     that referenced com.codename1.analytics.
+                                     invite. It compiles in the generated app;
+                                     AndroidGradleBuilder deletes the package
+                                     for everyone else, so no other app carries
+                                     the dependency or the Play service bind
+                                     permission that comes with it. -->
+                                <exclude>com/codename1/impl/android/referrer/**</exclude>
                                 <!-- BillingSupport is written against the Play
                                      Billing ProductDetails API, which needs
                                      billing 8 or newer; cn1-binaries carries

@@ -14,21 +14,12 @@ if [ $# -lt 1 ]; then
   exit 2
 fi
 
-# Match build-ios-app.sh. The generated project may depend on the simulator
-# platforms installed into Xcode 26; using the runner default Xcode here can
-# make xcodebuild see only tvOS destinations for an iOS test scheme.
-if [ -z "${XCODE_APP:-}" ]; then
-  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-fi
-if [ ! -x "${XCODE_APP:-}/Contents/Developer/usr/bin/xcodebuild" ]; then
-  ri_log "Xcode 26 not found. Set XCODE_APP to an installed Xcode 26 app bundle path." >&2
-  exit 1
-fi
-export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-export XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
-export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
-ri_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
-ri_log "Using XCODEBUILD=$XCODEBUILD"
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh for the
+# resolution order and for CN1_XCODE_MAJOR, the single knob that moves the
+# whole tree to the next Xcode.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode ri_log || exit 1
 
 WORKSPACE_PATH="$1"
 APP_SCHEME="${2:-}"

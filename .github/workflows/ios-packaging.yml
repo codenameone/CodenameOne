@@ -9,6 +9,7 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'Ports/iOSPort/**'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-device-release-build.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
@@ -24,6 +25,7 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'Ports/iOSPort/**'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-device-release-build.sh'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
@@ -120,6 +122,7 @@ jobs:
               scripts/build-ios-app.sh \
               scripts/run-ios-device-release-build.sh \
               scripts/run-ios-ui-tests.sh \
+              scripts/lib/xcode.sh \
               .github/workflows/_build-ios-port.yml \
               | shasum -a 256 | awk '{print $1}')
           echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"

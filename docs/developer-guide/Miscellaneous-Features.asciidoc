@@ -163,7 +163,7 @@ TIP: The `scheduleBackgroundTask` method is like `new Thread()` in some regards.
 
 
 .Contacts with the default photos on the simulator, on device these will use actual user photos when available
-image::img/contacts-with-photos.png[Contacts with the default photos on the simulator, on device these will use actual user photos when available,scaledwidth=20%]
+image::img/contacts-with-photos.png["Contacts with the default photos on the simulator, on device these will use actual user photos when available",scaledwidth=20%]
 
 TIP: Notice that the code above uses `callSerially` & `scheduleBackgroundTask` in a liberal nested way. This is important to avoid an EDT violation
 
@@ -813,6 +813,11 @@ You try to make Codename One "seamless," this expresses itself in small details 
 A good example for a common problem developers face is location code that doesn't work in iOS. This is due to the `ios.locationUsageDescription` build hint that's required. The reason that build hint was added is a need by Apple to provide a description for every app that uses the location service.
 
 To solve this sort of used case you have two APIs in `Display`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava010Snippet.java[tag=miscellaneous-features-java-010,indent=0]
+----
 
 
 Both of these allow you to detect if a build hint is set and if not (or if it's set incorrectly) set its value...

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.analytics;
 
 import com.codename1.io.Preferences;
@@ -59,6 +81,72 @@ class AnalyticsFacadeTest extends UITestBase {
         assertNotNull(reset);
         assertNotEquals(id, reset, "reset must produce a new client id");
         assertEquals(reset, Analytics.clientId());
+    }
+
+    @FormTest
+    void reservedDimensionsThatOutlivedAnErasureAreDroppedOnTheNextLaunch() {
+        // Preferences.set discards its write-failure boolean, so an erasure
+        // that could not reach the disk removed the reserved dimensions from
+        // memory and left them in the file. The next launch loaded them back
+        // and attached the referral identity the user asked to be rid of to
+        // their NEW client id -- one launch later, with nothing in memory left
+        // to notice.
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        String current = Analytics.clientId();
+
+        // The file as a failed erasure leaves it: framework dimensions and an
+        // application dimension, stamped with the identity that has gone.
+        Analytics.simulateSurvivingDimensionsForTest(
+                "cn1_campaign\tspring\ncn1_invite\tinstall_confirmed\nplan\tpro",
+                "an-erased-client-id");
+
+        Map<String, String> loaded = Analytics.getDimensions();
+        assertNull(loaded.get("cn1_campaign"),
+                "an erased referral came back and attached itself to the new client id");
+        assertNull(loaded.get("cn1_invite"));
+        // The APPLICATION's own dimension is not what an erasure asked about,
+        // and losing it would be a second bug in the name of fixing the first.
+        assertEquals("pro", loaded.get("plan"),
+                "the application's own dimension was destroyed by someone else's erasure");
+        assertEquals(current, Analytics.clientId(), "the fixture changed the identity");
+    }
+
+    @FormTest
+    void dimensionsFromTheCurrentIdentityAreKept() {
+        // The drop is keyed on the STAMP, not on the prefix, or an ordinary
+        // launch would throw away the referral dimensions every time.
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        Analytics.simulateSurvivingDimensionsForTest(
+                "cn1_campaign\tspring\nplan\tpro", Analytics.clientId());
+
+        Map<String, String> loaded = Analytics.getDimensions();
+        assertEquals("spring", loaded.get("cn1_campaign"),
+                "a live referral was discarded on an ordinary launch");
+        assertEquals("pro", loaded.get("plan"));
+    }
+
+    @FormTest
+    void anUnstampedFileIsAdoptedRatherThanDropped() {
+        // A file written before the stamp existed, which is what every app
+        // upgrading from an earlier release has. This was briefly treated as
+        // foreign -- absent provenance resolving to "drop it" -- and that read
+        // deleted live data: the framework cannot have written a reserved
+        // dimension into an unstamped file (persistDimensions() stamps in the
+        // same call, into the same preferences record), and before this
+        // feature setDimension() accepted every key and reserved no prefix. So
+        // a `cn1_` key here is the APPLICATION's, and dropping it silently
+        // destroys segmentation for an app that never asked for an erasure.
+        Analytics.clearProviders();
+        Analytics.clearDimensions();
+        Analytics.simulateSurvivingDimensionsForTest(
+                "cn1_campaign\tspring\nplan\tpro", null);
+
+        Map<String, String> loaded = Analytics.getDimensions();
+        assertEquals("spring", loaded.get("cn1_campaign"),
+                "an upgrading app lost a dimension it set under the old contract");
+        assertEquals("pro", loaded.get("plan"));
     }
 
     @FormTest

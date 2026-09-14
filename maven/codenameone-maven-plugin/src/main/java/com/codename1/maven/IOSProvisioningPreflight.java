@@ -1058,6 +1058,12 @@ final class IOSProvisioningPreflight {
             return;
         }
 
+        Problem wrongApp = checkProfileSignsThisApp(profile, settings, describe, settingKey);
+        if (wrongApp != null) {
+            problems.add(wrongApp);
+            return;
+        }
+
         if (!checkMethodMismatch) {
             return;
         }
@@ -1070,6 +1076,55 @@ final class IOSProvisioningPreflight {
         if (mismatch != null) {
             problems.add(mismatch);
         }
+    }
+
+    /**
+     * Whether the profile's App ID covers the bundle identifier this build will stamp on the app.
+     *
+     * <p>This is the check that was missing while {@link #profileCoversBundleId} was already
+     * being applied to every app EXTENSION: the app's own profile was only ever checked for
+     * readability, expiry and distribution method, so a profile belonging to a different App ID
+     * passed preflight and failed minutes later on the build server with
+     * {@code Provisioning profile "..." doesn't match the entitlements file's values for the
+     * application-identifier and keychain-access-groups entitlements}. Both of those entitlements
+     * are {@code $(AppIdentifierPrefix)$(CFBundleIdentifier)}, which is to say both of them are
+     * this comparison, spelled by Xcode after the upload (issues #5773 and #5793).
+     *
+     * <p>Fatal, because there is nothing ambiguous left by the time it fires: a wildcard App ID
+     * is matched by {@link #profileCoversBundleId}, an unresolved or absent package name is not
+     * judged at all, and a profile that names no App ID has already returned above. What remains
+     * is a profile Apple issued for a different application.
+     *
+     * <p>What it does NOT catch is the same bundle identifier under a different TEAM prefix, and
+     * that half of the Xcode message stays a build-server failure. {@code profileCoversBundleId}
+     * compares the App ID pattern with the prefix stripped, deliberately: nothing in
+     * {@code codenameone_settings.properties} states the team, so the only honest comparison here
+     * is the one that does not need it.
+     *
+     * @return the problem, or null when the profile covers this app or nothing here can tell
+     */
+    private static Problem checkProfileSignsThisApp(Profile profile, Properties settings,
+            String describe, String settingKey) {
+        String bundleId = trimmed(settings.getProperty("codename1.packageName"));
+        if (bundleId == null || bundleId.isEmpty() || bundleId.indexOf("${") >= 0) {
+            // The same rule the rest of this class follows: what it cannot resolve, it may not
+            // judge. A build with no package name fails elsewhere, and with a better message.
+            return null;
+        }
+        if (profile.applicationIdentifier == null || profile.applicationIdentifier.isEmpty()) {
+            return null;
+        }
+        if (profileCoversBundleId(profile.applicationIdentifier, bundleId)) {
+            return null;
+        }
+        return new Problem("The provisioning profile " + describe + " is for App ID "
+                + appIdPattern(profile.applicationIdentifier) + ", which cannot sign \"" + bundleId
+                + "\" (codename1.packageName). Signing fails on the application-identifier and "
+                + "keychain-access-groups entitlements, because both of them are the App ID.\n"
+                + "Either point " + settingKey + " at a profile issued for " + bundleId
+                + ", or set codename1.packageName to the bundle ID the profile was issued for. "
+                + "The certificate wizard creates a matching profile from the project's own "
+                + "package name.", true);
     }
 
     /**

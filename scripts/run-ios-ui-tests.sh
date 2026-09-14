@@ -84,19 +84,12 @@ ri_log "Loading workspace environment from $ENV_FILE"
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
-# Pin Xcode 26 for CI validation.
-if [ -z "${XCODE_APP:-}" ]; then
-  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-fi
-if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
-  ri_log "Xcode 26 not found. Set XCODE_APP to an installed Xcode 26 app bundle path." >&2
-  exit 3
-fi
-export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-export XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
-export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
-ri_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
-ri_log "Using XCODEBUILD=$XCODEBUILD"
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh for the
+# resolution order and for CN1_XCODE_MAJOR, the single knob that moves the
+# whole tree to the next Xcode.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode ri_log || exit 3
 
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
   ri_log "JAVA17_HOME not set correctly" >&2
@@ -262,12 +255,26 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
+# The newest simulator OS this toolchain can actually drive. Destinations above
+# it are rejected below, because xcodebuild lists runtimes it cannot build for.
 SIM_SDK_VERSION="$("$XCODEBUILD" -showsdks 2>/dev/null | awk '/iphonesimulator/ {print $NF}' | tail -n 1 | sed 's/iphonesimulator//')"
 SIM_SDK_MAJOR="${SIM_SDK_VERSION%%.*}"
 case "$SIM_SDK_MAJOR" in
-  ''|*[!0-9]*) SIM_SDK_MAJOR=20 ;;
+  ''|*[!0-9]*)
+    # This used to fall back to 20, which was above every shipping SDK when it
+    # was written and is now below one: under Xcode 27 a failed parse would
+    # silently mark every genuine iOS 27 destination invalid and the run would
+    # end in "no usable destination" with nothing pointing at the cause. There
+    # is no safe guess here -- a ceiling that is too low rejects everything and
+    # one that is too high picks a destination that cannot build -- so say so.
+    ri_log "Could not read the iphonesimulator SDK version from '$XCODEBUILD -showsdks'." >&2
+    ri_log "Got: '${SIM_SDK_VERSION:-<empty>}'. Without it there is no way to tell which" >&2
+    ri_log "simulator runtimes this Xcode can drive." >&2
+    exit 3
+    ;;
 esac
 MAX_SIM_OS_MAJOR="$SIM_SDK_MAJOR"
+ri_log "Simulator SDK is $SIM_SDK_VERSION; destinations above iOS $MAX_SIM_OS_MAJOR are ignored."
 
 trim_whitespace() {
   local value="$1"

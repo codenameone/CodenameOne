@@ -233,6 +233,13 @@ const JSO_RETRYABLE_READ_METHODS = {
 // tries clears realistic bursts while staying bounded (only on the degraded
 // path, ~0.5s worst case).
 const JSO_MAX_RETRY = 12;
+// How many 1 ms cooperative parks a green thread will spend waiting for
+// ANOTHER thread's <clinit> to finish before it gives up and reads the
+// statics anyway. Only reachable since clinits became suspendable
+// (ensureClassInitializedSuspending); a bound rather than an unbounded wait
+// because the owner may be blocked on us, and a hung thread is a worse
+// outcome than the early-return this port shipped for years.
+const CLINIT_CROSS_THREAD_WAIT_TICKS = 5000;
 // Lost-response watchdog timeouts, keyed by host-call symbol (see the watchdog
 // armed in dispatchYield). Only BOUNDED host natives are listed: a fast
 // JSO-bridge DOM/canvas read (resolves in <100ms), the screenshot UI-settle
@@ -1074,6 +1081,7 @@ const jvm = {
       return;
     }
     cls.initializing = true;
+    cls.initializingThread = this.currentThread;
     if (cls.baseClass) {
       this.ensureClassInitialized(cls.baseClass);
     }
@@ -1100,6 +1108,7 @@ const jvm = {
       } catch (e) {
         jvm.__cn1ClinitDepth--;
         cls.initializing = false;
+        cls.initializingThread = null;
         if (VM_DIAG_ENABLED) {
           try { vmTrace("DIAG:CLINIT_THREW:" + className + ":err=" + String(e && e.message || e).slice(0, 120) + ":stack=" + String(e && e.stack || new Error().stack).split("\n").slice(0, 12).join("<")); } catch (_e2) {}
         }
@@ -1113,27 +1122,46 @@ const jvm = {
         try {
           let step = result.next();
           while (!step.done) {
-            // Tolerate {sleep:0} produced by the budget-yield helper:
-            // inside clinit we are synchronous, so a "cooperative
-            // hand-off" simply means continue stepping. {sleep:N>0}
-            // and {wait:...} genuinely cannot be honoured (the worker
-            // is single-threaded and the surrounding caller is blocked
-            // on this synchronous step). Other ops (HOST_CALL etc.)
-            // were never explicitly handled here pre-budget-yield --
-            // keep that pass-through behaviour so any clinit that
-            // happens to make a host call continues to silently
-            // step (the runtime never had clinits that legitimately
-            // suspended; if one ever does land here it will just
-            // misbehave, same as before).
-            if (step.value && (
-                (step.value.op === "sleep" && (_LtoNum(step.value.millis) | 0) > 0)
-                || step.value.op === "wait")) {
-              throw new Error("Blocking static initializers are not supported in javascript backend");
+            // Tolerate the cooperative hand-offs ({sleep:0} / {op:"byield"})
+            // the budget-yield helper produces: we are synchronous here, so
+            // "give someone else a turn" just means continue stepping.
+            //
+            // EVERY OTHER OP IS FATAL, and that is the whole point of this
+            // branch. Stepping a generator with ``result.next()`` discards
+            // the yielded op and resumes with ``undefined`` -- the op is
+            // never handed to ``handleYield``, so a {HOST_CALL} is never
+            // posted to the main thread and the ``yield`` it came from
+            // evaluates to ``undefined``. For a JSO bridge read that
+            // ``undefined`` becomes a Java null with no error anywhere
+            // (``isDegradedObjectResult`` does not treat a null getter
+            // result as degraded), and the app dies later on an NPE that
+            // names none of this. Issue #5774 is exactly that: a clinit
+            // reached ``Window.current()``, got ``undefined`` back, cached
+            // the worker global as the window, and NPE'd inside
+            // ``LocalForage.<init>``. Prefer a message that names the class
+            // and the op over a mystery null.
+            //
+            // Generator call sites do not come through here at all any more:
+            // the emitter routes them to ``_Ig``, which drives the clinit
+            // on the real trampoline (see ensureClassInitializedSuspending).
+            // What is left is class init triggered from a NON-generator
+            // (synchronous) translated method and from runtime internals
+            // (``newObject``, ``enumValues``), where there is no trampoline
+            // to suspend onto.
+            const yieldedOp = step.value && step.value.op;
+            const cooperativeHandoff = yieldedOp === "byield"
+                || (yieldedOp === "sleep" && (_LtoNum(step.value.millis) | 0) <= 0);
+            if (yieldedOp && !cooperativeHandoff) {
+              throw new Error("Static initializer of " + className + " suspended on '"
+                  + yieldedOp + "' but was reached from a synchronous context that"
+                  + " cannot suspend. Move the work out of <clinit>, or reach the"
+                  + " class from a suspending method.");
             }
             step = result.next();
           }
         } catch (e) {
           cls.initializing = false;
+          cls.initializingThread = null;
           if (VM_DIAG_ENABLED) {
             try { vmTrace("DIAG:CLINIT_THREW:" + className + ":err=" + String(e && e.message || e).slice(0, 120)); } catch (_e2) {}
           }
@@ -1146,6 +1174,79 @@ const jvm = {
       }
     }
     cls.initializing = false;
+    cls.initializingThread = null;
+    cls.initialized = true;
+  },
+  // Suspending twin of ``ensureClassInitialized``. Same bookkeeping, but the
+  // clinit generator is driven with ``yield*`` so every op it produces --
+  // HOST_CALL above all -- reaches ``handleYield`` on the real trampoline and
+  // resumes with the host's answer. ``_Ig`` routes here from every class-init
+  // guard the emitter placed inside a generator method, which is what makes a
+  // <clinit> that touches Storage / Preferences / the DOM work at all (#5774).
+  //
+  // ``__cn1ClinitDepth`` is deliberately NOT bumped here: it exists to muzzle
+  // the translator's budget yield while the synchronous driver holds the
+  // worker, and this driver holds nothing. A long clinit running here is
+  // preemptible like any other Java code.
+  *ensureClassInitializedSuspending(className) {
+    const cls = this.classes[className];
+    if (!cls) {
+      throw new Error("Unknown class " + className);
+    }
+    if (cls.initialized) {
+      return;
+    }
+    if (cls.initializing) {
+      // Re-entry from inside the clinit itself (the owning thread) must
+      // proceed against the partially-written statics rather than deadlock --
+      // that is what the JVM does, and what the synchronous driver has always
+      // done. A DIFFERENT green thread is a new situation: before clinits
+      // could suspend, the run-to-completion loop held the worker for the
+      // whole initializer, so nobody else could observe the gap. Now they can,
+      // and returning early hands them half-written statics. Park until the
+      // owner is done.
+      if (cls.initializingThread === this.currentThread) {
+        return;
+      }
+      let guard = 0;
+      while (cls.initializing && !cls.initialized && guard++ < CLINIT_CROSS_THREAD_WAIT_TICKS) {
+        yield { op: "sleep", millis: 1 };
+      }
+      if (!cls.initialized) {
+        // The owner never finished (it threw, or it is itself blocked on us).
+        // Falling through the way the synchronous driver always has is
+        // strictly better than hanging this thread forever, but it is worth
+        // saying so out loud rather than silently reading partial statics.
+        vmLifecycle("clinit-cross-thread-wait-expired:" + className);
+      }
+      return;
+    }
+    cls.initializing = true;
+    cls.initializingThread = this.currentThread;
+    try {
+      if (cls.baseClass) {
+        yield* this.ensureClassInitializedSuspending(cls.baseClass);
+      }
+      const clinitMethodId = "cn1_" + className + "___CLINIT__";
+      const clinit = this.nativeMethods[clinitMethodId] || cls.clinit;
+      if (clinit) {
+        const result = clinit();
+        // A clinit the translator proved synchronous returns a non-iterable
+        // (usually null); only a generator needs delegating.
+        if (result && typeof result.next === "function") {
+          yield* result;
+        }
+      }
+    } catch (e) {
+      cls.initializing = false;
+      cls.initializingThread = null;
+      if (VM_DIAG_ENABLED) {
+        try { vmTrace("DIAG:CLINIT_THREW:" + className + ":err=" + String(e && e.message || e).slice(0, 120) + ":stack=" + String(e && e.stack || new Error().stack).split("\n").slice(0, 12).join("<")); } catch (_e2) {}
+      }
+      throw e;
+    }
+    cls.initializing = false;
+    cls.initializingThread = null;
     cls.initialized = true;
   },
   newObject(className) {
@@ -3829,6 +3930,35 @@ global._Yv = _Yv;
 // silently captured ``undefined`` because those assignments hadn't
 // run yet.
 global._I = (n) => jvm.ensureClassInitialized(n);
+// Suspending class-init guard. The emitter uses this instead of ``_I`` at a
+// guard whose <clinit> chain contains a SUSPENDING initializer -- exactly where
+// driving the clinit synchronously would swallow a HOST_CALL and hand the
+// initializer ``undefined`` (issue #5774). The suspension analysis records the
+// same guard as an edge into that clinit, so the method holding it is a
+// generator and the ``yield*`` is legal. Guards for the ordinary
+// sync-clinit/no-clinit majority keep the plain ``_I`` and cost nothing.
+//
+// The already-initialized case is the overwhelmingly common one and must not
+// allocate: ``yield*`` needs an iterable, so hand it a shared stateless
+// no-op instead of a fresh generator object. ``yield*`` only reads
+// ``[Symbol.iterator]()`` and ``next()`` here -- the delegation finishes on
+// the first step and never becomes the outer generator's active delegate --
+// so reuse is safe even when guards nest.
+const _CLINIT_NOOP_STEP = { done: true, value: undefined };
+const _CLINIT_NOOP_ITER = {
+  next() { return _CLINIT_NOOP_STEP; },
+  [Symbol.iterator]() { return this; }
+};
+global._Ig = (n) => {
+  // ``initialized`` only -- an ``initializing`` class must reach the driver so
+  // it can tell re-entry by the OWNING thread (proceed, as the JVM does) from
+  // another green thread (park until the statics are whole).
+  const cls = jvm.classes[n];
+  if (cls && cls.initialized) {
+    return _CLINIT_NOOP_ITER;
+  }
+  return jvm.ensureClassInitializedSuspending(n);
+};
 global._L = (v) => jvm.createStringLiteral(v);
 // Primitive class literals (``int.class`` etc.) -> interned primitive
 // ``Class`` object (carries ``isPrimitive=true``). Emitted by the translator

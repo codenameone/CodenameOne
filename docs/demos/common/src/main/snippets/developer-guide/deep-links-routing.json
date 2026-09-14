@@ -1,0 +1,30 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::deep-links-routing-json-001[]
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["ABCDE12345.com.example.app"],
+        "components": [
+          { "/": "/users/*" },
+          { "/": "/promo/*" }
+        ]
+      }
+    ]
+  }
+}
+// end::deep-links-routing-json-001[]
+
+// tag::deep-links-routing-json-002[]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.app",
+      "sha256_cert_fingerprints": ["14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5", "7B:5A:1F:C9:0E:52:44:7C:82:19:6E:38:0A:B7:D4:11:5C:63:9F:28:E1:47:8B:30:A6:C2:5D:94:F0:6B:38:19"]
+    }
+  }
+]
+// end::deep-links-routing-json-002[]

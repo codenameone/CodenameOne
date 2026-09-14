@@ -409,4 +409,18 @@
         <Class name="~com\.codename1\.ui\.editor\..*" />
         <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
     </Match>
+
+    <!--
+    Invites.InviteConnection is a one-shot ConnectionRequest carrying the
+    per-request fields the response handler needs (match type, whether the
+    call is a deferred resolution, whether it is a registration). It is queued
+    once, never compared and never used as a map key, so equals()/hashCode()
+    would add noise without changing behaviour. Same idiom and same reasoning
+    as OsrmRouteService$RouteConnection above, and scoped to the one named
+    class so the rest of the package stays under the check.
+    -->
+    <Match>
+        <Class name="com.codename1.analytics.invite.Invites$InviteConnection" />
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+    </Match>
 </FindBugsFilter>

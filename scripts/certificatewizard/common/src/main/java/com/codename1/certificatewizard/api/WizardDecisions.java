@@ -153,6 +153,52 @@ public final class WizardDecisions {
         return out;
     }
 
+    /// The certificate the overview's "Apple distribution certificate" card is about, or null when
+    /// the account has none.
+    ///
+    /// It reported `certificates.get(0)` -- the first row of an unfiltered list -- so an account
+    /// holding a Mac certificate was told "Apple distribution certificate: Ready" beside the name
+    /// of a MAC APP DISTRIBUTION certificate, which cannot sign an iOS build and was never going
+    /// to be chosen for one (issue #5773). Nothing downstream was wrong; the panel was. Answering
+    /// from [#compatibleCertificates] makes the card agree with the code that actually picks.
+    public static SigningState.Certificate distributionCertificateForOverview(SigningState state) {
+        List<SigningState.Certificate> compatible = compatibleCertificates(state, "IOS_APP_STORE");
+        return compatible.isEmpty() ? null : compatible.get(0);
+    }
+
+    /// The profile the overview's "App Store profile" card is about, or null when there is none.
+    ///
+    /// Same defect, same shape: `profiles.get(0)` called a Development profile the App Store
+    /// profile. Three things have to match, and each has been wrong in this card at some point:
+    ///
+    ///  - the TYPE, because a Development profile is not an App Store profile;
+    ///  - the STATE, because a profile Apple has marked INVALID is one the next build cannot
+    ///    sign with, and "Ready" is the same false assurance;
+    ///  - the BUNDLE ID, because the card speaks for THIS project. An account accumulates
+    ///    profiles for every app its team ships, and once "Sync with Apple" imports the whole
+    ///    account rather than only what this wizard created, another app's App Store profile is
+    ///    the likely first match -- announced "Ready" here and then refused by
+    ///    IOSProvisioningPreflight, which compares the same two things.
+    ///
+    /// `projectBundleId` null or blank means the project's identifier could not be read, and the
+    /// filter is skipped rather than guessed: the same rule the preflight follows, because a card
+    /// reading "None yet" beside a perfectly good profile is its own kind of wrong.
+    public static SigningState.Profile appStoreProfileForOverview(SigningState state,
+                                                                  String projectBundleId) {
+        String wanted = projectBundleId == null ? null : projectBundleId.trim();
+        for (SigningState.Profile p : state.profiles) {
+            if (!"IOS_APP_STORE".equals(p.profileType())
+                    || !(p.status() == null || "ACTIVE".equals(p.status()))) {
+                continue;
+            }
+            if (wanted != null && !wanted.isEmpty() && !wanted.equals(p.bundleId())) {
+                continue;
+            }
+            return p;
+        }
+        return null;
+    }
+
     /// The one input still missing before a profile can be created, phrased for the user, or null
     /// when nothing is. Reported in the same order the dialog lays the sections out, so the
     /// message always points at the first thing above the button rather than at whichever check

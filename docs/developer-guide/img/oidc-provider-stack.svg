@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="478" viewBox="0 0 760 478">
+  <rect x="0" y="0" width="760" height="478" fill="#ffffff"/>
+  <text x="380.0" y="24" font-family="Arial, sans-serif" font-size="12.5" font-weight="bold" text-anchor="middle" fill="#222222">The OpenID Connect stack, and the two paths that leave it</text>
+  <rect x="24" y="42" width="136" height="60" rx="5" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.2"/>
+  <text x="92.0" y="61" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">GoogleConnect</text>
+  <text x="92.0" y="77" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">system browser,</text>
+  <text x="92.0" y="89" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">no native SDK</text>
+  <path d="M 92 102 L 92 122" fill="none" stroke="#4a6fa5" stroke-width="1.2"/>
+  <rect x="170" y="42" width="136" height="60" rx="5" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.2"/>
+  <text x="238.0" y="61" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">MicrosoftConnect</text>
+  <text x="238.0" y="77" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">Entra ID,</text>
+  <text x="238.0" y="89" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">any tenant</text>
+  <path d="M 238 102 L 238 122" fill="none" stroke="#4a6fa5" stroke-width="1.2"/>
+  <rect x="316" y="42" width="136" height="60" rx="5" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.2"/>
+  <text x="384.0" y="61" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">FacebookConnect</text>
+  <text x="384.0" y="77" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">OAuth 2.0 only --</text>
+  <text x="384.0" y="89" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">issues no ID token</text>
+  <path d="M 384 102 L 384 122" fill="none" stroke="#4a6fa5" stroke-width="1.2"/>
+  <rect x="462" y="42" width="136" height="60" rx="5" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.2"/>
+  <text x="530.0" y="61" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Auth0Connect</text>
+  <text x="530.0" y="77" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">a plain OIDC</text>
+  <text x="530.0" y="89" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">provider</text>
+  <path d="M 530 102 L 530 122" fill="none" stroke="#4a6fa5" stroke-width="1.2"/>
+  <rect x="608" y="42" width="136" height="60" rx="5" fill="#eef3fa" stroke="#4a6fa5" stroke-width="1.2"/>
+  <text x="676.0" y="61" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">AppleSignIn</text>
+  <text x="676.0" y="77" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">native on iOS 13+,</text>
+  <text x="676.0" y="89" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">OIDC elsewhere</text>
+  <path d="M 648 102 L 648 122" fill="none" stroke="#4a6fa5" stroke-width="1.2"/>
+  <path d="M 92 122 L 648 122" fill="none" stroke="#4a6fa5" stroke-width="1.4"/>
+  <path d="M 380 122 L 380 214" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <path d="M 375 208 L 380 214 L 385 208" fill="none" stroke="#4a6fa5" stroke-width="1.5"/>
+  <rect x="24" y="140" width="344" height="62" rx="5" fill="#fdf2ee" stroke="#a33a3a" stroke-width="1.2"/>
+  <text x="196" y="158" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#a33a3a">FirebaseAuth</text>
+  <text x="196" y="174" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">not OpenID Connect: Identity Toolkit REST. Federate it</text>
+  <text x="196" y="186" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">with an ID token from Google, Microsoft, Apple or Auth0.</text>
+  <path d="M 380 132 L 196 132 L 196 140" fill="none" stroke="#a33a3a" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <path d="M 192 135 L 196 140 L 200 135" fill="none" stroke="#a33a3a" stroke-width="1.4"/>
+  <rect x="392" y="140" width="344" height="62" rx="5" fill="#f7f2fa" stroke="#6a4a95" stroke-width="1.2"/>
+  <text x="564" y="158" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#6a4a95">The native Apple sheet</text>
+  <text x="564" y="174" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">ASAuthorizationAppleIDProvider on iOS 13+. AppleSignIn</text>
+  <text x="564" y="186" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#333333">takes it whenever it can, and touches neither primitive.</text>
+  <path d="M 704 102 L 704 132 L 564 132 L 564 140" fill="none" stroke="#6a4a95" stroke-width="1.4"/>
+  <path d="M 560 135 L 564 140 L 568 135" fill="none" stroke="#6a4a95" stroke-width="1.4"/>
+  <rect x="24" y="220" width="712" height="72" rx="6" fill="#f2f7ef" stroke="#4a7a3d" stroke-width="1.4"/>
+  <text x="380" y="242" font-family="Arial, sans-serif" font-size="12.5" font-weight="bold" text-anchor="middle" fill="#4a7a3d">OidcClient</text>
+  <text x="380" y="258" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">discovery, PKCE (S256), state verification, a nonce check when the ID</text>
+  <text x="380" y="271" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">token carries one, code exchange, the refresh-token grant, and</text>
+  <text x="380" y="284" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">persistence through TokenStore</text>
+  <path d="M 380 292 L 380 324" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <path d="M 375 318 L 380 324 L 385 318" fill="none" stroke="#4a7a3d" stroke-width="1.5"/>
+  <rect x="24" y="332" width="712" height="42" rx="6" fill="#faf5ef" stroke="#a56a3a" stroke-width="1.4"/>
+  <text x="380" y="358" font-family="Arial, sans-serif" font-size="12.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">SystemBrowser</text>
+  <rect x="24" y="396" width="172" height="56" rx="5" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="110.0" y="415" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">iOS</text>
+  <text x="110.0" y="430" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#555555">ASWebAuthenticationSession</text>
+  <path d="M 110 374 L 110 396" fill="none" stroke="#a56a3a" stroke-width="1.2"/>
+  <rect x="204" y="396" width="172" height="56" rx="5" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="290.0" y="415" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">Android</text>
+  <text x="290.0" y="430" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#555555">Custom Tabs</text>
+  <path d="M 290 374 L 290 396" fill="none" stroke="#a56a3a" stroke-width="1.2"/>
+  <rect x="384" y="396" width="172" height="56" rx="5" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="470.0" y="415" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">JavaSE</text>
+  <text x="470.0" y="430" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#555555">an in-app WebView</text>
+  <text x="470.0" y="441" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#a33a3a">an embedded view; providers may refuse it</text>
+  <path d="M 470 374 L 470 396" fill="none" stroke="#a56a3a" stroke-width="1.2"/>
+  <rect x="564" y="396" width="172" height="56" rx="5" fill="#ffffff" stroke="#a56a3a" stroke-width="1"/>
+  <text x="650.0" y="415" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#a56a3a">Web</text>
+  <text x="650.0" y="430" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#555555">a browser popup window</text>
+  <text x="650.0" y="441" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#555555">a real window, not embedded</text>
+  <path d="M 650 374 L 650 396" fill="none" stroke="#a56a3a" stroke-width="1.2"/>
+</svg>
