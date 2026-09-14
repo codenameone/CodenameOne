@@ -469,9 +469,14 @@ public final class DataSource {
      * is not.
      */
     private void configure(Database db) throws IOException {
-        if(busyTimeoutMillis > 0) {
-            db.tuneForConcurrency(busyTimeoutMillis);
-        }
+        // ALWAYS, not only when a timeout was asked for. tuneForConcurrency does
+        // two things -- it turns on write-ahead logging and it sets the busy
+        // timeout -- and skipping it for a zero timeout skipped the WAL as well.
+        // A pool of connections to one SQLite file without WAL is the thing this
+        // class exists to avoid: readers and writers then contend on the rollback
+        // journal and get SQLITE_BUSY, so the extra connections buy nothing.
+        // Zero is a legitimate timeout, meaning do not wait, and it stays that.
+        db.tuneForConcurrency(busyTimeoutMillis);
     }
 
     /**

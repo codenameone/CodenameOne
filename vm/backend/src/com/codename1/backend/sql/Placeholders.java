@@ -205,7 +205,7 @@ final class Placeholders {
             } else if(c == ')') {
                 depth--;
             } else if(depth == 0 && valuesAt < 0 && (c == 'v' || c == 'V')
-                    && isWord(sql, at, "values")) {
+                    && (isWord(sql, at, "values") || isWord(sql, at, "value"))) {
                 // The FIRST one at the top level, and nothing replaces it.
                 //
                 // MySQL has a VALUES(column) EXPRESSION, used in ON DUPLICATE KEY
@@ -213,7 +213,13 @@ final class Placeholders {
                 // made "INSERT INTO t (a) VALUES (?), (?) ON DUPLICATE KEY UPDATE
                 // a = VALUES(a)" count from that function call, find one group,
                 // and report a single row. The multi-row insert then ran.
-                valuesAt = at + 6;
+                //
+                // VALUE is MySQL's accepted singular spelling of the same clause,
+                // and "VALUE (?), (?)" is as multi-row as VALUES is. Recognised
+                // on every dialect: the other two reject the word outright, so
+                // counting the tuples of a statement they will refuse anyway
+                // changes nothing.
+                valuesAt = at + (isWord(sql, at, "values") ? 6 : 5);
             }
             at++;
         }
