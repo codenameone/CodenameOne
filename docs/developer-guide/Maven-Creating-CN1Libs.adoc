@@ -344,6 +344,17 @@ IMPORTANT: Notice that you appended "-lib" to the `artifactId`. This is because 
 
 Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
 
+This calls into the library you just built, so it isn't one of the compiled
+examples:
+
+[listing]
+----
+import com.example.mylib.MyLib;
+
+// ... inside start()
+MyLib.helloWorld();
+----
+
 
 And build the project. The project should build OK, and if you run it, you should see that the `helloWorld()` method works as designed.
 
@@ -377,6 +388,19 @@ No groups, no submenus, no priority — flat by design. If you need ordering rel
 ==== The action method
 
 The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
+
+This is a method in your own cn1lib, so it isn't one of the compiled
+examples:
+
+[listing]
+----
+public static void resetPairing() {
+    PairingState.clear();                 // package-private, same cn1lib
+    if (Display.isInitialized()) {
+        ToastBar.showInfoMessage("Pairing state cleared");
+    }
+}
+----
 
 
 The `Display.isInitialized()` guard is a useful pattern when the same static methods are also called from JUnit tests that don't run inside a live CN1 simulator — the state mutation runs in both contexts, only the UI feedback is skipped.

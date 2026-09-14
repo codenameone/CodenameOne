@@ -173,6 +173,11 @@ NOTE: Apps that need broker (Microsoft Authenticator) support for Conditional Ac
 
 Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AuthenticationAndIdentityJava200Snippet.java[tag=authentication-and-identity-java-200,indent=0]
+----
+
 
 For federated sign-in (Google / Apple / Microsoft as Firebase providers), first obtain an ID token via the matching `*Connect` class, then swap it for a Firebase session:
 

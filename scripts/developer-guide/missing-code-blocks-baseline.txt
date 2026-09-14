@@ -1,15 +1,3 @@
 # Prose that promises a code block where none follows.
 # A ratchet: entries may be removed as holes are filled, never added.
 # Regenerate with check-missing-code-blocks.py --write-baseline.
-Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
-Maven-Creating-CN1Libs.adoc	Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
-Maven-Creating-CN1Libs.adoc	The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
-The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
-The-Components-Of-Codename-One.asciidoc	This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
-io.asciidoc	In the above code you do the following:
-io.asciidoc	Since you assume most developers reading this will be familiar with Java here is the way to implement the multipart upload in the servlet API:
-io.asciidoc	That's what the new method of `URLImage` does:
-io.asciidoc	There are many methods of interest to keep an eye for:
-io.asciidoc	database by name:
-performance.asciidoc	In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:
-performance.asciidoc	These icons are in a shared resource file that you load and don't cache. The initial workaround was to cache this resource but a better solution was to convert this code:

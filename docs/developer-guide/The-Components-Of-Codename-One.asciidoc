@@ -1540,6 +1540,23 @@ For a single call the helper writes four files at the root of the extension bund
 
 Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
 
+`IOSShareExtensionBuilder` lives in the Codename One Maven plugin rather than
+in the framework, so this runs at build time and isn't one of the compiled
+examples:
+
+[listing]
+----
+new IOSShareExtensionBuilder()
+        .setExtensionName("MyShareExtension")
+        .setDisplayName("Share to MyApp")
+        .setHostBundleId("com.example.myapp")
+        .setAppGroupId("group.com.example.myapp")
+        .acceptText(true)
+        .acceptURLs(true)
+        .acceptImages(true)
+        .writeAppext(new File("src/main/resources/MyShareExtension.ios.appext"));
+----
+
 
 The next iOS build picks up the `.ios.appext` archive automatically; no Xcode steps are required.
 
@@ -2025,6 +2042,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
+
+[listing]
+----
+public void execute(String js, SuccessCallback<JSRef> callback)
+----
 
 
 The first parameter is a JavaScript expression. This JavaScript *MUST* call either `callback.onSuccess(result)` or `callback.onError(message, errCode)` at some point in order for your callback to be called.
