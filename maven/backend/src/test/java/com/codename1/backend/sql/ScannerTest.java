@@ -91,6 +91,27 @@ class ScannerTest {
         rows("INSERT INTO t (a) VALUES (?) RETURNING id", 1, 1, 1);
     }
 
+    @Test
+    @DisplayName("identifier and comment forms only one dialect has")
+    void dialectOnlyForms() throws Exception {
+        // SQLite accepts [identifier]. A ? inside one is not a parameter there.
+        assertEquals("SELECT [question?] FROM t WHERE id = ?",
+                Dialect.SQLITE.bind("SELECT [question?] FROM t WHERE id = ?", 1));
+        // And NOT on PostgreSQL, where brackets are an array subscript: a[1]
+        // must survive, and the ? inside a bracket IS a parameter.
+        assertEquals("SELECT a[1] FROM t WHERE id = $1",
+                Dialect.POSTGRES.bind("SELECT a[1] FROM t WHERE id = ?", 1));
+
+        // MySQL's /*! ... */ is executable: what is inside RUNS, so the second
+        // tuple here is a second row.
+        rows("INSERT INTO t (a) VALUES (1) /*! , (2) */", 1, 1, 2);
+        rows("INSERT INTO t (a) VALUES (1) /*!50100 , (2) */", 1, 1, 2);
+        // An ordinary block comment is still ignored on all three.
+        rows("INSERT INTO t (a) VALUES (1) /* , (2) */", 1, 1, 1);
+        // And a placeholder inside an executable comment is a placeholder there.
+        assertEquals("SELECT 1 /*! , ? */", Dialect.MYSQL.bind("SELECT 1 /*! , ? */", 1));
+    }
+
     private static void ends(String sql, int sqlite, int postgres, int mysql) throws Exception {
         assertEquals(sqlite, Dialect.SQLITE.endOfStatement(sql), "SQLite: " + sql);
         assertEquals(postgres, Dialect.POSTGRES.endOfStatement(sql), "PostgreSQL: " + sql);

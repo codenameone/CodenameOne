@@ -70,6 +70,20 @@ final class Table {
         this.quotedColumns = new String[columns.length];
         for(int iter = 0 ; iter < columns.length ; iter++) {
             quotedColumns[iter] = dialect.quote(columns[iter].getColumn());
+            for(int earlier = 0 ; earlier < iter ; earlier++) {
+                if(columns[earlier].getColumn().equals(columns[iter].getColumn())) {
+                    // Two fields on one column. Every statement would name it
+                    // twice: the CREATE TABLE is refused outright, and against a
+                    // schema the ORM did not create, a read puts the same value
+                    // in both fields and a write stores whichever came last. The
+                    // generator refuses this at build time; a hand-written
+                    // definition reaches here instead.
+                    throw new IllegalStateException(definition.type().getName()
+                            + " maps both " + columns[earlier].getField() + " and "
+                            + columns[iter].getField() + " to the column '"
+                            + columns[iter].getColumn() + "'");
+                }
+            }
         }
         this.idCondition = quotedColumns[idIndex] + " = ?";
 

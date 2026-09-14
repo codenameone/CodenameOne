@@ -307,6 +307,24 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             ctx.error(cls, "@Entity " + ec.binaryName + " requires exactly one @Id field");
             return;
         }
+        // TWO FIELDS, ONE COLUMN. Every statement then names the column twice:
+        // the CREATE TABLE is refused for a duplicate column, and against a
+        // schema somebody else created -- where the ORM creates nothing -- a read
+        // loads the same value into both fields and a write stores whichever the
+        // generated order put last. Caught here, where both field names can be
+        // said out loud.
+        for (int i = 0; i < ec.fields.size(); i++) {
+            for (int j = i + 1; j < ec.fields.size(); j++) {
+                PersistedField a = ec.fields.get(i);
+                PersistedField b = ec.fields.get(j);
+                if (a.columnName.equals(b.columnName)) {
+                    ctx.error(cls, "@Entity " + ec.binaryName + " maps both " + a.fieldName
+                            + " and " + b.fieldName + " to the column '" + a.columnName
+                            + "'. Give one of them a @Column(name) of its own, or mark it "
+                            + "@DbTransient.");
+                }
+            }
+        }
         accepted.put(ec.binaryName, ec);
     }
 

@@ -236,6 +236,31 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void refusesTwoFieldsMappedToOneColumn() throws Exception {
+        // Every generated statement would name the column twice: the CREATE
+        // TABLE is refused for a duplicate column, and against a schema the ORM
+        // did not create, a read loads the same value into both fields and a
+        // write stores whichever the generated order put last. Caught at build
+        // time, where both field names can be said out loud.
+        File classes = compileFixture(
+                "com.example.Clash",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Clash {\n"
+                        + "    @Id public long id;\n"
+                        + "    @Column(name=\"label\") public String name;\n"
+                        + "    @Column(name=\"label\") public String title;\n"
+                        + "    public Clash() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertTrue("two fields on one column should be refused", ctx.hasErrors());
+        String reported = String.valueOf(ctx.getErrors());
+        assertTrue(reported, reported.contains("label"));
+        assertTrue(reported, reported.contains("name"));
+        assertTrue(reported, reported.contains("title"));
+    }
+
+    @Test
     public void generatesForAnEntityThatLivesInADependency() throws Exception {
         // The entity in a module BOTH halves of the application depend on, which
         // is where a shared one belongs -- and then the backend module's own

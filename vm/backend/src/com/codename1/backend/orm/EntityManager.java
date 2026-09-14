@@ -135,6 +135,20 @@ public final class EntityManager {
         }
     }
 
+    /**
+     * Removes a definition, for a test that registered a deliberately broken one.
+     *
+     * <p>Nothing in a server calls this: the registry is filled once at start-up
+     * by generated code and never emptied, which is why there is no public way to
+     * unregister. A test that installs a definition the runtime must REFUSE would
+     * otherwise leave it there for every test class sharing the JVM.
+     */
+    static void forgetForTest(Class entity) {
+        synchronized(REGISTRY) {
+            REGISTRY.remove(entity.getName());
+        }
+    }
+
     /** Every registered definition, in registration order. */
     public static EntityDefinition[] registered() {
         synchronized(REGISTRY) {
