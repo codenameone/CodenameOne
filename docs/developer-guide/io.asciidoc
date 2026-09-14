@@ -753,7 +753,7 @@ Calling `setReadResponseForErrors(true)` will trigger a mode where even errors w
 
 Gzip is a common compression format based on the lz algorithm, it’s used by web servers around the world to compress data.
 
-Codename One supports https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZIPInputStream.html[GZipInputStream] and https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZIPOutputStream.html[GZipOutputStream], which allow you to compress data seamlessly into a stream and extract compressed data from a stream. This is useful and can be applied to every arbitrary stream.
+Codename One supports https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZIPInputStream.html[GZIPInputStream] and https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZIPOutputStream.html[GZIPOutputStream], which allow you to compress data seamlessly into a stream and extract compressed data from a stream. This is useful and can be applied to every arbitrary stream.
 
 Codename One also features a https://www.codenameone.com/javadoc/com/codename1/io/gzip/GZConnectionRequest.html[GZConnectionRequest], which will automatically unzip an HTTP response if it's indeed gzipped. Notice that some devices (iOS) always request gzip’ed data and always decompress it for you, but for iOS it doesn't remove the gziped header. The `GZConnectionRequest` is aware of such behaviors so it's better to use that when connecting to the network (if applicable).
 

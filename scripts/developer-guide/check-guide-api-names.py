@@ -12,9 +12,9 @@ approved words.
     nowhere in this repository's own sources, is a misspelling of that class.
     ``EnclodedImage``, ``ConectionRequest``, ``GenenricListCellRenderer``,
     ``BubbleTransiton``, ``SwipableContainer``, ``GridbagLayout``,
-    ``InifiniteContainer``, ``DataChangeListener`` and ``MiGLayout`` all
-    shipped in the manual, and each one sends a reader looking for a class
-    that is not there.
+    ``InifiniteContainer``, ``DataChangeListener``, ``MiGLayout`` and
+    ``GZipInputStream`` all shipped in the manual, and each one sends a
+    reader looking for a class that is not there.
 
 The second question needs no allow-list because the repository answers it.
 The guide legitimately names classes from other worlds -- ``NSObject``,
@@ -44,9 +44,15 @@ IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
                        '.xml', '.gradle', '.swift', '.cs')
 
 JAVADOC = re.compile(r'codenameone\.com/javadoc/(com/codename1/[A-Za-z0-9/]+)\.html')
-# A backticked identifier, or a bare CamelCase word in prose.
-WORD = re.compile(r'`([A-Z][A-Za-z0-9]{5,})`|\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,})\b')
-IDENTIFIER = re.compile(r'\b[A-Z][A-Za-z0-9]{3,}\b')
+# A backticked identifier, or a bare word in prose that is shaped like a class
+# name. The bare form needs both shapes: a name can lead with an acronym --
+# URLImage, GZIPInputStream, JSONParser -- and the CamelCase alternative alone
+# skipped those, so "URLIamge" went unread. Backticks are code, so four
+# characters is enough there and "Iamge" is caught.
+WORD = re.compile(r'`([A-Z][A-Za-z0-9]{3,})`'
+                  r'|\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}'
+                  r'|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b')
+IDENTIFIER = re.compile(r'\b[A-Z][A-Za-z0-9]{2,}\b')
 
 
 def class_index():
