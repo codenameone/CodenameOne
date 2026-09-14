@@ -43,11 +43,20 @@ import static org.junit.jupiter.api.Assertions.*;
 class VaultTest extends UITestBase {
 
     /// A device key store that is simply a map, so the remembered-device paths can be tested.
-    private static final class FakeDeviceProtection extends DeviceProtection {
+    private static class FakeDeviceProtection extends DeviceProtection {
         final Map<String, byte[]> keys = new HashMap<String, byte[]>();
         boolean userVerification;
         boolean refuseWrites;
         boolean unreadable;
+        DeviceProtection gatedVariant;
+
+        @Override
+        public DeviceProtection userVerifying() {
+            if (gatedVariant != null) {
+                return gatedVariant;
+            }
+            return userVerification ? this : null;
+        }
 
         public ProtectionReport protection() {
             return ProtectionReport.builder()
@@ -123,12 +132,23 @@ class VaultTest extends UITestBase {
         }
     }
 
+    /// A second, separate mechanism for the gated policy -- the shape the browser has, where
+    /// `REQUIRE_USER_VERIFICATION` is a passkey rather than the same stored key with a flag.
+    private static final class FakeGatedProtection extends FakeDeviceProtection {
+        FakeGatedProtection() {
+            userVerification = true;
+        }
+    }
+
     private FakeDeviceProtection device;
+    private FakeGatedProtection gated;
     private int counter;
 
     @BeforeEach
     void installDevice() {
         device = new FakeDeviceProtection();
+        gated = new FakeGatedProtection();
+        device.gatedVariant = gated;
     }
 
     /// A name no other test has used, so one test's stored record cannot be another's starting
@@ -342,23 +362,23 @@ class VaultTest extends UITestBase {
         // The rule that makes REQUIRE_USER_VERIFICATION mean anything: the wrap that opens
         // without a prompt has to go, or the prompt is decoration.
         String name = freshName();
-        device.userVerification = true;
         Vault vault = Vault.named(name)
                 .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
         vault.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
         byte[] beforeWrap = vault.seal("note", "x".getBytes()).get();
         assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
-        byte[] unattendedKey = device.keys.values().iterator().next();
+        assertEquals(1, device.keys.size());
+        assertTrue(gated.keys.isEmpty());
 
         vault.setPolicy(UnlockPolicy.REQUIRE_USER_VERIFICATION).get();
         assertEquals(UnlockPolicy.REQUIRE_USER_VERIFICATION, vault.getPolicy());
 
-        // The device key itself was replaced, not merely left unused. Anything captured while the
-        // unattended wrap existed is now a key for nothing -- which is the most a policy change
-        // can do, and worth asserting rather than assuming.
-        assertEquals(1, device.keys.size());
-        byte[] gatedKey = device.keys.values().iterator().next();
-        assertFalse(java.util.Arrays.equals(unattendedKey, gatedKey));
+        // The unattended key is gone and the gated mechanism now holds one. Deleting through the
+        // OUTGOING policy's protection is what makes that true: asking the incoming mechanism to
+        // delete would have left the unattended key in place, which is exactly the wrap this
+        // policy exists to remove.
+        assertTrue(device.keys.isEmpty(), "the unattended key should have been deleted");
+        assertEquals(1, gated.keys.size(), "the gated mechanism should hold the new key");
 
         vault.lock();
         Vault reopened = Vault.named(name).configure(fast());
@@ -373,7 +393,6 @@ class VaultTest extends UITestBase {
         // rather than the enrolled one would replace the gated wrap with an unattended one and
         // turn off the prompt the user asked for, with nothing to see.
         String name = freshName();
-        device.userVerification = true;
         VaultOptions strong = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
         Vault vault = Vault.named(name).configure(strong);
         vault.enroll(pw("p"), strong).get();
@@ -389,7 +408,6 @@ class VaultTest extends UITestBase {
     @Test
     void rememberDeviceWillNotQuietlyWeakenAStrongerPolicy() {
         String name = freshName();
-        device.userVerification = true;
         VaultOptions strong = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
         Vault vault = Vault.named(name).configure(strong);
         vault.enroll(pw("p"), strong).get();
@@ -416,6 +434,72 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aGatedPolicyUsesTheUserVerifyingMechanismAndNotTheOtherOne() {
+        // On the browser these are two different things -- a stored key and a passkey -- and the
+        // policy has to pick. Enrolling gated must put the wrap in the gated mechanism and leave
+        // the unattended one with nothing to offer.
+        String name = freshName();
+        VaultOptions strong = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        Vault vault = Vault.named(name).configure(strong);
+        vault.enroll(pw("p"), strong).get();
+
+        assertTrue(device.keys.isEmpty(), "the unattended mechanism must hold nothing");
+        assertEquals(1, gated.keys.size(), "the gated mechanism must hold the key");
+
+        byte[] sealed = vault.seal("note", "contents".getBytes()).get();
+        vault.lock();
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockRemembered().get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", sealed).get());
+    }
+
+    @Test
+    void forgettingADeviceClearsBothMechanisms() {
+        // A vault that was gated and then relaxed can have a leftover in the mechanism it is no
+        // longer using. "Forget this device" has to mean it, so the deletion reaches both.
+        String name = freshName();
+        VaultOptions strong = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        Vault vault = Vault.named(name).configure(strong);
+        vault.enroll(pw("p"), strong).get();
+        assertEquals(1, gated.keys.size());
+        // A stale unattended key, as a relaxed-then-re-tightened vault would leave behind.
+        device.keys.put("stale", new byte[32]);
+
+        vault.forgetDevice().get();
+        assertTrue(gated.keys.isEmpty(), "the gated key should be gone");
+        assertFalse(device.keys.containsKey(vaultKeyIdOf(device)),
+                "this vault's unattended key should be gone");
+    }
+
+    @Test
+    void capabilitiesDescribeTheMechanismEachPolicyWouldUse() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        assertTrue(vault.capabilities().supports(UnlockPolicy.SESSION_ONLY));
+        assertTrue(vault.capabilities().supports(UnlockPolicy.REMEMBER_DEVICE));
+        assertTrue(vault.capabilities().supports(UnlockPolicy.REQUIRE_USER_VERIFICATION));
+        assertTrue(vault.capabilities().protectionFor(UnlockPolicy.REQUIRE_USER_VERIFICATION)
+                .provides(Protection.USER_VERIFICATION));
+        // And the unattended policy must not claim it.
+        assertFalse(vault.capabilities().protectionFor(UnlockPolicy.REMEMBER_DEVICE)
+                .provides(Protection.USER_VERIFICATION));
+
+        // Without a gated mechanism the strong policy is unsupported rather than approximated.
+        device.gatedVariant = null;
+        device.userVerification = false;
+        assertFalse(vault.capabilities().supports(UnlockPolicy.REQUIRE_USER_VERIFICATION));
+    }
+
+    /// The single key id this vault registered with a mechanism, for the leftover assertion above.
+    private static String vaultKeyIdOf(FakeDeviceProtection mechanism) {
+        for (String key : mechanism.keys.keySet()) {
+            if (!"stale".equals(key)) {
+                return key;
+            }
+        }
+        return "";
+    }
+
+    @Test
     void sessionOnlyDeletesTheDeviceKeyEntirely() {
         String name = freshName();
         Vault vault = Vault.named(name)
@@ -431,6 +515,7 @@ class VaultTest extends UITestBase {
 
     @Test
     void userVerificationPolicyIsRefusedWhereUnavailable() {
+        device.gatedVariant = null;
         device.userVerification = false;
         Vault vault = Vault.named(freshName())
                 .configure(fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION));

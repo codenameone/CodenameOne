@@ -23,6 +23,8 @@ on:
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/test-javascript-weak-refs.mjs'
+      - 'scripts/test-javascript-vault-bridge.mjs'
+      - 'vm/ByteCodeTranslator/src/javascript/browser_bridge.js'
       - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
@@ -224,6 +226,19 @@ jobs:
           # job resilient to Playwright revving its bundled chromium build
           # in between cache writes.
           npx playwright install chromium
+
+      # Placed here, before the workspace build, because it needs nothing from
+      # it: the vault bridge is sliced straight out of browser_bridge.js and run
+      # in a page. That also means a failure here is unambiguous -- it is the
+      # bridge, not the bundle.
+      #
+      # This is the only coverage the WebAuthn PRF path has anywhere. It needs an
+      # authenticator and a user, which no unit test can supply; Chrome's virtual
+      # authenticator over the DevTools protocol supplies both. The Node test in
+      # vm/tests covers the same bridge against a stub IndexedDB and cannot reach
+      # any of the passkey code.
+      - name: Vault bridge in a real browser (IndexedDB, Web Crypto, WebAuthn PRF)
+        run: node scripts/test-javascript-vault-bridge.mjs
 
       - name: Install Xvfb for headless Java AWT
         run: bash scripts/ci/apt-get-update.sh && sudo apt-get install -y xvfb

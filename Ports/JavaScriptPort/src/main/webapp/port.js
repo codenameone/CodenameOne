@@ -1365,6 +1365,51 @@ bindNative([
   }));
 });
 
+// --------------------------------------------------------------------------
+// com.codename1.impl.html5.HTML5PasskeyProtection -- the user-verifying variant.
+//
+// Enrol and derive both put a prompt on screen; prfState deliberately does not,
+// so an application can ask whether the option is available without asking for
+// the thing it is offering.
+// --------------------------------------------------------------------------
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfState_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfState",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfEnroll_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(keyId, userName) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfEnroll",
+    keyId: jvm.toNativeString(keyId),
+    userName: jvm.toNativeString(userName)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfDerive_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfDerive",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfForget_java_lang_String_R_byte_1ARRAY"
+], function*(keyId) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "prfForget",
+    keyId: jvm.toNativeString(keyId)
+  }));
+});
+
 // PBKDF2 through Web Crypto. The portable fallback in KdfProfile is the same
 // algorithm in pure Java and produces identical bytes, and at the default six
 // hundred thousand iterations it is minutes of a translated worker's time

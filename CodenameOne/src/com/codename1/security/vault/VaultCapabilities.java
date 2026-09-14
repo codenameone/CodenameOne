@@ -52,8 +52,9 @@ public final class VaultCapabilities {
             return false;
         }
         if (policy == UnlockPolicy.REQUIRE_USER_VERIFICATION) {
-            return device.requiresUserVerification()
-                    && report.provides(Protection.USER_VERIFICATION);
+            DeviceProtection gated = device.userVerifying();
+            return gated != null && gated.requiresUserVerification()
+                    && gated.protection().provides(Protection.USER_VERIFICATION);
         }
         return true;
     }
@@ -76,7 +77,11 @@ public final class VaultCapabilities {
             b.set(Protection.USER_VERIFICATION, false);
             return b.build();
         }
-        ProtectionReport report = device.protection();
+        // Reported from the protection that policy would actually use, which on the browser is a
+        // different mechanism for the gated policy than for the unattended one.
+        DeviceProtection forPolicy = policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
+                && device.userVerifying() != null ? device.userVerifying() : device;
+        ProtectionReport report = forPolicy.protection();
         b.set(Protection.NON_EXTRACTABLE_KEY, report.answer(Protection.NON_EXTRACTABLE_KEY));
         b.set(Protection.OS_PROTECTED, report.answer(Protection.OS_PROTECTED));
         b.set(Protection.HARDWARE_BACKED, report.answer(Protection.HARDWARE_BACKED));

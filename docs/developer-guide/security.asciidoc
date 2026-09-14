@@ -222,8 +222,16 @@ Three, and the choice belongs to the user rather than to you.
 |The data key is additionally wrapped under this device's key store, so the vault reopens with no prompt. That's unattended access: anyone who can run the app on this device reopens the vault without the password.
 
 |`REQUIRE_USER_VERIFICATION`
-|The device key exists but reaching it needs a biometric or passcode. Choosing this *deletes* any unattended wrap and replaces the device key, because a policy that promises a prompt while a wrap that skips it sits alongside promises nothing.
+|Reaching the key needs the user to verify themselves. Choosing this *deletes* the unattended wrap, because a policy that promises a prompt while a wrap that skips it sits alongside promises nothing.
 |===
+
+In a browser the third one isn't the second with a flag on it -- it's a different mechanism. `REMEMBER_DEVICE` wraps the data key under a non-extractable `CryptoKey` in IndexedDB; `REQUIRE_USER_VERIFICATION` wraps it under key material a *passkey* derives, through the WebAuthn PRF extension.
+
+That distinction is the one thing a browser can offer that the stored key can't: **the key material doesn't exist until the user verifies**. A copied browser profile carries the credential id, which isn't a secret, and can't derive anything without the authenticator and a person in front of it. The stored `CryptoKey`, by contrast, travels with the profile and works in the copy.
+
+A passkey signature isn't an encryption key, and it's worth being clear why, because the obvious shortcut is wrong: signatures are randomised, so signing a fixed challenge gives different bytes every time. PRF is the part of WebAuthn that actually derives a key -- the authenticator evaluates its own HMAC secret over a salt, so the same credential and salt give the same 32 bytes forever.
+
+Not every authenticator implements it. Enrolment checks `prf.enabled` from the creation ceremony and refuses to keep a credential that can't derive, so `capabilities().supports(...)` tells you the truth rather than offering a prompt with nothing behind it. And note that **WebAuthn doesn't work on an IP-address origin at all** -- a relying-party id has to be a domain. For local development that means serving from `localhost`, not `127.0.0.1`.
 
 `REQUIRE_USER_VERIFICATION` isn't available everywhere. Ask `vault.capabilities().supports(policy)` before you offer the switch, because a "remember this device" toggle on a platform that can't remember is worse than no toggle.
 
@@ -312,6 +320,8 @@ Everything about the format is pinned so the same password opens the same data e
 ==== Deploying the browser build
 
 The vault needs a secure context. Served over plain `http:` on anything but `localhost` there's no Web Crypto, and writes are refused rather than stored in the clear.
+
+The SQLite engine -- about 1.5 MB of WebAssembly and its loader -- is copied into the build only when the application can actually reach it. It's fetched on first use rather than at page load, so it never cost startup time for anyone; it cost deployment size in an artifact you upload to static hosting. The decision is made from the translated output, and it fails toward shipping: if the build can't tell, the engine goes in, because a database that won't open is a worse outcome than a download nobody makes.
 
 The JavaScript build writes its own deployment configuration: `_headers` at the publish root for Netlify and Cloudflare Pages, and a `cn1-security/` directory holding an nginx include, an Apache `.htaccess`, and a README explaining them. That directory is for you and shouldn't be uploaded with the application. The Content-Security-Policy in them is generated from the page that was actually emitted -- each inline block is hashed -- so it doesn't go stale against a template.
 

@@ -458,6 +458,7 @@
   var CN1V_INSECURE_CONTEXT = 6;
   var CN1V_TEMPORARILY_UNREADABLE = 7;
   var CN1V_UNKNOWN = 8;
+  var CN1V_CANCELLED = 9;
 
   var cn1VaultDbPromise = null;
 
@@ -697,6 +698,222 @@
       && w.navigator && w.navigator.credentials);
   }
 
+
+  // --------------------------------------------------------------------------
+  // Passkey-derived key material, via the WebAuthn PRF extension.
+  //
+  // A passkey signature is not an encryption key, and the common mistake is to
+  // treat one as the other -- signing a fixed challenge and hashing the
+  // signature gives something that looks stable and is not: signatures are
+  // randomised, and ECDSA's are different every time. The PRF extension is the
+  // part of WebAuthn that genuinely does derive a key: the authenticator
+  // evaluates its own HMAC secret over a salt we supply, so the same credential
+  // and the same salt give the same 32 bytes every time, and no other credential
+  // can produce them.
+  //
+  // What that buys over the IndexedDB device key: the material does not exist
+  // until the user verifies to the authenticator. A copied browser profile
+  // carries the credential id, which is not a secret, and cannot produce the
+  // PRF output without the authenticator and the user. That is the one place a
+  // browser can offer something the non-extractable CryptoKey cannot.
+  //
+  // What it does not buy: anything at all once the vault is unlocked. The
+  // derived key is in the page's memory from that moment, exactly as the other
+  // path's is.
+  // --------------------------------------------------------------------------
+
+  var CN1_PRF_STORE_PREFIX = 'prf:';
+
+  function cn1VaultWebAuthn() {
+    var w = global.window || global;
+    if (!w.navigator || !w.navigator.credentials || !w.PublicKeyCredential) {
+      return null;
+    }
+    return w.navigator.credentials;
+  }
+
+  function cn1VaultRandom(length) {
+    var out = new Uint8Array(length);
+    cn1CryptoApi().getRandomValues(out);
+    return out;
+  }
+
+  // No relying-party id is set, anywhere in this file, and that is deliberate.
+  // Left unset the browser uses the origin's own effective domain, which is what
+  // a single-origin application wants; setting it from ``location.hostname``
+  // adds a way to get a subdomain deployment wrong and buys nothing.
+  //
+  // Worth knowing separately, because it looks like the same problem and is not:
+  // **WebAuthn does not work on an IP-address origin at all.** A relying-party
+  // id has to be a domain, an IP literal is not one, and Chrome answers
+  // ``SecurityError: This is an invalid domain.`` no matter what is passed --
+  // measured against 127.0.0.1. Serve the application from a hostname, which for
+  // local development means ``localhost`` rather than ``127.0.0.1``.
+
+  function cn1VaultPrfRecord(keyId) {
+    return cn1VaultRead(CN1_PRF_STORE_PREFIX + keyId);
+  }
+
+  function cn1VaultStorePrfRecord(keyId, record) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        // ``add`` for the same reason the device key uses it: two tabs enrolling
+        // at once must converge on one credential rather than the second
+        // replacing the first, whose wraps would then be unopenable.
+        return store.add({
+          id: CN1_PRF_STORE_PREFIX + keyId,
+          credentialId: record.credentialId,
+          salt: record.salt,
+          created: 0
+        });
+      });
+    });
+  }
+
+  /// Creates a passkey and confirms the authenticator will actually evaluate a PRF.
+  ///
+  /// ``prf.enabled`` from the creation ceremony is the only honest signal here:
+  /// most authenticators do not return PRF *results* during creation, so a flow
+  /// that expected them would report every working authenticator as unsupported.
+  /// The salt is generated now and stored beside the credential id, because the
+  /// derived key is a function of both and a lost salt is a lost vault.
+  function cn1VaultPrfEnroll(keyId, userName) {
+    var credentials = cn1VaultWebAuthn();
+    if (!credentials) {
+      return Promise.resolve(cn1VaultReply(CN1V_UNKNOWN, null));
+    }
+    return cn1VaultPrfRecord(keyId).then(function(existing) {
+      if (existing && existing.credentialId) {
+        return cn1VaultReply(CN1V_OK, null);
+      }
+      var userId = cn1VaultRandom(16);
+      var options = {
+        challenge: cn1VaultRandom(32),
+        rp: { name: 'Codename One' },
+        user: {
+          id: userId,
+          name: userName || 'vault',
+          displayName: userName || 'vault'
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 }
+        ],
+        authenticatorSelection: {
+          residentKey: 'required',
+          requireResidentKey: true,
+          userVerification: 'required'
+        },
+        extensions: { prf: {} }
+      };
+      return credentials.create({ publicKey: options }).then(function(credential) {
+        var results = credential.getClientExtensionResults
+          ? credential.getClientExtensionResults() : {};
+        if (!results || !results.prf || !results.prf.enabled) {
+          // The authenticator registered a passkey and will not evaluate a PRF.
+          // Reported as unsupported rather than kept: a credential that cannot
+          // derive is a prompt with nothing behind it.
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        var record = {
+          credentialId: new Uint8Array(credential.rawId),
+          salt: cn1VaultRandom(32)
+        };
+        return cn1VaultStorePrfRecord(keyId, record).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        });
+      }, function(error) {
+        return cn1VaultReply(cn1VaultPrfStatusOf(error), null);
+      });
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  /// Derives the 32 bytes for this vault, prompting the user.
+  function cn1VaultPrfDerive(keyId) {
+    var credentials = cn1VaultWebAuthn();
+    if (!credentials) {
+      return Promise.resolve(cn1VaultReply(CN1V_UNKNOWN, null));
+    }
+    return cn1VaultPrfRecord(keyId).then(function(record) {
+      if (!record || !record.credentialId) {
+        return cn1VaultReply(CN1V_KEY_MISSING, null);
+      }
+      var options = {
+        challenge: cn1VaultRandom(32),
+        allowCredentials: [{
+          type: 'public-key',
+          id: cn1VaultBytes(record.credentialId)
+        }],
+        userVerification: 'required',
+        extensions: { prf: { eval: { first: cn1VaultBytes(record.salt) } } }
+      };
+      return credentials.get({ publicKey: options }).then(function(assertion) {
+        var results = assertion.getClientExtensionResults
+          ? assertion.getClientExtensionResults() : {};
+        var first = results && results.prf && results.prf.results
+          ? results.prf.results.first : null;
+        if (!first) {
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        return cn1VaultReply(CN1V_OK, new Uint8Array(first));
+      }, function(error) {
+        return cn1VaultReply(cn1VaultPrfStatusOf(error), null);
+      });
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  /// Whether a passkey is enrolled for this vault, asked without prompting anybody.
+  ///
+  /// Separate from deriving on purpose: a capability question must not put a
+  /// biometric prompt on screen, and a caller deciding whether to offer the
+  /// option would otherwise have to ask for the thing it is offering.
+  function cn1VaultPrfState(keyId) {
+    return cn1VaultPrfRecord(keyId).then(function(record) {
+      return cn1VaultReply(CN1V_OK, [record && record.credentialId ? 1 : 0]);
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  function cn1VaultPrfForget(keyId) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store['delete'](CN1_PRF_STORE_PREFIX + String(keyId));
+      }).then(function() {
+        return cn1VaultReply(CN1V_OK, null);
+      });
+    }, function(error) {
+      return cn1VaultReply(cn1VaultStatusOf(error), null);
+    });
+  }
+
+  function cn1VaultPrfStatusOf(error) {
+    var name = error && error.name ? String(error.name) : '';
+    if (name === 'NotAllowedError' || name === 'AbortError') {
+      // The user dismissed the prompt, or it timed out. Not a failure to report
+      // as one: the difference between "cancelled" and "failed" is the
+      // difference between an error dialog and no dialog.
+      return CN1V_CANCELLED;
+    }
+    if (name === 'InvalidStateError') {
+      // A credential for this relying party already exists on the authenticator.
+      return CN1V_KEY_MISSING;
+    }
+    if (name === 'NotSupportedError' || name === 'ConstraintError') {
+      return CN1V_UNKNOWN;
+    }
+    if (name === 'SecurityError') {
+      return CN1V_INSECURE_CONTEXT;
+    }
+    return cn1VaultStatusOf(error);
+  }
+
   hostBridge.register('__cn1_vault__', function(request) {
     var op = request && request.op;
     try {
@@ -777,6 +994,18 @@
         }, function(error) {
           return cn1VaultReply(cn1VaultStatusOf(error), null);
         });
+      }
+      if (op === 'prfEnroll') {
+        return cn1VaultPrfEnroll(String(request.keyId), request.userName);
+      }
+      if (op === 'prfDerive') {
+        return cn1VaultPrfDerive(String(request.keyId));
+      }
+      if (op === 'prfState') {
+        return cn1VaultPrfState(String(request.keyId));
+      }
+      if (op === 'prfForget') {
+        return cn1VaultPrfForget(String(request.keyId));
       }
       if (op === 'deleteKey') {
         return cn1VaultOpenDb().then(function(db) {

@@ -491,7 +491,7 @@ public final class Vault {
     /// configured, and a rewrap that read the configured one would replace the gated wrap with an
     /// unattended one -- silently turning off the prompt the user asked for.
     private void rememberNow(UnlockPolicy policy) {
-        DeviceProtection device = deviceProtection();
+        DeviceProtection device = deviceProtection(policy);
         if (policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
                 && !device.requiresUserVerification()) {
             throw new VaultException(VaultError.POLICY_NOT_MET,
@@ -532,8 +532,7 @@ public final class Vault {
             public void run() {
                 try {
                     Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                    await(deviceProtection().deleteKey(deviceKeyId()),
-                            "the device key could not be deleted");
+                    forgetEveryMechanism();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -582,8 +581,7 @@ public final class Vault {
                     }
                     storage.deleteStorageFile(deviceRecordKey());
                     storage.deleteStorageFile(metadataKey());
-                    await(deviceProtection().deleteKey(deviceKeyId()),
-                            "the device key could not be deleted");
+                    forgetEveryMechanism();
                     lock();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -1108,14 +1106,21 @@ public final class Vault {
                     requirePolicySupported(policy);
                     options.policy(policy);
                     DeviceRecord current = deviceRecord();
+                    UnlockPolicy previous = current == null
+                            ? UnlockPolicy.SESSION_ONLY : current.policy;
                     if (policy == UnlockPolicy.SESSION_ONLY) {
                         Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                        await(deviceProtection().deleteKey(deviceKeyId()),
+                        await(deviceProtection(previous).deleteKey(deviceKeyId()),
                                 "the device key could not be deleted");
                     } else if (current == null || current.policy != policy) {
                         requireUnlocked();
                         Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                        await(deviceProtection().deleteKey(deviceKeyId()),
+                        // Deleted through the OUTGOING policy's protection, because on a port
+                        // where the two policies are different mechanisms -- a stored key and a
+                        // passkey in the browser -- asking the incoming one to delete would leave
+                        // the outgoing key in place. That is the unattended wrap a stronger policy
+                        // exists to remove.
+                        await(deviceProtection(previous).deleteKey(deviceKeyId()),
                                 "the previous device key could not be deleted");
                         rememberNow(policy);
                     }
@@ -1266,7 +1271,31 @@ public final class Vault {
         }
     }
 
+    /// The device protection for a given policy.
+    ///
+    /// [UnlockPolicy#REQUIRE_USER_VERIFICATION] gets the port's user-verifying variant, which on
+    /// the browser is a different mechanism entirely -- a passkey rather than a stored key. When
+    /// the port has none this falls back to the unattended one, which then fails the
+    /// `requiresUserVerification` check in [#rememberNow] and in [VaultCapabilities]: the policy
+    /// is refused rather than quietly downgraded, which is the whole point of it.
+    private DeviceProtection deviceProtection(UnlockPolicy policy) {
+        DeviceProtection base = baseDeviceProtection();
+        if (policy == UnlockPolicy.REQUIRE_USER_VERIFICATION) {
+            DeviceProtection gated = base.userVerifying();
+            if (gated != null) {
+                return gated;
+            }
+        }
+        return base;
+    }
+
+    /// The protection for the policy this device is actually enrolled under, which is the one to
+    /// use for an operation on an existing wrap.
     private DeviceProtection deviceProtection() {
+        return deviceProtection(getPolicy());
+    }
+
+    private DeviceProtection baseDeviceProtection() {
         DeviceProtection supplied = options.getDeviceProtection();
         if (supplied != null) {
             return supplied;
@@ -1286,6 +1315,25 @@ public final class Vault {
         mac.update(codeBytes);
         Bytes.zero(codeBytes);
         return mac.doFinal();
+    }
+
+    /// Deletes this vault's device key under every mechanism the port has, not only the one the
+    /// record named.
+    ///
+    /// "Forget this device" has to mean it. A port with two mechanisms can have a leftover from a
+    /// policy this vault used earlier -- a passkey enrolled, then the policy relaxed -- and a
+    /// deletion that only reached the current one would leave it usable.
+    private void forgetEveryMechanism() {
+        DeviceProtection base = baseDeviceProtection();
+        await(base.deleteKey(deviceKeyId()), "the device key could not be deleted");
+        DeviceProtection gated = base.userVerifying();
+        if (gated != null) {
+            // No check for whether this is the same object as `base`. A port whose single key
+            // store is itself user-verifying returns `this` here, and deleting a key that is
+            // already gone is what every store does anyway -- so the second call is a wasted
+            // round trip on those ports and the correct one on the ports that have two stores.
+            await(gated.deleteKey(deviceKeyId()), "the device key could not be deleted");
+        }
     }
 
     private AssociatedData binding(VaultMetadata meta, String record, String purpose) {

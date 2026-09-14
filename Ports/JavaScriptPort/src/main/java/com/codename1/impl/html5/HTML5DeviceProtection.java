@@ -97,6 +97,11 @@ public final class HTML5DeviceProtection extends DeviceProtection {
     /// Anything else.
     static final int STATUS_UNKNOWN = 8;
 
+    /// The user dismissed a prompt, or it timed out. Not a failure: nothing went wrong, the
+    /// check simply did not happen, and an application that shows an error here is showing one
+    /// for a button the user chose not to press.
+    static final int STATUS_CANCELLED = 9;
+
     private static HTML5DeviceProtection instance;
 
     private HTML5DeviceProtection() {
@@ -108,6 +113,18 @@ public final class HTML5DeviceProtection extends DeviceProtection {
             instance = new HTML5DeviceProtection();
         }
         return instance;
+    }
+
+    /// The passkey-backed variant, when this browser can offer one.
+    ///
+    /// Reported from a capability bit rather than assumed: the PRF extension needs an
+    /// authenticator that implements `hmac-secret`, and plenty register a passkey without one.
+    /// Null here makes [com.codename1.security.vault.UnlockPolicy#REQUIRE_USER_VERIFICATION]
+    /// refuse rather than enrol under the weaker unattended key.
+    @Override
+    public DeviceProtection userVerifying() {
+        return (capabilities() & CAP_WEBAUTHN_PRF) != 0
+                ? HTML5PasskeyProtection.getInstance() : null;
     }
 
     public ProtectionReport protection() {
@@ -244,7 +261,7 @@ public final class HTML5DeviceProtection extends DeviceProtection {
         return new VaultException(errorFor(code), message);
     }
 
-    private static VaultError errorFor(int code) {
+    static VaultError errorFor(int code) {
         switch (code) {
             case STATUS_KEY_MISSING:
                 return VaultError.KEY_MISSING;
@@ -260,6 +277,8 @@ public final class HTML5DeviceProtection extends DeviceProtection {
                 return VaultError.INSECURE_CONTEXT;
             case STATUS_TEMPORARILY_UNREADABLE:
                 return VaultError.TEMPORARILY_UNREADABLE;
+            case STATUS_CANCELLED:
+                return VaultError.CANCELLED;
             default:
                 return VaultError.UNKNOWN;
         }

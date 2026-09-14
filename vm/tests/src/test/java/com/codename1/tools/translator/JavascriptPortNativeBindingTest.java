@@ -61,10 +61,13 @@ class JavascriptPortNativeBindingTest {
     private static final Path PORT_ROOT =
             Paths.get("..", "..", "Ports", "JavaScriptPort").toAbsolutePath().normalize();
 
-    private static final String COVERED_CLASS = "com.codename1.impl.html5.HTML5DeviceProtection";
-
-    private static final Path COVERED_SOURCE = PORT_ROOT.resolve(Paths.get("src", "main", "java",
-            "com", "codename1", "impl", "html5", "HTML5DeviceProtection.java"));
+    /// The classes covered here, as (fully qualified name, source path under src/main/java).
+    private static final String[][] COVERED = {
+        {"com.codename1.impl.html5.HTML5DeviceProtection",
+            "com/codename1/impl/html5/HTML5DeviceProtection.java"},
+        {"com.codename1.impl.html5.HTML5PasskeyProtection",
+            "com/codename1/impl/html5/HTML5PasskeyProtection.java"}
+    };
 
     /// `[modifiers] native <return> <name>(<args>);`
     private static final Pattern NATIVE = Pattern.compile(
@@ -74,12 +77,15 @@ class JavascriptPortNativeBindingTest {
     @Test
     void everyCoveredNativeIsBoundInPortJs() throws Exception {
         String portJs = portJs();
-        List<String> natives = nativesOf(source());
-        // Guards the guard: if the class were renamed, its natives removed, or the pattern above
+        List<String> natives = new ArrayList<String>();
+        for (String[] covered : COVERED) {
+            natives.addAll(nativesOf(covered[0], sourceOf(covered[1])));
+        }
+        // Guards the guard: if a class were renamed, its natives removed, or the pattern above
         // stopped matching the source's style, the loop below would pass over an empty list and
         // report success.
-        assertEquals(6, natives.size(),
-                "expected the six device-protection natives, found: " + natives);
+        assertEquals(10, natives.size(),
+                "expected six device-protection natives and four passkey ones, found: " + natives);
 
         List<String> missing = new ArrayList<String>();
         for (String identifier : natives) {
@@ -103,7 +109,8 @@ class JavascriptPortNativeBindingTest {
         assertEquals("(Ljava/lang/String;)Z", descriptorOf("boolean", "String name"));
 
         String identifier = JavascriptNameUtil.methodIdentifier(
-                COVERED_CLASS.replace('.', '/'), "nativeWrap", "(Ljava/lang/String;[B[B)[B");
+                "com/codename1/impl/html5/HTML5DeviceProtection", "nativeWrap",
+                "(Ljava/lang/String;[B[B)[B");
         assertEquals("cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeWrap"
                 + "_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY", identifier);
     }
@@ -125,17 +132,19 @@ class JavascriptPortNativeBindingTest {
         return text;
     }
 
-    private static String source() throws Exception {
-        assertTrue(Files.exists(COVERED_SOURCE), "port source not found at " + COVERED_SOURCE);
-        return new String(Files.readAllBytes(COVERED_SOURCE), StandardCharsets.UTF_8);
+    private static String sourceOf(String relative) throws Exception {
+        Path path = PORT_ROOT.resolve(Paths.get("src", "main", "java"))
+                .resolve(relative.replace('/', java.io.File.separatorChar));
+        assertTrue(Files.exists(path), "port source not found at " + path);
+        return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
     }
 
-    private static List<String> nativesOf(String source) {
+    private static List<String> nativesOf(String className, String source) {
         List<String> out = new ArrayList<String>();
         Matcher matcher = NATIVE.matcher(source);
         while (matcher.find()) {
             String descriptor = descriptorOf(matcher.group(1), matcher.group(3));
-            out.add(JavascriptNameUtil.methodIdentifier(COVERED_CLASS.replace('.', '/'),
+            out.add(JavascriptNameUtil.methodIdentifier(className.replace('.', '/'),
                     matcher.group(2), descriptor));
         }
         return out;

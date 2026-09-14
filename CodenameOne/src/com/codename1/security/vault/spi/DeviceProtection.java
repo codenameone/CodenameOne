@@ -141,4 +141,27 @@ public abstract class DeviceProtection {
     public boolean requiresUserVerification() {
         return false;
     }
+
+    /// The variant of this protection whose key cannot be reached without the user verifying
+    /// themselves, or null when this platform has none.
+    ///
+    /// A port can have two genuinely different mechanisms rather than one with a flag. The
+    /// browser does: the unattended key is a non-extractable `CryptoKey` in IndexedDB, and the
+    /// gated one is a passkey whose authenticator derives key material through the WebAuthn PRF
+    /// extension -- different storage, different failure modes, and material that does not exist
+    /// at all until the user verifies. A native port whose single key store can be created with a
+    /// user-authentication requirement returns `this` and reports
+    /// [com.codename1.security.vault.Protection#USER_VERIFICATION].
+    ///
+    /// Returning null is the honest answer where there is no such mechanism, and
+    /// [com.codename1.security.vault.UnlockPolicy#REQUIRE_USER_VERIFICATION] is then refused with
+    /// [com.codename1.security.vault.VaultError#POLICY_NOT_MET] rather than quietly enrolled
+    /// under the weaker one.
+    ///
+    /// #### Returns
+    ///
+    /// a protection whose [#requiresUserVerification()] is true, or null
+    public DeviceProtection userVerifying() {
+        return requiresUserVerification() ? this : null;
+    }
 }
