@@ -87,7 +87,12 @@ def strip_comments(text):
 DECLARATION = re.compile(
     r'(?P<modifiers>(?:\b(?:public|protected|private|static|final|abstract'
     r'|strictfp|sealed|non-sealed)\s+)*)'
-    r'\b(?:class|interface|enum|@interface)\s+(?P<name>[A-Z][A-Za-z0-9]*)')
+    # The annotation form has to come first, and the plain "interface" must
+    # refuse to match inside it: \b cannot match before '@', so
+    # "public @interface Route" was matched from its inner token and lost the
+    # modifier, leaving every annotation out of the index.
+    r'(?P<kind>@\s*interface|\bclass|(?<!@)(?<!@ )\binterface|\benum)'
+    r'\s+(?P<name>[A-Z][A-Za-z0-9]*)')
 # Declarations and braces in one pass, so a file is read once.
 TOKEN = re.compile(DECLARATION.pattern + r'|[{}]')
 # The published javadoc drops this package and everything under it; see
@@ -119,9 +124,14 @@ def declared_types(source):
         text = token.group(0)
         if text == '{':
             if pending is not None:
-                stack.append((depth, pending))
-                trail = [name for _, (name, _) in stack]
-                published = all(flag for _, (_, flag) in stack)
+                name, visible, kind = pending
+                # A member of an interface is implicitly public, so
+                # Mapper.Direct has a page although it carries no modifier.
+                if not visible and stack and stack[-1][1][2] == 'interface':
+                    visible = True
+                stack.append((depth, (name, visible, kind)))
+                trail = [n for _, (n, _, _) in stack]
+                published = all(flag for _, (_, flag, _) in stack)
                 out.append((trail, published))
                 pending = None
             depth += 1
@@ -132,8 +142,10 @@ def declared_types(source):
             pending = None
         else:
             modifiers = token.group('modifiers').split()
+            kind = 'interface' if 'interface' in token.group('kind') else 'class'
             pending = (token.group('name'),
-                       'public' in modifiers or 'protected' in modifiers)
+                       'public' in modifiers or 'protected' in modifiers,
+                       kind)
     return out
 
 
