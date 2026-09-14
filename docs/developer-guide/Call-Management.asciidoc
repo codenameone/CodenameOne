@@ -244,10 +244,20 @@ Disturb on iOS, or a blocked number -- so no action will arrive for it.
 repeat report into an update and only surface this when the collision can't be
 reconciled, so seeing it points at your id allocation.
 
-`NOT_SUPPORTED` is the platform: Android self-managed calls need API 26 and
-CallKit is absent from tvOS and watchOS, and `Calls.isSupported()` lets
-cross-platform code branch before it ever sees the code. `UNAUTHORIZED` is a
-missing runtime permission or role.
+`NOT_SUPPORTED` is either the whole integration or the one operation you asked
+for. `Calls.isSupported()` covers the first -- Android self-managed calls need
+API 26, CallKit is absent from tvOS and watchOS -- so branch on it rather than
+waiting for the error. It doesn't cover the second: `setMuted` answers
+`NOT_SUPPORTED` on Android because Telecom won't let a self-managed call set its
+own mute state, and `groupWith` answers it on every port today. Disable the
+capability that came back unsupported, not calling as a whole.
+
+`UNAUTHORIZED` is a missing runtime permission or role -- `MANAGE_OWN_CALLS`,
+the microphone grant, a declined call-screening role -- and on Android also an
+incoming report when notifications are off or the incoming-call channel sits
+below high importance. That last one grants no permission, so an app that only
+re-requests permissions asks for things the user already granted while the
+setting that actually stops the ringing goes untouched.
 
 `BUSY` is about neither a call nor the app: a conflicting operation is already
 running, which can be another call but can equally be an unrelated request
