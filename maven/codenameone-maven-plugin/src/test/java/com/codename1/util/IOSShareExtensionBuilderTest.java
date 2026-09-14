@@ -16,6 +16,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +32,29 @@ public class IOSShareExtensionBuilderTest {
                 .acceptText(true)
                 .acceptURLs(true)
                 .acceptImages(true);
+    }
+
+    /// The plist must not name a storyboard the archive does not contain.
+    /// buildFileMap writes four files and none of them is a storyboard, so a
+    /// declared NSExtensionMainStoryboard leaves iOS unable to build the
+    /// extension's interface -- it installs and fails to launch.
+    @Test
+    void plistDoesNotDeclareAStoryboardThatIsNeverEmitted() {
+        IOSShareExtensionBuilder b = new IOSShareExtensionBuilder()
+                .setExtensionName("MyShareExtension")
+                .setHostBundleId("com.example.myapp")
+                .setAppGroupId("group.com.example.myapp")
+                .acceptText(true);
+        java.util.Map<String, byte[]> files = b.buildFileMap();
+        String plist = new String(files.get("Info.plist"), java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(plist.contains("NSExtensionMainStoryboard"),
+                "the plist names a storyboard; was:\n" + plist);
+        assertTrue(plist.contains("NSExtensionPrincipalClass"),
+                "without a storyboard the principal class is what iOS instantiates");
+        for (String name : files.keySet()) {
+            assertFalse(name.endsWith(".storyboard"),
+                    "unexpected storyboard in the archive: " + name);
+        }
     }
 
     @Test

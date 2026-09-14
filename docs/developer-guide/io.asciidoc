@@ -794,7 +794,10 @@ public class UploadServlet extends HttpServlet {
     @Override
     public void doPost(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        Part data = req.getParts().iterator().next();
+        // By name, matching the addData(...) call above: getParts() also
+        // carries any addArgument values and comes off an unordered map,
+        // so the first part is not necessarily the file.
+        Part data = req.getPart("myFileName");
         try (InputStream in = data.getInputStream()) {
             // Persist the bytes wherever the upload belongs.
         }
