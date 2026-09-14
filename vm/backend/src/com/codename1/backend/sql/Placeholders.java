@@ -239,6 +239,18 @@ final class Placeholders {
         while(true) {
             at = skipBlanks(sql, at, nestedComments, backslashEscapes, hashComments,
                     dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            // MySQL writes its tuples as ROW(...) since 8.0.19, and the keyword
+            // is optional: "VALUES ROW(?), ROW(?)" is two rows exactly as
+            // "VALUES (?), (?)" is. Requiring the parenthesis immediately made
+            // the count -1, which means "cannot tell" -- and the multi-row insert
+            // then ran. Recognised on every dialect: the other two reject the
+            // word, so counting a statement they will refuse costs nothing.
+            if(at < length && (sql.charAt(at) == 'r' || sql.charAt(at) == 'R')
+                    && isWord(sql, at, "row")) {
+                at = skipBlanks(sql, at + 3, nestedComments, backslashEscapes, hashComments,
+                        dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers,
+                        executableComments);
+            }
             if(at >= length || sql.charAt(at) != '(') {
                 break;
             }

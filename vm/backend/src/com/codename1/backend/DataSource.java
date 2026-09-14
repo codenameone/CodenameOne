@@ -521,72 +521,16 @@ public final class DataSource {
         // is asked. It is the one the local development loop meets, because
         // sqlite-jdbc is what serves it.
         //
-        // The translated arm hands the whole string to sqlite3_open, where such
-        // a URL is a FILE with a startling name rather than a memory database.
-        // Reading it as memory there is conservative -- a file pooled at one --
-        // and never wrong in the direction that loses rows.
+        // The file: URI forms -- "file::memory:", "file:app?mode=memory" -- do
+        // NOT appear here: Database.open refuses them outright, because only the
+        // Java SE arm parses a URI and a packaged binary would read the whole
+        // string as a file name. That refusal is what keeps this question to two
+        // spellings of the same private database.
         String path = url;
         if(path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
             path = path.substring(12);
         }
-        if(":memory:".equals(path)) {
-            return true;
-        }
-        int query = path.indexOf('?');
-        // SQLite's URI spelling of the same thing. "file::memory:" is a PRIVATE
-        // in-memory database, one per connection, exactly like ":memory:".
-        String withoutQuery = query < 0 ? path : path.substring(0, query);
-        boolean fileMemory = "file::memory:".equals(withoutQuery);
-        if(query < 0) {
-            return fileMemory;
-        }
-        // ...unless the URI asks for the shared cache, which is what makes
-        // several connections see ONE in-memory database. That is a pool that
-        // works, so it is not refused.
-        if(hasSharedCache(path, query)) {
-            return false;
-        }
-        if(fileMemory) {
-            return true;
-        }
-        int at = query + 1;
-        while(at < path.length()) {
-            int end = path.indexOf('&', at);
-            if(end < 0) {
-                end = path.length();
-            }
-            if(end - at == 11 && path.regionMatches(at, "mode=memory", 0, 11)) {
-                return true;
-            }
-            at = end + 1;
-        }
-        return false;
-    }
-
-    /**
-     * Whether a SQLite URI asks for the shared cache, which is what lets several
-     * connections open the SAME in-memory database.
-     *
-     * <p>Worth the extra look: without it every file::memory: URL would be
-     * refused a pool, including the one spelling that genuinely supports one.
-     *
-     * <p>The translated arm hands the whole string to sqlite3_open, which parses
-     * a URI only when the build asks it to -- so there such a URL is a file with
-     * a startling name, and a pool of one over it loses nothing.
-     */
-    private static boolean hasSharedCache(String path, int query) {
-        int at = query + 1;
-        while(at < path.length()) {
-            int end = path.indexOf('&', at);
-            if(end < 0) {
-                end = path.length();
-            }
-            if(end - at == 12 && path.regionMatches(at, "cache=shared", 0, 12)) {
-                return true;
-            }
-            at = end + 1;
-        }
-        return false;
+        return ":memory:".equals(path);
     }
 
     /**

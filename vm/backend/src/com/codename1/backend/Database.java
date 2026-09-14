@@ -160,7 +160,37 @@ public final class Database {
                     parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
                     parsed.describe("mysql"), Dialect.MYSQL);
         }
+        refuseUnportableSqliteUri(url);
         return new Database(Db.open(url), null, null, "sqlite:" + url, Dialect.SQLITE);
+    }
+
+    /**
+     * Refuses a SQLite file: URI, because only one of the two runtimes reads it.
+     *
+     * <p>sqlite-jdbc parses "file:app?mode=memory&cache=shared" as a URI and
+     * gives the local development loop a shared in-memory database. sqlite3_open
+     * does NOT unless the build turns URI handling on, so the SAME url in a
+     * packaged binary opens a disk file whose name is that whole string -- and
+     * the server persists where development was ephemeral, or fails outright in
+     * a read-only working directory.
+     *
+     * <p>This class refuses jdbc:postgresql: for exactly this reason, and it is
+     * why the jdbc:sqlite: prefix is stripped on both arms rather than honoured
+     * on one. A spelling that cannot mean the same thing in both places is worth
+     * less than the confidence that they agree, so it is refused in both.
+     */
+    private static void refuseUnportableSqliteUri(String url) throws IOException {
+        String path = url;
+        if(path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
+            path = path.substring(12);
+        }
+        if(path.regionMatches(true, 0, "file:", 0, 5)) {
+            throw new IOException("A SQLite file: URI is not portable here: the local Java SE "
+                    + "loop hands it to a driver that parses it, and a packaged binary hands "
+                    + "it to sqlite3_open, which reads the whole string as a FILE NAME -- so "
+                    + "the same URL is an in-memory database in development and a file on "
+                    + "disk in production. Use a plain path, or \":memory:\".");
+        }
     }
 
     /** Wraps an already-open SQLite handle, for code that opened one directly. */
