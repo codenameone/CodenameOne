@@ -184,6 +184,9 @@ public final class FileIo {
         return BENEATH_UNSUPPORTED;
     }
 
+    /** openRead: the file is there and could not be opened. See the native twin. */
+    public static final int OPEN_FAILED = -2;
+
     public static int openRead(String path) {
         try {
             Path p = Paths.get(path);
@@ -225,8 +228,20 @@ public final class FileIo {
                 channel.close();
             }
             return Descriptors.add(opened);
-        } catch (Exception err) {
+        } catch (java.nio.file.NoSuchFileException absent) {
             return -1;
+        } catch (java.nio.file.InvalidPathException unnameable) {
+            // ABSENT, NOT UNREADABLE, and the translated arm says so explicitly:
+            // a path holding a NUL is not a path to anything. Paths.get throws
+            // this rather than NoSuchFileException, so the first version of the
+            // split below answered -2 here and the two arms disagreed about the
+            // one case SelfTest already checks on both.
+            return -1;
+        } catch (Exception err) {
+            // THE SAME SPLIT THE NATIVE ARM MAKES. -1 is "no such file", which a
+            // caller may treat as an absent optional file; -2 is "there is one
+            // and it could not be opened", which nobody may quietly ignore.
+            return OPEN_FAILED;
         }
     }
 

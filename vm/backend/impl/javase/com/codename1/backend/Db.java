@@ -74,6 +74,12 @@ public final class Db {
                     + "would hand " + path + " to sqlite3_open. Use Database.open for "
                     + "PostgreSQL or MySQL.");
         }
+        // FORWARDED IN THE SPELLING IT ARRIVED IN, which is safe: measured
+        // against sqlite-jdbc, DriverManager accepts jdbc:sqlite::memory:,
+        // JDBC:SQLITE::memory:, JDBC:SQLite::memory: and Jdbc:Sqlite::memory:
+        // alike -- the driver folds the scheme before comparing it, as a JDBC
+        // driver is expected to. Rewriting it to lower case would only change
+        // the URL the developer sees quoted back in an error.
         String url = path != null && path.regionMatches(true, 0, "jdbc:", 0, 5)
                 ? path : "jdbc:sqlite:" + path;
         try {
@@ -81,7 +87,11 @@ public final class Db {
             connection.setAutoCommit(true);
             return new Db(connection);
         } catch (SQLException err) {
-            if(url.startsWith("jdbc:sqlite:")) {
+            if(url.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
+                // IGNORING CASE like the two tests above it. This one was left
+                // exact when they were relaxed, so a mixed-case URL that failed
+                // for the usual reason got the generic message instead of the
+                // one naming the driver.
                 // The usual cause is a dev classpath without the driver, and
                 // "No suitable driver" on its own does not say which one.
                 throw new IOException("Could not open " + url + " -- is sqlite-jdbc on "

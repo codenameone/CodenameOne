@@ -151,7 +151,28 @@ JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODE
     if(p == NULL) {
         return -1;
     }
-    return open(p, O_RDONLY | O_CLOEXEC);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    if(fd < 0) {
+        /*
+         * -1 means THERE IS NO SUCH FILE and -2 means there is one and it could
+         * not be opened. Collapsing both into -1 made a configuration file that
+         * exists but cannot be read indistinguishable from an absent optional
+         * one, so a server whose TLS certificate and key are named in
+         * application.properties started in plaintext when the file's
+         * permissions were wrong.
+         *
+         * ONLY ENOENT is absent. ENOTDIR -- a path component that is not a
+         * directory -- reads like "names nothing", and classifying it that way
+         * made the two arms disagree: the JVM's FileChannel.open throws a plain
+         * FileSystemException there rather than NoSuchFileException, so it
+         * already answered -2. Measured, not assumed, and -2 is the better of
+         * the two answers anyway: a configuration path of the shape
+         * /etc/hosts/application.properties is a broken deployment, not an
+         * optional file somebody chose not to write.
+         */
+        return errno == ENOENT ? -1 : -2;
+    }
+    return fd;
 #endif
 }
 

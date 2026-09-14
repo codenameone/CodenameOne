@@ -364,8 +364,34 @@ public final class EntityManager {
         Map out = new LinkedHashMap();
         EntityDefinition[] all = registered();
         List clashes = null;
+        // TABLE NAME -> the entity that claimed it. The map above is keyed by
+        // CLASS, so two entities on one table both register and neither is
+        // reported: foo.User and bar.User default to the same table "User",
+        // createTables runs CREATE TABLE IF NOT EXISTS for the first and skips
+        // the second, and the second dao then selects columns that were never
+        // created. The failure surfaces as a missing column on a query, far from
+        // the two classes that explain it.
+        Map byTable = new LinkedHashMap();
         for(int iter = 0 ; iter < all.length ; iter++) {
             EntityDefinition definition = all[iter];
+            String claimed = asciiLower(definition.table());
+            Object owner = byTable.get(claimed);
+            if(owner != null) {
+                if(clashes == null) {
+                    clashes = new ArrayList();
+                }
+                // Case insensitively, because the engines differ on whether an
+                // unquoted name folds -- and the ORM quotes every identifier, so
+                // on PostgreSQL "User" and "user" WOULD be two tables while on
+                // MySQL's default macOS and Windows configurations they are one.
+                // An entity pair that works on one engine and not another is the
+                // thing this whole layer exists to prevent.
+                clashes.add(definition.type().getName() + " and " + owner
+                        + " are both stored in table '" + definition.table()
+                        + "'; give one of them @Entity(table = \"...\")");
+                continue;
+            }
+            byTable.put(claimed, definition.type().getName());
             try {
                 out.put(definition.type().getName(), new Table(definition, dialect));
             } catch (IllegalStateException err) {
@@ -383,5 +409,31 @@ public final class EntityManager {
             throw new IOException("These entities cannot be mapped: " + clashes);
         }
         return out;
+    }
+
+    /**
+     * ASCII lower case, by hand.
+     *
+     * <p>String.toLowerCase() is locale sensitive and this runtime has no Locale
+     * to ask for the root one, so on a device set to Turkish the I of a table
+     * named "USERS" folds to a dotless i and two names that are the same table
+     * compare as different ones. A table name is ASCII by the schema's choice
+     * here; anything above it is left alone rather than guessed at.
+     */
+    private static String asciiLower(String name) {
+        if(name == null) {
+            return null;
+        }
+        char[] out = null;
+        for(int iter = 0 ; iter < name.length() ; iter++) {
+            char c = name.charAt(iter);
+            if(c >= 'A' && c <= 'Z') {
+                if(out == null) {
+                    out = name.toCharArray();
+                }
+                out[iter] = (char)(c + 32);
+            }
+        }
+        return out == null ? name : new String(out);
     }
 }

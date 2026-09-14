@@ -399,6 +399,41 @@ class EntityManagerTest {
     }
 
     @Test
+    @DisplayName("two entities on one table is refused, naming both")
+    void refusesTwoEntitiesOnOneTable() throws Exception {
+        // The registry is keyed by CLASS, so both of these register and nothing
+        // notices. createTables then runs CREATE TABLE IF NOT EXISTS for the
+        // first and skips the second, and the second dao selects columns that
+        // were never created -- surfacing as a missing column on a query, far
+        // from the two classes that explain it. foo.User and bar.User both
+        // defaulting to "User" is the ordinary way to arrive here.
+        //
+        // Their names differ in CASE, which still counts: the ORM quotes every
+        // identifier, so these are two tables on PostgreSQL and one on a MySQL
+        // configured the usual way for macOS or Windows -- an entity pair that
+        // works on one engine and not another, which is the whole failure this
+        // layer exists to prevent.
+        EntityManager.register(new TestEntities.SharedADefinition());
+        EntityManager.register(new TestEntities.SharedBDefinition());
+        try {
+            DataSource pool = DataSource.open(":memory:");
+            try {
+                IOException err = assertThrows(IOException.class,
+                        () -> EntityManager.open(pool));
+                assertTrue(err.getMessage().contains("SharedA"), err.getMessage());
+                assertTrue(err.getMessage().contains("SharedB"), err.getMessage());
+                // And it says what to do about it.
+                assertTrue(err.getMessage().contains("@Entity(table"), err.getMessage());
+            } finally {
+                pool.close();
+            }
+        } finally {
+            EntityManager.forgetForTest(TestEntities.SharedA.class);
+            EntityManager.forgetForTest(TestEntities.SharedB.class);
+        }
+    }
+
+    @Test
     @DisplayName("two fields on one column is refused, naming both")
     void refusesTwoFieldsOnOneColumn() throws Exception {
         // Every statement would name the column twice: the CREATE TABLE is

@@ -447,6 +447,18 @@ public final class Config {
     /** A whole file as bytes, or null when it cannot be opened. */
     private static byte[] readFile(String path) throws IOException {
         int fd = FileIo.openRead(path);
+        if(fd == FileIo.OPEN_FAILED) {
+            // NOT THE SAME AS ABSENT. Every setting this file carries would fall
+            // back to an environment variable or a default, and the ones that
+            // have no default are the ones that matter: a deployment naming its
+            // TLS certificate and key here came up in PLAINTEXT when the file's
+            // permissions were wrong, reporting nothing. An optional file that
+            // is not there is a choice; one that is there and cannot be read is
+            // a broken deployment, and it says so before serving anything.
+            throw new IOException(path + " exists and could not be opened. A configuration "
+                    + "file that is present must be readable: every setting in it would "
+                    + "otherwise fall back to a default, silently.");
+        }
         if(fd < 0) {
             return null;
         }

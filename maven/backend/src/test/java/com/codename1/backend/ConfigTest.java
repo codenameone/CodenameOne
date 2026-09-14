@@ -35,6 +35,7 @@ import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -248,6 +249,32 @@ class ConfigTest {
             out.write(content.getBytes("UTF-8"));
         } finally {
             out.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a configuration file that exists and cannot be read is not an absent one")
+    void anUnreadableFileIsRefused(@TempDir File dir) throws Exception {
+        File properties = new File(dir, "application.properties");
+        write(dir, "application.properties", "cn1.server.port=8080\n");
+        // Proven unreadable before anything is asserted: root ignores the
+        // permission bits, and a check that cannot fail is no check.
+        if(!properties.setReadable(false, false) || properties.canRead()) {
+            System.out.println("SKIPPING the unreadable-file check: this user can read a "
+                    + "file with no read permission, which is what root does");
+            return;
+        }
+        try {
+            IOException err = assertThrows(IOException.class,
+                    () -> Config.load(dir.getAbsolutePath()));
+            // Named, because the operator has to know WHICH file to fix.
+            assertTrue(err.getMessage().indexOf("application.properties") >= 0,
+                    err.getMessage());
+            // And the file that is simply absent is still fine, which is the
+            // distinction being made.
+            assertNotNull(Config.load(new File(dir, "empty").getAbsolutePath()));
+        } finally {
+            properties.setReadable(true, true);
         }
     }
 }

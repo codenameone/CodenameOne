@@ -211,4 +211,80 @@ final class TestEntities {
             }
         }
     }
+
+    /** Two entities, two classes, ONE table -- which is the mistake. */
+    public static final class SharedA {
+        public long id;
+        public SharedA() {
+        }
+    }
+
+    public static final class SharedB {
+        public long id;
+        public SharedB() {
+        }
+    }
+
+    /** Spelled in different CASES on purpose: the engines disagree about whether
+     * an unquoted name folds, and the ORM quotes every identifier, so "Shared"
+     * and "shared" are two tables on PostgreSQL and one on a MySQL configured
+     * the usual way for macOS or Windows. An entity pair that works on one
+     * engine and not another is what this refusal exists to stop. */
+    static final class SharedADefinition extends EntityDefinition {
+        private static final ColumnDefinition[] COLUMNS = {
+            new ColumnDefinition("id", "id", Dialect.BIGINT, false, null, true, true),
+        };
+
+        public Class type() {
+            return SharedA.class;
+        }
+
+        public String table() {
+            return "Shared";
+        }
+
+        public ColumnDefinition[] columns() {
+            return COLUMNS;
+        }
+
+        public Object newInstance() {
+            return new SharedA();
+        }
+
+        public Object get(Object entity, int index) {
+            return null;
+        }
+
+        public void set(Object entity, int index, Object value) {
+        }
+    }
+
+    static final class SharedBDefinition extends EntityDefinition {
+        private static final ColumnDefinition[] COLUMNS = {
+            new ColumnDefinition("id", "id", Dialect.BIGINT, false, null, true, true),
+        };
+
+        public Class type() {
+            return SharedB.class;
+        }
+
+        public String table() {
+            return "shared";
+        }
+
+        public ColumnDefinition[] columns() {
+            return COLUMNS;
+        }
+
+        public Object newInstance() {
+            return new SharedB();
+        }
+
+        public Object get(Object entity, int index) {
+            return null;
+        }
+
+        public void set(Object entity, int index, Object value) {
+        }
+    }
 }
