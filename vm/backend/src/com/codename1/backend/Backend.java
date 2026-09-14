@@ -135,6 +135,39 @@ public final class Backend {
     }
 
     /**
+     * The pool, or a refusal naming the handler that asked for one.
+     *
+     * <p>Called from generated wiring: a controller declaring a
+     * {@link DataSource} constructor is declaring a DEPENDENCY, and handing it
+     * null because nothing configured a database turns that into a server that
+     * starts, reports healthy and fails on the first request that touches the
+     * database. The deployment is missing a setting, and start-up is where that
+     * is cheap to see.
+     */
+    public static DataSource requireDataSource(DataSource dataSource, String handler)
+            throws IOException {
+        if(dataSource == null) {
+            throw new IOException(handler + " takes a DataSource, so it needs a database, and "
+                    + "none is configured. Set " + Config.DATASOURCE_URL + " (or DATABASE_URL), "
+                    + "or run on a development profile, which substitutes an in-memory one.");
+        }
+        return dataSource;
+    }
+
+    /** The entity manager, or a refusal naming the handler that asked for one. */
+    public static EntityManager requireEntities(EntityManager entities, String handler)
+            throws IOException {
+        if(entities == null) {
+            throw new IOException(handler + " takes an EntityManager, so it needs the generated "
+                    + "daos and a database to reach them through. Either no class in this build "
+                    + "carries @Entity, or no database is configured: set "
+                    + Config.DATASOURCE_URL + " (or DATABASE_URL), or run on a development "
+                    + "profile.");
+        }
+        return entities;
+    }
+
+    /**
      * Where the handlers are built, once the things they need exist.
      *
      * <p>A handler that talks to a database cannot be constructed before the pool
@@ -282,6 +315,27 @@ public final class Backend {
                 config = Config.load();
             }
             DataSource pool = openDataSource();
+            try {
+                return startWith(pool);
+            } catch (Exception err) {
+                // EVERY failure after the pool is open, not just the bind. A
+                // controller constructor that rejects its configuration, a
+                // static root that is not a directory, a CREATE TABLE the
+                // server refuses: each of those used to leave the connections
+                // open, and a supervisor that retries turns that into a pool of
+                // dead sessions the database still counts.
+                //
+                // Only a pool this builder OPENED. One handed in belongs to the
+                // caller and is theirs to close.
+                if(pool != null && !dataSourceGiven) {
+                    pool.close();
+                }
+                throw err;
+            }
+        }
+
+        /** {@link #start} once the database, if any, is open. */
+        private Backend startWith(DataSource pool) throws Exception {
             EntityManager manager = openEntityManager(pool);
             List routers = new ArrayList(handlers);
             if(factory != null) {
@@ -322,9 +376,7 @@ public final class Backend {
             int drain = shutdownMillis >= 0 ? shutdownMillis
                     : config.getInt(Config.SERVER_SHUTDOWN_MILLIS, 10000);
             Tls context = resolveTls();
-            HttpServer server;
-            try {
-                server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
+            HttpServer server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
                         new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request)
                                     throws Exception {
@@ -339,18 +391,6 @@ public final class Backend {
                                 return null;
                             }
                         }, context);
-            } catch (IOException err) {
-                // The POOL, which is open by now and holds connections the
-                // database counts against its limit. A bind that fails -- the
-                // port is taken, which is the ordinary case when a previous run
-                // has not exited -- used to leave them to the garbage collector,
-                // and a supervisor restarting the process every second then ran
-                // the server out of connections before it ever served a request.
-                if(pool != null && !dataSourceGiven) {
-                    pool.close();
-                }
-                throw err;
-            }
             Backend backend = new Backend(server, pool, manager, config, drain);
             if(!quiet) {
                 announce(backend, listenPort, context != null);

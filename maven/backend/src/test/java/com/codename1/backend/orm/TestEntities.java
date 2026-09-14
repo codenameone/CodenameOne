@@ -56,6 +56,53 @@ final class TestEntities {
         }
     }
 
+    /**
+     * An entity whose ONLY persisted field is a key the database generates.
+     *
+     * <p>Legal, and the case the obvious insert construction cannot express:
+     * with no columns to name it builds "INSERT INTO t () VALUES ()", which
+     * SQLite and PostgreSQL both refuse.
+     */
+    public static final class Ticket {
+        public long id;
+
+        public Ticket() {
+        }
+    }
+
+    /** What `@Entity` on Ticket generates. */
+    static final class TicketDefinition extends EntityDefinition {
+        private static final ColumnDefinition[] COLUMNS = {
+            new ColumnDefinition("id", "id", Dialect.BIGINT, false, null, true, true),
+        };
+
+        public Class type() {
+            return Ticket.class;
+        }
+
+        public String table() {
+            return "tickets";
+        }
+
+        public ColumnDefinition[] columns() {
+            return COLUMNS;
+        }
+
+        public Object newInstance() {
+            return new Ticket();
+        }
+
+        public Object get(Object entity, int index) {
+            return index == 0 ? Long.valueOf(((Ticket)entity).id) : null;
+        }
+
+        public void set(Object entity, int index, Object value) throws java.io.IOException {
+            if(index == 0) {
+                ((Ticket)entity).id = Values.asLong(value, 0L);
+            }
+        }
+    }
+
     /** What `@Entity` on Note generates. */
     static final class NoteDefinition extends EntityDefinition {
         private static final ColumnDefinition[] COLUMNS = {

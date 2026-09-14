@@ -59,6 +59,7 @@ class EntityManagerTest {
     static void registerDefinitions() {
         // What the generated cn1app.BackendDaoBootstrap does at start-up.
         EntityManager.register(new TestEntities.NoteDefinition());
+        EntityManager.register(new TestEntities.TicketDefinition());
     }
 
     @Test
@@ -160,6 +161,30 @@ class EntityManagerTest {
 
             // And the escape hatch, which is SQL and says so.
             assertEquals(1, notes.find("views > ?", new Object[] {Integer.valueOf(5)}).size());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("an entity that is only a generated key can still be created")
+    void storesAnEntityWithNothingButAKey() throws Exception {
+        // The insert has no columns to name, and the construction that names
+        // none -- INSERT INTO t () VALUES () -- is refused by SQLite and
+        // PostgreSQL alike. Each engine spells this its own way.
+        DataSource pool = DataSource.open(":memory:");
+        try {
+            EntityManager em = EntityManager.open(pool);
+            Dao<TestEntities.Ticket> tickets = em.dao(TestEntities.Ticket.class);
+            tickets.createTable();
+            TestEntities.Ticket first = new TestEntities.Ticket();
+            tickets.insert(first);
+            assertTrue(first.id > 0, "the generated key is written back");
+            TestEntities.Ticket second = new TestEntities.Ticket();
+            tickets.insert(second);
+            assertTrue(second.id > first.id, "each insert gets its own key");
+            assertEquals(2, tickets.count());
+            assertNotNull(tickets.findById(Long.valueOf(first.id)));
         } finally {
             pool.close();
         }

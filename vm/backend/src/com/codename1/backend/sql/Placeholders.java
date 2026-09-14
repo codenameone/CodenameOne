@@ -50,12 +50,16 @@ final class Placeholders {
      * @param dollars   true to render parameters as $1, $2 (PostgreSQL), false to
      *                  leave them as ?
      * @param nestedComments true where a block comment can contain another one
+     * @param backslashEscapes true where a backslash escapes the next character
+     *                  inside an ordinary string literal, which is MySQL in its
+     *                  default SQL mode
+     * @param hashComments true where # begins a line comment, which is MySQL
      * @throws IOException when the statement carries placeholders and their count
      *                     is not {@code paramCount}, or when a literal, comment or
      *                     dollar-quoted body is left unterminated
      */
-    static String render(String sql, int paramCount, boolean dollars, boolean nestedComments)
-            throws IOException {
+    static String render(String sql, int paramCount, boolean dollars, boolean nestedComments,
+                         boolean backslashEscapes, boolean hashComments) throws IOException {
         StringBuilder out = null;
         int found = 0;
         int at = 0;
@@ -82,7 +86,7 @@ final class Placeholders {
                 at++;
                 continue;
             }
-            int next = skip(sql, at, nestedComments);
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments);
             if(next > at) {
                 if(out != null) {
                     out.append(sql, at, next);
@@ -126,11 +130,25 @@ final class Placeholders {
      * The index just past the literal, identifier, comment or dollar-quoted body
      * beginning at {@code at}, or {@code at} itself when nothing begins there.
      */
-    private static int skip(String sql, int at, boolean nestedComments) throws IOException {
+    private static int skip(String sql, int at, boolean nestedComments,
+                            boolean backslashEscapes, boolean hashComments) throws IOException {
         char c = sql.charAt(at);
         int length = sql.length();
         if(c == '\'') {
-            return skipQuoted(sql, at, '\'', backslashEscapes(sql, at));
+            // MySQL escapes with a backslash in EVERY literal; PostgreSQL only in
+            // an E'' one; SQLite not at all, where a backslash is an ordinary
+            // character. Reading them all one way breaks the other two: with the
+            // escape assumed, "SELECT 'a\\'" swallows the rest of the statement
+            // on SQLite, and without it "SELECT 'it\\'s ?'" ends the literal at
+            // the escaped quote on MySQL and counts the ? that follows.
+            return skipQuoted(sql, at, '\'',
+                    backslashEscapes || eStringBackslash(sql, at));
+        }
+        if(hashComments && c == '#') {
+            // MySQL's other line comment. Missing it counted every ? in a
+            // commented-out line as a parameter.
+            int end = sql.indexOf('\n', at + 1);
+            return end < 0 ? length : end + 1;
         }
         if(c == '"') {
             return skipQuoted(sql, at, '"', false);
@@ -158,13 +176,14 @@ final class Placeholders {
      * Whether the literal starting at {@code at} is one where a backslash escapes
      * the following character.
      *
-     * <p>It is exactly PostgreSQL's E'' form. In an ordinary literal a backslash
+     * <p>It is exactly PostgreSQL's E'' form, and this is asked only where the
+     * dialect does not already escape with a backslash everywhere. In an ordinary literal a backslash
      * is an ordinary character -- that is what standard_conforming_strings means,
      * on by default for fifteen years -- so treating one as an escape would read
      * the closing quote of 'a\' as escaped and swallow the rest of the statement
      * into the literal. Reading the prefix is what keeps both forms right.
      */
-    private static boolean backslashEscapes(String sql, int at) {
+    private static boolean eStringBackslash(String sql, int at) {
         if(at == 0) {
             return false;
         }

@@ -70,7 +70,12 @@ jobs:
           --health-timeout 5s
           --health-retries 20
       mysql:
-        image: mysql:8
+        # 8.0 rather than 8, because 8.4 no longer LOADS mysql_native_password
+        # and a service container cannot be given server flags to turn it back
+        # on: GitHub's `services` supports image, env, ports and options, and
+        # none of those appends a command. See the step below for why the plugin
+        # has to be reachable at all.
+        image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: cn1secret
           MYSQL_USER: cn1
@@ -86,6 +91,25 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      # The backend's MySQL client REFUSES to complete caching_sha2_password's
+      # full exchange on an unencrypted connection, because that exchange sends
+      # the password itself. That refusal is the client behaving correctly, and
+      # it means a freshly created service container -- whose password cache is
+      # empty -- cannot be reached over plaintext loopback at all: the first
+      # connection is exactly the one with nothing cached.
+      #
+      # The alternative to this step is TLS, and the container's auto-generated
+      # certificate chains to nothing and carries no name the client could
+      # verify, so `sslmode=require` fails for a different reason. Native
+      # password authentication is what CI can actually offer, and the code path
+      # under test -- the wire protocol, the schema, the generated keys -- is the
+      # same either way.
+      - name: Let the MySQL service authenticate our client
+        run: |
+          docker exec ${{ job.services.mysql.id }} mysql -uroot -pcn1secret -e \
+            "ALTER USER 'cn1'@'%' IDENTIFIED WITH mysql_native_password BY 'cn1secret'; \
+             FLUSH PRIVILEGES;"
 
       - name: Install native build tools
         run: |

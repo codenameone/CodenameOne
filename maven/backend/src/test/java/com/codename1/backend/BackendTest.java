@@ -256,6 +256,49 @@ class BackendTest {
         }
     }
 
+    @Test
+    @DisplayName("a handler that asked for a database is refused one that is not there")
+    void refusesAMissingDependency() {
+        // The generated wiring passes a controller's declared dependency through
+        // these. Handing null instead produces a server that starts, reports
+        // healthy, and fails on the first request that touches the database --
+        // when what is actually wrong is a missing deployment setting.
+        IOException err = assertThrows(IOException.class,
+                () -> Backend.requireDataSource(null, "com.example.Api"));
+        assertTrue(err.getMessage().contains("com.example.Api"), err.getMessage());
+        assertTrue(err.getMessage().contains(Config.DATASOURCE_URL), err.getMessage());
+        IOException entities = assertThrows(IOException.class,
+                () -> Backend.requireEntities(null, "com.example.Api"));
+        assertTrue(entities.getMessage().contains("com.example.Api"), entities.getMessage());
+        // And what is there is passed straight through.
+        assertThrows(IOException.class, () -> Backend.requireDataSource(null, "x"));
+    }
+
+    @Test
+    @DisplayName("a failure while building handlers closes the pool that was opened for them")
+    void closesThePoolWhenHandlerConstructionFails() throws Exception {
+        // The pool is open before the handlers exist, because the handlers are
+        // what needs it. A controller constructor that rejects its configuration
+        // used to leave those connections open, and a supervisor that retries
+        // turns that into a database full of dead sessions.
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        settings.setProperty(Config.DATASOURCE_URL, ":memory:");
+        final DataSource[] opened = new DataSource[1];
+        assertThrows(IllegalStateException.class, () -> Backend.builder(Config.of(settings, "test"))
+                .quiet()
+                .handlers(new Backend.Handlers() {
+                    public HttpServer.Handler[] create(DataSource dataSource,
+                            com.codename1.backend.orm.EntityManager entities) {
+                        opened[0] = dataSource;
+                        throw new IllegalStateException("this controller refuses to start");
+                    }
+                })
+                .start());
+        assertNotNull(opened[0], "the pool was opened before the handlers were built");
+        assertThrows(IOException.class, () -> opened[0].borrow());
+    }
+
     private static HttpServer.Handler ok() {
         return new HttpServer.Handler() {
             public HttpServer.Response handle(HttpServer.Request request) throws Exception {

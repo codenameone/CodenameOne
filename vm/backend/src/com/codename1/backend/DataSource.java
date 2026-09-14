@@ -62,10 +62,11 @@ import com.codename1.backend.sql.Dialect;
  * {@link #open} so that a wrong URL, an unreachable host or a refused password
  * fails at start-up rather than on the first request that needed the database.
  *
- * <p>An in-memory SQLite database is pooled at size one, always. Each connection
- * to ":memory:" gets its OWN private database, so a pool of them would hand
- * successive requests different empty databases -- the one case where a bigger
- * pool is not slower but wrong.
+ * <p>An in-memory SQLite database is pooled at size one, and a configuration
+ * asking for more is REFUSED rather than quietly reduced. Each connection to
+ * ":memory:" gets its OWN private database, so a pool of them hands successive
+ * requests different empty databases -- the one case where a bigger pool is not
+ * slower but wrong, and a setting worth reporting rather than ignoring.
  */
 public final class DataSource {
     /** A unit of work run against one borrowed connection. */
@@ -137,6 +138,19 @@ public final class DataSource {
         Database first = Database.open(url);
         Dialect dialect = first.dialect();
         int limit = size > 0 ? size : defaultSize(url, dialect);
+        if(dialect == Dialect.SQLITE && isMemory(url) && limit != 1) {
+            // ALWAYS one, whatever was asked for. Each connection to an in-memory
+            // SQLite database gets its OWN database, so a second one is not more
+            // capacity, it is a second empty database: the table the first
+            // connection created is missing on it, and which one a request gets
+            // depends on the order borrows happen in. Honouring the setting here
+            // would mean honouring it into a data-loss bug, so it is refused
+            // rather than clamped in silence.
+            throw new IOException("An in-memory SQLite database cannot be pooled: each "
+                    + "connection would get its own, so rows written through one would be "
+                    + "missing from the next. " + Config.DATASOURCE_POOL_SIZE + " is " + limit
+                    + "; leave it unset for an in-memory database, or point the URL at a file.");
+        }
         DataSource out = new DataSource(url, first.toString(), limit, busyTimeoutMillis,
                 borrowTimeoutMillis, dialect, true);
         try {
@@ -402,6 +416,13 @@ public final class DataSource {
         if(owns) {
             db.close();
         }
+        // AND WAKE THE WAITERS. Dropping a connection is the one event that
+        // creates capacity without putting anything back in the idle list, so a
+        // borrower parked because the pool was full has to be told it can open a
+        // replacement. Without this, a release() that discards leaves them
+        // waiting: for the borrow timeout, or -- with the documented 0, meaning
+        // wait forever -- for good.
+        notifyAll();
     }
 
     /**

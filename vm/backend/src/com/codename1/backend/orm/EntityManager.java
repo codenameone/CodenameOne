@@ -56,11 +56,13 @@ import com.codename1.backend.sql.Dialect;
  * {@code <Entity>Cn1BackendDao} per entity and a
  * {@code cn1app.BackendDaoBootstrap} whose constructor registers every one of
  * them, and the generated server entry point runs that before it starts
- * listening. A hand-written {@code main} does the same in one line:
+ * listening.
  *
- * <pre>
- *   new cn1app.BackendDaoBootstrap();
- * </pre>
+ * <p>That entry point is the ONLY thing that can run it. The bootstrap is
+ * generated during process-classes, after javac has compiled the module's own
+ * sources, so a {@code main} written by hand cannot name it -- a module that
+ * sets its own mainClass reaches the database through {@link DataSource} and not
+ * through this.
  *
  * <p>The names are not the client's -- there the dao is {@code <Entity>Cn1Dao}
  * and the bootstrap is {@code cn1app.DaoBootstrap} -- because an entity shared
@@ -165,11 +167,12 @@ public final class EntityManager {
         Dao<T> dao = (Dao<T>)daos.get(entity.getName());
         if(dao == null) {
             throw new IllegalStateException("No dao was generated for " + entity.getName()
-                    + ". Either the class has no @Entity on it, or cn1:process-annotations "
-                    + "did not run over this module, or the generated "
-                    + "cn1app.BackendDaoBootstrap was never constructed -- the generated "
-                    + "server entry point does that for you; a hand-written main writes "
-                    + "'new cn1app.BackendDaoBootstrap();'.");
+                    + ". Either the class has no @Entity on it, or cn1:process-annotations did "
+                    + "not run over this module, or this server has a hand-written main: the "
+                    + "generated cn1app.BackendDaoBootstrap is what registers the daos, only "
+                    + "the generated entry point can construct it -- it is written after your "
+                    + "sources are compiled, so nothing you write can name it -- and a module "
+                    + "that sets its own mainClass therefore has no daos.");
         }
         return dao;
     }

@@ -272,16 +272,24 @@
         <!--
              The configuration the server reads at start-up.
 
-             Not packaged, because these are resources rather than classes and
-             keep the path they have here; and not filtered, because a properties
-             file is full of ${...} references that the server resolves from the
-             environment and the archetype's own filter would try to resolve
-             first.
+             In the MODULE ROOT rather than src/main/resources, which is where a
+             Spring developer would look for it and where it would never be read:
+             this runtime has no classpath to load a resource from, and Config
+             opens application*.properties as FILES relative to the working
+             directory. `cn1:backend` runs the server with the module directory
+             as its working directory (BackendRunMojo sets it), and a packaged
+             binary reads them from wherever it is started, so the module root is
+             the one place both find.
+
+             Not packaged, because these are resources rather than classes; and
+             not filtered, because a properties file is full of ${...} references
+             that the SERVER resolves from the environment and the archetype's
+             own filter would consume first.
         -->
         <fileSet filtered="false" encoding="UTF-8">
-          <directory>src/main/resources</directory>
+          <directory></directory>
           <includes>
-            <include>**/*.properties</include>
+            <include>application*.properties</include>
           </includes>
         </fileSet>
       </fileSets>

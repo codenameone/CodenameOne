@@ -77,6 +77,8 @@ public class OrmCheck {
                 queriesByFieldName(notes);
                 transactionsAreAtomic(em, notes);
                 createTableIsIdempotent(notes);
+                anEntityThatIsOnlyAKey(em);
+                aTerminatedStatementStillAnswersItsKey(pool);
             } finally {
                 notes.dropTable();
             }
@@ -242,6 +244,58 @@ public class OrmCheck {
         notes.createTable();
         check("creating an existing table keeps its rows", String.valueOf(before),
                 String.valueOf(notes.count()));
+    }
+
+    /**
+     * An entity with nothing but a generated key, on every engine.
+     *
+     * <p>The insert names no columns, and the three engines disagree about how
+     * to write that: SQLite and PostgreSQL want DEFAULT VALUES and refuse the
+     * empty lists, MySQL wants the empty lists and has no DEFAULT VALUES.
+     */
+    private static void anEntityThatIsOnlyAKey(EntityManager em) throws Exception {
+        Dao<Ticket> tickets = em.dao(Ticket.class);
+        tickets.dropTable();
+        tickets.createTable();
+        try {
+            Ticket first = new Ticket();
+            tickets.insert(first);
+            check("a key-only entity is created", "true", String.valueOf(first.id > 0));
+            Ticket second = new Ticket();
+            tickets.insert(second);
+            check("a key-only entity gets a new key each time", "true",
+                    String.valueOf(second.id > first.id));
+            check("both rows are there", "2", String.valueOf(tickets.count()));
+        } finally {
+            tickets.dropTable();
+        }
+    }
+
+    /**
+     * An INSERT written with the semicolon SQL is usually written with.
+     *
+     * <p>PostgreSQL is the engine that has to read its generated key back out of
+     * the statement, and appending RETURNING after a terminator produces two
+     * statements, the second of which is not SQL. The same call works on the
+     * other two whatever the terminator, which is what makes it a portability
+     * hole rather than an error everywhere.
+     */
+    private static void aTerminatedStatementStillAnswersItsKey(DataSource pool) throws Exception {
+        pool.execute("DROP TABLE IF EXISTS cn1_terminated", null);
+        pool.execute("CREATE TABLE cn1_terminated (id "
+                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + ")", null);
+        try {
+            long key = pool.insert("INSERT INTO cn1_terminated (name) VALUES (?);",
+                    new Object[] {"terminated"}, "id");
+            check("a statement ending in a semicolon still answers its key", "true",
+                    String.valueOf(key > 0));
+            check("and it wrote exactly one row", "1",
+                    String.valueOf(pool.query("SELECT name FROM cn1_terminated", null).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_terminated", null);
+        }
     }
 
     /**

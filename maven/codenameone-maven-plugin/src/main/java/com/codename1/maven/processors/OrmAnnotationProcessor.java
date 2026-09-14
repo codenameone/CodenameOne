@@ -104,6 +104,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// rather than over the Codename One core. Settled once in [#start].
     private boolean backend;
 
+    /// Set to skip the detection in [#start]. The native packaging goal knows
+    /// the answer and the classpath cannot tell it: `cn1:backend-package`
+    /// deliberately compiles against the JavaAPI with the runtime EXCLUDED from
+    /// the classpath it passes here, so a detection reading that classpath
+    /// concludes "not a backend module" for the one build that most certainly
+    /// is one.
+    private Boolean forcedFlavour;
+
     @Override
     public Set<String> getAnnotationDescriptors() {
         return DESCRIPTORS;
@@ -112,7 +120,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
-        backend = isBackendModule(ctx);
+        backend = forcedFlavour != null ? forcedFlavour.booleanValue() : isBackendModule(ctx);
+    }
+
+    /// Generates server-side daos whatever the classpath looks like. See
+    /// [#forcedFlavour].
+    public void setBackendFlavour(boolean serverSide) {
+        this.forcedFlavour = Boolean.valueOf(serverSide);
     }
 
     /// Which runtime this module's entities are stored through.
@@ -608,13 +622,25 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
-    /// Packages no application entity is in, skipped so a scan does not read
+    /// Packages no application entity can be in, skipped so a scan does not read
     /// every class of the runtime to learn it has no annotations.
+    ///
+    /// Deliberately SHORT. An earlier version skipped `org/` and `kotlin/` as
+    /// well, which reads as "libraries" and is not: `org.example` is one of the
+    /// most ordinary package names an application has, and an entity there,
+    /// shipped in a jar, was silently never given a dao -- while the same class
+    /// worked when Maven resolved the dependency as a directory, because only
+    /// the archive scan consulted this. A few thousand extra class headers cost
+    /// milliseconds; a skipped entity costs a server that fails on its first
+    /// query.
+    ///
+    /// What is left cannot hold an application's entity: the JDK's own
+    /// namespaces, and the two packages this runtime declares the annotations
+    /// and the ORM in.
     private static boolean skipPackage(String entryName) {
         return entryName.startsWith("java/") || entryName.startsWith("javax/")
                 || entryName.startsWith("com/codename1/backend/")
-                || entryName.startsWith("com/codename1/annotations/")
-                || entryName.startsWith("org/") || entryName.startsWith("kotlin/");
+                || entryName.startsWith("com/codename1/annotations/");
     }
 
     /// Runs one class found on the classpath through the same acceptance the

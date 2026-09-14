@@ -168,6 +168,20 @@ public abstract class Dialect {
     }
 
     /**
+     * An INSERT that supplies NO columns, for the entity whose only persisted
+     * field is a key the database generates.
+     *
+     * <p>Another line the three spell differently, and the naive construction is
+     * not merely ugly but invalid: "INSERT INTO t () VALUES ()" is what an empty
+     * column list builds, and SQLite and PostgreSQL both refuse it. They want
+     * DEFAULT VALUES; MySQL wants the empty lists and has no DEFAULT VALUES form
+     * at all.
+     */
+    public String insertDefaults(String quotedTable) {
+        return "INSERT INTO " + quotedTable + " DEFAULT VALUES";
+    }
+
+    /**
      * {@code count} rows starting at {@code offset}, or an empty string when both
      * are unbounded. All three accept LIMIT n OFFSET m; MySQL needs a limit before
      * it will accept an offset at all, so an offset-only request is given the
@@ -218,11 +232,34 @@ public abstract class Dialect {
         if(sql == null) {
             throw new IOException("No statement");
         }
-        return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments());
+        return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments());
     }
 
     /** Whether this engine's parameters are written $1, $2 rather than ?. */
     boolean dollarPlaceholders() {
+        return false;
+    }
+
+    /**
+     * Whether a backslash escapes the next character inside an ordinary string
+     * literal.
+     *
+     * <p>True for MySQL, whose default SQL mode works that way. False for SQLite,
+     * where a backslash is an ordinary character, and for PostgreSQL, where it is
+     * one unless the literal carries an E prefix.
+     *
+     * <p>A MySQL server started with NO_BACKSLASH_ESCAPES is the case this reads
+     * the wrong way, and it is the right way round to be wrong: that mode is
+     * off by default, and the statement it mis-scans has to end a literal with a
+     * backslash.
+     */
+    boolean backslashEscapesInLiterals() {
+        return false;
+    }
+
+    /** Whether # begins a line comment. MySQL alone. */
+    boolean hashLineComments() {
         return false;
     }
 
@@ -397,6 +434,19 @@ public abstract class Dialect {
 
         public String generatedKeyColumn(int kind) {
             return (kind == INTEGER ? "INT" : "BIGINT") + " NOT NULL AUTO_INCREMENT PRIMARY KEY";
+        }
+
+        boolean backslashEscapesInLiterals() {
+            return true;
+        }
+
+        boolean hashLineComments() {
+            return true;
+        }
+
+        /** MySQL has no DEFAULT VALUES; the empty lists are its spelling. */
+        public String insertDefaults(String quotedTable) {
+            return "INSERT INTO " + quotedTable + " () VALUES ()";
         }
 
         /**

@@ -326,26 +326,28 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/R
 
 That's the whole of the injection. A constructor taking a `DataSource` gets the
 pool instead, a constructor taking no arguments is called with none, and a
-controller that needs something else builds it itself -- there's no container, and the generated entry
-point holds a `new` with the argument written into it.
+controller that needs something else builds it itself. There's no container: the
+generated entry point holds a `new` with the argument written into it, and a
+controller that declares a dependency nothing configured is refused at start-up
+rather than handed a null to fail on later.
 
-A hand-written `main` opens its own entity manager and registers the generated
-daos first:
+The generated entry point is also the only place that registration can live, and
+that's a consequence of the build order rather than a preference. This runtime
+has no reflection and the translator drops a class nothing references, so the
+generated `cn1app.BackendDaoBootstrap` holds a direct reference to every dao and
+is what keeps them in the binary. It's written during `process-classes`, AFTER
+javac has compiled the module's own sources -- so a `main` you write yourself
+can't name it, and a module that sets its own `mainClass` can't reach the
+generated daos at all. Use `DataSource` directly there, or let the build write
+the entry point and put the startup work in a controller.
+
+Opening an entity manager is otherwise a single call over a pool, which is what
+a test does:
 
 [source,java]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/OrmSnippets.java[tag=backend-orm-open,indent=0]
 ----
-
-----
-new cn1app.BackendDaoBootstrap();
-----
-
-That line isn't ceremony. This runtime has no reflection and the translator
-drops a class nothing references, so a registry populated by scanning or by
-`Class.forName` would be empty in exactly the builds that ship. The generated
-bootstrap holds a direct reference to every generated dao, which is what keeps
-them in the binary.
 
 Queries name JAVA FIELDS rather than columns, and the builder quotes the column
 each one maps to:
