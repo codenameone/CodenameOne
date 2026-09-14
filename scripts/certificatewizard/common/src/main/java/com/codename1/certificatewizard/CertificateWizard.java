@@ -449,12 +449,25 @@ public class CertificateWizard extends Lifecycle {
         Container setup = new Container(new GridLayout(1, 3));
         setupCard(setup, "ASC API Key", state.credential.configured() ? "Connected" : "Not configured",
                 state.credential.configured() ? state.credential.keyId() : "-");
+        // Each card answers for ITS OWN slot. Both used to show row zero of an unfiltered list,
+        // so an account holding a Mac certificate and a development profile was told "Apple
+        // distribution certificate: Ready -- <name> MAC APP DISTRIBUTION" and "App Store profile:
+        // Ready -- <name> Development" (issue #5773). Neither slot was filled, and the reporter
+        // reasonably concluded the wizard was signing iOS builds with Mac App Store assets. It was
+        // not -- WizardDecisions.certificateTypeSatisfies has always been strict about this -- but
+        // a readiness panel that reports readiness it does not have is worse than no panel.
+        SigningState.Certificate distribution = WizardDecisions.distributionCertificateForOverview(state);
         setupCard(setup, "Apple distribution certificate",
-                state.certificates.isEmpty() ? "None active" : "Ready",
-                state.certificates.isEmpty() ? "-" : state.certificates.get(0).displayName());
+                distribution == null ? "None active" : "Ready",
+                distribution == null ? "-" : distribution.displayName());
+        // Scoped to this project's bundle id. The certificate card is not, and that asymmetry is
+        // deliberate: an Apple Distribution certificate signs anything the team ships, while a
+        // provisioning profile is issued for one App ID and another app's is no use here.
+        SigningState.Profile appStore = WizardDecisions.appStoreProfileForOverview(
+                state, projectBundleIdentifier());
         setupCard(setup, "App Store profile",
-                state.profiles.isEmpty() ? "None yet" : "Ready",
-                state.profiles.isEmpty() ? "-" : state.profiles.get(0).name());
+                appStore == null ? "None yet" : "Ready",
+                appStore == null ? "-" : appStore.name());
         page.add(setup);
         label(page, "YOUR ASSETS", "CWNavLabel");
         Container metrics = new Container(new GridLayout(1, 4));
@@ -1144,13 +1157,46 @@ public class CertificateWizard extends Lifecycle {
         showModal(d);
     }
 
+    /// Registers a device, on the platform the developer picks.
+    ///
+    /// The platform used to be hardcoded to iOS, which made the Mac profile types this wizard
+    /// offers unreachable: a Mac profile may only name MAC_OS devices ([WizardDecisions#isUsableDevice]),
+    /// an iOS device is correctly hidden from its picker, and no Mac device could be registered
+    /// here to put in it. The result was a profile type you could select and never create
+    /// (issue #5773). The service has always accepted either platform -- only this dialog did not
+    /// ask.
+    ///
+    /// A Mac is registered by its Provisioning UDID (the hardware UUID), not by the 25-character
+    /// identifier an iPhone has, so the hint follows the selection.
     private void deviceDialog() {
         InteractionDialog d = modal("Register device");
+        final String[] platform = {"IOS"};
+        label(d, "Platform", "CWFieldLabel");
+        final String[] platformValues = {"IOS", "MAC_OS"};
+        // Spelled out rather than derived with toLowerCase(): these are component names, and
+        // String.toLowerCase() is locale sensitive with no root-locale overload in this runtime,
+        // so on a Turkish device the "I" of "IOS" folds to a dotless i and the name changes.
+        final String[] platformNames = {"pick.devicePlatform.ios", "pick.devicePlatform.mac_os"};
+        final Button[] platformButtons = {segment("iPhone or iPad", true), segment("Mac", false)};
         TextField name = field("Device name", "QA iPhone");
         TextField udid = field("UDID", "00008120-000A1C3E0C68201E");
+        for (int i = 0; i < platformButtons.length; i++) {
+            platformButtons[i].setName(platformNames[i]);
+            final int index = i;
+            platformButtons[i].addActionListener(e -> {
+                platform[0] = platformValues[index];
+                updateSegmentButtons(platformButtons, platformValues, platform[0]);
+                boolean mac = "MAC_OS".equals(platform[0]);
+                name.setHint(mac ? "Build Mac" : "QA iPhone");
+                udid.setHint(mac ? "Provisioning UDID (hardware UUID)"
+                        : "00008120-000A1C3E0C68201E");
+                d.revalidate();
+            });
+        }
+        d.add(actionRow(Component.LEFT, platformButtons[0], platformButtons[1]));
         d.add(name).add(udid);
         Button save = primary("Register", "modal.device.submit");
-        save.addActionListener(e -> { d.dispose(); service.registerDevice(name.getText(), udid.getText(), r -> afterMutation(r, "Device registered")); });
+        save.addActionListener(e -> { d.dispose(); service.registerDevice(name.getText(), udid.getText(), platform[0], r -> afterMutation(r, "Device registered")); });
         addDialogActions(d, save);
         showModal(d);
     }
@@ -2727,7 +2773,12 @@ public class CertificateWizard extends Lifecycle {
         }
         latestCertificatePath = r.value;
         latestCertificatePassword = password == null ? "" : password;
-        latestAssetsDebug = "IOS_DEVELOPMENT".equals(c.certificateType());
+        // isDevelopmentCertificate, not an equality test against IOS_DEVELOPMENT. Apple's generic
+        // "Apple Development" type (DEVELOPMENT) supersedes the platform-specific one and every
+        // other decision in this class already reads it that way; only here did it fall through to
+        // "release", which offered to install a development certificate into
+        // codename1.ios.release.certificate and overwrite the unqualified key with it.
+        latestAssetsDebug = isDevelopmentCertificate(c.certificateType());
         offerInstall();
     }
 

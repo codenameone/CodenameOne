@@ -8,6 +8,10 @@
     </parent>
     <artifactId>cn1-certificatewizard-common</artifactId>
     <packaging>jar</packaging>
+
+    <properties>
+        <cn1.certificatewizard.skipTests>true</cn1.certificatewizard.skipTests>
+    </properties>
     <name>cn1-certificatewizard-common</name>
     <description>Shared UI and service code for the Codename One Certificate Wizard.</description>
 
@@ -152,7 +156,13 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <skipTests>true</skipTests>
+                    <!-- Skipped by default: these tests need a JDK 17 toolchain and the CN1
+                         simulator classes, which the packaging build does not set up. The value
+                         was hardcoded true, which meant -DskipTests=false could not reach it and
+                         the suite could not be run at all, here or anywhere. Opt in with
+                         -Dcn1.certificatewizard.skipTests=false, the same switch
+                         scripts/settings/common uses for the same reason. -->
+                    <skipTests>${cn1.certificatewizard.skipTests}</skipTests>
                 </configuration>
             </plugin>
         </plugins>

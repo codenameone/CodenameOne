@@ -276,8 +276,8 @@ class CertificateWizardErrorBannerTest {
             delegate.enablePushCapability(bundleId, cb);
         }
 
-        public void registerDevice(String name, String udid, OnComplete<Result<Void>> cb) {
-            delegate.registerDevice(name, udid, cb);
+        public void registerDevice(String name, String udid, String platform, OnComplete<Result<Void>> cb) {
+            delegate.registerDevice(name, udid, platform, cb);
         }
 
         public void createProfile(String name, String type, String bundleId, List<String> certs,

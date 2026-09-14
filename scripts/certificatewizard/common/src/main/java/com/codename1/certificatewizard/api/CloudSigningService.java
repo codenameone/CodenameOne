@@ -199,8 +199,44 @@ public final class CloudSigningService implements SigningService {
                 r -> done(r, callback));
     }
 
+    /// "Sync with Apple": reconcile BOTH certificates and provisioning profiles.
+    ///
+    /// This used to call the certificate reconcile alone, and there was no profile reconcile to
+    /// call -- the profile list was served from rows this wizard had itself created, so a sync
+    /// could not bring it into step with Apple no matter how often it ran. That is issue #5793:
+    /// a list showing 11 of an account's 24 profiles, a row for a profile deleted in the portal
+    /// that answers "Apple no longer has this item" straight after a sync, and a create refused
+    /// for a duplicate name that is invisible here.
+    ///
+    /// Sequential rather than parallel, and profiles second: the certificate pass is the one
+    /// whose failure means the key is unusable, and reporting that is more useful than reporting
+    /// whichever of the two happened to answer first.
     public void reconcile(OnComplete<Result<Void>> callback) {
-        certificatesApi.reconcileCertificates(bearerToken, r -> done(r, callback));
+        certificatesApi.reconcileCertificates(bearerToken, r -> {
+            if (!ok(r)) {
+                callback.completed(Result.fail(error(r)));
+                return;
+            }
+            profilesApi.reconcileProfiles(bearerToken, rr -> {
+                if (ok(rr) || endpointAbsent(rr)) {
+                    // endpointAbsent: a wizard newer than the signing service it is talking to.
+                    // The two ship separately, so for the window where an older service is
+                    // deployed the certificate half must still work rather than the whole sync
+                    // failing on a route that does not exist yet. Every other status is a real
+                    // failure and is reported.
+                    callback.completed(Result.<Void>ok(null));
+                    return;
+                }
+                callback.completed(Result.<Void>fail(error(rr)));
+            });
+        });
+    }
+
+    /// Whether this reply means the route is not there at all, as opposed to the request being
+    /// refused. 404 is what a service without the profile reconcile answers; 405 is what one
+    /// answers that has the /profiles/{id} routes but not this one.
+    private static boolean endpointAbsent(Response<?> r) {
+        return r != null && (r.getResponseCode() == 404 || r.getResponseCode() == 405);
     }
 
     public void revokeCertificate(Long id, OnComplete<Result<Void>> callback) {
@@ -251,8 +287,9 @@ public final class CloudSigningService implements SigningService {
                 bearerToken, r -> done(r, callback));
     }
 
-    public void registerDevice(String name, String udid, OnComplete<Result<Void>> callback) {
-        devicesApi.registerDevice(new RegisterDeviceRequest(name, udid, "IOS"), bearerToken, r -> done(r, callback));
+    public void registerDevice(String name, String udid, String platform, OnComplete<Result<Void>> callback) {
+        String plat = platform == null || platform.trim().isEmpty() ? "IOS" : platform.trim();
+        devicesApi.registerDevice(new RegisterDeviceRequest(name, udid, plat), bearerToken, r -> done(r, callback));
     }
 
     public void createProfile(String name, String profileType, String bundleIdAppleId, List<String> certificateAppleIds,

@@ -89,6 +89,15 @@ public class IOSProvisioningPreflightTest {
                 + "<key>Entitlements</key><dict><key>get-task-allow</key><true/></dict>\n");
     }
 
+    /** An App Store profile that names the App ID it was issued for, the way Apple's do. */
+    private static String appStoreFor(String name, String applicationIdentifier) {
+        return profile(name, FUTURE,
+                "<key>Entitlements</key><dict>"
+                + "<key>get-task-allow</key><false/>"
+                + "<key>application-identifier</key><string>" + applicationIdentifier + "</string>"
+                + "</dict>\n");
+    }
+
     private static String enterprise(String name) {
         return profile(name, FUTURE,
                 "<key>ProvisionsAllDevices</key><true/>\n"
@@ -184,6 +193,71 @@ public class IOSProvisioningPreflightTest {
         File f = write(profile("Old Profile", expiry,
                 "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>\n"));
         assertFatal(check(settings(f, true, null), true), "Old Profile", "expired on");
+    }
+
+    // ---- the profile is for a different app ----
+
+    /**
+     * Issues #5773 and #5793: an App Store profile for one App ID, configured on a project whose
+     * package name is another. Both reporters spent a cloud build each to be told
+     * "Provisioning profile ... doesn't match the entitlements file's values for the
+     * application-identifier and keychain-access-groups entitlements", which is this, after the
+     * upload. Every fact needed was on disk before the build was sent.
+     */
+    @Test
+    public void profileForAnotherAppIsRefused() throws Exception {
+        Properties p = settings(write(appStoreFor("dtest11 STORE", "ABCD1234.com.example.other")),
+                true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        assertFatal(check(p, true), "dtest11 STORE", "com.example.other", "com.example.app",
+                "application-identifier", "keychain-access-groups");
+    }
+
+    /** The same profile, on the project it was actually issued for. */
+    @Test
+    public void profileForThisAppPasses() throws Exception {
+        Properties p = settings(write(appStoreFor("Store", "ABCD1234.com.example.app")),
+                true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        assertTrue(check(p, true).isEmpty());
+    }
+
+    /** A wildcard App ID covers the bundle id, and refusing it would block a working build. */
+    @Test
+    public void wildcardProfileIsNotRefused() throws Exception {
+        Properties p = settings(write(appStoreFor("Wildcard", "ABCD1234.com.example.*")),
+                true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        assertTrue(check(p, true).isEmpty());
+    }
+
+    /**
+     * The team prefix is not part of the comparison, so a profile from another team under the
+     * same bundle id still passes here. Asserted rather than left implied: it is the half of the
+     * Xcode message this check cannot answer, because nothing in the settings states the team.
+     */
+    @Test
+    public void aDifferentTeamPrefixIsNotJudged() throws Exception {
+        Properties p = settings(write(appStoreFor("Other Team", "ZZZZ9999.com.example.app")),
+                true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        assertTrue(check(p, true).isEmpty());
+    }
+
+    /** No package name to compare against, and a profile is not refused on a guess. */
+    @Test
+    public void absentPackageNameIsNotJudged() throws Exception {
+        Properties p = settings(write(appStoreFor("Store", "ABCD1234.com.example.other")),
+                true, "app-store");
+        assertTrue(check(p, true).isEmpty());
+    }
+
+    /** A profile that names no App ID at all says nothing either way. */
+    @Test
+    public void profileWithoutAnAppIdIsNotJudged() throws Exception {
+        Properties p = settings(write(appStore("Store")), true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        assertTrue(check(p, true).isEmpty());
     }
 
     // ---- the combinations that must NOT be refused ----
