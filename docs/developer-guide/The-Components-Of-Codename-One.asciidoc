@@ -1087,11 +1087,11 @@ Here is a simple example of a `MultiList` containing a highly popular subject ma
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava167Snippet.java[tag=the-components-of-codename-one-java-167,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/MultiListFigure.java[tag=the-components-of-codename-one-java-167,indent=0]
 ----
 
 .Basic usage of the MultiList & DefaultListModel]
-image::img/components-multilist.png[Basic usage of the MultiList and DefaultListModel,scaledwidth=20%]
+image::img/generated/components-multilist.png[Basic usage of the MultiList and DefaultListModel,scaledwidth=20%]
 
 `createListEntry` is trivial:
 
@@ -1614,11 +1614,11 @@ Since `Tabs` are a `Container` its a common mistake to try and add a `Tab` using
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava080Snippet.java[tag=the-components-of-codename-one-java-080,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/TabsFigure.java[tag=the-components-of-codename-one-java-080,indent=0]
 ----
 
 .Simple usage of Tabs
-image::img/components-tabs.png[Simple usage of Tabs,scaledwidth=20%]
+image::img/generated/components-tabs.png[Simple usage of Tabs,scaledwidth=20%]
 
 A common usage for `Tabs` is the swipe to proceed effect which is common in iOS applications. In the code below you use https://www.codenameone.com/javadoc/com/codename1/ui/RadioButton.html[RadioButton] and https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] with hidden tabs to produce that effect:
 
