@@ -1406,7 +1406,7 @@ To line wrap table cells you can override the `createCell` method and return a h
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/TableMultilineFigure.java[tag=the-components-of-codename-one-java-071,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava071Snippet.java[tag=the-components-of-codename-one-java-071,indent=0]
 ----
 
 TIP: Notice that you don't need to do anything else as binding to the `TextArea` is built-in to the `Table`.
@@ -1414,7 +1414,7 @@ TIP: Notice that you don't need to do anything else as binding to the `TextArea`
 IMPORTANT: You must set the column width constraint when you want multi-line to work. Otherwise the preferred size of the column might be too wide and the remaining columns might not have space left.
 
 .Multiline table cell in portrait mode
-image::img/generated/components-table-multiline-portrait.png[Multiline table cell in portrait mode,scaledwidth=20%]
+image::img/components-table-multiline-portrait.png[Multiline table cell in portrait mode,scaledwidth=20%]
 
 .Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly
 image::img/components-table-multiline-landscape.png[Multiline table cell in landscape mode. Notice the cell row count adapts seamlessly,scaledwidth=20%]
