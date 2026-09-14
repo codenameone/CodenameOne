@@ -172,7 +172,7 @@
 ///
 /// ### Tabs
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-tabs.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-tabs.png)
 /// `com.codename1.ui.Tabs` places components/containers into tabbable entries, allows swiping
 /// between choices thru touch
 ///
