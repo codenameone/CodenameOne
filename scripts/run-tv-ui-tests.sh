@@ -31,17 +31,14 @@ source "$SCRIPT_DIR/lib/cn1ss.sh"
 mkdir -p "$ARTIFACTS_DIR"
 
 # --- Xcode / project resolution -------------------------------------------
-if [ -z "${XCODE_APP:-}" ]; then
-  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-fi
-if [ ! -x "${XCODE_APP:-}/Contents/Developer/usr/bin/xcodebuild" ]; then
-  XCODE_APP="/Applications/Xcode.app"
-fi
-export DEVELOPER_DIR="${DEVELOPER_DIR:-$XCODE_APP/Contents/Developer}"
-rt_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
-if ! command -v xcodebuild >/dev/null 2>&1; then
-  rt_log "xcodebuild not found (DEVELOPER_DIR=$DEVELOPER_DIR)"; exit 3
-fi
+# This slice needs the pinned Xcode specifically: the runner's default
+# xcodebuild is often old enough that its watchOS/tvOS SDK cannot build the
+# target at all. This used to fall back to /Applications/Xcode.app when the
+# pinned one was missing, which turned that into a confusing build failure
+# later instead of a clear one here. See scripts/lib/xcode.sh.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode rt_log || exit 3
 
 # The tvOS target builds via -project (its target carries no CocoaPods deps).
 if [[ "$WORKSPACE_PATH" == *.xcodeproj ]]; then

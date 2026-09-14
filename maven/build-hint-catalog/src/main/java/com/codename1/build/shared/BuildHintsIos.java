@@ -209,6 +209,76 @@ final class BuildHintsIos {
                 .doc("Objective-C code that can be injected into the iOS callback method (message) "
                         + "`applicationDidEnterBackground`."));
 
+        h.add(new Hint("ios.invite.universalLinks")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("ios")
+                .doc("Whether the build appends `applinks:` for the invite link domain to "
+                        + "`ios.associatedDomains` and requests the matching "
+                        + "`com.apple.developer.associated-domains` entitlement. Set it to `false` "
+                        + "to manage both yourself. The provisioning profile must grant the "
+                        + "Associated Domains capability either way, or invite links open Safari "
+                        + "instead of the app with no error reported."));
+
+        h.add(new Hint("ios.invite.appClip")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("ios")
+                .doc("Whether the build generates and embeds the App Clip that makes invite "
+                        + "attribution exact on iOS. The App Store carries no referrer of its "
+                        + "own, so without the clip an iOS install can't be attributed at all. "
+                        + "Set it to `false` only if you ship an App Clip of your own: the "
+                        + "build then generates no clip, but the app still carries the shared "
+                        + "app group and the reader, so a clip of yours that writes the "
+                        + "handoff below is still picked up. This is the ONLY hint that "
+                        + "suppresses the clip: `ios.invite.universalLinks=false` means you "
+                        + "manage the associated domains yourself and leaves the clip, the "
+                        + "shared app group and the reader in place, because an app that "
+                        + "configured its own domains correctly still needs them.\n"
+                        + "\n"
+                        + "THE HANDOFF, for a clip of your own. Write one entry into the "
+                        + "`NSUserDefaults` suite named by `ios.invite.appGroup`, under the key "
+                        + "`cn1-invite-app-clip-handoff`. The value is a dictionary with "
+                        + "`code`, a string holding the invite code taken from the last path "
+                        + "segment of the invite url, and `clicked`, a number holding the tap "
+                        + "time as whole seconds since the epoch. `clicked` may be omitted, and "
+                        + "the App Clip is the only thing that ever observes that time -- the "
+                        + "invocation never reaches the redirect -- so a clip that drops it "
+                        + "leaves every attribution dated zero. A code containing a newline is "
+                        + "rejected on the way in.\n"
+                        + "\n"
+                        + "Then call `synchronize` on the suite before returning. A clip is "
+                        + "killed without notice the moment the App Store sheet takes over, and "
+                        + "the write IS the attribution -- there is no second chance to make "
+                        + "it.\n"
+                        + "\n"
+                        + "Don't clear the entry after writing it. The installed app reads it, "
+                        + "keeps it until its own record is durable, and clears it then; a clip "
+                        + "that clears its own copy destroys the code whenever that write fails "
+                        + "or the process exits first, and the install is then reported as "
+                        + "organic permanently."));
+
+        h.add(new Hint("ios.invite.appGroup")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("The app group the invite App Clip hands the invite code to the installed "
+                        + "app through. Defaults to `group.<package name>.cn1invite`, and is "
+                        + "added to `ios.app_groups` automatically. It must start with `group.` "
+                        + "and must be registered on your developer account, or the clip and the "
+                        + "app both sign and neither can read what the other wrote."));
+
+        h.add(new Hint("ios.invite.appStoreId")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("The numeric App Store identifier of this app, which the invite App Clip "
+                        + "uses to offer the full app through `SKOverlay`. Leave it unset before "
+                        + "your first release: the clip still records the invite code, it simply "
+                        + "shows no install sheet until the app exists in the store."));
+
         h.add(new Hint("ios.associatedDomains")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)

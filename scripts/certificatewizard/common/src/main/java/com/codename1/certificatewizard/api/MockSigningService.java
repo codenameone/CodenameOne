@@ -254,8 +254,9 @@ public final class MockSigningService implements SigningService {
         return assoc == null ? new ArrayList<String>() : new ArrayList<String>(assoc);
     }
 
-    public void registerDevice(String name, String udid, OnComplete<Result<Void>> callback) {
-        devices.add(new SigningState.Device("DEV_" + (++seq), name, udid, "IOS", "ENABLED"));
+    public void registerDevice(String name, String udid, String platform, OnComplete<Result<Void>> callback) {
+        String plat = platform == null || platform.trim().isEmpty() ? "IOS" : platform.trim();
+        devices.add(new SigningState.Device("DEV_" + (++seq), name, udid, plat, "ENABLED"));
         callback.completed(Result.ok(null));
     }
 

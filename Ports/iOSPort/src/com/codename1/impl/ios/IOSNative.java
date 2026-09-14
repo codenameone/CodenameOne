@@ -2539,4 +2539,42 @@ public final class IOSNative {
 
     /** Stops advertising and browsing and drops every session. */
     native void nearbyStopAllTransport();
+
+    /**
+     * Whether the app group holding the App Clip invite handoff can be opened
+     * at all. False when the application carries no such entitlement, which is
+     * every build that generated no clip.
+     *
+     * @param appGroup the group identifier
+     * @return true when the shared container is reachable
+     */
+    native boolean isAppClipHandoffSupported(String appGroup);
+
+    /**
+     * Reads the invite handoff an App Clip left behind, WITHOUT clearing it.
+     *
+     * <p>The container is the only durable copy of an exact App Clip code
+     * until the framework writes its own record, so reading and clearing in
+     * one step destroyed it whenever that write failed or the process exited
+     * in between -- and the next launch, finding no handoff, settled an
+     * invited install as no_match for ever. {@link
+     * #clearAppClipInviteHandoff(String)} is what empties it, once the code is
+     * stored.</p>
+     *
+     * @param appGroup the group identifier
+     * @return "code\nclickedSeconds", or null when no clip ran
+     */
+    native String readAppClipInviteHandoff(String appGroup);
+
+    /**
+     * Empties the shared container, once the framework has stored the code.
+     *
+     * <p>Read-once is still the contract the source states: this is the step
+     * that enforces it, moved to the point where losing the value costs
+     * nothing.</p>
+     *
+     * @param appGroup the group identifier
+     */
+    native boolean clearAppClipInviteHandoff(String appGroup);
+
 }

@@ -130,7 +130,7 @@ Open *Push > Messages* and complete the three numbered sections:
 . *Delivery*: choose how long providers may retain an undelivered message. Console messages use safe cross-platform defaults and enter the durable queue immediately.
 
 .The restrictive message composer accepts a saved audience and typed fields
-image::img/push-v3-console-messages.png[New Push Message composer with audience, message, and delivery sections,scaledwidth=95%]
+image::img/push-v3-console-messages.png["New Push Message composer with audience, message, and delivery sections",scaledwidth=95%]
 
 Select *Queue message* only after checking the audience name and estimate. BuildCloud creates the campaign, resolves the segment, and admits the recipients to the durable delivery queue. The provider may accept a notification that the device never displays, so inspect *Push > Analytics* for provider acceptance and failures without treating acceptance as device delivery.
 

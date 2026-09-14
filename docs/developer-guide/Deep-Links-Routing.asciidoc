@@ -85,6 +85,11 @@ Host an `apple-app-site-association` JSON file at
 `https://your.domain/.well-known/apple-app-site-association` over HTTPS
 without redirects. The plugin's `AasaBuilder` produces the payload:
 
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.json[tag=deep-links-routing-json-001,indent=0]
+----
+
 
 Tell iOS which domains your app claims by setting the
 `ios.associatedDomains` build hint -- a comma-separated list of
@@ -103,10 +108,33 @@ Host an `assetlinks.json` file at
 `https://your.domain/.well-known/assetlinks.json`. The plugin's
 `AssetLinksBuilder` produces the payload:
 
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.json[tag=deep-links-routing-json-002,indent=0]
+----
+
 
 Tell Android which URLs to intercept by setting the
-`android.xintent_filter` build hint with a verified intent filter for
-your domain. The Android builder injects the filter into the manifest.
+`android.xintent_filter` build hint. The Android builder injects the
+value into the manifest verbatim, so it's the whole `<intent-filter>`
+element, with `\n` for the line breaks:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.properties[tag=deep-links-routing-properties-002,indent=0]
+----
+
+Three parts of that carry weight. `android:autoVerify="true"` is what makes
+Android fetch the `assetlinks.json` above at install time and route the link
+straight into your app. Leaving it out doesn't fall back to an app chooser:
+from Android 12 onward an unverified web link goes to the default browser, and
+your filter never sees it until the user turns the association on by hand under
+**Settings > Apps > Open by default**. The `<data>` element needs
+`android:scheme="https"` and the host, and narrowing it with
+`android:pathPrefix` keeps the app from claiming every URL on the domain. And
+the hint holds one value, so an app that also registers a custom scheme puts
+both `<intent-filter>` elements in the same string rather than setting the hint
+twice.
 
 The SHA-256 fingerprint comes from `keytool -list -v -keystore ...`, or
 from the Play Console under **Setup > App integrity** when using Play

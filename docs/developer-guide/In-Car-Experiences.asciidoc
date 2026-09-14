@@ -20,7 +20,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 That single description renders natively on both platforms:
 
-image::img/car-carplay-list.png[CarPlay list template,640]
+image::img/car-carplay-list.png[CarPlay list template,width=640]
 
 On the simulator and on any port without in-car projection there is no head unit, so the whole API is an inert no-op and `CN.isCarConnected()` returns `false` -- your code never needs platform `if` statements.
 
@@ -41,7 +41,7 @@ A `CarScreen` returns exactly one `CarTemplate`. The catalogue mirrors what the 
 
 Rows (`CarRow`), grid items (`CarGridItem`) and actions (`CarAction`) carry a title, optional secondary text, an optional `com.codename1.ui.Image` icon and a `CarActionListener` invoked on the EDT when the element is selected. Mark a row `setBrowsable(true)` when selecting it drills into a deeper screen.
 
-image::img/car-androidauto-grid.png[Android Auto grid template,640]
+image::img/car-androidauto-grid.png[Android Auto grid template,width=640]
 
 Head units enforce a hard cap on the number of rows/items they display (driver-distraction rules). Query it and trim accordingly:
 
@@ -70,7 +70,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 For audio apps the track metadata, artwork, scrubber and transport controls are driven by the platform media session (the Android background audio service / `MPNowPlayingInfoCenter` on iOS), so `CarNowPlayingTemplate` carries no metadata of its own -- it routes the head unit to the now-playing surface and lets you add a couple of app-specific buttons (shuffle, like).
 
-image::img/car-now-playing.png[Now-playing / pane template,640]
+image::img/car-now-playing.png[Now-playing / pane template,width=640]
 
 === Build configuration
 
@@ -101,11 +101,11 @@ The fastest way to build and debug an in-car experience is the Codename One simu
 
 This needs no iOS/Android toolchain, no entitlement and no head unit -- it exercises the same portable template tree and the same `CarActionListener` callbacks (on the EDT) that ship to the device, so you can iterate on your screens in seconds. If you haven't called `Car.setApplication(...)` the menu tells you so. The simulated head unit approximates the two platform styles and the driver-distraction row caps; it's a debugging aid, not a pixel-accurate emulation.
 
-image::img/car-sim-carplay-list.png[Simulated CarPlay head unit rendering a CarListTemplate,640]
+image::img/car-sim-carplay-list.png[Simulated CarPlay head unit rendering a CarListTemplate,width=640]
 
 Selecting a browsable row pushes the next screen, just as it would in the car -- here a `CarGridTemplate`, reachable via the *Back* button:
 
-image::img/car-sim-carplay-grid.png[Simulated CarPlay head unit rendering a CarGridTemplate,640]
+image::img/car-sim-carplay-grid.png[Simulated CarPlay head unit rendering a CarGridTemplate,width=640]
 
 === Testing on the real platforms
 

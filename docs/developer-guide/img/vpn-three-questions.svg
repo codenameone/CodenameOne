@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430">
+  <rect x="0" y="0" width="900" height="430" fill="#ffffff"/>
+  <text x="450" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Three different VPN questions, and the one most apps are really asking</text>
+  <text x="450" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Reach for this chapter when your app needs to configure a VPN, not when it needs to know about one. Those are</text>
+  <text x="450" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">different questions with different answers, and the cheapest of them is not in this chapter at all.</text>
+  <rect x="16" y="74" width="868" height="104" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="30" y="96" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">Know whether traffic looks like it is going over a VPN</text>
+  <text x="430" y="96" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">NetworkManager.isVPNActive()</text>
+  <text x="30" y="116" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Answered for years, on far more platforms than can install a profile, and it needs no entitlement.</text>
+  <text x="30" y="131" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Advisory only by contract: it misses some VPN configurations and reports some non-VPN tunnels as</text>
+  <text x="30" y="146" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">VPNs, so warn on it, do not enforce with it. Check isVPNDetectionSupported first. Most apps that</text>
+  <text x="30" y="161" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">reach for this chapter want this one.</text>
+  <rect x="16" y="192" width="868" height="74" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="30" y="214" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">Configure a VPN the platform runs</text>
+  <text x="430" y="214" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">com.codename1.vpn.profile</text>
+  <text x="30" y="234" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Install a managed IKEv2 profile, connect, disconnect, watch the status, set always-on. This is what</text>
+  <text x="30" y="249" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">a request for a connect to VPN button usually means. Branch on Vpn.isSupported and getCapabilities.</text>
+  <rect x="16" y="280" width="868" height="74" rx="4" fill="#ffffff" stroke="#a56a3a" stroke-width="1.5"/>
+  <text x="30" y="302" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#a56a3a">Receive the raw IP packets yourself</text>
+  <text x="430" y="302" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">com.codename1.vpn.tunnel</text>
+  <text x="30" y="322" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">Your own loop decides what happens to each packet. Android needs no configuration; iOS needs a build</text>
+  <text x="30" y="337" font-family="Arial, sans-serif" font-size="10.5" fill="#333333">hint and an entitlement Apple grants case by case. Branch on Tunnels.isSupported.</text>
+  <rect x="16" y="368" width="868" height="46" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="450" y="387" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Branch on the capability rather than the platform, and note the whole package answers nothing on JavaScript.</text>
+  <text x="450" y="402" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Every callback arrives on the EDT, so none of this needs marshalling back.</text>
+</svg>

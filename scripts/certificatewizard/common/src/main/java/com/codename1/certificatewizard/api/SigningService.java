@@ -46,7 +46,11 @@ public interface SigningService {
     /// and the capability has to be asserted on it separately or the build stamps an
     /// aps-environment entitlement the profile does not grant.
     void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback);
-    void registerDevice(String name, String udid, OnComplete<Result<Void>> callback);
+    /// Registers a device on `platform`, which is Apple's BundleIdPlatform -- IOS or
+    /// MAC_OS. A Mac has to be registrable or the Mac profile types are unreachable:
+    /// a Mac profile may name only MAC_OS devices, so hardcoding IOS here left a
+    /// profile type selectable and never creatable (issue #5773).
+    void registerDevice(String name, String udid, String platform, OnComplete<Result<Void>> callback);
     void createProfile(String name, String profileType, String bundleIdAppleId, List<String> certificateAppleIds,
                        List<String> deviceAppleIds, OnComplete<Result<Void>> callback);
     void deleteProfile(Long id, OnComplete<Result<Void>> callback);

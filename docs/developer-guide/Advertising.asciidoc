@@ -74,8 +74,11 @@ include::../demos/common/src/main/snippets/developer-guide/advertising.xml[tag=a
 
 === Enabling a provider
 
-Enable a provider once at startup. Each library exposes a static `install()`
-method that registers its provider with `AdManager`:
+Enable a provider once at startup, from your app's `init(Object)`, by calling
+the static `install()` method on the provider class named in the table above --
+`AdMobProvider.install()`, `AppLovinProvider.install()`,
+`LevelPlayProvider.install()` or `MockAdProvider.install()`. Each one registers
+its provider with `AdManager` and takes no arguments.
 
 
 That single call binds the provider; the rest of your code uses only the
@@ -92,6 +95,34 @@ wrap Google's User Messaging Platform or an equivalent), and on iOS the App
 Tracking Transparency prompt must be presented to access the advertising
 identifier. The recommended order is to initialize, gather consent, then load:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AdvertisingJava009Snippet.java[tag=advertising-java-009,indent=0]
+----
+
+
+Two things about that flow are worth knowing before you rely on it.
+
+The readiness flag says a provider was installed and took the config; it isn't
+a report that the network came up. Every provider passes the config to its
+native bridge and answers `true` immediately, while the SDK behind it
+initializes asynchronously -- so an invalid SDK key surfaces as failing loads
+later, not as `false` here.
+
+And `AdConsent.requestConsent` presents a form only where the provider
+implements one. AdMob does, through Google's User Messaging Platform. AppLovin
+MAX and Unity LevelPlay read consent from an external CMP and the IAB TCF
+string instead, so their implementations report `STATUS_NOT_REQUIRED` at once
+and `canRequestAds()` always answers `true`. On those two the consent flow is
+the CMP's, not this one, and it has to be in place before the first load for
+EEA/UK users.
+
+WARNING: On iOS 14 and later the AdMob provider starts the App Tracking
+Transparency prompt alongside the User Messaging Platform request and fires its
+consent callback when UMP finishes, without waiting for the tracking answer. The
+callback can therefore arrive while the system prompt is still on screen, and a
+load started from it runs before tracking authorization is settled. Present the ATT
+prompt yourself at a point you control, and load after the user has answered.
 
 `AdConfig` also carries the global compliance flags every network requires:
 test mode, test device ids, child directed treatment, under-age-of-consent

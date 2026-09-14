@@ -150,21 +150,40 @@ final class InputValidationUITests: XCTestCase {
         //
         // Stopped by the driver's keytype.stop gate, written as soon as the step
         // resolves either way. The app exits a second and a half after the suite
-        // finishes, and typing into a process that has left fails the XCUITest
-        // run even though every event landed; app.state is re-checked before
-        // each key so the loop cannot outlive the app in the gap between the
-        // gate being written and this loop waking up.
+        // finishes, and typing into a process that has left fails the XCUITest run
+        // even though every event landed.
+        //
+        // The GATE is checked before every key, not once per pass. It is the leading
+        // signal -- the driver writes it as soon as the step resolves, about a second
+        // and a half before the app goes -- whereas app.state only flips once the app
+        // is already on its way out, which is too late to stop a keystroke already
+        // being synthesised. Relying on app.state alone, and testing the gate only
+        // once per pass, left up to three keystrokes and a one-second sleep between
+        // the stop being requested and this loop noticing: a CI run typed straight
+        // through the app's exit that way, with every gesture already landed and
+        // CN1IV:SUITE:FINISHED already in the log, and failed anyway.
+        //
+        // The sleep is sliced for the same reason: a whole second of not looking is
+        // most of the margin the gate buys.
         for _ in 0..<15 {
             if stopRequested("keytype", syncDir: syncDir) {
                 return
             }
             for key in ["c", "n", "1"] {
+                if stopRequested("keytype", syncDir: syncDir) {
+                    return
+                }
                 guard app.state == .runningForeground else {
                     return
                 }
                 app.typeKey(key, modifierFlags: [])
             }
-            Thread.sleep(forTimeInterval: 1.0)
+            for _ in 0..<10 {
+                if stopRequested("keytype", syncDir: syncDir) {
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.1)
+            }
         }
     }
 
@@ -181,7 +200,19 @@ final class InputValidationUITests: XCTestCase {
             return
         }
         let gate = syncDir.appendingPathComponent("\(name).go")
-        let deadline = Date().addingTimeInterval(45.0)
+        // Matched to the harness. drivers/run-ios.sh release_xcui_step() waits up to 240s for
+        // CN1IV:READY:<step> before it creates this gate, and waiting only 45s for it here
+        // meant the test could give up while the harness was still willing -- which is exactly
+        // what happened on a contended runner: the suite failed, and then the log recorded
+        // "Releasing XCUITest gesture after CN1IV:READY:tap" and the same for drag, seconds
+        // into teardown. The app was slow, not stuck, and nothing was wrong with it.
+        //
+        // Whatever these two numbers are, this one must not be the smaller. A readiness gate
+        // should not decide pass or fail on machine load; an app that never signals still
+        // fails, just later, and the message says how long it waited.
+        let timeout = ProcessInfo.processInfo.environment["CN1IV_GATE_TIMEOUT"]
+            .flatMap(Double.init) ?? 240.0
+        let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if FileManager.default.fileExists(atPath: gate.path) {
                 return
@@ -191,7 +222,8 @@ final class InputValidationUITests: XCTestCase {
         throw NSError(
             domain: "CN1InputValidationUITests",
             code: 1,
-            userInfo: [NSLocalizedDescriptionKey: "Timed out waiting for \(gate.path)"]
+            userInfo: [NSLocalizedDescriptionKey:
+                "Timed out after \(timeout)s waiting for \(gate.path)"]
         )
     }
 }

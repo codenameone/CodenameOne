@@ -85,11 +85,14 @@ class MonetizationJava040Snippet {
     
     void snippet() throws Exception {
         // tag::monetization-java-040[]
-        Purchase iap = Purchase.getInAppPurchase();
+        // A fresh Purchase on every click, never one captured by the
+        // listener: receipts are cached per instance, so a captured one keeps
+        // answering from before the purchase the user just made.
         //...
         Button rentWorld1M = new Button("Rent World 1 Month");
         rentWorld1M.addActionListener(e->{
          String msg = null;
+         Purchase iap = Purchase.getInAppPurchase();
          if (iap.isSubscribed(PRODUCTS)) { // <1>
          msg = "you're already renting the world until "
          +iap.getExpiryDate(PRODUCTS) // <2>
@@ -98,7 +101,7 @@ class MonetizationJava040Snippet {
          msg = "Rent the world for 1 month?";
          }
          if (Dialog.show("Confirm", msg, "Yes", "No")) {
-         Purchase.getInAppPurchase().purchase(SKU_WORLD_1_MONTH); // <3>
+         iap.purchase(SKU_WORLD_1_MONTH); // <3>
          // Note: since this is a non-renewable subscription it's a regular
          // product in the play store - therefore you use the purchase() method.
          // If it were a "subscription" product in the play store, then you
@@ -109,6 +112,7 @@ class MonetizationJava040Snippet {
         Button rentWorld1Y = new Button("Rent World 1 Year");
         rentWorld1Y.addActionListener(e->{
          String msg = null;
+         Purchase iap = Purchase.getInAppPurchase();
          if (iap.isSubscribed(PRODUCTS)) {
          msg = "you're already renting the world until "+
          iap.getExpiryDate(PRODUCTS)+
@@ -117,7 +121,7 @@ class MonetizationJava040Snippet {
          msg = "Rent the world for 1 year?";
          }
          if (Dialog.show("Confirm", msg, "Yes", "No")) {
-         Purchase.getInAppPurchase().purchase(SKU_WORLD_1_YEAR);
+         iap.purchase(SKU_WORLD_1_YEAR);
          // Note: since this is a non-renewable subscription it's a regular
          // product in the play store - therefore you use the purchase() method.
          // If it were a "subscription" product in the play store, then you
@@ -125,8 +129,10 @@ class MonetizationJava040Snippet {
          }
         });
         // end::monetization-java-040[]
+
     }
 
+    Purchase iap = Purchase.getInAppPurchase();
     static final String SKU_WORLD_1_YEAR = "com.example.world.year";
     String[] PRODUCTS = {SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR};
     static final String SKU_WORLD_1_MONTH = "com.example.world.month";

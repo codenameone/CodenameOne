@@ -48,6 +48,8 @@ the id.
 
 ==== Asset (template) versus placed element (instance)
 
+image::img/game-asset-template-instance.svg["How a placed element relates to its asset template",scaledwidth=95%]
+
 Keep this distinction clear:
 
 * An *asset* (`AssetDef`) is the shared template. There is exactly one `coin` definition.

@@ -1,78 +1,77 @@
 @echo off
-setlocal EnableDelayedExpansion
+setlocal DisableDelayedExpansion
 setlocal EnableExtensions
 
 
 
-set MVNW=mvnw.cmd
+pushd "%~dp0" || exit /b 1
+set "MVNW=mvnw.cmd"
 
-SET CMD=%1
+SET "CMD=%~1"
 if "%CMD%"=="" (
+  echo No target selected: building a LOCAL JAR. For a cloud build, run .\build.bat javascript_cloud.
   set CMD=jar
 )
 goto %CMD%
 
-goto :EOF
+goto :finish
 :mac_desktop
-!MVNW! package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=mac-os-x-desktop -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=mac-os-x-desktop -U -e
 
-goto :EOF
+goto :finish
 :mac_native
-!MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=mac-os-x-native -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=mac-os-x-native -U -e
 
-goto :EOF
+goto :finish
 :windows_desktop
-!MVNW! package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=windows-desktop -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=windows-desktop -U -e
 
-goto :EOF
+goto :finish
 :windows_device
-!MVNW! package -DskipTests -Dcodename1.platform^=win -Dcodename1.buildTarget^=windows-device -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=win -Dcodename1.buildTarget^=windows-device -U -e
 
-goto :EOF
+goto :finish
 :linux_device
-!MVNW! package -DskipTests -Dcodename1.platform^=linux -Dcodename1.buildTarget^=linux-device -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=linux -Dcodename1.buildTarget^=linux-device -U -e
 
-goto :EOF
+goto :finish
 :javascript
-!MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=local-javascript -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=local-javascript -U -e
 
-goto :EOF
+goto :finish
 :javascript_cloud
-!MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=javascript -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=javascript -U -e
 
-goto :EOF
+goto :finish
 :android
-!MVNW! package -DskipTests -Dcodename1.platform^=android -Dcodename1.buildTarget^=android-device -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=android -Dcodename1.buildTarget^=android-device -U -e
 
-goto :EOF
+goto :finish
 :xcode
-!MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=ios-source -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=ios-source -U -e
 
-goto :EOF
+goto :finish
 :ios_source
-set /a _0_%~2=^(1 + %~2^)
-call :xcode _1_%~2 !_0_%~2!
-echo | set /p ^=!_1_%~2!
+goto :xcode
 
-goto :EOF
 :android_source
-!MVNW! package -DskipTests -Dcodename1.platform^=android -Dcodename1.buildTarget^=android-source -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=android -Dcodename1.buildTarget^=android-source -U -e
 
-goto :EOF
+goto :finish
 :ios
-!MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=ios-device -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=ios-device -U -e
 
-goto :EOF
+goto :finish
 :ios_release
-!MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=ios-device-release -U -e
+call "%MVNW%" package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=ios-device-release -U -e
 
-goto :EOF
+goto :finish
 :jar
-!MVNW! -Pexecutable-jar package -Dcodename1.platform^=javase -DskipTests -U -e
+call "%MVNW%" -Pexecutable-jar package -Dcodename1.platform^=javase -DskipTests -U -e
 
-goto :EOF
+goto :finish
 :help
-echo build.sh [COMMAND]
+echo .\build.bat [COMMAND]
 echo Local Build Commands:
 echo   The following commands will build the app locally ^(i.e. does NOT use the Codename One build server^)
 echo 
@@ -114,6 +113,11 @@ echo     Builds a native Linux app ^(ELF^, no JVM^).
 echo   javascript_cloud
 echo     Builds the web app using the build server.
 
-goto :EOF
+goto :finish
 :settings
-!MVNW! cn:settings -U -e
+call "%MVNW%" cn1:settings -U -e
+
+:finish
+set "CN1_EXIT_CODE=%errorlevel%"
+popd
+exit /b %CN1_EXIT_CODE%

@@ -113,13 +113,33 @@ their `name()`.  Built-in scalars map to their boxed Java type
 
 The `@GraphQLClient` interface looks like:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/example/starwars/StarWarsApi.java[tag=appendix-goal-generate-graphql-java-001,indent=0]
+----
+
 
 Call sites use the static factory.  Queries and mutations report through
 an `OnComplete<GraphQLResponse<T>>`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/example/starwars/StarWarsCallSite.java[tag=appendix-goal-generate-graphql-java-002,indent=0]
+----
+
+NOTE: The call sites here are written against the Java 17 output, where the
+response types are records. On a Java 8 target the generator emits classes
+with public fields instead, so `response.getData().hero().name()` becomes
+`response.getData().hero.name`.
+
 
 A subscription returns a `GraphQLSubscription` handle whose `cancel()`
 ends the stream:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/example/starwars/StarWarsCallSite.java[tag=appendix-goal-generate-graphql-java-003,indent=0]
+----
 
 
 The `<Name>Impl` class that performs the request lives in

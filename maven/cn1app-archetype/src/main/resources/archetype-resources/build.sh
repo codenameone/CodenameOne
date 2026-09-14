@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit 1
 MVNW="./mvnw"
 
 function mac_desktop {
@@ -102,11 +103,12 @@ function help {
 }
 function settings {
   
-  "$MVNW" "cn:settings" "-U" "-e"
+  "$MVNW" "cn1:settings" "-U" "-e"
 }
 CMD="$1"
 
 if [ "$CMD" == "" ]; then
+  echo "No target selected: building a LOCAL JAR. To submit your first cloud build, run ./build.sh javascript_cloud."
   CMD="jar"
 fi
 "$CMD"

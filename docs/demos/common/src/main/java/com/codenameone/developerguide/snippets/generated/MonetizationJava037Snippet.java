@@ -78,6 +78,18 @@ class MonetizationJava037Snippet {
     Container myForm;
     Component component;
     Button button;
+    SpanLabel rentalStatus = new SpanLabel();
+
+    Form current;
+
+    void showRentalStatus() {
+    }
+
+    void addExpiryLabel(Form hi) {
+    }
+
+    void addSyncButton(Form hi) {
+    }
     MultiButton myMultiButton;
     Label label;
     BrowserComponent browserComponent;
@@ -85,13 +97,35 @@ class MonetizationJava037Snippet {
     
     // tag::monetization-java-037[]
     public void start() {
+     if (current != null) {
+     // A resume. The form and everything on it survived, so rebuilding it
+     // would hand a second form components the first one still owns, which
+     // Container rejects.
+     current.show();
+     } else {
+     Form hi = new Form("Hello World", BoxLayout.y());
 
-    // ...
+     // ... the rest of the form
 
-     // Now synchronize the receipts
-     iap.synchronizeReceipts(0, res->{
-     // Update the UI as necessary to reflect
+     // The expiry label and the button that refreshes it, both of which
+     // the next two listings build.
+     addExpiryLabel(hi);
+     addSyncButton(hi);
 
+     current = hi;
+     hi.show();
+     }
+
+     // Outside the branch on purpose: a subscription can be bought, renewed
+     // or cancelled on another device while this one is suspended, so the
+     // resume needs this as much as the launch does.
+     Purchase.getInAppPurchase().synchronizeReceipts(0, success -> {
+         // Whatever this brought back, the expiry label is now out of date.
+         // Repaint it from the same method the manual button uses.
+         if (success) {
+             showRentalStatus();
+             current.revalidate();
+         }
      });
     }
     // end::monetization-java-037[]

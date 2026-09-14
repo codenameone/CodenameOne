@@ -22,9 +22,9 @@ show how the pieces fit together.
 
 [cols="1a,1a,1a", frame=none, grid=none]
 |===
-| image::img/game-casual.png[Casual arena demo,240]
-| image::img/game-scroller.png[Side scroller demo,240]
-| image::img/game-3d.png[3D world demo,240]
+| image::img/game-casual.png[Casual arena demo,width=240]
+| image::img/game-scroller.png[Side scroller demo,width=240]
+| image::img/game-3d.png[3D world demo,width=240]
 
 | *`CasualGameSample`* +
 A top-down arena: fly a thruster ship with the on-screen joystick, scoop up
@@ -205,7 +205,7 @@ is a `Sprite` that cycles through a sequence of frames over time; the scene adva
 it every frame, so adding it to the scene is all you need.
 
 
-image::img/game-spritesheet.png[A six-frame run cycle laid out as a sprite sheet,640]
+image::img/game-spritesheet.png[A six-frame run cycle laid out as a sprite sheet,width=640]
 
 A sprite sheet is just a strip (or grid) of frames like the run cycle above: the
 arms and legs swing a little further each frame, and playing them in sequence reads
@@ -224,7 +224,7 @@ exactly this reason). `play()`, `pause()`, `stop()`, `setLooping(boolean)` and
 
 === Case study: The card game (flat 2D)
 
-image::img/game-cards.png[The Memory card game mid-flip: two matched pairs and one card face up,240]
+image::img/game-cards.png[The Memory card game mid-flip: two matched pairs and one card face up,width=240]
 
 `CardGameSample` is Memory (Concentration): sixteen face-down cards in a four-by-four
 grid, tap two and they stay up when they match, flip back when they don't. It's
@@ -267,7 +267,7 @@ subtract `dt` from a countdown field each frame and act when it crosses zero.
 
 === Case study: Faux-3D checkers (isometric projection)
 
-image::img/game-board.png[Isometric checkers mid-game with a selected piece and a highlighted destination,240]
+image::img/game-board.png[Isometric checkers mid-game with a selected piece and a highlighted destination,width=240]
 
 `BoardGameSample` plays a full game of checkers -- moves, forced captures, chained
 jumps, crowning, and a small AI opponent -- on a board that looks convincingly 3D --
@@ -331,7 +331,7 @@ camera-facing billboards in a 3D world and lets you draw 3D meshes alongside the
 That's the basis for deeper gameplay modes -- an over-the-shoulder racer, an
 isometric or top-down view with real depth, a 2.5D shooter.
 
-image::img/game-3d.png[The 3D sample: a textured grid ground, stacked cube models, ringed buildings and billboarded coins,250]
+image::img/game-3d.png["The 3D sample: a textured grid ground, stacked cube models, ringed buildings and billboarded coins",width=250]
 
 `Gaming3DDemoSample` (above) is built entirely from the primitives this section
 describes -- a textured ground plane, lit cube `Model` meshes, and billboarded

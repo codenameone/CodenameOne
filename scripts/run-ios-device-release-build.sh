@@ -45,20 +45,12 @@ TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 
-# Match the other iOS CI scripts: prefer Xcode 26, while still allowing callers
-# to pin a specific installation via XCODE_APP.
-if [ -z "${XCODE_APP:-}" ]; then
-  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-fi
-if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
-  rd_log "Xcode 26 not found. Set XCODE_APP to an installed Xcode 26 app bundle path." >&2
-  exit 3
-fi
-export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-export XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
-export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
-rd_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
-rd_log "Using XCODEBUILD=$XCODEBUILD"
+# Toolchain selection lives in one place; see scripts/lib/xcode.sh for the
+# resolution order and for CN1_XCODE_MAJOR, the single knob that moves the
+# whole tree to the next Xcode.
+# shellcheck source=lib/xcode.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/xcode.sh"
+cn1_select_xcode rd_log || exit 3
 
 if ! command -v xcodebuild >/dev/null 2>&1; then
   rd_log "xcodebuild not found" >&2

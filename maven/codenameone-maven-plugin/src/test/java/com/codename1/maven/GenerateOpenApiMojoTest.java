@@ -1,5 +1,24 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maven;
 
@@ -195,6 +214,42 @@ class GenerateOpenApiMojoTest {
         String apiSrc = readString(apiFile);
         assertTrue(apiSrc.startsWith("// hand-edited"),
                 "overwrite=false should preserve user edits; was:\n" + apiSrc);
+    }
+
+    /// The Swagger Petstore case: Tag and Category have the same shape, so one
+    /// is unified away, and Pet references both. Property types are resolved
+    /// before unification runs, so the surviving reference used to name the
+    /// dropped class and the emitted model did not compile.
+    @Test
+    void unifiedAwaySchemaIsNotLeftDanglingInAReference(@TempDir Path tmp) throws Exception {
+        String spec =
+                "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"t\",\"version\":\"1\"},"
+                + "\"paths\":{\"/pet\":{\"get\":{\"tags\":[\"Pet\"],\"operationId\":\"getPet\","
+                + "  \"responses\":{\"200\":{\"description\":\"ok\",\"content\":{\"application/json\":"
+                + "  {\"schema\":{\"$ref\":\"#/components/schemas/Pet\"}}}}}}}},"
+                + "\"components\":{\"schemas\":{"
+                + "  \"Category\":{\"type\":\"object\",\"properties\":{"
+                + "    \"id\":{\"type\":\"integer\",\"format\":\"int64\"},\"name\":{\"type\":\"string\"}}},"
+                + "  \"Tag\":{\"type\":\"object\",\"properties\":{"
+                + "    \"id\":{\"type\":\"integer\",\"format\":\"int64\"},\"name\":{\"type\":\"string\"}}},"
+                + "  \"Pet\":{\"type\":\"object\",\"properties\":{"
+                + "    \"category\":{\"$ref\":\"#/components/schemas/Category\"},"
+                + "    \"tags\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/components/schemas/Tag\"}}}}"
+                + "}}}";
+        File out = tmp.toFile();
+        new GenerateOpenApiMojo.Generator(parse(spec), "com.example.petstore", out,
+                true, /*emitRecords*/ true, new SystemStreamLog()).run();
+
+        File tag = new File(out, "com/example/petstore/model/Tag.java");
+        File category = new File(out, "com/example/petstore/model/Category.java");
+        assertTrue(category.exists(), "Category is the canonical shape and must be emitted");
+        assertFalse(tag.exists(), "Tag is structurally identical and should unify away");
+
+        String petSrc = readString(new File(out, "com/example/petstore/model/Pet.java"));
+        assertFalse(petSrc.contains("model.Tag"),
+                "Pet must not reference the class that was unified away; was:\n" + petSrc);
+        assertTrue(petSrc.contains("java.util.List<com.example.petstore.model.Category> tags"),
+                "the tags property should retype to the surviving class; was:\n" + petSrc);
     }
 
     @Test

@@ -72,6 +72,8 @@ The default lookup matches GUI-builder names exactly.
 [[annotation-binding-loop,Loop guard]]
 A binding declared `twoWay = true` flows in both directions:
 
+image::img/binding-update-region.svg["How the update region breaks the two-way loop",scaledwidth=95%]
+
 . **Component -> model.** The generated binder installs a listener on
   the editable component (`TextField`, `CheckBox`, etc.). When the user
   mutates the component, the binder calls the model's setter (or
@@ -123,14 +125,37 @@ automatically.
 ==== Limitation -- cross-field setter chains
 
 When a setter synchronously mutates a *second* bound field
-(`setFirstName` also calls `setFullName`, for example), the second
-field's `notifyChanged` lands inside the same update region as the
-first and is suppressed. The bound component for `fullName` won't
-catch up until something exits the region and a separate event drives
-the refresh. If you need the cross-field update to propagate, call
+(`setFirstName` also calls `setFullName`, for example), whether the
+second field's `notifyChanged` is suppressed depends on who called the
+first. An application calling `setFirstName` directly isn't inside an
+update region, so the nested `setFullName` notifies at depth zero and
+its component refreshes normally. Reached from the generated component
+listener or from `commit()`, the chain runs inside a region that's
+already open, the second field's `notifyChanged` lands in it and is
+suppressed, and the bound component for `fullName` won't catch up
+until something exits the region and a separate event drives the
+refresh. If you need the cross-field update to propagate, call
 `binding.refresh()` explicitly after the setter chain completes, or
 restructure the model so the cross-field mutation happens outside the
 setter's call frame -- for example via a `Display.callSerially`.
+
+`commit()` is worse than suppression, and only one of the two remedies survives
+it. When both fields are bound two-way and `fullName` is emitted after
+`firstName`, the generated `_commit` carries on to the `fullName` component,
+reads the value still sitting in it, and calls `setFullName` -- overwriting what
+`setFirstName` just derived. An immediate `binding.refresh()` afterward
+publishes the overwritten value rather than the derived one, so that remedy
+doesn't help here.
+
+The deferred write still does. `Display.callSerially()` queues the write and
+returns, so `_commit` finishes and leaves its update region before the deferred
+`setFullName` runs and notifies at depth zero.
+
+Binding the derived field one way stops that write but doesn't finish the
+job: one-way fields aren't instrumented, and the `setFirstName` notification is
+still suppressed by the commit's region, so the model holds the derived value
+while the screen keeps the old one. If you go that way, call
+`binding.refresh()` after the commit to publish it.
 
 === POJOs versus Property objects
 

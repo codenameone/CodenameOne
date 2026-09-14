@@ -35,6 +35,7 @@ on:
       - '!scripts/templates/**/*.md'
       - 'scripts/common/java/**'
       - 'scripts/lib/cn1ss.sh'
+      - 'scripts/lib/xcode.sh'
       - 'CodenameOne/src/**'
       - '!CodenameOne/src/**/*.md'
       - 'Ports/MacPort/**'
@@ -72,6 +73,7 @@ on:
       - '!scripts/templates/**/*.md'
       - 'scripts/common/java/**'
       - 'scripts/lib/cn1ss.sh'
+      - 'scripts/lib/xcode.sh'
       - 'CodenameOne/src/**'
       - 'Ports/MacPort/**'
       - 'Ports/iOSPort/**'
@@ -198,14 +200,12 @@ jobs:
         # macOS -- so the download is always required.
         run: |
           set -euo pipefail
-          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-          if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
-            echo "Xcode 26 not found under /Applications. Cannot install Metal Toolchain." >&2
-            exit 1
-          fi
-          echo "Using $XCODE_APP"
-          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
-          "$DEVELOPER_DIR/usr/bin/xcodebuild" -downloadComponent MetalToolchain
+          # Same selection the build scripts use, so this cannot install the
+          # component into one Xcode and then build with another.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          "$XCODEBUILD" -downloadComponent MetalToolchain
         timeout-minutes: 10
 
       - name: Build sample macOS app and compile workspace

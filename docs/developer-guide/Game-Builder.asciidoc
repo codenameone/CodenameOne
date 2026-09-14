@@ -93,7 +93,7 @@ install step. The `cn1:gamebuilder` goal only applies to Java 17 Codename One pr
 
 === The editor at a glance
 
-image::img/gamebuilder-editor.png[The Game Builder editing a 2D platformer,800]
+image::img/gamebuilder-editor.png[The Game Builder editing a 2D platformer,width=800]
 
 * *Top bar* -- the project / scene dropdown (switch scenes, rename, or start a *new
 scene of any game type*), undo / redo, the *grid* and *snap* toggles, zoom, a *text-size*
@@ -148,7 +148,7 @@ Game rules live in two complementary places.
 
 ==== Data -- set in the Inspector
 
-image::img/gamebuilder-inspector.png[Editing a selected object's properties,800]
+image::img/gamebuilder-inspector.png[Editing a selected object's properties,width=800]
 
 Select an object to edit its *Transform* (name, position, *Layer* dropdown) and its
 *Behavior* properties -- the typed values that parameterize how it acts:
@@ -211,7 +211,7 @@ Switch type from the scene dropdown's _New scene_ buttons or scaffold with
 terrain; placed elements become meshes (import your own glTF via `GltfLoader` from the
 companion's `buildModels` hook).
 
-image::img/gamebuilder-3d.png[Editing a 3D map -- the board autofits the canvas and zooms,800]
+image::img/gamebuilder-3d.png[Editing a 3D map -- the board autofits the canvas and zooms,width=800]
 
 In *3D mode* the board is edited top-down (placement, terrain and lighting), and the
 grid autofits the canvas so it stays usable at any size and zoom. Each placed element
@@ -219,7 +219,7 @@ reads as a single object on the grid rather than a flat sprite filling the board
 
 === Live preview
 
-image::img/gamebuilder-live.png[Live preview -- playing the level in a device frame,800]
+image::img/gamebuilder-live.png[Live preview -- playing the level in a device frame,width=800]
 
 Press *Live* to play the level in place inside a device frame with a HUD. The preview
 ships *default behaviors* so common cases work without any code: in a 2D platformer the
@@ -232,7 +232,7 @@ For a *3D map* the preview switches to a true perspective view -- a receding gro
 with the placed meshes rendered as depth-sorted objects under an orbiting camera -- so
 you see 3D gameplay rather than a flat top-down board:
 
-image::img/gamebuilder-3d-preview.png[The 3D live preview -- perspective camera over the board,800]
+image::img/gamebuilder-3d-preview.png[The 3D live preview -- perspective camera over the board,width=800]
 
 The in-editor preview is for quick iteration; for full-fidelity play on device, run the
 companion in your app, where the scene is rendered by the GPU-accelerated
@@ -276,7 +276,7 @@ bag, keeping levels data-only.
 
 To bring in custom artwork, click *Import* in the Asset Library header and pick an image.
 
-image::img/gamebuilder-import.png[Importing a custom image into the Custom asset pack,800]
+image::img/gamebuilder-import.png[Importing a custom image into the Custom asset pack,width=800]
 
 The image is added to a *Custom* pack as a new asset (a *tile* when a tile layer is
 active, otherwise an *actor*), selected and ready to paint or stamp immediately. When the

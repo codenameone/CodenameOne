@@ -378,21 +378,27 @@ public class GeneratorModel {
     /// that the translator no longer wraps synchronous natives in generators and
     /// resolves inherited interface static fields correctly.
     void writeEntriesToZip(OutputStream outputStream, Map<String, byte[]> mergedEntries) throws IOException {
-        try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
-            zos.setMethod(ZipOutputStream.STORED);
-            for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
-                byte[] data = fileEntry.getValue();
-                ZipEntry zipEntry = new ZipEntry(fileEntry.getKey());
-                zipEntry.setMethod(ZipOutputStream.STORED);
-                zipEntry.setSize(data.length);
-                zipEntry.setCompressedSize(data.length);
-                CRC32 crc = new CRC32();
-                crc.update(data);
-                zipEntry.setCrc(crc.getValue());
-                zos.putNextEntry(zipEntry);
-                zos.write(data);
-                zos.closeEntry();
+        try (OutputStream target = outputStream) {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            try (ZipOutputStream zos = new ZipOutputStream(buffer)) {
+                zos.setMethod(ZipOutputStream.STORED);
+                for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
+                    byte[] data = fileEntry.getValue();
+                    ZipEntry zipEntry = new ZipEntry(fileEntry.getKey());
+                    zipEntry.setMethod(ZipOutputStream.STORED);
+                    zipEntry.setSize(data.length);
+                    zipEntry.setCompressedSize(data.length);
+                    CRC32 crc = new CRC32();
+                    crc.update(data);
+                    zipEntry.setCrc(crc.getValue());
+                    zos.putNextEntry(zipEntry);
+                    zos.write(data);
+                    zos.closeEntry();
+                }
             }
+            byte[] archive = buffer.toByteArray();
+            ProjectZipPermissions.apply(archive);
+            target.write(archive);
         }
     }
 
@@ -806,13 +812,20 @@ public class GeneratorModel {
                 .append("You can write the app in Java and/or Kotlin, and build for Android, iOS, desktop, and web.\n\n")
                 .append("## Getting Started\n\n");
 
-        if (template.IS_KOTLIN) {
-            out.append("You selected the Kotlin template. Start here:\n")
-                    .append("https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.html\n\n");
-        } else {
-            out.append("You selected a Java template. Start here:\n")
-                    .append("https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html\n\n");
-        }
+        out.append("Use JDK ").append(options.javaVersion == ProjectOptions.JavaVersion.JAVA_17 ? "17" : "8")
+                .append(" or newer for this project's selected Java level. Configure your IDE's project SDK ")
+                .append("and Maven runner, and set JAVA_HOME for terminal builds. An IDE's bundled runtime ")
+                .append("does not necessarily configure either.\n\n")
+                .append("Extract the entire ZIP, then open the root pom.xml as a Maven project. ")
+                .append("Use a terminal so errors remain visible.\n\n")
+                .append("Windows PowerShell or Command Prompt:\n\n```\n.\\mvnw.cmd -v\n.\\build.bat javascript_cloud\n```\n\n")
+                .append("macOS/Linux:\n\n```\n./mvnw -v\n./build.sh javascript_cloud\n```\n\n")
+                .append("Check that Maven reports the required JDK. Complete browser login when prompted. ")
+                .append("The first build downloads dependencies and can take several minutes. ")
+                .append("If a download fails, check your connection or Maven proxy settings and retry.\n\n")
+                .append("The javascript command builds locally; javascript_cloud submits a hosted build. ")
+                .append("With no target, build makes a local JAR and run starts the local simulator. ")
+                .append("These local operations do not create a cloud build.\n\n");
 
         appendIdeSection(out);
 
@@ -847,7 +860,7 @@ public class GeneratorModel {
         if (ide == IDE.ECLIPSE) {
             out.append("## Eclipse Users\n\n")
                     .append("The `tools/eclipse` folder includes `.launch` files that add common Maven goals to Eclipse.\n\n")
-                    .append("After importing this project into Eclipse, import those launch files.\n\n");
+                    .append("After the Maven import, choose File > Import > Run/Debug > Launch Configurations, select tools/eclipse, and import the launch files before using Run > Run Configurations.\n\n");
             return;
         }
         if (ide == IDE.NETBEANS) {
