@@ -51,6 +51,12 @@ class VaultTest extends UITestBase {
         /// What the wrapping store says about encryption at rest. False is the JavaSE simulator
         /// and Android below API 23, where the key sits in the clear beside the ciphertext.
         boolean encryptedAtRest = true;
+        /// Completes deleteKey with FALSE even though the key is still there -- the browser does
+        /// this when the IndexedDB delete fails.
+        boolean refuseDeletes;
+        /// Throws a RuntimeException out of ensureKey, to stand in for anything a port can throw
+        /// that is not a VaultException.
+        boolean throwOnEnsure;
         DeviceProtection gatedVariant;
 
         @Override
@@ -86,6 +92,11 @@ class VaultTest extends UITestBase {
 
         public AsyncResource<Boolean> ensureKey(String keyId) {
             AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            if (throwOnEnsure) {
+                // Thrown, not completed with an error: this is what a port does when something
+                // unexpected goes wrong inside it, and it used to end the vault's worker.
+                throw new IllegalStateException("the key store fell over");
+            }
             if (refuseWrites) {
                 out.error(new VaultException(VaultError.STORAGE_UNAVAILABLE, "refused"));
                 return out;
@@ -130,6 +141,11 @@ class VaultTest extends UITestBase {
 
         public AsyncResource<Boolean> deleteKey(String keyId) {
             AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            if (refuseDeletes) {
+                // Present, and not removed: the exact answer the finding is about.
+                out.complete(Boolean.FALSE);
+                return out;
+            }
             out.complete(Boolean.valueOf(keys.remove(keyId) != null));
             return out;
         }
@@ -699,6 +715,54 @@ class VaultTest extends UITestBase {
         VaultError error = errorOf(vault.enroll(pw("p"), options));
         assertEquals(VaultError.POLICY_NOT_MET, error);
         assertEquals(Vault.NOT_ENROLLED, vault.state());
+    }
+
+    @Test
+    void aDeviceKeyThatWillNotDeleteIsReportedRatherThanIgnored() {
+        VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(freshName()).configure(options);
+        vault.enroll(pw("p"), options).get();
+        assertFalse(device.keys.isEmpty());
+
+        // The store completes normally with FALSE and the key is still there. Reporting success
+        // here is "forget this device" leaving the wrapping key in place, with no signal to retry.
+        device.refuseDeletes = true;
+        assertEquals(VaultError.STORAGE_UNAVAILABLE, errorOf(vault.forgetDevice()));
+        assertFalse(device.keys.isEmpty(), "the key really is still there");
+
+        // And FALSE for a key that was already gone is NOT a failure -- that is the ordinary
+        // answer when forgetting reaches a mechanism this vault never used.
+        device.refuseDeletes = false;
+        device.keys.clear();
+        assertTrue(vault.forgetDevice().get().booleanValue());
+    }
+
+    @Test
+    void aWorkerThatThrowsAnswersInsteadOfHanging() throws Exception {
+        // These workers run detached, so anything that is not a VaultException used to end the
+        // thread with the AsyncResource never completed -- and a caller blocked in get() waits
+        // for that forever. Run on a thread and joined, so a regression fails the test rather
+        // than hanging the suite.
+        VaultOptions options = fast().policy(UnlockPolicy.SESSION_ONLY);
+        final Vault vault = Vault.named(freshName()).configure(options);
+        vault.enroll(pw("p"), options).get();
+        vault.setPolicy(UnlockPolicy.REMEMBER_DEVICE).get();
+
+        device.throwOnEnsure = true;
+        final java.util.concurrent.atomic.AtomicReference<VaultError> outcome =
+                new java.util.concurrent.atomic.AtomicReference<VaultError>();
+        final java.util.concurrent.atomic.AtomicBoolean answered =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        Thread asking = new Thread(new Runnable() {
+            public void run() {
+                outcome.set(errorOf(vault.rememberDevice()));
+                answered.set(true);
+            }
+        });
+        asking.start();
+        asking.join(30000);
+        assertTrue(answered.get(), "the operation must answer rather than leave the caller waiting");
+        assertNotNull(outcome.get(), "and it must answer with an error");
     }
 
     @Test

@@ -298,6 +298,17 @@ public final class Vault {
                     out.error(new VaultException(VaultError.CRYPTO_UNAVAILABLE,
                             "the platform could not perform the cryptography enrolment needs",
                             failed));
+                } catch (RuntimeException broke) {
+                    // LAST, because CryptoException is a RuntimeException: put ahead of it and
+                    // the specific handler above becomes unreachable, which javac refuses.
+                    //
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(password);
                 }
@@ -436,6 +447,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(password);
                 }
@@ -484,7 +503,7 @@ public final class Vault {
                                 + "has been discarded; unlock with the password to remember it "
                                 + "again");
                     }
-                    key = await(deviceProtection().unwrap(deviceKeyId(), record.wrap,
+                    key = awaitBytes(deviceProtection().unwrap(deviceKeyId(), record.wrap,
                                     wrapBinding(meta, PURPOSE_DEVICE).serialize()),
                             "the remembered device key could not be used");
                     if (generation != lockGeneration) {
@@ -503,6 +522,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(key);
                 }
@@ -554,6 +581,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -617,6 +652,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -667,6 +710,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -681,16 +732,34 @@ public final class Vault {
     /// method clears the array it is given once the secret is sealed.
     public AsyncResource<Boolean> putSecret(final String secretName, final char[] value) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
                 byte[] plain = null;
                 try {
                     requireUnlocked();
+                    // Taken once, into locals. Reading metadata again further down is what
+                    // turned a concurrent lock() into a NullPointerException -- lock() nulls
+                    // the field, and this expression dereferenced it after requireUnlocked had
+                    // already passed.
+                    byte[] key = dataKey;
+                    VaultMetadata meta = metadata;
+                    requireSameGeneration(generation);
+                    if (key == null || meta == null) {
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this secret was being stored");
+                    }
                     plain = Bytes.utf8(value);
-                    byte[] sealed = SecureEnvelope.seal(dataKey, metadata.dataKeyId,
-                            metadata.dataKeyVersion,
-                            binding(metadata, secretName, PURPOSE_SECRET), plain);
+                    byte[] sealed = SecureEnvelope.seal(key, meta.dataKeyId,
+                            meta.dataKeyVersion,
+                            binding(meta, secretName, PURPOSE_SECRET), plain);
+                    // Asked again before the write. The snapshot above is a REFERENCE, and
+                    // lock() zeroes the array in place before it drops it, so a lock landing
+                    // during the seal leaves ciphertext made with a key of zeroes. Refusing here
+                    // means that is discarded rather than stored as if it were the secret.
+                    requireSameGeneration(generation);
                     if (!Storage.getInstance().writeObject(secretKey(secretName),
                             Bytes.toHex(sealed))) {
                         throw new VaultException(VaultError.QUOTA_EXCEEDED,
@@ -699,6 +768,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(plain);
                     Bytes.zero(value);
@@ -723,12 +800,13 @@ public final class Vault {
                 byte[] plain = null;
                 try {
                     requireUnlocked();
-                    Object stored = Storage.getInstance().readObject(secretKey(secretName));
-                    if (!(stored instanceof String)) {
+                    String stored = asString(Storage.getInstance().readObject(
+                            secretKey(secretName)));
+                    if (stored == null) {
                         throw new VaultException(VaultError.KEY_MISSING,
                                 "no secret is stored under that name");
                     }
-                    byte[] sealed = Bytes.fromHex((String) stored);
+                    byte[] sealed = Bytes.fromHex(stored);
                     if (sealed == null) {
                         throw new VaultException(VaultError.CORRUPT,
                                 "the stored secret is not in a format this build wrote");
@@ -738,6 +816,14 @@ public final class Vault {
                     out.complete(chars(plain));
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(plain);
                 }
@@ -764,16 +850,41 @@ public final class Vault {
     /// [#exportSyncState()].
     public AsyncResource<byte[]> seal(final String recordId, final byte[] plaintext) {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
                 try {
                     requireUnlocked();
-                    out.complete(SecureEnvelope.seal(dataKey, metadata.dataKeyId,
-                            metadata.dataKeyVersion,
-                            binding(metadata, recordId, PURPOSE_RECORD), plaintext));
+                    // Snapshotted for the same reason as putSecret: lock() nulls metadata, and
+                    // dereferencing it here after requireUnlocked has passed is a
+                    // NullPointerException rather than a refusal.
+                    byte[] key = dataKey;
+                    VaultMetadata meta = metadata;
+                    requireSameGeneration(generation);
+                    if (key == null || meta == null) {
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this record was being sealed");
+                    }
+                    byte[] sealed = SecureEnvelope.seal(key, meta.dataKeyId,
+                            meta.dataKeyVersion,
+                            binding(meta, recordId, PURPOSE_RECORD), plaintext);
+                    // lock() zeroes the key array in place, so a lock during the seal above
+                    // produces ciphertext under zeroes. Handing that back would look like a
+                    // sealed record and open as nothing.
+                    requireSameGeneration(generation);
+                    out.complete(sealed);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -804,6 +915,14 @@ public final class Vault {
                     out.complete(plain);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -827,7 +946,14 @@ public final class Vault {
             public void run() {
                 try {
                     requireUnlocked();
-                    Hmac mac = Hmac.create(Hash.SHA256, dataKey);
+                    byte[] source = dataKey;
+                    VaultMetadata meta = metadata;
+                    requireSameGeneration(generation);
+                    if (source == null || meta == null) {
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this key was being derived");
+                    }
+                    Hmac mac = Hmac.create(Hash.SHA256, source);
                     mac.update(Bytes.utf8("cn1.vault.subkey.v1"));
                     mac.update(Bytes.utf8(purpose == null ? "" : purpose));
                     byte[] derived = mac.doFinal();
@@ -842,9 +968,17 @@ public final class Vault {
                     // saying NON_EXTRACTABLE_KEY while the object contradicts it is the kind
                     // of guarantee that gets believed.
                     out.complete(new VaultKeyHandle(Vault.this, lockGeneration, derived,
-                            purpose, metadata.dataKeyVersion, extractedKeyProtection()));
+                            purpose, meta.dataKeyVersion, extractedKeyProtection()));
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -898,7 +1032,13 @@ public final class Vault {
                                 Protection.NON_EXTRACTABLE_KEY, null);
                     }
                     requireUnlocked();
-                    Hmac mac = Hmac.create(Hash.SHA256, dataKey);
+                    byte[] source = dataKey;
+                    requireSameGeneration(generation);
+                    if (source == null) {
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this key was being derived");
+                    }
+                    Hmac mac = Hmac.create(Hash.SHA256, source);
                     mac.update(Bytes.utf8("cn1.vault.dbkey.v1"));
                     mac.update(Bytes.utf8(alias == null ? "" : alias));
                     byte[] key = mac.doFinal();
@@ -909,6 +1049,14 @@ public final class Vault {
                     out.complete(key);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -977,6 +1125,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(key);
                     Bytes.zero(oldPassword);
@@ -1023,6 +1179,14 @@ public final class Vault {
                     out.complete(code);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -1059,6 +1223,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(derived);
                     Bytes.zero(code);
@@ -1216,6 +1388,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(fresh);
                     Bytes.zero(password);
@@ -1331,6 +1511,14 @@ public final class Vault {
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
                     Bytes.zero(password);
                 }
@@ -1367,7 +1555,7 @@ public final class Vault {
                             ? UnlockPolicy.SESSION_ONLY : current.policy;
                     if (policy == UnlockPolicy.SESSION_ONLY) {
                         Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                        await(deviceProtection(previous).deleteKey(deviceKeyId()),
+                        requireKeyDeleted(deviceProtection(previous),
                                 "the device key could not be deleted");
                     } else if (current == null || current.policy != policy) {
                         requireUnlocked();
@@ -1402,13 +1590,21 @@ public final class Vault {
                         // just written.
                         DeviceProtection outgoing = deviceProtection(previous);
                         if (outgoing != deviceProtection(policy)) {
-                            await(outgoing.deleteKey(deviceKeyId()),
+                            requireKeyDeleted(outgoing,
                                     "the previous device key could not be deleted");
                         }
                     }
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
                 }
             }
         });
@@ -1661,16 +1857,42 @@ public final class Vault {
     /// "Forget this device" has to mean it. A port with two mechanisms can have a leftover from a
     /// policy this vault used earlier -- a passkey enrolled, then the policy relaxed -- and a
     /// deletion that only reached the current one would leave it usable.
+    /// Deletes a device key and insists it was deleted.
+    ///
+    /// await() unwraps the SPI's answer, and a protection that completes normally with FALSE --
+    /// the browser does exactly that when the IndexedDB delete fails -- was being discarded. So
+    /// "forget this device" removed the record, reported success, and left the wrapping key in
+    /// place: the one outcome that promise exists to rule out, with no signal to retry.
+    private void requireKeyDeleted(DeviceProtection protection, String message) {
+        Boolean gone = await(protection.deleteKey(deviceKeyId()), message);
+        if (gone != null && gone.booleanValue()) {
+            return;
+        }
+        // FALSE is overloaded, and treating it as failure on its own would break "forget this
+        // device" on every port that has two mechanisms. Stores answer it for "the delete
+        // failed" AND for "there was nothing here" -- the test double returns
+        // `keys.remove(id) != null`, which is false for an absent key, and forgetEveryMechanism
+        // asks BOTH mechanisms precisely because one of them usually has nothing. Only the state
+        // afterwards separates the two, so ask.
+        //
+        // KEY_UNKNOWN is not good enough: a store that cannot say whether the key is there
+        // cannot be the evidence that it is gone.
+        if (protection.keyState(deviceKeyId()) == DeviceProtection.KEY_ABSENT) {
+            return;
+        }
+        throw new VaultException(VaultError.STORAGE_UNAVAILABLE, message);
+    }
+
     private void forgetEveryMechanism() {
         DeviceProtection base = baseDeviceProtection();
-        await(base.deleteKey(deviceKeyId()), "the device key could not be deleted");
+        requireKeyDeleted(base, "the device key could not be deleted");
         DeviceProtection gated = base.userVerifying();
         if (gated != null) {
             // No check for whether this is the same object as `base`. A port whose single key
             // store is itself user-verifying returns `this` here, and deleting a key that is
             // already gone is what every store does anyway -- so the second call is a wasted
             // round trip on those ports and the correct one on the ports that have two stores.
-            await(gated.deleteKey(deviceKeyId()), "the device key could not be deleted");
+            requireKeyDeleted(gated, "the device key could not be deleted");
         }
     }
 
@@ -1789,6 +2011,26 @@ public final class Vault {
         } else {
             work.run();
         }
+    }
+
+    /// The same wait, typed, so the erased narrowing does not land in the caller.
+    ///
+    /// `await` is generic, so javac puts a CHECKCAST at every call site. ParparVM does not throw
+    /// for a failed cast, and the terminal `catch (RuntimeException)` these workers now carry is
+    /// a supertype of ClassCastException -- so the cast-semantics gate reads that pair as a
+    /// handler that cannot run on iOS, and it is right to. Keeping the narrowing in a method with
+    /// no handler at all removes the question rather than baselining it.
+    private static byte[] awaitBytes(AsyncResource<byte[]> resource, String message) {
+        return await(resource, message);
+    }
+
+    /// A storage value narrowed to a String without relying on a cast to raise anything.
+    ///
+    /// Returns null when it is not one, for the same reason: on ParparVM a failed cast hands the
+    /// next instruction the wrong object rather than throwing, so the test has to be the
+    /// instanceof and not the catch.
+    private static String asString(Object value) {
+        return value instanceof String ? (String) value : null;
     }
 
     /// Waits for an SPI resource on the current thread, translating whatever it failed with.
