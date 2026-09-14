@@ -492,6 +492,9 @@ public final class Vault {
     /// unattended one -- silently turning off the prompt the user asked for.
     private void rememberNow(UnlockPolicy policy) {
         DeviceProtection device = deviceProtection(policy);
+        // Set before ensureKey, because it changes how the key is created rather than how it is
+        // used. A port that cannot honour it refuses there.
+        device.setDeviceBoundRequired(options.isDeviceBoundPasskeyRequired());
         if (policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
                 && !device.requiresUserVerification()) {
             throw new VaultException(VaultError.POLICY_NOT_MET,

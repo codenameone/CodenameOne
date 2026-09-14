@@ -459,6 +459,7 @@
   var CN1V_TEMPORARILY_UNREADABLE = 7;
   var CN1V_UNKNOWN = 8;
   var CN1V_CANCELLED = 9;
+  var CN1V_POLICY_NOT_MET = 10;
 
   var cn1VaultDbPromise = null;
 
@@ -765,10 +766,44 @@
           id: CN1_PRF_STORE_PREFIX + keyId,
           credentialId: record.credentialId,
           salt: record.salt,
+          backupEligible: record.backupEligible,
+          deviceBound: record.deviceBound,
           created: 0
         });
       });
     });
+  }
+
+  /// Whether a created credential is allowed to leave this device.
+  ///
+  /// Attachment is the wrong thing to ask. ``authenticatorAttachment: 'platform'``
+  /// is satisfied by an iCloud Keychain passkey, which is platform-attached and
+  /// syncs to every device on the account -- so a check written against
+  /// attachment reports device-binding it does not have.
+  ///
+  /// The flag that actually answers it is BE (backup eligible) in the
+  /// authenticator data: set means the credential may be copied off this device,
+  /// whether or not it has been yet. BS (backup state) says whether it currently
+  /// is. Byte 32 of the authenticator data holds the flags; BE is 0x08, BS 0x10.
+  ///
+  /// Returns null when the browser will not hand over the authenticator data, in
+  /// which case backup eligibility is unknown -- and a caller that required
+  /// device binding must treat unknown as "not guaranteed".
+  function cn1VaultBackupFlags(credential) {
+    try {
+      var response = credential && credential.response;
+      if (!response || typeof response.getAuthenticatorData !== 'function') {
+        return null;
+      }
+      var data = new Uint8Array(response.getAuthenticatorData());
+      if (data.length < 33) {
+        return null;
+      }
+      var flags = data[32];
+      return { backupEligible: (flags & 0x08) !== 0, backedUp: (flags & 0x10) !== 0 };
+    } catch (e) {
+      return null;
+    }
   }
 
   /// Creates a passkey and confirms the authenticator will actually evaluate a PRF.
@@ -778,7 +813,7 @@
   /// that expected them would report every working authenticator as unsupported.
   /// The salt is generated now and stored beside the credential id, because the
   /// derived key is a function of both and a lost salt is a lost vault.
-  function cn1VaultPrfEnroll(keyId, userName) {
+  function cn1VaultPrfEnroll(keyId, userName, deviceBound) {
     var credentials = cn1VaultWebAuthn();
     if (!credentials) {
       return Promise.resolve(cn1VaultReply(CN1V_UNKNOWN, null));
@@ -807,6 +842,13 @@
         },
         extensions: { prf: {} }
       };
+      if (deviceBound) {
+        // Narrows the field to authenticators built into this machine. Necessary
+        // and not sufficient -- the BE flag below is what actually decides -- but
+        // it keeps the chooser from offering a phone or a security key for a
+        // credential we are about to refuse anyway.
+        options.authenticatorSelection.authenticatorAttachment = 'platform';
+      }
       return credentials.create({ publicKey: options }).then(function(credential) {
         var results = credential.getClientExtensionResults
           ? credential.getClientExtensionResults() : {};
@@ -816,9 +858,20 @@
           // derive is a prompt with nothing behind it.
           return cn1VaultReply(CN1V_UNKNOWN, null);
         }
+        var flags = cn1VaultBackupFlags(credential);
+        if (deviceBound && (flags === null || flags.backupEligible)) {
+          // Refused rather than kept. The application asked for a key that cannot
+          // leave this device, and this credential either may leave it or will
+          // not say -- and a credential kept here would silently be the weaker
+          // thing under the stronger name. The passkey itself stays on the
+          // authenticator; only this vault's reference to it is dropped.
+          return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+        }
         var record = {
           credentialId: new Uint8Array(credential.rawId),
-          salt: cn1VaultRandom(32)
+          salt: cn1VaultRandom(32),
+          backupEligible: flags === null ? 1 : (flags.backupEligible ? 1 : 0),
+          deviceBound: deviceBound ? 1 : 0
         };
         return cn1VaultStorePrfRecord(keyId, record).then(function() {
           return cn1VaultReply(CN1V_OK, null);
@@ -874,7 +927,14 @@
   /// option would otherwise have to ask for the thing it is offering.
   function cn1VaultPrfState(keyId) {
     return cn1VaultPrfRecord(keyId).then(function(record) {
-      return cn1VaultReply(CN1V_OK, [record && record.credentialId ? 1 : 0]);
+      if (!record || !record.credentialId) {
+        return cn1VaultReply(CN1V_OK, [0, 0]);
+      }
+      // Second byte: 1 when the credential may leave this device, or when the
+      // browser would not say. Unknown is reported as "may leave" on purpose --
+      // an application describing its own protection to a user must not round a
+      // missing answer up into a guarantee.
+      return cn1VaultReply(CN1V_OK, [1, record.backupEligible ? 1 : 0]);
     }, function(error) {
       return cn1VaultReply(cn1VaultStatusOf(error), null);
     });
@@ -996,7 +1056,7 @@
         });
       }
       if (op === 'prfEnroll') {
-        return cn1VaultPrfEnroll(String(request.keyId), request.userName);
+        return cn1VaultPrfEnroll(String(request.keyId), request.userName, !!request.deviceBound);
       }
       if (op === 'prfDerive') {
         return cn1VaultPrfDerive(String(request.keyId));

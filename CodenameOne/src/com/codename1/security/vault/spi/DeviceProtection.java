@@ -142,6 +142,22 @@ public abstract class DeviceProtection {
         return false;
     }
 
+    /// Requires that a key created by this protection cannot leave the device.
+    ///
+    /// Set from [com.codename1.security.vault.VaultOptions#requireDeviceBoundPasskey()] before
+    /// the key is created. The default ignores it, which is correct for a store whose key is
+    /// local by construction -- an OS key store does not sync. It matters where the key is a
+    /// passkey, because most passkeys do.
+    ///
+    /// A port that accepts this must **refuse** creation when it cannot verify the guarantee,
+    /// rather than creating a key that may sync. An unverifiable answer is not a pass.
+    ///
+    /// #### Parameters
+    ///
+    /// - `required`: whether the key must be device bound
+    public void setDeviceBoundRequired(boolean required) {
+    }
+
     /// The variant of this protection whose key cannot be reached without the user verifying
     /// themselves, or null when this platform has none.
     ///

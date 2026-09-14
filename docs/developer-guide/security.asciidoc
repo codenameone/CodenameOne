@@ -229,7 +229,18 @@ In a browser the third one isn't the second with a flag on it -- it's a differen
 
 That distinction is the one thing a browser can offer that the stored key can't: **the key material doesn't exist until the user verifies**. A copied browser profile carries the credential id, which isn't a secret, and can't derive anything without the authenticator and a person in front of it. The stored `CryptoKey`, by contrast, travels with the profile and works in the copy.
 
-One limit worth telling users rather than implying away: **a passkey may be synced.** The port doesn't constrain which authenticator the browser offers, so on a Mac the credential can land in iCloud Keychain and reach every device on that Apple account, and a Google-account passkey on Android behaves the same way. Where that happens, "remember this device" amounts to "remember this account" -- still a genuine protection, because it needs the account *and* a biometric, but not device-binding. If you need the key bound to one device, constrain the ceremony rather than assuming it.
+**A passkey may be synced, and that's your choice to make.** By default the browser offers whatever authenticators it has, so on a Mac the credential can land in iCloud Keychain and reach every device on that Apple account; a Google-account passkey on Android behaves the same way. Where that happens, "remember this device" amounts to "remember this account" -- still a genuine protection, because it needs the account *and* a biometric, but not device-binding.
+
+For a notes app that's usually what the user wants: a new laptop unlocks with a face scan and no password. For something holding a second factor it's the opposite, which is why this is a choice:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-device-bound,indent=0]
+----
+
+`requireDeviceBoundPasskey()` checks the credential's *backup-eligibility flag*, which is the part that actually decides. Asking for platform attachment alone isn't enough -- an iCloud Keychain passkey is platform-attached and syncs anyway. A browser that won't report the flag counts as *may leave this device*, so an unknown answer is never rounded up into a guarantee.
+
+What it costs: hardware security keys are excluded, and a user whose only authenticator syncs can't enrol at all -- enrolment fails with `POLICY_NOT_MET` rather than keeping a credential that doesn't meet the requirement. Offer the weaker policy as a fallback, or don't require it.
 
 Checked on real hardware and not only against a virtual authenticator: macOS Touch ID in Chrome derives 32 bytes, and derives the same 32 bytes again after the browser has been quit and reopened -- which is the property the whole scheme rests on, since a passkey that derived fresh bytes each time would make the wrapped data key unrecoverable.
 

@@ -1383,12 +1383,13 @@ bindNative([
 });
 
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfEnroll_java_lang_String_java_lang_String_R_byte_1ARRAY"
-], function*(keyId, userName) {
+  "cn1_com_codename1_impl_html5_HTML5PasskeyProtection_nativePrfEnroll_java_lang_String_java_lang_String_boolean_R_byte_1ARRAY"
+], function*(keyId, userName, deviceBound) {
   return cn1VaultJavaBytes(yield* cn1VaultHost({
     op: "prfEnroll",
     keyId: jvm.toNativeString(keyId),
-    userName: jvm.toNativeString(userName)
+    userName: jvm.toNativeString(userName),
+    deviceBound: !!deviceBound
   }));
 });
 

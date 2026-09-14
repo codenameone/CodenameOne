@@ -212,11 +212,13 @@ try {
 
   // Asked before anything is enrolled, and it must not prompt: an application deciding
   // whether to offer the option would otherwise have to ask for the thing it is offering.
-  check('no passkey is enrolled yet', await call({ op: 'prfState', keyId: KEY }), [0, 0]);
+  // [status, enrolled, syncable]. The third byte is only meaningful when the
+  // second is 1, and is 0 here because there is nothing to describe.
+  check('no passkey is enrolled yet', await call({ op: 'prfState', keyId: KEY }), [0, 0, 0]);
 
   const enrolled = await call({ op: 'prfEnroll', keyId: KEY, userName: 'tester' });
   check('passkey enrolment succeeds', status(enrolled), 0);
-  check('and the state now reports one', await call({ op: 'prfState', keyId: KEY }), [0, 1]);
+  check('and the state now reports one', await call({ op: 'prfState', keyId: KEY }), [0, 1, 0]);
 
   const first = await call({ op: 'prfDerive', keyId: KEY });
   check('the PRF derivation succeeds', status(first), 0);
@@ -245,8 +247,42 @@ try {
     status(await call({ op: 'prfDerive', keyId: KEY })), 9);
   await cdp.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: true });
 
+  // ------------------------------------------------- device-bound passkeys
+  //
+  // The virtual authenticator's backup flags are what make this testable: a real
+  // one is whatever it is, and the refusal path would otherwise never run.
+  check('this authenticator reports a non-syncable credential',
+    (await call({ op: 'prfState', keyId: KEY }))[2], 0);
+
+  await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+  const syncing = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: 'ctap2', ctap2Version: 'ctap2_1', transport: 'internal',
+      hasResidentKey: true, hasUserVerification: true, hasPrf: true,
+      isUserVerified: true, automaticPresenceSimulation: true,
+      defaultBackupEligibility: true, defaultBackupState: true
+    }
+  });
+
+  const SYNCED = 'browser-vault-synced';
+  // Without the requirement, a syncable credential is accepted -- that is the
+  // ordinary case and most passkeys are like this.
+  check('a syncable passkey enrols when device binding is not required',
+    status(await call({ op: 'prfEnroll', keyId: SYNCED, userName: 'tester' })), 0);
+  check('and it reports itself as able to leave this device',
+    (await call({ op: 'prfState', keyId: SYNCED }))[2], 1);
+
+  const STRICT = 'browser-vault-strict';
+  // With it, the same authenticator is refused rather than quietly accepted.
+  check('a syncable passkey is refused when device binding IS required',
+    status(await call({ op: 'prfEnroll', keyId: STRICT, userName: 'tester', deviceBound: true })), 10);
+  check('and nothing was stored for it',
+    (await call({ op: 'prfState', keyId: STRICT }))[1], 0);
+
+  await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: syncing.authenticatorId });
+
   check('forgetting the passkey succeeds', status(await call({ op: 'prfForget', keyId: KEY })), 0);
-  check('and the state reports none', await call({ op: 'prfState', keyId: KEY }), [0, 0]);
+  check('and the state reports none', await call({ op: 'prfState', keyId: KEY }), [0, 0, 0]);
   check('and the vault then has no passkey', status(await call({ op: 'prfDerive', keyId: KEY })), 1);
 } finally {
   await browser.close();

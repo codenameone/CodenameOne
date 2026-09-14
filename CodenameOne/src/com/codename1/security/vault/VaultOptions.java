@@ -43,6 +43,7 @@ public final class VaultOptions {
     private long autoLockMillis;
     private boolean opaqueKeysOnly;
     private com.codename1.security.vault.spi.DeviceProtection deviceProtection;
+    private boolean deviceBoundPasskeyRequired;
 
     /// Adds a protection the vault must provide, or the operation fails.
     ///
@@ -152,6 +153,39 @@ public final class VaultOptions {
     public VaultOptions deviceProtection(com.codename1.security.vault.spi.DeviceProtection protection) {
         deviceProtection = protection;
         return this;
+    }
+
+    /// Requires that a passkey used for [UnlockPolicy#REQUIRE_USER_VERIFICATION] cannot leave
+    /// this device.
+    ///
+    /// #### Why this is a choice and not a default
+    ///
+    /// Most passkeys sync. An iCloud Keychain credential reaches every device on the Apple
+    /// account, and a Google-account one every device signed into it -- so the ordinary
+    /// "remember this device" is closer to "remember this account". For a note-taking
+    /// application that is what the user wants: a new laptop unlocks with a face scan and no
+    /// password. For something holding a second factor it is the opposite of what was asked for.
+    ///
+    /// Requiring this narrows the ceremony to an authenticator built into the machine **and**
+    /// checks the credential's backup-eligibility flag, which is the part that actually decides.
+    /// `authenticatorAttachment: "platform"` alone does not: an iCloud Keychain passkey is
+    /// platform-attached and syncs anyway.
+    ///
+    /// #### What it costs
+    ///
+    /// Hardware security keys are excluded, and so is every authenticator whose browser will not
+    /// report the flag -- an unknown answer is treated as "may leave this device" rather than
+    /// rounded up. A user whose only authenticator syncs cannot enrol, and enrolment fails with
+    /// [VaultError#POLICY_NOT_MET] rather than quietly keeping a credential that does not meet
+    /// the requirement. Offer the weaker policy as a fallback, or do not require this.
+    public VaultOptions requireDeviceBoundPasskey() {
+        deviceBoundPasskeyRequired = true;
+        return this;
+    }
+
+    /// Whether a passkey must be bound to this device. See [#requireDeviceBoundPasskey()].
+    public boolean isDeviceBoundPasskeyRequired() {
+        return deviceBoundPasskeyRequired;
     }
 
     /// The device key store supplied through [#deviceProtection], or null for the port's.

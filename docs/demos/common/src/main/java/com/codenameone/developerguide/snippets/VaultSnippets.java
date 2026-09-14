@@ -93,6 +93,21 @@ public class VaultSnippets {
         // end::vault-second-device[]
     }
 
+    /** Choosing whether the passkey may sync to the user's other devices. */
+    public void deviceBoundPasskey(char[] password, boolean mustNotLeaveThisDevice) {
+        // tag::vault-device-bound[]
+        VaultOptions options = new VaultOptions()
+                .policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        if (mustNotLeaveThisDevice) {
+            // Excludes security keys and every synced passkey. Enrolment fails with
+            // POLICY_NOT_MET where no authenticator can meet it, so have a fallback.
+            options.requireDeviceBoundPasskey();
+        }
+        Vault vault = Vault.named("payments").configure(options);
+        vault.enroll(password, options).except(failure -> offerPasswordOnly());
+        // end::vault-device-bound[]
+    }
+
     /** Refusing rather than silently storing with less protection than was asked for. */
     public void requireProtection(char[] password) {
         // tag::vault-require[]
@@ -155,5 +170,8 @@ public class VaultSnippets {
     }
 
     private void storeInCache(byte[] sealed) {
+    }
+
+    private void offerPasswordOnly() {
     }
 }

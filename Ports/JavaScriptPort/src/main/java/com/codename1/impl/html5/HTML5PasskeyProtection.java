@@ -65,7 +65,17 @@ public final class HTML5PasskeyProtection extends DeviceProtection {
 
     private static HTML5PasskeyProtection instance;
 
+    /// Set from [com.codename1.security.vault.VaultOptions#requireDeviceBoundPasskey()] before
+    /// enrolment. Instance state on a singleton rather than a parameter, because it changes how
+    /// a key is created and the SPI creates keys through [#ensureKey(String)].
+    private boolean deviceBoundRequired;
+
     private HTML5PasskeyProtection() {
+    }
+
+    @Override
+    public void setDeviceBoundRequired(boolean required) {
+        deviceBoundRequired = required;
     }
 
     /// The port's singleton.
@@ -113,11 +123,38 @@ public final class HTML5PasskeyProtection extends DeviceProtection {
         return answer.length > 1 && answer[1] != 0 ? KEY_PRESENT : KEY_ABSENT;
     }
 
+    /// Whether the enrolled passkey may leave this device, which is what decides whether
+    /// "remember this device" is the truth or whether "remember this account" is.
+    ///
+    /// Read from the credential's backup-eligibility flag at enrolment. A browser that would not
+    /// report the flag answers `true` here: an application describing its own protection to a
+    /// user must not round a missing answer up into a guarantee.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyId`: the vault's device key id
+    ///
+    /// #### Returns
+    ///
+    /// true when the credential may sync, or when it could not be determined
+    public boolean isPasskeySyncable(String keyId) {
+        byte[] answer = nativePrfState(keyId);
+        if (status(answer) != HTML5DeviceProtection.STATUS_OK || answer.length < 3) {
+            return true;
+        }
+        return answer[2] != 0;
+    }
+
     @Override
     public AsyncResource<Boolean> ensureKey(String keyId) {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        byte[] answer = nativePrfEnroll(keyId, "Codename One vault");
-        VaultException failure = failureOf(answer, "a passkey could not be enrolled for this vault");
+        byte[] answer = nativePrfEnroll(keyId, "Codename One vault", deviceBoundRequired);
+        VaultException failure = failureOf(answer,
+                deviceBoundRequired
+                        ? "no authenticator here could provide a passkey that cannot leave this "
+                          + "device; most passkeys sync, and an unverifiable answer is treated as "
+                          + "\"may leave\" rather than accepted"
+                        : "a passkey could not be enrolled for this vault");
         if (failure != null) {
             out.error(failure);
         } else {
@@ -216,7 +253,11 @@ public final class HTML5PasskeyProtection extends DeviceProtection {
     static native byte[] nativePrfState(String keyId);
 
     /// Creates a passkey and confirms the authenticator will evaluate a PRF. Prompts.
-    static native byte[] nativePrfEnroll(String keyId, String userName);
+    ///
+    /// `deviceBound` narrows the ceremony to a built-in authenticator and refuses a credential
+    /// whose backup-eligibility flag says it may be copied elsewhere -- or whose browser will not
+    /// report the flag at all.
+    static native byte[] nativePrfEnroll(String keyId, String userName, boolean deviceBound);
 
     /// Evaluates the PRF for this vault's stored salt. Prompts. Payload is 32 bytes.
     static native byte[] nativePrfDerive(String keyId);

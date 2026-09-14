@@ -97,6 +97,10 @@ public final class HTML5DeviceProtection extends DeviceProtection {
     /// Anything else.
     static final int STATUS_UNKNOWN = 8;
 
+    /// The operation could have succeeded and would not have met what was required of it -- a
+    /// passkey that may sync where one bound to this device was asked for.
+    static final int STATUS_POLICY_NOT_MET = 10;
+
     /// The user dismissed a prompt, or it timed out. Not a failure: nothing went wrong, the
     /// check simply did not happen, and an application that shows an error here is showing one
     /// for a button the user chose not to press.
@@ -279,6 +283,8 @@ public final class HTML5DeviceProtection extends DeviceProtection {
                 return VaultError.TEMPORARILY_UNREADABLE;
             case STATUS_CANCELLED:
                 return VaultError.CANCELLED;
+            case STATUS_POLICY_NOT_MET:
+                return VaultError.POLICY_NOT_MET;
             default:
                 return VaultError.UNKNOWN;
         }
