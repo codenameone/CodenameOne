@@ -272,6 +272,18 @@ public final class DataSource {
             if(closed) {
                 throw new IOException("This pool is closed");
             }
+            if(url == null && all.isEmpty()) {
+                // A pool made by of(): it wraps ONE connection somebody else
+                // opened and has no URL to open another from. Once that
+                // connection has been discarded -- the server hung up, or an
+                // error it could not resynchronize from closed it -- nothing can
+                // ever put one back, so waiting is waiting for an event that
+                // cannot happen. With the borrow timeout this form is built with
+                // (none), that is every later request hanging for good.
+                throw new IOException("The connection this data source wraps was closed and "
+                        + "there is no URL to open another from. Open the DataSource with a "
+                        + "URL if it has to survive its connection being dropped.");
+            }
             long wait = 0;
             if(deadline != 0) {
                 wait = deadline - System.currentTimeMillis();
@@ -492,20 +504,33 @@ public final class DataSource {
      * is only ever about SQLite.
      */
     private static boolean isMemory(String url) {
-        if(":memory:".equals(url)) {
+        // Db.open accepts a jdbc:sqlite: URL verbatim, so that prefix is a
+        // spelling of the same database and has to come off before the question
+        // is asked. It is the one the local development loop meets, because
+        // sqlite-jdbc is what serves it.
+        //
+        // The translated arm hands the whole string to sqlite3_open, where such
+        // a URL is a FILE with a startling name rather than a memory database.
+        // Reading it as memory there is conservative -- a file pooled at one --
+        // and never wrong in the direction that loses rows.
+        String path = url;
+        if(path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
+            path = path.substring(12);
+        }
+        if(":memory:".equals(path)) {
             return true;
         }
-        int query = url.indexOf('?');
+        int query = path.indexOf('?');
         if(query < 0) {
             return false;
         }
         int at = query + 1;
-        while(at < url.length()) {
-            int end = url.indexOf('&', at);
+        while(at < path.length()) {
+            int end = path.indexOf('&', at);
             if(end < 0) {
-                end = url.length();
+                end = path.length();
             }
-            if(end - at == 11 && url.regionMatches(at, "mode=memory", 0, 11)) {
+            if(end - at == 11 && path.regionMatches(at, "mode=memory", 0, 11)) {
                 return true;
             }
             at = end + 1;
