@@ -162,65 +162,78 @@ do.
 === The Values These APIs Hand You
 
 Everything above takes or returns a handful of small types from
-`com.codename1.call`. They're enumerations rather than integer constants, so a
-value that isn't one of them won't compile -- though a `switch` over one still
-isn't required to cover every constant, so a state you don't handle is a
-silent default rather than a compiler error. Each of them has a value that
-matters more than the rest.
+`com.codename1.call`. Six are enumerations -- `CallState`, `CallDirection`,
+`CallEndReason`, `CallAvailability`, `CallHandleType` and `CallError` -- so a
+value that isn't one of their constants won't compile, though a `switch` over
+one isn't required to cover every constant and an unhandled state falls through
+rather than failing the build. `CallHandle` and `CallException` are ordinary
+classes and `CallId` is a holder for static helpers whose identifiers are
+plain strings, so none of those three offer `values()` or anything else
+enum-shaped.
 
 `CallState`:: `RINGING`, `DIALING`, `ACTIVE`, `HELD`, `ENDED`. Incoming calls
 start at `RINGING` and outgoing ones at `DIALING`, but `ACTIVE` and `HELD`
 cycle in both directions -- `CallSession.setHeld(false)` and a fulfilled resume
-request both put a held call back to `ACTIVE`, so code that treats `HELD` as
-one-way rejects a legitimate resume or leaves media paused. `ENDED` is the only
-terminal state: a call never leaves it, acting on one that has reports
-`CallError.INVALID_ID`, and it's where you release whatever the call held.
+both put a held call back to `ACTIVE`, so code that treats `HELD` as one-way
+rejects a legitimate resume or leaves media paused. `ENDED` is the only
+terminal state, and it's where you release whatever the call was holding. The
+session's asynchronous operations -- `end`, `setHeld`, `setMuted`, `sendDigits`,
+`groupWith` -- fail with `CallError.INVALID_ID` once a call has ended, which is
+how a bookkeeping bug in the app surfaces; the reporting methods that return
+`void`, such as `reportConnected` and `update`, return without a word instead,
+so don't wait on them for that signal.
 
-`CallDirection`:: `INCOMING` or `OUTGOING`, fixed when the call is reported and
-never changing after that. Read it when you hold a session you didn't report
-yourself -- a session passed to a listener, or fetched from `Calls.getSessions()` --
-rather than keeping your own note of the direction beside the call id.
+`CallDirection`:: `INCOMING` or `OUTGOING`, fixed when the session is created
+and never changing after that. Read it when you hold a session you didn't
+report yourself -- a session passed to a listener, or fetched from
+`Calls.getSessions()` -- rather than keeping your own note of the direction
+beside the call id.
 
 `CallEndReason`:: `REMOTE_ENDED`, `LOCAL_ENDED`, `UNANSWERED`, `BUSY`, `FAILED`,
+`FILTERED`. `FILTERED` covers more ground than its name suggests. It's
 // vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
-`FILTERED`. `FILTERED` covers more ground than its name suggests. It is
 documented as the system declining the call rather than the user -- Do Not
 Disturb, or a blocked number -- and it differs from `UNANSWERED` in that the
-call never rang. But the Android port also reports it for a fulfilled reject,
-so a Decline from the lock screen arrives as `FILTERED` there while a hang-up
-after answering arrives as `LOCAL_ENDED`. Treat it as "this call ended without
-being taken, and not because the far end gave up," and don't build anything
-that needs to tell an explicit decline from a silent block out of this value
-alone.
+call never rang. The Android port also reports it for a fulfilled reject,
+though, so a Decline from the lock screen arrives as `FILTERED` there while a
+hang-up after answering arrives as `LOCAL_ENDED`. Read it as "this call ended
+without being taken, and not because the far end gave up," and don't try to
+tell an explicit decline from a silent block out of this value alone.
 
 `CallAvailability`:: what `Calls.getAvailability()` answers before you report a
-call, and `AVAILABLE` is the only value that lets one ring. The rest divide
-three ways rather than two. `EMERGENCY_CALL_IN_PROGRESS`, `OTHER_APP_IN_CALL`
-and `THIS_APP_IN_CALL` pass on their own, so a retry is the right response.
+call, and `AVAILABLE` is the only value that lets one ring. The rest need three
+different responses, not two. `EMERGENCY_CALL_IN_PROGRESS` and
+`OTHER_APP_IN_CALL` pass on their own, so a retry is the right move --
+`THIS_APP_IN_CALL` is in the same family, though Android's bridge never reports it
+by design, because Telecom accepts a second call from the same account.
 `NOT_CONFIGURED` means `Calls.configure` hasn't run, which is yours to fix in
-code and not something a user can clear -- prompting for it strands them in
-front of a dialog that changes nothing. `NOT_PERMITTED` is the one that wants
-the user: they switched your app's calling off, or a permission or role is
-missing. Only `UNSUPPORTED` is permanent: the platform has no telephony
-integration to offer.
+code and not something a user can clear; prompting for it strands them in front
+of a dialog that changes nothing. `NOT_PERMITTED` is the one that wants the
+user: they switched your app's calling off, or a permission or role is missing.
+Only `UNSUPPORTED` is permanent.
 
-`CallHandle` and `CallHandleType`:: who the call is with. Build one with
-`CallHandle.phone(...)`, `CallHandle.email(...)` or `CallHandle.generic(...)`
-rather than by hand; the type travels with the value and decides how the system
-displays and dials it.
+`CallHandle` and `CallHandleType`:: who the call is with, and one of `GENERIC`,
+`PHONE_NUMBER` or `EMAIL_ADDRESS`. Build a handle with `CallHandle.phone(...)`,
+`CallHandle.email(...)` or `CallHandle.generic(...)` rather than by hand; the
+type travels with the value and decides how the system displays and dials it.
 
-`CallId`:: the identifier both ends of a call have to agree on. `CallId.random()`
-mints one, `CallId.isValid(...)` checks one that arrived over your own
-connection, and `CallId.normalize(...)` puts it in the form the platform expects.
+`CallId`:: static helpers for the identifier both ends of a call have to agree
+on, which is a `String` rather than a type of its own. `CallId.random()` mints
+one, `CallId.isValid(...)` checks one that arrived over your own connection, and
+`CallId.normalize(...)` puts it in the form the platform expects.
 
-`CallError` and `CallException`:: why an action failed. `CALL_REFUSED`,
-`CALL_FILTERED` and `DUPLICATE_CALL` are about the call you tried to place or
-report; `NOT_SUPPORTED`, `UNAUTHORIZED` and `PROVIDER_RESET` are about the app
-or the platform and keep failing until something changes. `BUSY` belongs to
-neither group: it means a conflicting operation is already running, which can be
-another call but can equally be an unrelated request holding a shared channel --
-`CallDirectory.requestScreeningRole()` answers it when another dialog owns the
-activity result. Retry the operation rather than attributing it to a session.
+`CallError` and `CallException`:: why an action failed, as an enum and the
+exception that carries it. `CALL_REFUSED`, `CALL_FILTERED` and `DUPLICATE_CALL`
+are about the call you tried to place or report, while `NOT_SUPPORTED` and
+`UNAUTHORIZED` are about the app or the platform and keep failing until
+something changes. Two don't fit that split. `BUSY` means a conflicting
+operation is already running, which can be another call but can equally be an
+unrelated request holding a shared channel -- `CallDirectory.requestScreeningRole()`
+answers it when another dialog owns the activity result -- so retry the
+operation rather than blaming a session. And `PROVIDER_RESET` says the system's
+call provider was reset while that one operation was in flight, so it could
+never be answered; the provider is usable again afterward and the next report
+may well succeed.
 
 === Actions, And Why They Have To Be Answered
 
