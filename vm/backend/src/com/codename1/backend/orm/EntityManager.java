@@ -93,13 +93,28 @@ public final class EntityManager {
 
     private final DataSource pool;
     private final Database pinned;
+    /**
+     * Whether this manager exists only for the duration of a transaction
+     * somebody else opened.
+     *
+     * <p>Both kinds are pinned to one connection, and telling them apart is what
+     * two operations depend on. {@link #transaction} JOINS an open transaction
+     * rather than opening a nested one, which every engine refuses -- but a
+     * manager the caller built over its own connection is not in a transaction
+     * at all, and running its body without a BEGIN left earlier writes committed
+     * when a later one threw. {@link #close} is the other: the caller's manager
+     * owns its connection and this one owns nothing.
+     */
+    private final boolean transactionScoped;
     private final Dialect dialect;
     private final Map tables;
     private final Map daos;
 
-    private EntityManager(DataSource pool, Database pinned, Dialect dialect, Map tables) {
+    private EntityManager(DataSource pool, Database pinned, Dialect dialect, Map tables,
+                          boolean transactionScoped) {
         this.pool = pool;
         this.pinned = pinned;
+        this.transactionScoped = transactionScoped;
         this.dialect = dialect;
         this.tables = tables;
         this.daos = new HashMap();
@@ -136,7 +151,7 @@ public final class EntityManager {
         if(pool == null) {
             throw new IOException("No data source");
         }
-        return new EntityManager(pool, null, pool.dialect(), tablesFor(pool.dialect()));
+        return new EntityManager(pool, null, pool.dialect(), tablesFor(pool.dialect()), false);
     }
 
     /**
@@ -148,7 +163,7 @@ public final class EntityManager {
         if(db == null) {
             throw new IOException("No database");
         }
-        return new EntityManager(null, db, db.dialect(), tablesFor(db.dialect()));
+        return new EntityManager(null, db, db.dialect(), tablesFor(db.dialect()), false);
     }
 
     /**
@@ -206,16 +221,31 @@ public final class EntityManager {
         if(body == null) {
             throw new IOException("No work to run");
         }
-        if(pinned != null) {
+        final EntityManager self = this;
+        if(transactionScoped) {
+            // Already inside one. Every engine refuses a nested BEGIN, and a
+            // service method that works alone should not break when another one
+            // calls it.
             return body.run(this);
         }
-        final EntityManager self = this;
+        if(pinned != null) {
+            // Pinned, but by the CALLER rather than by a transaction: this is
+            // the manager EntityManager.open(Database) hands back, and it is not
+            // in a transaction until this opens one. Running the body without a
+            // BEGIN left the writes before a failure committed.
+            return pinned.transaction(new Database.Work() {
+                public Object run(Database inner) throws Exception {
+                    return body.run(new EntityManager(null, inner, self.dialect,
+                            self.tables, true));
+                }
+            });
+        }
         return pool.withConnection(new DataSource.Work() {
             public Object run(final Database db) throws Exception {
                 return db.transaction(new Database.Work() {
                     public Object run(Database inner) throws Exception {
                         return body.run(new EntityManager(null, inner, self.dialect,
-                                self.tables));
+                                self.tables, true));
                     }
                 });
             }
@@ -282,12 +312,25 @@ public final class EntityManager {
     }
 
     /**
-     * Closes the pool, or the connection, this manager was opened over. A pinned
-     * manager handed to a transaction body owns nothing and closes nothing.
+     * Closes the pool, or the connection, this manager was opened over.
+     *
+     * <p>The manager handed to a transaction body owns nothing and closes
+     * nothing: the connection under it belongs to the transaction, which is not
+     * over. One opened over a caller's {@link Database} does close it, which is
+     * what the sentence above promises and what the client-side entity manager
+     * does -- leaving it open made repeated open/use/close cycles leak a SQLite
+     * handle or a network session each time.
      */
     public void close() {
+        if(transactionScoped) {
+            return;
+        }
         if(pool != null) {
             pool.close();
+            return;
+        }
+        if(pinned != null) {
+            pinned.close();
         }
     }
 

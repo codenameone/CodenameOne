@@ -263,6 +263,73 @@ class EntityManagerTest {
     }
 
     @Test
+    @DisplayName("a manager over one connection still opens a real transaction")
+    void transactionsWorkOverASingleConnection(@TempDir File dir) throws Exception {
+        // Both kinds of manager are pinned to one connection, and telling them
+        // apart is the whole of this: the one a transaction created must JOIN
+        // rather than nest, and the one the CALLER opened is not in a
+        // transaction at all. Treating the second like the first ran the body
+        // with no BEGIN, so the writes before a failure stayed committed.
+        Database db = Database.open(new File(dir, "pinned.db").getAbsolutePath());
+        try {
+            EntityManager em = EntityManager.open(db);
+            final Dao<Note> notes = em.dao(Note.class);
+            notes.createTable();
+            assertThrows(IllegalStateException.class, () -> em.transaction(new EntityManager.Work() {
+                public Object run(EntityManager tx) throws Exception {
+                    tx.dao(Note.class).insert(note("rolled back", 1, false, 1L));
+                    assertEquals(1, tx.dao(Note.class).count(), "the write is visible inside");
+                    throw new IllegalStateException("no");
+                }
+            }));
+            assertEquals(0, notes.count(), "the failed transaction left a row behind");
+
+            em.transaction(new EntityManager.Work() {
+                public Object run(EntityManager tx) throws Exception {
+                    tx.dao(Note.class).insert(note("committed", 1, false, 1L));
+                    // And a transaction inside it still joins rather than nesting.
+                    return tx.transaction(new EntityManager.Work() {
+                        public Object run(EntityManager inner) throws Exception {
+                            inner.dao(Note.class).insert(note("also committed", 1, false, 1L));
+                            return null;
+                        }
+                    });
+                }
+            });
+            assertEquals(2, notes.count());
+        } finally {
+            db.close();
+        }
+    }
+
+    @Test
+    @DisplayName("closing a manager closes what it was opened over, and nothing it borrowed")
+    void closesWhatItOwns(@TempDir File dir) throws Exception {
+        // The contract is "the pool, or the connection, this manager was opened
+        // over". A manager over a caller's Database used to close nothing, so
+        // repeated open/use/close cycles leaked a handle each time -- while the
+        // manager handed to a transaction body must close nothing at all,
+        // because the connection under it belongs to a transaction that is not
+        // over.
+        Database db = Database.open(new File(dir, "owned.db").getAbsolutePath());
+        EntityManager em = EntityManager.open(db);
+        em.dao(Note.class).createTable();
+        final EntityManager[] insideTransaction = new EntityManager[1];
+        em.transaction(new EntityManager.Work() {
+            public Object run(EntityManager tx) throws Exception {
+                insideTransaction[0] = tx;
+                tx.close();                       // must be a no-op
+                tx.dao(Note.class).insert(note("still works", 1, false, 1L));
+                return null;
+            }
+        });
+        assertTrue(db.isOpen(), "a transaction-scoped manager closed the caller's connection");
+        assertEquals(1, em.dao(Note.class).count());
+        em.close();
+        assertFalse(db.isOpen(), "closing the manager did not close the connection it owns");
+    }
+
+    @Test
     @DisplayName("an entity with no dao says which of the two things went wrong")
     void reportsAnUnregisteredEntity() throws Exception {
         DataSource pool = DataSource.open(":memory:");

@@ -267,15 +267,29 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if (idAnn != null) {
                 pf.isId = true;
                 pf.autoIncrement = idAnn.getBoolOrDefault("autoIncrement", true);
-                if (backend && pf.autoIncrement && pf.dialectKind == KIND_TEXT) {
-                    // No engine generates a string key. SQLite's AUTOINCREMENT
-                    // is legal only after INTEGER PRIMARY KEY, and the other two
-                    // count. Refusing here beats a CREATE TABLE the server
-                    // rejects at start-up with a message about its own syntax.
+                if (backend && pf.autoIncrement && !isGeneratableKey(pf.dialectKind)) {
+                    // A DATABASE COUNTS. Every other type fails somewhere the
+                    // build cannot see: a String key is refused by SQLite, whose
+                    // AUTOINCREMENT is legal only after INTEGER PRIMARY KEY; a
+                    // byte[] one commits the insert and then throws reading the
+                    // generated Long back; a boolean one turns every key into
+                    // true, so the first row's id is 1 and every later update and
+                    // delete targets it.
                     ctx.error(cls, "@Id on " + ec.binaryName + "." + f.getName()
-                            + " is autoIncrement and the field is a String; a database "
-                            + "generates integer keys. Use @Id(autoIncrement = false) and "
+                            + " is autoIncrement and the field is " + pf.kind.binaryName
+                            + "; a database generates integer keys. Use int, long or short "
+                            + "(or their boxed forms), or @Id(autoIncrement = false) and "
                             + "assign the key yourself.");
+                }
+                if (backend && !pf.autoIncrement && pf.dialectKind == KIND_BLOB) {
+                    // And a blob is not a key on MySQL at all: it indexes one
+                    // only by a prefix whose length it has to be given, so the
+                    // generated CREATE TABLE is refused there and accepted by the
+                    // other two. The same entity would build in development and
+                    // fail in production.
+                    ctx.error(cls, "@Id on " + ec.binaryName + "." + f.getName()
+                            + " is a byte[], which MySQL cannot make a primary key without "
+                            + "a prefix length. Use a String or an integer key.");
                 }
                 if (ec.idField != null) {
                     ctx.error(cls, "@Entity " + ec.binaryName
@@ -693,6 +707,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             default:
                 return KIND_TEXT;
         }
+    }
+
+    /// Whether a DATABASE can generate a key of this kind. Integers, and
+    /// nothing else: what comes back from every engine is a number, and the
+    /// generated dao writes it into the field with no room to interpret it.
+    private static boolean isGeneratableKey(int kind) {
+        return kind == KIND_INTEGER || kind == KIND_BIGINT;
     }
 
     /// The source spelling of a kind, so the generated class references the

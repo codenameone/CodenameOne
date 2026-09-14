@@ -267,7 +267,9 @@ final class Table {
                 return dialect.generatedKeyColumn(column.getKind());
             }
             if(column.getDeclaredType() != null) {
-                return column.getDeclaredType() + " PRIMARY KEY";
+                // NOT NULL for the reason Dialect#assignedKeyColumn gives: SQLite
+                // admits a null primary key that the other two refuse.
+                return column.getDeclaredType() + " NOT NULL PRIMARY KEY";
             }
             return dialect.assignedKeyColumn(column.getKind());
         }

@@ -194,6 +194,44 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void refusesAGeneratedKeyNoDatabaseCanGenerate() throws Exception {
+        // Every one of these fails somewhere the build cannot see: a byte[] key
+        // commits the insert and then throws reading the generated Long back, and
+        // a boolean key turns every generated value into true -- so the first
+        // row's id is 1 and every later update and delete targets it.
+        String[] fields = {"public byte[] id;", "public boolean id;", "public double id;",
+                "public java.util.Date id;"};
+        for (String field : fields) {
+            File classes = compileFixture(
+                    "com.example.Bad",
+                    "package com.example;\n"
+                            + "import com.codename1.annotations.*;\n"
+                            + "@Entity public class Bad {\n"
+                            + "    @Id " + field + "\n"
+                            + "    public Bad() {}\n"
+                            + "}\n");
+            ProcessorContext ctx = runProcessor(classes, backendClasspath());
+            assertTrue("a generated key of type " + field + " should be refused",
+                    ctx.hasErrors());
+        }
+        // And the types a database really does generate are accepted.
+        String[] good = {"public long id;", "public int id;", "public Long id;"};
+        for (String field : good) {
+            File classes = compileFixture(
+                    "com.example.Good",
+                    "package com.example;\n"
+                            + "import com.codename1.annotations.*;\n"
+                            + "@Entity public class Good {\n"
+                            + "    @Id " + field + "\n"
+                            + "    public Good() {}\n"
+                            + "}\n");
+            ProcessorContext ctx = runProcessor(classes, backendClasspath());
+            assertFalse("a generated key of type " + field + " should be accepted: "
+                    + ctx.getErrors(), ctx.hasErrors());
+        }
+    }
+
+    @Test
     public void generatesForAnEntityThatLivesInADependency() throws Exception {
         // The entity in a module BOTH halves of the application depend on, which
         // is where a shared one belongs -- and then the backend module's own
@@ -293,7 +331,10 @@ public class OrmAnnotationProcessorTest {
     // ---------------------------------------------------------------
 
     private File compileFixture(String fqn, String src) throws Exception {
-        File classes = tmp.newFolder("classes");
+        // An unnamed folder, so a test that compiles several fixtures gets a
+        // fresh one each time rather than "a folder with the path 'classes'
+        // already exists".
+        File classes = tmp.newFolder();
         JavaSourceCompiler.compile(
                 JavaSourceCompiler.singleSource(fqn, src),
                 classes,

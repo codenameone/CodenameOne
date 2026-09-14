@@ -127,6 +127,45 @@ final class Placeholders {
     }
 
     /**
+     * The index just past the last character that is part of the statement
+     * ITSELF: not trailing whitespace, not a trailing terminator, and not a
+     * trailing comment.
+     *
+     * <p>Where a clause has to be appended INSIDE the statement -- PostgreSQL's
+     * RETURNING is the one -- this is where it goes. Appending at the end put it
+     * after a semicolon, which makes it a second statement, or inside a trailing
+     * "-- explanation", which comments it out; the insert then reported a key of
+     * zero for a row it had written. Through the same scanner as everything else
+     * here, so a semicolon or a double dash inside a literal is not mistaken for
+     * either.
+     */
+    static int endOfStatement(String sql, boolean nestedComments, boolean backslashEscapes,
+                              boolean hashComments) throws IOException {
+        int at = 0;
+        int end = 0;
+        int length = sql.length();
+        while(at < length) {
+            char c = sql.charAt(at);
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments);
+            if(next > at) {
+                // A literal or a quoted identifier is part of the statement; a
+                // comment is not. skip() answers for both, so which one this was
+                // is decided by what it started with.
+                if(c != '-' && c != '/' && c != '#') {
+                    end = next;
+                }
+                at = next;
+                continue;
+            }
+            if(c != ';' && c > ' ') {
+                end = at + 1;
+            }
+            at++;
+        }
+        return end;
+    }
+
+    /**
      * The index just past the literal, identifier, comment or dollar-quoted body
      * beginning at {@code at}, or {@code at} itself when nothing begins there.
      */

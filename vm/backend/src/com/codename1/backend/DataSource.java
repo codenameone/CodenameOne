@@ -105,6 +105,14 @@ public final class DataSource {
         this.owns = owns;
     }
 
+    /** The one refusal, so both paths to it say the same thing. */
+    private static IOException memoryCannotBePooled(int size) {
+        return new IOException("An in-memory SQLite database cannot be pooled: each connection "
+                + "would get its own, so rows written through one would be missing from the "
+                + "next. " + Config.DATASOURCE_POOL_SIZE + " is " + size + "; leave it unset "
+                + "for an in-memory database, or point the URL at a file.");
+    }
+
     /** A pool of the default size for whatever engine {@code url} names. */
     public static DataSource open(String url) throws IOException {
         return open(url, 0, 5000, 10000);
@@ -135,6 +143,13 @@ public final class DataSource {
         // The FIRST connection is opened here, and it is what decides the engine:
         // the alternative is parsing the URL a second time in this class and
         // having two answers to the same question.
+        if(isMemory(url) && size > 1) {
+            // BEFORE anything is opened. Refusing after the first connection was
+            // made leaked its native handle every time a process caught the
+            // configuration error and retried -- and this question is answered by
+            // the URL alone, so there is nothing to open to ask it.
+            throw memoryCannotBePooled(size);
+        }
         Database first = Database.open(url);
         Dialect dialect = first.dialect();
         int limit = size > 0 ? size : defaultSize(url, dialect);
@@ -146,10 +161,8 @@ public final class DataSource {
             // depends on the order borrows happen in. Honouring the setting here
             // would mean honouring it into a data-loss bug, so it is refused
             // rather than clamped in silence.
-            throw new IOException("An in-memory SQLite database cannot be pooled: each "
-                    + "connection would get its own, so rows written through one would be "
-                    + "missing from the next. " + Config.DATASOURCE_POOL_SIZE + " is " + limit
-                    + "; leave it unset for an in-memory database, or point the URL at a file.");
+            first.close();
+            throw memoryCannotBePooled(limit);
         }
         DataSource out = new DataSource(url, first.toString(), limit, busyTimeoutMillis,
                 borrowTimeoutMillis, dialect, true);

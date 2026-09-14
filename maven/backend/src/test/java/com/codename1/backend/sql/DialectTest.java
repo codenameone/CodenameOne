@@ -226,8 +226,43 @@ class DialectTest {
         assertTrue(!Dialect.MYSQL.generatedKeysThroughReturning());
         // MySQL cannot index a TEXT column without a prefix length, so an
         // application-assigned string key is a VARCHAR there and TEXT elsewhere.
-        assertEquals("VARCHAR(255) PRIMARY KEY", Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
-        assertEquals("TEXT PRIMARY KEY", Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT));
+        // NOT NULL because SQLite would otherwise admit a null key; see
+        // assignedKeysAreNotNull.
+        assertEquals("VARCHAR(255) NOT NULL PRIMARY KEY",
+                Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
+        assertEquals("TEXT NOT NULL PRIMARY KEY", Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT));
+    }
+
+    @Test
+    @DisplayName("a statement ends before its terminator and its trailing comment")
+    void findsWhereTheStatementEnds() throws Exception {
+        // Where PostgreSQL's RETURNING has to be inserted. After the end it is
+        // either a second statement (past a semicolon) or commented out.
+        String plain = "INSERT INTO t (a) VALUES ($1)";
+        assertEquals(plain.length(), Dialect.POSTGRES.endOfStatement(plain));
+        assertEquals(plain.length(), Dialect.POSTGRES.endOfStatement(plain + ";"));
+        assertEquals(plain.length(), Dialect.POSTGRES.endOfStatement(plain + "  ;  "));
+        assertEquals(plain.length(), Dialect.POSTGRES.endOfStatement(plain + " -- why"));
+        assertEquals(plain.length(), Dialect.POSTGRES.endOfStatement(plain + "; -- why"));
+        assertEquals(plain.length(), Dialect.POSTGRES.endOfStatement(plain + " /* why */"));
+        // A semicolon or a double dash INSIDE a literal ends nothing.
+        String quoted = "INSERT INTO t (a) VALUES ('x; -- y')";
+        assertEquals(quoted.length(), Dialect.POSTGRES.endOfStatement(quoted + ";"));
+    }
+
+    @Test
+    @DisplayName("an application-assigned key cannot be null, including on SQLite")
+    void assignedKeysAreNotNull() {
+        // SQLite admits a null -- and several nulls -- in a PRIMARY KEY column
+        // that is not INTEGER PRIMARY KEY, where the other two refuse. Without
+        // this, an insert that forgot its key succeeded in development, failed in
+        // production, and left a row the generated id = ? predicate cannot find.
+        assertTrue(Dialect.SQLITE.assignedKeyColumn(Dialect.TEXT).contains("NOT NULL"));
+        assertTrue(Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT).contains("NOT NULL"));
+        assertTrue(Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT).contains("NOT NULL"));
+        assertEquals("TEXT NOT NULL PRIMARY KEY", Dialect.SQLITE.assignedKeyColumn(Dialect.TEXT));
+        assertEquals("VARCHAR(255) NOT NULL PRIMARY KEY",
+                Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
     }
 
     @Test

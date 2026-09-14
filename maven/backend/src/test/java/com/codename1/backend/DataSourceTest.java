@@ -126,6 +126,25 @@ class DataSourceTest {
     }
 
     @Test
+    @DisplayName("refusing an in-memory pool opens no connection to leak")
+    void refusesBeforeOpeningAnything() throws Exception {
+        // The refusal used to come after the first connection was made, so a
+        // process that catches configuration errors and retries leaked a native
+        // SQLite handle per attempt. The URL alone answers the question, so
+        // there is nothing to open in order to ask it.
+        for(int iter = 0 ; iter < 50 ; iter++) {
+            assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
+        }
+        // And the legal configuration still works afterwards.
+        DataSource pool = DataSource.open(":memory:");
+        try {
+            assertEquals(1, pool.getMaxSize());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     @DisplayName("dropping a dead connection wakes a borrower waiting for capacity")
     void discardingWakesAWaiter() throws Exception {
         // The pool is full and every connection is out, so a borrower waits. The
