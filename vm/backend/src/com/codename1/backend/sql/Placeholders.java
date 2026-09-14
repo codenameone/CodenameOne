@@ -64,7 +64,8 @@ final class Placeholders {
      */
     static String render(String sql, int paramCount, boolean dollars, boolean nestedComments,
                          boolean backslashEscapes, boolean hashComments,
-                         boolean dollarQuotedStrings) throws IOException {
+                         boolean dollarQuotedStrings, boolean dashCommentNeedsSpace)
+            throws IOException {
         StringBuilder out = null;
         int found = 0;
         int at = 0;
@@ -92,7 +93,7 @@ final class Placeholders {
                 continue;
             }
             int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
-                    dollarQuotedStrings);
+                    dollarQuotedStrings, dashCommentNeedsSpace);
             if(next > at) {
                 if(out != null) {
                     out.append(sql, at, next);
@@ -146,15 +147,15 @@ final class Placeholders {
      * either.
      */
     static int endOfStatement(String sql, boolean nestedComments, boolean backslashEscapes,
-                              boolean hashComments, boolean dollarQuotedStrings)
-            throws IOException {
+                              boolean hashComments, boolean dollarQuotedStrings,
+                              boolean dashCommentNeedsSpace) throws IOException {
         int at = 0;
         int end = 0;
         int length = sql.length();
         while(at < length) {
             char c = sql.charAt(at);
             int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
-                    dollarQuotedStrings);
+                    dollarQuotedStrings, dashCommentNeedsSpace);
             if(next > at) {
                 // A literal or a quoted identifier is part of the statement; a
                 // comment is not. skip() answers for both, so which one this was
@@ -185,15 +186,15 @@ final class Placeholders {
      * four of anything.
      */
     static int countInsertRows(String sql, boolean nestedComments, boolean backslashEscapes,
-                               boolean hashComments, boolean dollarQuotedStrings)
-            throws IOException {
+                               boolean hashComments, boolean dollarQuotedStrings,
+                               boolean dashCommentNeedsSpace) throws IOException {
         int at = 0;
         int depth = 0;
         int length = sql.length();
         int valuesAt = -1;
         while(at < length) {
             int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
-                    dollarQuotedStrings);
+                    dollarQuotedStrings, dashCommentNeedsSpace);
             if(next > at) {
                 at = next;
                 continue;
@@ -228,7 +229,7 @@ final class Placeholders {
         at = valuesAt;
         while(true) {
             at = skipBlanks(sql, at, nestedComments, backslashEscapes, hashComments,
-                    dollarQuotedStrings);
+                    dollarQuotedStrings, dashCommentNeedsSpace);
             if(at >= length || sql.charAt(at) != '(') {
                 break;
             }
@@ -236,7 +237,7 @@ final class Placeholders {
             int depthHere = 0;
             while(at < length) {
                 int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
-                        dollarQuotedStrings);
+                        dollarQuotedStrings, dashCommentNeedsSpace);
                 if(next > at) {
                     at = next;
                     continue;
@@ -253,7 +254,7 @@ final class Placeholders {
                 }
             }
             at = skipBlanks(sql, at, nestedComments, backslashEscapes, hashComments,
-                    dollarQuotedStrings);
+                    dollarQuotedStrings, dashCommentNeedsSpace);
             if(at >= length || sql.charAt(at) != ',') {
                 break;
             }
@@ -265,7 +266,8 @@ final class Placeholders {
     /** The index of the next character that is neither whitespace nor a comment. */
     private static int skipBlanks(String sql, int at, boolean nestedComments,
                                   boolean backslashEscapes, boolean hashComments,
-                                  boolean dollarQuotedStrings) throws IOException {
+                                  boolean dollarQuotedStrings, boolean dashCommentNeedsSpace)
+            throws IOException {
         while(at < sql.length()) {
             char c = sql.charAt(at);
             if(c <= ' ') {
@@ -277,7 +279,7 @@ final class Placeholders {
             // being passed over.
             if(c == '-' || c == '/' || (hashComments && c == '#')) {
                 int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
-                        dollarQuotedStrings);
+                        dollarQuotedStrings, dashCommentNeedsSpace);
                 if(next > at) {
                     at = next;
                     continue;
@@ -303,6 +305,27 @@ final class Placeholders {
         return after >= sql.length() || !isWordChar(sql.charAt(after));
     }
 
+    /**
+     * The character before {@code at}, or a space when there is none -- which is
+     * a boundary, and is what the start of a statement is.
+     */
+    private static char charBefore(String sql, int at) {
+        return at == 0 ? ' ' : sql.charAt(at - 1);
+    }
+
+    /**
+     * Whether {@code at} is whitespace, a control character, or the end of the
+     * statement.
+     *
+     * <p>MySQL asks this of the character after a double dash before it will
+     * call one a comment, which is why "VALUES (5--1), (2)" is two rows of
+     * arithmetic there and one row plus a comment everywhere else. Reading it as
+     * a comment hid the second tuple from the multi-row insert check.
+     */
+    private static boolean isBlankOrEnd(String sql, int at) {
+        return at >= sql.length() || sql.charAt(at) <= ' ';
+    }
+
     private static boolean isWordChar(char c) {
         return c == '_' || c == '$' || (c >= '0' && c <= '9')
                 || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -314,7 +337,8 @@ final class Placeholders {
      */
     private static int skip(String sql, int at, boolean nestedComments,
                             boolean backslashEscapes, boolean hashComments,
-                            boolean dollarQuotedStrings) throws IOException {
+                            boolean dollarQuotedStrings, boolean dashCommentNeedsSpace)
+            throws IOException {
         char c = sql.charAt(at);
         int length = sql.length();
         if(c == '\'') {
@@ -345,7 +369,8 @@ final class Placeholders {
         if(c == '`') {
             return skipQuoted(sql, at, '`', false);
         }
-        if(c == '-' && at + 1 < length && sql.charAt(at + 1) == '-') {
+        if(c == '-' && at + 1 < length && sql.charAt(at + 1) == '-'
+                && (!dashCommentNeedsSpace || isBlankOrEnd(sql, at + 2))) {
             int end = sql.indexOf('\n', at + 2);
             // A line comment with no newline after it runs to the end of the
             // statement, which is not an error -- unlike the cases below, there
@@ -355,7 +380,12 @@ final class Placeholders {
         if(c == '/' && at + 1 < length && sql.charAt(at + 1) == '*') {
             return skipBlockComment(sql, at, nestedComments);
         }
-        if(dollarQuotedStrings && c == '$') {
+        if(dollarQuotedStrings && c == '$' && !isWordChar(charBefore(sql, at))) {
+            // AT A TOKEN BOUNDARY ONLY. PostgreSQL allows a dollar after the
+            // first character of an unquoted identifier, and a dollar-quoted
+            // string may not adjoin one -- so price$usd$ is an identifier, and
+            // reading it as an opener left the body unterminated and refused a
+            // valid statement.
             return skipDollarQuoted(sql, at);
         }
         return at;

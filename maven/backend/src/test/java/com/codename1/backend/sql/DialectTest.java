@@ -298,6 +298,36 @@ class DialectTest {
     }
 
     @Test
+    @DisplayName("a dollar quote opens only at a token boundary")
+    void requiresABoundaryBeforeADollarQuote() throws Exception {
+        // PostgreSQL allows a dollar after the first character of an unquoted
+        // identifier, and a dollar-quoted string may not adjoin one -- so
+        // price$usd$ is an identifier, and reading it as an opener left a body
+        // unterminated and refused a valid statement.
+        assertEquals("SELECT price$usd$ FROM totals WHERE id = $1",
+                Dialect.POSTGRES.bind("SELECT price$usd$ FROM totals WHERE id = ?", 1));
+        // And a real one, at a boundary, is still a literal: the ? inside is not
+        // a parameter.
+        assertEquals("SELECT $tag$ ? $tag$, $1",
+                Dialect.POSTGRES.bind("SELECT $tag$ ? $tag$, ?", 1));
+    }
+
+    @Test
+    @DisplayName("MySQL needs whitespace after a double dash before it is a comment")
+    void readsMySqlDashComments() throws Exception {
+        // "5--1" is five minus minus-one on MySQL, where only "-- " opens a
+        // comment. Read as a comment, the second tuple of this insert vanished
+        // and the multi-row check saw one row.
+        assertEquals(2, Dialect.MYSQL.countInsertRows("INSERT INTO t (a) VALUES (5--1), (2)"));
+        // With the space it IS a comment there, and the other two take the two
+        // dashes whatever follows.
+        assertEquals(1, Dialect.MYSQL.countInsertRows("INSERT INTO t (a) VALUES (5) -- , (2)"));
+        assertEquals(1, Dialect.SQLITE.countInsertRows("INSERT INTO t (a) VALUES (5--1), (2)"));
+        // A ? after a MySQL dash-comment-that-is-not-one is still a parameter.
+        assertEquals("SELECT 5--1, ?", Dialect.MYSQL.bind("SELECT 5--1, ?", 1));
+    }
+
+    @Test
     @DisplayName("a statement ends before its terminator and its trailing comment")
     void findsWhereTheStatementEnds() throws Exception {
         // Where PostgreSQL's RETURNING has to be inserted. After the end it is
