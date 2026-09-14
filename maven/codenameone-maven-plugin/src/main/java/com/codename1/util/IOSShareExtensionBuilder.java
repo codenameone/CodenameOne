@@ -356,8 +356,14 @@ public final class IOSShareExtensionBuilder {
         }
         sb.append("            </dict>\n");
         sb.append("        </dict>\n");
-        sb.append("        <key>NSExtensionMainStoryboard</key>\n");
-        sb.append("        <string>MainInterface</string>\n");
+        // No NSExtensionMainStoryboard. That key names a storyboard iOS must
+        // load to build the extension's interface, and buildFileMap writes only
+        // the plist, the entitlements, the Swift controller and the build
+        // settings -- nothing emits a MainInterface.storyboard, so declaring it
+        // produced an archive that installs and then fails to launch.
+        // NSExtensionPrincipalClass below is the documented alternative: iOS
+        // instantiates that class directly, and the generated
+        // SLComposeServiceViewController subclass supplies its own UI.
         sb.append("        <key>NSExtensionPointIdentifier</key>\n");
         sb.append("        <string>com.apple.share-services</string>\n");
         sb.append("        <key>NSExtensionPrincipalClass</key>\n");

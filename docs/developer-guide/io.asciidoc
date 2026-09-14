@@ -208,6 +208,11 @@ across SQLite versions regardless, so a database file remains portable either wa
 The https://www.codenameone.com/javadoc/com/codename1/db/Database.html[Database] API opens a
 database by name:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava200Snippet.java[tag=io-java-200,indent=0]
+----
+
 
 Some SQLite apps ship with a "ready made" database. You allow you to replace the DB file by using the code:
 
@@ -776,6 +781,30 @@ TIP: `MultipartRequest` is a `ConnectionRequest` most stuff you expect from ther
 
 Since you assume most developers reading this will be familiar with Java here is the way to implement the multipart upload in the servlet API:
 
+This is server-side Java rather than Codename One, so it isn't one of the
+compiled examples:
+
+[listing]
+----
+@WebServlet(name = "UploadServlet", urlPatterns = {"/upload"})
+@MultipartConfig(fileSizeThreshold = 1024 * 1024 * 100,
+        maxFileSize = 1024 * 1024 * 150,
+        maxRequestSize = 1024 * 1024 * 200)
+public class UploadServlet extends HttpServlet {
+    @Override
+    public void doPost(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException {
+        // By name, matching the addData(...) call above: getParts() also
+        // carries any addArgument values and comes off an unordered map,
+        // so the first part is not necessarily the file.
+        Part data = req.getPart("myFileName");
+        try (InputStream in = data.getInputStream()) {
+            // Persist the bytes wherever the upload belongs.
+        }
+    }
+}
+----
+
 
 ==== Parsing
 
@@ -1080,6 +1109,12 @@ JavaScript already knows how to download and cache images from the web. `URLImag
 
 That's what the new method of `URLImage` does:
 
+[listing]
+----
+public static Image createCachedImage(String imageName, String url,
+                                      Image placeholder, int resizeRule);
+----
+
 
 A few important things you need to notice about this method:
 
@@ -1268,6 +1303,14 @@ default using `setDefaultCacheMode(CachingMode)`.
 NOTE: Caching applies to `GET` operations, it won't work for `POST` or other methods
 
 There are many methods of interest to keep an eye for:
+
+[listing]
+----
+protected InputStream getCachedData() throws IOException;
+protected void cacheUnmodified() throws IOException;
+public void purgeCache();
+public static void purgeCacheDirectory() throws IOException;
+----
 
 
 ==== getCachedData()
@@ -1632,6 +1675,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 In the above code you do the following:
+
+<1> Open or create the SQLite database. The name is an identifier rather than a path.
+<2> Wrap it in a `SQLMap`, which is what maps properties to columns.
+<3> Declare `id` the primary key and let the database assign it.
+<4> Create the table if it isn't there yet.
 
 
 TIP: Notice that now altering a created table isn't possible so if you add a new property you might need to detect that and do an `alter` call manually
