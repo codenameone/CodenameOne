@@ -181,6 +181,51 @@ class XYTransitionsTest extends UITestBase {
         assertEquals(7.0, series.getY(1), "a later frame walked the series back");
     }
 
+    @FormTest
+    void aTransitionWithNoBufferIsANoOpRatherThanACrash() {
+        // The buffer is created lazily by getBuffer(), so a transition nobody
+        // wrote to has a null one. initTransition() handed that straight to
+        // copyValues() and threw -- which animateChart() has always done and
+        // updateChart() inherited the moment it started running the lifecycle.
+        // Applying no pending changes has to stay a repaint.
+        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+        XYSeries series = new XYSeries("Series");
+        series.add(0, 1);
+        series.add(1, 2);
+        dataset.addSeries(series);
+
+        ChartComponent chartComponent = createChartComponent(dataset);
+        Form form = new Form();
+        form.add(chartComponent);
+
+        XYSeriesTransition immediate = new XYSeriesTransition(chartComponent, series);
+        immediate.updateChart();
+        assertEquals(1.0, series.getY(0), "an empty update changed the series");
+        assertEquals(2.0, series.getY(1), "an empty update changed the series");
+
+        XYSeriesTransition animated = new XYSeriesTransition(chartComponent, series);
+        animated.animateChart();
+        assertEquals(1.0, series.getY(0), "an empty animation changed the series");
+    }
+
+    @FormTest
+    void aValueSeriesTransitionWithNoBufferIsANoOpToo() {
+        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+        XYValueSeries series = new XYValueSeries("Series");
+        // Doubles, deliberately: int literals bind to XYSeries.add(int, double,
+        // double), which inserts at an index and never records the value.
+        series.add(0.0, 1.0, 5.0);
+        dataset.addSeries(series);
+
+        ChartComponent chartComponent = createChartComponent(dataset);
+        Form form = new Form();
+        form.add(chartComponent);
+
+        new XYValueSeriesTransition(chartComponent, series).updateChart();
+        assertEquals(1, series.getItemCount());
+        assertEquals(1.0, series.getY(0));
+    }
+
     private ChartComponent createChartComponent(XYMultipleSeriesDataset dataset) {
         XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
         for (int i = 0; i < dataset.getSeriesCount(); i++) {
