@@ -2102,6 +2102,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-14T00:03:06+00:00"
+      },
+      "devto": {
+        "id": 4652521,
+        "url": "https://dev.to/codenameone/fill-an-sms-verification-code-without-reading-the-inbox-926",
+        "syndicated_at": "2026-09-14T18:47:30+00:00"
       }
     }
   }
