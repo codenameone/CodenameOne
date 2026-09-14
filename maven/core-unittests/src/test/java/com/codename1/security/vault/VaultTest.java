@@ -1399,6 +1399,157 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anExportReflectsThePersistedVaultRatherThanTheCachedOne() {
+        // loadMetadata answers the in-memory copy once the vault is open, so an instance holding
+        // version N exported N after another tab had already moved the shared vault to N+1. The
+        // import side's own fresh read cannot help: the stale bytes have already left this
+        // device, and a sync server or a newly enrolled device accepting them restores the
+        // superseded password wrap and omits the rotated key newer records need.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault first = Vault.named(name).configure(options);
+        first.enroll(pw("p"), options).get();
+
+        // A second handle on the same storage caches version 1.
+        Vault second = Vault.named(name).configure(options);
+        assertTrue(second.unlockWithPassword(pw("p")).get().booleanValue());
+        assertEquals(1, keyVersionOf(second.exportSyncState()));
+
+        // The first rotates. The second's cache is now stale.
+        assertTrue(first.rotateDataKey(pw("p")).get().booleanValue());
+
+        assertEquals(2, keyVersionOf(second.exportSyncState()),
+                "an export must describe the vault that is stored, not the one this handle "
+                + "happens to be holding");
+    }
+
+    /// The data key version a serialized record claims.
+    private static int keyVersionOf(byte[] record) {
+        String text = new String(record, java.nio.charset.StandardCharsets.UTF_8);
+        for (String line : com.codename1.util.StringUtil.tokenize(text, '\n')) {
+            if (line.startsWith("key.version=")) {
+                return Integer.parseInt(line.substring("key.version=".length()).trim());
+            }
+        }
+        throw new IllegalStateException("no key version in " + text);
+    }
+
+    @Test
+    void aFailedFirstImportDoesNotDeleteAVaultAnotherSessionIsUsing() {
+        // The import's own rollback, which is a separate branch from enrolment's and kept the
+        // unconditional delete after enrolment's was fixed. Importing sync state commits the
+        // record and THEN establishes the policy, so the same window is open: another tab can
+        // unlock the committed vault and store secrets while this one is waiting on a prompt.
+        String source = freshName();
+        Vault origin = Vault.named(source).configure(fast());
+        origin.enroll(pw("p"), fast()).get();
+        final byte[] state = origin.exportSyncState();
+
+        final String name = freshName();
+        final Vault importing = Vault.named(name).configure(
+                fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+
+        // Deterministic without a prompt gate: the import commits the record before it remembers,
+        // so the other session is set up first and the remember step is simply made to fail.
+        device.refuseEnsure = true;
+        assertNotNull(errorOf(importing.importSyncState(state, pw("p"))));
+        device.refuseEnsure = false;
+        // Nothing else had touched it, so that one really was rolled back.
+        assertEquals(VaultError.KEY_MISSING,
+                errorOf(Vault.named(name).configure(fast()).unlockWithPassword(pw("p"))));
+
+        // Now the same failure with another session already using the record.
+        final Vault retry = Vault.named(freshName()).configure(
+                fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        VaultError outcome = errorOf(retry.importSyncState(origin.exportSyncState(), pw("p")));
+        assertNull(outcome, "the control import must succeed so the next one is a REFRESH check");
+
+        String shared = freshName();
+        final Vault joining = Vault.named(shared).configure(
+                fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        final java.util.concurrent.atomic.AtomicReference<VaultError> reported =
+                new java.util.concurrent.atomic.AtomicReference<VaultError>();
+        final String otherName = shared;
+        device.ensureEntered = new java.util.concurrent.CountDownLatch(1);
+        device.releaseEnsure = new java.util.concurrent.CountDownLatch(1);
+        Thread worker = new Thread(new Runnable() {
+            public void run() {
+                reported.set(errorOf(joining.importSyncState(state, pw("p"))));
+            }
+        });
+        worker.start();
+        try {
+            assertTrue(awaitQuietly(device.ensureEntered),
+                    "the device store was never asked for a key");
+            Vault other = Vault.named(otherName).configure(fast());
+            assertTrue(other.unlockWithPassword(pw("p")).get().booleanValue(),
+                    "the imported record is already readable by other sessions here");
+            assertTrue(other.putSecret("token", pw("abc123")).get().booleanValue());
+            device.refuseEnsure = true;
+        } finally {
+            device.releaseEnsure.countDown();
+        }
+        joinQuietly(worker);
+        device.refuseEnsure = false;
+        device.ensureEntered = null;
+        device.releaseEnsure = null;
+
+        assertNotNull(reported.get(), "the import failed, and must still report that");
+        Vault survivor = Vault.named(shared).configure(fast());
+        assertTrue(survivor.unlockWithPassword(pw("p")).get().booleanValue(),
+                "the record another session was using must not have been deleted");
+        assertArrayEquals(pw("abc123"), survivor.getSecret("token").get());
+    }
+
+    private static boolean awaitQuietly(java.util.concurrent.CountDownLatch latch) {
+        try {
+            return latch.await(60, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static void joinQuietly(Thread worker) {
+        try {
+            worker.join(60000);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Test
+    void aVaultLockedWhileASecretIsRemovedKeepsTheSecret() {
+        // The generation is checked after the delete -- it has to be, because a lock can land
+        // inside the delete itself -- and reporting LOCKED over ciphertext that is irreversibly
+        // gone tells the caller nothing changed when everything did. putSecret already restores
+        // what it overwrites in the same race; this did not.
+        String name = freshName();
+        final Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        String entry = secretEntryName(vault, "token");
+        assertTrue(vault.putSecret("token", pw("keepme")).get().booleanValue());
+
+        TestCodenameOneImplementation.getInstance().setDuringStorageDelete(entry,
+                new Runnable() {
+                    public void run() {
+                        vault.lock();
+                    }
+                });
+        try {
+            assertEquals(VaultError.LOCKED, errorOf(vault.removeSecret("token")),
+                    "a removal interrupted by lock() must be refused");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setDuringStorageDelete(null, null);
+        }
+
+        // And the secret is still here, which is what "nothing changed" has to mean.
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals(pw("keepme"), reopened.getSecret("token").get());
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

@@ -191,6 +191,25 @@ public final class HTML5SecureStorage extends SecureStorage {
     private void migrate(String account, String value) {
         try {
             String sealed = seal(account, value);
+            // Re-read before writing, because seal() is where this pauses and a browser runs
+            // many tabs against one store. A tab that read the plaintext and then waited here
+            // would write it over whatever arrived meanwhile: set() puts the new value in the
+            // encrypted entry and removes the plaintext, so a token another tab had just
+            // refreshed was silently replaced by the stale one this migration set out with.
+            //
+            // Two questions, both of them "is this still the entry I read?". The plaintext has
+            // to still be the value being migrated, and no encrypted entry may have appeared --
+            // get() only reaches here when there was none, so one now is newer than this by
+            // construction. Neither is a compare-and-set: com.codename1.io.Storage has no such
+            // primitive, so this narrows the window from the whole of seal() to the instructions
+            // between the check and the write rather than closing it.
+            Object stillPlain = Storage.getInstance().readObject(legacyKey(account));
+            if (!(stillPlain instanceof String) || !value.equals(stillPlain)) {
+                return;
+            }
+            if (Storage.getInstance().exists(encryptedKey(account))) {
+                return;
+            }
             if (!Storage.getInstance().writeObject(encryptedKey(account), sealed)) {
                 return;
             }
@@ -201,7 +220,13 @@ public final class HTML5SecureStorage extends SecureStorage {
                 Storage.getInstance().deleteStorageFile(encryptedKey(account));
                 return;
             }
-            Storage.getInstance().deleteStorageFile(legacyKey(account));
+            // Asked once more before the plaintext goes. It is the only copy of anything that
+            // arrived after the check above, and deleting it there would lose that value
+            // outright rather than merely deferring a migration.
+            Object beforeDelete = Storage.getInstance().readObject(legacyKey(account));
+            if (beforeDelete instanceof String && value.equals(beforeDelete)) {
+                Storage.getInstance().deleteStorageFile(legacyKey(account));
+            }
         } catch (RuntimeException failed) {
             Log.p("SecureStorage migration deferred: " + reasonOf(failed), Log.WARNING);
         }

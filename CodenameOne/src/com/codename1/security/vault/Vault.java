@@ -968,10 +968,22 @@ public final class Vault {
                     // works without a key; this one is an ordinary edit and answers LOCKED like
                     // its siblings.
                     requireUnlocked();
-                    Storage.getInstance().deleteStorageFile(secretKey(secretName));
-                    requireSameGeneration(generation);
-                    out.complete(Boolean.valueOf(
-                            !Storage.getInstance().exists(secretKey(secretName))));
+                    String entry = secretKey(secretName);
+                    // Kept so the delete can be undone, the way putSecret keeps what it
+                    // overwrites. The generation is checked after the delete -- it has to be,
+                    // because a lock can land inside the delete itself -- and reporting LOCKED
+                    // over a secret that is irreversibly gone tells the caller nothing changed
+                    // when everything did.
+                    Object previous = Storage.getInstance().readObject(entry);
+                    Storage.getInstance().deleteStorageFile(entry);
+                    if (generation != lockGeneration) {
+                        if (previous instanceof String) {
+                            Storage.getInstance().writeObject(entry, previous);
+                        }
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this secret was being removed");
+                    }
+                    out.complete(Boolean.valueOf(!Storage.getInstance().exists(entry)));
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -1605,7 +1617,13 @@ public final class Vault {
     /// password. A server that can verify the login must never be able to derive the vault key,
     /// which it could if they were the same string.
     public byte[] exportSyncState() {
-        VaultMetadata meta = loadMetadata();
+        // FRESH, for the same reason importSyncState reads fresh. loadMetadata answers the
+        // in-memory copy once the vault is open, so an instance holding version N exported N
+        // after another tab had already moved the shared vault to N+1 -- and the import side's
+        // own fresh read cannot help, because the stale bytes have already left this device. A
+        // sync server or a newly enrolled device accepting them restores the superseded password
+        // wrap and omits the rotated key that newer records need.
+        VaultMetadata meta = loadMetadataFresh();
         if (meta == null) {
             throw new VaultException(VaultError.KEY_MISSING, "there is no vault to export");
         }
@@ -1744,12 +1762,22 @@ public final class Vault {
                             // secret already on the device unreadable, on a call that reported
                             // failure.
                             if (local == null) {
-                                Storage.getInstance().deleteStorageFile(metadataKey());
-                                try {
-                                    forgetEveryMechanism();
-                                } catch (RuntimeException alsoFailed) {
-                                    // Nothing here can reach a half-made key, and reporting this
-                                    // instead of the original would name the wrong failure.
+                                // Guarded exactly as enrolment's rollback is, and for the same
+                                // reason: the record has been readable by every session on this
+                                // origin since it was committed, the step that failed is a
+                                // prompt, and another tab can unlock the vault and store secrets
+                                // inside that window. Deleting then takes the only password wrap
+                                // with it -- and forgetting every mechanism would also destroy a
+                                // remembered unlock that other tab had just established.
+                                if (vaultIsStillUntouched(incoming)) {
+                                    Storage.getInstance().deleteStorageFile(metadataKey());
+                                    try {
+                                        forgetEveryMechanism();
+                                    } catch (RuntimeException alsoFailed) {
+                                        // Nothing here can reach a half-made key, and reporting
+                                        // this instead of the original would name the wrong
+                                        // failure.
+                                    }
                                 }
                             } else {
                                 // Put the previous record back and leave the mechanisms alone:

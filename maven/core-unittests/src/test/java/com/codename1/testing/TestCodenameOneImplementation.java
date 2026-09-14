@@ -3323,8 +3323,31 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return new String[]{single};
     }
 
+    /**
+     * Runs {@code action} once, inside the next storage delete of {@code name}.
+     *
+     * <p>The delete half of {@link #setDuringStorageWrite(String, Runnable)}, for operations
+     * whose storage step removes an entry rather than writing one.</p>
+     *
+     * @param name the storage entry whose delete should be interrupted, or null to cancel
+     * @param action what to do inside it
+     */
+    public void setDuringStorageDelete(String name, Runnable action) {
+        duringStorageDeleteFor = name;
+        duringStorageDelete = action;
+    }
+
+    private String duringStorageDeleteFor;
+    private Runnable duringStorageDelete;
+
     @Override
     public void deleteStorageFile(String name) {
+        if (duringStorageDelete != null && name != null && name.equals(duringStorageDeleteFor)) {
+            Runnable once = duringStorageDelete;
+            duringStorageDelete = null;
+            duringStorageDeleteFor = null;
+            once.run();
+        }
         storageEntries.remove(name);
         // a real port publishes an entry by replacing it, so deleting one abandons
         // any write still open against it rather than being undone by it

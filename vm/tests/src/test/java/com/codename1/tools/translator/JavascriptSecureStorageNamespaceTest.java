@@ -75,6 +75,74 @@ class JavascriptSecureStorageNamespaceTest {
                 + encrypted + ", so an account name can address both");
     }
 
+    /// The body of one method, by brace counting from its signature.
+    private static String methodBody(String source, String signature) {
+        int at = source.indexOf(signature);
+        assertTrue(at >= 0, "could not find " + signature + " in " + SOURCE);
+        int open = source.indexOf('{', at);
+        assertTrue(open >= 0, "malformed " + signature);
+        int depth = 0;
+        for (int iter = open; iter < source.length(); iter++) {
+            char c = source.charAt(iter);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open, iter + 1);
+                }
+            }
+        }
+        throw new AssertionError("unterminated " + signature);
+    }
+
+    @Test
+    void theMigrationRereadsBeforeItOverwrites() throws Exception {
+        // A browser runs many tabs against one store, and seal() is where migrate() pauses. A tab
+        // that read the plaintext and then waited there would write it over whatever arrived
+        // meanwhile -- set() puts a new value in the encrypted entry and removes the plaintext, so
+        // a token another tab had just refreshed was silently replaced by the stale one this
+        // migration set out with.
+        //
+        // Structural rather than behavioural, for the reason this whole class exists: the
+        // JavaScript port's classes are not on this module's classpath. What it asserts is the
+        // ORDER, which is the whole of the property -- a re-read after the write proves nothing.
+        assertTrue(Files.exists(SOURCE), "HTML5SecureStorage.java not found at " + SOURCE);
+        String source = new String(Files.readAllBytes(SOURCE), StandardCharsets.UTF_8);
+        String body = methodBody(source, "private void migrate(String account, String value)");
+
+        int write = body.indexOf("writeObject(encryptedKey(account)");
+        assertTrue(write > 0, "migrate no longer writes the encrypted entry: " + body);
+        String beforeTheWrite = body.substring(0, write);
+        assertTrue(beforeTheWrite.indexOf("readObject(legacyKey(account))") > 0,
+                "migrate must re-read the plaintext it is migrating before it overwrites the "
+                + "encrypted entry, or a stale tab wins over a newer write");
+        assertTrue(beforeTheWrite.indexOf("exists(encryptedKey(account))") > 0,
+                "migrate must check that no encrypted entry has appeared before writing one; "
+                + "get() only reaches migrate when there was none, so one now is newer");
+
+        // And the plaintext is only removed while it is still the value that was migrated.
+        int delete = body.indexOf("deleteStorageFile(legacyKey(account))");
+        assertTrue(delete > 0, "migrate no longer removes the plaintext: " + body);
+        assertTrue(body.lastIndexOf("readObject(legacyKey(account))", delete) > write,
+                "the plaintext must be re-read between the encrypted write and its deletion, or "
+                + "a value that arrived in between is deleted rather than kept");
+    }
+
+    @Test
+    void theOrderingCheckWouldHaveCaughtTheMigrationItWasWrittenFor() {
+        // Guards that guard too. The shipped draft sealed and then wrote with nothing in between,
+        // so the text before the write held no re-read at all.
+        String original = "{ String sealed = seal(account, value);"
+                + " if (!Storage.getInstance().writeObject(encryptedKey(account), sealed)) {"
+                + " return; } }";
+        int write = original.indexOf("writeObject(encryptedKey(account)");
+        assertTrue(write > 0);
+        assertFalse(original.substring(0, write).indexOf("readObject(legacyKey(account))") > 0,
+                "the original really did write without re-reading, so the check has something "
+                + "to catch");
+    }
+
     @Test
     void theCheckWouldHaveCaughtTheCollisionItWasWrittenFor() {
         // Guards the guard: the assertion above must actually reject the spelling that shipped in
