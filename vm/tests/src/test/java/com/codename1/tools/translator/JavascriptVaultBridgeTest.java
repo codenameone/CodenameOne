@@ -168,6 +168,23 @@ class JavascriptVaultBridgeTest {
     }
 
     @Test
+    void aKeyWhoseTransactionAbortedIsNotReportedAsCreated() throws Exception {
+        Map<String, String> r = run();
+        // IndexedDB fires a request's success while its transaction is still open, so a bridge
+        // that answered there handed back a key that had not become durable. The caller then
+        // wrapped real records under it -- including, through SecureStorage, a managed database
+        // key -- and after a reload the ciphertext opened with nothing.
+        //
+        // 5 is QUOTA_EXCEEDED, not the generic 4: the abort carries a QuotaExceededError and the
+        // bridge maps it by name, so the caller is told which storage failure it was. What the
+        // assertion is really about is that this is a typed FAILURE and not a success.
+        assertNotEquals("0", r.get("ensureKeyUncommittedStatus"));
+        assertEquals("5", r.get("ensureKeyUncommittedStatus"));
+        // And the aborted write left nothing behind claiming to be a key. 0 is KEY_ABSENT.
+        assertEquals("0", r.get("keyStateAfterAbort"));
+    }
+
+    @Test
     void anUnreachableStoreIsNeverReportedAsAnAbsentKey() throws Exception {
         Map<String, String> r = run();
         // 4 is STORAGE_UNAVAILABLE. The answer that must not appear here is a successful status

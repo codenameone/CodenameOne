@@ -526,6 +526,26 @@
     return cn1VaultDbPromise;
   }
 
+  /// Settles when the transaction actually commits.
+  ///
+  /// An IndexedDB request fires ``onsuccess`` while its transaction is still open, so a value
+  /// returned at that point describes a write that has not happened yet: the transaction can
+  /// still abort -- quota, a storage failure, the tab going away -- and everything in it is
+  /// discarded. Handing back a freshly generated key there let the caller wrap real records
+  /// under a key that never became durable, and after a reload the ciphertext beside it, up to
+  /// and including a managed database key, opened with nothing.
+  function cn1VaultCommit(tx) {
+    return new Promise(function(resolve, reject) {
+      tx.oncomplete = function() { resolve(); };
+      tx.onabort = function() {
+        reject(tx.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+      };
+      tx.onerror = function() {
+        reject(tx.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+      };
+    });
+  }
+
   function cn1VaultRequest(store, operation) {
     return new Promise(function(resolve, reject) {
       var request;
@@ -589,14 +609,19 @@
             return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
               return store.add({ id: String(keyId), key: key, created: 0 });
             }).then(function(added) {
-              if (added !== undefined) {
-                return key;
-              }
-              return cn1VaultRead(keyId).then(function(settled) {
-                if (settled && settled.key) {
-                  return settled.key;
+              // Committed before the key is handed back. A ConstraintError has already been
+              // turned into ``undefined`` above rather than left to bubble, so the transaction
+              // is still live either way and this waits for its real outcome.
+              return cn1VaultCommit(tx).then(function() {
+                if (added !== undefined) {
+                  return key;
                 }
-                throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+                return cn1VaultRead(keyId).then(function(settled) {
+                  if (settled && settled.key) {
+                    return settled.key;
+                  }
+                  throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+                });
               });
             });
           });
@@ -755,6 +780,13 @@
     return cn1VaultRead(CN1_PRF_STORE_PREFIX + keyId);
   }
 
+  /// Stores the credential and answers with the record that actually SETTLED.
+  ///
+  /// Not with the one passed in. ``add`` converges two tabs on a single credential, and the
+  /// loser's own record is discarded -- so a tab that asked for a device-bound passkey and lost
+  /// the race to a tab that did not would otherwise report success and then derive under the
+  /// syncable credential the winner stored. The caller has to see what won in order to judge it,
+  /// so the settled record is what comes back.
   function cn1VaultStorePrfRecord(keyId, record) {
     return cn1VaultOpenDb().then(function(db) {
       var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
@@ -769,6 +801,14 @@
           backupEligible: record.backupEligible,
           deviceBound: record.deviceBound,
           created: 0
+        });
+      }).then(function(added) {
+        // Durable before it is described as stored, for the reason on cn1VaultCommit.
+        return cn1VaultCommit(tx).then(function() {
+          if (added !== undefined) {
+            return record;
+          }
+          return cn1VaultPrfRecord(keyId);
         });
       });
     });
@@ -883,7 +923,17 @@
           backupEligible: flags === null ? 1 : (flags.backupEligible ? 1 : 0),
           deviceBound: deviceBound ? 1 : 0
         };
-        return cn1VaultStorePrfRecord(keyId, record).then(function() {
+        return cn1VaultStorePrfRecord(keyId, record).then(function(settled) {
+          // Judged against what settled, not against what this tab created. Another tab can
+          // win the add between the read at the top of this function and here, and if it was
+          // not asking for a device-bound credential its syncable one is now the vault's --
+          // which is exactly the credential requireDeviceBoundPasskey() exists to refuse.
+          if (!settled || !settled.credentialId) {
+            return cn1VaultReply(CN1V_STORAGE_UNAVAILABLE, null);
+          }
+          if (deviceBound && settled.backupEligible !== 0) {
+            return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+          }
           return cn1VaultReply(CN1V_OK, null);
         });
       }, function(error) {

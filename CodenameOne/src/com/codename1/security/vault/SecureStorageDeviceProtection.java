@@ -86,9 +86,15 @@ public class SecureStorageDeviceProtection extends DeviceProtection {
         // The key is bytes this class can read back, by construction. Saying otherwise would be
         // the single most misleading thing this file could do.
         b.set(Protection.NON_EXTRACTABLE_KEY, false);
-        // Whether the store is the OS key store is a question about the port, and the port is
-        // what overrides this class when the answer is no. From here it cannot be verified.
-        b.set(Protection.OS_PROTECTED, hasStore ? ProtectionReport.UNKNOWN : ProtectionReport.NO);
+        // Propagated, for the same reason as encryption above. This used to answer UNKNOWN on
+        // the grounds that the port is what knows -- which was true when nothing here could ask,
+        // and stopped being true once every native store gained protection(). iOS says YES for
+        // the keychain and Windows for DPAPI, and every non-browser port reaches this shared
+        // fallback, so overriding their verified answer with UNKNOWN made
+        // VaultOptions.require(OS_PROTECTED) refuse a remembered vault on exactly the platforms
+        // that do provide it.
+        b.set(Protection.OS_PROTECTED, hasStore
+                ? store.protection().answer(Protection.OS_PROTECTED) : ProtectionReport.NO);
         b.set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN);
         b.set(Protection.USER_VERIFICATION, false);
         b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);

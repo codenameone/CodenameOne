@@ -52,6 +52,11 @@ function makeIndexedDb() {
   // would be reporting on a race that did not happen.
   let constraintErrors = 0;
   let clonedKeys = 0;
+  // A real transaction can still abort AFTER its requests have reported success -- quota, a
+  // storage failure, the tab going away. The stub had no transaction lifecycle at all, so the
+  // bridge's commit wait had nothing to listen to and the difference between "the request
+  // succeeded" and "the write is durable" could not be expressed here.
+  let failEveryCommit = false;
 
   function request(run) {
     const req = { onsuccess: null, onerror: null, result: undefined, error: null };
@@ -82,6 +87,35 @@ function makeIndexedDb() {
         throw err;
       }
       const data = stores.get(name);
+      // Writes land immediately and an ABORT rolls them back, rather than being buffered until
+      // commit. Buffering would be the other faithful model, but not for what this harness is
+      // for: two tabs are two connections and their adds genuinely interleave, which is the
+      // whole of the ConstraintError convergence this file exists to exercise. Per-transaction
+      // buffers hid that from each other and the convergence test went vacuous. An undo log
+      // keeps the race and still discards an aborted transaction's writes.
+      const undo = [];
+      const remember = (key) => {
+        undo.push({ key: key, had: data.has(key), prev: data.get(key) });
+      };
+      // Settles after the requests queued on it, the way a real one does: the handlers are
+      // attached during this turn, so the completion has to be scheduled behind them.
+      const tx = { oncomplete: null, onabort: null, onerror: null, error: null };
+      setTimeout(() => {
+        if (failEveryCommit) {
+          for (let i = undo.length - 1; i >= 0; i--) {
+            const entry = undo[i];
+            if (entry.had) {
+              data.set(entry.key, entry.prev);
+            } else {
+              data.delete(entry.key);
+            }
+          }
+          tx.error = Object.assign(new Error('quota exceeded'), { name: 'QuotaExceededError' });
+          if (tx.onabort) tx.onabort();
+          return;
+        }
+        if (tx.oncomplete) tx.oncomplete();
+      }, 0);
       const store = {
         get: (key) => request(() => data.get(key)),
         add: (record) => request(() => {
@@ -104,17 +138,20 @@ function makeIndexedDb() {
           } catch (e) {
             stored = record;
           }
+          remember(record.id);
           data.set(record.id, stored);
           return record.id;
         }),
-        delete: (key) => request(() => { data.delete(key); return undefined; })
+        delete: (key) => request(() => { remember(key); data.delete(key); return undefined; })
       };
-      return { objectStore: () => store };
+      tx.objectStore = () => store;
+      return tx;
     }
   };
 
   return {
     setFailEveryOpen(value) { failEveryOpen = value; },
+    setFailEveryCommit(value) { failEveryCommit = value; },
     constraintErrors() { return constraintErrors; },
     clonedKeys() { return clonedKeys; },
     recordCount(name) { return stores.has(name) ? stores.get(name).size : 0; },
@@ -313,6 +350,17 @@ function payload(reply) {
     // it forever, so the next call opens a fresh one.
     const recovered = await call({ op: 'keyState', keyId: KEY });
     results.keyStateAfterRecovery = status(recovered);
+
+    // A write whose TRANSACTION aborts is not a write. The request reports success first --
+    // that is how IndexedDB is specified -- so a bridge that answered there handed back a key
+    // that never became durable, and the caller went on to wrap real records under it.
+    fakeIndexedDb.setFailEveryCommit(true);
+    const uncommitted = await call({ op: 'ensureKey', keyId: 'commit-probe' });
+    results.ensureKeyUncommittedStatus = status(uncommitted);
+    fakeIndexedDb.setFailEveryCommit(false);
+    // And nothing was left behind claiming to be a key.
+    const afterAbort = await call({ op: 'keyState', keyId: 'commit-probe' });
+    results.keyStateAfterAbort = payload(afterAbort)[0];
 
     console.log(JSON.stringify(results));
   } catch (e) {
