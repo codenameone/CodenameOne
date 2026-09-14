@@ -3896,6 +3896,49 @@ public class SelfTest {
      * file. This check runs on BOTH arms, which is the point: it is the two
      * answering alike that was missing.
      */
+    /**
+     * An open that failed for a reason OTHER than the file being absent.
+     *
+     * <p>-1 means "no such file", which a caller may treat as an optional file
+     * nobody wrote; -2 means "there is something there and it could not be
+     * opened", which nobody may quietly ignore -- Config refuses to start on it,
+     * because a deployment whose TLS certificate and key are named in a file it
+     * cannot read would otherwise come up in plaintext.
+     *
+     * <p>Provoked with an over-long name rather than a permission bit, so this
+     * needs no chmod and answers the same whether or not the tests run as root.
+     * Both arms have to agree, and they did not at first: the JVM's
+     * FileChannel.open throws a plain FileSystemException for a path under a
+     * non-directory while the native arm read that errno as "absent".
+     */
+    private static void anUnopenableFileIsNotAnAbsentOne() throws Exception {
+        StringBuilder tooLong = new StringBuilder("/tmp/");
+        for(int iter = 0 ; iter < 600 ; iter++) {
+            tooLong.append('x');
+        }
+        int refused = FileIo.openRead(tooLong.toString());
+        if(refused >= 0) {
+            FileIo.close(refused);
+        }
+        check("an unopenable path is told apart from an absent one", "-2",
+                String.valueOf(refused));
+        // A path under a file rather than a directory, which is the case the two
+        // arms disagreed about.
+        int underAFile = FileIo.openRead("/etc/hosts/nope");
+        if(underAFile >= 0) {
+            FileIo.close(underAFile);
+        }
+        check("and so is a path under a non-directory", "-2", String.valueOf(underAFile));
+        // THE CONTROL: a name that is merely absent still answers -1, so this
+        // cannot pass by reporting -2 for everything.
+        int absent = FileIo.openRead("/tmp/cn1-selftest-no-such-file");
+        if(absent >= 0) {
+            FileIo.close(absent);
+        }
+        check("while a file that is simply not there answers -1", "-1",
+                String.valueOf(absent));
+    }
+
     private static void aTruncatingPathOpensNothing() throws Exception {
         int truncated = FileIo.openRead("/etc/hosts\u0000.png");
         if(truncated >= 0) {
@@ -5574,6 +5617,7 @@ public class SelfTest {
         aChunkedResponseEndsWhereItsFramingSays();
         aResponseEndsAtItsDeclaredLength();
         aTruncatingPathOpensNothing();
+        anUnopenableFileIsNotAnAbsentOne();
         aTlsVerificationNameWithANulIsRefused();
         aHeadResponseIsNotReadAsTruncated();
         aNullMethodIsGet();

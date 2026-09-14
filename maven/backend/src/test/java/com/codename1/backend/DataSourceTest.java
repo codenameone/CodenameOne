@@ -174,6 +174,20 @@ class DataSourceTest {
         // URL to one of them and an in-memory database to the other. Whichever
         // way it is spelled it is one database, and one connection.
         assertThrows(IOException.class, () -> DataSource.open("JDBC:SQLite::memory:", 2));
+        // EVERY CASING REACHES THE DRIVER, which is the half the recogniser does
+        // not settle: Db forwards the URL in the spelling it arrived in, so
+        // whether it opens at all is sqlite-jdbc's answer rather than ours.
+        // Measured, because "the driver wants lower case" is a plausible thing
+        // to believe and would mean this recogniser accepts URLs that then fail.
+        for(String spelling : new String[] {"jdbc:sqlite::memory:", "JDBC:SQLITE::memory:",
+                "JDBC:SQLite::memory:", "Jdbc:Sqlite::memory:"}) {
+            DataSource one = DataSource.open(spelling);
+            try {
+                one.execute("CREATE TABLE t (a INTEGER)", null);
+            } finally {
+                one.close();
+            }
+        }
         DataSource pool = DataSource.open("JDBC:SQLite::memory:");
         try {
             assertEquals(1, pool.getMaxSize());

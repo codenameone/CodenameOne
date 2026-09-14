@@ -206,6 +206,16 @@ jobs:
           # the behaviour the database layer is supposed to have.
           CN1_DBCHECK_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
           CN1_DBCHECK_MYSQL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
+          # WITHOUT THIS THE BACKEND TESTS CAN SKIP AND THE JOB STAYS GREEN.
+          # BackendTestSupport.skipOrFail turns a backend build failure into a
+          # JUnit assumption abort, because a developer machine with no C
+          # toolchain must not fail the suite -- and a missing link library in CI
+          # looks exactly the same from inside the test. This is the only job
+          # that runs the whole tests module, so it is the one place that has to
+          # say the backend is expected to build here: a compile, link or
+          # toolchain regression fails the workflow rather than quietly
+          # subtracting BackendDatabaseTest, BackendOrmTest and the rest from it.
+          CN1_BACKEND_REQUIRED: 1
 
       - name: Run ParparVM Benchmark
         working-directory: vm
