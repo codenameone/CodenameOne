@@ -718,6 +718,52 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void twoVaultNamesThatEscapeAlikeStayIsolated() {
+        // Storage.fixFileName rewrites '%' to '_' with normalizeNames on, which is the default.
+        // So a '%' escape made "a.b" persist as "a_002eb" -- exactly where a vault literally
+        // called "a_002eb" persists -- and one vault could read, unlock or destroy the other.
+        String stem = freshName();
+        String dotted = stem + ".b";
+        String collides = stem + "_002eb";
+
+        VaultOptions options = fast();
+        Vault first = Vault.named(dotted).configure(options);
+        first.enroll(pw("p"), options).get();
+        first.putSecret("s", pw("from-dotted")).get();
+
+        // The second name must look untouched, not like an existing vault.
+        Vault second = Vault.named(collides).configure(options);
+        assertEquals(Vault.NOT_ENROLLED, second.state(),
+                "a vault whose name escapes to the other's spelling must not find its record");
+        second.enroll(pw("q"), options).get();
+        second.putSecret("s", pw("from-underscored")).get();
+
+        // And neither overwrote the other.
+        assertArrayEquals(pw("from-dotted"), first.getSecret("s").get());
+        assertArrayEquals(pw("from-underscored"), second.getSecret("s").get());
+    }
+
+    @Test
+    void twoSecretNamesThatNormalizeAlikeStayIndependent() {
+        // fixFileName also rewrites '/', so an unescaped secret name meant "api/token" and
+        // "api_token" addressed one stored object: the second write clobbered the first, whose
+        // own associated data then failed to authenticate, and removing either removed both.
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+
+        vault.putSecret("api/token", pw("slashed")).get();
+        vault.putSecret("api_token", pw("underscored")).get();
+
+        assertArrayEquals(pw("slashed"), vault.getSecret("api/token").get());
+        assertArrayEquals(pw("underscored"), vault.getSecret("api_token").get());
+
+        // Removing one leaves the other.
+        vault.removeSecret("api/token").get();
+        assertEquals(VaultError.KEY_MISSING, errorOf(vault.getSecret("api/token")));
+        assertArrayEquals(pw("underscored"), vault.getSecret("api_token").get());
+    }
+
+    @Test
     void aDeviceKeyThatWillNotDeleteIsReportedRatherThanIgnored() {
         VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
         Vault vault = Vault.named(freshName()).configure(options);

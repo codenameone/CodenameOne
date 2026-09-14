@@ -1948,18 +1948,28 @@ public final class Vault {
     /// character would reintroduce the collision a step further along.
     private String safeName() {
         // '.' is deliberately NOT in the safe set here: it separates a metadata key from the
-        // device key built on it, which is the collision this method exists to prevent.
-        return escaped(name, "-_");
+        // device key built on it, which is the collision this method exists to prevent. Nor is
+        // '_', which is now the escape character.
+        return escaped(name, "-");
     }
 
-    /// The escape both identities are built from: anything outside the safe set becomes `%` and
-    /// four hex digits, and `%` is itself outside every safe set, so `a%0020b` and `a b` cannot
-    /// encode alike. Reversible, which is the whole point -- two values that differ must keep
-    /// different keys, and folding to one replacement character is how they stop doing that.
+    /// The escape every storage name here is built from: anything outside the safe set becomes
+    /// `_` and four hex digits, and `_` is itself outside every safe set, so `a_0020b` and `a b`
+    /// cannot encode alike. Reversible, which is the whole point -- two values that differ must
+    /// keep different keys, and folding to one replacement character is how they stop doing that.
     ///
-    /// The safe set is a parameter because the two callers genuinely differ: a vault name must
-    /// escape `.`, an application identity must keep it, since that is what package names are
-    /// made of.
+    /// The escape character is `_` and NOT `%`, which is what this used at first and which does
+    /// not survive the trip. `Storage.fixFileName` rewrites `/ \\ % ? * : =` to `_` whenever
+    /// `normalizeNames` is on, and it is on by default -- so a vault called `a.b` escaped to
+    /// `a%002eb` and then PERSISTED as `a_002eb`, which is exactly the spelling a vault literally
+    /// called `a_002eb` persisted under. The escape was reversible everywhere except the one
+    /// place it had to be, and `destroyLocalData` compounded it by matching an unnormalized
+    /// prefix against the normalized names `listEntries` returns, so it walked past the entries
+    /// it was asked to delete. `_` is not in that rewrite list.
+    ///
+    /// The safe set is a parameter because the callers genuinely differ: a vault name must escape
+    /// `.`, an application identity must keep it, since that is what package names are made of.
+    /// None of them may include `_`.
     private static String escaped(String value, String alsoSafe) {
         StringBuilder b = new StringBuilder(value.length());
         for (int iter = 0; iter < value.length(); iter++) {
@@ -1969,7 +1979,7 @@ public final class Vault {
             if (safe) {
                 b.append(c);
             } else {
-                b.append('%');
+                b.append('_');
                 b.append(HEX.charAt((c >> 12) & 0x0f));
                 b.append(HEX.charAt((c >> 8) & 0x0f));
                 b.append(HEX.charAt((c >> 4) & 0x0f));
@@ -1986,7 +1996,11 @@ public final class Vault {
     }
 
     private String secretKey(String secretName) {
-        return metadataKey() + ".s." + secretName;
+        // Escaped, not embedded. Storage.fixFileName rewrites '/' and six other characters to
+        // '_', so `api/token` and `api_token` addressed ONE stored object: writing the second
+        // overwrote the first, whose own associated data then failed to authenticate, and
+        // removing either removed both.
+        return metadataKey() + ".s." + escaped(secretName == null ? "" : secretName, "-");
     }
 
     private String deviceKeyId() {

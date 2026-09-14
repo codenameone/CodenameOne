@@ -3360,7 +3360,19 @@ public class IPhoneBuilder extends Executor {
         // com.codename1.security.* get stub-only versions of the iOS
         // crypto bridge -- no CommonCrypto / Security framework symbols
         // referenced -- which keeps Apple's static-symbol scanner happy.
-        usesCryptoGcm = usesCryptoAPI && "true".equals(request.getArg("ios.crypto.gcm", "false"));
+        // Defaulted ON wherever the crypto API is on, which is what macOS has always done --
+        // MacOSBuildHints.getCryptoGcm defaults to "true" and its hint documentation says it
+        // matches "what an iOS build of the same application gets". It did not. iOS defaulted to
+        // false, so com.codename1.security.vault, which seals every record with AES-GCM, got
+        // CN1_CRYPTO_E_UNSUPPORTED from the first enrolment onwards: a documented API that could
+        // not work on iOS unless the developer already knew to set a build hint nothing told
+        // them about.
+        //
+        // This costs nothing to an application that does not use crypto at all -- usesCryptoAPI
+        // gates it, and those builds still get the stub-only bridge that keeps Apple's
+        // static-symbol scanner quiet. An application that wants the smaller symbol set can
+        // still say so, exactly as on macOS.
+        usesCryptoGcm = usesCryptoAPI && "true".equals(request.getArg("ios.crypto.gcm", "true"));
         try {
             File cn1Crypto = new File(buildinRes, "CN1Crypto.h");
             if (cn1Crypto.exists()) {
