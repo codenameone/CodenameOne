@@ -53,6 +53,10 @@ WORD = re.compile(r'`([A-Z][A-Za-z0-9]{3,})`'
                   r'|\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}'
                   r'|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b')
 IDENTIFIER = re.compile(r'\b[A-Z][A-Za-z0-9]{2,}\b')
+# Comments are prose, and prose carries the same typos the guide does.
+BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
+LINE_COMMENT = re.compile(r'(?<![:"\'])//[^\n]*')
+XML_COMMENT = re.compile(r'<!--.*?-->', re.S)
 
 
 def class_index():
@@ -69,9 +73,35 @@ def class_index():
     return simple, qualified
 
 
+def strip_comments(text):
+    """Removes comments, which are prose and carry the same typos.
+
+    The whole point of reading the tree is to tell a real identifier from a
+    misspelling, and a comment holds neither -- it holds English. Leaving
+    them in let a typo vouch for itself: `ConectionRequest` was written into
+    both the io chapter and the javadoc of com.codename1.io, and the second
+    copy made this check pass over the first.
+    """
+    text = BLOCK_COMMENT.sub(' ', text)
+    text = LINE_COMMENT.sub(' ', text)
+    return XML_COMMENT.sub(' ', text)
+
+
 def tree_identifiers():
-    """Every capitalised identifier this repository's own sources use."""
-    seen = set()
+    """Capitalised words this repository uses, in code and in all of it.
+
+    Two sets, because comments cut both ways. They are the only place some
+    genuinely foreign names appear -- our own notes discuss SFSpeechRecognizer,
+    HKWorkoutSession and XPath -- so throwing them away would report every one
+    of those. But a comment is prose and carries the same typos the guide
+    does, so letting them vouch for a word let a typo vouch for itself:
+    `ConectionRequest` was written into both the io chapter and the javadoc of
+    com.codename1.io, and the second copy made this check pass over the first.
+
+    So a word one character away from a Codename One class has to earn its
+    place in real code; two characters away, anywhere in the tree will do.
+    """
+    code, anywhere = set(), set()
     for root in IDENTIFIER_ROOTS:
         for path, dirs, files in os.walk(root):
             dirs[:] = [d for d in dirs if d not in ('target', '.git', 'build')]
@@ -81,22 +111,29 @@ def tree_identifiers():
                 try:
                     with open(os.path.join(path, name), encoding='utf-8',
                               errors='ignore') as handle:
-                        seen.update(IDENTIFIER.findall(handle.read()))
+                        text = handle.read()
                 except OSError:
                     continue
-    return seen
+                anywhere.update(IDENTIFIER.findall(text))
+                code.update(IDENTIFIER.findall(strip_comments(text)))
+    return code, anywhere
 
 
 # Two edits rather than one, because a transposition costs two: "BordreLayout"
 # is that far from BorderLayout.  The repository's own identifiers are what
 # keep the wider radius quiet.
 EDIT_LIMIT = 2
+# A class whose name is shorter than this is too generic to tell a typo from an
+# ordinary word: XPath is one character from Path and is neither.
+SHORTEST_DISTINGUISHING_NAME = 5
 
 
 def near_miss_of(word, candidates):
-    """The closest candidate within EDIT_LIMIT edits, or None."""
+    """The closest candidate within EDIT_LIMIT edits as (name, distance)."""
     best = None
     for candidate in candidates:
+        if len(candidate) < SHORTEST_DISTINGUISHING_NAME:
+            continue
         if abs(len(word) - len(candidate)) > EDIT_LIMIT:
             continue
         previous = list(range(len(candidate) + 1))
@@ -113,7 +150,7 @@ def near_miss_of(word, candidates):
             distance = previous[-1]
             if 0 < distance <= EDIT_LIMIT and (best is None or distance < best[1]):
                 best = (candidate, distance)
-    return best[0] if best else None
+    return best
 
 
 def is_plural_of_a_class(word, simple):
@@ -123,7 +160,7 @@ def is_plural_of_a_class(word, simple):
 
 def main():
     simple, qualified = class_index()
-    known = tree_identifiers()
+    code, anywhere = tree_identifiers()
     dead_links, typos, seen = [], [], set()
 
     for name in sorted(os.listdir(GUIDE)):
@@ -137,7 +174,7 @@ def main():
                 dead_links.append('%s: %s' % (name, target))
         for match in WORD.finditer(text):
             word = match.group(1) or match.group(2)
-            if word in simple or word in known or word in seen:
+            if word in simple or word in seen:
                 continue
             seen.add(word)
             if is_plural_of_a_class(word, simple) or word.startswith('My'):
@@ -145,8 +182,12 @@ def main():
                 # reader's own class, which are near-misses by construction.
                 continue
             near = near_miss_of(word, simple)
-            if near:
-                typos.append((name, word, near))
+            if near is None:
+                continue
+            candidate, distance = near
+            vouched = code if distance == 1 else anywhere
+            if word not in vouched:
+                typos.append((name, word, candidate))
 
     for line in dead_links:
         print('javadoc link names a class that does not exist: %s' % line,

@@ -706,7 +706,7 @@ Here you can extract the headers one by one to handle complex headers such as co
 
 ===== Error handling
 
-As you noticed above practically all the methods in the `ConectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
+As you noticed above practically all the methods in the `ConnectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
 
 There are two distinct places where you can handle a networking error:
 

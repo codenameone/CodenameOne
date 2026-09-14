@@ -406,7 +406,7 @@
 ///
 /// ### Error Handling
 ///
-/// As you noticed above practically all of the methods in the `ConectionRequest`
+/// As you noticed above practically all of the methods in the `ConnectionRequest`
 /// throw `IOException`. This allows you to avoid the `try`/`catch`
 /// semantics and just let the error propagate up the chain so it can be handled uniformly by
 /// the application.
