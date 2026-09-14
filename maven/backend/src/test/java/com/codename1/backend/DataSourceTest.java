@@ -36,7 +36,9 @@ import com.codename1.backend.sql.Dialect;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -104,6 +106,66 @@ class DataSourceTest {
             pool.release(held);
             // And the pool still works once the connection comes back.
             pool.release(pool.borrow());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a pool of more than one over an in-memory database is refused")
+    void refusesAPooledMemoryDatabase() {
+        // Each connection to ":memory:" gets its OWN database, so a second one is
+        // not more capacity: it is a second empty database, and which one a
+        // request sees depends on borrow order. Rows written through the first
+        // connection are simply missing, or the table is. Refused rather than
+        // clamped in silence, because the setting says something the deployment
+        // believes.
+        IOException err = assertThrows(IOException.class, () -> DataSource.open(":memory:", 4));
+        assertTrue(err.getMessage().contains("cannot be pooled"), err.getMessage());
+        assertTrue(err.getMessage().contains(Config.DATASOURCE_POOL_SIZE), err.getMessage());
+    }
+
+    @Test
+    @DisplayName("dropping a dead connection wakes a borrower waiting for capacity")
+    void discardingWakesAWaiter() throws Exception {
+        // The pool is full and every connection is out, so a borrower waits. The
+        // holder then finds its connection dead and releases it: that creates
+        // capacity without putting anything in the idle list, and it is the one
+        // path that used not to notify. With borrowTimeoutMillis at the
+        // documented 0 -- wait forever -- the waiter never woke at all.
+        final DataSource pool = DataSource.open(":memory:", 1, 0, 0);
+        try {
+            Database held = pool.borrow();
+            final Database[] got = new Database[1];
+            final Throwable[] failed = new Throwable[1];
+            final java.util.concurrent.CountDownLatch waiting =
+                    new java.util.concurrent.CountDownLatch(1);
+            final java.util.concurrent.CountDownLatch done =
+                    new java.util.concurrent.CountDownLatch(1);
+            Thread waiter = new Thread(new Runnable() {
+                public void run() {
+                    waiting.countDown();
+                    try {
+                        got[0] = pool.borrow();
+                    } catch (Throwable err) {
+                        failed[0] = err;
+                    } finally {
+                        done.countDown();
+                    }
+                }
+            });
+            waiter.start();
+            assertTrue(waiting.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            // Long enough that the waiter is parked rather than about to park.
+            Thread.sleep(200);
+            held.close();                  // as a connection the server hung up on
+            pool.release(held);
+            assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS),
+                    "the waiter was never woken when the dead connection was dropped");
+            assertNull(failed[0], String.valueOf(failed[0]));
+            assertNotNull(got[0]);
+            assertTrue(got[0].isOpen());
+            pool.release(got[0]);
         } finally {
             pool.close();
         }

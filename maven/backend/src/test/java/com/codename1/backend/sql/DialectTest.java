@@ -141,6 +141,45 @@ class DialectTest {
     }
 
     @Test
+    @DisplayName("MySQL escapes with a backslash in every literal; the others do not")
+    void readsEachEngineOwnStringEscapes() throws Exception {
+        // MySQL's default SQL mode makes a backslash an escape everywhere, so
+        // the literal here ends at the LAST quote and the ? inside it is not a
+        // parameter. Read PostgreSQL's way, the literal ended at the escaped
+        // quote and the ? that followed was counted, so a valid statement was
+        // refused before MySQL ever saw it.
+        assertEquals("SELECT 'it\\'s ?', ?", Dialect.MYSQL.bind("SELECT 'it\\'s ?', ?", 1));
+        // And the other two keep their own rule: a backslash is an ordinary
+        // character in SQLite and in an unprefixed PostgreSQL literal, so the
+        // literal ends at the first unescaped quote.
+        assertEquals("SELECT 'a\\', $1", Dialect.POSTGRES.bind("SELECT 'a\\', ?", 1));
+        assertEquals("SELECT 'a\\', ?", Dialect.SQLITE.bind("SELECT 'a\\', ?", 1));
+    }
+
+    @Test
+    @DisplayName("MySQL's hash comment is a comment")
+    void readsHashComments() throws Exception {
+        // # starts a line comment on MySQL alone. Unrecognised, the ? in the
+        // comment was counted and the statement refused for having two
+        // parameters when one value was supplied.
+        assertEquals("SELECT 1 # why?\nWHERE a = ?",
+                Dialect.MYSQL.bind("SELECT 1 # why?\nWHERE a = ?", 1));
+        // Not on the others, where # is not a comment introducer at all.
+        assertThrows(IOException.class, () -> Dialect.SQLITE.bind("SELECT 1 # why?\nWHERE a = ?", 1));
+    }
+
+    @Test
+    @DisplayName("an insert with no columns is spelled per engine")
+    void insertsDefaults() {
+        // The entity whose only persisted field is a generated key. The obvious
+        // construction, INSERT INTO t () VALUES (), is refused by two of the
+        // three; MySQL is the one that wants it and has no DEFAULT VALUES.
+        assertEquals("INSERT INTO \"t\" DEFAULT VALUES", Dialect.SQLITE.insertDefaults("\"t\""));
+        assertEquals("INSERT INTO \"t\" DEFAULT VALUES", Dialect.POSTGRES.insertDefaults("\"t\""));
+        assertEquals("INSERT INTO `t` () VALUES ()", Dialect.MYSQL.insertDefaults("`t`"));
+    }
+
+    @Test
     @DisplayName("identifiers are quoted so their case survives PostgreSQL")
     void quotesIdentifiers() {
         assertEquals("\"createdAt\"", Dialect.POSTGRES.quote("createdAt"));

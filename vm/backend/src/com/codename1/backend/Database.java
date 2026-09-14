@@ -259,7 +259,7 @@ public final class Database {
         // through query rather than execute. Appended AFTER the portable form is
         // rendered would mean rendering twice; appending before costs nothing
         // because the clause holds no placeholder.
-        Map row = queryOne(sql + " RETURNING " + dialect.quote(idColumn), params);
+        Map row = queryOne(withReturning(sql, idColumn), params);
         if(row == null) {
             return 0;
         }
@@ -272,6 +272,25 @@ public final class Database {
         }
         throw new IOException("The generated key came back as something other than a "
                 + "number, so the column named is not the generated one: " + idColumn);
+    }
+
+    /**
+     * {@code sql} with a RETURNING clause, placed INSIDE the statement.
+     *
+     * <p>A trailing semicolon is where this goes wrong if nobody looks for it:
+     * appending to "INSERT INTO t (a) VALUES (?);" gives
+     * "INSERT INTO t (a) VALUES (?); RETURNING id", which is two statements, the
+     * second of which is not SQL. The same call works on SQLite and MySQL, which
+     * never append anything, so it would be a portability hole in exactly the
+     * engine this method exists for. The terminator is dropped rather than moved:
+     * the statement ends where the clause does.
+     */
+    private String withReturning(String sql, String idColumn) {
+        int end = sql.length();
+        while(end > 0 && (sql.charAt(end - 1) == ';' || sql.charAt(end - 1) <= ' ')) {
+            end--;
+        }
+        return sql.substring(0, end) + " RETURNING " + dialect.quote(idColumn);
     }
 
     /**

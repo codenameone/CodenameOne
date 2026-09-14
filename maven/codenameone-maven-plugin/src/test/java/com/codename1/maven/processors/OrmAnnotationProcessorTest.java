@@ -25,6 +25,7 @@ package com.codename1.maven.processors;
 import com.codename1.maven.annotations.AnnotatedClass;
 import com.codename1.maven.annotations.ClassScanner;
 import com.codename1.maven.annotations.JavaSourceCompiler;
+import com.codename1.maven.annotations.ProcessingException;
 import com.codename1.maven.annotations.ProcessorContext;
 
 import org.apache.maven.plugin.logging.SystemStreamLog;
@@ -216,6 +217,77 @@ public class OrmAnnotationProcessorTest {
                 new File(moduleClasses, "com/example/SharedCn1BackendDao.class").exists());
     }
 
+    @Test
+    public void theEntryPointCompilesAgainstTheDaosGeneratedBeforeIt() throws Exception {
+        // The packaging order, as a test rather than as a convention.
+        //
+        // cn1:backend-package compiles into its own class tree and generates
+        // into it; the entry point it writes references cn1app.BackendDaoBootstrap
+        // whenever the module has an @Entity, because that reference is what
+        // keeps the generated daos in the binary. Run the controller processor
+        // over a tree the entity processor has not touched and its own javac
+        // fails on a class that is not there -- which is what native packaging
+        // did for every project that had both.
+        String entity = "package com.example;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Entity public class Stored {\n"
+                + "    @Id public long id;\n"
+                + "    public String name;\n"
+                + "    public Stored() {}\n"
+                + "}\n";
+        String controller = "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/healthz\") public String health() { return \"ok\"; }\n"
+                + "}\n";
+
+        // Without the entity pass: the entry point cannot compile.
+        File alone = tmp.newFolder("without-daos");
+        java.util.Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.Stored", entity);
+        sources.put("com.example.Api", controller);
+        JavaSourceCompiler.compile(sources, alone, filesOf(backendClasspath()));
+        try {
+            runControllers(alone, backendClasspath());
+            fail("the entry point referenced a bootstrap that was never generated, so its "
+                    + "compilation should have failed");
+        } catch (ProcessingException expected) {
+            assertTrue(expected.getMessage(),
+                    expected.getMessage().contains("BackendDaoBootstrap")
+                            || expected.getMessage().contains("cannot find symbol"));
+        }
+
+        // With it, in the order the packaging goal now uses.
+        File together = tmp.newFolder("with-daos");
+        JavaSourceCompiler.compile(sources, together, filesOf(backendClasspath()));
+        ProcessorContext ctx = runProcessor(together, backendClasspath(), true);
+        assertFalse("errors: " + ctx.getErrors(), ctx.hasErrors());
+        assertTrue(new File(together, "cn1app/BackendDaoBootstrap.class").exists());
+        runControllers(together, backendClasspath());
+        assertTrue("the generated entry point should have compiled",
+                new File(together, "com/example/BackendApplication.class").exists());
+    }
+
+    /** The controller processor alone, over an already-compiled tree. */
+    private void runControllers(File classesDir, List<String> compileClasspath) throws Exception {
+        Map<String, AnnotatedClass> index = ClassScanner.scan(classesDir);
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        ProcessorContext ctx = new ProcessorContext(classesDir, tmp.newFolder(),
+                index, new SystemStreamLog(), null, null, null,
+                Collections.<String>emptyList(), "UTF-8", compileClasspath);
+        proc.start(ctx);
+        for (AnnotatedClass cls : index.values()) {
+            if (!cls.getClassAnnotations().isEmpty()) proc.processClass(cls, ctx);
+        }
+        proc.finish(ctx);
+    }
+
+    private static List<File> filesOf(List<String> paths) {
+        List<File> out = new ArrayList<File>();
+        for (String p : paths) out.add(new File(p));
+        return out;
+    }
+
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
@@ -254,8 +326,19 @@ public class OrmAnnotationProcessorTest {
 
     private ProcessorContext runProcessor(File classesDir, List<String> compileClasspath)
             throws Exception {
+        return runProcessor(classesDir, compileClasspath, false);
+    }
+
+    private ProcessorContext runProcessor(File classesDir, List<String> compileClasspath,
+                                          boolean forceBackend) throws Exception {
         Map<String, AnnotatedClass> index = ClassScanner.scan(classesDir);
         OrmAnnotationProcessor proc = new OrmAnnotationProcessor();
+        if (forceBackend) {
+            // What BackendPackageMojo does: that build compiles against the
+            // JavaAPI with the runtime off the classpath, so detection cannot
+            // answer for it.
+            proc.setBackendFlavour(true);
+        }
         ProcessorContext ctx = new ProcessorContext(classesDir, tmp.newFolder(),
                 index, new SystemStreamLog(), null, null, null,
                 Collections.<String>emptyList(), "UTF-8", compileClasspath);

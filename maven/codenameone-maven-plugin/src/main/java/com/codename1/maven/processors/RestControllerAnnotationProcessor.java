@@ -2375,12 +2375,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     }
 
     /// What the generated entry point passes to one controller's constructor.
+    ///
+    /// Through a REQUIRE rather than straight: a controller declaring one of
+    /// these constructors is declaring a dependency, and handing it null because
+    /// nothing configured a database produces a server that starts, reports
+    /// healthy and fails on the first request that touches it. The check names
+    /// the controller, and it runs before the server binds.
     private static String argumentFor(Controller c) {
         if ("ENTITIES".equals(c.injection)) {
-            return "entities";
+            return "com.codename1.backend.Backend.requireEntities(entities, \""
+                    + c.binaryName + "\")";
         }
         if ("DATASOURCE".equals(c.injection)) {
-            return "dataSource";
+            return "com.codename1.backend.Backend.requireDataSource(dataSource, \""
+                    + c.binaryName + "\")";
         }
         return "";
     }

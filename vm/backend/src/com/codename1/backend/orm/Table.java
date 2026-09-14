@@ -88,20 +88,28 @@ final class Table {
         this.selectPrefix = select.toString();
 
         this.insertColumns = indicesExcept(columns[idIndex].isGenerated() ? idIndex : -1);
-        StringBuilder insert = new StringBuilder("INSERT INTO ");
-        insert.append(quotedTable).append(" (");
-        for(int iter = 0 ; iter < insertColumns.length ; iter++) {
-            if(iter > 0) {
-                insert.append(", ");
+        if(insertColumns.length == 0) {
+            // An entity whose only persisted field is a generated key. The empty
+            // column list builds "INSERT INTO t () VALUES ()", which SQLite and
+            // PostgreSQL both refuse, so the row could not be created at all --
+            // and each engine spells the no-columns insert its own way.
+            this.insertSql = dialect.insertDefaults(quotedTable);
+        } else {
+            StringBuilder insert = new StringBuilder("INSERT INTO ");
+            insert.append(quotedTable).append(" (");
+            for(int iter = 0 ; iter < insertColumns.length ; iter++) {
+                if(iter > 0) {
+                    insert.append(", ");
+                }
+                insert.append(quotedColumns[insertColumns[iter]]);
             }
-            insert.append(quotedColumns[insertColumns[iter]]);
+            insert.append(") VALUES (");
+            for(int iter = 0 ; iter < insertColumns.length ; iter++) {
+                insert.append(iter > 0 ? ", ?" : "?");
+            }
+            insert.append(")");
+            this.insertSql = insert.toString();
         }
-        insert.append(") VALUES (");
-        for(int iter = 0 ; iter < insertColumns.length ; iter++) {
-            insert.append(iter > 0 ? ", ?" : "?");
-        }
-        insert.append(")");
-        this.insertSql = insert.toString();
 
         this.updateColumns = indicesExcept(idIndex);
         StringBuilder update = new StringBuilder("UPDATE ");
