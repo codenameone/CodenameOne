@@ -339,6 +339,30 @@ class DataSourceTest {
     }
 
     @Test
+    @DisplayName("a multi-row insert is refused before it writes anything")
+    void refusesAMultiRowInsert() throws Exception {
+        // SQLite reports the LAST key for one of these, MySQL the FIRST, and
+        // PostgreSQL returns a row per insert -- so there is no key that means
+        // the same thing on all three. Refused before the rows are written,
+        // rather than after, which is what the PostgreSQL path used to do.
+        DataSource pool = DataSource.open(":memory:");
+        try {
+            pool.execute("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, a TEXT)", null);
+            IOException err = assertThrows(IOException.class,
+                    () -> pool.insert("INSERT INTO t (a) VALUES (?), (?)",
+                            new Object[] {"one", "two"}, "id"));
+            assertTrue(err.getMessage().contains("ONE generated key"), err.getMessage());
+            assertEquals(0, pool.query("SELECT id FROM t", null).size(),
+                    "the refused statement wrote rows anyway");
+            // And the single-row form still works.
+            assertTrue(pool.insert("INSERT INTO t (a) VALUES (?)",
+                    new Object[] {"one"}, "id") > 0);
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     @DisplayName("a pool describes itself without its password")
     void describesWithoutTheUrl() throws Exception {
         DataSource pool = DataSource.open(":memory:");

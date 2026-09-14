@@ -174,6 +174,93 @@ final class Placeholders {
     }
 
     /**
+     * The number of tuples in an INSERT's VALUES clause, or -1 when there is no
+     * VALUES clause to count.
+     *
+     * <p>Through the same scanner as everything else here, so a literal
+     * containing the word VALUES or a stray parenthesis counts for nothing. The
+     * keyword is recognised at nesting depth zero only, which keeps a subquery's
+     * own VALUES out of the answer, and what is counted after it is the
+     * top-level groups: "VALUES (?, ?), (?, ?)" is two rows of two columns, not
+     * four of anything.
+     */
+    static int countInsertRows(String sql, boolean nestedComments, boolean backslashEscapes,
+                               boolean hashComments, boolean dollarQuotedStrings)
+            throws IOException {
+        int at = 0;
+        int depth = 0;
+        int length = sql.length();
+        int valuesAt = -1;
+        while(at < length) {
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings);
+            if(next > at) {
+                at = next;
+                continue;
+            }
+            char c = sql.charAt(at);
+            if(c == '(') {
+                depth++;
+            } else if(c == ')') {
+                depth--;
+            } else if(depth == 0 && (c == 'v' || c == 'V') && isWord(sql, at, "values")) {
+                // The LAST one at the top level: "INSERT INTO t (a) VALUES (?)"
+                // has only one, and a statement that somehow had two would be
+                // counted from the one the tuples follow.
+                valuesAt = at + 6;
+            }
+            at++;
+        }
+        if(valuesAt < 0) {
+            return -1;
+        }
+        int rows = 0;
+        at = valuesAt;
+        depth = 0;
+        while(at < length) {
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings);
+            if(next > at) {
+                at = next;
+                continue;
+            }
+            char c = sql.charAt(at);
+            if(c == '(') {
+                if(depth == 0) {
+                    rows++;
+                }
+                depth++;
+            } else if(c == ')') {
+                depth--;
+            } else if(depth == 0 && c == ';') {
+                break;
+            }
+            at++;
+        }
+        return rows == 0 ? -1 : rows;
+    }
+
+    /**
+     * Whether {@code word} sits at {@code at} as a whole word, ignoring case --
+     * so the VALUES in "revalues" or "values_of" is not the keyword.
+     */
+    private static boolean isWord(String sql, int at, String word) {
+        if(!sql.regionMatches(true, at, word, 0, word.length())) {
+            return false;
+        }
+        if(at > 0 && isWordChar(sql.charAt(at - 1))) {
+            return false;
+        }
+        int after = at + word.length();
+        return after >= sql.length() || !isWordChar(sql.charAt(after));
+    }
+
+    private static boolean isWordChar(char c) {
+        return c == '_' || c == '$' || (c >= '0' && c <= '9')
+                || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    /**
      * The index just past the literal, identifier, comment or dollar-quoted body
      * beginning at {@code at}, or {@code at} itself when nothing begins there.
      */

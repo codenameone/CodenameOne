@@ -186,9 +186,18 @@ public final class Dao<T> {
         return list(table.select(tail), params);
     }
 
-    /** The first row matching a hand-written WHERE clause, or null. */
+    /**
+     * The first row matching a hand-written WHERE clause, or null.
+     *
+     * <p>Asks the database for ONE row. Reading them all and keeping the first
+     * is the same answer and an unbounded amount of work to get it: a predicate
+     * that matches a large table materialised the whole of it, mapped every row
+     * into an entity, and then dropped all but one. {@link Query#first} has
+     * always done this; this is the hand-written half catching up.
+     */
     public T findOne(String where, Object[] params) throws IOException {
-        List found = find(where, params);
+        String tail = where == null || where.length() == 0 ? "" : " WHERE " + where;
+        List found = list(table.select(tail + table.dialect.limit(1, 0)), params);
         return found.isEmpty() ? (T)null : (T)found.get(0);
     }
 

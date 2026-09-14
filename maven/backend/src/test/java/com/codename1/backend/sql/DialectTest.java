@@ -250,6 +250,27 @@ class DialectTest {
     }
 
     @Test
+    @DisplayName("an insert's rows are counted, and only the real VALUES counts")
+    void countsInsertRows() throws Exception {
+        assertEquals(1, Dialect.SQLITE.countInsertRows("INSERT INTO t (a) VALUES (?)"));
+        assertEquals(2, Dialect.SQLITE.countInsertRows("INSERT INTO t (a) VALUES (?), (?)"));
+        assertEquals(3, Dialect.SQLITE.countInsertRows(
+                "INSERT INTO t (a, b) VALUES (?, ?), (?, ?), (?, ?);"));
+        // A shape with no tuples to count says so rather than guessing.
+        assertEquals(-1, Dialect.SQLITE.countInsertRows("INSERT INTO t (a) SELECT b FROM u"));
+        // The word inside a literal, inside a comment, or inside an identifier is
+        // not the keyword.
+        assertEquals(1, Dialect.SQLITE.countInsertRows(
+                "INSERT INTO t (a) VALUES ('VALUES (1), (2)')"));
+        assertEquals(1, Dialect.POSTGRES.countInsertRows(
+                "INSERT INTO t (a) VALUES ($1) -- VALUES (1), (2)"));
+        assertEquals(-1, Dialect.SQLITE.countInsertRows("INSERT INTO revalues (a) SELECT 1"));
+        // A nested VALUES belongs to the subquery, not to this insert.
+        assertEquals(1, Dialect.SQLITE.countInsertRows(
+                "INSERT INTO t (a) VALUES ((SELECT max(x) FROM (VALUES (1), (2)) v))"));
+    }
+
+    @Test
     @DisplayName("a statement ends before its terminator and its trailing comment")
     void findsWhereTheStatementEnds() throws Exception {
         // Where PostgreSQL's RETURNING has to be inserted. After the end it is
