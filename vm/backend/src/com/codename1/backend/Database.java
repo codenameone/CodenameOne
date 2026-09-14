@@ -306,6 +306,21 @@ public final class Database {
                     + "client cannot ask. insert() answers with ONE generated key; use "
                     + "execute() for a statement whose shape the server decides: [" + sql + "]");
         }
+        if(tuples < 0 && tuples != Dialect.VERSION_GATED) {
+            // AN INSERT WHOSE ROWS COME FROM A QUERY -- INSERT ... SELECT, or
+            // MySQL's INSERT ... TABLE. How many rows it writes is the server's
+            // answer, so the one key this method promises is not available:
+            // SQLite and MySQL hand back one engine-specific id for however many
+            // rows were written, and PostgreSQL noticed only AFTER the rows had
+            // committed, from the number of RETURNING rows. Refused here, before
+            // it runs, so nothing is committed behind the message. The forms
+            // that write exactly one row without a tuple list -- DEFAULT VALUES,
+            // and MySQL's SET -- count as one and are unaffected.
+            throw new IOException("This statement's rows come from a query, so how many it "
+                    + "inserts is decided by the data and insert() answers with ONE "
+                    + "generated key. Use execute(), and read the keys back with a query: ["
+                    + sql + "]");
+        }
         if(tuples > 1) {
             throw new IOException("insert() answers with ONE generated key and this "
                     + "statement inserts " + tuples + " rows, which the three engines key "

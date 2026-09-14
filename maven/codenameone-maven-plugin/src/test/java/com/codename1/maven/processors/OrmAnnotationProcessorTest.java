@@ -177,6 +177,79 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void refusesToGenerateOverAClassTheProjectAlreadyHas() throws Exception {
+        // The generated dao lands in the same output directory under a name
+        // derived from the developer's entity, in the developer's own package.
+        // javac never sees the two as duplicates -- the existing one is a
+        // classpath class, not a second source -- so without this the
+        // application class is simply overwritten and everything compiles.
+        File classes = compileFixture(
+                "com.example.Memo",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Memo {\n"
+                        + "    @Id public long id;\n"
+                        + "    public String title;\n"
+                        + "    public Memo() {}\n"
+                        + "}\n");
+        // The collision, compiled into the same output directory the way the
+        // developer's own build would have put it there.
+        compileInto(classes, "com.example.MemoCn1BackendDao",
+                "package com.example;\n"
+                        + "public class MemoCn1BackendDao {\n"
+                        + "    public String mine() { return \"application code\"; }\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertTrue("a name the project already uses should be refused", ctx.hasErrors());
+        assertTrue("the message should name the class: " + ctx.getErrors(),
+                ctx.getErrors().toString().indexOf("MemoCn1BackendDao") >= 0);
+    }
+
+    @Test
+    public void generatesTwiceWithoutReportingItsOwnOutputAsACollision() throws Exception {
+        // The other half, and the one that broke @RestController before it: an
+        // incremental build runs process-classes again without a clean and finds
+        // the dao written on the first pass. Generated sources carry @Generated
+        // so that one is recognised as ours; a real collision has no marker.
+        File classes = compileFixture(
+                "com.example.Card",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Card {\n"
+                        + "    @Id public long id;\n"
+                        + "    public String title;\n"
+                        + "    public Card() {}\n"
+                        + "}\n");
+        ProcessorContext first = runProcessor(classes, backendClasspath());
+        assertFalse("the first pass should not have reported errors: " + first.getErrors(),
+                first.hasErrors());
+        assertTrue("the first pass should have generated the dao",
+                new File(classes, "com/example/CardCn1BackendDao.class").exists());
+        ProcessorContext second = runProcessor(classes, backendClasspath());
+        assertFalse("a second pass must not report its own output as a collision: "
+                + second.getErrors(), second.hasErrors());
+    }
+
+    @Test
+    public void refusesANullableColumnOnAPrimitiveField() throws Exception {
+        // A primitive has no null to read, so the two cannot both be true. Said
+        // at build time rather than at the first row that happens to be null.
+        File classes = compileFixture(
+                "com.example.Gauge",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Gauge {\n"
+                        + "    @Id public long id;\n"
+                        + "    @Column(nullable=true) public int reading;\n"
+                        + "    public Gauge() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertTrue("nullable=true on a primitive should be refused", ctx.hasErrors());
+        assertTrue("the message should name the field: " + ctx.getErrors(),
+                ctx.getErrors().toString().indexOf("reading") >= 0);
+    }
+
+    @Test
     public void refusesAGeneratedStringKeyOnTheServer() throws Exception {
         // No engine generates a string key: SQLite's AUTOINCREMENT is legal only
         // after INTEGER PRIMARY KEY and the other two count. Caught here rather
@@ -384,6 +457,16 @@ public class OrmAnnotationProcessorTest {
                 classes,
                 Arrays.asList(testClassesDir()));
         return classes;
+    }
+
+    /// Compiles one more class into a directory a fixture already occupies, so
+    /// the processor meets it exactly as it would meet a class the developer's
+    /// own build had put there.
+    private void compileInto(File classesDir, String fqn, String src) throws Exception {
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource(fqn, src),
+                classesDir,
+                Arrays.asList(testClassesDir()));
     }
 
     private void runProcessorOrFail(File classesDir) throws Exception {

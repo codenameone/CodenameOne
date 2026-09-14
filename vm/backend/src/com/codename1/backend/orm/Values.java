@@ -352,6 +352,29 @@ public final class Values {
     }
 
     /**
+     * {@code value}, or a refusal when the column holds SQL NULL.
+     *
+     * <p>What the generated access wraps a PRIMITIVE field's read in. A Java
+     * primitive has no null, so the conversions below take a fallback and answer
+     * it -- which for a column that really is null means the entity carries 0,
+     * false or '\0' where the row carries nothing at all, told apart by nobody.
+     * The tables this ORM creates declare a primitive field's column NOT NULL so
+     * the case cannot arise in them; this is for the ones it did not create, and
+     * a migration or another client is exactly where a null turns up.
+     *
+     * <p>Boxed fields do not come through here: they can hold the null, and
+     * that is the reason to declare one.
+     */
+    public static Object required(Object value, String field) throws IOException {
+        if(value == null) {
+            throw new IOException("The column for " + field + " holds SQL NULL and the "
+                    + "field is a primitive, which cannot hold one. Declare the field as "
+                    + "its boxed type to read a nullable column.");
+        }
+        return value;
+    }
+
+    /**
      * The value as a UTF-16 code unit, or {@code fallback} when it is null.
      *
      * <p>This is how an entity's char field is stored: the NUMBER of the code
