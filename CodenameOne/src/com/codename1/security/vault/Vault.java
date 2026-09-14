@@ -836,10 +836,38 @@ public final class Vault {
     }
 
     /// Removes a secret.
-    public AsyncResource<Boolean> removeSecret(String secretName) {
-        AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        Storage.getInstance().deleteStorageFile(secretKey(secretName));
-        out.complete(Boolean.valueOf(!Storage.getInstance().exists(secretKey(secretName))));
+    public AsyncResource<Boolean> removeSecret(final String secretName) {
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
+        background(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // The only secret operation that did none of this. Deleting needs no key, so
+                    // it ran while locked -- including after the auto-lock timeout, where the
+                    // session is over and a stale screen tapping "remove" still destroyed the
+                    // ciphertext irreversibly. destroyLocalData is the operation that deliberately
+                    // works without a key; this one is an ordinary edit and answers LOCKED like
+                    // its siblings.
+                    requireUnlocked();
+                    Storage.getInstance().deleteStorageFile(secretKey(secretName));
+                    requireSameGeneration(generation);
+                    out.complete(Boolean.valueOf(
+                            !Storage.getInstance().exists(secretKey(secretName))));
+                } catch (VaultException failed) {
+                    out.error(failed);
+                } catch (RuntimeException broke) {
+                    // A worker that throws anything else must still ANSWER. These run detached,
+                    // so an escaping exception used to end the thread with the AsyncResource
+                    // never completed -- and a caller blocked in get() waits for that forever.
+                    // A hang is a worse failure than an error, and it is the one the caller
+                    // cannot diagnose. Reached most easily by locking mid-operation, which nulls
+                    // metadata under a worker that already passed requireUnlocked.
+                    out.error(asVaultException(broke, "this vault operation could not complete"));
+                }
+            }
+        });
         return out;
     }
 

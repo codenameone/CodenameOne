@@ -906,6 +906,29 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void removingASecretWhileLockedIsRefused() {
+        // Deleting needs no key, so this was the one secret operation that ran while locked --
+        // including after the auto-lock timeout, where the session is over and a stale screen
+        // tapping "remove" still destroyed the ciphertext irreversibly. destroyLocalData is the
+        // operation that deliberately works without a key; this one is an ordinary edit.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        vault.putSecret("api.token", pw("t0ken")).get();
+
+        vault.lock();
+        assertEquals(VaultError.LOCKED, errorOf(vault.removeSecret("api.token")));
+
+        // And the secret is still there once the vault is opened again.
+        assertTrue(vault.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals(pw("t0ken"), vault.getSecret("api.token").get());
+
+        // Unlocked, it removes as before.
+        assertTrue(vault.removeSecret("api.token").get().booleanValue());
+        assertEquals(VaultError.KEY_MISSING, errorOf(vault.getSecret("api.token")));
+    }
+
+    @Test
     void capabilitiesDescribeEachPolicysOwnMechanism() {
         // While a vault is enrolled REQUIRE_USER_VERIFICATION, deviceProtection() answers the
         // gated mechanism -- so seeding capabilities with it made protectionFor(REMEMBER_DEVICE)
