@@ -183,21 +183,26 @@ rather than keeping your own note of the direction beside the call id.
 
 `CallEndReason`:: `REMOTE_ENDED`, `LOCAL_ENDED`, `UNANSWERED`, `BUSY`, `FAILED`,
 // vale-skip: Microsoft.Contractions: "Do Not Disturb" is the name of the OS feature.
-`FILTERED`. `FILTERED` is the one to treat on its own: the system declined the
-call rather than the user, through Do Not Disturb or a blocked number, and it
-is distinct from `UNANSWERED` because the call never rang at all. Don't read it
-as "the user rejected this" -- that's `LOCAL_ENDED`, and conflating the two
-sends the wrong status back to whatever placed the call.
+`FILTERED`. `FILTERED` covers more ground than its name suggests. It is
+documented as the system declining the call rather than the user -- Do Not
+Disturb, or a blocked number -- and it differs from `UNANSWERED` in that the
+call never rang. But the Android port also reports it for a fulfilled reject,
+so a Decline from the lock screen arrives as `FILTERED` there while a hang-up
+after answering arrives as `LOCAL_ENDED`. Treat it as "this call ended without
+being taken, and not because the far end gave up," and don't build anything
+that needs to tell an explicit decline from a silent block out of this value
+alone.
 
 `CallAvailability`:: what `Calls.getAvailability()` answers before you report a
 call, and `AVAILABLE` is the only value that lets one ring. The rest divide
 three ways rather than two. `EMERGENCY_CALL_IN_PROGRESS`, `OTHER_APP_IN_CALL`
 and `THIS_APP_IN_CALL` pass on their own, so a retry is the right response.
-`NOT_CONFIGURED` means `Calls.configure` hasn't run and `NOT_PERMITTED` means
-the user switched your app's calling off or a permission or role is missing --
-both clear once you do something about them, so they call for asking the user
-rather than either retrying or giving up. Only `UNSUPPORTED` is
-permanent: the platform has no telephony integration to offer.
+`NOT_CONFIGURED` means `Calls.configure` hasn't run, which is yours to fix in
+code and not something a user can clear -- prompting for it strands them in
+front of a dialog that changes nothing. `NOT_PERMITTED` is the one that wants
+the user: they switched your app's calling off, or a permission or role is
+missing. Only `UNSUPPORTED` is permanent: the platform has no telephony
+integration to offer.
 
 `CallHandle` and `CallHandleType`:: who the call is with. Build one with
 `CallHandle.phone(...)`, `CallHandle.email(...)` or `CallHandle.generic(...)`
@@ -208,11 +213,14 @@ displays and dials it.
 mints one, `CallId.isValid(...)` checks one that arrived over your own
 connection, and `CallId.normalize(...)` puts it in the form the platform expects.
 
-`CallError` and `CallException`:: why an action failed. The codes divide the same
-way as availability -- `CALL_REFUSED`, `CALL_FILTERED`, `DUPLICATE_CALL` and
-`BUSY` describe this call, while `NOT_SUPPORTED`, `UNAUTHORIZED` and
-`PROVIDER_RESET` describe the app or the platform and will keep failing until
-something changes.
+`CallError` and `CallException`:: why an action failed. `CALL_REFUSED`,
+`CALL_FILTERED` and `DUPLICATE_CALL` are about the call you tried to place or
+report; `NOT_SUPPORTED`, `UNAUTHORIZED` and `PROVIDER_RESET` are about the app
+or the platform and keep failing until something changes. `BUSY` belongs to
+neither group: it means a conflicting operation is already running, which can be
+another call but can equally be an unrelated request holding a shared channel --
+`CallDirectory.requestScreeningRole()` answers it when another dialog owns the
+activity result. Retry the operation rather than attributing it to a session.
 
 === Actions, And Why They Have To Be Answered
 
