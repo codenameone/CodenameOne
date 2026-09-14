@@ -338,16 +338,6 @@
 
                 <executions>
                     <execution>
-                        <!-- Added automatically: this project has SVG/Lottie
-                             assets, and without this execution they compile to
-                             blank 1x1 placeholders on the device. -->
-                        <id>transcode-svg</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>transcode-svg</goal>
-                        </goals>
-                    </execution>
-                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
