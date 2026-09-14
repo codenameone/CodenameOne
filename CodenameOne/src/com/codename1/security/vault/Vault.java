@@ -1604,12 +1604,31 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the sync state was being imported");
                     }
+                    // The configured policy governs this enrolment too. Importing sync state is
+                    // how a SECOND device joins a vault, so it is an enrolment entry point in
+                    // everything but name -- and it went from authentication straight to commit,
+                    // so a device configured REMEMBER_DEVICE or REQUIRE_USER_VERIFICATION, or
+                    // with unmet require(...), reported success and ended up session-only.
+                    requireProtections();
                     // Committed against the record that was read above, so a tab that wrote
                     // between the comparison and here loses rather than being overwritten.
                     commitMetadata(local, incoming);
-                    metadata = incoming;
-                    Bytes.zero(dataKey);
-                    dataKey = key;
+                    // Through the same lock-aware handoff as every other publication: the check
+                    // above is before the commit, and the commit is a storage write wide enough
+                    // for a lock to land inside. publishKey withdraws the key and re-locks if it
+                    // did, so an overlapping lock leaves the vault closed rather than reopened.
+                    // No `key = null` here, unlike unlockRemembered: that method's finally
+                    // zeroes the local, so it has to be released before publication. This one's
+                    // finally touches only the password, so nulling it is a dead store -- which
+                    // SpotBugs says outright, and it was copied from the other path by shape.
+                    publishKey(generation, incoming, key);
+                    // Established after the record is committed, because remembering wraps the
+                    // key this record describes. A failure here is reported rather than
+                    // swallowed: the device is enrolled, but not under the policy that was asked
+                    // for, and the caller has to know that.
+                    if (options.getPolicy() != UnlockPolicy.SESSION_ONLY) {
+                        rememberNow(options.getPolicy());
+                    }
                     touch();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {

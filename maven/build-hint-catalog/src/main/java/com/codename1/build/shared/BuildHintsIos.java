@@ -364,7 +364,7 @@ final class BuildHintsIos {
         h.add(new Hint("ios.crypto.gcm")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
-                .def("true")
+                .def("false")
                 .platform("ios"));
 
         h.add(new Hint("ios.debug.teamId")

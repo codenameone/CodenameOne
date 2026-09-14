@@ -910,6 +910,42 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void importingSyncStateAppliesTheConfiguredPolicy() {
+        // Importing sync state is how a SECOND device joins a vault, so it is an enrolment entry
+        // point in everything but name -- and it went from authentication straight to commit.
+        // A device configured to remember therefore reported success and ended up session-only.
+        String name = freshName();
+        Vault first = Vault.named(name).configure(fast());
+        first.enroll(pw("p"), fast()).get();
+        byte[] state = first.exportSyncState();
+
+        String otherName = freshName();
+        VaultOptions remembering = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault second = Vault.named(otherName).configure(remembering);
+        assertTrue(second.importSyncState(state, pw("p")).get().booleanValue());
+
+        // The policy it asked for actually happened: it reopens without a password.
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, second.getPolicy());
+        second.lock();
+        assertTrue(Vault.named(otherName).configure(remembering)
+                .unlockRemembered().get().booleanValue(),
+                "an import configured to remember must actually remember");
+    }
+
+    @Test
+    void importingSyncStateRefusesAnUnmetRequirement() {
+        // And require(...) governs this door too.
+        String name = freshName();
+        Vault first = Vault.named(name).configure(fast());
+        first.enroll(pw("p"), fast()).get();
+        byte[] state = first.exportSyncState();
+
+        VaultOptions demanding = fast().require(Protection.HARDWARE_BACKED);
+        Vault second = Vault.named(freshName()).configure(demanding);
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(second.importSyncState(state, pw("p"))));
+    }
+
+    @Test
     void aRequirementAddedAfterEnrolmentStillGovernsUnlock() {
         // require(...) was enforced by enrolment and by setPolicy, and by nothing else -- so a
         // vault enrolled before the application started asking reopened forever without ever

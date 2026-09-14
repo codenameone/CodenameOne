@@ -741,9 +741,12 @@ public abstract class Executor {
 
         private final boolean cipher;
 
-        DatabaseUsage(boolean database, boolean cipher) {
+        private final boolean vault;
+
+        DatabaseUsage(boolean database, boolean cipher, boolean vault) {
             this.database = database;
             this.cipher = cipher;
+            this.vault = vault;
         }
 
         /// The answer from two roots, since a build can stage classes and libraries separately.
@@ -759,7 +762,8 @@ public abstract class Executor {
             if (other == null) {
                 return this;
             }
-            return new DatabaseUsage(database || other.database, cipher || other.cipher);
+            return new DatabaseUsage(database || other.database, cipher || other.cipher,
+                    vault || other.vault);
         }
 
         /// Whether anything outside the framework references `com.codename1.db`.
@@ -771,11 +775,26 @@ public abstract class Executor {
         public boolean usesDatabaseCipher() {
             return cipher;
         }
+
+        /// Whether anything outside the framework references `com.codename1.security.vault`.
+        ///
+        /// Attributed the same way the database answers are, and for the same reason: Display,
+        /// CodenameOneImplementation and DatabaseConfig all name vault types in their own
+        /// signatures -- DatabaseConfig holds a Vault field -- so a plain package check answers
+        /// yes for every application ever built.
+        public boolean usesVault() {
+            return vault;
+        }
     }
 
     /// The database API itself. Every class in it names the package, so none of them says
     /// anything about whether the application does.
     private static final String DATABASE_PACKAGE = "com/codename1/db";
+
+    /// The vault API. Referenced by an application only when it actually uses one -- the
+    /// framework classes that name these types are excluded by name below, exactly as the
+    /// database ones are.
+    private static final String VAULT_PACKAGE = "com/codename1/security/vault";
 
     /// Framework classes whose reference to the database package is their own.
     ///
@@ -807,6 +826,12 @@ public abstract class Executor {
         "com/codename1/db/DatabaseConfig",
         "com/codename1/db/DatabaseEncryptionException",
         "com/codename1/db/ManagedKeys",
+        // Name vault types in their own signatures rather than using a vault: Display and
+        // CodenameOneImplementation expose the SPI, DatabaseConfig holds a Vault field, and
+        // SecureStorage reports a ProtectionReport. Without these an application that never
+        // heard of the vault would link a private CommonCrypto SPI on iOS.
+        // (Display and CodenameOneImplementation are already listed above for the database.)
+        "com/codename1/security/SecureStorage",
         "com/codename1/db/Row",
         "com/codename1/db/RowExt",
         "com/codename1/db/ThreadSafeDatabase",
@@ -850,13 +875,13 @@ public abstract class Executor {
     ///
     /// what the application's own classes reference, never null
     protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
-        boolean[] found = {false, false};
+        boolean[] found = {false, false, false};
         if (classesDir != null && classesDir.isDirectory()) {
             // One budget for the whole scan, so a hundred small archives cannot
             // add up to what one big one is refused for.
             scanForDatabaseUsage(classesDir, "", found, new PermScanBudget());
         }
-        return new DatabaseUsage(found[0], found[1]);
+        return new DatabaseUsage(found[0], found[1], found[2]);
     }
 
     private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found,
@@ -867,7 +892,7 @@ public abstract class Executor {
             return;
         }
         for (int iter = 0; iter < children.length; iter++) {
-            if (found[0] && found[1]) {
+            if (found[0] && found[1] && found[2]) {
                 return;
             }
             File child = children[iter];
@@ -900,7 +925,7 @@ public abstract class Executor {
         try {
             zip = new java.util.zip.ZipFile(archive);
             java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements() && !(found[0] && found[1])) {
+            while (entries.hasMoreElements() && !(found[0] && found[1] && found[2])) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
                 // Charged before any branch, exactly as the permission scanner
@@ -1061,10 +1086,10 @@ public abstract class Executor {
     /// - `bytes`: one class file
     /// - `found`: the two answers so far, updated in place
     private void inspectClassForDatabaseUsage(byte[] bytes, boolean[] found) {
-        if (found[0] && found[1]) {
+        if (found[0] && found[1] && found[2]) {
             return;
         }
-        boolean[] hit = {false, false};
+        boolean[] hit = {false, false, false};
         try {
             new ClassReader(bytes).accept(new DatabaseUsageVisitor(hit),
                     ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
@@ -1076,9 +1101,13 @@ public abstract class Executor {
             // that stops at Java 8, reads the constant pool directly instead for that reason.
             hit[0] = true;
             hit[1] = true;
+            // NOT hit[2]. Charging an unreadable class the cipher is conservative -- it adds a
+            // dependency. Charging it the vault links a private CommonCrypto SPI into a binary
+            // Apple scans, so the conservative answer there is the other one.
         }
         found[0] = found[0] || hit[0];
         found[1] = found[1] || hit[1];
+        found[2] = found[2] || hit[2];
     }
 
     /// Answers "does this class use the database" and "does it configure encryption".
@@ -1095,6 +1124,9 @@ public abstract class Executor {
         private void note(String name) {
             if (name == null) {
                 return;
+            }
+            if (name.indexOf(VAULT_PACKAGE + "/") >= 0) {
+                hit[2] = true;
             }
             if (name.indexOf(DATABASE_PACKAGE + "/") >= 0) {
                 hit[0] = true;
