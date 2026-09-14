@@ -99,6 +99,10 @@ public final class HTML5PasskeyProtection extends DeviceProtection {
                 && (caps & HTML5DeviceProtection.CAP_SUBTLE) != 0
                 && (caps & HTML5DeviceProtection.CAP_INDEXEDDB) != 0
                 && (caps & HTML5DeviceProtection.CAP_WEBAUTHN_PRF) != 0;
+        // From storage working rather than from `navigator.storage.persisted()`, for the reason
+        // set out at the same line in [HTML5DeviceProtection#protection()]: persisted() answers
+        // "will not be evicted", PERSISTENT means "survives the process", and every current
+        // browser answers persisted() false on a fresh profile.
         b.set(Protection.PERSISTENT, usable);
         b.set(Protection.ENCRYPTED_AT_REST, usable);
         // The authenticator's HMAC secret never leaves it -- there is no API that exports one, on

@@ -134,7 +134,7 @@ Some values are too sensitive for `Storage` or `Preferences`, which are plaintex
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava032Snippet.java[tag=security-java-032,indent=0]
 ----
 
-What backs it differs by port, and a `null` read isn't the only thing to watch for. The native ports mostly put the value behind something real: Keychain Services on iOS, an `AndroidKeyStore` key on Android from API 23, DPAPI on Windows and the Secret Service on Linux. Below API 23 the Android path falls back to Base64 in `SharedPreferences` and warns about itself, so it's a store and not a protection. The base implementation returns `false` / `null` where there's nothing to use, so treat that as "not available" and fall back accordingly. The browser port now encrypts what it writes: the value goes into origin-private storage as AES-GCM ciphertext under a `CryptoKey` created with `extractable: false` and held in IndexedDB, which is a key the page can use and can't read out. That protects a copied storage file, a profile backup and a stolen database, and it doesn't protect the value from script running on the origin, which calls `get` exactly as your code does. Outside a secure context there is no Web Crypto at all, so a write over plain `http:` is refused rather than stored in the clear. The simulator's non-prompting tier still describes itself as obfuscation rather than security. Don't let a successful read in either of those stand in for a test on a device.
+What backs it differs by port, and a `null` read isn't the only thing to watch for. The native ports mostly put the value behind something real: Keychain Services on iOS, an `AndroidKeyStore` key on Android from API 23, DPAPI on Windows and the Secret Service on Linux. Below API 23 the Android path falls back to Base64 in `SharedPreferences` and warns about itself, so it's a store and not a protection. The base implementation returns `false` / `null` where there's nothing to use, so treat that as "not available" and fall back accordingly. The browser port now encrypts what it writes: the value goes into origin-private storage as AES-GCM ciphertext under a `CryptoKey` created with `extractable: false` and held in IndexedDB, which is a key the page can use and can't read out. That protects a copied storage file, a profile backup and a stolen database, and it doesn't protect the value from script running on the origin, which calls `get` exactly as your code does. Outside a secure context there is no Web Crypto at all, so writing over plain `http:` is refused rather than stored in the clear. The simulator's non-prompting tier still describes itself as obfuscation rather than security. Don't let a successful read in either of those stand in for a test on a device.
 
 ==== Secrets (fetched from the cloud, never shipped in the binary)
 
@@ -231,7 +231,7 @@ That distinction is the one thing a browser can offer that the stored key can't:
 
 **A passkey may be synced, and that's your choice to make.** By default the browser offers whatever authenticators it has, so on a Mac the credential can land in iCloud Keychain and reach every device on that Apple account; a Google-account passkey on Android behaves the same way. Where that happens, "remember this device" amounts to "remember this account" -- still a genuine protection, because it needs the account *and* a biometric, but not device-binding.
 
-For a notes app that's usually what the user wants: a new laptop unlocks with a face scan and no password. For something holding a second factor it's the opposite, which is why this is a choice:
+For a note-taking app that's usually what the user wants: a new laptop unlocks with a face scan and no password. For something holding a second factor it's the opposite, which is why this is a choice:
 
 [source,java]
 ----
@@ -240,13 +240,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/V
 
 `requireDeviceBoundPasskey()` checks the credential's *backup-eligibility flag*, which is the part that actually decides. Asking for platform attachment alone isn't enough -- an iCloud Keychain passkey is platform-attached and syncs anyway. A browser that won't report the flag counts as *may leave this device*, so an unknown answer is never rounded up into a guarantee.
 
-What it costs: hardware security keys are excluded, and a user whose only authenticator syncs can't enrol at all -- enrolment fails with `POLICY_NOT_MET` rather than keeping a credential that doesn't meet the requirement. Offer the weaker policy as a fallback, or don't require it.
+What it costs: hardware security keys are excluded, and a user whose only authenticator syncs can't enroll at all -- enrollment fails with `POLICY_NOT_MET` rather than keeping a credential that doesn't meet the requirement. Offer the weaker policy as a fallback, or don't require it.
 
 Checked on real hardware and not only against a virtual authenticator: macOS Touch ID in Chrome derives 32 bytes, and derives the same 32 bytes again after the browser has been quit and reopened -- which is the property the whole scheme rests on, since a passkey that derived fresh bytes each time would make the wrapped data key unrecoverable.
 
-A passkey signature isn't an encryption key, and it's worth being clear why, because the obvious shortcut is wrong: signatures are randomised, so signing a fixed challenge gives different bytes every time. PRF is the part of WebAuthn that actually derives a key -- the authenticator evaluates its own HMAC secret over a salt, so the same credential and salt give the same 32 bytes forever.
+A passkey signature isn't an encryption key, and it's worth being clear why, because the obvious shortcut is wrong: signatures are randomized, so signing a fixed challenge gives different bytes every time. PRF is the part of WebAuthn that actually derives a key -- the authenticator evaluates its own HMAC secret over a salt, so the same credential and salt give the same 32 bytes forever.
 
-Not every authenticator implements it. Enrolment checks `prf.enabled` from the creation ceremony and refuses to keep a credential that can't derive, so `capabilities().supports(...)` tells you the truth rather than offering a prompt with nothing behind it. And note that **WebAuthn doesn't work on an IP-address origin at all** -- a relying-party id has to be a domain. For local development that means serving from `localhost`, not `127.0.0.1`.
+Not every authenticator implements it. Enrollment checks `prf.enabled` from the creation ceremony and refuses to keep a credential that can't derive, so `capabilities().supports(...)` tells you the truth rather than offering a prompt with nothing behind it. And note that **WebAuthn doesn't work on an IP-address origin at all** -- a relying-party id has to be a domain. For local development that means serving from `localhost`, not `127.0.0.1`.
 
 ==== Measured browser support
 
@@ -353,7 +353,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/V
 
 While the database is open the key is in the process and stays there; locking the vault doesn't close the connection. What the vault adds over `DatabaseConfig.managed()` is that the key doesn't exist at all until the user unlocks -- which in a browser is the difference between a page that holds a database key from the moment it loads and one that doesn't. If you can't accept the exposure, call `VaultOptions.requireOpaqueKeysOnly()`, which makes that call fail with `POLICY_NOT_MET` and means this vault can't key a database.
 
-`rotateDataKey` changes the database key. Rekey the database in the same operation or you won't be able to open it again; there's no automatic rekey, because an interrupted one leaves a database encrypted under neither key.
+`rotateDataKey` changes the database key. Re-key the database in the same operation or you won't be able to open it again; there's no automatic re-key, because an interrupted one leaves a database encrypted under neither key.
 
 ==== Cross-platform interoperability
 
@@ -370,7 +370,7 @@ The vault needs a secure context. Served over plain `http:` on anything but `loc
 
 The SQLite engine -- about 1.5 MB of WebAssembly and its loader -- is copied into the build only when the application can actually reach it. It's fetched on first use rather than at page load, so it never cost startup time for anyone; it cost deployment size in an artifact you upload to static hosting. The decision is made from the translated output, and it fails toward shipping: if the build can't tell, the engine goes in, because a database that won't open is a worse outcome than a download nobody makes.
 
-The JavaScript build writes its own deployment configuration: `_headers` at the publish root for Netlify and Cloudflare Pages, and a `cn1-security/` directory holding an nginx include, an Apache `.htaccess`, and a README explaining them. That directory is for you and shouldn't be uploaded with the application. The Content-Security-Policy in them is generated from the page that was actually emitted -- each inline block is hashed -- so it doesn't go stale against a template.
+The JavaScript build writes its own deployment configuration into a `cn1-security/` directory: a `_headers` file for Netlify and Cloudflare Pages, configuration for nginx and for Apache, and a README explaining them. Nothing here is active until you copy the file your host reads to where it reads it. That's on purpose: Netlify and Cloudflare read `_headers` automatically, and an application that never asked for a policy shouldn't acquire one on its next deploy. Read the README first: the policy restricts `connect-src` to this origin, so an app that calls a backend elsewhere has to add it. The Content-Security-Policy in them is generated from the page that was actually emitted -- each inline block is hashed -- so it doesn't go stale against a template.
 
 Three of those protections exist only as response headers and are ignored in a `<meta>` tag: `frame-ancestors`, `X-Frame-Options` and `Strict-Transport-Security`. A deployment that puts the policy in the page and skips the host configuration has no clickjacking protection and no HSTS, whatever the rest of it says.
 

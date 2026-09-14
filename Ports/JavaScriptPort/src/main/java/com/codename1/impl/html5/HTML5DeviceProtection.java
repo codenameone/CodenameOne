@@ -136,10 +136,24 @@ public final class HTML5DeviceProtection extends DeviceProtection {
         int caps = capabilities();
         boolean crypto = (caps & CAP_SUBTLE) != 0 && (caps & CAP_SECURE_CONTEXT) != 0;
         boolean storage = (caps & CAP_INDEXEDDB) != 0;
-        // Persistence is reported from what the browser said about this origin, not from the fact
-        // that IndexedDB exists. An origin the browser has not granted persistence to can be
-        // evicted under storage pressure, and a vault that claimed otherwise would be promising
-        // something the specification explicitly does not give it.
+        // PERSISTENT is reported from storage actually working, NOT from
+        // `navigator.storage.persisted()`. That looks like the stronger check and is the wrong
+        // one, so this is worth stating rather than leaving to be re-derived.
+        //
+        // [Protection#PERSISTENT] is defined as "survives the process" -- a page reload, a browser
+        // restart -- which working IndexedDB gives. `persisted()` answers a different question:
+        // whether the browser has promised never to evict the origin under storage pressure. It
+        // grants that on engagement heuristics, so a freshly loaded application is told no.
+        //
+        // Measured, on a real profile with a real user, all three returning false:
+        // Chrome 152, Safari 26.6, Firefox 155. Gating on it would make
+        // `VaultCapabilities.supports(REMEMBER_DEVICE)` answer false in every browser on first
+        // run and take the remembered-device feature away from everyone, to describe a risk that
+        // is eviction rather than non-persistence.
+        //
+        // The eviction risk is real and is reported where it belongs: [#isStoragePersisted()]
+        // answers it directly, [VaultError#QUOTA_EXCEEDED] is what an evicted origin produces,
+        // and the class documentation says a browser makes no permanent guarantee.
         b.set(Protection.PERSISTENT, storage);
         b.set(Protection.ENCRYPTED_AT_REST, crypto && storage);
         b.set(Protection.NON_EXTRACTABLE_KEY, crypto && storage);

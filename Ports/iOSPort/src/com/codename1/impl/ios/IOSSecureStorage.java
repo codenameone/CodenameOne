@@ -30,6 +30,8 @@ import com.codename1.util.AsyncResource;
 
 import java.util.HashMap;
 import java.util.Map;
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
 
 /**
  * iOS backing for {@link SecureStorage} backed by the system Keychain. Reads
@@ -58,6 +60,34 @@ public final class IOSSecureStorage extends SecureStorage {
 
     IOSSecureStorage(IOSNative nativeInstance) {
         this.nativeInstance = nativeInstance;
+    }
+
+    /// What the keychain provides for the non-prompting tier.
+    ///
+    /// The base class answers [ProtectionReport#none()], which is the honest report for a platform
+    /// with no store. Left uninherited here it would say an iOS keychain entry has no protection
+    /// at all -- and the required-protection overload would then refuse every write on the
+    /// platform with the best store of any port.
+    ///
+    /// `HARDWARE_BACKED` is `UNKNOWN` rather than yes. Keychain items are protected by a key the
+    /// Secure Enclave holds on devices that have one, and the API does not report which happened,
+    /// so claiming it would be inferring a guarantee from the platform's name.
+    @Override
+    public ProtectionReport protection() {
+        return ProtectionReport.builder()
+                .set(Protection.PERSISTENT, true)
+                .set(Protection.ENCRYPTED_AT_REST, true)
+                // The item is readable through SecItemCopyMatching by this application, so the
+                // value is not non-extractable in the sense this flag means.
+                .set(Protection.NON_EXTRACTABLE_KEY, false)
+                .set(Protection.OS_PROTECTED, true)
+                .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
+                // The non-prompting tier is kSecAttrAccessibleAfterFirstUnlock with no
+                // SecAccessControl: no prompt, by design. The biometric overloads are the other
+                // tier and are not what this reports on.
+                .set(Protection.USER_VERIFICATION, false)
+                .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                .build();
     }
 
     @Override

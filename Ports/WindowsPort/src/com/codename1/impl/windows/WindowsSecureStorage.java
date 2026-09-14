@@ -27,6 +27,8 @@ import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
 import com.codename1.security.SecureStorage;
 import com.codename1.util.AsyncResource;
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
 
 /**
  * Windows secure storage backed by the OS Data Protection API (DPAPI). Each
@@ -155,6 +157,30 @@ public class WindowsSecureStorage extends SecureStorage {
         }
     }
 
+
+    /// What DPAPI provides.
+    ///
+    /// The stored bytes are DPAPI ciphertext bound to this Windows user account, so another user
+    /// on the same machine -- and a copy of the file taken elsewhere -- cannot read them. That is
+    /// a genuine OS-held protection and the reason this reports more than the desktop simulator
+    /// does.
+    ///
+    /// It is not hardware backing and does not prompt: DPAPI keys off the user's logon, so
+    /// anything already running as that user decrypts without asking.
+    @Override
+    public ProtectionReport protection() {
+        return ProtectionReport.builder()
+                .set(Protection.PERSISTENT, true)
+                .set(Protection.ENCRYPTED_AT_REST, true)
+                // The protecting key belongs to the OS and is never handed to this process, but
+                // the protected value is returned in full -- which is what this flag asks about.
+                .set(Protection.NON_EXTRACTABLE_KEY, false)
+                .set(Protection.OS_PROTECTED, true)
+                .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
+                .set(Protection.USER_VERIFICATION, false)
+                .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                .build();
+    }
 
     @Override
     public boolean set(String account, String value) {

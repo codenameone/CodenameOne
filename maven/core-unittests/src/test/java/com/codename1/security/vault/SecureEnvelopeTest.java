@@ -243,6 +243,23 @@ class SecureEnvelopeTest extends UITestBase {
     }
 
     @Test
+    void sealNeverEmitsAnEnvelopeParseWouldRefuse() {
+        // The parser bounds the declared ciphertext length, and the sealer has to respect the same
+        // bound or this class can write bytes it then refuses to read -- a failure that would
+        // surface at the open rather than at the write that caused it.
+        //
+        // A byte over the limit is enough to prove it; allocating the full 64MiB to check would
+        // cost more than the property is worth.
+        byte[] tooLarge = new byte[SecureEnvelope.MAX_CIPHERTEXT - SecureEnvelope.TAG_LENGTH + 1];
+        try {
+            SecureEnvelope.seal(key(1), "dk", 1, binding(), tooLarge);
+            fail("expected an oversized plaintext to be refused at seal time");
+        } catch (VaultException e) {
+            assertEquals(VaultError.UNSUPPORTED_FORMAT, e.getError());
+        }
+    }
+
+    @Test
     void emptyPlaintextRoundTrips() {
         byte[] sealed = SecureEnvelope.seal(key(1), "dk", 1, binding(), new byte[0]);
         assertEquals(0, SecureEnvelope.parse(sealed).open(key(1), binding()).length);

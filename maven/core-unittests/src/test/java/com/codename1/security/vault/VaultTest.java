@@ -420,6 +420,60 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aSuccessfulRotationLeavesTheDeviceStillRemembered() {
+        // The other side of the version check. Stamping the data key version into the device
+        // record is what makes a stale wrap detectable -- and if the stamp were written from the
+        // wrong place, every rotation would instead orphan a perfectly good remembered device.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        byte[] beforeRotation = vault.seal("note", "old".getBytes()).get();
+
+        vault.rotateDataKey(pw("p")).get();
+        byte[] afterRotation = vault.seal("note", "new".getBytes()).get();
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockRemembered().get().booleanValue(),
+                "a rotation that succeeded must leave the device remembered");
+        assertArrayEquals("new".getBytes(), reopened.open("note", afterRotation).get());
+        assertArrayEquals("old".getBytes(), reopened.open("note", beforeRotation).get());
+    }
+
+    @Test
+    void aRememberedWrapFromBeforeARotationIsNeverUsed() {
+        // The failure this guards is silent data loss. Rotation commits the new metadata and then
+        // rewrites the device wrap; if that second step does not happen -- a cancelled prompt,
+        // storage that went away, a crash -- the wrap still holds the OLD key while the vault
+        // labels everything it seals with the NEW version. A remembered unlock would hand back
+        // the old key, records would be written under it carrying the new version number, and
+        // they would fail to open after any password unlock.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+
+        // Rotate with the rewrap made to fail, which is what leaves the stale wrap behind.
+        device.refuseWrites = true;
+        assertNotNull(errorOf(vault.rotateDataKey(pw("p"))),
+                "the rotation should report that it could not rewrite the device wrap");
+        device.refuseWrites = false;
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        // Refused, not used. KEY_MISSING is the honest answer: this device is no longer
+        // remembered, and the password still works.
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()));
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+
+        // And what it seals now round-trips, which is the property the stale wrap would have
+        // broken.
+        byte[] sealed = reopened.seal("note", "after".getBytes()).get();
+        assertArrayEquals("after".getBytes(), reopened.open("note", sealed).get());
+    }
+
+    @Test
     void rotationVoidsTheRecoveryCode() {
         // Documented rather than silently true: the code wrapped the outgoing key and cannot be
         // rewrapped, because it is not stored anywhere.
@@ -681,6 +735,18 @@ class VaultTest extends UITestBase {
         assertFalse(vault.protection().provides(Protection.ISOLATED_FROM_APPLICATION_CODE));
         assertFalse(vault.capabilities().protectionFor(UnlockPolicy.REQUIRE_USER_VERIFICATION)
                 .provides(Protection.ISOLATED_FROM_APPLICATION_CODE));
+    }
+
+    @Test
+    void secureStorageReportsWhatTheStoreActuallyProvides() {
+        // The base class answers none(), which is right for a platform with no store and wrong
+        // for every platform that has one. A store inheriting it would have the required-
+        // protection overload refuse writes it can perfectly well make.
+        ProtectionReport report = com.codename1.security.SecureStorage.getInstance().protection();
+        assertNotNull(report);
+        // The test implementation genuinely has no store, so none() is the correct answer here --
+        // what this pins is that asking does not throw and that UNKNOWN is never silently a yes.
+        assertFalse(report.provides(Protection.OS_PROTECTED));
     }
 
     @Test

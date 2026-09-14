@@ -222,6 +222,15 @@ public final class SecureEnvelope {
         }
         byte[] nonce = SecureRandom.bytes(NONCE_LENGTH);
         byte[] body = plaintext == null ? new byte[0] : plaintext;
+        if (body.length > MAX_CIPHERTEXT - TAG_LENGTH) {
+            // Checked here and not only in the parser. Without this, sealing a body this large
+            // succeeds and produces an envelope whose declared ciphertext length is past the
+            // parser's bound -- so this class could emit bytes it then refuses to read, and the
+            // failure would surface at the open rather than at the write that caused it.
+            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,
+                    "the plaintext is larger than an envelope can carry; the limit is "
+                    + (MAX_CIPHERTEXT - TAG_LENGTH) + " bytes");
+        }
 
         // Built before the encryption because the header is what the tag covers. The ciphertext
         // length is known in advance: GCM adds exactly the tag.

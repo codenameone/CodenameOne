@@ -27,6 +27,8 @@ import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
 import com.codename1.security.SecureStorage;
 import com.codename1.util.AsyncResource;
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
 
 /**
  * Linux secure storage backed by the OS Data Protection API (DPAPI). Each
@@ -156,6 +158,32 @@ public class LinuxSecureStorage extends SecureStorage {
         }
     }
 
+
+    /// What the Secret Service provides.
+    ///
+    /// The secret lives in the user's keyring and this class keeps only a token naming it, so the
+    /// value is held by the desktop's own secret store rather than by the application. Whether
+    /// that keyring is locked, and what unlocks it, is the user's session policy and not
+    /// something this can report on.
+    ///
+    /// A desktop with no Secret Service provider running has no store at all, which is why
+    /// availability is asked of the store rather than assumed from the platform.
+    @Override
+    public ProtectionReport protection() {
+        boolean available = entryState("cn1.probe") != ENTRY_UNKNOWN;
+        return ProtectionReport.builder()
+                .set(Protection.PERSISTENT, available)
+                .set(Protection.ENCRYPTED_AT_REST, available)
+                .set(Protection.NON_EXTRACTABLE_KEY, false)
+                .set(Protection.OS_PROTECTED, available)
+                .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
+                // A locked keyring can prompt, and an unlocked one does not. The store does not
+                // say which, and a flag that guessed would be describing the session rather than
+                // the entry.
+                .set(Protection.USER_VERIFICATION, ProtectionReport.UNKNOWN)
+                .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                .build();
+    }
 
     @Override
     public boolean set(String account, String value) {

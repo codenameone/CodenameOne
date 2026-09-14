@@ -55,6 +55,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
 
 /**
  * Android backing for {@link SecureStorage}. Values are AES/CBC/PKCS7-encrypted
@@ -215,6 +217,32 @@ public final class AndroidSecureStorage extends SecureStorage {
     // would force a transitive dependency on every Android build and it is
     // itself deprecated. The value is stored as
     // base64(iv) + ":" + base64(ciphertext) in a private preferences file.
+
+    /// What the Android store provides for the non-prompting tier.
+    ///
+    /// Two different things wear this name. From API 23 the value is AES-GCM ciphertext under an
+    /// `AndroidKeyStore` key the application cannot export, which is a real protection. Below 23
+    /// there is no keystore to use and the value is Base64 in preferences -- obfuscation, and
+    /// reported as such rather than rounded up.
+    ///
+    /// `HARDWARE_BACKED` stays `UNKNOWN` even on a modern device: whether the keystore key lives
+    /// in a TEE or StrongBox is a property of the hardware, and this class does not query the key
+    /// attestation that would establish it.
+    @Override
+    public ProtectionReport protection() {
+        boolean keystore = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M;
+        return ProtectionReport.builder()
+                .set(Protection.PERSISTENT, true)
+                .set(Protection.ENCRYPTED_AT_REST, keystore)
+                // The keystore key itself cannot be exported, which is exactly what this flag is
+                // about -- and below API 23 there is no such key.
+                .set(Protection.NON_EXTRACTABLE_KEY, keystore)
+                .set(Protection.OS_PROTECTED, keystore)
+                .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
+                .set(Protection.USER_VERIFICATION, false)
+                .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                .build();
+    }
 
     @Override
     public boolean set(String account, String value) {

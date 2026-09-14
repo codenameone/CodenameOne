@@ -415,6 +415,23 @@ public final class Vault {
                                 "this device is not remembered for this vault");
                     }
                     VaultMetadata meta = requireMetadata();
+                    if (record.keyVersion != meta.dataKeyVersion) {
+                        // The wrap holds a different data key than the vault record says is
+                        // current, which happens when a rotation committed its metadata and then
+                        // could not rewrite this wrap -- a cancelled prompt, storage that went
+                        // away, or a crash in between. Using it would hand back the OLD key while
+                        // the vault labels everything it seals with the NEW version, and those
+                        // records then fail to open after a password unlock. Data loss, silently.
+                        //
+                        // Refused rather than repaired: repairing needs the new key, and the only
+                        // thing here that has it is a password unlock. The stale record is removed
+                        // so the next remembered unlock is an honest "not remembered".
+                        Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                        throw new VaultException(VaultError.KEY_MISSING,
+                                "this device's remembered key is from before a key rotation and "
+                                + "has been discarded; unlock with the password to remember it "
+                                + "again");
+                    }
                     // Read before the unwrap, compared after it. The unwrap can prompt and can
                     // take as long as the user does, and a vault locked in the meantime must not
                     // be silently reopened by a result that was already in flight.
@@ -520,7 +537,7 @@ public final class Vault {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                     "the device wrap did not read back as it was written");
         }
-        writeDeviceRecord(new DeviceRecord(policy, wrapped));
+        writeDeviceRecord(new DeviceRecord(policy, wrapped, metadata.dataKeyVersion));
     }
 
     /// Forgets this device: the local wrap is deleted and so is the device key behind it.
@@ -992,7 +1009,18 @@ public final class Vault {
                         // leaving it would let a remembered unlock produce a key that no longer
                         // opens anything new. Under the policy the device is actually enrolled
                         // with, not the one this caller happens to have configured.
-                        rememberNow(remembered.policy);
+                        //
+                        // The metadata above is already committed, so a failure here cannot be
+                        // rolled back -- the rotation happened. What it can do is not leave a wrap
+                        // of the superseded key lying about: that is discarded, and the vault is
+                        // still openable by password. The version stamped into the record makes
+                        // the same state safe after a crash, where this handler never runs.
+                        try {
+                            rememberNow(remembered.policy);
+                        } catch (VaultException rewrapFailed) {
+                            Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                            throw rewrapFailed;
+                        }
                     }
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -1457,14 +1485,19 @@ public final class Vault {
     private static final class DeviceRecord {
         final UnlockPolicy policy;
         final byte[] wrap;
+        /// The data key version this wrap contains. See [Vault#unlockRemembered()] for why a
+        /// record that does not carry one is refused rather than trusted.
+        final int keyVersion;
 
-        DeviceRecord(UnlockPolicy policy, byte[] wrap) {
+        DeviceRecord(UnlockPolicy policy, byte[] wrap, int keyVersion) {
             this.policy = policy;
             this.wrap = wrap;
+            this.keyVersion = keyVersion;
         }
 
         String serialize() {
-            return "CN1VAULTDEV1\npolicy=" + policy.name() + "\nwrap=" + Bytes.toHex(wrap) + "\n";
+            return "CN1VAULTDEV1\npolicy=" + policy.name() + "\nversion=" + keyVersion
+                    + "\nwrap=" + Bytes.toHex(wrap) + "\n";
         }
 
         static DeviceRecord parse(String text) {
@@ -1473,6 +1506,7 @@ public final class Vault {
             }
             UnlockPolicy policy = UnlockPolicy.REMEMBER_DEVICE;
             byte[] wrap = null;
+            int keyVersion = 0;
             int at = text.indexOf('\n') + 1;
             while (at > 0 && at < text.length()) {
                 int end = text.indexOf('\n', at);
@@ -1488,11 +1522,17 @@ public final class Vault {
                     } else if (UnlockPolicy.SESSION_ONLY.name().equals(value)) {
                         policy = UnlockPolicy.SESSION_ONLY;
                     }
+                } else if (line.startsWith("version=")) {
+                    try {
+                        keyVersion = Integer.parseInt(line.substring(8));
+                    } catch (NumberFormatException malformed) {
+                        keyVersion = 0;
+                    }
                 } else if (line.startsWith("wrap=")) {
                     wrap = Bytes.fromHex(line.substring(5));
                 }
             }
-            return wrap == null ? null : new DeviceRecord(policy, wrap);
+            return wrap == null ? null : new DeviceRecord(policy, wrap, keyVersion);
         }
     }
 }

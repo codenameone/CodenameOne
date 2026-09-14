@@ -85,20 +85,25 @@ final class JavascriptSecurityHeaders {
                 ? new String(Files.readAllBytes(index.toPath()), StandardCharsets.UTF_8) : "";
         String csp = contentSecurityPolicy(html);
 
-        // _headers has to sit at the publish root: it is the name Netlify and Cloudflare Pages
-        // read, and both consume it rather than serving it.
-        Files.write(new File(outputDirectory, "_headers").toPath(),
-                netlifyHeaders(csp).getBytes(StandardCharsets.UTF_8));
-
-        // The rest go in a subdirectory, because this output directory becomes the application's
-        // public web root and a server configuration file sitting in it is a file the server
-        // hands out. Nothing here is secret -- a CSP is visible in the response headers anyway --
-        // but publishing a host's configuration because a build step had nowhere else to put it
-        // is not a habit to start.
+        // Everything goes in a subdirectory, including `_headers`, and that last part is the
+        // important one.
+        //
+        // `_headers` at the publish root is the name Netlify and Cloudflare Pages read, and they
+        // read it *automatically*. Writing it there would mean an application that had never
+        // asked for a Content-Security-Policy acquired one on its next deploy -- and this policy
+        // sets `connect-src 'self'`, which blocks every ConnectionRequest, fetch and WebSocket
+        // aimed at a backend on another origin. Most applications have one. Rebuilding would have
+        // taken their networking away with no diagnostic beyond a console error in a browser
+        // nobody was watching.
+        //
+        // So the build generates the policy and the developer activates it, by copying one file.
+        // The README beside it says which, and says what to edit first.
         File guidance = new File(outputDirectory, DEPLOYMENT_DIRECTORY);
         if (!guidance.isDirectory() && !guidance.mkdirs()) {
             throw new IOException("could not create " + guidance);
         }
+        Files.write(new File(guidance, "_headers").toPath(),
+                netlifyHeaders(csp).getBytes(StandardCharsets.UTF_8));
         Files.write(new File(guidance, "cn1-security.nginx.conf").toPath(),
                 nginxHeaders(csp).getBytes(StandardCharsets.UTF_8));
         Files.write(new File(guidance, "cn1-security.htaccess").toPath(),
@@ -299,17 +304,39 @@ final class JavascriptSecurityHeaders {
     private static String readme(String csp) {
         return "# Deploying this application securely\n"
                 + "\n"
-                + "The same policy is written in three formats. Use the one your host reads:\n"
+                + "## Nothing here is active until you activate it\n"
                 + "\n"
-                + "- `../_headers` -- Netlify, Cloudflare Pages. It is at the publish root\n"
-                + "  because that is where those platforms look; they consume it rather than\n"
-                + "  serving it.\n"
+                + "The build generates this policy; it does not apply it. Copy the file your\n"
+                + "host reads to where it reads it:\n"
+                + "\n"
+                + "- `_headers` -- Netlify, Cloudflare Pages. Copy it to the **publish root**,\n"
+                + "  beside index.html. Those platforms read it automatically, which is exactly\n"
+                + "  why the build does not put it there for you.\n"
                 + "- `cn1-security.nginx.conf` -- nginx, included from the serving block\n"
                 + "- `cn1-security.htaccess` -- Apache, renamed to `.htaccess`\n"
                 + "\n"
-                + "**Do not upload this `cn1-security/` directory with the application.** It is\n"
-                + "for you; the generated application does not read any of it, and a web root is\n"
-                + "not the place for a host's configuration.\n"
+                + "**Do not upload this `cn1-security/` directory itself.** It is for you; the\n"
+                + "application reads none of it, and a web root is not the place for a host\'s\n"
+                + "configuration.\n"
+                + "\n"
+                + "## Read this before you activate it: connect-src\n"
+                + "\n"
+                + "The policy sets `connect-src \'self\'`, which permits network calls back to\n"
+                + "this origin and **blocks every other one** -- every `ConnectionRequest`,\n"
+                + "`fetch` and WebSocket aimed at an API on a different host. If your application\n"
+                + "talks to a backend anywhere else, and most do, add its origin before you\n"
+                + "deploy:\n"
+                + "\n"
+                + "```\n"
+                + "connect-src \'self\' https://api.example.com wss://api.example.com;\n"
+                + "```\n"
+                + "\n"
+                + "The build cannot fill that in, because nothing in the application declares\n"
+                + "which origins it talks to. A policy that guessed would be either wrong or\n"
+                + "meaningless, so it states the restrictive default and tells you to widen it.\n"
+                + "\n"
+                + "The same applies to `frame-src` for an embedded `BrowserComponent` pointing at\n"
+                + "another site, and to `img-src` / `media-src` for assets loaded from a CDN.\n"
                 + "\n"
                 + "## HTTPS is not optional\n"
                 + "\n"
