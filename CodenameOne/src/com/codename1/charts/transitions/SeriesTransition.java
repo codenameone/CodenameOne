@@ -224,8 +224,20 @@ public abstract class SeriesTransition implements Animation {
         // cleanup() at the end rather than leaving the buffer full, so the
         // state after this call is the state after an animation finishes and
         // a caller can reuse the transition either way.
+        //
+        // An animateChart() already in flight has to be stopped FIRST, and
+        // finished latched afterwards. Without both, the next animation frame
+        // called animate() on a motion initTransition() had just restarted,
+        // and update() walked the series back towards the start values this
+        // call had captured -- so an immediate update issued during an
+        // animation was undone and replayed as one.
+        if (animationHost != null) {
+            animationHost.deregisterAnimated(this);
+            animationHost = null;
+        }
         initTransition();
         update(100);
+        finished = true;
         cleanup();
         chart.repaint();
     }

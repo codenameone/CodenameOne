@@ -140,6 +140,47 @@ class XYTransitionsTest extends UITestBase {
         assertEquals(0, buffer.getItemCount());
     }
 
+    @FormTest
+    void updateChartDuringAnAnimationStopsIt() {
+        // updateChart() called on a transition animateChart() had already
+        // registered left it registered, and its own initTransition() restarted
+        // the motion -- so the next frame ran update() at a low progress and
+        // walked the series back towards the values this call had just
+        // replaced. The immediate update was undone and replayed as an
+        // animation.
+        //
+        // The form is deliberately NOT shown: registration works without it,
+        // and showing it puts the EDT's animation loop on the same transition
+        // this test drives by hand, so the two race over one XYSeries.
+        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+        XYSeries series = new XYSeries("Series");
+        series.add(0, 1);
+        series.add(1, 2);
+        dataset.addSeries(series);
+
+        ChartComponent chartComponent = createChartComponent(dataset);
+        Form form = new Form();
+        form.add(chartComponent);
+
+        XYSeriesTransition transition = new XYSeriesTransition(chartComponent, series);
+        transition.getBuffer().add(0, 5);
+        transition.getBuffer().add(1, 7);
+        transition.setDuration(10000);
+        transition.animateChart();
+
+        // The same transition, finished early. The buffer still holds what the
+        // animation was heading for, because only cleanup() drains it.
+        transition.updateChart();
+
+        assertEquals(5.0, series.getY(0));
+        assertEquals(7.0, series.getY(1));
+
+        // A frame already queued behind the update must not move it again.
+        assertFalse(transition.animate(), "the transition is still animating");
+        assertEquals(5.0, series.getY(0), "a later frame walked the series back");
+        assertEquals(7.0, series.getY(1), "a later frame walked the series back");
+    }
+
     private ChartComponent createChartComponent(XYMultipleSeriesDataset dataset) {
         XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
         for (int i = 0; i < dataset.getSeriesCount(); i++) {
