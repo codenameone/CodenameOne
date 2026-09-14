@@ -178,7 +178,7 @@ The most important distinction in the API is between "the shield couldn't be rea
 |A pinned host presented a chain matching none of its pins. Nothing was sent.
 |===
 
-`ShieldStatus` is a constant *object* rather than an enum on purpose: the vocabulary is visible on the wire and the service must be able to add a status without breaking apps built against an older release. Compare with `equals`, branch on `isSuccess()` and `isTransient()`, and treat an id you don't recognise as a non-success.
+`ShieldStatus` is a constant *object* rather than an enum on purpose: the vocabulary is visible on the wire and the service must be able to add a status without breaking apps built against an older release. Compare with `equals`, branch on `isSuccess()` and `isTransient()`, and treat an id you don't recognize as a non-success.
 
 Listeners are delivered on the EDT, so they may touch the UI directly. The framework never shows a dialog and never terminates the app over a shield event -- what the user sees is entirely your decision:
 

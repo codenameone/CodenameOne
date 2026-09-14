@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.codenameone.developerguide</groupId>
+    <artifactId>democode</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>backendsnippets</artifactId>
+  <name>backendsnippets</name>
+  <!--
+       Compiles the Backend chapter's snippets. The guide includes them from here by
+       tag rather than quoting them inline, so a snippet that stops matching the API
+       fails this build instead of sitting wrong in the docs until someone tries it.
+
+       Separate from the common module because that one is the CLIENT: it builds for
+       iOS, Android and the browser, and codenameone-backend is a server library that
+       has no business on those classpaths.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-backend</artifactId>
+      <version>${cn1.version}</version>
+    </dependency>
+    <!-- For the REST contract annotations, which the client half of the guide's
+         shared-contract example uses. -->
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-core</artifactId>
+      <version>${cn1.version}</version>
+    </dependency>
+  </dependencies>
+</project>

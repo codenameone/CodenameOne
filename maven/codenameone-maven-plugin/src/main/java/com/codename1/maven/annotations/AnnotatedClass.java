@@ -116,7 +116,26 @@ public final class AnnotatedClass {
     /// guess and this is not.
     public String getSourceFile() { return sourceFile; }
 
+    /**
+     * The name to write in generated JAVA SOURCE.
+     *
+     * The binary name for a top-level class, and the dotted chain for a member
+     * one: a controller or a DTO declared as `public static class Api` inside
+     * `Notes` has the binary name Notes$Api, which javac reads as a top-level
+     * identifier and cannot resolve -- the generated bootstrap and codec failed
+     * to compile for an otherwise valid class. Decided from the InnerClasses
+     * attribute rather than from the `$`, because `$` is legal in a top-level
+     * name and those two spellings are not interchangeable.
+     */
+    public String getSourceName() {
+        return sourceName == null ? getBinaryName() : sourceName;
+    }
+
+    void setSourceName(String sourceName) { this.sourceName = sourceName; }
+
     void setSourceFile(String sourceFile) { this.sourceFile = sourceFile; }
+
+    private String sourceName;
 
     public String getInternalName() { return internalName; }
 

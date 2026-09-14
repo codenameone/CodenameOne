@@ -23,7 +23,6 @@
 
 package java.lang;
 
-import java.io.PrintWriter;
 
 /**
  * The Throwable class is the superclass of all errors and exceptions in the Java language. Only objects that are instances of this class (or of one of its subclasses) are thrown by the Java Virtual Machine or can be thrown by the Java throw statement. Similarly, only this class or one of its subclasses can be the argument type in a catch clause.
@@ -115,13 +114,24 @@ public class Throwable{
         }
     }
 
-    public void printStackTrace(PrintWriter s) {
-        s.println(renderedStack());
-        if (cause != null) {
-            s.println("Caused by ");
-            cause.printStackTrace(s);
-        }
-    }
+    /*
+     * There is deliberately NO printStackTrace(java.io.PrintWriter) here.
+     *
+     * This VM has no java.io.PrintWriter -- not in vm/JavaAPI and not in
+     * Ports/CLDC11 -- so nothing on a device can construct one to pass, and
+     * CLDC11's Throwable, which is what the CN1 API offers at compile time, never
+     * declared the overload either. It existed here only because this file is
+     * compiled without a -bootclasspath and borrowed the JDK's class; the
+     * translator then emitted "#include java_io_PrintWriter.h" into
+     * java_lang_Throwable.c and every fresh translation died on the missing
+     * header. Nothing in the core or the device ports called it: the one caller in
+     * the tree is Ports/JavaSE, which compiles against the real JDK.
+     *
+     * Restoring it does not make `e.printStackTrace(writer)` translate either --
+     * the app's own PrintWriter reference is just as unresolvable -- so it would
+     * buy back the broken build and nothing else. Add java/io/PrintWriter.java
+     * first if that pattern is ever wanted.
+     */
 
     /**
      * The text to print for this throwable's own frames. By default this is the native

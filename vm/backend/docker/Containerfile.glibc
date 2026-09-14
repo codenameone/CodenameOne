@@ -1,0 +1,22 @@
+# Builder image for glibc Linux backend binaries.
+#
+# The counterpart to Containerfile.musl. A static musl binary runs in a scratch
+# image and depends on nothing; a glibc binary is what belongs in a base image
+# that already carries libc and OpenSSL and patches them on its own schedule --
+# which is the arrangement most organisations have a policy about. Both are one
+# clang invocation over the same generated C.
+#
+# Debian's own libcurl, OpenSSL and nghttp2 are used rather than a build from
+# source: the whole point of this target is to link against what the distribution
+# ships and updates.
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        clang libcurl4-openssl-dev libssl-dev libnghttp2-dev zlib1g-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY link.sh /usr/local/bin/link.sh
+RUN chmod +x /usr/local/bin/link.sh
+ENV CN1_LINK_MODE=dynamic
+ENTRYPOINT ["/usr/local/bin/link.sh"]

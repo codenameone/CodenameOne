@@ -73,7 +73,7 @@ Use `AuthenticationOptions` to control prompt copy and security policy:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BiometricAuthenticationJava004Snippet.java[tag=biometric-authentication-java-004,indent=0]
 ----
 
-Unrecognised options are ignored, so callers can set the union without platform-checking.
+Unrecognized options are ignored, so callers can set the union without platform-checking.
 
 === Typed error handling
 
@@ -89,7 +89,7 @@ Unrecognised options are ignored, so callers can set the union without platform-
 | `PASSCODE_NOT_SET`         | Device has no PIN / pattern configured (can't use biometrics)
 | `USER_CANCELED`            | User dismissed the prompt
 | `SYSTEM_CANCELED`          | OS dismissed the prompt (app backgrounded, system pre-empted)
-| `AUTHENTICATION_FAILED`    | Prompt completed but the user wasn't recognised
+| `AUTHENTICATION_FAILED`    | Prompt completed but the user wasn't recognized
 | `KEY_REVOKED`              | `SecureStorage` entry can no longer be decrypted (re-enrolment occurred)
 | `UNKNOWN`                  | Anything not covered above
 |===
