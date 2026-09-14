@@ -87,7 +87,7 @@ class TheComponentsOfCodenameOneJava134Snippet {
             Label l = new Label("Added this");
             hi.add(l);
             hi.revalidate();
-            ToastBar.showMessage("Added, click here to undonull", FontImage.MATERIAL_UNDO,
+            ToastBar.showMessage("Added, click here to undo...", FontImage.MATERIAL_UNDO,
                     ee -> {
                         l.remove();
                         hi.revalidate();
