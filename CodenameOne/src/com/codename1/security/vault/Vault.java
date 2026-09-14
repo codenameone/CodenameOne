@@ -397,7 +397,32 @@ public final class Vault {
             key = null;
             touch();
             if (options.getPolicy() != UnlockPolicy.SESSION_ONLY) {
-                rememberNow(options.getPolicy());
+                try {
+                    rememberNow(options.getPolicy());
+                } catch (RuntimeException rememberFailed) {
+                    // RuntimeException and not just VaultException: a port can throw rather than
+                    // complete with an error, and that left the vault published exactly the same
+                    // way. VaultException is one of these.
+                    //
+                    // Undone rather than left standing. The record and the live key were already
+                    // published above, so a cancelled passkey prompt or a store that refused the
+                    // key left the vault enrolled and open WITHOUT the policy that was asked for
+                    // -- while enroll() reported failure. The documented answer to that failure
+                    // is to try again with a weaker policy, and that attempt then hit CONFLICT
+                    // against the record this call had quietly left behind.
+                    //
+                    // Safe to roll back precisely here: enrolment is the one moment when the
+                    // vault protects nothing yet, so removing the record destroys no data.
+                    Storage.getInstance().deleteStorageFile(metadataKey());
+                    try {
+                        forgetEveryMechanism();
+                    } catch (RuntimeException alsoFailed) {
+                        // The mechanism may hold a half-made key. Nothing here can reach it, and
+                        // reporting this instead of the original would name the wrong failure.
+                    }
+                    lock();
+                    throw rememberFailed;
+                }
             }
         } finally {
             Bytes.zero(key);
@@ -445,6 +470,12 @@ public final class Vault {
                                 "the vault was locked while it was being unlocked");
                     }
                     requireAuthenticRecord(meta, key);
+                    // Checked here too, not only at enrolment. A vault enrolled before the
+                    // application started asking for anything reopened without ever meeting the
+                    // requirements it was later configured with -- so require(...) governed the
+                    // first launch and nothing afterwards, which is the opposite of what a
+                    // requirement is for.
+                    requireProtections();
                     publishKey(generation, meta, key);
                     passwordNeedsRewrap = envelope.getKdf().needsUpgrade();
                     touch();
@@ -507,7 +538,23 @@ public final class Vault {
                                 + "has been discarded; unlock with the password to remember it "
                                 + "again");
                     }
-                    key = awaitBytes(deviceProtection().unwrap(deviceKeyId(), record.wrap,
+                    // Judged against the policy configured NOW, not the one this device was
+                    // enrolled under. An application that adds requireDeviceBoundPasskey() to a
+                    // vault already remembered with a syncable passkey was still reopened by
+                    // that credential: enrolment validates it and this path went straight to
+                    // unwrap, so the requirement governed new enrolments and nothing else.
+                    //
+                    // ensureKey is the validation, not a creation: with a record already stored
+                    // the port checks it against the requirement and refuses rather than making
+                    // anything.
+                    DeviceProtection unlocking = deviceProtection();
+                    unlocking.setDeviceBoundRequired(options.isDeviceBoundPasskeyRequired());
+                    if (options.isDeviceBoundPasskeyRequired()) {
+                        await(unlocking.ensureKey(deviceKeyId()),
+                                "the remembered credential does not satisfy this vault's "
+                                + "device-bound requirement");
+                    }
+                    key = awaitBytes(unlocking.unwrap(deviceKeyId(), record.wrap,
                                     wrapBinding(meta, PURPOSE_DEVICE).serialize()),
                             "the remembered device key could not be used");
                     if (generation != lockGeneration) {
@@ -519,6 +566,9 @@ public final class Vault {
                                 "the device wrap did not contain a data key");
                     }
                     requireAuthenticRecord(meta, key);
+                    // Against the policy this device is actually enrolled under, which is what
+                    // a remembered unlock is using.
+                    requireProtections(record.policy);
                     publishKey(generation, meta, key);
                     key = null;
                     touch();
@@ -1142,6 +1192,12 @@ public final class Vault {
                     }
                     key = SecureEnvelope.parse(meta.passwordWrap).openWithPassword(oldPassword,
                             wrapBinding(meta, PURPOSE_PASSWORD));
+                    // Before anything is re-signed. This is an entry point of its own -- it works
+                    // on a locked instance and never goes through an unlock path -- so a record
+                    // whose counter or retired chain had been edited was opened, and then
+                    // stampMac below signed the edit. That does not merely miss the check, it
+                    // launders the corruption into something every later check accepts.
+                    requireAuthenticRecord(meta, key);
                     byte[] rewrapped = SecureEnvelope.sealWithPassword(newPassword,
                             options.getKdf(), meta.dataKeyId, meta.dataKeyVersion,
                             wrapBinding(meta, PURPOSE_PASSWORD), key);
@@ -1251,6 +1307,7 @@ public final class Vault {
                                 "the vault was locked while it was being unlocked");
                     }
                     requireAuthenticRecord(meta, key);
+                    requireProtections();
                     publishKey(generation, meta, key);
                     touch();
                     out.complete(Boolean.TRUE);

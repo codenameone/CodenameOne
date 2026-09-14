@@ -57,6 +57,10 @@ class VaultTest extends UITestBase {
         /// Throws a RuntimeException out of ensureKey, to stand in for anything a port can throw
         /// that is not a VaultException.
         boolean throwOnEnsure;
+        /// Fails ensureKey while still REPORTING a healthy store, which refuseWrites cannot do:
+        /// it also drives protection(), so a vault configured with it is refused before it ever
+        /// reaches the remembering step this is meant to exercise.
+        boolean refuseEnsure;
         DeviceProtection gatedVariant;
 
         @Override
@@ -97,7 +101,7 @@ class VaultTest extends UITestBase {
                 // unexpected goes wrong inside it, and it used to end the vault's worker.
                 throw new IllegalStateException("the key store fell over");
             }
-            if (refuseWrites) {
+            if (refuseWrites || refuseEnsure) {
                 out.error(new VaultException(VaultError.STORAGE_UNAVAILABLE, "refused"));
                 return out;
             }
@@ -903,6 +907,52 @@ class VaultTest extends UITestBase {
         vault.lock();
         assertTrue(Vault.named(name).configure(options).unlockRemembered().get().booleanValue(),
                 "the remembered unlock must survive a policy change that failed");
+    }
+
+    @Test
+    void aRequirementAddedAfterEnrolmentStillGovernsUnlock() {
+        // require(...) was enforced by enrolment and by setPolicy, and by nothing else -- so a
+        // vault enrolled before the application started asking reopened forever without ever
+        // meeting the requirement. A requirement that governs only the first launch is not one.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        vault.lock();
+
+        // The same vault, now configured to demand something this device does not report.
+        VaultOptions demanding = fast().require(Protection.HARDWARE_BACKED);
+        Vault reopened = Vault.named(name).configure(demanding);
+        assertEquals(VaultError.POLICY_NOT_MET,
+                errorOf(reopened.unlockWithPassword(pw("p"))));
+        assertFalse(reopened.isUnlocked(), "a refused unlock must leave the vault closed");
+
+        // And without the requirement it still opens, so the refusal is the requirement and not
+        // a vault that stopped working.
+        assertTrue(Vault.named(name).configure(fast())
+                .unlockWithPassword(pw("p")).get().booleanValue());
+    }
+
+    @Test
+    void anEnrolmentThatCannotRememberLeavesNothingBehind() {
+        // The record and the live key were published before rememberNow ran, so a refused device
+        // store left the vault enrolled and open WITHOUT the policy asked for, while enroll()
+        // reported failure -- and the documented retry with a weaker policy then hit CONFLICT
+        // against the record this call had quietly left behind.
+        device.refuseEnsure = true;
+        String name = freshName();
+        VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(options);
+        assertEquals(VaultError.STORAGE_UNAVAILABLE, errorOf(vault.enroll(pw("p"), options)));
+
+        // Nothing was left behind: not a record, and not an open vault.
+        assertFalse(vault.isUnlocked(), "a failed enrolment must not leave the vault open");
+        assertEquals(Vault.NOT_ENROLLED, Vault.named(name).configure(options).state());
+
+        // So the documented fallback works rather than colliding with a ghost.
+        device.refuseEnsure = false;
+        VaultOptions weaker = fast().policy(UnlockPolicy.SESSION_ONLY);
+        assertTrue(Vault.named(name).configure(weaker).enroll(pw("p"), weaker)
+                .get().booleanValue());
     }
 
     @Test
