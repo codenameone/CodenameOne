@@ -67,6 +67,37 @@ public class Note {
     /** Boxed, so the column can be null and come back as null. */
     public Long revision;
 
+    /**
+     * The narrow integrals, which are an INTEGER column on every engine: what
+     * comes back is a Long, and reading it into these fields narrows. A value
+     * outside their range is refused rather than wrapped.
+     */
+    public short rank;
+
+    public byte flags;
+
+    /** Stored in the same REAL column a double is, and narrowed on the way in. */
+    public float weight;
+
+    /**
+     * The boxed forms, each of which can be null. Every scalar type an entity
+     * can hold appears in this class exactly so that one run of ormcheck
+     * answers for all of them on all three engines: a type nobody listed here
+     * is a type nobody tested, which is how a char field that could not be
+     * inserted on PostgreSQL at all went unnoticed.
+     */
+    public Integer priority;
+
+    public Boolean archived;
+
+    public Double weightAgain;
+
+    public Short rankAgain;
+
+    public Byte flagsAgain;
+
+    public Float weightNarrow;
+
     /** A primitive char, which is stored as one-character text. */
     public char initial;
 
