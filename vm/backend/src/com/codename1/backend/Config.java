@@ -174,6 +174,22 @@ public final class Config {
         String profile = fromProcess(PROFILE);
         if(profile == null) {
             profile = base.getProperty(PROFILE);
+            if(profile != null) {
+                // EXPANDED, like every other value read from a file. Without
+                // this, "cn1.profile=${CN1_DEFAULT_PROFILE:dev}" made the
+                // literal text the profile name: the server looked for
+                // application-${CN1_DEFAULT_PROFILE:dev}.properties, found
+                // nothing, and ran on a profile that is not a development one --
+                // so the in-memory datasource and table creation were off and
+                // the reason was a filename nobody reads.
+                //
+                // Against the BASE FILE ALONE, because that is everything which
+                // exists at this point: the profile file has not been chosen
+                // yet, and a profile referring to a key inside the file it
+                // selects would be circular.
+                profile = new Config(base, new Properties(), "default", new ArrayList())
+                        .expand(profile, PROFILE, 0);
+            }
         }
         if(profile == null || profile.length() == 0) {
             profile = "default";
@@ -464,7 +480,20 @@ public final class Config {
         }
         try {
             long[] info = new long[3];
-            if(FileIo.stat(fd, info) < 0 || info[2] == 1) {
+            if(info.length >= 3 && FileIo.stat(fd, info) >= 0 && info[2] == 1) {
+                // A DIRECTORY IS NOT AN ABSENT FILE. openRead gives a descriptor
+                // for one -- StaticFiles needs that, to stat it and retry at the
+                // index -- so a bad ConfigMap or volume mount that put a
+                // directory where application.properties belongs read as "no
+                // such file" and every file-based setting silently became an
+                // environment default, plaintext included when both TLS paths
+                // lived in that file.
+                throw new IOException(path + " is a directory, not a properties file. "
+                        + "A configuration file that is present must be a regular file: "
+                        + "every setting in it would otherwise fall back to a default, "
+                        + "silently.");
+            }
+            if(FileIo.stat(fd, info) < 0) {
                 return null;
             }
             long size = info[0];

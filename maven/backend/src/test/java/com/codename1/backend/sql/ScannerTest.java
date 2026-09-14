@@ -122,6 +122,16 @@ class ScannerTest {
         // REPLACE inserts a row, so last_insert_rowid() does answer for it.
         assertFalse(Dialect.SQLITE.updatesOnConflict("REPLACE INTO t (a) VALUES (?)"));
 
+        // PostgreSQL's OVERRIDING clause puts the singular keyword in FRONT of
+        // the real VALUES, so latching the first match counted one row for a
+        // statement that writes two -- and the multi-row refusal never fired,
+        // leaving PostgreSQL to object after both rows had committed.
+        rows("INSERT INTO t(id, a) OVERRIDING USER VALUE VALUES (?, ?), (?, ?)", 2, 2, 2);
+        rows("INSERT INTO t(id, a) OVERRIDING SYSTEM VALUE VALUES (?, ?)", 1, 1, 1);
+        // MySQL's singular row clause is still a row clause, because a tuple
+        // follows it -- which is the test that tells the two apart.
+        rows("INSERT INTO t (a) VALUE (?), (?)", 2, 2, 2);
+
         // And the words are read as SQL: inside a literal or a comment they are
         // not keywords, and a longer word that merely contains one is not it.
         assertFalse(Dialect.SQLITE.updatesOnConflict(
