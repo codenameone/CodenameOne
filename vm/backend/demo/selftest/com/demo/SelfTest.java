@@ -2055,6 +2055,34 @@ public class SelfTest {
                 "refused", refusal);
         check("while a well-formed one is decoded",
                 "read the URL and failed to connect", wellFormed);
+        // AND A '%' THAT IS NOT AN ESCAPE AT ALL, which is the earlier half of the
+        // same rule: a bare, truncated or non-hex one used to be appended as a
+        // literal, so "p%ZZ" and "p%2" became passwords holding a percent sign and
+        // the client authenticated with a value the URL does not contain. The
+        // request target takes the opposite decision on purpose -- browsers do
+        // send a bare '%' -- and a database URL is configuration somebody typed,
+        // with no such traffic to keep working.
+        check("a non-hex escape is refused", "refused",
+                escapeVerdict("postgres://u:p%ZZss@127.0.0.1:1/db?sslmode=disable"));
+        check("and a truncated one", "refused",
+                escapeVerdict("postgres://u:pass%2@127.0.0.1:1/db?sslmode=disable"));
+        check("and a bare percent", "refused",
+                escapeVerdict("postgres://u:pass%@127.0.0.1:1/db?sslmode=disable"));
+        // The control again, for the new rule: %41 is 'A' and must still decode.
+        check("a well-formed escape is still not a complaint",
+                "read the URL", escapeVerdict("postgres://u:p%41ss@127.0.0.1:1/db?sslmode=disable"));
+    }
+
+    /** "refused" when the URL's escapes are rejected, "read the URL" otherwise. */
+    private static String escapeVerdict(String url) {
+        try {
+            Database db = Database.open(url);
+            db.close();
+            return "read the URL";
+        } catch (Exception err) {
+            String message = String.valueOf(err.getMessage());
+            return message.indexOf("hex digits") >= 0 ? "refused" : "read the URL";
+        }
     }
 
     /**
@@ -2507,6 +2535,93 @@ public class SelfTest {
                 redirectOutcome("DELETE", "307 Temporary Redirect", null));
         check("nor is an empty PUT", "307 nothing",
                 redirectOutcome("PUT", "307 Temporary Redirect", null));
+    }
+
+    /**
+     * A response past the ceiling is refused, and refusing it does not cost twice
+     * the ceiling first.
+     *
+     * <p>The read buffer doubled whenever it filled, and the byte count that
+     * enforces CN1_HTTP_MAX_RESPONSE_MB ran after: a response at the limit had
+     * already bought an array of twice it, so the reply to 64 MB of unwanted body
+     * was a 128 MB allocation and, on a small heap, an OutOfMemoryError instead of
+     * the IOException the setting promises. At a large configured limit the
+     * doubling overflows and the array size goes negative. The growth stops one
+     * byte past the ceiling now -- enough for the count to still see the byte that
+     * proves the response too long.
+     *
+     * <p>What this check can show is the refusal and its wording; the size of the
+     * allocation behind it is not visible from here, so the cap on the growth is
+     * argued by reading the code rather than by this. It runs only when the
+     * ceiling is small, since the default is 64 MB.
+     */
+    private static void aResponsePastTheClientCeilingIsRefused() throws Exception {
+        String configured = System.getenv("CN1_HTTP_MAX_RESPONSE_MB");
+        int megabytes = 0;
+        if(configured != null && configured.length() > 0) {
+            try {
+                megabytes = Integer.parseInt(configured.trim());
+            } catch (NumberFormatException malformed) {
+                megabytes = 0;
+            }
+        }
+        if(megabytes <= 0 || megabytes > 4) {
+            System.out.println("NOTE client response ceiling check skipped: set "
+                    + "CN1_HTTP_MAX_RESPONSE_MB to 4 or less to run it");
+            return;
+        }
+        final int ceiling = megabytes * 1024 * 1024;
+        final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
+        final int port = listener.getPort();
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    ServerSocket.setTimeout(client, 10000);
+                    byte[] in = new byte[4096];
+                    ServerSocket.read(client, in, 0, in.length);
+                    // Twice the ceiling, declared honestly and then sent.
+                    int total = ceiling * 2;
+                    byte[] head = ("HTTP/1.1 200 OK\r\nContent-Length: " + total
+                            + "\r\nConnection: close\r\n\r\n").getBytes("UTF-8");
+                    ServerSocket.write(client, head, 0, head.length);
+                    byte[] chunk = new byte[65536];
+                    for(int iter = 0 ; iter < chunk.length ; iter++) {
+                        chunk[iter] = (byte)'x';
+                    }
+                    int sent = 0;
+                    while(sent < total) {
+                        int step = total - sent < chunk.length ? total - sent : chunk.length;
+                        ServerSocket.write(client, chunk, 0, step);
+                        sent += step;
+                    }
+                } catch (Exception ignored) {
+                    // The client refusing part way through is the expected ending.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        try {
+            Http.Response got = Http.get("127.0.0.1", port, "/big");
+            outcome = "accepted " + got.getBodyAsString().length();
+        } catch (Exception refused) {
+            String message = String.valueOf(refused.getMessage());
+            outcome = message.indexOf("will read") >= 0 ? "refused"
+                    : "other: " + message;
+        } finally {
+            listener.close();
+        }
+        stub.join(10000);
+        check("a response past the client's ceiling is refused", "refused", outcome);
     }
 
     /**
@@ -5161,6 +5276,7 @@ public class SelfTest {
         oneReadyDescriptorIsOneSlot();
         aTunableBelowItsFloorTakesTheDefault();
         aStalledPeerDoesNotHoldTheHandshake();
+        aResponsePastTheClientCeilingIsRefused();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
         halfACredentialPairIsRefused();

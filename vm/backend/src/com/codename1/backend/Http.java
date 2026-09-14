@@ -250,7 +250,35 @@ public final class Http {
                 }
             }
             if(size == buffer.length) {
-                byte[] grown = new byte[buffer.length * 2];
+                // DOUBLING, BUT NOT PAST THE CEILING. The byte count below refuses
+                // a response over MAX_RESPONSE_BYTES -- after this ran, so the
+                // buffer had already doubled to twice the configured limit to hold
+                // bytes that were about to be refused: 128 MB of allocation to
+                // reject a 64 MB response, and an OutOfMemoryError rather than the
+                // IOException that was promised. At a large configured limit the
+                // doubling overflows instead, and a negative array size is not an
+                // answer at all.
+                //
+                // One byte past the ceiling is exactly enough: the read below can
+                // then still deliver the byte that proves the response is too
+                // long, which is what the count wants to see. A buffer already
+                // there has nowhere left to go, and the response is over the limit
+                // by definition, so it is refused here in the same words.
+                long ceiling = MAX_RESPONSE_BYTES + 1;
+                if(ceiling > Integer.MAX_VALUE - 8) {
+                    ceiling = Integer.MAX_VALUE - 8;
+                }
+                long want = (long)buffer.length * 2L;
+                if(want > ceiling) {
+                    want = ceiling;
+                }
+                if(want <= buffer.length) {
+                    throw new IOException("The response passed the "
+                            + (MAX_RESPONSE_BYTES / (1024 * 1024)) + " MB this client "
+                            + "will read; set CN1_HTTP_MAX_RESPONSE_MB higher if the "
+                            + "endpoint really answers that much");
+                }
+                byte[] grown = new byte[(int)want];
                 System.arraycopy(buffer, 0, grown, 0, size);
                 buffer = grown;
             }

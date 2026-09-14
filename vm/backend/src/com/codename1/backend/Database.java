@@ -501,15 +501,37 @@ public final class Database {
             try {
                 for(int iter = 0 ; iter < value.length() ; iter++) {
                     char c = value.charAt(iter);
-                    if(c == '%' && iter + 2 < value.length()) {
-                        int high = digit(value.charAt(iter + 1));
-                        int low = digit(value.charAt(iter + 2));
-                        if(high >= 0 && low >= 0) {
-                            flushLiteral(literal, out);
-                            out.write((high << 4) | low);
-                            iter += 2;
-                            continue;
+                    if(c == '%') {
+                        int high = iter + 2 < value.length()
+                                ? digit(value.charAt(iter + 1)) : -1;
+                        int low = iter + 2 < value.length()
+                                ? digit(value.charAt(iter + 2)) : -1;
+                        if(high < 0 || low < 0) {
+                            // A '%' INTRODUCES TWO HEX DIGITS OR THE URL IS
+                            // MALFORMED. RFC 3986 2.1 leaves no other reading, and
+                            // this used to append the '%' as a literal: "p%ZZ" and
+                            // "p%2" became passwords containing a percent sign, so
+                            // the client authenticated with a value the URL does
+                            // not contain and the operator read a remote
+                            // authentication failure rather than a typo in their
+                            // own configuration -- the same silent substitution
+                            // the UTF-8 check below exists for, arriving earlier.
+                            //
+                            // The request target takes the OPPOSITE decision, and
+                            // on purpose: browsers do send a bare '%', and a
+                            // server that refused one would reject real traffic. A
+                            // database URL is configuration somebody typed, so
+                            // there is no such traffic to keep working, and the
+                            // index is all this says about it -- the component may
+                            // be a password.
+                            throw new IOException("The URL holds a '%' at index "
+                                    + iter + " that is not followed by two hex "
+                                    + "digits; percent-encode it as %25");
                         }
+                        flushLiteral(literal, out);
+                        out.write((high << 4) | low);
+                        iter += 2;
+                        continue;
                     }
                     literal.append(c);
                 }

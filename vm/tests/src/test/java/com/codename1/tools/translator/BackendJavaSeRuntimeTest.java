@@ -81,6 +81,7 @@ class BackendJavaSeRuntimeTest {
         // Short enough for the stalled-peer handshake check to run; the
         // default of 15s is not something a suite should spend.
         env.put("CN1_TLS_HANDSHAKE_MS", "1500");
+        env.put("CN1_HTTP_MAX_RESPONSE_MB", "1");
         if (System.getenv("CN1_SELFTEST_NETWORK") != null) {
             env.put("CN1_SELFTEST_NETWORK", "1");
             String bundle = caBundle();
