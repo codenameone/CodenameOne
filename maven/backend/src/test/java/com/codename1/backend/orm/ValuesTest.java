@@ -121,6 +121,10 @@ class ValuesTest {
                         + "-9.223372E18,true,!,-9223372036854775808,!,!");
         // Larger than a float holds: narrowing would make it infinite.
         expect(Double.valueOf(1e100), "1.0E100,!,!,!,!,1.0E100,!,!,!,!,!,!");
+        // And below what a float holds at the other end: 1e-100 is nonzero and
+        // narrows to 0.0f, so the field would carry no value where the row has
+        // one. A double reads it exactly, which is why only the float cell moves.
+        expect(Double.valueOf(1e-100), "1.0E-100,!,!,!,!,1.0E-100,!,!,!,!,!,!");
         expect(Double.valueOf(Double.NaN), "NaN,!,!,!,!,NaN,NaN,!,!,!,!,!");
         // Already infinite: PostgreSQL stores that, and reproducing it is right.
         expect(Double.valueOf(Double.POSITIVE_INFINITY),
@@ -138,6 +142,8 @@ class ValuesTest {
         // integral conversions refuse a value that does not survive narrowing.
         expect("1e400", "1e400,!,!,!,!,!,!,!,1,!,5,1");
         expect("1e-400", "1e-400,!,!,!,!,!,!,!,1,!,6,1");
+        // Text a double DOES hold and a float does not, so the two disagree.
+        expect("1e-100", "1e-100,!,!,!,!,1.0E-100,!,!,1,!,6,1");
         // An infinity the database really stores is spelled, so it still passes.
         expect("Infinity", "Infinity,!,!,!,!,Infinity,Infinity,!,I,!,8,I");
 

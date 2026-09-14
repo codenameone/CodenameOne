@@ -918,7 +918,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                   .append(field).append(".getTime())");
                 return;
             default:
-                sb.append("null");
+                // UNREACHABLE by construction: every kind an entity can persist
+                // has a case above, and the rest are refused in consider()
+                // before they reach here. It throws rather than falling back
+                // because the fallback that reads naturally -- bind null, assign
+                // nothing -- is silent DATA LOSS: a field kind added to the enum
+                // later would be written as NULL and read back as its default,
+                // on a build with no error in it. A crash names the field.
+                throw new IllegalStateException("no server-side binding for field "
+                        + f.fieldName + " of kind " + f.kind.kind);
         }
     }
 
@@ -979,7 +987,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 sb.append(field).append(" = ").append(values).append("asBytes(value);");
                 return;
             default:
-                sb.append(";");
+                // The other half of the same rule; see emitBackendRead.
+                throw new IllegalStateException("no server-side read for field "
+                        + f.fieldName + " of kind " + f.kind.kind);
         }
     }
 
