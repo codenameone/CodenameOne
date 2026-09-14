@@ -953,10 +953,7 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this key was being derived");
                     }
-                    Hmac mac = Hmac.create(Hash.SHA256, source);
-                    mac.update(Bytes.utf8("cn1.vault.subkey.v1"));
-                    mac.update(Bytes.utf8(purpose == null ? "" : purpose));
-                    byte[] derived = mac.doFinal();
+                    byte[] derived = deriveSubkey(source, purpose);
                     if (generation != lockGeneration) {
                         Bytes.zero(derived);
                         requireSameGeneration(generation);
@@ -1623,7 +1620,19 @@ public final class Vault {
     /// in the vault record one link at a time.
     byte[] openAnyVersion(byte[] sealed, AssociatedData aad) {
         SecureEnvelope envelope = SecureEnvelope.parse(sealed);
-        int wanted = envelope.getKeyVersion();
+        byte[] key = dataKeyAtVersion(envelope.getKeyVersion());
+        try {
+            return envelope.open(key, aad);
+        } finally {
+            Bytes.zero(key);
+        }
+    }
+
+    /// The data key as it was at a given version, walking the retired chain back to it.
+    ///
+    /// Always a copy, even for the current version, so the caller can zero what it is given
+    /// without reaching into the vault's own key.
+    byte[] dataKeyAtVersion(int wanted) {
         int current = metadata.dataKeyVersion;
         if (wanted > current) {
             throw new VaultException(VaultError.UNSUPPORTED_FORMAT,
@@ -1631,11 +1640,9 @@ public final class Vault {
                     + " and this device only knows about version " + current
                     + "; synchronise before reading it");
         }
-        if (wanted == current) {
-            return envelope.open(dataKey, aad);
-        }
         byte[] key = new byte[32];
         System.arraycopy(dataKey, 0, key, 0, 32);
+        boolean reached = false;
         try {
             for (int version = current - 1; version >= wanted; version--) {
                 byte[] link = metadata.retired.get(Integer.valueOf(version));
@@ -1648,10 +1655,37 @@ public final class Vault {
                 Bytes.zero(key);
                 key = older;
             }
-            return envelope.open(key, aad);
+            reached = true;
+            return key;
         } finally {
-            Bytes.zero(key);
+            if (!reached) {
+                Bytes.zero(key);
+            }
         }
+    }
+
+    /// The operational subkey for a purpose as it was at a given data key version.
+    ///
+    /// Rotation changes the data key, and every subkey is derived from it, so a handle acquired
+    /// after a rotation derives something different from the one that sealed an older record.
+    /// KeyHandle#getVersion promises those records stay readable, which means the older subkey
+    /// has to be reachable -- through the same retired chain the vault's own records use.
+    byte[] subkeyAtVersion(String purpose, int wanted) {
+        requireUnlocked();
+        byte[] source = dataKeyAtVersion(wanted);
+        try {
+            return deriveSubkey(source, purpose);
+        } finally {
+            Bytes.zero(source);
+        }
+    }
+
+    /// The one subkey derivation, so the live handle and a recovered older one cannot drift.
+    static byte[] deriveSubkey(byte[] source, String purpose) {
+        Hmac mac = Hmac.create(Hash.SHA256, source);
+        mac.update(Bytes.utf8("cn1.vault.subkey.v1"));
+        mac.update(Bytes.utf8(purpose == null ? "" : purpose));
+        return mac.doFinal();
     }
 
     private void requireUnlocked() {

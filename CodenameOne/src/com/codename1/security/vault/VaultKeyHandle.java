@@ -107,7 +107,27 @@ final class VaultKeyHandle extends KeyHandle {
     public AsyncResource<byte[]> open(byte[] sealed, AssociatedData aad) {
         AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         try {
-            out.complete(SecureEnvelope.parse(sealed).open(live(), aad));
+            SecureEnvelope envelope = SecureEnvelope.parse(sealed);
+            // live() first either way: it is the liveness check, and a destroyed or locked
+            // handle must answer LOCKED rather than reach into the vault for an older key.
+            byte[] current = live();
+            if (envelope.getKeyVersion() == version) {
+                out.complete(envelope.open(current, aad));
+            } else {
+                // Every subkey is derived from the data key, so a rotation changes this handle's
+                // material and a record sealed before it no longer opens under the live one --
+                // even though the envelope records the version that sealed it and the vault
+                // still holds the retired chain reaching back to it. getVersion() documents that
+                // such a record stays readable, and opening only with the live key is what broke
+                // that promise: an application that cached ciphertext from operationalKey lost
+                // it at the first rotation.
+                byte[] older = owner.subkeyAtVersion(purpose, envelope.getKeyVersion());
+                try {
+                    out.complete(envelope.open(older, aad));
+                } finally {
+                    Bytes.zero(older);
+                }
+            }
         } catch (VaultException failed) {
             out.error(failed);
         }

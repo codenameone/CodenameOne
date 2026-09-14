@@ -718,6 +718,44 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anOperationalKeyStillOpensWhatItSealedBeforeARotation() {
+        // KeyHandle.getVersion documents that an envelope records the version that sealed it "so
+        // an old envelope can still be opened after a rotation". Every operational subkey is
+        // derived from the data key, so rotation changes it -- and opening only with the live
+        // subkey silently broke that promise: an application that cached ciphertext from
+        // operationalKey("cache") lost it at the first rotation.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+
+        KeyHandle before = vault.operationalKey("cache").get();
+        AssociatedData binding = AssociatedData.of("app", "v", "r", "cache");
+        byte[] sealed = before.seal("cached".getBytes(), binding).get();
+        int sealedAt = before.getVersion();
+
+        assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue());
+
+        // A handle taken after the rotation derives from the new data key.
+        KeyHandle after = vault.operationalKey("cache").get();
+        assertTrue(after.getVersion() > sealedAt, "rotation must advance the version");
+        assertArrayEquals("cached".getBytes(), after.open(sealed, binding).get(),
+                "ciphertext from before the rotation must still open");
+
+        // And it survives a restart, which is the case the application actually hits.
+        vault.lock();
+        Vault reopened = Vault.named(name).configure(options);
+        reopened.unlockWithPassword(pw("p")).get();
+        KeyHandle restarted = reopened.operationalKey("cache").get();
+        assertArrayEquals("cached".getBytes(), restarted.open(sealed, binding).get());
+
+        // A different purpose still must not open it -- recovering an older version must not
+        // have widened what a handle can read.
+        KeyHandle other = reopened.operationalKey("index").get();
+        assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(other.open(sealed, binding)));
+    }
+
+    @Test
     void twoVaultNamesThatEscapeAlikeStayIsolated() {
         // Storage.fixFileName rewrites '%' to '_' with normalizeNames on, which is the default.
         // So a '%' escape made "a.b" persist as "a_002eb" -- exactly where a vault literally
