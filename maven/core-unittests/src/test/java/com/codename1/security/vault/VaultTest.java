@@ -906,6 +906,32 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void capabilitiesDescribeEachPolicysOwnMechanism() {
+        // While a vault is enrolled REQUIRE_USER_VERIFICATION, deviceProtection() answers the
+        // gated mechanism -- so seeding capabilities with it made protectionFor(REMEMBER_DEVICE)
+        // describe the passkey rather than the store that policy would actually use. A capability
+        // query is about what each policy WOULD provide.
+        device.userVerification = true;
+        // The two mechanisms disagree on exactly one answer, which is what makes this visible.
+        gated.encryptedAtRest = false;
+
+        VaultOptions options = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        Vault vault = Vault.named(freshName()).configure(options);
+        vault.enroll(pw("p"), options).get();
+        assertEquals(UnlockPolicy.REQUIRE_USER_VERIFICATION, vault.getPolicy());
+
+        VaultCapabilities caps = vault.capabilities();
+        // The gated policy still reports the gated mechanism's answer.
+        assertEquals(ProtectionReport.NO,
+                caps.protectionFor(UnlockPolicy.REQUIRE_USER_VERIFICATION)
+                        .answer(Protection.ENCRYPTED_AT_REST));
+        // And the unattended policy reports the base store's, not the passkey's.
+        assertEquals(ProtectionReport.YES,
+                caps.protectionFor(UnlockPolicy.REMEMBER_DEVICE)
+                        .answer(Protection.ENCRYPTED_AT_REST));
+    }
+
+    @Test
     void changingPolicyRecheckesTheRequiredProtections() {
         // SESSION_ONLY genuinely is encrypted at rest -- nothing that can reopen the vault is
         // written down -- so this enrolls. REMEMBER_DEVICE has to put a wrapping key in the

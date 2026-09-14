@@ -52,6 +52,20 @@ class SecureStorageTest extends UITestBase {
     }
 
     @Test
+    void anAbsentEntryAnswersNullRatherThanRefusingOnProtection() {
+        // The overload documents "the value, or null when there is none". Checking the store's
+        // report before looking meant an account that does not exist threw POLICY_NOT_MET on any
+        // platform whose store cannot provide the requested protection -- so probing an optional
+        // value was impossible on the weaker ports, even though nothing unprotected would have
+        // been returned either way.
+        SecureStorage store = SecureStorage.getInstance();
+        String absent = "cn1.test.absent." + System.nanoTime();
+        assertNull(store.get(absent, new com.codename1.security.vault.Protection[] {
+                com.codename1.security.vault.Protection.ENCRYPTED_AT_REST
+        }), "an absent entry must answer null, whatever the store can or cannot provide");
+    }
+
+    @Test
     void getInstanceReturnsStableFallbackSingleton() {
         SecureStorage a = SecureStorage.getInstance();
         SecureStorage b = SecureStorage.getInstance();

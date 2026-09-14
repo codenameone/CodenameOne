@@ -464,11 +464,20 @@ public class SecureStorage {
     /// - `VaultException`: with [com.codename1.security.vault.VaultError#POLICY_NOT_MET] when the
     ///   entry is not protected as required
     public String get(String account, Protection[] required) {
+        // Fetched first, so an entry that is not there answers null the way this overload says
+        // it does. Checking the store's report before looking meant that probing an optional
+        // value on a weaker platform -- JavaSE with ENCRYPTED_AT_REST required -- threw
+        // POLICY_NOT_MET for an account that did not exist, when nothing unprotected would have
+        // been handed back either way.
+        String value = get(account);
+        if (value == null) {
+            return null;
+        }
         Protection unmet = protectionOf(account).firstUnmet(required);
         if (unmet != null) {
             throw new VaultException(VaultError.POLICY_NOT_MET,
                     "the stored entry is not protected by " + unmet.name(), unmet, null);
         }
-        return get(account);
+        return value;
     }
 }

@@ -173,7 +173,14 @@ public final class Vault {
     /// Ask before offering the user a choice: a "remember this device" switch on a platform that
     /// cannot remember is worse than no switch.
     public VaultCapabilities capabilities() {
-        return new VaultCapabilities(deviceProtection());
+        // The BASE mechanism, not the one the current policy happens to use. deviceProtection()
+        // answers the gated variant while this vault is enrolled REQUIRE_USER_VERIFICATION, so
+        // seeding capabilities with it made protectionFor(REMEMBER_DEVICE) describe the passkey
+        // rather than the store that policy would actually use -- in the browser, reporting
+        // NON_EXTRACTABLE_KEY=NO from the passkey where the device key reports YES. A capability
+        // query is about what each policy WOULD provide, and protectionFor selects the gated
+        // variant itself for the one policy that needs it.
+        return new VaultCapabilities(baseDeviceProtection());
     }
 
     /// What currently protects this vault on this device, as observed.
@@ -2031,7 +2038,24 @@ public final class Vault {
         }
     }
 
-    /// Refuses to deliver when the vault was locked while this operation was running.
+    /// Why this is a plain int and not volatile, which a review has asked for more than once.
+    ///
+    /// Codename One's model is one thread on each side of a boundary rather than two on the same
+    /// state, and its rule for work that outlives the turn that started it is a plain counter --
+    /// explicitly not a lock and not volatile. The PR quality gate enforces the same thing:
+    /// `AvoidUsingVolatile` is on the forbidden PMD list, so the suggested change does not
+    /// compile past CI, and `volatile` appears nowhere else in this package or in Display.
+    ///
+    /// What is true, and worth stating rather than hiding: the sanctioned pattern compares the
+    /// counter ON the EDT, and these workers compare it off it, so the Java memory model
+    /// promises nothing about when an increment becomes visible to them. Closing that properly
+    /// means the rest of the prescribed answer -- workers that take what they need as parameters
+    /// and return through callSerially, touching no field -- which is a redesign of this class's
+    /// asynchronous API rather than a keyword, and belongs to whoever decides that trade.
+    ///
+    /// What is here instead bounds the damage rather than the window: every publication goes
+    /// through publishKey, which re-reads the counter and locks again if it moved, so a worker
+    /// that loses the race leaves the vault closed rather than open.
     ///
     /// lock() promises that nothing in flight delivers afterwards, and an operation that reads
     /// storage and decrypts is in flight for long enough to matter -- an EDT caller's lifecycle
