@@ -31,7 +31,6 @@ ASM_CP_FILE="$REPO_ROOT/vm/ByteCodeTranslator/target/cast-semantics-asm-classpat
 #     build never loads a line of it -- and ART implements CHECKCAST to spec.
 #   - maven/java-runtime (Ports/CLDC11) runs on a real JVM -- the simulator and
 #     desktop. ParparVM's runtime is vm/JavaAPI.
-#   - Ports/retro is vendored retroweaver code, not ours to restyle.
 DEFAULT_ROOTS=(
   "vm/JavaAPI/target/classes"
   "maven/core/target/classes"

@@ -152,7 +152,7 @@ public class RunOnDevice extends javax.swing.JPanel {
         jLabel1.setText("Preparing Device Preview");
         jLabel1.setName("jLabel1"); // NOI18N
 
-        informationLine.setText("Blackberry users please be advised that only OS's 4.7 or newer are supported!");
+        informationLine.setText("");
         informationLine.setName("informationLine"); // NOI18N
 
         prog.setIndeterminate(true);

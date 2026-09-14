@@ -73,7 +73,7 @@ ParparVM doesn't support JNI and just invokes C code directly when needed which 
 
 ## Java Level Support
 
-We aimed the VM at Java 5 support and overlay the Java 8 support with retrolambda, it should work for some Java 8 syntax out of the box simply because of ASM's ability to parse newer class files.
+We aimed the VM at Java 5 support, and it works for some Java 8 syntax out of the box simply because of ASM's ability to parse newer class files.
 
 The API is relatively limited in scope to keep the size low, we occasionally add additional API's ideally with very concise implementations to avoid bringing over the full JDK. Check out [this post](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html) explaining why we don't think supporting the entire JDK makes sense.
 
