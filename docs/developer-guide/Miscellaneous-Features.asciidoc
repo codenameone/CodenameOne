@@ -814,6 +814,11 @@ A good example for a common problem developers face is location code that doesn'
 
 To solve this sort of used case you have two APIs in `Display`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava010Snippet.java[tag=miscellaneous-features-java-010,indent=0]
+----
+
 
 Both of these allow you to detect if a build hint is set and if not (or if it's set incorrectly) set its value...
 

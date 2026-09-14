@@ -119,6 +119,11 @@ persisted across builds.
 Sometimes a class lives in a third-party JAR the build can't annotate.
 Hand-write a `Mapper<T>` and register it at startup:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationJsonXmlMappingJava003Snippet.java[tag=annotation-json-xml-mapping-java-003,indent=0]
+----
+
 
 Hand-written mappers take precedence over generated ones for the same
 class.

@@ -35,8 +35,7 @@ Notice that this is a temporary roadblock as any savvy hacker would compile the 
 
 NOTE: This isn't encoding or encryption — it's a simple obfuscation of the data.
 
-There are two simple methods in the `Util` class:
-
+The `Util` class has two static methods for it: `xorEncode(String)` turns a string into the obfuscated form, and `xorDecode(String)` turns it back.
 
 They use a simple xor based obfuscation to make a String less readable. For example, if you've code like this:
 
@@ -90,8 +89,31 @@ This works through a new mechanism in storage where you can replace the storage 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava030Snippet.java[tag=security-java-030,indent=0]
 ----
 
-You can leverage that knowledge to change the encryption password on the encryption storage using pseudo-code like this:
+You can leverage that knowledge to change the encryption password on the encryption storage. The key is installed for the whole of `Storage`, so every entry has to move together: read them all under the old key, install the new one, write them all back. `EncryptedStorage` comes from the bouncy castle cn1lib, so this listing isn't part of the compiled examples:
 
+[listing]
+----
+EncryptedStorage.install(oldKey);
+Map<String, byte[]> all = new LinkedHashMap<>();
+for (String name : Storage.getInstance().listEntries()) {
+    try (InputStream is = Storage.getInstance().createInputStream(name)) {
+        all.put(name, Util.readInputStream(is));
+    }
+}
+
+EncryptedStorage.install(newKey);
+for (Map.Entry<String, byte[]> e : all.entrySet()) {
+    try (OutputStream o = Storage.getInstance().createOutputStream(e.getKey())) {
+        o.write(e.getValue());
+    }
+}
+----
+
+The `try`-with-resources is deliberate: `Util.cleanup` swallows a close failure, and on the write side a swallowed close means an entry was never finalized under the new key. Let it throw.
+
+WARNING: This isn't crash-safe, and it can't be made crash-safe from the outside. If the process dies part way through the second loop, some entries are under each key and neither opens the whole store. `Storage` has no rename, so there is no way to stage the converted copies and swap them in atomically, and the recovery data lives only in that in-memory map.
+
+Which is the real argument for not rotating the storage key at all. Encrypt `Storage` with a random key your app generates once, keep that key wrapped under the password-derived one in a single record outside `Storage`, and a password change re-wraps that one small record instead of rewriting every entry. Nothing else moves, so there is no half-converted state to recover from. If you do rewrite the store in place, do it once at startup with nothing else touching `Storage`, and treat the possibility of an interrupted run as something your app has to survive rather than something this loop prevents.
 
 NOTE: It isn't a good idea to replace storage objects when an app is running so this is purely for this special case...
 
