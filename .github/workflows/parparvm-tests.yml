@@ -178,6 +178,38 @@ jobs:
         with:
           node-version: '20'
 
+      # WITHOUT THIS EVERY BACKEND TEST SKIPS. generate-contract.sh compiles the
+      # shared @RestClient/@Entity contract against codenameone-core and runs the
+      # Codename One maven plugin over it, so both have to be in the local repo
+      # the backend scripts use -- and this job never built the maven modules, so
+      # they never were. BackendDatabaseTest, BackendOrmTest,
+      # BackendRuntimeSelfTest and BackendJavaSeRuntimeTest all reported
+      # "codenameone-core:8.0-SNAPSHOT is not in .m2-repo" and skipped, which is
+      # why CN1_BACKEND_REQUIRED below found four of them at once: the PostgreSQL
+      # and MySQL services this job stands up were serving nobody.
+      #
+      # -Plocal-dev-javase and the repo-local .m2-repo are what the scripts
+      # expect; the path is $GITHUB_WORKSPACE/.m2-repo because that is where
+      # generate-contract.sh looks (CN1_M2 overrides it, and nothing sets one).
+      #
+      # The static-analysis gates are OFF here on purpose. This step exists to
+      # put jars in a repo, and -am drags in every port because the maven plugin
+      # depends on them -- so with them on, a SpotBugs finding in the Android
+      # port fails THIS workflow, where nobody would look for it and where it
+      # says nothing about ParparVM. pr.yml owns those gates and runs them over
+      # the same modules.
+      - name: Install core + maven plugin for the backend contract
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,codenameone-maven-plugin \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
       - name: Run ParparVM JVM tests
         working-directory: vm
         # Maven Central intermittently serves 403/429 from the runner CDN edge
