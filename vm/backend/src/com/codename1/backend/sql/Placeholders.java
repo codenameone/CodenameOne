@@ -71,8 +71,21 @@ final class Placeholders {
         int found = 0;
         int at = 0;
         int length = sql.length();
+        // Whether the scan is INSIDE a version-gated executable comment. What is
+        // in one runs only on a server new enough, so a placeholder there is a
+        // parameter on some servers and not on others -- and the count is a claim
+        // this method checks against the values supplied. See the refusal below.
+        boolean gated = false;
         while(at < length) {
             char c = sql.charAt(at);
+            if(executableComments && c == '/' && at + 3 < length && sql.charAt(at + 1) == '*'
+                    && sql.charAt(at + 2) == '!' && sql.charAt(at + 3) >= '0'
+                    && sql.charAt(at + 3) <= '9') {
+                gated = true;
+            } else if(executableComments && gated && c == '*' && at + 1 < length
+                    && sql.charAt(at + 1) == '/') {
+                gated = false;
+            }
             if(c == '?') {
                 if(at + 1 < length && sql.charAt(at + 1) == '?') {
                     // The escape for a literal question mark. It collapses to one
@@ -84,6 +97,20 @@ final class Placeholders {
                     out.append('?');
                     at += 2;
                     continue;
+                }
+                if(gated) {
+                    // UNKNOWABLE, and it has to be refused here rather than
+                    // counted: MySQL prepares "SELECT 1 /*!99999 + ? */" with no
+                    // parameters at all on a server the gate excludes, so the one
+                    // value counted here reaches runPrepared as a parameter the
+                    // statement does not have and the query fails on a count
+                    // mismatch. An UNGATED "/*! ... ? ... */" always runs, so its
+                    // placeholder is a placeholder and is counted.
+                    throw new IOException("A parameter placeholder sits inside a MySQL "
+                            + "version-gated comment, so whether it is a parameter depends "
+                            + "on the server and this client cannot ask. Put the placeholder "
+                            + "outside the gate, or spell the statement for one server with "
+                            + "execute(): [" + sql + "]");
                 }
                 found++;
                 if(dollars) {
@@ -343,6 +370,57 @@ final class Placeholders {
                 return true;
             }
             at = sql.indexOf("/*!", at + 3);
+        }
+        return false;
+    }
+
+    /**
+     * Whether the statement updates an existing row when it conflicts --
+     * "ON CONFLICT ... DO UPDATE" or MySQL's "ON DUPLICATE KEY UPDATE".
+     *
+     * <p>Scanned as SQL rather than searched for as text, so a DO UPDATE inside
+     * a string literal or a comment is not one. The question is asked of the
+     * statement's SHAPE and not of a particular execution on purpose: which
+     * branch an upsert takes depends on the rows that happen to be there, so a
+     * statement that CAN update is one whose generated key is undefined on an
+     * engine that reads the key from connection state.
+     */
+    static boolean updatesOnConflict(String sql, boolean nestedComments,
+                                     boolean backslashEscapes, boolean hashComments,
+                                     boolean dollarQuotedStrings, boolean dashCommentNeedsSpace,
+                                     boolean bracketIdentifiers, boolean executableComments)
+            throws IOException {
+        int at = 0;
+        int length = sql.length();
+        while(at < length) {
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            if(next > at) {
+                at = next;
+                continue;
+            }
+            if(isWord(sql, at, "DO")) {
+                int after = skipBlanks(sql, at + 2, nestedComments, backslashEscapes,
+                        hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                        bracketIdentifiers, executableComments);
+                if(after < length && isWord(sql, after, "UPDATE")) {
+                    return true;
+                }
+            }
+            if(isWord(sql, at, "DUPLICATE")) {
+                int key = skipBlanks(sql, at + 9, nestedComments, backslashEscapes,
+                        hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                        bracketIdentifiers, executableComments);
+                if(key < length && isWord(sql, key, "KEY")) {
+                    int update = skipBlanks(sql, key + 3, nestedComments, backslashEscapes,
+                            hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                            bracketIdentifiers, executableComments);
+                    if(update < length && isWord(sql, update, "UPDATE")) {
+                        return true;
+                    }
+                }
+            }
+            at++;
         }
         return false;
     }

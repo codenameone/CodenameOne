@@ -290,7 +290,13 @@ public final class Query<T> {
             return Long.valueOf(((Boolean)value).booleanValue() ? 1L : 0L);
         }
         if(value instanceof Character) {
-            return String.valueOf(((Character)value).charValue());
+            // THE CODE UNIT, because that is what the column holds: the
+            // server-side mapping stores a char as a number rather than as
+            // one-character text. Binding the text compared 120 with "x" and
+            // matched nothing -- silently, since a query that finds no row is
+            // an ordinary answer. findById and deleteById come through here too,
+            // so an assigned character key had the same hole.
+            return Long.valueOf(((Character)value).charValue());
         }
         return value;
     }

@@ -242,6 +242,13 @@ public class OrmCheck {
         check("in with nothing in it", "0",
                 String.valueOf(notes.query().in("title", new Object[0]).count()));
         check("isNull", "3", String.valueOf(notes.query().isNull("body").count()));
+        // A CHARACTER AS A QUERY VALUE. The column holds the code unit, so a
+        // query that bound one-character text compared 120 with "x" and matched
+        // nothing -- an empty result being an ordinary answer, silently.
+        check("eq on a char", "3",
+                String.valueOf(notes.query().eq("initial", Character.valueOf('z')).count()));
+        check("eq on a char that no row has", "0",
+                String.valueOf(notes.query().eq("initial", Character.valueOf('q')).count()));
         // And a condition that matches some of them deletes only those.
         check("a bulk delete answers how many", "1",
                 String.valueOf(notes.query().eq("title", "low").delete()));
@@ -368,22 +375,45 @@ public class OrmCheck {
             long first = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
                     new Object[] {"a", Long.valueOf(1)}, "id");
             check("the upsert fixture inserted", "true", String.valueOf(first > 0));
+            // A SECOND ROW ON THE SAME CONNECTION, which is what makes the
+            // stale key visible: with only one row ever inserted, the connection
+            // state happens to hold the right answer and a wrong reading passes.
+            long second = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
+                    new Object[] {"b", Long.valueOf(1)}, "id");
+            check("the second fixture row has its own key", "true",
+                    String.valueOf(second > first));
             String upsert = mysql
                     ? "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
                             + "ON DUPLICATE KEY UPDATE hits = hits + 1"
                     : "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
                             + "ON CONFLICT (name) DO UPDATE SET hits = cn1_upsert.hits + 1";
+            // PostgreSQL reads the key of the row it actually touched, through
+            // RETURNING, so the upsert answers and answers correctly. The other
+            // two read it from CONNECTION state, which after the update branch
+            // still holds row b's key -- so insert() refuses rather than
+            // reporting that key for row a. The refusal is a preflight: nothing
+            // is committed behind it, which the hits check below confirms.
             String answered;
             try {
-                pool.insert(upsert, new Object[] {"a", Long.valueOf(1)}, "id");
-                answered = "answered";
+                answered = String.valueOf(pool.insert(upsert,
+                        new Object[] {"a", Long.valueOf(1)}, "id"));
             } catch (Exception err) {
-                answered = "threw: " + err.getMessage();
+                answered = "refused";
             }
-            check("an upsert that updated a row does not report failure", "answered", answered);
+            boolean returning = pool.dialect().generatedKeysThroughReturning();
+            check("an upsert answers with the updated row's key, or not at all",
+                    returning ? String.valueOf(first) : "refused", answered);
+            if(!returning) {
+                // And the statement itself is fine -- it is the KEY that cannot
+                // be answered, so execute() runs it and the caller reads the key
+                // back with a query.
+                check("the same statement runs through execute", "1",
+                        String.valueOf(pool.execute(upsert,
+                                new Object[] {"a", Long.valueOf(1)}) > 0 ? 1 : 0));
+            }
             List rows = pool.query("SELECT hits FROM cn1_upsert WHERE name = ?",
                     new Object[] {"a"});
-            check("and the update happened", "2",
+            check("and the update happened exactly once", "2",
                     String.valueOf(((java.util.Map)rows.get(0)).values().iterator().next()));
         } finally {
             pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
@@ -532,6 +562,9 @@ public class OrmCheck {
         out.views = views;
         out.pinned = pinned;
         out.created = new Date(created);
+        // So the three rows this builds share a char value a query can find them
+        // by; an unset char is '\0', which is a value too but a less legible one.
+        out.initial = 'z';
         return out;
     }
 
