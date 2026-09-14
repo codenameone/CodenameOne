@@ -240,7 +240,7 @@ public abstract class Dialect {
             throw new IOException("No statement");
         }
         return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments(),
-                backslashEscapesInLiterals(), hashLineComments());
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings());
     }
 
     /**
@@ -255,7 +255,7 @@ public abstract class Dialect {
             throw new IOException("No statement");
         }
         return Placeholders.endOfStatement(sql, nestedBlockComments(),
-                backslashEscapesInLiterals(), hashLineComments());
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings());
     }
 
     /** Whether this engine's parameters are written $1, $2 rather than ?. */
@@ -282,6 +282,18 @@ public abstract class Dialect {
 
     /** Whether # begins a line comment. MySQL alone. */
     boolean hashLineComments() {
+        return false;
+    }
+
+    /**
+     * Whether $tag$...$tag$ is a string literal. PostgreSQL alone.
+     *
+     * <p>Scanning for one everywhere refused valid MySQL: $ is legal inside an
+     * unquoted identifier there, so a column pair like total$usd$ opened a
+     * dollar-quoted body that never closed and the statement was rejected before
+     * the server saw it.
+     */
+    boolean dollarQuotedStrings() {
         return false;
     }
 
@@ -418,6 +430,10 @@ public abstract class Dialect {
         }
 
         boolean nestedBlockComments() {
+            return true;
+        }
+
+        boolean dollarQuotedStrings() {
             return true;
         }
 

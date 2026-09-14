@@ -54,12 +54,17 @@ final class Placeholders {
      *                  inside an ordinary string literal, which is MySQL in its
      *                  default SQL mode
      * @param hashComments true where # begins a line comment, which is MySQL
+     * @param dollarQuotedStrings true where $tag$...$tag$ is a string literal,
+     *                  which is PostgreSQL. MySQL allows $ inside an unquoted
+     *                  identifier, so scanning for one there read a valid
+     *                  statement as an unterminated literal and refused it
      * @throws IOException when the statement carries placeholders and their count
      *                     is not {@code paramCount}, or when a literal, comment or
      *                     dollar-quoted body is left unterminated
      */
     static String render(String sql, int paramCount, boolean dollars, boolean nestedComments,
-                         boolean backslashEscapes, boolean hashComments) throws IOException {
+                         boolean backslashEscapes, boolean hashComments,
+                         boolean dollarQuotedStrings) throws IOException {
         StringBuilder out = null;
         int found = 0;
         int at = 0;
@@ -86,7 +91,8 @@ final class Placeholders {
                 at++;
                 continue;
             }
-            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments);
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings);
             if(next > at) {
                 if(out != null) {
                     out.append(sql, at, next);
@@ -140,13 +146,15 @@ final class Placeholders {
      * either.
      */
     static int endOfStatement(String sql, boolean nestedComments, boolean backslashEscapes,
-                              boolean hashComments) throws IOException {
+                              boolean hashComments, boolean dollarQuotedStrings)
+            throws IOException {
         int at = 0;
         int end = 0;
         int length = sql.length();
         while(at < length) {
             char c = sql.charAt(at);
-            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments);
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings);
             if(next > at) {
                 // A literal or a quoted identifier is part of the statement; a
                 // comment is not. skip() answers for both, so which one this was
@@ -170,7 +178,8 @@ final class Placeholders {
      * beginning at {@code at}, or {@code at} itself when nothing begins there.
      */
     private static int skip(String sql, int at, boolean nestedComments,
-                            boolean backslashEscapes, boolean hashComments) throws IOException {
+                            boolean backslashEscapes, boolean hashComments,
+                            boolean dollarQuotedStrings) throws IOException {
         char c = sql.charAt(at);
         int length = sql.length();
         if(c == '\'') {
@@ -205,7 +214,7 @@ final class Placeholders {
         if(c == '/' && at + 1 < length && sql.charAt(at + 1) == '*') {
             return skipBlockComment(sql, at, nestedComments);
         }
-        if(c == '$') {
+        if(dollarQuotedStrings && c == '$') {
             return skipDollarQuoted(sql, at);
         }
         return at;

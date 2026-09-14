@@ -166,6 +166,44 @@ class DataSourceTest {
     }
 
     @Test
+    @DisplayName("the JDBC spelling of an in-memory database is one too")
+    void recognisesTheJdbcSpelling() throws Exception {
+        // Db.open passes a jdbc:sqlite: URL through verbatim, so this is the
+        // same database under another name -- and the name the local development
+        // loop meets, because sqlite-jdbc is what serves it. Unrecognised, it
+        // defaulted to four connections and handed successive requests four
+        // different empty databases.
+        assertThrows(IOException.class, () -> DataSource.open("jdbc:sqlite::memory:", 2));
+        DataSource pool = DataSource.open("jdbc:sqlite::memory:");
+        try {
+            assertEquals(1, pool.getMaxSize());
+            pool.execute("CREATE TABLE t (a INTEGER)", null);
+            pool.execute("INSERT INTO t (a) VALUES (?)", new Object[] {Long.valueOf(1)});
+            // The same database on the next borrow, which is the whole point.
+            assertEquals(1, pool.query("SELECT a FROM t", null).size());
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a wrapped connection that died is reported, not waited for")
+    void refusesWhenAWrappedConnectionCannotBeReplaced() throws Exception {
+        // of() wraps ONE connection and has no URL to open another from, and it
+        // is built with no borrow timeout. Once that connection is discarded --
+        // the server hung up -- nothing can ever put one back, so the wait was
+        // for an event that cannot happen: every later request hung for good.
+        Database db = Database.open(":memory:");
+        DataSource pool = DataSource.of(db);
+        Database borrowed = pool.borrow();
+        assertEquals(db, borrowed);
+        borrowed.close();                       // as a dropped network session
+        pool.release(borrowed);
+        IOException err = assertThrows(IOException.class, () -> pool.borrow());
+        assertTrue(err.getMessage().contains("no URL to open another from"), err.getMessage());
+    }
+
+    @Test
     @DisplayName("dropping a dead connection wakes a borrower waiting for capacity")
     void discardingWakesAWaiter() throws Exception {
         // The pool is full and every connection is out, so a borrower waits. The

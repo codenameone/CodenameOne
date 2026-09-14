@@ -234,6 +234,22 @@ class DialectTest {
     }
 
     @Test
+    @DisplayName("dollar quoting is PostgreSQL's, and a $ elsewhere is an identifier")
+    void readsDollarQuotingOnlyWherePostgres() throws Exception {
+        // MySQL allows $ inside an unquoted identifier. Scanning for a
+        // dollar-quoted body everywhere read total$usd$ as opening one that
+        // never closed, and the statement was refused before the server saw it.
+        assertEquals("SELECT total$usd$ FROM t WHERE id = ?",
+                Dialect.MYSQL.bind("SELECT total$usd$ FROM t WHERE id = ?", 1));
+        assertEquals("SELECT total$usd$ FROM t WHERE id = ?",
+                Dialect.SQLITE.bind("SELECT total$usd$ FROM t WHERE id = ?", 1));
+        // And PostgreSQL still reads its own: the ? inside the body is not a
+        // parameter.
+        assertEquals("SELECT $tag$ ? $tag$, $1",
+                Dialect.POSTGRES.bind("SELECT $tag$ ? $tag$, ?", 1));
+    }
+
+    @Test
     @DisplayName("a statement ends before its terminator and its trailing comment")
     void findsWhereTheStatementEnds() throws Exception {
         // Where PostgreSQL's RETURNING has to be inserted. After the end it is
