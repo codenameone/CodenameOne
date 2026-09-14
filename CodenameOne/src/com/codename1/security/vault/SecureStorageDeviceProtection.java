@@ -74,7 +74,15 @@ public class SecureStorageDeviceProtection extends DeviceProtection {
         // for everything, which is exactly the platform that must not be described as protected.
         boolean hasStore = store.entryState(account("cn1.probe")) != SecureStorage.ENTRY_UNKNOWN;
         b.set(Protection.PERSISTENT, hasStore);
-        b.set(Protection.ENCRYPTED_AT_REST, hasStore);
+        // Asked of the store, not inferred from the fact that one exists. "A store answered"
+        // and "that store encrypts" are different questions, and two ports answer NO to the
+        // second on purpose: the JavaSE simulator, where this is reproducible obfuscation, and
+        // Android below API 23, which has no keystore to wrap with. Inferring YES from
+        // hasStore let a remembered vault that required ENCRYPTED_AT_REST pass policy
+        // enforcement on exactly those two. A store that says nothing still answers NO here,
+        // which is the right default: an unproven store must not be described as protected.
+        b.set(Protection.ENCRYPTED_AT_REST, hasStore
+                && store.protection().answer(Protection.ENCRYPTED_AT_REST) == ProtectionReport.YES);
         // The key is bytes this class can read back, by construction. Saying otherwise would be
         // the single most misleading thing this file could do.
         b.set(Protection.NON_EXTRACTABLE_KEY, false);

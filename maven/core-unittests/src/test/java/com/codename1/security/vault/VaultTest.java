@@ -647,6 +647,34 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void sessionOnlyRefusesToRememberThisDevice() {
+        // The public rememberDevice() used to pass the configured policy straight through, so
+        // a SESSION_ONLY vault persisted a device wrap whose record still said SESSION_ONLY --
+        // reopenable with no password while getPolicy() promised nothing was stored.
+        Vault vault = Vault.named(freshName())
+                .configure(fast().policy(UnlockPolicy.SESSION_ONLY));
+        vault.enroll(pw("p"), fast().policy(UnlockPolicy.SESSION_ONLY)).get();
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(vault.rememberDevice()));
+        // And nothing was written on the way to refusing.
+        assertTrue(device.keys.isEmpty());
+    }
+
+    @Test
+    void anOperationalKeyDoesNotClaimToBeNonExtractable() {
+        // The handle carries a derived subkey in a byte array and says so through
+        // isExportable(); reporting the DEVICE key's non-extractability beside it handed back
+        // a guarantee the object itself contradicts.
+        // The fake device protection reports NON_EXTRACTABLE_KEY = YES unconditionally, which
+        // is exactly the report that used to be handed back on the handle.
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        KeyHandle key = vault.operationalKey("cache").get();
+        assertTrue(key.isExportable());
+        assertEquals(ProtectionReport.NO,
+                key.getProtection().answer(Protection.NON_EXTRACTABLE_KEY));
+    }
+
+    @Test
     void userVerificationPolicyIsRefusedWhereUnavailable() {
         device.gatedVariant = null;
         device.userVerification = false;

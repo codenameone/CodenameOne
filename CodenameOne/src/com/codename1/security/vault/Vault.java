@@ -526,6 +526,19 @@ public final class Vault {
                                 + "setPolicy to change that deliberately",
                                 Protection.USER_VERIFICATION, null);
                     }
+                    if (options.getPolicy() == UnlockPolicy.SESSION_ONLY) {
+                        // SESSION_ONLY is a promise that nothing capable of reopening this
+                        // vault is written down. Honouring "remember me" here would persist a
+                        // device wrap whose own record still says SESSION_ONLY: the vault
+                        // reopens without a password while getPolicy() reports that it cannot.
+                        // Refused rather than silently upgraded, because changing what a vault
+                        // promises is setPolicy's job and is the caller's decision to make.
+                        throw new VaultException(VaultError.POLICY_NOT_MET,
+                                "this vault is configured session-only, which stores nothing "
+                                + "that can reopen it; use setPolicy to choose a remembering "
+                                + "policy first",
+                                Protection.PERSISTENT, null);
+                    }
                     rememberNow(options.getPolicy());
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -795,8 +808,14 @@ public final class Vault {
                     mac.update(Bytes.utf8("cn1.vault.subkey.v1"));
                     mac.update(Bytes.utf8(purpose == null ? "" : purpose));
                     byte[] derived = mac.doFinal();
+                    // extractedKeyProtection(), not the device report. The device key may
+                    // well be non-extractable -- in the browser it is -- but what this handle
+                    // carries is a derived subkey sitting in a Java byte array, which its own
+                    // isExportable() correctly reports as exportable. Handing back a report
+                    // saying NON_EXTRACTABLE_KEY while the object contradicts it is the kind
+                    // of guarantee that gets believed.
                     out.complete(new VaultKeyHandle(Vault.this, lockGeneration, derived,
-                            purpose, metadata.dataKeyVersion, deviceProtection().protection()));
+                            purpose, metadata.dataKeyVersion, extractedKeyProtection()));
                 } catch (VaultException failed) {
                     out.error(failed);
                 }
@@ -869,6 +888,16 @@ public final class Vault {
     /// database keyed this way is protected at rest by whatever protects the vault, and not at
     /// all from code running while it is open.
     public ProtectionReport databaseKeyProtection() {
+        return extractedKeyProtection();
+    }
+
+    /// This vault's protections, restated for a key whose bytes the caller is now holding.
+    ///
+    /// Everything else about the vault still applies -- where the record lives, what gates an
+    /// unlock -- but NON_EXTRACTABLE_KEY cannot survive handing the bytes out, whatever the
+    /// underlying device key can do. Shared by the two places that do it, so the answer cannot
+    /// drift between them.
+    private ProtectionReport extractedKeyProtection() {
         ProtectionReport vaultReport = protection();
         ProtectionReport.Builder b = ProtectionReport.builder();
         for (Protection protection : Protection.values()) {

@@ -136,20 +136,28 @@ public final class HTML5SecureStorage extends SecureStorage {
         }
         Object sealed = Storage.getInstance().readObject(encryptedKey(account));
         if (sealed instanceof String) {
-            // A leftover plaintext entry beside an encrypted one is a migration that was
-            // interrupted after the write and before the delete. Finish it.
-            if (Storage.getInstance().exists(legacyKey(account))) {
-                Storage.getInstance().deleteStorageFile(legacyKey(account));
-            }
             // The cast is taken before the try rather than inside it: ParparVM does not throw
             // for a failed cast, so a cast under a catch is a handler that cannot run.
             String ciphertext = (String) sealed;
+            String plaintext;
             try {
-                return open(account, ciphertext);
+                plaintext = open(account, ciphertext);
             } catch (RuntimeException failed) {
                 Log.p("SecureStorage read failed: " + reasonOf(failed), Log.WARNING);
-                return null;
+                // Fall through to the legacy entry rather than answering null. Reaching here
+                // means the encrypted copy did not open -- the IndexedDB key was cleared or is
+                // momentarily unavailable, or the ciphertext is damaged -- and if an
+                // interrupted migration left the plaintext beside it, that copy is the same
+                // value and is the only one still readable. This ordering is the whole point:
+                // the delete below used to run BEFORE this open, so a failure here had already
+                // destroyed the only recoverable copy.
+                return legacyValue(account);
             }
+            // Proven readable, so the interrupted migration can be finished now and not sooner.
+            if (Storage.getInstance().exists(legacyKey(account))) {
+                Storage.getInstance().deleteStorageFile(legacyKey(account));
+            }
+            return plaintext;
         }
         Object legacy = Storage.getInstance().readObject(legacyKey(account));
         if (!(legacy instanceof String)) {
@@ -159,6 +167,19 @@ public final class HTML5SecureStorage extends SecureStorage {
             return null;
         }
         migrate(account, (String) legacy);
+        return (String) legacy;
+    }
+
+    /// The plaintext entry alone, read without migrating it.
+    ///
+    /// Only reached when an encrypted entry exists and would not open, so migrating here would
+    /// rewrite the ciphertext that just failed -- and the entry has to stay exactly where it is
+    /// until something can actually read the encrypted copy again.
+    private String legacyValue(String account) {
+        Object legacy = Storage.getInstance().readObject(legacyKey(account));
+        if (!(legacy instanceof String)) {
+            return null;
+        }
         return (String) legacy;
     }
 
