@@ -13103,6 +13103,53 @@ public abstract class CodenameOneImplementation {
         return out;
     }
 
+    /// Derives key material from a password with PBKDF2, per RFC 8018.
+    ///
+    /// Used by [com.codename1.security.vault.KdfProfile], which is the portable password KDF
+    /// behind every vault envelope. The default returns `null`, meaning "no native derivation
+    /// here", and the caller falls back to a pure Java loop over HMAC that produces identical
+    /// bytes. Returning null rather than throwing is deliberate: a missing hook must degrade to
+    /// slow, never to a weaker derivation or a failure.
+    ///
+    /// A port SHOULD override this. Six hundred thousand iterations of software HMAC-SHA-256 is
+    /// seconds of a phone's time and considerably worse in a translated JavaScript worker, and
+    /// every platform Codename One targets has a native PBKDF2 a few lines away.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hashAlgorithm`: the PRF hash, currently always `"SHA-256"`
+    ///
+    /// - `password`: the password bytes, already UTF-8 encoded by the caller. Implementations
+    ///   must not re-encode, normalise or null-terminate them: the derived bytes have to match
+    ///   every other port's exactly.
+    ///
+    /// - `salt`: the salt
+    ///
+    /// - `iterations`: the iteration count, already range-checked by the caller
+    ///
+    /// - `length`: how many bytes to derive
+    ///
+    /// #### Returns
+    ///
+    /// the derived bytes, or `null` when this port has no native derivation
+    public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+        return null;
+    }
+
+    /// Returns the port-specific device protection used by
+    /// [com.codename1.security.vault.Vault] to remember an unlocked vault across restarts.
+    ///
+    /// Default implementation returns `null`, and the vault falls back to a portable
+    /// implementation that keeps a wrapping key in
+    /// [com.codename1.security.SecureStorage] -- which is the right answer on every port whose
+    /// secure storage is the OS key store. A port overrides this only when it can do better than
+    /// a key it can read back: the browser does, because a non-extractable `CryptoKey` in
+    /// IndexedDB can wrap and unwrap without the wrapping key ever existing as bytes the page can
+    /// touch.
+    public com.codename1.security.vault.spi.DeviceProtection getDeviceProtection() {
+        return null;
+    }
+
     // -------------------------------------------------------------------
     // Crash protection (com.codename1.crash.CrashProtection) -- platform
     // hooks that let the framework attach native log context and

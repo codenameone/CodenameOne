@@ -57,6 +57,7 @@ final class JavascriptBundleWriter {
         writeWorker(outputDirectory);
         writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
+        JavascriptSecurityHeaders.write(outputDirectory);
         // vm_protocol.md and jso-bridge-dispatch-ids.txt are developer
         // artifacts, and this output directory becomes the app's PUBLIC web
         // root. vm_protocol.md documents the worker boundary and is checked in

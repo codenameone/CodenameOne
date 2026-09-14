@@ -1,0 +1,715 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.junit.UITestBase;
+import com.codename1.security.vault.spi.DeviceProtection;
+import com.codename1.util.AsyncResource;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/// The vault's behaviour, including the parts that are only interesting when they refuse.
+///
+/// The device protection is a stand-in rather than a port's: the test implementation has no key
+/// store, so the portable fallback correctly refuses to remember anything and the remembered
+/// paths -- which are the ones most easily got wrong -- would never be exercised. The stand-in
+/// keeps an AES key in a map and performs the same [SecureEnvelope] operations a real one does,
+/// so what it verifies is the vault's logic and not the port's.
+class VaultTest extends UITestBase {
+
+    /// A device key store that is simply a map, so the remembered-device paths can be tested.
+    private static final class FakeDeviceProtection extends DeviceProtection {
+        final Map<String, byte[]> keys = new HashMap<String, byte[]>();
+        boolean userVerification;
+        boolean refuseWrites;
+        boolean unreadable;
+
+        public ProtectionReport protection() {
+            return ProtectionReport.builder()
+                    .set(Protection.PERSISTENT, !refuseWrites)
+                    .set(Protection.ENCRYPTED_AT_REST, true)
+                    .set(Protection.NON_EXTRACTABLE_KEY, true)
+                    .set(Protection.OS_PROTECTED, true)
+                    .set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN)
+                    .set(Protection.USER_VERIFICATION, userVerification)
+                    .set(Protection.ISOLATED_FROM_APPLICATION_CODE, false)
+                    .build();
+        }
+
+        public boolean requiresUserVerification() {
+            return userVerification;
+        }
+
+        public int keyState(String keyId) {
+            if (unreadable) {
+                return KEY_UNKNOWN;
+            }
+            return keys.containsKey(keyId) ? KEY_PRESENT : KEY_ABSENT;
+        }
+
+        public AsyncResource<Boolean> ensureKey(String keyId) {
+            AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            if (refuseWrites) {
+                out.error(new VaultException(VaultError.STORAGE_UNAVAILABLE, "refused"));
+                return out;
+            }
+            if (!keys.containsKey(keyId)) {
+                byte[] key = com.codename1.security.SecureRandom.bytes(32);
+                keys.put(keyId, key);
+            }
+            out.complete(Boolean.TRUE);
+            return out;
+        }
+
+        public AsyncResource<byte[]> wrap(String keyId, byte[] plaintext, byte[] aad) {
+            AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+            byte[] key = keys.get(keyId);
+            if (key == null) {
+                out.error(new VaultException(VaultError.KEY_MISSING, "no key"));
+                return out;
+            }
+            out.complete(SecureEnvelope.seal(key, keyId, 1, aad, plaintext));
+            return out;
+        }
+
+        public AsyncResource<byte[]> unwrap(String keyId, byte[] wrapped, byte[] aad) {
+            AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+            if (unreadable) {
+                out.error(new VaultException(VaultError.TEMPORARILY_UNREADABLE, "unreadable"));
+                return out;
+            }
+            byte[] key = keys.get(keyId);
+            if (key == null) {
+                out.error(new VaultException(VaultError.KEY_MISSING, "no key"));
+                return out;
+            }
+            try {
+                out.complete(SecureEnvelope.parse(wrapped).open(key, aad));
+            } catch (VaultException e) {
+                out.error(e);
+            }
+            return out;
+        }
+
+        public AsyncResource<Boolean> deleteKey(String keyId) {
+            AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            out.complete(Boolean.valueOf(keys.remove(keyId) != null));
+            return out;
+        }
+    }
+
+    private FakeDeviceProtection device;
+    private int counter;
+
+    @BeforeEach
+    void installDevice() {
+        device = new FakeDeviceProtection();
+    }
+
+    /// A name no other test has used, so one test's stored record cannot be another's starting
+    /// state. Storage outlives a test method.
+    private String freshName() {
+        counter++;
+        return "t" + System.nanoTime() + "-" + counter;
+    }
+
+    private VaultOptions fast() {
+        // The floor rather than the default. Six hundred thousand iterations is the right number
+        // to ship and the wrong one to run forty times in a unit test. The stand-in key store
+        // goes in here too: the test implementation has no platform one, so without it every
+        // remembered-device path would correctly refuse and never be exercised.
+        return new VaultOptions()
+                .kdf(KdfProfile.pbkdf2(KdfProfile.MIN_ITERATIONS))
+                .deviceProtection(device);
+    }
+
+    private static char[] pw(String s) {
+        return s.toCharArray();
+    }
+
+    private static VaultError errorOf(AsyncResource<?> r) {
+        try {
+            r.get();
+            return null;
+        } catch (RuntimeException e) {
+            Throwable t = e;
+            while (t != null) {
+                if (t instanceof VaultException) {
+                    return ((VaultException) t).getError();
+                }
+                t = t.getCause();
+            }
+            return VaultError.UNKNOWN;
+        }
+    }
+
+    @Test
+    void enrollUnlockAndReadBack() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        assertEquals(Vault.NOT_ENROLLED, vault.state());
+        assertTrue(vault.enroll(pw("hunter2"), fast()).get().booleanValue());
+        assertTrue(vault.isUnlocked());
+
+        vault.putSecret("api.token", pw("t0ken")).get();
+        assertArrayEquals(pw("t0ken"), vault.getSecret("api.token").get());
+
+        vault.lock();
+        assertFalse(vault.isUnlocked());
+        assertEquals(Vault.LOCKED, vault.state());
+        assertEquals(VaultError.LOCKED, errorOf(vault.getSecret("api.token")));
+
+        assertTrue(vault.unlockWithPassword(pw("hunter2")).get().booleanValue());
+        assertArrayEquals(pw("t0ken"), vault.getSecret("api.token").get());
+    }
+
+    @Test
+    void wrongPasswordDoesNotUnlock() {
+        String name = freshName();
+        Vault.named(name).configure(fast()).enroll(pw("right"), fast()).get();
+        Vault second = Vault.named(name).configure(fast());
+        assertEquals(VaultError.AUTHENTICATION_FAILED,
+                errorOf(second.unlockWithPassword(pw("wrong"))));
+        assertFalse(second.isUnlocked());
+    }
+
+    @Test
+    void enrollingTwiceIsAConflict() {
+        String name = freshName();
+        Vault.named(name).configure(fast()).enroll(pw("a"), fast()).get();
+        assertEquals(VaultError.CONFLICT,
+                errorOf(Vault.named(name).configure(fast()).enroll(pw("b"), fast())));
+    }
+
+    @Test
+    void aRecordOnlyOpensAgainstItsOwnBinding() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] sealed = vault.seal("note-1", "contents".getBytes()).get();
+        assertArrayEquals("contents".getBytes(), vault.open("note-1", sealed).get());
+        // The same vault, the same key, a different record. Moving ciphertext between records is
+        // the attack the binding exists to stop.
+        assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(vault.open("note-2", sealed)));
+    }
+
+    @Test
+    void anotherVaultCannotOpenTheRecord() {
+        Vault a = Vault.named(freshName()).configure(fast());
+        a.enroll(pw("same password"), fast()).get();
+        byte[] sealed = a.seal("note", "contents".getBytes()).get();
+
+        Vault b = Vault.named(freshName()).configure(fast());
+        b.enroll(pw("same password"), fast()).get();
+        assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(b.open("note", sealed)));
+    }
+
+    @Test
+    void changePasswordRewrapsWithoutTouchingData() {
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("old"), fast()).get();
+        byte[] sealed = vault.seal("note", "contents".getBytes()).get();
+        vault.changePassword(pw("old"), pw("new")).get();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(VaultError.AUTHENTICATION_FAILED,
+                errorOf(reopened.unlockWithPassword(pw("old"))));
+        assertTrue(reopened.unlockWithPassword(pw("new")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", sealed).get());
+    }
+
+    @Test
+    void changePasswordNeedsTheOldOne() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("old"), fast()).get();
+        // Unlocked, and still refused. Otherwise anyone who finds an unlocked application locks
+        // the owner out of every other device.
+        assertTrue(vault.isUnlocked());
+        assertEquals(VaultError.AUTHENTICATION_FAILED,
+                errorOf(vault.changePassword(pw("guess"), pw("new"))));
+    }
+
+    @Test
+    void rotationKeepsOldRecordsReadable() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] beforeFirst = vault.seal("note", "v1".getBytes()).get();
+
+        vault.rotateDataKey(pw("p")).get();
+        byte[] beforeSecond = vault.seal("note", "v2".getBytes()).get();
+        vault.rotateDataKey(pw("p")).get();
+        byte[] after = vault.seal("note", "v3".getBytes()).get();
+
+        // Two rotations deep, and the chain still walks back to the first key.
+        assertArrayEquals("v1".getBytes(), vault.open("note", beforeFirst).get());
+        assertArrayEquals("v2".getBytes(), vault.open("note", beforeSecond).get());
+        assertArrayEquals("v3".getBytes(), vault.open("note", after).get());
+    }
+
+    @Test
+    void rotationSurvivesALockAndReopen() {
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] old = vault.seal("note", "v1".getBytes()).get();
+        vault.rotateDataKey(pw("p")).get();
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        reopened.unlockWithPassword(pw("p")).get();
+        assertArrayEquals("v1".getBytes(), reopened.open("note", old).get());
+    }
+
+    @Test
+    void recoveryCodeOpensTheVault() {
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("forgotten"), fast()).get();
+        char[] code = vault.createRecoveryCode().get();
+        byte[] sealed = vault.seal("note", "contents".getBytes()).get();
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockWithRecoveryCode(code).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", sealed).get());
+    }
+
+    @Test
+    void aWrongRecoveryCodeDoesNotOpenTheVault() {
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        vault.createRecoveryCode().get();
+        vault.lock();
+        assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(
+                Vault.named(name).configure(fast()).unlockWithRecoveryCode(pw("AAAAAAAAAAAAAAAA"))));
+    }
+
+    @Test
+    void rememberedDeviceReopensWithoutAPassword() {
+        String name = freshName();
+        Vault vault = Vault.named(name)
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        vault.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+        byte[] sealed = vault.seal("note", "contents".getBytes()).get();
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockRemembered().get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", sealed).get());
+    }
+
+    @Test
+    void forgettingADeviceLeavesThePasswordWorking() {
+        String name = freshName();
+        Vault vault = Vault.named(name)
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        vault.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+        vault.forgetDevice().get();
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()));
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+    }
+
+    @Test
+    void aStrongerPolicyRemovesTheUnattendedWrap() {
+        // The rule that makes REQUIRE_USER_VERIFICATION mean anything: the wrap that opens
+        // without a prompt has to go, or the prompt is decoration.
+        String name = freshName();
+        device.userVerification = true;
+        Vault vault = Vault.named(name)
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        vault.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+        byte[] beforeWrap = vault.seal("note", "x".getBytes()).get();
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+        byte[] unattendedKey = device.keys.values().iterator().next();
+
+        vault.setPolicy(UnlockPolicy.REQUIRE_USER_VERIFICATION).get();
+        assertEquals(UnlockPolicy.REQUIRE_USER_VERIFICATION, vault.getPolicy());
+
+        // The device key itself was replaced, not merely left unused. Anything captured while the
+        // unattended wrap existed is now a key for nothing -- which is the most a policy change
+        // can do, and worth asserting rather than assuming.
+        assertEquals(1, device.keys.size());
+        byte[] gatedKey = device.keys.values().iterator().next();
+        assertFalse(java.util.Arrays.equals(unattendedKey, gatedKey));
+
+        vault.lock();
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockRemembered().get().booleanValue());
+        assertArrayEquals("x".getBytes(), reopened.open("note", beforeWrap).get());
+    }
+
+    @Test
+    void rotationKeepsTheUserVerificationPolicy() {
+        // The downgrade this guards: a caller that reopens the vault without repeating the policy
+        // in its options, then rotates. Rewriting the device wrap under the configured policy
+        // rather than the enrolled one would replace the gated wrap with an unattended one and
+        // turn off the prompt the user asked for, with nothing to see.
+        String name = freshName();
+        device.userVerification = true;
+        VaultOptions strong = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        Vault vault = Vault.named(name).configure(strong);
+        vault.enroll(pw("p"), strong).get();
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(UnlockPolicy.REQUIRE_USER_VERIFICATION, reopened.getPolicy());
+        reopened.unlockWithPassword(pw("p")).get();
+        reopened.rotateDataKey(pw("p")).get();
+        assertEquals(UnlockPolicy.REQUIRE_USER_VERIFICATION, reopened.getPolicy());
+    }
+
+    @Test
+    void rememberDeviceWillNotQuietlyWeakenAStrongerPolicy() {
+        String name = freshName();
+        device.userVerification = true;
+        VaultOptions strong = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        Vault vault = Vault.named(name).configure(strong);
+        vault.enroll(pw("p"), strong).get();
+
+        Vault reopened = Vault.named(name)
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        reopened.unlockWithPassword(pw("p")).get();
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(reopened.rememberDevice()));
+        assertEquals(UnlockPolicy.REQUIRE_USER_VERIFICATION, reopened.getPolicy());
+    }
+
+    @Test
+    void rotationVoidsTheRecoveryCode() {
+        // Documented rather than silently true: the code wrapped the outgoing key and cannot be
+        // rewrapped, because it is not stored anywhere.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        char[] code = vault.createRecoveryCode().get();
+        vault.rotateDataKey(pw("p")).get();
+        vault.lock();
+        assertEquals(VaultError.KEY_MISSING,
+                errorOf(Vault.named(name).configure(fast()).unlockWithRecoveryCode(code)));
+    }
+
+    @Test
+    void sessionOnlyDeletesTheDeviceKeyEntirely() {
+        String name = freshName();
+        Vault vault = Vault.named(name)
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        vault.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+        assertFalse(device.keys.isEmpty());
+        vault.setPolicy(UnlockPolicy.SESSION_ONLY).get();
+        assertTrue(device.keys.isEmpty());
+        vault.lock();
+        assertEquals(VaultError.KEY_MISSING,
+                errorOf(Vault.named(name).configure(fast()).unlockRemembered()));
+    }
+
+    @Test
+    void userVerificationPolicyIsRefusedWhereUnavailable() {
+        device.userVerification = false;
+        Vault vault = Vault.named(freshName())
+                .configure(fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION));
+        // Refused rather than quietly enrolled under a weaker policy.
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(
+                vault.enroll(pw("p"), fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION))));
+        assertEquals(Vault.NOT_ENROLLED, vault.state());
+    }
+
+    @Test
+    void aRequiredProtectionThatIsMissingRefusesEnrolment() {
+        VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE)
+                .require(Protection.HARDWARE_BACKED);
+        Vault vault = Vault.named(freshName()).configure(options);
+        // The stand-in reports HARDWARE_BACKED as UNKNOWN, which is exactly what a browser
+        // reports, and UNKNOWN does not satisfy a requirement.
+        VaultError error = errorOf(vault.enroll(pw("p"), options));
+        assertEquals(VaultError.POLICY_NOT_MET, error);
+        assertEquals(Vault.NOT_ENROLLED, vault.state());
+    }
+
+    @Test
+    void anUnwritableDeviceStoreFailsLoudlyRatherThanSilently() {
+        device.refuseWrites = true;
+        Vault vault = Vault.named(freshName())
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        assertNotNull(errorOf(vault.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE))));
+    }
+
+    @Test
+    void operationalKeysAreIndependentAndDieWithTheVault() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        KeyHandle cache = vault.operationalKey("cache").get();
+        KeyHandle index = vault.operationalKey("index").get();
+
+        AssociatedData binding = AssociatedData.of("app", "v", "r", "p");
+        byte[] sealed = cache.seal("data".getBytes(), binding).get();
+        assertArrayEquals("data".getBytes(), cache.open(sealed, binding).get());
+        // Two purposes, two keys. A handle for one must not open the other's data.
+        assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(index.open(sealed, binding)));
+
+        assertFalse(cache.isDestroyed());
+        vault.lock();
+        assertTrue(cache.isDestroyed());
+        assertEquals(VaultError.LOCKED, errorOf(cache.seal("more".getBytes(), binding)));
+    }
+
+    @Test
+    void aKeyHandleHasNoWayToExportItsMaterial() {
+        // Not a behavioural test so much as a shape one: the guarantee is that the type has no
+        // accessor, and a future refactor that adds getEncoded() should have to delete this.
+        java.lang.reflect.Method[] methods = KeyHandle.class.getMethods();
+        for (int iter = 0; iter < methods.length; iter++) {
+            String name = methods[iter].getName();
+            assertFalse("getEncoded".equals(name) || "export".equals(name)
+                    || "getKeyMaterial".equals(name),
+                    "KeyHandle must not expose key material through " + name);
+        }
+    }
+
+    @Test
+    void macRoundTripsAndRejectsATamperedTag() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        KeyHandle key = vault.operationalKey("integrity").get();
+        byte[] tag = key.mac("payload".getBytes()).get();
+        assertTrue(key.verifyMac("payload".getBytes(), tag).get().booleanValue());
+        tag[0] ^= 0x01;
+        assertFalse(key.verifyMac("payload".getBytes(), tag).get().booleanValue());
+    }
+
+    @Test
+    void syncStateEnrollsAnotherDeviceAndRefusesARollback() {
+        String name = freshName();
+        Vault first = Vault.named(name).configure(fast());
+        first.enroll(pw("p"), fast()).get();
+        byte[] early = first.exportSyncState();
+        byte[] sealed = first.seal("note", "contents".getBytes()).get();
+        first.changePassword(pw("p"), pw("p2")).get();
+        byte[] later = first.exportSyncState();
+
+        String otherName = freshName();
+        Vault other = Vault.named(otherName).configure(fast());
+        assertTrue(other.importSyncState(later, pw("p2")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), other.open("note", sealed).get());
+
+        // The rollback: a server that serves the older record would otherwise put the device back
+        // on a password the user has already changed away from.
+        assertEquals(VaultError.CONFLICT, errorOf(other.importSyncState(early, pw("p"))));
+    }
+
+    @Test
+    void syncStateFromAnotherVaultIsRefused() {
+        Vault a = Vault.named(freshName()).configure(fast());
+        a.enroll(pw("p"), fast()).get();
+        Vault b = Vault.named(freshName()).configure(fast());
+        b.enroll(pw("p"), fast()).get();
+        assertEquals(VaultError.CONFLICT, errorOf(b.importSyncState(a.exportSyncState(), pw("p"))));
+    }
+
+    @Test
+    void syncStateWithTheWrongPasswordChangesNothingLocally() {
+        String name = freshName();
+        Vault local = Vault.named(name).configure(fast());
+        local.enroll(pw("mine"), fast()).get();
+        byte[] sealed = local.seal("note", "contents".getBytes()).get();
+
+        Vault donor = Vault.named(freshName()).configure(fast());
+        donor.enroll(pw("theirs"), fast()).get();
+        assertNotNull(errorOf(local.importSyncState(donor.exportSyncState(), pw("wrong"))));
+
+        // Unchanged: the import is verified before it is stored, so a record that will not open
+        // never replaces one that does.
+        local.lock();
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockWithPassword(pw("mine")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("note", sealed).get());
+    }
+
+    @Test
+    void destroyLocalDataRemovesEverythingHere() {
+        String name = freshName();
+        Vault vault = Vault.named(name)
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        vault.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+        vault.putSecret("s", pw("v")).get();
+        vault.destroyLocalData().get();
+
+        assertEquals(Vault.NOT_ENROLLED, Vault.named(name).configure(fast()).state());
+        assertTrue(device.keys.isEmpty());
+    }
+
+    @Test
+    void autoLockClosesTheVaultAfterIdleTime() throws Exception {
+        VaultOptions options = fast().autoLockAfter(1);
+        Vault vault = Vault.named(freshName()).configure(options);
+        vault.enroll(pw("p"), options).get();
+        assertTrue(vault.isUnlocked());
+        Thread.sleep(20);
+        assertFalse(vault.isUnlocked());
+        assertEquals(VaultError.LOCKED, errorOf(vault.seal("note", "x".getBytes())));
+    }
+
+    @Test
+    void passwordNeedsRewrapIsReportedAfterUnlock() {
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        vault.lock();
+        Vault reopened = Vault.named(name).configure(fast());
+        reopened.unlockWithPassword(pw("p")).get();
+        // Enrolled at the floor, so it is behind today's default and should be rewrapped.
+        assertTrue(reopened.passwordNeedsRewrap());
+    }
+
+    @Test
+    void protectionReportsNoIsolationFromApplicationCode() {
+        // Every port, every policy. The day this starts answering YES somewhere, the claim needs
+        // a great deal more evidence than a passing test.
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertFalse(vault.protection().provides(Protection.ISOLATED_FROM_APPLICATION_CODE));
+        assertFalse(vault.capabilities().protectionFor(UnlockPolicy.REQUIRE_USER_VERIFICATION)
+                .provides(Protection.ISOLATED_FROM_APPLICATION_CODE));
+    }
+
+    @Test
+    void databaseKeyIsDerivedPerAliasAndDiesWithTheLock() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] a = vault.databaseKey("notes").get();
+        byte[] b = vault.databaseKey("audit").get();
+        assertEquals(32, a.length);
+        assertFalse(java.util.Arrays.equals(a, b), "two aliases must not share a key");
+        // Stable across calls, or a database opened twice would be keyed twice differently.
+        assertArrayEquals(a, vault.databaseKey("notes").get());
+        vault.lock();
+        assertEquals(VaultError.LOCKED, errorOf(vault.databaseKey("notes")));
+    }
+
+    @Test
+    void databaseKeyIsNotTheDataKeyItself() {
+        // A leak of a database key must not open the vault's own records. They are separate
+        // derivations, so sealing under the vault and opening with the database key cannot work.
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] sealed = vault.seal("note", "contents".getBytes()).get();
+        byte[] dbKey = vault.databaseKey("notes").get();
+        try {
+            SecureEnvelope.parse(sealed).open(dbKey, AssociatedData.of("x", "y", "z", "w"));
+            fail("the database key must not open a vault record");
+        } catch (VaultException e) {
+            assertEquals(VaultError.AUTHENTICATION_FAILED, e.getError());
+        }
+    }
+
+    @Test
+    void opaqueOnlyPolicyRefusesTheDatabaseKey() {
+        // The policy has to actually constrain the one path that produces bytes, rather than
+        // being a flag nothing reads.
+        VaultOptions options = fast().requireOpaqueKeysOnly();
+        Vault vault = Vault.named(freshName()).configure(options);
+        vault.enroll(pw("p"), options).get();
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(vault.databaseKey("notes")));
+        // And the rest of the vault still works, so the refusal is scoped to raw material.
+        assertNotNull(vault.seal("note", "x".getBytes()).get());
+        assertNotNull(vault.operationalKey("cache").get());
+    }
+
+    @Test
+    void databaseKeyProtectionNeverClaimsNonExtractability() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertFalse(vault.databaseKeyProtection().provides(Protection.NON_EXTRACTABLE_KEY));
+    }
+
+    @Test
+    void aVaultKeyedDatabaseConfigResolvesAndRefusesWhenLocked() throws Exception {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        com.codename1.db.DatabaseConfig config =
+                com.codename1.db.DatabaseConfig.vault(vault, "notes");
+        assertTrue(config.isEncrypted());
+        String literal = config.resolveKeyMaterial("notes");
+        assertEquals(67, literal.length(), "expected the engine's raw key literal");
+        assertTrue(literal.startsWith("x'"));
+        assertFalse(config.effectiveKeyProtection().provides(Protection.NON_EXTRACTABLE_KEY));
+
+        vault.lock();
+        try {
+            config.resolveKeyMaterial("notes");
+            fail("a locked vault must not key a database");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().indexOf("locked") >= 0, expected.getMessage());
+        }
+    }
+
+    @Test
+    void rotationChangesTheDatabaseKey() {
+        // Documented behaviour, and worth pinning: an application that rotates without rekeying
+        // its database can no longer open it, and a test that let the key stay the same would be
+        // hiding that.
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        byte[] before = vault.databaseKey("notes").get();
+        vault.rotateDataKey(pw("p")).get();
+        assertFalse(java.util.Arrays.equals(before, vault.databaseKey("notes").get()));
+    }
+
+    @Test
+    void aVaultNameCannotCollideWithAnotherVaultsDeviceRecord() {
+        // "notes" keeps its device record one key along from its metadata. A vault literally
+        // called "notes.device" must not land on it: the collision would have one vault silently
+        // overwriting the other's device wrap, which reads as a vault that stopped working.
+        String base = freshName();
+        Vault notes = Vault.named(base)
+                .configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        notes.enroll(pw("p"), fast().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
+        byte[] sealed = notes.seal("n", "contents".getBytes()).get();
+
+        Vault impostor = Vault.named(base + ".device").configure(fast());
+        impostor.enroll(pw("q"), fast()).get();
+
+        notes.lock();
+        Vault reopened = Vault.named(base).configure(fast());
+        assertTrue(reopened.unlockRemembered().get().booleanValue());
+        assertArrayEquals("contents".getBytes(), reopened.open("n", sealed).get());
+    }
+
+    @Test
+    void sessionOnlyVaultReportsNoStoredKey() {
+        Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        ProtectionReport report = vault.protection();
+        assertTrue(report.provides(Protection.ENCRYPTED_AT_REST));
+        // Nothing on this device can reopen the vault, so none of the key-storage protections
+        // apply -- which reads weaker than it is.
+        assertFalse(report.provides(Protection.OS_PROTECTED));
+        assertFalse(report.provides(Protection.NON_EXTRACTABLE_KEY));
+    }
+}

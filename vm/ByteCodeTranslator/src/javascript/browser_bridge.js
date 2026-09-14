@@ -381,6 +381,24 @@
           return subtle.verify(signatureAlgorithm, key, cn1CryptoBytes(request.signature), cn1CryptoBytes(request.data));
         });
     }
+    if (op === 'pbkdf2') {
+      // RFC 8018 PBKDF2, the one password KDF a browser has. The iteration
+      // count arrives already range-checked by KdfProfile -- clamping it here
+      // instead would put the bound on the side of the boundary an attacker who
+      // can edit stored bytes is on.
+      var kdfHash = cn1CryptoHash(request.hash || 'SHA-256');
+      return subtle.importKey('raw', cn1CryptoBytes(request.password), { name: 'PBKDF2' },
+          false, ['deriveBits'])
+        .then(function(key) {
+          return subtle.deriveBits({
+            name: 'PBKDF2',
+            salt: cn1CryptoBytes(request.salt),
+            iterations: request.iterations | 0,
+            hash: kdfHash
+          }, key, (request.length | 0) * 8);
+        })
+        .then(cn1CryptoResult);
+    }
     if (op === 'generateRsaKeyPair') {
       var generationAlgorithm = {
         name: 'RSA-OAEP',
@@ -401,6 +419,384 @@
     }
     throw new Error('Unsupported Web Crypto bridge operation: ' + op);
   });
+
+  // CN1_VAULT_BRIDGE_BEGIN -- JavascriptVaultBridgeTest slices between these two
+  // markers and runs what is between them under Node against a stub IndexedDB.
+  // The code here therefore must not reach outside ``global``, ``hostBridge`` and
+  // ``cn1CryptoApi``; adding a dependency on something else in this file breaks
+  // the only test that executes it.
+  // --------------------------------------------------------------------------
+  // Vault device protection -- com.codename1.impl.html5.HTML5DeviceProtection.
+  //
+  // The browser has no key store, and it does have one thing that is close
+  // enough to be worth building on: a CryptoKey created with
+  // ``extractable: false``, kept in IndexedDB. The page can encrypt and decrypt
+  // with it and ``crypto.subtle.exportKey`` on it rejects, so what lands on
+  // disk in the origin's storage is ciphertext beside a key handle that never
+  // becomes bytes here. That is the whole mechanism; everything below is
+  // plumbing and failure classification.
+  //
+  // What it is not: it is not hardware backing (the browser does not say and
+  // cannot be asked), it is not protection from a copied profile (the copy
+  // contains this IndexedDB and the key works there), and it is not protection
+  // from script in this origin (which calls the same decrypt the application
+  // does). The Java side says all three in its class documentation; this
+  // comment repeats them because the temptation to overstate lives here.
+  // --------------------------------------------------------------------------
+
+  var CN1_VAULT_DB = 'cn1-vault';
+  var CN1_VAULT_STORE = 'keys';
+  var CN1_VAULT_NONCE = 12;
+
+  // Status codes, and they must stay in step with HTML5DeviceProtection.
+  var CN1V_OK = 0;
+  var CN1V_KEY_MISSING = 1;
+  var CN1V_AUTH_FAILED = 2;
+  var CN1V_CRYPTO_UNAVAILABLE = 3;
+  var CN1V_STORAGE_UNAVAILABLE = 4;
+  var CN1V_QUOTA_EXCEEDED = 5;
+  var CN1V_INSECURE_CONTEXT = 6;
+  var CN1V_TEMPORARILY_UNREADABLE = 7;
+  var CN1V_UNKNOWN = 8;
+
+  var cn1VaultDbPromise = null;
+
+  function cn1VaultIndexedDb() {
+    return global.indexedDB || (global.window && global.window.indexedDB) || null;
+  }
+
+  function cn1VaultSecureContext() {
+    // ``isSecureContext`` is defined in workers as well as windows. Treated as
+    // false when absent rather than true: a runtime old enough not to define it
+    // is not one to grant a security claim to.
+    if (typeof global.isSecureContext === 'boolean') {
+      return global.isSecureContext;
+    }
+    if (global.window && typeof global.window.isSecureContext === 'boolean') {
+      return global.window.isSecureContext;
+    }
+    return false;
+  }
+
+  function cn1VaultOpenDb() {
+    // Cached, because every wrap and unwrap opens it and an IndexedDB open is
+    // not free. Dropped on failure so a browser that recovers -- site data
+    // cleared and re-granted, a private window that changed its mind -- is
+    // retried rather than remembered as broken.
+    if (cn1VaultDbPromise) {
+      return cn1VaultDbPromise;
+    }
+    var factory = cn1VaultIndexedDb();
+    if (!factory) {
+      return Promise.reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+    }
+    cn1VaultDbPromise = new Promise(function(resolve, reject) {
+      var request;
+      try {
+        request = factory.open(CN1_VAULT_DB, 1);
+      } catch (e) {
+        reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+        return;
+      }
+      request.onupgradeneeded = function() {
+        var db = request.result;
+        if (!db.objectStoreNames.contains(CN1_VAULT_STORE)) {
+          db.createObjectStore(CN1_VAULT_STORE, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = function() {
+        var db = request.result;
+        // A connection the browser closes under us -- the user clears site data,
+        // the origin is evicted, a version change lands in another tab -- must
+        // not stay in the cache. Every later transaction on it throws, and the
+        // cached promise would keep handing the same dead connection back.
+        db.onclose = function() { cn1VaultDbPromise = null; };
+        db.onversionchange = function() {
+          cn1VaultDbPromise = null;
+          try { db.close(); } catch (ignored) { /* already closing */ }
+        };
+        resolve(db);
+      };
+      request.onerror = function() { reject({ cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE }); };
+      request.onblocked = function() { reject({ cn1VaultStatus: CN1V_TEMPORARILY_UNREADABLE }); };
+    });
+    cn1VaultDbPromise['catch'](function() { cn1VaultDbPromise = null; });
+    return cn1VaultDbPromise;
+  }
+
+  function cn1VaultRequest(store, operation) {
+    return new Promise(function(resolve, reject) {
+      var request;
+      try {
+        request = operation(store);
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      request.onsuccess = function() { resolve(request.result); };
+      request.onerror = function() {
+        // Stopped here rather than left to bubble: an unhandled IndexedDB
+        // request error aborts its transaction, which would turn a benign
+        // "this key already exists" into a failed write of everything else.
+        if (request.error && request.error.name === 'ConstraintError') {
+          resolve(undefined);
+        } else {
+          reject(request.error || { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE });
+        }
+      };
+    });
+  }
+
+  function cn1VaultRead(keyId) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx;
+      try {
+        tx = db.transaction(CN1_VAULT_STORE, 'readonly');
+      } catch (closed) {
+        // Opening a transaction on a closed connection throws rather than
+        // calling an error handler. Caught here so the caller sees a storage
+        // failure and not "no key", which is the answer that would have the
+        // Java side create a replacement.
+        cn1VaultDbPromise = null;
+        throw closed;
+      }
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.get(String(keyId));
+      });
+    });
+  }
+
+  function cn1VaultEnsureKey(keyId) {
+    var api = cn1CryptoApi();
+    return cn1VaultRead(keyId).then(function(existing) {
+      if (existing && existing.key) {
+        return existing.key;
+      }
+      return api.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+        .then(function(key) {
+          return cn1VaultOpenDb().then(function(db) {
+            var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+            // ``add`` and not ``put``. This is the whole of the cross-tab
+            // convergence: two tabs that both found nothing each generate a
+            // key, and the store accepts exactly one of them -- the second
+            // fails with a ConstraintError, which cn1VaultRequest turns into
+            // ``undefined`` rather than an error. The loser then re-reads and
+            // adopts the winner's key. ``put`` would let the loser overwrite
+            // the winner, and every record the winner had already wrapped
+            // would be unopenable.
+            return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+              return store.add({ id: String(keyId), key: key, created: 0 });
+            }).then(function(added) {
+              if (added !== undefined) {
+                return key;
+              }
+              return cn1VaultRead(keyId).then(function(settled) {
+                if (settled && settled.key) {
+                  return settled.key;
+                }
+                throw { cn1VaultStatus: CN1V_STORAGE_UNAVAILABLE };
+              });
+            });
+          });
+        });
+    });
+  }
+
+  function cn1VaultBytes(value) {
+    if (value == null) {
+      return new Uint8Array(0);
+    }
+    return value instanceof Uint8Array ? value : new Uint8Array(value);
+  }
+
+  function cn1VaultReply(status, payload) {
+    var body = payload == null ? new Uint8Array(0) : cn1VaultBytes(payload);
+    var out = new Array(body.length + 1);
+    out[0] = status & 0xff;
+    for (var i = 0; i < body.length; i++) {
+      out[i + 1] = body[i] & 0xff;
+    }
+    return out;
+  }
+
+  function cn1VaultStatusOf(error) {
+    if (error && typeof error.cn1VaultStatus === 'number') {
+      return error.cn1VaultStatus;
+    }
+    var name = error && error.name ? String(error.name) : '';
+    if (name === 'QuotaExceededError') {
+      return CN1V_QUOTA_EXCEEDED;
+    }
+    if (name === 'OperationError') {
+      // What Web Crypto reports for a failed AES-GCM tag. It is also what it
+      // reports for some malformed inputs, and the two are not distinguishable
+      // from here -- which is fine, because telling a caller which of them it
+      // was would tell an attacker too.
+      return CN1V_AUTH_FAILED;
+    }
+    if (name === 'NotSupportedError' || name === 'InvalidAccessError') {
+      return CN1V_CRYPTO_UNAVAILABLE;
+    }
+    if (name === 'InvalidStateError' || name === 'UnknownError') {
+      return CN1V_STORAGE_UNAVAILABLE;
+    }
+    if (!cn1VaultSecureContext()) {
+      return CN1V_INSECURE_CONTEXT;
+    }
+    return CN1V_UNKNOWN;
+  }
+
+  function cn1VaultCapabilities() {
+    var bits = 0;
+    if (cn1VaultSecureContext()) {
+      bits |= 1;
+    }
+    var api = global.crypto || (global.window && global.window.crypto);
+    if (api && api.subtle) {
+      bits |= 2;
+    }
+    // Whether IndexedDB is *usable*, which is a different question from whether
+    // the object exists: a private window can expose the API and refuse every
+    // open, and reporting persistence on the strength of the symbol being there
+    // is how an application promises to remember something it will lose.
+    return cn1VaultOpenDb().then(function() {
+      bits |= 4;
+      return cn1VaultPersisted();
+    }, function() {
+      return false;
+    }).then(function(persisted) {
+      if (persisted) {
+        bits |= 8;
+      }
+      if (cn1VaultPrfCapable()) {
+        bits |= 16;
+      }
+      return cn1VaultReply(CN1V_OK, [bits]);
+    });
+  }
+
+  function cn1VaultPersisted() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    if (!nav || !nav.storage || typeof nav.storage.persisted !== 'function') {
+      return Promise.resolve(false);
+    }
+    return nav.storage.persisted().then(function(value) {
+      return !!value;
+    }, function() {
+      return false;
+    });
+  }
+
+  function cn1VaultPrfCapable() {
+    // Presence of the API only. Whether a given authenticator implements the
+    // PRF extension is discoverable solely by performing a ceremony, so this
+    // bit says "worth offering", never "supported" -- the Java side treats it
+    // the same way.
+    var w = global.window || global;
+    return !!(w.PublicKeyCredential && typeof w.PublicKeyCredential === 'function'
+      && w.navigator && w.navigator.credentials);
+  }
+
+  hostBridge.register('__cn1_vault__', function(request) {
+    var op = request && request.op;
+    try {
+      if (op === 'capabilities') {
+        return cn1VaultCapabilities();
+      }
+      if (op === 'keyState') {
+        return cn1VaultRead(request.keyId).then(function(existing) {
+          return cn1VaultReply(CN1V_OK, [existing && existing.key ? 1 : 0]);
+        }, function(error) {
+          // Deliberately not "absent". A store that could not be asked and a
+          // store that answered "nothing here" lead to opposite decisions on
+          // the Java side, and collapsing them is how a device key that was
+          // there all along gets replaced.
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'ensureKey') {
+        return cn1VaultEnsureKey(request.keyId).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'wrap') {
+        var api = cn1CryptoApi();
+        return cn1VaultEnsureKey(request.keyId).then(function(key) {
+          var nonce = new Uint8Array(CN1_VAULT_NONCE);
+          // Fresh for every wrap, from the platform CSPRNG. A repeated nonce
+          // under one AES-GCM key is catastrophic rather than merely weak, and
+          // there is no code path here that can supply one from outside.
+          api.getRandomValues(nonce);
+          var algorithm = { name: 'AES-GCM', iv: nonce, tagLength: 128 };
+          if (request.aad != null) {
+            algorithm.additionalData = cn1VaultBytes(request.aad);
+          }
+          return api.subtle.encrypt(algorithm, key, cn1VaultBytes(request.data))
+            .then(function(cipher) {
+              var body = new Uint8Array(CN1_VAULT_NONCE + cipher.byteLength);
+              body.set(nonce, 0);
+              body.set(new Uint8Array(cipher), CN1_VAULT_NONCE);
+              return cn1VaultReply(CN1V_OK, body);
+            });
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        })['catch'](function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'unwrap') {
+        var cryptoApi = cn1CryptoApi();
+        var sealed = cn1VaultBytes(request.data);
+        if (sealed.length <= CN1_VAULT_NONCE) {
+          return cn1VaultReply(CN1V_UNKNOWN, null);
+        }
+        return cn1VaultRead(request.keyId).then(function(existing) {
+          if (!existing || !existing.key) {
+            // Definite, because the read succeeded. This is the one answer that
+            // lets the Java side create a replacement key.
+            return cn1VaultReply(CN1V_KEY_MISSING, null);
+          }
+          var algorithm = {
+            name: 'AES-GCM',
+            iv: sealed.subarray(0, CN1_VAULT_NONCE),
+            tagLength: 128
+          };
+          if (request.aad != null) {
+            algorithm.additionalData = cn1VaultBytes(request.aad);
+          }
+          return cryptoApi.subtle.decrypt(algorithm, existing.key, sealed.subarray(CN1_VAULT_NONCE))
+            .then(function(plain) {
+              return cn1VaultReply(CN1V_OK, new Uint8Array(plain));
+            }, function() {
+              // No partial result, no "here is what we got". A failed tag means
+              // the bytes are not trustworthy and there is nothing to hand back.
+              return cn1VaultReply(CN1V_AUTH_FAILED, null);
+            });
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'deleteKey') {
+        return cn1VaultOpenDb().then(function(db) {
+          var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+          return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+            return store['delete'](String(request.keyId));
+          }).then(function() {
+            return cn1VaultReply(CN1V_OK, null);
+          });
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+    } catch (e) {
+      return cn1VaultReply(cn1VaultStatusOf(e), null);
+    }
+    return cn1VaultReply(CN1V_UNKNOWN, null);
+  });
+
+  // CN1_VAULT_BRIDGE_END
 
   var hostRefNextId = 1;
   var hostRefById = {};

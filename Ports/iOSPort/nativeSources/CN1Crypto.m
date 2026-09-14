@@ -52,6 +52,42 @@ int cn1_crypto_secure_random(uint8_t* out, int len) {
     return 0;
 }
 
+/* --- PBKDF2 ------------------------------------------------------------ */
+
+int cn1_crypto_pbkdf2(int hashKind,
+                      const uint8_t* password, int passwordLen,
+                      const uint8_t* salt, int saltLen,
+                      int iterations,
+                      uint8_t* out, int outLen) {
+    if (out == NULL || outLen <= 0 || salt == NULL || saltLen <= 0 || iterations <= 0) {
+        return CN1_CRYPTO_E_BAD_INPUT;
+    }
+    CCPseudoRandomAlgorithm prf;
+    if (hashKind == 512) {
+        prf = kCCPRFHmacAlgSHA512;
+    } else if (hashKind == 256) {
+        prf = kCCPRFHmacAlgSHA256;
+    } else {
+        return CN1_CRYPTO_E_UNSUPPORTED;
+    }
+    /*
+     * CCKeyDerivationPBKDF takes the password as (char*, length) and does not
+     * stop at a NUL, which is what makes it usable for bytes that came out of a
+     * UTF-8 encoder rather than a C string. A password of length zero is legal
+     * and passing NULL for it is not, so an empty one gets a valid pointer.
+     */
+    static const uint8_t emptyPassword[1] = { 0 };
+    const uint8_t* pw = (password == NULL || passwordLen <= 0) ? emptyPassword : password;
+    size_t pwLen = (password == NULL || passwordLen <= 0) ? 0 : (size_t) passwordLen;
+    if (CCKeyDerivationPBKDF(kCCPBKDF2, (const char*) pw, pwLen,
+                             salt, (size_t) saltLen,
+                             prf, (uint) iterations,
+                             out, (size_t) outLen) != kCCSuccess) {
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    return outLen;
+}
+
 /* --- AES-CBC ----------------------------------------------------------- */
 
 int cn1_crypto_aes_cbc(int encrypt, const uint8_t* key, int keyLen,

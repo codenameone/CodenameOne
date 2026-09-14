@@ -12894,6 +12894,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private com.codename1.security.SecureStorage secureStorage;
 
+    /// The browser's device protection: an AES-GCM key kept in IndexedDB as a `CryptoKey` created
+    /// with `extractable: false`. Overridden here because the portable fallback keeps its
+    /// wrapping key in `SecureStorage`, and in a browser that is the same origin-private storage
+    /// the ciphertext sits in -- which would be no protection at all. See
+    /// [HTML5DeviceProtection].
+    @Override
+    public com.codename1.security.vault.spi.DeviceProtection getDeviceProtection() {
+        return HTML5DeviceProtection.getInstance();
+    }
+
     @Override
     public boolean isRelativeAttachmentNameResolvable() {
         // No filesystem and no working directory: the engine is SQLite compiled to wasm over a

@@ -84,6 +84,20 @@ int cn1_crypto_aes_gcm(int encrypt, const uint8_t* key, int keyLen,
                        const uint8_t* in, int inLen,
                        uint8_t* out, int outCap);
 
+/* --- PBKDF2 ------------------------------------------------------------ */
+
+/// PBKDF2 key derivation, RFC 8018, over the password BYTES as supplied.
+///
+/// Deliberately not over a C string: the password arrives already UTF-8 encoded
+/// by the caller, may contain a NUL, and must derive the same bytes here as it
+/// does on Android and in a browser. `hashKind` is 256 for HMAC-SHA-256 and 512
+/// for HMAC-SHA-512. Returns `outLen` on success or a negative CN1_CRYPTO_E_*.
+int cn1_crypto_pbkdf2(int hashKind,
+                      const uint8_t* password, int passwordLen,
+                      const uint8_t* salt, int saltLen,
+                      int iterations,
+                      uint8_t* out, int outLen);
+
 /* --- RSA --------------------------------------------------------------- */
 
 /// RSA encrypt with the given X.509 SubjectPublicKeyInfo DER bytes.

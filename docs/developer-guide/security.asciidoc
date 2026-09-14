@@ -134,7 +134,7 @@ Some values are too sensitive for `Storage` or `Preferences`, which are plaintex
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava032Snippet.java[tag=security-java-032,indent=0]
 ----
 
-What backs it differs by port, and a `null` read isn't the only thing to watch for. The native ports mostly put the value behind something real: Keychain Services on iOS, an `AndroidKeyStore` key on Android from API 23, DPAPI on Windows and the Secret Service on Linux. Below API 23 the Android path falls back to Base64 in `SharedPreferences` and warns about itself, so it's a store and not a protection. The base implementation returns `false` / `null` where there's nothing to use, so treat that as "not available" and fall back accordingly. Two cases answer instead of refusing, and neither protects anything: the browser port writes through ordinary `Storage`, so the value is readable by any script on the origin including anything an XSS gets to run, and the simulator's non-prompting tier describes itself as obfuscation rather than security. Don't let a successful read in either of those stand in for a test on a device.
+What backs it differs by port, and a `null` read isn't the only thing to watch for. The native ports mostly put the value behind something real: Keychain Services on iOS, an `AndroidKeyStore` key on Android from API 23, DPAPI on Windows and the Secret Service on Linux. Below API 23 the Android path falls back to Base64 in `SharedPreferences` and warns about itself, so it's a store and not a protection. The base implementation returns `false` / `null` where there's nothing to use, so treat that as "not available" and fall back accordingly. The browser port now encrypts what it writes: the value goes into origin-private storage as AES-GCM ciphertext under a `CryptoKey` created with `extractable: false` and held in IndexedDB, which is a key the page can use and can't read out. That protects a copied storage file, a profile backup and a stolen database, and it doesn't protect the value from script running on the origin, which calls `get` exactly as your code does. Outside a secure context there is no Web Crypto at all, so a write over plain `http:` is refused rather than stored in the clear. The simulator's non-prompting tier still describes itself as obfuscation rather than security. Don't let a successful read in either of those stand in for a test on a device.
 
 ==== Secrets (fetched from the cloud, never shipped in the binary)
 
@@ -157,6 +157,167 @@ To publish a secret, open the *Secrets* page of the build console and add it und
 |_(Codename One cloud)_
 |Base URL of the secrets service. Override only if you self-host.
 |===
+
+=== Vaults: One password, every device
+
+`SecureStorage` answers one question -- where does this device keep a small secret -- and it answers it per device. `com.codename1.security.vault.Vault` answers the harder one: how does the same user read the same encrypted data on their phone and in a browser, without a server ever being able to read it, and without typing a password on every page load.
+
+One random 32-byte *data key* protects everything a vault holds. The data key is never stored. What's stored are wrapped copies of it: one sealed under a key derived from the user's password, optionally one sealed under a recovery code, and, if the user asked to be remembered, one sealed by this device's key store -- the keychain on iOS, the keystore on Android, a non-extractable `CryptoKey` in a browser. Unlocking means unwrapping one of those copies. Changing the password rewrites one wrap and re-encrypts no data at all.
+
+That shape is what makes synchronization work. The record describing a vault is ciphertext, and so is every record the vault seals, so a sync server can store both and read neither.
+
+==== Setting one up
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-enroll,indent=0]
+----
+
+On every later run, try the remembered key first and fall back to asking:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-unlock,indent=0]
+----
+
+`KEY_MISSING` from `unlockRemembered` is the ordinary case, not an error to show anyone: it's how you learn this device was never remembered, or has been forgotten.
+
+==== Storing things
+
+Small secrets go in by name. Values are `char[]` rather than `String` so you can clear them -- a `String` is immutable and lives in the heap until it's collected, which is an unbounded window in a heap dump.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-secret,indent=0]
+----
+
+Larger data is sealed rather than stored, so you decide where it lives:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-seal,indent=0]
+----
+
+A second device enrolls from the first device's exported state and the same password:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-second-device,indent=0]
+----
+
+Keep the credentials the user signs into your sync server with separate from the vault password. A server that can verify the login must not be able to derive the vault key, and it can if they're the same string.
+
+==== Unlock policies
+
+Three, and the choice belongs to the user rather than to you.
+
+[cols="1,3"]
+|===
+|Policy |What it means
+
+|`SESSION_ONLY`
+|The password is required every launch, and every page load in a browser. Nothing that can reopen the vault is written to the device.
+
+|`REMEMBER_DEVICE`
+|The data key is additionally wrapped under this device's key store, so the vault reopens with no prompt. That's unattended access: anyone who can run the app on this device reopens the vault without the password.
+
+|`REQUIRE_USER_VERIFICATION`
+|The device key exists but reaching it needs a biometric or passcode. Choosing this *deletes* any unattended wrap and replaces the device key, because a policy that promises a prompt while a wrap that skips it sits alongside promises nothing.
+|===
+
+`REQUIRE_USER_VERIFICATION` isn't available everywhere. Ask `vault.capabilities().supports(policy)` before you offer the switch, because a "remember this device" toggle on a platform that can't remember is worse than no toggle.
+
+==== Asking what actually protects it
+
+Protections are independent flags with three answers each -- yes, no, and *can't say* -- rather than a security level. The third is a real answer: no browser will tell you whether a key ended up in a secure element, and a report that guessed would be inventing a guarantee.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-report,indent=0]
+----
+
+When you need a protection rather than a description of one, require it. The vault then refuses instead of storing with less:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-require,indent=0]
+----
+
+`UNKNOWN` never satisfies a requirement.
+
+==== What a vault protects against
+
+[cols="3,2"]
+|===
+|Threat |Protected
+
+|A stolen database file, a stolen backup, a copied storage pool
+|Yes. Everything at rest is authenticated ciphertext under a key that isn't stored beside it.
+
+|A copied browser profile, vault locked
+|Yes under `SESSION_ONLY`. *No* under `REMEMBER_DEVICE` in a browser: the copy contains the IndexedDB the wrapping key lives in, and the key works in the copy.
+
+|A copied profile, vault unlocked
+|No. The data key is in memory.
+
+|Script running on your own origin, vault unlocked
+|*No.* It calls the same decrypt your code calls. Non-extractable keys and Web Workers don't change this.
+
+|Script on your origin, vault locked
+|It can't read the data. It can wait, and read the password when the user next types it.
+
+|A browser extension, or malware on the device
+|No.
+
+|A compromised server that serves new application code
+|No. New code runs in your origin and inherits everything your application has.
+
+|Data already copied elsewhere
+|No. `forgetDevice()` and `destroyLocalData()` remove local access; they can't reach a copy.
+|===
+
+The second row is the one that gets misread. "The database file alone is useless" and "a copy of the whole profile is useless" are different claims, and only the first holds for a browser with a remembered device. Say that to users in those words.
+
+==== Keys you can use and can't read
+
+`operationalKey` hands back a `KeyHandle` -- a key with no byte accessor at all. There's no `getEncoded()` on it and no method that adds one, and it stops working the moment the vault locks.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-handle,indent=0]
+----
+
+==== Encrypted databases
+
+SQLCipher keys from bytes, on the device and in the browser's WebAssembly build alike, so a database can't be keyed by a handle. `DatabaseConfig.vault(...)` therefore produces real key bytes, and says so rather than exporting a handle behind your back:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VaultSnippets.java[tag=vault-database,indent=0]
+----
+
+While the database is open the key is in the process and stays there; locking the vault doesn't close the connection. What the vault adds over `DatabaseConfig.managed()` is that the key doesn't exist at all until the user unlocks -- which in a browser is the difference between a page that holds a database key from the moment it loads and one that doesn't. If you can't accept the exposure, call `VaultOptions.requireOpaqueKeysOnly()`, which makes that call fail with `POLICY_NOT_MET` and means this vault can't key a database.
+
+`rotateDataKey` changes the database key. Rekey the database in the same operation or you won't be able to open it again; there's no automatic rekey, because an interrupted one leaves a database encrypted under neither key.
+
+==== Cross-platform interoperability
+
+Everything about the format is pinned so the same password opens the same data everywhere:
+
+* AES-256-GCM with a 12-byte nonce and a 128-bit tag, in a versioned envelope whose header -- version, cipher suite, KDF parameters, key id -- is authenticated rather than merely present. Rewriting the iteration count fails the tag instead of steering the decryption.
+* PBKDF2-HMAC-SHA256, 600,000 iterations by default, with the count carried in the envelope so it can be raised without breaking what's already written. It's the one password KDF a browser has, and a KDF one of the three platforms has to emulate in application code isn't a portable one.
+* UTF-8 encoded by Codename One rather than by the platform, because runtimes disagree about unpaired surrogates. No normalization is applied: if you want to accept two spellings of the same accented password, normalize before you call.
+* Every envelope is bound to its application, vault, record and purpose. Ciphertext moved from one record to another fails to authenticate rather than decrypting into the wrong slot.
+
+==== Deploying the browser build
+
+The vault needs a secure context. Served over plain `http:` on anything but `localhost` there's no Web Crypto, and writes are refused rather than stored in the clear.
+
+The JavaScript build writes its own deployment configuration: `_headers` at the publish root for Netlify and Cloudflare Pages, and a `cn1-security/` directory holding an nginx include, an Apache `.htaccess`, and a README explaining them. That directory is for you and shouldn't be uploaded with the application. The Content-Security-Policy in them is generated from the page that was actually emitted -- each inline block is hashed -- so it doesn't go stale against a template.
+
+Three of those protections exist only as response headers and are ignored in a `<meta>` tag: `frame-ancestors`, `X-Frame-Options` and `Strict-Transport-Security`. A deployment that puts the policy in the page and skips the host configuration has no clickjacking protection and no HSTS, whatever the rest of it says.
+
+Give the application its own origin where you can. Storage, IndexedDB, the vault's key and cookies are all keyed by origin and not by path, so a second application on the same host under a different path shares every one of them.
 
 === Disabling screenshots
 

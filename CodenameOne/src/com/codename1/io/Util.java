@@ -1891,6 +1891,14 @@ public final class Util {
         return cryptoImpl().generateSymmetricKey(bytes);
     }
 
+    /// PBKDF2 key derivation, or `null` when the port has no native implementation and the
+    /// caller should fall back to the portable one. See
+    /// [com.codename1.impl.CodenameOneImplementation#pbkdf2] for the parameter contract.
+    public static byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt,
+                                int iterations, int length) {
+        return cryptoImpl().pbkdf2(hashAlgorithm, password, salt, iterations, length);
+    }
+
     /// Merges arrays into one larger array
     public static void mergeArrays(Object[] arr1, Object[] arr2, Object[] destinationArray) {
         System.arraycopy(arr1, 0, destinationArray, 0, arr1.length);

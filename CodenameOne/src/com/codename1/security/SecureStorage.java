@@ -22,6 +22,10 @@
  */
 package com.codename1.security;
 
+import com.codename1.security.vault.Protection;
+import com.codename1.security.vault.ProtectionReport;
+import com.codename1.security.vault.VaultError;
+import com.codename1.security.vault.VaultException;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
@@ -363,5 +367,108 @@ public class SecureStorage {
     /// one of `#ENTRY_PRESENT`, `#ENTRY_ABSENT` or `#ENTRY_UNKNOWN`
     public int entryState(String account) {
         return ENTRY_UNKNOWN;
+    }
+
+    // -----------------------------------------------------------------
+    // Capability reporting and required protections
+    // -----------------------------------------------------------------
+    //
+    // The non-prompting methods above answer "did it work". They cannot
+    // answer "what protected it", and on the JavaScript port those are
+    // very different questions: a write that succeeds into ordinary
+    // origin-private storage is persistence and nothing else, while the
+    // same call on iOS put the value in the keychain. An application
+    // storing a database key needs to be able to tell those apart, and
+    // an application that requires the second needs to be refused rather
+    // than silently given the first.
+
+    /// What this store actually provides, as observed rather than as advertised.
+    ///
+    /// The base class answers [ProtectionReport#none()], which is the honest report for a
+    /// platform with no store at all. A port answers what it can verify, and
+    /// [ProtectionReport#UNKNOWN] for what it cannot -- no browser can say whether a key ended up
+    /// in a secure element, and a port that guessed would be making a guarantee up.
+    public ProtectionReport protection() {
+        return ProtectionReport.none();
+    }
+
+    /// What protects one particular entry, which need not be what the store can provide.
+    ///
+    /// An entry written before a port gained encryption is still plaintext; an entry written by an
+    /// older version of the application may be too. The default answers the store-wide report,
+    /// which is correct for a store where every entry is alike.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry to ask about
+    public ProtectionReport protectionOf(String account) {
+        return protection();
+    }
+
+    /// Stores a value, refusing rather than downgrading when a required protection is missing.
+    ///
+    /// This is the overload to use for anything whose exposure would matter. `set(account, value)`
+    /// stores what it can and reports whether the write worked; this one first checks that the
+    /// store provides everything in `required` and throws
+    /// [com.codename1.security.vault.VaultError#POLICY_NOT_MET] if it does not, naming the
+    /// protection that was missing.
+    ///
+    /// [ProtectionReport#UNKNOWN] does not satisfy a requirement. A store that cannot say whether
+    /// it encrypts has not encrypted anything as far as a policy is concerned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry name
+    ///
+    /// - `value`: the value to store
+    ///
+    /// - `required`: the protections this value must have, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// whether the write succeeded
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: with [com.codename1.security.vault.VaultError#POLICY_NOT_MET] when a
+    ///   required protection is not provided. Nothing is written in that case
+    public boolean set(String account, String value, Protection[] required) {
+        Protection unmet = protection().firstUnmet(required);
+        if (unmet != null) {
+            throw new VaultException(VaultError.POLICY_NOT_MET,
+                    "this platform's secure storage does not provide " + unmet.name()
+                    + "; refusing to store the value with weaker protection than was asked for",
+                    unmet, null);
+        }
+        return set(account, value);
+    }
+
+    /// Reads a value, refusing when the entry is not protected the way the caller requires.
+    ///
+    /// The check is against [#protectionOf(String)] rather than [#protection()], so an entry
+    /// written before a port gained encryption is refused even on a port that now encrypts. An
+    /// application seeing this should rewrite the entry.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry name
+    ///
+    /// - `required`: the protections this value must have, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when there is none
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: with [com.codename1.security.vault.VaultError#POLICY_NOT_MET] when the
+    ///   entry is not protected as required
+    public String get(String account, Protection[] required) {
+        Protection unmet = protectionOf(account).firstUnmet(required);
+        if (unmet != null) {
+            throw new VaultException(VaultError.POLICY_NOT_MET,
+                    "the stored entry is not protected by " + unmet.name(), unmet, null);
+        }
+        return get(account);
     }
 }
