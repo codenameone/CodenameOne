@@ -244,7 +244,7 @@ final class JavascriptSecurityHeaders {
         StringBuilder b = new StringBuilder();
         b.append("# Codename One JavaScript port -- security headers.\n");
         b.append("# Netlify and Cloudflare Pages read this file verbatim; see "
-                + "SECURITY-DEPLOYMENT.md.\n");
+                + "cn1-security/README.md.\n");
         b.append("/*\n");
         String[] lines = commonHeaders(csp).split("\n");
         for (int iter = 0; iter < lines.length; iter++) {
