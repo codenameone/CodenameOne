@@ -254,6 +254,21 @@ public class OrmAnnotationProcessorTest {
                         + "}\n");
         ProcessorContext ctx = runProcessor(classes, backendClasspath());
         assertTrue("two fields on one column should be refused", ctx.hasErrors());
+        // And the same mapping differing only in CASE, because SQLite and MySQL
+        // read those as one column even quoted while PostgreSQL keeps them
+        // apart: a mapping only one of the three accepts is not portable.
+        File folded = compileFixture(
+                "com.example.Folded",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Folded {\n"
+                        + "    @Id public long id;\n"
+                        + "    @Column(name=\"label\") public String name;\n"
+                        + "    @Column(name=\"LABEL\") public String title;\n"
+                        + "    public Folded() {}\n"
+                        + "}\n");
+        assertTrue("a case-folded duplicate should be refused too",
+                runProcessor(folded, backendClasspath()).hasErrors());
         String reported = String.valueOf(ctx.getErrors());
         assertTrue(reported, reported.contains("label"));
         assertTrue(reported, reported.contains("name"));

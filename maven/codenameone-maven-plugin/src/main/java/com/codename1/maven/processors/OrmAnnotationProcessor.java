@@ -317,7 +317,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             for (int j = i + 1; j < ec.fields.size(); j++) {
                 PersistedField a = ec.fields.get(i);
                 PersistedField b = ec.fields.get(j);
-                if (a.columnName.equals(b.columnName)) {
+                // IGNORING CASE: SQLite and MySQL treat "name" and "NAME" as
+                // one column even quoted, while PostgreSQL keeps them apart, so
+                // a mapping only PostgreSQL accepts is not portable and the
+                // strictest engine decides. equalsIgnoreCase is locale
+                // independent; toLowerCase is not.
+                if (a.columnName.equalsIgnoreCase(b.columnName)) {
                     ctx.error(cls, "@Entity " + ec.binaryName + " maps both " + a.fieldName
                             + " and " + b.fieldName + " to the column '" + a.columnName
                             + "'. Give one of them a @Column(name) of its own, or mark it "
