@@ -1152,12 +1152,28 @@ public final class Result {
         // if the last element of expression is an attribute, handle it here
         if (key.startsWith("@")) {
             key = key.substring(1);
-            String v = obj.getAttribute(key);
             List array = new Vector();
-            if (v != null) {
-                // this will allow caller to get parent of an attribute if
-                // needed
-                array.add(new MapContent(v, obj));
+            // Per node, not once for the whole result.
+            //
+            // A step that selects several elements answers with a SubContent,
+            // whose getAttribute() returns null by definition -- a node set
+            // has no single attribute value. Asking it for one therefore threw
+            // away every match: "//player/@id" and "//player[@rank < 3]/@id"
+            // both came back EMPTY on a document with three players, while the
+            // same expression against a single match worked. Nothing said so;
+            // the array was simply zero long.
+            //
+            // nodesOf() is what makes the loop safe: a node set can hold a
+            // null, for a branch where the step after a predicate resolved to
+            // nothing, and it can hold another set.
+            for (Object o : nodesOf(obj)) {
+                StructuredContent node = (StructuredContent) o;
+                String v = node.getAttribute(key);
+                if (v != null) {
+                    // the node rather than the set, so a caller can still walk
+                    // back to the parent of the attribute it read
+                    array.add(new MapContent(v, node));
+                }
             }
             return array;
         } else if (key.charAt(0) == Result.ARRAY_END && tokens.size() >= 4) {
@@ -1170,6 +1186,49 @@ public final class Result {
         }
         // otherwise, last element of expression selects a child node.
         return obj.getChildren(key);
+    }
+
+    /// The elements a resolved path step stands for.
+    ///
+    /// One node answers for itself; a node set answers with its members. The
+    /// two are indistinguishable to every other step -- getChildren() and
+    /// getDescendants() aggregate over the set -- and only an attribute read
+    /// has to tell them apart.
+    ///
+    /// - `content`: a single node or a node set
+    ///
+    /// #### Returns
+    ///
+    /// the nodes to read individually
+    private static List nodesOf(final StructuredContent content) {
+        List out = new Vector();
+        collectNodes(content, out);
+        return out;
+    }
+
+    /// Flattens one node or node set into `out`, dropping what did not resolve.
+    ///
+    /// A set can hold a null -- apply() adds one for every branch where the
+    /// step after a predicate matched nothing, so "//player[@rank]/address/@code"
+    /// carries a null for each player with no address -- and a set can hold
+    /// another set. Both have to be dealt with here, because everything that
+    /// reads a node individually would otherwise dereference a null.
+    ///
+    /// - `content`: a node, a node set, or null
+    ///
+    /// - `out`: collects the real nodes, in document order
+    private static void collectNodes(final StructuredContent content,
+                                     final List out) {
+        if (content == null) {
+            return;
+        }
+        if (content instanceof SubContent) {
+            for (Object o : ((SubContent) content).nodes()) {
+                collectNodes((StructuredContent) o, out);
+            }
+            return;
+        }
+        out.add(content);
     }
 
     /// Internal worker utility method, traverses dom based on path tokens

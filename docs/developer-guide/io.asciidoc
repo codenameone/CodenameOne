@@ -941,7 +941,7 @@ If you're at all familiar with processing responses from webservices, you will n
 In the code above, input can be any of:
 
 - `InputStream` directly from `ConnectionRequest.readResponse(java.io.InputStream)`.
-- XML or JSON document in the form of a {@code String}</li>
+- XML or JSON document in the form of a `String`
 - XML DOM https://www.codenameone.com/javadoc/com/codename1/xml/Element.html[Element] returned from https://www.codenameone.com/javadoc/com/codename1/xml/XMLParser.html[XMLParser]
 - JSON DOM `Map` returned from https://www.codenameone.com/javadoc/com/codename1/io/JSONParser.html[JSONParser]
 
@@ -988,7 +988,7 @@ Above, if you want to select the IDs of all players that are ranked in the top 2
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava121Snippet.java[tag=io-java-121,indent=0]
 ----
 
-TIP: Notice above that the expression is using an attribute for selecting both rank and id. In JSON documents, if you try to select an attribute, it will look for a child node under the attribute name you ask for)
+TIP: Notice above that the expression is using an attribute for selecting both rank and id. In JSON documents, if you try to select an attribute, it will look for a child node under the attribute name you ask for.
 
 If a document is ordered, you might want to select nodes by their position, for example:
 
@@ -1011,15 +1011,13 @@ Above, you globally find a lastname element with a value of ‘Hewitt’, then g
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava124Snippet.java[tag=io-java-124,indent=0]
 ----
 
-It's also possible to nest expressions, for example:
+A predicate can't hold another predicate. An expression such as
+`+//player[//address[country/isocode='CA']]/@id+` is rejected with
+`Syntax error: unclosed predicate`, because the outer predicate is split at
+its comparator before it's tokenized and that cuts the inner one in half.
+Select the inner nodes first and match on what comes back.
 
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava125Snippet.java[tag=io-java-125,indent=0]
-----
-
-In the above example, if the player node had an address object, you’d be selecting all players from Canada. This is a simple example of a nested expression, but they can get much more complex, which will be required as the documents themselves get more complex. +
-Moving on, to select a node based on the existence of an attribute:
+To select a node based on the existence of an attribute:
 
 [source,java]
 ----
@@ -1033,12 +1031,11 @@ Above, you selected the IDs of all ranked players. Conversely, you can select th
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava127Snippet.java[tag=io-java-127,indent=0]
 ----
 
-NOTE: Logical not (!) operators aren't implemented)
+NOTE: Logical not (`!`) operators aren't implemented.
 
-You can also select by the existence of a child node
+A child node's existence is tested the same way, by naming it with no
+comparison: `+//player[middlename]/@id+` selects the players that have one.
 
-
-Above, you selected all players that have a middle name.<br/>
 Keep in mind that the Codename One path expression language isn't a full implementation of XPath 1.0, but does already handle many of the most useful features of the specification.
 
 ===== Properties files

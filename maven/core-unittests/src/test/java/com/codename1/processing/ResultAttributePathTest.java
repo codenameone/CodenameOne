@@ -1,0 +1,141 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/// The attribute half of the path language, which the developer guide has
+/// always documented and which answered nothing at all.
+class ResultAttributePathTest {
+
+    /// Three players, and the third carries no rank.
+    private static final String RANKINGS =
+            "<rankings>"
+            + "<player id='1036' rank='1'><lastname>Tomic</lastname></player>"
+            + "<player id='2585' rank='2'><lastname>Ebden</lastname></player>"
+            + "<player id='6457'><lastname>Hewitt</lastname></player>"
+            + "</rankings>";
+
+    private static Result rankings() {
+        return Result.fromContent(RANKINGS, Result.XML);
+    }
+
+    @Test
+    void anAttributeIsReadFromEveryNodeTheStepSelected() {
+        // SubContent.getAttribute() answers null by definition -- a node set
+        // has no single attribute value -- and Result asked it for one, so a
+        // step matching more than one element dropped them all. A single match
+        // worked, which is what made this look like a predicate problem.
+        int[] all = rankings().getAsIntegerArray("//player/@id");
+        assertEquals(3, all.length, "reading an attribute across a node set answered nothing");
+        assertEquals(1036, all[0]);
+        assertEquals(2585, all[1]);
+        assertEquals(6457, all[2]);
+    }
+
+    @Test
+    void aComparisonPredicateKeepsEveryMatchingAttribute() {
+        // The comparison itself always worked; what followed it did not.
+        int[] top2 = rankings().getAsIntegerArray("//player[@rank < 3]/@id");
+        assertEquals(2, top2.length, "the guide's own top-2 example answered nothing");
+        assertEquals(1036, top2[0]);
+        assertEquals(2585, top2[1]);
+    }
+
+    @Test
+    void anAttributeExistencePredicateMatchesTheElementsThatCarryIt() {
+        // AttributeEvaluator.evaluateSingle looked up the predicate text with
+        // its '@' still on, so it asked for an attribute named "@rank".
+        int[] ranked = rankings().getAsIntegerArray("//player[@rank]/@id");
+        assertEquals(2, ranked.length, "[@rank] matched nothing");
+        assertEquals(1036, ranked[0]);
+        assertEquals(2585, ranked[1]);
+    }
+
+    @Test
+    void aNullAttributePredicateMatchesTheElementsThatLackIt() {
+        // The documented way to ask for absence, and it returned before the
+        // rvalue was read -- so the one predicate written for a missing
+        // attribute could never match one.
+        int[] unranked = rankings().getAsIntegerArray("//player[@rank=null]/@id");
+        assertEquals(1, unranked.length, "[@rank=null] matched nothing");
+        assertEquals(6457, unranked[0]);
+    }
+
+    @Test
+    void aQuotedNullIsStillAValueToCompareAgainst() {
+        // 'null' in quotes is a string an attribute can really hold, so it
+        // must not be read as the absence test.
+        Result r = Result.fromContent(
+                "<t><a v='null'/><a v='x'/></t>", Result.XML);
+        assertEquals("null", r.getAsString("/t/a[@v='null']/@v"));
+    }
+
+    @Test
+    void aBranchThatResolvedToNothingIsSkippedRatherThanDereferenced() {
+        // apply() puts a null in the node set for every branch where the step
+        // after a predicate matched nothing, and it can nest one set inside
+        // another. Reading attributes per node walked straight into both.
+        Result r = Result.fromContent(
+                "<t><player rank='1'><address code='X'/></player>"
+                + "<player rank='2'/></t>", Result.XML);
+        String[] codes = r.getAsStringArray("//player[@rank]/address/@code");
+        assertEquals(1, codes.length, "a branch with no address took the others with it");
+        assertEquals("X", codes[0]);
+    }
+
+    @Test
+    void jsonHasNoAttributesSoTheFieldIsTheChild() {
+        // HashtableContent.getAttribute() answers null for every name, so an
+        // absence test that only asked it matched every object in the document
+        // -- including the ones carrying the field. Both halves read the child.
+        Result r = Result.fromContent(
+                "{\"players\":[{\"rank\":1,\"name\":\"A\"},{\"name\":\"B\"}]}",
+                Result.JSON);
+        String[] unranked = r.getAsStringArray("/players[@rank=null]/name");
+        assertEquals(1, unranked.length, "[@rank=null] matched a player that has a rank");
+        assertEquals("B", unranked[0]);
+
+        String[] ranked = r.getAsStringArray("/players[@rank]/name");
+        assertEquals(1, ranked.length, "[@rank] and [@rank=null] disagree on JSON");
+        assertEquals("A", ranked[0]);
+    }
+
+    @Test
+    void anUnclosedPredicateIsReportedRatherThanSpun() {
+        // getPredicate() ran off the end with the bracket still open, left the
+        // position where it was, and tokenize() called it again from there for
+        // ever: the process died with an OutOfMemoryError. It is reachable
+        // from a well-formed expression, because a predicate containing a
+        // nested one is split at its comparator before being tokenized.
+        try {
+            rankings().getAsIntegerArray("//player[//address[country='CA']]/@id");
+            fail("an unclosed predicate was accepted");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().indexOf("unclosed predicate") >= 0,
+                    "wrong diagnosis: " + expected.getMessage());
+        }
+    }
+}
