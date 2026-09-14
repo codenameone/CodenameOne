@@ -371,8 +371,19 @@ public final class Config {
         while(at >= 0) {
             int end = value.indexOf('}', at + 2);
             if(end < 0) {
-                throw new IOException(key + " holds a '${' that is never closed: '"
-                        + value + "'");
+                // THE KEY AND THE POSITION, NEVER THE VALUE. This one is reached
+                // with cn1.datasource.url in hand more often than with anything
+                // else, and that value carries a password: an uncaught start-up
+                // failure prints its message straight into a deployment log,
+                // which undoes the care describe() takes for the same reason.
+                //
+                // The two messages below name a key and a reference and no value
+                // at all, so they are left as they are; getInt and getBoolean do
+                // quote what they were given, and that is deliberate -- the value
+                // of a key declared to be a number or a flag is what the operator
+                // needs to see, and is not a credential.
+                throw new IOException(key + " holds a '${' at index " + at
+                        + " that is never closed");
             }
             out.append(value, from, at);
             String reference = value.substring(at + 2, end);

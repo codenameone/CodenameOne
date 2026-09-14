@@ -267,7 +267,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if (idAnn != null) {
                 pf.isId = true;
                 pf.autoIncrement = idAnn.getBoolOrDefault("autoIncrement", true);
-                if (backend && pf.autoIncrement && !isGeneratableKey(pf.dialectKind)) {
+                if (backend && pf.autoIncrement && !isGeneratableKey(pf.kind)) {
                     // A DATABASE COUNTS. Every other type fails somewhere the
                     // build cannot see: a String key is refused by SQLite, whose
                     // AUTOINCREMENT is legal only after INTEGER PRIMARY KEY; a
@@ -277,9 +277,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     // delete targets it.
                     ctx.error(cls, "@Id on " + ec.binaryName + "." + f.getName()
                             + " is autoIncrement and the field is " + pf.kind.binaryName
-                            + "; a database generates integer keys. Use int, long or short "
-                            + "(or their boxed forms), or @Id(autoIncrement = false) and "
-                            + "assign the key yourself.");
+                            + "; a database generates integer keys, and wide enough ones. "
+                            + "Use int or long (or their boxed forms) -- byte and short run "
+                            + "out after 127 and 32,767 rows and the key then narrows to a "
+                            + "negative number -- or @Id(autoIncrement = false) and assign "
+                            + "the key yourself.");
                 }
                 if (backend && !pf.autoIncrement && pf.dialectKind == KIND_BLOB) {
                     // And a blob is not a key on MySQL at all: it indexes one
@@ -709,11 +711,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
-    /// Whether a DATABASE can generate a key of this kind. Integers, and
-    /// nothing else: what comes back from every engine is a number, and the
-    /// generated dao writes it into the field with no room to interpret it.
-    private static boolean isGeneratableKey(int kind) {
-        return kind == KIND_INTEGER || kind == KIND_BIGINT;
+    /// Whether a DATABASE can generate a key this field can hold.
+    ///
+    /// Integers, and wide enough ones: `byte` and `short` are integers and were
+    /// accepted by an earlier version of this check, but a generated key leaves
+    /// their range after 127 and 32,767 rows. The generated setter then NARROWS
+    /// what came back -- silently, and to a negative number -- so the entity
+    /// carries a key no row has and every later update and delete either misses
+    /// or hits a row that belongs to something else. A table reaching 128 rows
+    /// is not an edge case.
+    private static boolean isGeneratableKey(PropertyTypeKind kind) {
+        return kind.kind == PropertyTypeKind.Kind.INT || kind.kind == PropertyTypeKind.Kind.LONG;
     }
 
     /// The source spelling of a kind, so the generated class references the

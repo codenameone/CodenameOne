@@ -131,6 +131,23 @@ class ConfigTest {
     }
 
     @Test
+    @DisplayName("a malformed value is reported without printing the value")
+    void doesNotPrintTheValueItCannotParse(@TempDir File dir) throws Exception {
+        // The value this is reached with is nearly always the datasource URL, and
+        // that carries a password. An uncaught start-up failure prints the
+        // message into a deployment log, which would undo the care describe()
+        // takes about exactly the same string.
+        write(dir, "application.properties",
+                "cn1.datasource.url=postgres://app:hunter2@db/app${unclosed\n");
+        Config config = Config.load(dir.getAbsolutePath());
+        IOException err = assertThrows(IOException.class,
+                () -> config.get(Config.DATASOURCE_URL));
+        assertFalse(err.getMessage().contains("hunter2"), err.getMessage());
+        assertTrue(err.getMessage().contains(Config.DATASOURCE_URL), err.getMessage());
+        assertTrue(err.getMessage().contains("index"), err.getMessage());
+    }
+
+    @Test
     @DisplayName("a reference can carry a fallback, and can name another key")
     void expandsWithFallbacksAndNestedKeys(@TempDir File dir) throws Exception {
         write(dir, "application.properties",
