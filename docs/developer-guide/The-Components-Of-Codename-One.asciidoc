@@ -1564,7 +1564,18 @@ If you prefer a directory layout (for example, to commit the generated sources o
 
 ==== Reading the payload from the host app
 
-The host app reads the most recent payload from the same App Group at startup or when it resumes:
+The host app has to be in that App Group too. `setAppGroupId` writes the
+entitlement for the extension only, so add the same identifier to the
+application with the `ios.app_groups` build hint -- the two sides are reading
+and writing one container, and a mismatch produces an empty
+dictionary rather than an error:
+
+[listing]
+----
+codename1.arg.ios.app_groups=group.com.example.myapp
+----
+
+It then reads the most recent payload at startup or when it resumes:
 
 [source,objective-c]
 ----
