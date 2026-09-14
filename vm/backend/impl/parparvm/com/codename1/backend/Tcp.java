@@ -107,27 +107,38 @@ public final class Tcp {
         if(tls != 0) {
             return;
         }
-        long fd;
-        synchronized(this) {
-            if(handle == 0) {
-                throw new IOException("Socket closed");
-            }
-            fd = handle;
+        // CLAIMED LIKE ANY OTHER OPERATION. Reading the descriptor under the
+        // monitor and letting go of it was not enough: the handshake below runs
+        // for as long as the peer takes, and a close() during it found inFlight
+        // at zero and released the descriptor outright. The number is then free
+        // for the next accept() or connect() on this process to take, while
+        // OpenSSL's socket BIO holds nothing but that number -- so the next
+        // handshake syscall reads or writes somebody else's connection. The
+        // recheck below stops the SESSION being published; it cannot unsend
+        // bytes. With the claim taken, close() shuts the descriptor down instead
+        // and leaves the number in place until release(), which is the whole
+        // reason the claim exists for read() and write().
+        long[] claimed = new long[1];
+        long session;
+        claim(claimed);
+        try {
+            session = startTlsImpl(claimed[0], host, caFile);
+        } finally {
+            release();
         }
-        long session = startTlsImpl(fd, host, caFile);
         if(session == 0) {
             throw new IOException("TLS handshake with " + host + " failed: " + tlsErrorImpl());
         }
         // Published under the same monitor the claim takes, so a thread that goes
         // on to read sees a session rather than a zero and the plain socket.
         //
-        // AND RECHECKED, because the handshake above holds no claim -- there is no
-        // session to claim yet. A close() during it closes the descriptor, which
-        // is what makes the handshake fail; the race that remains is the narrow
-        // one where it had just SUCCEEDED. Publishing then would report success on
-        // a closed socket and leave an SSL* that only a second close would free --
-        // by which time its descriptor number may belong to another connection,
-        // and SSL_shutdown would write TLS bytes into that one.
+        // AND RECHECKED, because the claim above is released before this runs and
+        // a close() may have been waiting on it. The race that remains is the
+        // narrow one where the handshake had just SUCCEEDED. Publishing then would
+        // report success on a closed socket and leave an SSL* that only a second
+        // close would free -- by which time its descriptor number may belong to
+        // another connection, and SSL_shutdown would write TLS bytes into that
+        // one.
         boolean lost;
         synchronized(this) {
             lost = handle == 0;

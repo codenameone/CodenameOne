@@ -36,6 +36,14 @@ public final class FileCountProbe {
     }
 
     /** Descriptors StaticFiles has handed to a Response and not yet closed. */
+    /**
+     * The tunable clamp itself; see HttpServer.atLeast, whose comment says this
+     * is why it is package visible. Nothing called it until now.
+     */
+    public static int clamp(String name, int value, int minimum) {
+        return HttpServer.atLeast(name, value, minimum);
+    }
+
     public static int openFiles() {
         return StaticFiles.openFileCount();
     }

@@ -2510,6 +2510,102 @@ public class SelfTest {
     }
 
     /**
+     * A peer that accepts and then says nothing does not hold a handler for ever.
+     *
+     * <p>connectTimeout is spent reaching the port. The handshake after it had no
+     * deadline on either arm -- a bare SSL_connect on a blocking descriptor, and
+     * a bare startHandshake() -- so a host that completes TCP and then stalls
+     * parks the calling thread indefinitely. Every handler opening a connection
+     * to a partly failed database does the same, and the pool is bounded, so the
+     * server stops answering anything.
+     *
+     * <p>Driven by a stub that accepts and never speaks TLS. It runs only when
+     * CN1_TLS_HANDSHAKE_MS names a short budget, because the default is fifteen
+     * seconds and this suite should not spend them; the harness that runs it in
+     * CI sets it. Asserted on the budget being SPENT rather than on any message:
+     * the handshake failing is the point, and it has to happen in about the time
+     * configured rather than not at all.
+     */
+    private static void aStalledPeerDoesNotHoldTheHandshake() throws Exception {
+        String configured = System.getenv("CN1_TLS_HANDSHAKE_MS");
+        int budget = 0;
+        if(configured != null && configured.length() > 0) {
+            try {
+                budget = Integer.parseInt(configured.trim());
+            } catch (NumberFormatException malformed) {
+                budget = 0;
+            }
+        }
+        if(budget <= 0 || budget > 5000) {
+            System.out.println("NOTE TLS handshake budget check skipped: set "
+                    + "CN1_TLS_HANDSHAKE_MS to 5000 or less to run it");
+            return;
+        }
+        final ServerSocket silent = ServerSocket.bind("127.0.0.1", 0, 1);
+        Thread stub = new Thread(new Runnable() {
+            public void run() {
+                int client = -1;
+                try {
+                    client = silent.accept();
+                    // AND NOTHING ELSE. The TCP connection is up and no TLS record
+                    // will ever arrive, which is the shape being bounded.
+                    Thread.sleep(20000);
+                } catch (Exception ignored) {
+                    // The client giving up is the expected ending.
+                } finally {
+                    if(client >= 0) {
+                        ServerSocket.closeFd(client);
+                    }
+                }
+            }
+        });
+        stub.start();
+        String outcome;
+        long started = System.currentTimeMillis();
+        Tcp socket = Tcp.connect("127.0.0.1", silent.getPort(), 5000);
+        try {
+            socket.startTls("127.0.0.1");
+            outcome = "handshook with a peer that said nothing";
+        } catch (Exception refused) {
+            long spent = System.currentTimeMillis() - started;
+            // Generous: the budget, plus room for a loaded machine. What is being
+            // ruled out is "never", not a hundred milliseconds either way.
+            outcome = spent < budget + 4000 ? "gave up in time"
+                    : "gave up after " + spent + "ms";
+        } finally {
+            socket.close();
+            silent.close();
+        }
+        stub.join(5000);
+        check("a handshake with a silent peer is bounded", "gave up in time", outcome);
+    }
+
+    /**
+     * A tunable below its floor takes the default, and the floor is not zero by
+     * accident.
+     *
+     * <p>The connection ceiling reads 0 as "no ceiling", which is a real thing to
+     * want, and the admission check applies the number only when it is positive.
+     * A negative therefore removed the ceiling too -- silently, and from a typo
+     * rather than a decision. The clamp is what separates the two, and its own
+     * comment says it is package visible so that this check can reach it; until
+     * now nothing did.
+     */
+    private static void aTunableBelowItsFloorTakesTheDefault() throws Exception {
+        // Answers negative when the value is refused, and the value when it stands.
+        check("a ceiling of zero is a deliberate no-ceiling", "0",
+                String.valueOf(FileCountProbe.clamp("CN1_HTTP_MAX_CONNECTIONS", 0, 0)));
+        check("a negative ceiling is refused", "true",
+                String.valueOf(FileCountProbe.clamp("CN1_HTTP_MAX_CONNECTIONS", -1, 0) < 0));
+        check("and an ordinary one stands", "4096",
+                String.valueOf(FileCountProbe.clamp("CN1_HTTP_MAX_CONNECTIONS", 4096, 0)));
+        // A floor above zero is the other use of the same clamp: a divisor of 0
+        // throws on one arm and answers 0 on the other, so neither may pass.
+        check("a divisor below its floor is refused", "true",
+                String.valueOf(FileCountProbe.clamp("CN1_HTTP_READ_RATE", 0, 1) < 0));
+    }
+
+    /**
      * One ready descriptor is one slot, whatever a poller counts.
      *
      * <p>kqueue registers a filter at a time and reports one event per FILTER, so
@@ -5063,6 +5159,8 @@ public class SelfTest {
         aChunkSizeCannotWrapTheWalk();
         aRedirectDoesNotCarryTheBodyOffHost();
         oneReadyDescriptorIsOneSlot();
+        aTunableBelowItsFloorTakesTheDefault();
+        aStalledPeerDoesNotHoldTheHandshake();
         aZeroTimeoutReadinessCheckDoesNotWait();
         aRegionResolvesInItsOwnPartition();
         halfACredentialPairIsRefused();

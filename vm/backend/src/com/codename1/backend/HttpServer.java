@@ -1265,8 +1265,16 @@ public final class HttpServer {
      * immediately rather than left in the backlog: refusing is a fast, legible
      * answer, while a full backlog looks to a client like a server that hangs. Set
      * to 0 for no ceiling.
+     *
+     * <p>THROUGH THE CLAMP, with zero as its floor. The admission check applies
+     * this only when it is positive, so a value below zero read as "no ceiling"
+     * -- and nobody types -1 at a connection limit meaning to remove the
+     * protection against descriptor and worker exhaustion. Zero says that, and
+     * says it on purpose; a negative is a typo, and takes the default with a line
+     * on stderr saying so.
      */
-    private static final int MAX_CONNECTIONS = envInt("CN1_HTTP_MAX_CONNECTIONS", 4096);
+    private static final int MAX_CONNECTIONS =
+            envIntAtLeast("CN1_HTTP_MAX_CONNECTIONS", 4096, 0);
 
     /**
      * A tunable that must be at least `minimum`, or the default is used instead.

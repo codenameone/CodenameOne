@@ -54,6 +54,22 @@
 
 #ifndef CN1_BACKEND_NO_TLS
 
+
+/* How long an outbound handshake may take in total, in milliseconds.
+   CN1_TLS_HANDSHAKE_MS, default 15000, 0 or less for no bound. Read here and in
+   the Java SE twin from the same name, so the two arms agree. */
+static long long cn1ClientTlsHandshakeBudget(void) {
+    const char* raw = getenv("CN1_TLS_HANDSHAKE_MS");
+    if(raw != NULL && *raw != 0) {
+        char* end = NULL;
+        long long parsed = strtoll(raw, &end, 10);
+        if(end != NULL && *end == 0) {
+            return parsed;
+        }
+    }
+    return 15000;
+}
+
 #ifndef _WIN32
 #include <unistd.h> /* CN1_RESUME_THREAD expands to usleep */
 #include <sys/socket.h>
@@ -64,6 +80,17 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
+
+/*
+ * The bounded handshake loop, defined beside the inbound one in
+ * cn1_backend_tls.c. Declared here rather than in a header because that file is
+ * REMOVED from a no-TLS build while this one stays and is stubbed -- so the
+ * reference must vanish with the TLS code around it, which it does.
+ */
+#if !defined(_WIN32)
+int cn1BackendTlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis,
+                                 int connecting);
+#endif
 
 static int cn1ClientTlsInitialised = 0;
 /* One context per trust root, because a context holds the trust store. The
@@ -368,9 +395,39 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
         free(h);
         return 0;
     }
+    /*
+     * BOUNDED, because the peer chooses how long this takes. SSL_connect on a
+     * blocking descriptor waits for as long as the other end cares to make it:
+     * connectTimeout was spent reaching the port, and a peer that accepts TCP and
+     * then stops talking parks the calling thread for good. Every handler opening
+     * a database connection to a partially failed host does the same, and the
+     * worker pool is bounded, so the server stops serving anything.
+     *
+     * The budget is TOTAL rather than per read: SO_RCVTIMEO bounds one read and
+     * OpenSSL does several here, so a peer delivering a byte just inside each
+     * window never trips it -- which is the whole argument the inbound handshake
+     * settled, and this is that same loop rather than a second answer to it.
+     * Zero or less leaves the old unbounded behaviour, and so does Windows, which
+     * has no poll here.
+     */
+#if !defined(_WIN32)
+    {
+        /* The helper yields around its own syscalls, as the loop below the
+           budget check does. */
+        long long budget = cn1ClientTlsHandshakeBudget();
+        if(budget > 0) {
+            rc = cn1BackendTlsHandshakeWithin(ssl, SSL_get_fd(ssl), budget, 1);
+        } else {
+            CN1_YIELD_THREAD;
+            rc = SSL_connect(ssl);
+            CN1_RESUME_THREAD;
+        }
+    }
+#else
     CN1_YIELD_THREAD;
     rc = SSL_connect(ssl);
     CN1_RESUME_THREAD;
+#endif
     free(h);
     if(rc != 1) {
         long verify = SSL_get_verify_result(ssl);

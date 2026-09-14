@@ -175,7 +175,17 @@ static long long cn1TlsNowMillis(void) {
  * returning, because Tls.readImpl maps WANT_READ to a hard error and the rest of
  * the connection's life depends on a blocking descriptor.
  */
-static int cn1TlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis) {
+/*
+ * Shared with the OUTBOUND client in cn1_backend_tlsclient.c, which has the same
+ * problem and must not grow a second copy of the answer: `connecting` picks
+ * SSL_connect over SSL_accept and nothing else differs. Not static for that
+ * reason; the client declares it itself rather than through a header, because
+ * this file is REMOVED in the no-TLS build while the client file stays and is
+ * stubbed -- so the reference has to disappear with the client's own TLS code,
+ * which it does, both being inside CN1_BACKEND_NO_TLS.
+ */
+int cn1BackendTlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis,
+                                 int connecting) {
     long long deadline = cn1TlsNowMillis() + budgetMillis;
     int flags = fcntl(fd, F_GETFL, 0);
     int restored;
@@ -184,7 +194,7 @@ static int cn1TlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis) {
         /* Cannot bound it; the old behaviour is still the best answer available,
            and it is what every other Windows-or-unsupported path here does. */
         CN1_YIELD_THREAD;
-        out = SSL_accept(ssl);
+        out = connecting ? SSL_connect(ssl) : SSL_accept(ssl);
         CN1_RESUME_THREAD;
         return out;
     }
@@ -195,7 +205,7 @@ static int cn1TlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis) {
         int polled;
         int pollErrno;
         CN1_YIELD_THREAD;
-        out = SSL_accept(ssl);
+        out = connecting ? SSL_connect(ssl) : SSL_accept(ssl);
         CN1_RESUME_THREAD;
         if(out == 1) {
             break;
@@ -256,7 +266,7 @@ JAVA_LONG com_codename1_backend_Tls_acceptImpl___long_int_long_R_long(CODENAME_O
     }
 #ifndef _WIN32
     if(budgetMillis > 0) {
-        rc = cn1TlsHandshakeWithin(ssl, (int)fd, (long long)budgetMillis);
+        rc = cn1BackendTlsHandshakeWithin(ssl, (int)fd, (long long)budgetMillis, 0);
     } else {
         CN1_YIELD_THREAD;
         rc = SSL_accept(ssl);

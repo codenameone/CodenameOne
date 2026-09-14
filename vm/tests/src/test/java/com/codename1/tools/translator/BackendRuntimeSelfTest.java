@@ -85,6 +85,7 @@ class BackendRuntimeSelfTest {
         // without serving the 64MB default. Every other web check here fetches
         // a few hundred bytes, so the bound is invisible to them.
         run.environment().put("CN1_WEB_MAX_RESPONSE_MB", "1");
+        run.environment().put("CN1_TLS_HANDSHAKE_MS", "1500");
         if (System.getenv("CN1_SELFTEST_NETWORK") != null) {
             run.environment().put("CN1_SELFTEST_NETWORK", "1");
             String bundle = caBundle();

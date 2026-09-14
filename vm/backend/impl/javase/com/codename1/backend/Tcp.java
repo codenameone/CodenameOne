@@ -104,6 +104,24 @@ public final class Tcp {
      * As {@link #startTls(String)}, verifying against the PEM bundle at `caFile`
      * INSTEAD of the system trust store. See the translated twin for why.
      */
+    /**
+     * How long an outbound handshake may take, in milliseconds.
+     *
+     * <p>CN1_TLS_HANDSHAKE_MS, default 15000, 0 or less for no bound. The
+     * packaged arm reads the same name in C, so a deployment tunes one knob.
+     */
+    private static int handshakeBudgetMillis() {
+        String raw = System.getenv("CN1_TLS_HANDSHAKE_MS");
+        if(raw != null && raw.length() > 0) {
+            try {
+                return Integer.parseInt(raw.trim());
+            } catch (NumberFormatException malformed) {
+                // The default is a better answer than refusing to connect.
+            }
+        }
+        return 15000;
+    }
+
     public void startTls(String host, String caFile) throws IOException {
         // BOTH STRINGS, and the name is the one that decides who the peer is
         // allowed to be. It crosses to a native as a C string, so a NUL inside it
@@ -128,7 +146,31 @@ public final class Tcp {
         SSLParameters parameters = upgraded.getSSLParameters();
         parameters.setEndpointIdentificationAlgorithm("HTTPS");
         upgraded.setSSLParameters(parameters);
-        upgraded.startHandshake();
+        // BOUNDED, for the reason the packaged arm's comment gives at its own
+        // SSL_connect: connectTimeout was spent reaching the port, and a peer that
+        // accepts TCP and then stops talking holds this thread for as long as it
+        // likes. CN1_TLS_HANDSHAKE_MS is read by both arms from the same name so
+        // they agree; 0 or less leaves it unbounded.
+        //
+        // A READ timeout rather than a total one, which is the weaker of the two
+        // and is what this arm can express: an SSLSocket handshake is several
+        // reads and a peer answering just inside each window stretches the whole.
+        // The packaged arm bounds the total because its loop is written against
+        // poll(); saying so here is better than implying the two are identical.
+        int handshakeMillis = handshakeBudgetMillis();
+        int previousTimeout = upgraded.getSoTimeout();
+        if(handshakeMillis > 0) {
+            upgraded.setSoTimeout(handshakeMillis);
+        }
+        try {
+            upgraded.startHandshake();
+        } finally {
+            if(handshakeMillis > 0) {
+                // Back to what it was, or an idle connection's first read after
+                // the handshake would inherit a deadline nobody asked for.
+                upgraded.setSoTimeout(previousTimeout);
+            }
+        }
         rebind(upgraded);
         secure = true;
     }
