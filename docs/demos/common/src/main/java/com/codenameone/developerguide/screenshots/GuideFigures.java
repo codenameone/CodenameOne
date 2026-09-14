@@ -78,6 +78,7 @@ public final class GuideFigures {
             new FigureVariant(new GraphicsFontimageMaterialFigure(), FigureDevice.ANDROID, false, "graphics-fontimage-material.png"),
             new FigureVariant(new CsvParsingFigure(), FigureDevice.ANDROID, false, "csv-parsing.png"),
             new FigureVariant(new TabsFigure(), FigureDevice.ANDROID, false, "components-tabs.png"),
+            new FigureVariant(new CalendarFigure(), FigureDevice.ANDROID, false, "components-calendar.png"),
             new FigureVariant(new MultiListFigure(), FigureDevice.ANDROID, false, "components-multilist.png"),
             new FigureVariant(new PropertiesBindingFigure(), FigureDevice.ANDROID, false,
                     "properties-demo-binding.png"),

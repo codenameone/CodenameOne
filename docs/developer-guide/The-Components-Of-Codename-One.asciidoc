@@ -2557,7 +2557,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .The Calendar component
-image::img/components-calendar.png[The Calendar component,scaledwidth=20%]
+image::img/generated/components-calendar.png[The Calendar component,scaledwidth=20%]
 
 === ToastBar
 
