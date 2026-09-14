@@ -84,16 +84,16 @@ class TheComponentsOfCodenameOneJava017Snippet {
 
         Label a = new Label("Short Text");
         a.setAutoSizeMode(true);
-        Label b = new Label("Much Longer Text than the previous linenull");
+        Label b = new Label("Much Longer Text than the previous line...");
         b.setAutoSizeMode(true);
-        Label c = new Label("MUCH MUCH MUCH Much Longer Text than the previous line by a pretty big marginnull");
+        Label c = new Label("MUCH MUCH MUCH Much Longer Text than the previous line by a pretty big margin...");
         c.setAutoSizeMode(true);
 
         Label a1 = new Button("Short Text");
         a1.setAutoSizeMode(true);
-        Label b1 = new Button("Much Longer Text than the previous linenull");
+        Label b1 = new Button("Much Longer Text than the previous line...");
         b1.setAutoSizeMode(true);
-        Label c1 = new Button("MUCH MUCH MUCH Much Longer Text than the previous line by a pretty big marginnull");
+        Label c1 = new Button("MUCH MUCH MUCH Much Longer Text than the previous line by a pretty big margin...");
         c1.setAutoSizeMode(true);
         hi.addAll(a, b, c, a1, b1, c1);
 
