@@ -80,16 +80,19 @@ fi
 # maven, and the local Java SE loop should not demand a JDK 8 it never uses.
 J8="${JDK_8_HOME:?set JDK_8_HOME to a JDK 8 home}"
 
-# The contract compiles against codenameone-core and is processed by the Codename
-# One maven plugin, so both have to be in the local repo. Saying which ones are
-# missing beats maven's "could not resolve" on an artifact nobody asked for
-# directly -- this is the first thing a fresh checkout hits.
+# The contract compiles against codenameone-core AND codenameone-backend -- it
+# names @GET and OnComplete from one and @Generated from the other -- and is
+# processed by the Codename One maven plugin, so all three have to be in the
+# local repo. Saying which ones are missing beats maven's "could not resolve" on
+# an artifact nobody asked for directly -- this is the first thing a fresh
+# checkout hits. The backend was missing from this list while being a real
+# dependency, so a repo holding the other two got the raw resolution error.
 CN1_VERSION="$(sed -n 's/.*<cn1\.version>\(.*\)<\/cn1\.version>.*/\1/p' contract/pom.xml | head -1)"
-for artifact in codenameone-core codenameone-maven-plugin; do
+for artifact in codenameone-core codenameone-backend codenameone-maven-plugin; do
     if [ ! -d "$M2/com/codenameone/$artifact/$CN1_VERSION" ]; then
         echo "$artifact:$CN1_VERSION is not in $M2."
         echo "Install it first:"
-        echo "  (cd $REPO/maven && JAVA_HOME=\$JDK_8_HOME mvn -B -pl core,codenameone-maven-plugin \\"
+        echo "  (cd $REPO/maven && JAVA_HOME=\$JDK_8_HOME mvn -B -pl core,backend,codenameone-maven-plugin \\"
         echo "      -am install -DskipTests -Plocal-dev-javase -Dmaven.repo.local=$M2)"
         exit 1
     fi
