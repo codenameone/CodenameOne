@@ -1,0 +1,265 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend.orm;
+
+import java.io.IOException;
+import java.util.Date;
+
+/**
+ * Turns what an engine sent into what a field holds.
+ *
+ * <p>{@link com.codename1.backend.Database} promises that rows come back as Long,
+ * Double, String, byte[] or null whichever engine answered, and it keeps that
+ * promise -- but "a Long" is not the same claim as "the type this field is". The
+ * same column is a Long from SQLite and a String from PostgreSQL when it is
+ * declared NUMERIC, because arbitrary precision does not fit in a double and the
+ * exact text is the only lossless answer; MySQL does the same for DECIMAL. A
+ * column somebody else's migration declared BOOLEAN comes back as a Long here and
+ * could be "t" from a text-format driver elsewhere.
+ *
+ * <p>So the conversions are written once, tolerantly, in one place instead of
+ * being generated into every entity -- and none of them is a cast whose failure
+ * is caught. ParparVM's CHECKCAST is unchecked, so a cast that fails hands the
+ * wrong object to the next instruction rather than throwing something a handler
+ * could see.
+ */
+public final class Values {
+    private Values() {
+    }
+
+    /** The value as text, or null. */
+    public static String asString(Object value) {
+        if(value == null) {
+            return null;
+        }
+        if(value instanceof String) {
+            return (String)value;
+        }
+        if(value instanceof byte[]) {
+            // A BLOB column read into a String field. Decoded as UTF-8 rather
+            // than through String.valueOf, which would answer "[B@1f3a".
+            try {
+                byte[] bytes = (byte[])value;
+                return new String(bytes, 0, bytes.length, "UTF-8");
+            } catch (IOException err) {
+                return null;
+            }
+        }
+        return String.valueOf(value);
+    }
+
+    /** The value as a 64-bit integer, or {@code fallback} when it is null. */
+    public static long asLong(Object value, long fallback) throws IOException {
+        Long out = asLongObject(value);
+        return out == null ? fallback : out.longValue();
+    }
+
+    /** The value as a 64-bit integer, or null. */
+    public static Long asLongObject(Object value) throws IOException {
+        if(value == null) {
+            return null;
+        }
+        if(value instanceof Number) {
+            return Long.valueOf(((Number)value).longValue());
+        }
+        if(value instanceof Boolean) {
+            return Long.valueOf(((Boolean)value).booleanValue() ? 1L : 0L);
+        }
+        if(value instanceof String) {
+            String text = ((String)value).trim();
+            // The spellings a server sends for a boolean when it does not send a
+            // number: PostgreSQL's text format is t and f.
+            if("t".equals(text) || "true".equalsIgnoreCase(text)) {
+                return Long.valueOf(1L);
+            }
+            if("f".equals(text) || "false".equalsIgnoreCase(text)) {
+                return Long.valueOf(0L);
+            }
+            try {
+                return Long.valueOf(Long.parseLong(text));
+            } catch (NumberFormatException notAnInteger) {
+                try {
+                    // A NUMERIC or DECIMAL column arrives as exact text, so
+                    // "12.00" is a perfectly ordinary integer that Long.parseLong
+                    // refuses. Going through double loses precision past 2^53 and
+                    // that is the trade this makes: a value that large in a
+                    // column being read into a long is already past what the
+                    // field can hold.
+                    return Long.valueOf((long)Double.parseDouble(text));
+                } catch (NumberFormatException err) {
+                    throw notANumber(value, "an integer");
+                }
+            }
+        }
+        throw notANumber(value, "an integer");
+    }
+
+    /** The value as a 32-bit integer, or {@code fallback} when it is null. */
+    public static int asInt(Object value, int fallback) throws IOException {
+        Long out = asLongObject(value);
+        return out == null ? fallback : (int)out.longValue();
+    }
+
+    /** The value as a boxed 32-bit integer, or null. */
+    public static Integer asIntObject(Object value) throws IOException {
+        Long out = asLongObject(value);
+        return out == null ? null : Integer.valueOf((int)out.longValue());
+    }
+
+    /** The value as a 16-bit integer, or {@code fallback} when it is null. */
+    public static short asShort(Object value, short fallback) throws IOException {
+        Long out = asLongObject(value);
+        return out == null ? fallback : (short)out.longValue();
+    }
+
+    /** The value as a boxed 16-bit integer, or null. */
+    public static Short asShortObject(Object value) throws IOException {
+        Long out = asLongObject(value);
+        return out == null ? null : Short.valueOf((short)out.longValue());
+    }
+
+    /** The value as a byte, or {@code fallback} when it is null. */
+    public static byte asByte(Object value, byte fallback) throws IOException {
+        Long out = asLongObject(value);
+        return out == null ? fallback : (byte)out.longValue();
+    }
+
+    /** The value as a boxed byte, or null. */
+    public static Byte asByteObject(Object value) throws IOException {
+        Long out = asLongObject(value);
+        return out == null ? null : Byte.valueOf((byte)out.longValue());
+    }
+
+    /** The value as a double, or {@code fallback} when it is null. */
+    public static double asDouble(Object value, double fallback) throws IOException {
+        Double out = asDoubleObject(value);
+        return out == null ? fallback : out.doubleValue();
+    }
+
+    /** The value as a boxed double, or null. */
+    public static Double asDoubleObject(Object value) throws IOException {
+        if(value == null) {
+            return null;
+        }
+        if(value instanceof Number) {
+            return Double.valueOf(((Number)value).doubleValue());
+        }
+        if(value instanceof String) {
+            try {
+                return Double.valueOf(Double.parseDouble(((String)value).trim()));
+            } catch (NumberFormatException err) {
+                throw notANumber(value, "a number");
+            }
+        }
+        throw notANumber(value, "a number");
+    }
+
+    /** The value as a float, or {@code fallback} when it is null. */
+    public static float asFloat(Object value, float fallback) throws IOException {
+        Double out = asDoubleObject(value);
+        return out == null ? fallback : (float)out.doubleValue();
+    }
+
+    /** The value as a boxed float, or null. */
+    public static Float asFloatObject(Object value) throws IOException {
+        Double out = asDoubleObject(value);
+        return out == null ? null : Float.valueOf((float)out.doubleValue());
+    }
+
+    /** The value as a flag: anything non-zero, or the text of one, is true. */
+    public static boolean asBoolean(Object value, boolean fallback) throws IOException {
+        Boolean out = asBooleanObject(value);
+        return out == null ? fallback : out.booleanValue();
+    }
+
+    /** The value as a boxed flag, or null. */
+    public static Boolean asBooleanObject(Object value) throws IOException {
+        if(value == null) {
+            return null;
+        }
+        if(value instanceof Boolean) {
+            return (Boolean)value;
+        }
+        Long number = asLongObject(value);
+        return number == null ? null : Boolean.valueOf(number.longValue() != 0);
+    }
+
+    /** The first character of the value, or {@code fallback} when it is empty. */
+    public static char asChar(Object value, char fallback) {
+        String text = asString(value);
+        return text == null || text.length() == 0 ? fallback : text.charAt(0);
+    }
+
+    /**
+     * The value as a moment in time, or null.
+     *
+     * <p>An entity stores a Date as epoch MILLISECONDS in an integer column, on
+     * every engine, which is what makes it the same value everywhere: a native
+     * timestamp comes back as text whose format follows the server's DateStyle
+     * and session time zone. A number is therefore read as milliseconds; text
+     * that is a number is read the same way, and anything else is refused rather
+     * than guessed at.
+     */
+    public static Date asDate(Object value) throws IOException {
+        Long millis = asLongObject(value);
+        return millis == null ? null : new Date(millis.longValue());
+    }
+
+    /** The value as bytes, or null. Text is encoded as UTF-8. */
+    public static byte[] asBytes(Object value) throws IOException {
+        if(value == null) {
+            return null;
+        }
+        if(value instanceof byte[]) {
+            return (byte[])value;
+        }
+        if(value instanceof String) {
+            return ((String)value).getBytes("UTF-8");
+        }
+        throw new IOException("A column holding " + describe(value)
+                + " cannot be read as bytes");
+    }
+
+    private static IOException notANumber(Object value, String wanted) {
+        return new IOException("A column holding " + describe(value)
+                + " cannot be read as " + wanted);
+    }
+
+    /** What a value is, for a message, without pasting a password into a log. */
+    private static String describe(Object value) {
+        if(value == null) {
+            return "null";
+        }
+        if(value instanceof String) {
+            String text = (String)value;
+            // Truncated: the value may be a row somebody stored, and an error
+            // message is a log line.
+            return "the text '" + (text.length() > 32 ? text.substring(0, 32) + "..." : text)
+                    + "'";
+        }
+        if(value instanceof byte[]) {
+            return ((byte[])value).length + " bytes";
+        }
+        return "a " + value.getClass().getName();
+    }
+}

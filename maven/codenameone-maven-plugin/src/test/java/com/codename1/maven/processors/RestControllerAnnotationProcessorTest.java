@@ -201,35 +201,27 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
-    public void theBootstrapRefusesToStartWithoutAShutdownHandler() throws Exception {
-        // installShutdownHandler answers false when the self-pipe or the sigaction
-        // cannot be set up -- under descriptor exhaustion, say. The bootstrap
-        // ignored that, and Signals.onShutdown then got -1 from
-        // awaitShutdownSignal immediately, stopped the server it had just started,
-        // and called System.exit(0): a container that never served a request,
-        // reporting success.
+    public void theEntryPointDelegatesTheWholeLifecycleToTheBuilder() throws Exception {
+        // The twenty lines every server used to open with -- read PORT, start,
+        // install a shutdown handler, refuse if it could not be installed, drain
+        // on SIGTERM, wait -- now live in Backend.Builder.run(), and this file
+        // writes the part that differs between one server and the next.
         //
-        // ASSERTED ON THE EMITTED SOURCE, which is what there is. The generated
+        // ASSERTED ON THE EMITTED SOURCE, which is what there is: the generated
         // file is compiled straight to classes and never written anywhere a test
-        // can open, and the only behavioural alternative -- calling main() -- starts
-        // a server and cannot make the install fail anyway.
+        // can open, and the behavioural alternative -- calling main() -- starts a
+        // server. The refusal itself is tested where it now lives, against the
+        // runtime, in the backend module's BackendBuilderTest.
         String bootstrap = new RestControllerAnnotationProcessor()
                 .generateBootstrap("com.example");
-        int install = bootstrap.indexOf("installShutdownHandler()");
-        assertTrue("the bootstrap no longer installs a shutdown handler", install >= 0);
-        assertTrue("the bootstrap ignores whether the shutdown handler installed:\n"
-                        + bootstrap,
-                bootstrap.indexOf("if (!com.codename1.backend.Signals."
-                        + "installShutdownHandler())") >= 0);
-        // And it refuses rather than carrying on, which is the point.
-        int throwAt = bootstrap.indexOf("IllegalStateException", install);
-        assertTrue("the bootstrap does not fail when the install fails:\n" + bootstrap,
-                throwAt > install);
-        // Before the server is started, not after: a refusal that has already
-        // bound the port is the failure mode this replaces.
-        int start = bootstrap.indexOf("HttpServer.start");
-        assertTrue("the check must come before the server starts:\n" + bootstrap,
-                start < 0 || throwAt < start);
+        assertTrue("the entry point no longer goes through the builder:\n" + bootstrap,
+                bootstrap.indexOf("com.codename1.backend.Backend.builder()") >= 0);
+        assertTrue("the entry point does not run the server:\n" + bootstrap,
+                bootstrap.indexOf(".run();") >= 0);
+        // And it does NOT open a server itself: a copy of the lifecycle here is
+        // a second place for it to be wrong.
+        assertTrue("the entry point starts a server of its own:\n" + bootstrap,
+                bootstrap.indexOf("HttpServer.start") < 0);
     }
 
     @Test

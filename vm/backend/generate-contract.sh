@@ -95,8 +95,12 @@ for artifact in codenameone-core codenameone-maven-plugin; do
     fi
 done
 
+# cn1.backendOrm says which flavour the @Entity processor generates. This module
+# is compiled against the core AND the backend runtime -- the contract names
+# @GET and OnComplete, the generated code names @Generated -- so the classpath
+# cannot answer the question for it the way it does in a real backend module.
 JAVA_HOME="$J8" mvn -q -B -f contract/pom.xml process-classes \
-    -Dcn1.restServer=true -Dmaven.repo.local="$M2"
+    -Dcn1.restServer=true -Dcn1.backendOrm=true -Dmaven.repo.local="$M2"
 
 rm -rf gen && mkdir -p gen
 cp -r contract/target/classes/. gen/
@@ -108,7 +112,12 @@ cp -r contract/target/classes/. gen/
 #
 # What stays: <Api>Server, <Api>Dispatcher, the DTOs and their <Dto>Json codecs.
 find gen -name '*Impl.class' -o -name '*Impl$*.class' | xargs -r rm -f
-rm -rf gen/cn1app
+# The CLIENT bootstrap only. cn1app also holds BackendDaoBootstrap, which is the
+# server's and is what keeps the generated daos in the binary: the translator
+# drops a class nothing references, and nothing but this class references them.
+rm -f gen/cn1app/RestClientBootstrap.class gen/cn1app/RestClientBootstrap'$'*.class
+rm -f gen/cn1app/DaoBootstrap.class gen/cn1app/DaoBootstrap'$'*.class
+rmdir gen/cn1app 2>/dev/null || true
 # A contract type ships to the server exactly when a codec was generated for it:
 # that is what makes it a DTO rather than the interface itself. Anything else from
 # contract/ names OnComplete and Response and would not link.
@@ -116,7 +125,10 @@ for f in $(find contract -name '*.java'); do
     rel="${f#contract/}"
     cls="gen/${rel%.java}.class"
     codec="gen/${rel%.java}Json.class"
-    if [ ! -f "$codec" ]; then
+    dao="gen/${rel%.java}Cn1BackendDao.class"
+    # An @Entity ships for the same reason a DTO does: the generated dao names
+    # it, so dropping the class would leave the dao unlinkable.
+    if [ ! -f "$codec" ] && [ ! -f "$dao" ]; then
         rm -f "$cls" "gen/${rel%.java}"'$'*.class 2>/dev/null || true
     fi
 done

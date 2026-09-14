@@ -1,0 +1,215 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend.sql;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * The engine differences, and the rewrite that hides them.
+ *
+ * <p>These are the cases that used to be a branch at every call site, plus the
+ * ones a naive search-and-replace over the statement gets wrong. The rewrite runs
+ * on every statement a server issues, so a mistake here is not a wrong answer to
+ * one query: it is every query on one engine.
+ */
+class DialectTest {
+
+    @Test
+    @DisplayName("a portable statement becomes each engine's own")
+    void rendersPlaceholdersPerEngine() throws Exception {
+        String portable = "INSERT INTO notes (title, body) VALUES (?, ?)";
+        assertEquals("INSERT INTO notes (title, body) VALUES ($1, $2)",
+                Dialect.POSTGRES.bind(portable, 2));
+        assertEquals(portable, Dialect.SQLITE.bind(portable, 2));
+        assertEquals(portable, Dialect.MYSQL.bind(portable, 2));
+    }
+
+    @Test
+    @DisplayName("a statement needing no change is not copied")
+    void returnsTheSameStringWhenNothingChanges() throws Exception {
+        // Every statement a server issues goes through this, so the case where
+        // there is nothing to do has to cost nothing but the scan.
+        String sql = "SELECT id FROM notes WHERE author = ?";
+        assertSame(sql, Dialect.SQLITE.bind(sql, 1));
+    }
+
+    @Test
+    @DisplayName("a question mark inside a literal is not a parameter")
+    void skipsLiteralsAndComments() throws Exception {
+        assertEquals("SELECT * FROM t WHERE a LIKE 'who?' AND b = $1",
+                Dialect.POSTGRES.bind("SELECT * FROM t WHERE a LIKE 'who?' AND b = ?", 1));
+        assertEquals("SELECT 'it''s ?', $1",
+                Dialect.POSTGRES.bind("SELECT 'it''s ?', ?", 1));
+        assertEquals("SELECT \"we?rd\" FROM t WHERE a = $1",
+                Dialect.POSTGRES.bind("SELECT \"we?rd\" FROM t WHERE a = ?", 1));
+        assertEquals("SELECT 1 -- is this ?\nWHERE a = $1",
+                Dialect.POSTGRES.bind("SELECT 1 -- is this ?\nWHERE a = ?", 1));
+        assertEquals("SELECT /* ? */ $1", Dialect.POSTGRES.bind("SELECT /* ? */ ?", 1));
+        // PostgreSQL's block comments NEST, so the inner close does not end the
+        // outer comment and the ? after it is still commented out.
+        assertEquals("SELECT /* a /* ? */ ? */ $1",
+                Dialect.POSTGRES.bind("SELECT /* a /* ? */ ? */ ?", 1));
+        assertEquals("SELECT $$ a ? b $$, $1",
+                Dialect.POSTGRES.bind("SELECT $$ a ? b $$, ?", 1));
+        assertEquals("SELECT $tag$ ? $tag$, $1",
+                Dialect.POSTGRES.bind("SELECT $tag$ ? $tag$, ?", 1));
+    }
+
+    @Test
+    @DisplayName("a backslash escapes only inside an E'' literal")
+    void readsBackslashEscapesOnlyWhereTheyAreOne() throws Exception {
+        // standard_conforming_strings has been on for fifteen years, so a
+        // backslash in an ordinary literal is a backslash. Reading it as an
+        // escape would swallow the closing quote and the rest of the statement
+        // with it.
+        assertEquals("SELECT 'a\\', $1", Dialect.POSTGRES.bind("SELECT 'a\\', ?", 1));
+        assertEquals("SELECT E'a\\'? b', $1", Dialect.POSTGRES.bind("SELECT E'a\\'? b', ?", 1));
+        // And the E has to BE a prefix rather than the tail of an identifier.
+        assertEquals("SELECT type'a\\', $1", Dialect.POSTGRES.bind("SELECT type'a\\', ?", 1));
+    }
+
+    @Test
+    @DisplayName("?? is a literal question mark on every engine")
+    void collapsesTheEscape() throws Exception {
+        // PostgreSQL is where it is needed -- its jsonb operators are spelled ?,
+        // ?| and ?& -- and it means the same thing everywhere so that a statement
+        // means the same thing wherever it runs.
+        assertEquals("SELECT data ? 'k'", Dialect.POSTGRES.bind("SELECT data ?? 'k'", 0));
+        assertEquals("SELECT a ? b", Dialect.SQLITE.bind("SELECT a ?? b", 0));
+        // Inside a literal there is nothing to escape, so both stay.
+        assertEquals("SELECT '??'", Dialect.SQLITE.bind("SELECT '??'", 0));
+    }
+
+    @Test
+    @DisplayName("engine-native SQL is passed through unchecked")
+    void leavesHandWrittenDollarParametersAlone() throws Exception {
+        // Existing code writes $1 for PostgreSQL, and the count it implies is the
+        // server's business rather than ours: a statement with no ? in it is not
+        // in the portable form at all.
+        String native1 = "INSERT INTO a (b, c) VALUES ($1, $2)";
+        assertEquals(native1, Dialect.POSTGRES.bind(native1, 2));
+        assertEquals(native1, Dialect.POSTGRES.bind(native1, 0));
+    }
+
+    @Test
+    @DisplayName("a parameter count that does not match is refused here")
+    void refusesAMismatchedParameterCount() {
+        // SQLite binds the missing ones to NULL and commits the row, MySQL reads
+        // the surplus descriptors as something else, and PostgreSQL refuses. One
+        // answer for all three, before the statement is sent.
+        IOException err = assertThrows(IOException.class,
+                () -> Dialect.SQLITE.bind("INSERT INTO a (b, c) VALUES (?, ?)", 1));
+        assertTrue(err.getMessage().contains("2 parameter placeholders"), err.getMessage());
+        assertTrue(err.getMessage().contains("1 value"), err.getMessage());
+        assertThrows(IOException.class,
+                () -> Dialect.POSTGRES.bind("SELECT ?, ?", 3));
+    }
+
+    @Test
+    @DisplayName("a statement ending inside a literal is refused, not guessed at")
+    void refusesAnUnterminatedLiteral() {
+        assertThrows(IOException.class, () -> Dialect.POSTGRES.bind("SELECT 'abc", 0));
+        assertThrows(IOException.class, () -> Dialect.POSTGRES.bind("SELECT /* abc", 0));
+    }
+
+    @Test
+    @DisplayName("identifiers are quoted so their case survives PostgreSQL")
+    void quotesIdentifiers() {
+        assertEquals("\"createdAt\"", Dialect.POSTGRES.quote("createdAt"));
+        assertEquals("\"we\"\"ird\"", Dialect.POSTGRES.quote("we\"ird"));
+        assertEquals("`we``ird`", Dialect.MYSQL.quote("we`ird"));
+        assertThrows(IllegalArgumentException.class, () -> Dialect.SQLITE.quote(""));
+        assertThrows(IllegalArgumentException.class, () -> Dialect.SQLITE.quote("a\0b"));
+    }
+
+    @Test
+    @DisplayName("each engine names the portable column kinds its own way")
+    void namesColumnTypes() {
+        assertEquals("TEXT", Dialect.SQLITE.columnType(Dialect.TEXT));
+        assertEquals("TEXT", Dialect.POSTGRES.columnType(Dialect.TEXT));
+        assertEquals("TEXT", Dialect.MYSQL.columnType(Dialect.TEXT));
+        assertEquals("INTEGER", Dialect.SQLITE.columnType(Dialect.BIGINT));
+        assertEquals("BIGINT", Dialect.POSTGRES.columnType(Dialect.BIGINT));
+        assertEquals("BIGINT", Dialect.MYSQL.columnType(Dialect.BIGINT));
+        assertEquals("REAL", Dialect.SQLITE.columnType(Dialect.REAL));
+        assertEquals("DOUBLE PRECISION", Dialect.POSTGRES.columnType(Dialect.REAL));
+        assertEquals("DOUBLE", Dialect.MYSQL.columnType(Dialect.REAL));
+        assertEquals("BLOB", Dialect.SQLITE.columnType(Dialect.BLOB));
+        assertEquals("BYTEA", Dialect.POSTGRES.columnType(Dialect.BLOB));
+        assertEquals("LONGBLOB", Dialect.MYSQL.columnType(Dialect.BLOB));
+        // A boolean and a timestamp are integers on every engine, so that one
+        // decoding path reads them back. See the note on the constants.
+        assertEquals("SMALLINT", Dialect.POSTGRES.columnType(Dialect.BOOLEAN));
+        assertEquals("BIGINT", Dialect.POSTGRES.columnType(Dialect.TIMESTAMP));
+    }
+
+    @Test
+    @DisplayName("a generated key is declared the way each engine can generate one")
+    void declaresGeneratedKeys() {
+        assertEquals("INTEGER PRIMARY KEY AUTOINCREMENT",
+                Dialect.SQLITE.generatedKeyColumn(Dialect.BIGINT));
+        assertEquals("BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY",
+                Dialect.POSTGRES.generatedKeyColumn(Dialect.BIGINT));
+        assertEquals("BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY",
+                Dialect.MYSQL.generatedKeyColumn(Dialect.BIGINT));
+        // PostgreSQL is the one engine with no last-insert-id, so it is the one
+        // that has to read the key back out of the INSERT itself.
+        assertTrue(Dialect.POSTGRES.generatedKeysThroughReturning());
+        assertTrue(!Dialect.SQLITE.generatedKeysThroughReturning());
+        assertTrue(!Dialect.MYSQL.generatedKeysThroughReturning());
+        // MySQL cannot index a TEXT column without a prefix length, so an
+        // application-assigned string key is a VARCHAR there and TEXT elsewhere.
+        assertEquals("VARCHAR(255) PRIMARY KEY", Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
+        assertEquals("TEXT PRIMARY KEY", Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT));
+    }
+
+    @Test
+    @DisplayName("an offset with no limit is spelled the way each parser accepts")
+    void limitsAndOffsets() {
+        assertEquals(" LIMIT 10", Dialect.SQLITE.limit(10, 0));
+        assertEquals(" LIMIT 10 OFFSET 5", Dialect.SQLITE.limit(10, 5));
+        assertEquals("", Dialect.SQLITE.limit(-1, 0));
+        // MySQL will not take an OFFSET without a LIMIT, and this is the value
+        // its own documentation gives for "the rest of them".
+        assertEquals(" LIMIT 18446744073709551615 OFFSET 5", Dialect.MYSQL.limit(-1, 5));
+        assertEquals(" LIMIT ALL OFFSET 5", Dialect.POSTGRES.limit(-1, 5));
+    }
+
+    @Test
+    @DisplayName("a scheme names its engine, ignoring case")
+    void resolvesByName() {
+        assertSame(Dialect.POSTGRES, Dialect.forName("postgres"));
+        assertSame(Dialect.POSTGRES, Dialect.forName("PostgreSQL"));
+        assertSame(Dialect.MYSQL, Dialect.forName("mariadb"));
+        assertSame(Dialect.SQLITE, Dialect.forName("SQLite"));
+        assertEquals(null, Dialect.forName("oracle"));
+    }
+}

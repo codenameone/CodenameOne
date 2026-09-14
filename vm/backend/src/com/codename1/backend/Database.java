@@ -26,7 +26,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
+import java.util.Map;
 
+import com.codename1.backend.sql.Dialect;
 import com.codename1.backend.sql.MySql;
 import com.codename1.backend.sql.Postgres;
 
@@ -62,9 +64,19 @@ import com.codename1.backend.sql.Postgres;
  * they speak the wire protocol over {@link Tcp}, so there is no driver to install
  * and nothing that can behave differently between the two.
  *
- * What differs between engines, and cannot be papered over: {@link #lastInsertId}
- * is meaningful for SQLite and MySQL and always 0 for PostgreSQL, which has no
- * such concept -- use `INSERT ... RETURNING id` there and read it as a row.
+ * Statements are written ONCE, in the portable form: ? for every parameter and
+ * plain unquoted names. PostgreSQL binds $1 rather than ?, and that difference
+ * stops inside {@link #execute} and {@link #query} -- see {@link Dialect#bind} --
+ * rather than at every call site. SQL already written for one engine keeps
+ * working: a statement carrying no ? at all is passed through untouched, so
+ * hand-written $1 is left alone.
+ *
+ * What differs between engines and used to be papered over by the caller:
+ * {@link #lastInsertId} is meaningful for SQLite and MySQL and always 0 for
+ * PostgreSQL, which has no such concept. {@link #insert} is the portable form of
+ * that question -- it asks whichever way this engine answers -- and
+ * {@link #dialect} exposes the rest of the differences for code that generates
+ * schema.
  */
 public final class Database {
     private final Db sqlite;
@@ -87,12 +99,20 @@ public final class Database {
     private final Postgres postgres;
     private final MySql mysql;
     private final String describedAs;
+    /**
+     * WHICH ENGINE THIS IS, as the things that differ between them rather than as
+     * a name to branch on. Chosen from the URL before anything is connected, and
+     * immutable afterwards, so asking is free on the request path.
+     */
+    private final Dialect dialect;
 
-    private Database(Db sqlite, Postgres postgres, MySql mysql, String describedAs) {
+    private Database(Db sqlite, Postgres postgres, MySql mysql, String describedAs,
+                     Dialect dialect) {
         this.sqlite = sqlite;
         this.postgres = postgres;
         this.mysql = mysql;
         this.describedAs = describedAs;
+        this.dialect = dialect;
     }
 
     /** A unit of work run inside {@link #transaction}. */
@@ -131,21 +151,21 @@ public final class Database {
             return new Database(null, Postgres.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
                     parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
-                    null, parsed.describe("postgres"));
+                    null, parsed.describe("postgres"), Dialect.POSTGRES);
         }
         if(hasScheme(url, "mysql://") || hasScheme(url, "mariadb://")) {
             Url parsed = Url.parse(url, 3306);
             return new Database(null, null, MySql.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
                     parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
-                    parsed.describe("mysql"));
+                    parsed.describe("mysql"), Dialect.MYSQL);
         }
-        return new Database(Db.open(url), null, null, "sqlite:" + url);
+        return new Database(Db.open(url), null, null, "sqlite:" + url, Dialect.SQLITE);
     }
 
     /** Wraps an already-open SQLite handle, for code that opened one directly. */
     public static Database of(Db db) {
-        return new Database(db, null, null, "sqlite");
+        return new Database(db, null, null, "sqlite", Dialect.SQLITE);
     }
 
     /**
@@ -165,24 +185,116 @@ public final class Database {
      * never the reverse -- and Db's monitor is reentrant for the callbacks.
      */
     public synchronized int execute(String sql, Object[] params) throws IOException {
+        String rendered = bind(sql, params);
         if(sqlite != null) {
-            return sqlite.execute(sql, params);
+            return sqlite.execute(rendered, params);
         }
         if(postgres != null) {
-            return postgres.execute(sql, params);
+            return postgres.execute(rendered, params);
         }
-        return mysql.execute(sql, params);
+        return mysql.execute(rendered, params);
     }
 
     /** Runs a query and returns every row as a column-name to value map. */
     public synchronized List query(String sql, Object[] params) throws IOException {
+        String rendered = bind(sql, params);
         if(sqlite != null) {
-            return sqlite.query(sql, params);
+            return sqlite.query(rendered, params);
         }
         if(postgres != null) {
-            return postgres.query(sql, params);
+            return postgres.query(rendered, params);
         }
-        return mysql.query(sql, params);
+        return mysql.query(rendered, params);
+    }
+
+    /**
+     * The one row a query is expected to return, or null when it returns none.
+     *
+     * <p>Its own method because the alternative is written at every call site and
+     * is wrong in the same way each time: reading get(0) off a list without
+     * looking at its size, which is an IndexOutOfBoundsException on the day the
+     * row is missing rather than the null the code above it is already written to
+     * handle. More than one row is a bug in the statement, and it is reported as
+     * one rather than silently discarded.
+     */
+    public synchronized Map queryOne(String sql, Object[] params) throws IOException {
+        List rows = query(sql, params);
+        if(rows.isEmpty()) {
+            return null;
+        }
+        if(rows.size() > 1) {
+            throw new IOException("Expected at most one row and the query returned "
+                    + rows.size() + ": [" + sql + "]");
+        }
+        return (Map)rows.get(0);
+    }
+
+    /**
+     * Runs an INSERT and answers the key the database generated for it.
+     *
+     * <p>This is the operation the engines disagree about most and the one an
+     * application needs most often. SQLite and MySQL assign the key and hold it
+     * until asked -- {@link #lastInsertId} -- while PostgreSQL has no such
+     * concept at all, and the only way to learn the key there is to ask the
+     * INSERT itself for it with a RETURNING clause. Written by hand that is a
+     * branch on the engine at every insert; here the dialect knows which it is.
+     *
+     * <p>{@code idColumn} names the generated column, which is what RETURNING
+     * needs. It is quoted for the engine, so a column named "order" or one whose
+     * case matters is spelled correctly rather than folded.
+     *
+     * @param sql an INSERT in the portable form, with no RETURNING of its own
+     * @return the generated key, or 0 where the statement generated none
+     */
+    public synchronized long insert(String sql, Object[] params, String idColumn)
+            throws IOException {
+        if(idColumn == null || idColumn.length() == 0) {
+            throw new IOException("insert needs the name of the generated key column");
+        }
+        if(!dialect.generatedKeysThroughReturning()) {
+            execute(sql, params);
+            return lastInsertId();
+        }
+        // RETURNING makes this a statement that answers with rows, so it goes
+        // through query rather than execute. Appended AFTER the portable form is
+        // rendered would mean rendering twice; appending before costs nothing
+        // because the clause holds no placeholder.
+        Map row = queryOne(sql + " RETURNING " + dialect.quote(idColumn), params);
+        if(row == null) {
+            return 0;
+        }
+        Object value = row.values().iterator().next();
+        if(value instanceof Number) {
+            // instanceof rather than a cast whose failure is caught: a failed cast
+            // does not throw under ParparVM, it hands the wrong object on and the
+            // next instruction reads a native crash out of it.
+            return ((Number)value).longValue();
+        }
+        throw new IOException("The generated key came back as something other than a "
+                + "number, so the column named is not the generated one: " + idColumn);
+    }
+
+    /**
+     * How this connection's engine spells what the three of them spell
+     * differently: parameter placeholders, identifier quoting, column types, the
+     * declaration of a generated key.
+     *
+     * <p>Statements passed to {@link #execute} and {@link #query} are already
+     * rendered through it, so ordinary code never needs this. Schema generation
+     * does -- it has to ask what this engine calls a 64-bit integer.
+     */
+    public Dialect dialect() {
+        return dialect;
+    }
+
+    /**
+     * The statement as this engine wants it. See {@link Dialect#bind}: a portable
+     * statement binds ? and PostgreSQL is handed $1, $2; a statement that carries
+     * no placeholder at all is passed through untouched, which is what keeps SQL
+     * written for one engine working.
+     */
+    private String bind(String sql, Object[] params) throws IOException {
+        return dialect.bind(sql, params == null ? 0 : params.length);
     }
 
     /**

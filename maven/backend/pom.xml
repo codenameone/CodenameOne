@@ -54,6 +54,20 @@
             <version>3.46.1.0</version>
             <optional>true</optional>
         </dependency>
+        <!--
+             The tests here exercise the half of this runtime that is plain Java
+             and needs no native: the dialect, the configuration, the pool, the
+             ORM and the server builder. They run in the PR CI plugin leg, which
+             builds this module with `-am` and therefore runs its tests; the
+             translated arm and the server engines are covered separately, by
+             vm/backend's demos under vm/tests.
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

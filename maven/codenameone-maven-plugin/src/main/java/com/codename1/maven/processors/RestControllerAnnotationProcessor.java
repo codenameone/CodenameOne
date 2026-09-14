@@ -154,6 +154,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * response: two controllers colliding makes the later one unreachable in
      * exactly the way two methods in one controller do.
      */
+    /// Whether the generated entry point registers server-side daos. Settled
+    /// when the entry point is written; see [#hasGeneratedDaos].
+    private boolean daos;
+
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
     /** Which controller claimed each shape, so a clash names the other one. */
@@ -171,6 +175,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String packageName;
         String simpleName;
         String routerSimpleName;
+        /// What the generated entry point passes to the constructor: the
+        /// entity manager, the connection pool, or nothing. See [#injectionOf].
+        String injection;
         List<String> basePaths = new ArrayList<String>();
         List<Route> routes = new ArrayList<Route>();
     }
@@ -240,9 +247,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (controller.basePaths.isEmpty()) {
             controller.basePaths.add("");
         }
-        if (!hasNoArgConstructor(cls)) {
-            ctx.error(cls, "@RestController needs a public no-argument constructor so the "
-                    + "generated bootstrap can create it: " + controller.binaryName);
+        controller.injection = injectionOf(cls);
+        if (controller.injection == null) {
+            ctx.error(cls, "@RestController " + controller.binaryName + " has no constructor "
+                    + "the generated entry point can call. Declare a public constructor "
+                    + "taking nothing, or one taking a "
+                    + "com.codename1.backend.orm.EntityManager, or one taking a "
+                    + "com.codename1.backend.DataSource -- the entry point opens both from "
+                    + "the configuration and hands over whichever the controller asks for.");
             return;
         }
 
@@ -991,6 +1003,52 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 || "short".equals(javaType) || "byte".equals(javaType);
     }
 
+    /// The DESCRIPTORS of the constructors the generated entry point knows how
+    /// to call, most specific first.
+    private static final String CONSTRUCTOR_ENTITIES =
+            "(Lcom/codename1/backend/orm/EntityManager;)V";
+    private static final String CONSTRUCTOR_DATASOURCE =
+            "(Lcom/codename1/backend/DataSource;)V";
+
+    /// What to hand this controller's constructor, or null when it declares
+    /// none that can be called.
+    ///
+    /// This is the whole of the dependency injection, and it is deliberately
+    /// three cases rather than a container: a server handler needs the database
+    /// and nothing else, the two ways to want it are the ORM and the pool, and
+    /// a controller that needs something else builds it itself. There is no
+    /// scanning, no proxying and nothing resolved at run time -- the generated
+    /// entry point contains a `new` with the argument written into it.
+    ///
+    /// The entity manager wins over the pool, and the pool over nothing, when a
+    /// class declares several: a test that keeps a no-arg constructor around
+    /// should not quietly become the shape production runs.
+    private static String injectionOf(AnnotatedClass cls) {
+        boolean entities = false;
+        boolean dataSource = false;
+        boolean none = false;
+        for (MethodInfo m : cls.getMethods()) {
+            if (!m.isConstructor() || !m.isPublic()) {
+                continue;
+            }
+            String descriptor = m.getDescriptor();
+            if (CONSTRUCTOR_ENTITIES.equals(descriptor)) {
+                entities = true;
+            } else if (CONSTRUCTOR_DATASOURCE.equals(descriptor)) {
+                dataSource = true;
+            } else if (Type.getArgumentTypes(descriptor).length == 0) {
+                none = true;
+            }
+        }
+        if (entities) {
+            return "ENTITIES";
+        }
+        if (dataSource) {
+            return "DATASOURCE";
+        }
+        return none ? "NONE" : null;
+    }
+
     private static boolean hasNoArgConstructor(AnnotatedClass cls) {
         for (MethodInfo m : cls.getMethods()) {
             if (m.isConstructor() && m.isPublic()
@@ -1099,6 +1157,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "that class, or move the controllers into another package.");
             return;
         }
+        daos = hasGeneratedDaos(ctx);
         sources.put(bootstrap, generateBootstrap(first.packageName));
         try {
             List<File> cp = new ArrayList<File>();
@@ -2283,67 +2342,71 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("public final class BackendApplication {\n\n");
         sb.append("    private BackendApplication() {\n    }\n\n");
         sb.append("    public static void main(String[] args) throws Exception {\n");
-        // CHECKED, because the failure is otherwise a server that exits saying it
-        // succeeded. installShutdownHandler answers false when the self-pipe or the
-        // sigaction cannot be set up -- under descriptor exhaustion, say -- and the
-        // onShutdown watcher below then gets -1 from awaitShutdownSignal
-        // immediately, stops the server it just started, and calls System.exit(0).
-        // A container that never served a request, reporting success.
-        sb.append("        if (!com.codename1.backend.Signals.installShutdownHandler()) {\n");
-        sb.append("            throw new IllegalStateException(\"could not install the \"\n");
-        sb.append("                    + \"shutdown handler, so a stop signal could not be \"\n");
-        sb.append("                    + \"waited for; refusing to start rather than exiting \"\n");
-        sb.append("                    + \"silently once it is registered\");\n");
-        sb.append("        }\n");
-        sb.append("        int port = 8080;\n");
-        sb.append("        String configured = System.getenv(\"PORT\");\n");
-        sb.append("        if (configured != null && configured.length() > 0) {\n");
-        sb.append("            try {\n");
-        sb.append("                port = Integer.parseInt(configured.trim());\n");
-        sb.append("            } catch (NumberFormatException err) {\n");
-        sb.append("                throw new IllegalStateException(\"PORT is not a number: \"\n");
-        sb.append("                        + configured);\n");
-        sb.append("            }\n");
-        sb.append("        }\n");
-        sb.append("        final com.codename1.backend.HttpServer.Handler[] routers =\n");
-        sb.append("                new com.codename1.backend.HttpServer.Handler[] {\n");
+        if (daos) {
+            // The generated daos are reachable from here and from nowhere else.
+            // The translator drops a class nothing references, so this line is
+            // what keeps them in the binary as well as what registers them.
+            sb.append("        new ").append(OrmAnnotationProcessor.BACKEND_BOOTSTRAP_BINARY)
+              .append("();\n");
+        }
+        // Everything a server used to open with -- read the port, start, install
+        // a shutdown handler, drain on SIGTERM, wait -- is inside run(). What is
+        // left here is the part that differs between one server and the next:
+        // which controllers there are and what each of them is given.
+        sb.append("        com.codename1.backend.Backend.builder()\n");
+        sb.append("                .handlers(new com.codename1.backend.Backend.Handlers() {\n");
+        sb.append("            public com.codename1.backend.HttpServer.Handler[] create(\n");
+        sb.append("                    com.codename1.backend.DataSource dataSource,\n");
+        sb.append("                    com.codename1.backend.orm.EntityManager entities)\n");
+        sb.append("                    throws Exception {\n");
+        sb.append("                return new com.codename1.backend.HttpServer.Handler[] {\n");
         int index = 0;
         for (Controller c : controllers.values()) {
             sb.append("                    new ").append(qualify(c.packageName, c.routerSimpleName))
-              .append("(new ").append(c.sourceName).append("())");
+              .append("(new ").append(c.sourceName).append("(").append(argumentFor(c)).append("))");
             sb.append(++index < controllers.size() ? ",\n" : "\n");
         }
         sb.append("                };\n");
-        sb.append("        final com.codename1.backend.HttpServer server =\n");
-        sb.append("                com.codename1.backend.HttpServer.start(null, port, 512, 16,\n");
-        sb.append("                new com.codename1.backend.HttpServer.Handler() {\n");
-        sb.append("            public com.codename1.backend.HttpServer.Response handle(\n");
-        sb.append("                    com.codename1.backend.HttpServer.Request request)\n");
-        sb.append("                    throws Exception {\n");
-        sb.append("                for (int i = 0 ; i < routers.length ; i++) {\n");
-        sb.append("                    com.codename1.backend.HttpServer.Response response =\n");
-        sb.append("                            routers[i].handle(request);\n");
-        sb.append("                    if (response != null) {\n");
-        sb.append("                        return response;\n");
-        sb.append("                    }\n");
-        sb.append("                }\n");
-        sb.append("                return null;\n");
         sb.append("            }\n");
-        sb.append("        }, null);\n");
-        sb.append("        com.codename1.backend.Signals.onShutdown(new Runnable() {\n");
-        sb.append("            public void run() {\n");
-        sb.append("                // Stop accepting and let what is in flight finish.\n");
-        sb.append("                // Signals ends the process; exiting from here would\n");
-        sb.append("                // deadlock the JVM shutdown hook this runs from.\n");
-        sb.append("                server.stop(10000);\n");
-        sb.append("            }\n");
-        sb.append("        });\n");
-        sb.append("        // Required: the host threads are detached, so a main that returned\n");
-        sb.append("        // would end the process without a word.\n");
-        sb.append("        server.awaitTermination();\n");
+        sb.append("        }).run();\n");
         sb.append("    }\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// What the generated entry point passes to one controller's constructor.
+    private static String argumentFor(Controller c) {
+        if ("ENTITIES".equals(c.injection)) {
+            return "entities";
+        }
+        if ("DATASOURCE".equals(c.injection)) {
+            return "dataSource";
+        }
+        return "";
+    }
+
+    /// Whether this module has server-side daos for the entry point to register.
+    ///
+    /// Asked two ways because neither alone is enough. The generated bootstrap
+    /// on disk is the exact answer, and it is there because the ORM processor
+    /// runs before this one -- but its entities can come from a jar rather than
+    /// from this module. The class index is the other half: a module with an
+    /// `@Entity` of its own must reference the bootstrap whether or not the file
+    /// is there yet, so a build where the two processors ran in the wrong order
+    /// fails to compile rather than starting a server whose registry is empty.
+    private static boolean hasGeneratedDaos(ProcessorContext ctx) {
+        File bootstrap = new File(ctx.getOutputClassDir(),
+                OrmAnnotationProcessor.BACKEND_BOOTSTRAP_BINARY.replace('.', File.separatorChar)
+                        + ".class");
+        if (bootstrap.isFile()) {
+            return true;
+        }
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            if (cls.getClassAnnotation(OrmAnnotationProcessor.ENTITY_DESC) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A route as a byte[] constant, which is what the request is compared against. */
