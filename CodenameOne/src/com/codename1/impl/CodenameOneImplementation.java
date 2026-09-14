@@ -13132,6 +13132,14 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// the derived bytes, or `null` when this port has no native derivation
+    ///
+    /// Do not conclude from a search for overrides of this method which ports derive
+    /// natively. Android, iOS and JavaSE override it in Java; the JavaScript port does not
+    /// and still derives through `crypto.subtle.deriveBits`, because it replaces THIS method
+    /// by native binding (`port.js`, alongside `aesEncrypt`, `rsaEncrypt`, `sign` and
+    /// `verify`) rather than by subclassing. A reviewer who greps for the signature sees
+    /// three ports and concludes the browser runs the portable fallback's 600,000 rounds in
+    /// translated JavaScript; it does not.
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
         return null;
     }

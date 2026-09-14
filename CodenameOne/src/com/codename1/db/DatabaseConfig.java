@@ -509,7 +509,13 @@ public final class DatabaseConfig {
         }
         com.codename1.security.vault.ProtectionReport store =
                 com.codename1.security.SecureStorage.getInstance().protection();
-        b.set(com.codename1.security.vault.Protection.ENCRYPTED_AT_REST, true);
+        // Propagated, not asserted. The managed key is only as encrypted as the store holding
+        // it, and two stores answer NO on purpose: the JavaSE simulator, where this is
+        // reproducible obfuscation rather than encryption, and Android below API 23, which has
+        // no keystore to wrap with. Answering YES here told policy and diagnostics the key was
+        // encrypted in exactly the two places it is not.
+        b.set(com.codename1.security.vault.Protection.ENCRYPTED_AT_REST,
+                store.answer(com.codename1.security.vault.Protection.ENCRYPTED_AT_REST));
         b.set(com.codename1.security.vault.Protection.PERSISTENT,
                 store.answer(com.codename1.security.vault.Protection.PERSISTENT));
         b.set(com.codename1.security.vault.Protection.NON_EXTRACTABLE_KEY, false);

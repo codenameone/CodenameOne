@@ -272,6 +272,15 @@ try {
   check('and it reports itself as able to leave this device',
     (await call({ op: 'prfState', keyId: SYNCED }))[2], 1);
 
+  // The policy is re-checked against a credential that ALREADY exists, which is the
+  // case an application reaches by adding requireDeviceBoundPasskey() to a vault that
+  // was enrolled without it. Reporting OK on the record's mere existence re-wrapped the
+  // vault under the syncable credential it was supposed to refuse.
+  check('an existing syncable passkey is refused once device binding is required',
+    status(await call({ op: 'prfEnroll', keyId: SYNCED, userName: 'tester', deviceBound: true })), 10);
+  check('and the existing credential is left alone rather than dropped',
+    (await call({ op: 'prfState', keyId: SYNCED }))[1], 1);
+
   const STRICT = 'browser-vault-strict';
   // With it, the same authenticator is refused rather than quietly accepted.
   check('a syncable passkey is refused when device binding IS required',

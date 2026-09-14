@@ -820,6 +820,16 @@
     }
     return cn1VaultPrfRecord(keyId).then(function(existing) {
       if (existing && existing.credentialId) {
+        // An existing credential still has to satisfy the policy being asked for NOW.
+        // Reporting OK on its mere existence is how a vault enrolled with a syncable
+        // passkey kept being re-wrapped under it after the application added
+        // requireDeviceBoundPasskey() -- the strong name over the weaker thing, which
+        // is the one outcome that option exists to prevent. backupEligible is stored
+        // as 1 both for "may leave this device" and for "would not say", and neither
+        // is device bound, so compliance is exactly backupEligible === 0.
+        if (deviceBound && existing.backupEligible !== 0) {
+          return cn1VaultReply(CN1V_POLICY_NOT_MET, null);
+        }
         return cn1VaultReply(CN1V_OK, null);
       }
       var userId = cn1VaultRandom(16);

@@ -342,6 +342,26 @@ public final class Vault {
                         "the vault record did not read back as it was written");
             }
             Bytes.zero(proof);
+            // Confirmed still ours immediately before publishing. Two tabs can both pass the
+            // NOT_ENROLLED check above, generate different data keys and both write: the
+            // read-back proof catches the interleaving where the other tab wrote FIRST, but
+            // not the one where it writes after we verified. Publishing there would leave
+            // this tab unlocked under a key the stored record no longer describes, sealing
+            // records that nothing can open after a restart.
+            //
+            // This narrows that window rather than closing it, and the honest reason is that
+            // com.codename1.io.Storage has no compare-and-set: writeObject is the only
+            // primitive, so an atomic create-if-absent cannot be expressed here for every
+            // port. What makes the residue safe rather than silent is the wrap binding --
+            // every record is sealed against this record's vaultId and dataKeyVersion, and
+            // the losing tab's vaultId is a different 16 random bytes, so its records fail
+            // authentication outright instead of decrypting into the wrong state.
+            VaultMetadata settled = loadMetadata();
+            if (settled == null || !settled.serialize().equals(verified.serialize())) {
+                throw new VaultException(VaultError.CONFLICT,
+                        "another session finished setting up this vault first; unlock with "
+                        + "the password instead of enrolling again");
+            }
             metadata = verified;
             dataKey = key;
             key = null;
