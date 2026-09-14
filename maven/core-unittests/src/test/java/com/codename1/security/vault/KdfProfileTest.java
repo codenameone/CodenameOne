@@ -148,6 +148,29 @@ class KdfProfileTest extends UITestBase {
     }
 
     @Test
+    void anEmptyPasswordDerivesInsteadOfThrowing() {
+        // Nothing in Vault or KdfProfile rejects an empty password, so the derivation has to
+        // define it. RFC 2104 zero-pads a short HMAC key, which the portable implementation
+        // does, and routing an empty password there is what keeps the JavaSE and Android native
+        // paths -- where JCE refuses a zero-length key outright -- from being reached at all.
+        //
+        // What this does NOT cover, measured rather than assumed: the native path. This module
+        // runs against the base CodenameOneImplementation, whose pbkdf2 answers null, so
+        // derive() already fell back to the portable code here before that guard existed and
+        // this test passed against the unfixed tree. The guard itself is covered by
+        // JavaSEPortPbkdf2Test, beside the port that has the defect.
+        byte[] derived = KdfProfile.pbkdf2(KdfProfile.MIN_ITERATIONS)
+                .derive(new char[0], "salt".getBytes(), 32);
+        assertEquals(32, derived.length);
+
+        // And the answer is the portable one on every port, so a vault enrolled with an empty
+        // password on one still opens on another.
+        byte[] portable = KdfProfile.pbkdf2Portable(new byte[0], "salt".getBytes(),
+                KdfProfile.MIN_ITERATIONS, 32);
+        assertEquals(hex(portable), hex(derived));
+    }
+
+    @Test
     void needsUpgradeReportsAWeakerProfile() {
         assertTrue(KdfProfile.pbkdf2(KdfProfile.MIN_ITERATIONS).needsUpgrade());
         assertFalse(KdfProfile.current().needsUpgrade());

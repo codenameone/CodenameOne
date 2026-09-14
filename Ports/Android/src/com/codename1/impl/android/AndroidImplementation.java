@@ -18610,6 +18610,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (hashAlgorithm != null && hashAlgorithm.indexOf("512") >= 0) {
                 macName = "HmacSHA512";
             }
+            if (password == null || password.length == 0) {
+                // SecretKeySpec throws IllegalArgumentException for a zero-length key, which is
+                // not a GeneralSecurityException and would escape the catch below. Answering
+                // null is this method's own contract for "no native derivation here", so the
+                // caller falls back to the portable implementation, which zero-pads the key the
+                // way RFC 2104 says to.
+                return null;
+            }
             javax.crypto.Mac mac = javax.crypto.Mac.getInstance(macName);
             mac.init(new javax.crypto.spec.SecretKeySpec(password, macName));
             int hashLength = mac.getMacLength();

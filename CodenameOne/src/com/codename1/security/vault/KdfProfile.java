@@ -201,7 +201,16 @@ public final class KdfProfile {
         }
         byte[] passwordBytes = Bytes.utf8(password);
         try {
-            byte[] platform = Util.pbkdf2(Hash.SHA256, passwordBytes, salt, iterations, length);
+            // An empty password never goes to a platform implementation. JCE rejects a
+            // zero-length key outright -- SecretKeySpec throws IllegalArgumentException
+            // ("Empty key"), which is not a GeneralSecurityException and so slipped past the
+            // ports' catch: on the EDT the vault's worker died without ever completing its
+            // AsyncResource, and off it the failure came out of the asynchronous API as a raw
+            // throw. RFC 8018 and RFC 2104 define this case perfectly well -- a short HMAC key
+            // is zero-padded -- and the portable path below already does exactly that, so every
+            // port now answers the same defined bytes instead of two of them dying.
+            byte[] platform = passwordBytes.length == 0 ? null
+                    : Util.pbkdf2(Hash.SHA256, passwordBytes, salt, iterations, length);
             if (platform != null) {
                 return platform;
             }

@@ -704,6 +704,8 @@ public final class Vault {
     /// means it was altered or was written under a different vault.
     public AsyncResource<char[]> getSecret(final String secretName) {
         final AsyncResource<char[]> out = new AsyncResource<char[]>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -721,6 +723,7 @@ public final class Vault {
                                 "the stored secret is not in a format this build wrote");
                     }
                     plain = openAnyVersion(sealed, binding(metadata, secretName, PURPOSE_SECRET));
+                    requireSameGeneration(generation);
                     out.complete(chars(plain));
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -774,13 +777,20 @@ public final class Vault {
     /// which is a state to report rather than to guess through.
     public AsyncResource<byte[]> open(final String recordId, final byte[] sealed) {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
                 try {
                     requireUnlocked();
-                    out.complete(openAnyVersion(sealed,
-                            binding(metadata, recordId, PURPOSE_RECORD)));
+                    byte[] plain = openAnyVersion(sealed,
+                            binding(metadata, recordId, PURPOSE_RECORD));
+                    if (generation != lockGeneration) {
+                        Bytes.zero(plain);
+                        requireSameGeneration(generation);
+                    }
+                    out.complete(plain);
                 } catch (VaultException failed) {
                     out.error(failed);
                 }
@@ -799,6 +809,8 @@ public final class Vault {
     /// The handle stops working when the vault locks.
     public AsyncResource<KeyHandle> operationalKey(final String purpose) {
         final AsyncResource<KeyHandle> out = new AsyncResource<KeyHandle>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -808,6 +820,10 @@ public final class Vault {
                     mac.update(Bytes.utf8("cn1.vault.subkey.v1"));
                     mac.update(Bytes.utf8(purpose == null ? "" : purpose));
                     byte[] derived = mac.doFinal();
+                    if (generation != lockGeneration) {
+                        Bytes.zero(derived);
+                        requireSameGeneration(generation);
+                    }
                     // extractedKeyProtection(), not the device report. The device key may
                     // well be non-extractable -- in the browser it is -- but what this handle
                     // carries is a derived subkey sitting in a Java byte array, which its own
@@ -858,6 +874,8 @@ public final class Vault {
     /// [VaultOptions#requireOpaqueKeysOnly()], or [VaultError#LOCKED] when it is locked
     public AsyncResource<byte[]> databaseKey(final String alias) {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -872,7 +890,12 @@ public final class Vault {
                     Hmac mac = Hmac.create(Hash.SHA256, dataKey);
                     mac.update(Bytes.utf8("cn1.vault.dbkey.v1"));
                     mac.update(Bytes.utf8(alias == null ? "" : alias));
-                    out.complete(mac.doFinal());
+                    byte[] key = mac.doFinal();
+                    if (generation != lockGeneration) {
+                        Bytes.zero(key);
+                        requireSameGeneration(generation);
+                    }
+                    out.complete(key);
                 } catch (VaultException failed) {
                     out.error(failed);
                 }
@@ -964,6 +987,8 @@ public final class Vault {
     /// [#unlockWithRecoveryCode] is fast where [#unlockWithPassword] is deliberately slow.
     public AsyncResource<char[]> createRecoveryCode() {
         final AsyncResource<char[]> out = new AsyncResource<char[]>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -979,6 +1004,9 @@ public final class Vault {
                             wrapBinding(next, PURPOSE_RECOVERY), dataKey);
                     Bytes.zero(derived);
                     next.counter = metadata.counter + 1;
+                    // Checked before the write: a recovery code refused after persisting its
+                    // wrap would be a code the vault accepts and the caller never received.
+                    requireSameGeneration(generation);
                     writeMetadata(next);
                     metadata = next;
                     out.complete(code);
@@ -1113,6 +1141,28 @@ public final class Vault {
                                 "the vault was locked while the key was being rotated");
                     }
                     writeMetadata(next);
+                    // Read back and confirm the record on disk is the one just written, BEFORE
+                    // the new key is adopted. Two tabs unlocking the same version-N vault both
+                    // produce a version-(N+1) key and both write the same next counter, so the
+                    // equal-counter check in importSyncState never sees them -- they share local
+                    // storage rather than exchanging sync state. Publishing regardless left this
+                    // tab sealing under a key no persisted wrap describes, and those records are
+                    // unreadable after a restart.
+                    //
+                    // The same portable limit as first enrollment applies and is worth stating
+                    // plainly: Storage has writeObject and no compare-and-set, so this is a
+                    // persisted-winner check rather than a lock, and a write landing after the
+                    // read below is still possible. It is strictly narrower than publishing
+                    // blind, and the failure stays closed -- both tabs label the key version
+                    // N+1, so a loser's records do not decrypt under the winner's key, they
+                    // fail authentication.
+                    VaultMetadata settled = loadMetadataFresh();
+                    if (settled == null || !settled.serialize().equals(next.serialize())) {
+                        Bytes.zero(fresh);
+                        throw new VaultException(VaultError.CONFLICT,
+                                "another session changed this vault while the key was being "
+                                + "rotated; nothing was adopted here");
+                    }
                     Bytes.zero(dataKey);
                     dataKey = fresh;
                     fresh = null;
@@ -1408,6 +1458,15 @@ public final class Vault {
         if (metadata != null) {
             return metadata;
         }
+        return loadMetadataFresh();
+    }
+
+    /// The stored record, never the cached one.
+    ///
+    /// A read-back that is checking whether this session's write survived has to reach storage:
+    /// loadMetadata() answers the in-memory record once the vault is open, which would make
+    /// every such check compare a value against itself and pass.
+    private VaultMetadata loadMetadataFresh() {
         Object stored;
         try {
             stored = Storage.getInstance().readObject(metadataKey());
@@ -1416,6 +1475,16 @@ public final class Vault {
                     "the vault record could not be read from storage", unreadable);
         }
         if (!(stored instanceof String)) {
+            // An entry that IS there and did not come back as a string is unreadable, not
+            // absent. Storage.readObject swallows a corrupt or failed read and answers null, so
+            // returning null here made state() say NOT_ENROLLED -- and enroll() is allowed over
+            // NOT_ENROLLED, which would overwrite the record and orphan everything it protects.
+            // The STATE_UNKNOWN guard in enrollNow already exists for exactly this; it just
+            // never got the chance to fire.
+            if (Storage.getInstance().exists(metadataKey())) {
+                throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
+                        "a vault record exists here and could not be read");
+            }
             return null;
         }
         return VaultMetadata.parse((String) stored);
@@ -1524,6 +1593,20 @@ public final class Vault {
     /// counter raised. Everything inside such a record agrees with itself, and an offline client
     /// has nothing to compare it against. That is the freshness limit documented on
     /// [#importSyncState].
+    /// Refuses to deliver when the vault was locked while this operation was running.
+    ///
+    /// lock() promises that nothing in flight delivers afterwards, and an operation that reads
+    /// storage and decrypts is in flight for long enough to matter -- an EDT caller's lifecycle
+    /// callback can land squarely inside it. The generation has to be captured on the CALLING
+    /// thread: read inside the worker it can already be the post-lock value, and the check then
+    /// passes for the very interleaving it exists to catch.
+    private void requireSameGeneration(int generation) {
+        if (generation != lockGeneration) {
+            throw new VaultException(VaultError.LOCKED,
+                    "the vault was locked while this operation was running");
+        }
+    }
+
     private AssociatedData wrapBinding(VaultMetadata meta, String purpose) {
         return AssociatedData.of(application, meta.vaultId, DATA_KEY_RECORD,
                 purpose + "." + meta.dataKeyVersion);
@@ -1545,11 +1628,25 @@ public final class Vault {
     /// reversible, so two names that differ keep different keys; folding to a single replacement
     /// character would reintroduce the collision a step further along.
     private String safeName() {
-        StringBuilder b = new StringBuilder(name.length());
-        for (int iter = 0; iter < name.length(); iter++) {
-            char c = name.charAt(iter);
+        // '.' is deliberately NOT in the safe set here: it separates a metadata key from the
+        // device key built on it, which is the collision this method exists to prevent.
+        return escaped(name, "-_");
+    }
+
+    /// The escape both identities are built from: anything outside the safe set becomes `%` and
+    /// four hex digits, and `%` is itself outside every safe set, so `a%0020b` and `a b` cannot
+    /// encode alike. Reversible, which is the whole point -- two values that differ must keep
+    /// different keys, and folding to one replacement character is how they stop doing that.
+    ///
+    /// The safe set is a parameter because the two callers genuinely differ: a vault name must
+    /// escape `.`, an application identity must keep it, since that is what package names are
+    /// made of.
+    private static String escaped(String value, String alsoSafe) {
+        StringBuilder b = new StringBuilder(value.length());
+        for (int iter = 0; iter < value.length(); iter++) {
+            char c = value.charAt(iter);
             boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                    || (c >= '0' && c <= '9') || c == '-' || c == '_';
+                    || (c >= '0' && c <= '9') || alsoSafe.indexOf(c) >= 0;
             if (safe) {
                 b.append(c);
             } else {
@@ -1632,14 +1729,12 @@ public final class Vault {
         if (id == null || id.length() == 0) {
             return "cn1app";
         }
-        StringBuilder b = new StringBuilder(id.length());
-        for (int iter = 0; iter < id.length(); iter++) {
-            char c = id.charAt(iter);
-            boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                    || (c >= '0' && c <= '9') || c == '.' || c == '-';
-            b.append(safe ? c : '_');
-        }
-        return b.toString();
+        // The same reversible escape safeName() uses, rather than folding every unsupported
+        // character to a single '_'. That folding made "foo$bar" and "foo_bar" -- both
+        // reachable, as a package component and as a fallback AppName -- encode alike, and two
+        // applications that collide here share metadata keys and device-key ids: one sees
+        // CONFLICT against, overwrites, or deletes the other's same-named vault.
+        return escaped(id, ".-");
     }
 
     /// The device-local half of a vault: which policy this device enrolled under and the wrap the
