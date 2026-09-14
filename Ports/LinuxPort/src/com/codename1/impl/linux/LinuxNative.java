@@ -668,6 +668,19 @@ public final class LinuxNative {
      */
     public static native byte[] dpapiProtect(byte[] data);
 
+    /**
+     * Whether a usable Secret Service is actually reachable from this process.
+     *
+     * <p>Side-effect free, which is the point: {@link #dpapiProtect(byte[])} answers the same
+     * question but STORES a secret to do it, so probing with it would litter the user's keyring
+     * on every capability query. This loads the library and resolves the symbols -- the same gate
+     * every other entry point here passes through, cached after the first call -- and reports
+     * whether that succeeded.
+     *
+     * @return true when libsecret loaded and its symbols resolved
+     */
+    public static native boolean secretServiceAvailable();
+
     /** Inverse of {@link #dpapiProtect}: decrypts a DPAPI blob, or {@code null}. */
     public static native byte[] dpapiUnprotect(byte[] data);
 

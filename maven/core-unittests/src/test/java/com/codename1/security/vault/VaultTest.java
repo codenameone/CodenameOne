@@ -702,6 +702,62 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void enrolmentThatWasRunningWhenLockArrivedIsRefused() throws Exception {
+        // Enrolment derives from the password and then verifies through storage, and published
+        // the key with no generation check at all -- so a lifecycle callback that locked during
+        // that window got a vault that opened anyway.
+        VaultOptions slow = new VaultOptions()
+                .kdf(KdfProfile.pbkdf2(2000000))
+                .deviceProtection(device);
+        final Vault vault = Vault.named(freshName()).configure(slow);
+        final java.util.concurrent.CountDownLatch called =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicReference<VaultError> outcome =
+                new java.util.concurrent.atomic.AtomicReference<VaultError>();
+        final VaultOptions used = slow;
+        Thread enrolling = new Thread(new Runnable() {
+            public void run() {
+                called.countDown();
+                outcome.set(errorOf(vault.enroll(pw("p"), used)));
+            }
+        });
+        enrolling.start();
+        called.await();
+        Thread.sleep(100);
+        vault.lock();
+        enrolling.join(60000);
+
+        assertEquals(VaultError.LOCKED, outcome.get(),
+                "an enrolment that was already running when lock() arrived must be refused");
+        assertFalse(vault.isUnlocked(), "lock() must leave the vault closed");
+    }
+
+    @Test
+    void aFailedPolicyChangeKeepsTheRememberedUnlock() {
+        // Moving to a stronger policy used to delete the working device record and key before the
+        // new mechanism was established, so a user who dismissed the prompt lost the remembered
+        // unlock they already had AND got an error.
+        String name = freshName();
+        VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+        assertFalse(device.keys.isEmpty());
+
+        // The gated mechanism exists but cannot complete -- a cancelled passkey ceremony.
+        gated.refuseWrites = true;
+        device.userVerification = true;
+        assertEquals(VaultError.STORAGE_UNAVAILABLE,
+                errorOf(vault.setPolicy(UnlockPolicy.REQUIRE_USER_VERIFICATION)));
+
+        // The vault is still remembered under the policy it already had.
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+        vault.lock();
+        assertTrue(Vault.named(name).configure(options).unlockRemembered().get().booleanValue(),
+                "the remembered unlock must survive a policy change that failed");
+    }
+
+    @Test
     void changingPolicyRecheckesTheRequiredProtections() {
         // SESSION_ONLY genuinely is encrypted at rest -- nothing that can reopen the vault is
         // written down -- so this enrolls. REMEMBER_DEVICE has to put a wrapping key in the

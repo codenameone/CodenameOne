@@ -492,6 +492,17 @@ static const SecretSchema cn1SecretSchema = {
     { { "token", SECRET_SCHEMA_ATTRIBUTE_STRING }, { "NULL", 0 } }
 };
 
+/*
+ * Whether libsecret loaded and its symbols resolved -- the same gate dpapiProtect and
+ * dpapiUnprotect pass through, asked without the side effect of storing anything. Answering this
+ * from the token-storage layer instead reported a working Secret Service on any desktop where
+ * ordinary storage was readable, so a capability check advertised a store whose every write
+ * would fail. cn1LoadSecret caches its result, so repeated calls cost nothing.
+ */
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_secretServiceAvailable___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    return cn1LoadSecret() ? JAVA_TRUE : JAVA_FALSE;
+}
+
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiProtect___byte_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data) {
     unsigned char* bytes;
     int len;

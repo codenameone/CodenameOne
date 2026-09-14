@@ -170,7 +170,20 @@ public class LinuxSecureStorage extends SecureStorage {
     /// availability is asked of the store rather than assumed from the platform.
     @Override
     public ProtectionReport protection() {
-        boolean available = entryState("cn1.probe") != ENTRY_UNKNOWN;
+        // Asked of the Secret Service itself, not of the token layer in front of it. entryState
+        // answers from ordinary CN1 Storage -- it reports where the TOKEN is, which is readable
+        // on a desktop with no secret provider at all -- so this reported PERSISTENT,
+        // ENCRYPTED_AT_REST and OS_PROTECTED as YES for a store whose every write returns false,
+        // because dpapiProtect answers null the moment cn1LoadSecret fails. A required-protection
+        // check then passed against a store that cannot hold anything.
+        boolean available;
+        try {
+            available = LinuxNative.secretServiceAvailable();
+        } catch (Throwable noNative) {
+            // A build whose native half is missing entirely cannot claim the protections it
+            // would have provided.
+            available = false;
+        }
         return ProtectionReport.builder()
                 .set(Protection.PERSISTENT, available)
                 .set(Protection.ENCRYPTED_AT_REST, available)

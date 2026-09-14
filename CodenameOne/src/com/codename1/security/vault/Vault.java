@@ -284,11 +284,13 @@ public final class Vault {
             options = opts;
         }
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // On the calling thread; see unlockWithPassword for why not in the worker.
+        final int generation = lockGeneration;
         background(new Runnable() {
             @Override
             public void run() {
                 try {
-                    enrollNow(password);
+                    enrollNow(password, generation);
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -304,7 +306,7 @@ public final class Vault {
         return out;
     }
 
-    private void enrollNow(char[] password) {
+    private void enrollNow(char[] password, int generation) {
         requirePolicySupported(options.getPolicy());
         requireProtections();
         int existing = state();
@@ -325,7 +327,10 @@ public final class Vault {
             fresh.passwordWrap = SecureEnvelope.sealWithPassword(password, options.getKdf(),
                     fresh.dataKeyId, fresh.dataKeyVersion,
                     wrapBinding(fresh, PURPOSE_PASSWORD), key);
-            writeMetadata(fresh);
+            // base null: this must be a creation, so a record appearing between the
+            // NOT_ENROLLED check above and here is a losing race rather than something to
+            // overwrite. As close to create-if-absent as Storage can express.
+            commitMetadata(null, fresh);
             // Read back and open. A store that accepted a write and did not keep it -- an evicted
             // origin, a full disk, a quota refusal reported as success -- would otherwise be
             // discovered at the next launch, by a user who can no longer get in.
@@ -342,6 +347,12 @@ public final class Vault {
                         "the vault record did not read back as it was written");
             }
             Bytes.zero(proof);
+            // Enrolment derives from the password and then verifies through storage, which is
+            // seconds at the default profile -- ample room for an EDT caller's lifecycle
+            // callback to lock in the middle. Publishing afterwards would leave the vault open
+            // against an explicit request to close it. The record stays: enrolling is what the
+            // call was for and it succeeded; what is refused is holding the key.
+            requireSameGeneration(generation);
             // Confirmed still ours immediately before publishing. Two tabs can both pass the
             // NOT_ENROLLED check above, generate different data keys and both write: the
             // read-back proof catches the interleaving where the other tab wrote FIRST, but
@@ -960,7 +971,7 @@ public final class Vault {
                     VaultMetadata next = meta.copy();
                     next.passwordWrap = rewrapped;
                     next.counter = meta.counter + 1;
-                    writeMetadata(next);
+                    commitMetadata(meta, next);
                     metadata = next;
                     passwordNeedsRewrap = false;
                     out.complete(Boolean.TRUE);
@@ -1007,7 +1018,7 @@ public final class Vault {
                     // Checked before the write: a recovery code refused after persisting its
                     // wrap would be a code the vault accepts and the caller never received.
                     requireSameGeneration(generation);
-                    writeMetadata(next);
+                    commitMetadata(metadata, next);
                     metadata = next;
                     out.complete(code);
                 } catch (VaultException failed) {
@@ -1140,7 +1151,7 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the key was being rotated");
                     }
-                    writeMetadata(next);
+                    commitMetadata(meta, next);
                     // Read back and confirm the record on disk is the one just written, BEFORE
                     // the new key is adopted. Two tabs unlocking the same version-N vault both
                     // produce a version-(N+1) key and both write the same next counter, so the
@@ -1162,6 +1173,22 @@ public final class Vault {
                         throw new VaultException(VaultError.CONFLICT,
                                 "another session changed this vault while the key was being "
                                 + "rotated; nothing was adopted here");
+                    }
+                    if (generation != lockGeneration) {
+                        // Asked once more, immediately before publication. The earlier check is
+                        // before the write, and the write plus its read-back is long enough for a
+                        // lock to land inside -- publishing after that reopens a vault the caller
+                        // was told to close.
+                        //
+                        // The metadata is already committed and is NOT rolled back: the rotation
+                        // did happen, and the record on disk describes the new key. What is
+                        // refused is holding it. The vault stays locked and the next unlock uses
+                        // the new password wrap, which is the same state a crash here would
+                        // leave.
+                        Bytes.zero(fresh);
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while the key was being rotated; the "
+                                + "rotation is stored and the vault is closed");
                     }
                     Bytes.zero(dataKey);
                     dataKey = fresh;
@@ -1344,15 +1371,40 @@ public final class Vault {
                                 "the device key could not be deleted");
                     } else if (current == null || current.policy != policy) {
                         requireUnlocked();
-                        Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                        // Deleted through the OUTGOING policy's protection, because on a port
+                        // The incoming mechanism is established and proven BEFORE the outgoing
+                        // one is discarded. Deleting first meant that a user who dismissed the
+                        // passkey prompt on the way from REMEMBER_DEVICE to
+                        // REQUIRE_USER_VERIFICATION got an error AND lost the remembered unlock
+                        // they already had -- the vault silently demoted to session-only by a
+                        // call that failed.
+                        Object saved = Storage.getInstance().readObject(deviceRecordKey());
+                        try {
+                            rememberNow(policy);
+                        } catch (VaultException establishFailed) {
+                            // rememberNow writes the device record, so a failure partway can
+                            // leave it describing a mechanism that was never completed. Put back
+                            // exactly what was there and report the failure: nothing changed.
+                            if (saved instanceof String) {
+                                Storage.getInstance().writeObject(deviceRecordKey(), saved);
+                            }
+                            throw establishFailed;
+                        }
+                        // Removed through the OUTGOING policy's protection, because on a port
                         // where the two policies are different mechanisms -- a stored key and a
                         // passkey in the browser -- asking the incoming one to delete would leave
                         // the outgoing key in place. That is the unattended wrap a stronger policy
                         // exists to remove.
-                        await(deviceProtection(previous).deleteKey(deviceKeyId()),
-                                "the previous device key could not be deleted");
-                        rememberNow(policy);
+                        //
+                        // Skipped when the two resolve to the SAME protection, which they do on
+                        // any port with no user-verifying variant: deviceProtection() falls back
+                        // to the base store, so both policies share one store and one key id, and
+                        // deleting the outgoing key there would delete the incoming one that was
+                        // just written.
+                        DeviceProtection outgoing = deviceProtection(previous);
+                        if (outgoing != deviceProtection(policy)) {
+                            await(outgoing.deleteKey(deviceKeyId()),
+                                    "the previous device key could not be deleted");
+                        }
                     }
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -1506,6 +1558,33 @@ public final class Vault {
             return null;
         }
         return VaultMetadata.parse((String) stored);
+    }
+
+    /// Writes a metadata mutation only if the stored record is still the one it was derived
+    /// from.
+    ///
+    /// Every mutation here is read-modify-write over a record two browser tabs share, and each
+    /// one raises the counter by one from whatever it read. Checking only the rotation writer
+    /// left the others able to overwrite it: a tab changing the password from cached metadata
+    /// would write its stale key version and the SAME next counter over a rotation that had
+    /// already published, removing the only persisted wrap and retired chain describing the new
+    /// key and making every record sealed under it unreadable.
+    ///
+    /// Storage has writeObject and no compare-and-set, so this is optimistic concurrency and not
+    /// a lock -- a writer landing between the read and the write is still possible. What it
+    /// removes is the much wider window of never looking at all, and it fails closed: the loser
+    /// is told CONFLICT and has changed nothing.
+    private void commitMetadata(VaultMetadata base, VaultMetadata next) {
+        VaultMetadata current = loadMetadataFresh();
+        String expected = base == null ? null : base.serialize();
+        String found = current == null ? null : current.serialize();
+        boolean same = expected == null ? found == null : expected.equals(found);
+        if (!same) {
+            throw new VaultException(VaultError.CONFLICT,
+                    "another session changed this vault while this change was being prepared; "
+                    + "nothing was written here");
+        }
+        writeMetadata(next);
     }
 
     private void writeMetadata(VaultMetadata meta) {
