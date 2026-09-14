@@ -241,7 +241,8 @@ public abstract class Dialect {
         }
         return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments(),
                 backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
-                dashCommentNeedsSpace());
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
     }
 
     /**
@@ -259,7 +260,8 @@ public abstract class Dialect {
         }
         return Placeholders.countInsertRows(sql, nestedBlockComments(),
                 backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
-                dashCommentNeedsSpace());
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
     }
 
     /**
@@ -275,7 +277,8 @@ public abstract class Dialect {
         }
         return Placeholders.endOfStatement(sql, nestedBlockComments(),
                 backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
-                dashCommentNeedsSpace());
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
     }
 
     /** Whether this engine's parameters are written $1, $2 rather than ?. */
@@ -327,6 +330,29 @@ public abstract class Dialect {
      * multi-row insert check was reading.
      */
     boolean dashCommentNeedsSpace() {
+        return false;
+    }
+
+    /**
+     * Whether [brackets] quote an identifier.
+     *
+     * <p>SQLite alone, and deliberately not PostgreSQL: brackets are an ARRAY
+     * SUBSCRIPT there, so treating a[1] as a quoted name would swallow the rest
+     * of the statement.
+     */
+    boolean bracketIdentifiers() {
+        return false;
+    }
+
+    /**
+     * Whether a block comment opening "/*!" is SQL that RUNS rather than text
+     * that is ignored.
+     *
+     * <p>MySQL alone. Its version-gated executable comments are how a statement
+     * says "run this on MySQL and nowhere else", so what is inside one has to be
+     * scanned as the statement it is.
+     */
+    boolean executableComments() {
         return false;
     }
 
@@ -410,6 +436,10 @@ public abstract class Dialect {
          */
         public String generatedKeyColumn(int kind) {
             return "INTEGER PRIMARY KEY AUTOINCREMENT";
+        }
+
+        boolean bracketIdentifiers() {
+            return true;
         }
     }
 
@@ -516,6 +546,10 @@ public abstract class Dialect {
         }
 
         boolean dashCommentNeedsSpace() {
+            return true;
+        }
+
+        boolean executableComments() {
             return true;
         }
 

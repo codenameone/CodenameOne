@@ -103,6 +103,49 @@ final class TestEntities {
         }
     }
 
+    /** The entity the clashing definition below describes. Its own class, so
+     * removing that definition cannot disturb another entity's registration. */
+    public static final class Clashing {
+        public long id;
+        public String name;
+        public String title;
+
+        public Clashing() {
+        }
+    }
+
+    /** A definition that maps two fields to one column, which is a mistake. */
+    static final class ClashingDefinition extends EntityDefinition {
+        private static final ColumnDefinition[] COLUMNS = {
+            new ColumnDefinition("id", "id", Dialect.BIGINT, false, null, true, true),
+            new ColumnDefinition("name", "label", Dialect.TEXT, true, null, false, false),
+            new ColumnDefinition("title", "label", Dialect.TEXT, true, null, false, false),
+        };
+
+        public Class type() {
+            return Clashing.class;
+        }
+
+        public String table() {
+            return "clashing";
+        }
+
+        public ColumnDefinition[] columns() {
+            return COLUMNS;
+        }
+
+        public Object newInstance() {
+            return new Clashing();
+        }
+
+        public Object get(Object entity, int index) {
+            return null;
+        }
+
+        public void set(Object entity, int index, Object value) {
+        }
+    }
+
     /** What `@Entity` on Note generates. */
     static final class NoteDefinition extends EntityDefinition {
         private static final ColumnDefinition[] COLUMNS = {

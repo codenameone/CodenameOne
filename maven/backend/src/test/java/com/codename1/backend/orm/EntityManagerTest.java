@@ -399,6 +399,36 @@ class EntityManagerTest {
     }
 
     @Test
+    @DisplayName("two fields on one column is refused, naming both")
+    void refusesTwoFieldsOnOneColumn() throws Exception {
+        // Every statement would name the column twice: the CREATE TABLE is
+        // refused outright, and against a schema the ORM did not create, a read
+        // puts the same value into both fields and a write stores whichever the
+        // generated order put last. The generator refuses this at build time --
+        // see OrmAnnotationProcessorTest -- and a hand-written definition, which
+        // is what this is, reaches the runtime check.
+        EntityManager.register(new TestEntities.ClashingDefinition());
+        try {
+            DataSource pool = DataSource.open(":memory:");
+            try {
+                // An IOException rather than the IllegalStateException the table
+                // itself throws: tablesFor COLLECTS every entity it cannot map,
+                // so opening a server reports all of them at once instead of one
+                // per restart.
+                IOException err = assertThrows(IOException.class,
+                        () -> EntityManager.open(pool));
+                assertTrue(err.getMessage().contains("label"), err.getMessage());
+                assertTrue(err.getMessage().contains("name"), err.getMessage());
+                assertTrue(err.getMessage().contains("title"), err.getMessage());
+            } finally {
+                pool.close();
+            }
+        } finally {
+            EntityManager.forgetForTest(TestEntities.Clashing.class);
+        }
+    }
+
+    @Test
     @DisplayName("an entity with no dao says which of the two things went wrong")
     void reportsAnUnregisteredEntity() throws Exception {
         DataSource pool = DataSource.open(":memory:");
