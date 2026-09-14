@@ -274,7 +274,20 @@ public final class Values {
             throw new IOException("A column holding " + describe(value)
                     + " is outside the range of the float field it is read into");
         }
-        return (float)number;
+        float narrowed = (float)number;
+        if(narrowed == 0.0f && number != 0.0) {
+            // THE OTHER BOUNDARY. A float's smallest subnormal is about 1.4e-45,
+            // so a stored 1e-100 narrows to zero -- a nonzero row read back as
+            // no value at all, which is the same silent substitution the
+            // overflow above refuses and the one asDoubleObject refuses for
+            // text. Losing PRECISION is inherent to a float and is not this;
+            // losing the value is. Note -0.0 compares equal to 0.0, so a stored
+            // negative zero passes rather than being reported as underflow.
+            throw new IOException("A column holding " + describe(value)
+                    + " is too small for the float field it is read into, "
+                    + "which would read it as zero");
+        }
+        return narrowed;
     }
 
     /** The value as a flag: anything non-zero, or the text of one, is true. */
