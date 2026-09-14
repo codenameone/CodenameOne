@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.charts.transitions;
 
 import com.codename1.charts.ChartComponent;
@@ -83,6 +105,39 @@ class XYTransitionsTest extends UITestBase {
         assertEquals(9.0, second.getY(1));
         assertEquals(0, buffer.getSeriesAt(0).getItemCount());
         assertEquals(0, buffer.getSeriesAt(1).getItemCount());
+    }
+
+    @FormTest
+    void updateChartAppliesTheBufferWithoutAnimating() {
+        // updateChart() is documented as animateChart() with a duration of 0,
+        // and was a bare chart.repaint(): the buffer was never read, so every
+        // value written into it was dropped and the series kept the numbers it
+        // already had. Nothing failed and nothing was logged -- the chart
+        // simply did not change.
+        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+        XYSeries series = new XYSeries("Series");
+        series.add(0, 1);
+        series.add(1, 2);
+        dataset.addSeries(series);
+
+        ChartComponent chartComponent = createChartComponent(dataset);
+        Form form = new Form();
+        form.add(chartComponent);
+        form.show();
+
+        XYSeriesTransition transition = new XYSeriesTransition(chartComponent, series);
+        XYSeries buffer = transition.getBuffer();
+        buffer.add(0, 5);
+        buffer.add(1, 7);
+
+        transition.updateChart();
+
+        assertEquals(2, series.getItemCount());
+        assertEquals(5.0, series.getY(0), "updateChart() left the series at its old value");
+        assertEquals(7.0, series.getY(1), "updateChart() left the series at its old value");
+        // Drained, so the transition is in the same state an animation would
+        // have left it in and can be reused.
+        assertEquals(0, buffer.getItemCount());
     }
 
     private ChartComponent createChartComponent(XYMultipleSeriesDataset dataset) {

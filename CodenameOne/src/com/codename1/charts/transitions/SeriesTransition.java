@@ -215,6 +215,18 @@ public abstract class SeriesTransition implements Animation {
     /// the chart.  This is basically like calling animateChart() with a duration
     /// of 0.
     public void updateChart() {
+        // The three steps animateChart() reaches through the animation, run
+        // back to back. This was a bare repaint(), which drew the series
+        // exactly as it already was: everything written into the buffer was
+        // discarded on the next initTransition(), so the documented
+        // "duration of 0" path silently did nothing at all.
+        //
+        // cleanup() at the end rather than leaving the buffer full, so the
+        // state after this call is the state after an animation finishes and
+        // a caller can reuse the transition either way.
+        initTransition();
+        update(100);
+        cleanup();
         chart.repaint();
     }
 
