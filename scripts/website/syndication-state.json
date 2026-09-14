@@ -2087,6 +2087,18 @@
         "url": "https://dev.to/codenameone/a-mac-app-not-an-ios-app-on-a-mac-2jce",
         "syndicated_at": "2026-09-13T16:57:44+00:00"
       }
+    },
+    "sms-otp-autofill": {
+      "hashnode": {
+        "url": "https://debugagent.com/fill-an-sms-verification-code-without-reading-the-inbox",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa739840ce7667578e0ebb9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-14T00:03:06+00:00"
+      }
     }
   }
 }
