@@ -203,10 +203,15 @@ final class Placeholders {
                 depth++;
             } else if(c == ')') {
                 depth--;
-            } else if(depth == 0 && (c == 'v' || c == 'V') && isWord(sql, at, "values")) {
-                // The LAST one at the top level: "INSERT INTO t (a) VALUES (?)"
-                // has only one, and a statement that somehow had two would be
-                // counted from the one the tuples follow.
+            } else if(depth == 0 && valuesAt < 0 && (c == 'v' || c == 'V')
+                    && isWord(sql, at, "values")) {
+                // The FIRST one at the top level, and nothing replaces it.
+                //
+                // MySQL has a VALUES(column) EXPRESSION, used in ON DUPLICATE KEY
+                // UPDATE, and it sits at the top level too: taking the last match
+                // made "INSERT INTO t (a) VALUES (?), (?) ON DUPLICATE KEY UPDATE
+                // a = VALUES(a)" count from that function call, find one group,
+                // and report a single row. The multi-row insert then ran.
                 valuesAt = at + 6;
             }
             at++;
@@ -214,30 +219,73 @@ final class Placeholders {
         if(valuesAt < 0) {
             return -1;
         }
+        // The tuple list, and NOTHING AFTER IT. Counting every top-level group
+        // to the end of the statement swept up whatever followed the tuples --
+        // MySQL's "ON DUPLICATE KEY UPDATE a = VALUES(a)" made a two-row insert
+        // count as three. A tuple list is groups separated by commas, and it
+        // ends at the first top-level token that is neither.
         int rows = 0;
         at = valuesAt;
-        depth = 0;
-        while(at < length) {
-            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+        while(true) {
+            at = skipBlanks(sql, at, nestedComments, backslashEscapes, hashComments,
                     dollarQuotedStrings);
-            if(next > at) {
-                at = next;
-                continue;
+            if(at >= length || sql.charAt(at) != '(') {
+                break;
             }
-            char c = sql.charAt(at);
-            if(c == '(') {
-                if(depth == 0) {
-                    rows++;
+            rows++;
+            int depthHere = 0;
+            while(at < length) {
+                int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                        dollarQuotedStrings);
+                if(next > at) {
+                    at = next;
+                    continue;
                 }
-                depth++;
-            } else if(c == ')') {
-                depth--;
-            } else if(depth == 0 && c == ';') {
+                char c = sql.charAt(at);
+                at++;
+                if(c == '(') {
+                    depthHere++;
+                } else if(c == ')') {
+                    depthHere--;
+                    if(depthHere == 0) {
+                        break;
+                    }
+                }
+            }
+            at = skipBlanks(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings);
+            if(at >= length || sql.charAt(at) != ',') {
                 break;
             }
             at++;
         }
         return rows == 0 ? -1 : rows;
+    }
+
+    /** The index of the next character that is neither whitespace nor a comment. */
+    private static int skipBlanks(String sql, int at, boolean nestedComments,
+                                  boolean backslashEscapes, boolean hashComments,
+                                  boolean dollarQuotedStrings) throws IOException {
+        while(at < sql.length()) {
+            char c = sql.charAt(at);
+            if(c <= ' ') {
+                at++;
+                continue;
+            }
+            // Only a COMMENT is skipped here: skip() also steps over literals,
+            // and a literal where a tuple was expected ends the list rather than
+            // being passed over.
+            if(c == '-' || c == '/' || (hashComments && c == '#')) {
+                int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                        dollarQuotedStrings);
+                if(next > at) {
+                    at = next;
+                    continue;
+                }
+            }
+            return at;
+        }
+        return at;
     }
 
     /**
@@ -286,7 +334,13 @@ final class Placeholders {
             return end < 0 ? length : end + 1;
         }
         if(c == '"') {
-            return skipQuoted(sql, at, '"', false);
+            // A QUOTED IDENTIFIER on SQLite and PostgreSQL; on MySQL, in its
+            // default SQL mode, a STRING LITERAL with the same backslash escapes
+            // its single-quoted strings have. Scanned without them, SELECT
+            // "it\"s ?" ended at the escaped quote and the ? after it was
+            // counted as a parameter. The flag is only ever set for MySQL, so
+            // passing it here is right for all three.
+            return skipQuoted(sql, at, '"', backslashEscapes);
         }
         if(c == '`') {
             return skipQuoted(sql, at, '`', false);
