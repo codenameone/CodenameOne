@@ -1541,9 +1541,35 @@ public class InPlaceEditView extends FrameLayout{
     private static void releaseEdit() {
         if (sInstance != null) {
             ViewParent p = sInstance.getParent();
-            if (p != null) {
-                ((ViewGroup) p).removeView(sInstance);
+            if (p instanceof ViewGroup) {
+                try {
+                    ((ViewGroup) p).removeView(sInstance);
+                } catch (RuntimeException err) {
+                    // Detaching the EditText runs Editor.onDetachedFromWindow, which
+                    // unregisters an OnDrawListener the platform may already have
+                    // dropped. ViewTreeObserver.removeOnDrawListener then reaches
+                    // ArrayList.remove(-1), and an ArrayIndexOutOfBoundsException comes
+                    // back out of removeView -- entirely inside framework frames, with
+                    // this call the only one of ours on the stack.
+                    //
+                    // It takes two detach paths for one editor to line up, which is why
+                    // it is occasional rather than constant: the system back tears the
+                    // window down while the runnable that calls this is still queued.
+                    //
+                    // Nothing here can repair the platform's own bookkeeping, and the
+                    // view is being thrown away either way, so the only question this
+                    // answers is whether the application dies with it. It must not:
+                    // this runs on the Android UI thread, where an escaping exception
+                    // is an uncaught exception and the process goes -- taking the app
+                    // down for closing a form that had a text field on it.
+                    Log.e(TAG, "removeView threw while releasing the editor: "
+                            + err + " " + Log.getStackTraceString(err));
+                }
             }
+            // Cleared whether or not the detach threw. sInstance is what the caller
+            // tests before building a replacement, so leaving it set after a failed
+            // release wedges every later edit against a view that is already gone
+            // from the hierarchy.
             sInstance = null;
         }
     }
