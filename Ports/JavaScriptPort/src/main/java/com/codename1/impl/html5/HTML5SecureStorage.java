@@ -145,6 +145,25 @@ public final class HTML5SecureStorage extends SecureStorage {
         return b.toString();
     }
 
+    /// Whether one entry is PROVEN gone, which is not the same as `!exists(name)`.
+    ///
+    /// exists() answers a boolean and this port's implementation catches the IndexedDB
+    /// IOException and returns false, so every "did the delete happen" check here read a storage
+    /// FAILURE as a successful removal. Only a definite ABSENT is evidence that something went.
+    private static boolean definitelyGone(String name) {
+        return Storage.getInstance().entryState(name)
+                == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_ABSENT;
+    }
+
+    /// Whether one entry is PROVEN there.
+    ///
+    /// The mirror, for the guards that ask "is something already here" before writing. A false
+    /// from exists() let those proceed over an entry the store simply could not read.
+    private static boolean definitelyThere(String name) {
+        return Storage.getInstance().entryState(name)
+                == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_PRESENT;
+    }
+
     /// One entry, read past Storage's process-local cache.
     ///
     /// readObject answers that cache before it looks at storage and nothing another context
@@ -153,7 +172,11 @@ public final class HTML5SecureStorage extends SecureStorage {
     /// already taken. Another tab replacing the value was invisible, and the deletion at the end
     /// then removed the replacement, leaving only the encrypted copy of the value it superseded.
     private static Object readUncached(String name) {
-        if (!Storage.getInstance().exists(name)) {
+        // Answers null for an entry this port could not look up as well as for one that is not
+        // there, and every caller is safe with that: they all ask "is the plaintext still exactly
+        // what I set out with" before DELETING it, and a null fails that test, so an unreadable
+        // store defers the migration instead of destroying a value.
+        if (!definitelyThere(name)) {
             return null;
         }
         java.io.InputStream in = null;
@@ -343,7 +366,7 @@ public final class HTML5SecureStorage extends SecureStorage {
             // implementation catches the IndexedDB failure and returns. Answering true there told
             // the caller its secret had been written securely while the OLD one was still sitting
             // in browser storage as plaintext. remove() already checks this way.
-            if (Storage.getInstance().exists(legacyKey(account))) {
+            if (!definitelyGone(legacyKey(account))) {
                 Log.p("SecureStorage: the plaintext entry this replaced could not be removed",
                         Log.WARNING);
                 return false;
@@ -361,7 +384,12 @@ public final class HTML5SecureStorage extends SecureStorage {
         if (account == null) {
             return null;
         }
-        Object sealed = Storage.getInstance().readObject(encryptedKey(account));
+        // Uncached, for the reason the vault's metadata reads give: readObject answers this
+        // TAB's copy and nothing another tab writes can invalidate it, so once this tab had read
+        // an account it kept returning that plaintext however many times another tab replaced the
+        // value. A secure store shared by every tab on an origin cannot answer from one tab's
+        // memory.
+        Object sealed = readUncached(encryptedKey(account));
         if (sealed instanceof String) {
             // The cast is taken before the try rather than inside it: ParparVM does not throw
             // for a failed cast, so a cast under a catch is a handler that cannot run.
@@ -392,7 +420,7 @@ public final class HTML5SecureStorage extends SecureStorage {
             }
             return plaintext;
         }
-        Object legacy = Storage.getInstance().readObject(legacyKey(account));
+        Object legacy = readUncached(legacyKey(account));
         if (!(legacy instanceof String)) {
             // Read back through instanceof rather than a cast: a failed cast raises nothing
             // catchable on this runtime, and a storage entry that is not a string is a corrupt
@@ -409,7 +437,7 @@ public final class HTML5SecureStorage extends SecureStorage {
     /// rewrite the ciphertext that just failed -- and the entry has to stay exactly where it is
     /// until something can actually read the encrypted copy again.
     private String legacyValue(String account) {
-        Object legacy = Storage.getInstance().readObject(legacyKey(account));
+        Object legacy = readUncached(legacyKey(account));
         if (!(legacy instanceof String)) {
             return null;
         }
@@ -440,13 +468,19 @@ public final class HTML5SecureStorage extends SecureStorage {
             if (!(stillPlain instanceof String) || !value.equals(stillPlain)) {
                 return;
             }
-            if (Storage.getInstance().exists(encryptedKey(account))) {
+            // definitelyThere is the wrong test here and !definitelyGone is the right one: this
+            // guard exists to avoid overwriting an encrypted entry somebody else wrote, so an
+            // entry the store cannot read has to count as one that might be there.
+            if (!definitelyGone(encryptedKey(account))) {
                 return;
             }
             if (!Storage.getInstance().writeObject(encryptedKey(account), sealed)) {
                 return;
             }
-            Object verify = Storage.getInstance().readObject(encryptedKey(account));
+            // Uncached. writeObject populates the cache, so reading it back through readObject
+            // returned the object this method had just put there and the verification verified
+            // against itself -- it would have agreed with a write that never reached IndexedDB.
+            Object verify = readUncached(encryptedKey(account));
             if (!(verify instanceof String) || !value.equals(open(account, asString(verify)))) {
                 // The encrypted copy does not read back as the original. Leave the plaintext
                 // alone: it is the only correct copy there is.
@@ -496,7 +530,7 @@ public final class HTML5SecureStorage extends SecureStorage {
         // Checked, because deleteStorageFile cannot report anything: it returns void. A forgotten
         // key that is still there would leave entryState answering PRESENT for a key the caller
         // believes is gone, and ManagedKeys then refuses to generate a replacement.
-        return !storage.exists(encryptedKey(account)) && !storage.exists(legacyKey(account));
+        return definitelyGone(encryptedKey(account)) && definitelyGone(legacyKey(account));
     }
 
     public int entryState(String account) {
@@ -507,8 +541,23 @@ public final class HTML5SecureStorage extends SecureStorage {
         // A definite answer either way, which is what lets ManagedKeys generate a first key at
         // all: it refuses unless the store can say the entry is genuinely absent. Both namespaces
         // are consulted, so a half-migrated entry never reads as absent.
-        boolean present = storage.exists(encryptedKey(account)) || storage.exists(legacyKey(account));
-        return present ? ENTRY_PRESENT : ENTRY_ABSENT;
+        // Combined as three states, not two. exists() turns this port's IndexedDB IOException
+        // into false, so a transient failure for BOTH namespaces reported a definite ABSENT --
+        // and ManagedKeys.keyFor is entitled to act on that by generating a replacement key. If
+        // storage recovers before the create, the new key wins the gate with no legacy record to
+        // converge on, and the existing database is permanently unreadable. ABSENT is claimed
+        // only when both namespaces say so.
+        int encrypted = storage.entryState(encryptedKey(account));
+        int plaintext = storage.entryState(legacyKey(account));
+        if (encrypted == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_PRESENT
+                || plaintext == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_PRESENT) {
+            return ENTRY_PRESENT;
+        }
+        if (encrypted == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_ABSENT
+                && plaintext == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_ABSENT) {
+            return ENTRY_ABSENT;
+        }
+        return ENTRY_UNKNOWN;
     }
 
     public ProtectionReport protection() {
@@ -525,7 +574,9 @@ public final class HTML5SecureStorage extends SecureStorage {
     }
 
     public ProtectionReport protectionOf(String account) {
-        if (account != null && Storage.getInstance().exists(legacyKey(account))) {
+        // !definitelyGone and not exists: a lookup this port could not perform answered false,
+        // which reported the value as encrypted at rest when it may be sitting in the open.
+        if (account != null && !definitelyGone(legacyKey(account))) {
             // A plaintext entry that has not been migrated yet. Reporting the store's capability
             // here would say this value is encrypted when it is sitting in the open.
             //

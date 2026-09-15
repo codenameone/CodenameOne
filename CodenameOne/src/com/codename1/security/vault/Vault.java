@@ -1030,8 +1030,13 @@ public final class Vault {
                 byte[] plain = null;
                 try {
                     requireUnlocked();
-                    String stored = asString(Storage.getInstance().readObject(
-                            secretKey(secretName)));
+                    // Uncached. readObject answers this TAB's copy and nothing another tab
+                    // writes can invalidate it, so once this tab had read a secret it kept
+                    // decrypting that same ciphertext however many times another tab replaced the
+                    // value -- indefinitely, with the newer record sitting in storage. Every
+                    // metadata and device-record read here already goes past the cache for
+                    // exactly this reason; the secrets themselves did not.
+                    String stored = asString(readUncached(secretKey(secretName)));
                     if (stored == null) {
                         throw new VaultException(VaultError.KEY_MISSING,
                                 "no secret is stored under that name");
@@ -2183,7 +2188,10 @@ public final class Vault {
                         // REQUIRE_USER_VERIFICATION got an error AND lost the remembered unlock
                         // they already had -- the vault silently demoted to session-only by a
                         // call that failed.
-                        Object saved = Storage.getInstance().readObject(deviceRecordKey());
+                        // Uncached, like every other device-record read here: this is the
+                        // record the rollback below puts back, so reading a stale copy of it
+                        // would restore a record another tab had already replaced.
+                        Object saved = readUncached(deviceRecordKey());
                         try {
                             rememberNow(policy);
                         } catch (VaultException establishFailed) {

@@ -1315,6 +1315,68 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aSecretReplacedByAnotherTabIsNotServedFromThisOnesCache() throws Exception {
+        // Storage.readObject answers a PROCESS-LOCAL cache and nothing another context writes can
+        // invalidate it. Once this process had read a secret it went on decrypting that same
+        // ciphertext however many times another tab replaced the value -- indefinitely, with the
+        // newer record sitting in storage the whole time. Every metadata and device-record read
+        // in this class already goes past the cache for exactly this reason; the secrets
+        // themselves did not.
+        //
+        // The other tab is simulated by writing BENEATH Storage, straight to the implementation's
+        // output stream. A second Vault instance would not do: Storage is a singleton with one
+        // cache, so anything written through it updates the very cache the defect is about and
+        // the test passes whether or not the bug is present. That is what the first version of
+        // this did.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+
+        vault.putSecret("api", pw("first")).get();
+        String entry = secretEntryName(name);
+        String first = (String) Storage.getInstance().readObject(entry);
+        vault.putSecret("api", pw("second")).get();
+        String second = (String) Storage.getInstance().readObject(entry);
+        assertNotEquals(first, second, "the two ciphertexts must differ or this proves nothing");
+
+        // Back to the first value THROUGH Storage, so the cache holds it, and then the second
+        // value underneath, which is the state another tab's write leaves behind.
+        assertTrue(Storage.getInstance().writeObject(entry, first));
+        assertEquals("first", new String(vault.getSecret("api").get()),
+                "the read that proves the cache is warm with the old ciphertext");
+        writeBehindTheCache(entry, second);
+
+        assertEquals("second", new String(vault.getSecret("api").get()),
+                "the secret must come from storage, not from this process's cached copy");
+    }
+
+    /// The storage entry one secret lands in.
+    private static String secretEntryName(String vaultName) {
+        for (String entry : Storage.getInstance().listEntries()) {
+            if (entry.indexOf(vaultName) > 0 && entry.indexOf(".s.") > 0) {
+                return entry;
+            }
+        }
+        throw new IllegalStateException("no secret entry for " + vaultName);
+    }
+
+    /// Writes one entry straight to the implementation, which is what another browser tab does.
+    ///
+    /// Storage.writeObject would update this process's cache on the way past, and the cache is
+    /// precisely what is under test.
+    private static void writeBehindTheCache(String entry, String value) throws java.io.IOException {
+        java.io.OutputStream out = TestCodenameOneImplementation.getInstance()
+                .createStorageOutputStream(entry);
+        java.io.DataOutputStream data = new java.io.DataOutputStream(out);
+        try {
+            com.codename1.io.Util.writeObject(value, data);
+        } finally {
+            data.close();
+        }
+    }
+
+    @Test
     void aVaultWhoseRecordCannotBeLookedUpIsNotReportedAsUnenrolled() throws Exception {
         // The browser's storageFileExists catches the IndexedDB IOException and answers false, so
         // a transient refusal read as "this entry is not here" -- and for the vault's own
