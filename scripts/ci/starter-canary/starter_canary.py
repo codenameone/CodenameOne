@@ -59,7 +59,7 @@ AWKWARD = "Project O'Brien with spaces"
 # updated every time another one is added. These are the cheap, non-Apple
 # targets a canary has any reason to ask for.
 CHEAP_TARGETS = ("javascript", "windows_device", "windows_desktop",
-                 "linux_device", "android", "android_source")
+                 "linux_device", "android")
 
 
 class CanaryFailure(RuntimeError):
@@ -204,11 +204,15 @@ def check_launcher_bits(project, modes):
 def check_repositories(project):
     """A pinned release with no repository declared resolves nothing."""
     pom = (project / "pom.xml").read_text(encoding="utf-8", errors="replace")
-    version = None
-    match = re.search(r"<cn1\.version>\s*([^<\s]+)\s*</cn1\.version>", pom) \
-        or re.search(r"<codenameone\.version>\s*([^<\s]+)\s*</codenameone\.version>", pom)
-    if match:
-        version = match.group(1)
+    def prop(name):
+        found = re.search(r"<%s>\s*([^<\s]+)\s*</%s>" % (re.escape(name), re.escape(name)), pom)
+        return found.group(1) if found else None
+
+    version = prop("cn1.version") or prop("codenameone.version")
+    # The starter declares the Maven plugin through its own property. They are
+    # equal today, but they are separate knobs, and authenticating with the
+    # framework version would resolve a plugin coordinate that may not exist.
+    plugin_version = prop("cn1.plugin.version") or version
     missing = [
         block for block in ("repositories", "pluginRepositories")
         if f"<{block}>" not in pom
@@ -226,11 +230,12 @@ def check_repositories(project):
         )
     if version and version <= "7.0.267":
         log(f"WARNING: starter pins cn1 {version}, at or below the Maven Central freeze point")
-    log(f"repository declarations OK (pinned version: {version or 'unknown'})")
-    return version
+    log(f"repository declarations OK (cn1 {version or 'unknown'}, "
+        f"plugin {plugin_version or 'unknown'})")
+    return version, plugin_version
 
 
-def seed_token(project, mvn, email, token, version):
+def seed_token(project, mvn, email, token, plugin_version):
     """Headless build-client auth, so no browser OAuth is needed in CI.
 
     The goal writes into the java Preferences node the build client reads, so it
@@ -238,14 +243,14 @@ def seed_token(project, mvn, email, token, version):
     An unversioned groupId:artifactId:goal makes Maven resolve LATEST, which is
     precisely the sort of implicit resolution this canary exists to catch.
     """
-    if not version:
+    if not plugin_version:
         raise CanaryFailure(
-            "could not read the Codename One version out of the served starter pom, "
+            "could not read the Maven plugin version out of the served starter pom, "
             "so the build client cannot be authenticated with a pinned plugin."
         )
     run(
         [mvn, "-B", "-q",
-         f"com.codenameone:codenameone-maven-plugin:{version}:set-user-token",
+         f"com.codenameone:codenameone-maven-plugin:{plugin_version}:set-user-token",
          f"-Dtoken={token}", f"-Duser={email}"],
         cwd=project,
         what="cn1:set-user-token",
@@ -373,11 +378,17 @@ def check_target_is_cloud(project, target):
             f"{', '.join(sorted(set(offered))) or 'nothing recognisable'}."
         )
     body = text.split(marker, 1)[1][:400]
-    if "local-" in body:
+    built = re.search(r"codename1\.buildTarget=([A-Za-z0-9._-]+)", body)
+    resolved = built.group(1) if built else ""
+    # Two shapes never reach the server: an explicitly local target, and a
+    # *-source target, which generates an Android Studio or Xcode project on
+    # the user's machine. Both would leave the canary polling for a build that
+    # was never submitted and then blaming the starter.
+    if resolved.startswith("local-") or resolved.endswith("-source"):
         raise CanaryFailure(
-            f"'{target}' maps to a LOCAL build in the served {launcher.name} "
-            f"(buildTarget contains 'local-'), so it would never submit anything. "
-            "Point the canary at the launcher's cloud target instead."
+            f"'{target}' maps to '{resolved}' in the served {launcher.name}, which "
+            "builds or generates locally and never submits to the server. Point the "
+            "canary at one of the launcher's cloud targets instead."
         )
     log(f"'{target}' is a cloud target in the served {launcher.name}")
 
@@ -433,7 +444,7 @@ def main():
         log(f"unpacked to {project}")
 
         check_launcher_bits(project, modes)
-        version = check_repositories(project)
+        version, plugin_version = check_repositories(project)
         check_target_is_cloud(project, args.target)
 
         if args.skip_build:
@@ -445,7 +456,7 @@ def main():
                     "CN1_CANARY_TOKEN is not set; cannot authenticate the build client headlessly."
                 )
             mvn = find_maven(project)
-            seed_token(project, mvn, email, token, version)
+            seed_token(project, mvn, email, token, plugin_version)
             # Snapshot first: a free account keeps only its most recent build,
             # so "is there a new id" is the only safe way to spot this run's.
             known = {b.get("id") for b in list_builds(opener, base)}

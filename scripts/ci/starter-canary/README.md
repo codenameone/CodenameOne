@@ -47,9 +47,10 @@ python3 scripts/ci/starter-canary/starter_canary.py --target javascript
 ```
 
 The canary only accepts cheap, non-Apple targets (`javascript`,
-`windows_device`, `windows_desktop`, `linux_device`, `android`,
-`android_source`) — an allowlist rather than a blocklist, so a new Apple target
-cannot slip through by being added later.
+`windows_device`, `windows_desktop`, `linux_device`, `android`) — an allowlist
+rather than a blocklist, so a new Apple target cannot slip through by being
+added later. `*_source` and `xcode` are excluded too: they generate an IDE
+project locally and submit nothing.
 
 Target names are also not portable between launchers: the project archetype maps
 `javascript` to a **local** build and keeps a separate `javascript_cloud`, while

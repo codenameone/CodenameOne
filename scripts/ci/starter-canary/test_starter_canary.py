@@ -18,7 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import starter_canary as canary
 
 GOOD_POM = """<project>
-  <properties><cn1.version>7.0.269</cn1.version></properties>
+  <properties>
+    <cn1.plugin.version>7.0.269</cn1.plugin.version>
+    <cn1.version>7.0.269</cn1.version>
+  </properties>
   <repositories>
     <repository><id>cn1</id><url>https://repo.codenameone.com/maven2</url></repository>
   </repositories>
@@ -66,7 +69,7 @@ class StarterAssertions(unittest.TestCase):
     def test_healthy_starter_passes(self):
         project, modes = self.unpack(make_zip())
         canary.check_launcher_bits(project, modes)
-        self.assertEqual(canary.check_repositories(project), "7.0.269")
+        self.assertEqual(canary.check_repositories(project), ("7.0.269", "7.0.269"))
 
     def test_non_executable_launchers_fail(self):
         """Non-executable launchers: permission denied on the first documented command."""
@@ -157,6 +160,23 @@ class StarterAssertions(unittest.TestCase):
             self.unpack(buffer)
 
 
+class PomProperties(unittest.TestCase):
+    """The plugin version is its own property and must not be assumed equal."""
+
+    def test_plugin_version_read_independently(self):
+        pom = GOOD_POM.replace("<cn1.plugin.version>7.0.269</cn1.plugin.version>",
+                               "<cn1.plugin.version>7.0.271</cn1.plugin.version>")
+        directory = Path(tempfile.mkdtemp())
+        (directory / "pom.xml").write_text(pom)
+        self.assertEqual(canary.check_repositories(directory), ("7.0.269", "7.0.271"))
+
+    def test_plugin_version_falls_back_to_framework_version(self):
+        pom = GOOD_POM.replace("<cn1.plugin.version>7.0.269</cn1.plugin.version>", "")
+        directory = Path(tempfile.mkdtemp())
+        (directory / "pom.xml").write_text(pom)
+        self.assertEqual(canary.check_repositories(directory), ("7.0.269", "7.0.269"))
+
+
 class TargetGuards(unittest.TestCase):
     """Target names are not portable between launchers, so read the served one."""
 
@@ -175,12 +195,24 @@ class TargetGuards(unittest.TestCase):
         """The archetype maps `javascript` to local-javascript; catch it up front."""
         with self.assertRaises(canary.CanaryFailure) as caught:
             canary.check_target_is_cloud(self.launcher(self.LOCAL), "javascript")
-        self.assertIn("LOCAL build", str(caught.exception))
+        self.assertIn("local-javascript", str(caught.exception))
 
     def test_unknown_target_lists_what_is_offered(self):
         with self.assertRaises(canary.CanaryFailure) as caught:
             canary.check_target_is_cloud(self.launcher(self.CLOUD), "javascript_cloud")
         self.assertIn("javascript", str(caught.exception))
+
+    def test_source_target_rejected_before_the_long_poll(self):
+        """*-source generates an IDE project locally and submits nothing."""
+        text = ('function android_source {\n'
+                '  "$MVNW" "package" "-Dcodename1.buildTarget=android-source"\n}\n')
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.check_target_is_cloud(self.launcher(text), "android_source")
+        self.assertIn("android-source", str(caught.exception))
+
+    def test_source_targets_are_not_in_the_allowlist(self):
+        for target in ("android_source", "ios_source", "xcode"):
+            self.assertNotIn(target, canary.CHEAP_TARGETS, target)
 
     def test_apple_launcher_targets_are_not_in_the_allowlist(self):
         for target in ("ios", "ios_release", "ios_source", "xcode",

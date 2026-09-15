@@ -52,7 +52,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: python3 scripts/ci/starter-canary/test_starter_canary.py
+      - run: python scripts/ci/starter-canary/test_starter_canary.py
 
   canary:
     # Never talk to production from a pull request: forks get no secrets, and a
@@ -101,9 +101,12 @@ jobs:
         # where a trailing backslash does not continue a line, so python would
         # get a stray argument and the --target/--report lines would be run as
         # separate commands.
+        # `python`, not `python3`: this runs under Git Bash on the Windows
+        # runner, which provides no python3 shim, while setup-python puts
+        # `python` on PATH for every platform.
         shell: bash
         run: |
-          python3 scripts/ci/starter-canary/starter_canary.py \
+          python scripts/ci/starter-canary/starter_canary.py \
             --target "${{ github.event.inputs.target || 'javascript' }}" \
             ${{ github.event.inputs.skip_build == 'true' && '--skip-build' || '' }} \
             --report "${{ runner.temp }}/canary.json"
