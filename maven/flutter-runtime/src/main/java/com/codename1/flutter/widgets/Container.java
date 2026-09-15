@@ -41,7 +41,12 @@ import com.codename1.flutter.rendering.BoxConstraints;
  * ({@link com.codename1.flutter.Alignment}/{@link com.codename1.flutter.AlignmentDirectional},
  * {@link com.codename1.flutter.EdgeInsets}, {@link com.codename1.flutter.BoxDecoration}).</p>
  */
-public class Container extends Widget {
+/// Implements {@link HasChild} so the widget walkers can see THROUGH it.
+/// A button consumes its content rather than mounting it, and the walk that finds that
+/// content stops at any wrapper it cannot open: Shrine's login buttons wrap their label
+/// in a Padding, and both rendered with no label at all -- the row collapsed to a blob
+/// where the reference reads CANCEL and NEXT.
+public class Container extends Widget implements HasChild {
 
     private Object alignment;
     private Object padding;

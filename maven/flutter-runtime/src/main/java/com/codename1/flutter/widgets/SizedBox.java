@@ -33,7 +33,12 @@ import com.codename1.flutter.rendering.Size;
  * it is a fixed-size spacer; with a child it tightens the child to the given
  * dimensions.
  */
-public class SizedBox extends Widget {
+/// Implements {@link HasChild} so the widget walkers can see THROUGH it.
+/// A button consumes its content rather than mounting it, and the walk that finds that
+/// content stops at any wrapper it cannot open: Shrine's login buttons wrap their label
+/// in a Padding, and both rendered with no label at all -- the row collapsed to a blob
+/// where the reference reads CANCEL and NEXT.
+public class SizedBox extends Widget implements HasChild {
 
     private Double width;
     private Double height;

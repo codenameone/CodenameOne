@@ -31,7 +31,12 @@ import com.codename1.flutter.Widget;
 /**
  * Insets its child by the given edge padding (logical pixels).
  */
-public class Padding extends Widget {
+/// Implements {@link HasChild} so the widget walkers can see THROUGH it.
+/// A button consumes its content rather than mounting it, and the walk that finds that
+/// content stops at any wrapper it cannot open: Shrine's login buttons wrap their label
+/// in a Padding, and both rendered with no label at all -- the row collapsed to a blob
+/// where the reference reads CANCEL and NEXT.
+public class Padding extends Widget implements HasChild {
 
     private EdgeInsets padding;
     private Widget child;
