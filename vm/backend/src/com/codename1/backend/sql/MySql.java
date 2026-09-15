@@ -76,8 +76,40 @@ public final class MySql {
      */
     private volatile boolean closed;
 
+    /**
+     * Whether the server that answered is MariaDB rather than MySQL.
+     *
+     * <p>Read from the handshake banner, because the two do not offer the same
+     * collations and the URL scheme cannot be trusted to say which is there --
+     * a mysql:// URL points at a MariaDB server perfectly often. See
+     * Dialect.MARIADB.
+     */
+    private boolean mariaDb;
+
+    /**
+     * Whether {@code haystack} holds {@code needle}, folding ASCII case by hand.
+     *
+     * <p>String.toLowerCase is locale sensitive and this runtime has no Locale
+     * to ask for the root one, so on a Turkish device the I of "MariaDB" folds
+     * to a dotless i and the marker stops matching.
+     */
+    private static boolean containsIgnoreCaseAscii(String haystack, String needle) {
+        int limit = haystack.length() - needle.length();
+        for(int at = 0 ; at <= limit ; at++) {
+            if(haystack.regionMatches(true, at, needle, 0, needle.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private MySql(Wire wire) {
         this.wire = wire;
+    }
+
+    /** See {@link #mariaDb}. */
+    public boolean isMariaDb() {
+        return mariaDb;
     }
 
     /**
@@ -119,7 +151,13 @@ public final class MySql {
         if(protocol != 10) {
             throw new IOException("Unsupported MySQL handshake protocol " + protocol);
         }
-        reader.cString(); // server version
+        // KEPT, not discarded: MariaDB and MySQL differ in which collations they
+        // have, and the URL scheme is not the answer -- mysql:// points at a
+        // MariaDB server perfectly often. The banner is the server's own word
+        // for what it is. MariaDB 10.x sends "5.5.5-10.11.19-MariaDB" for the
+        // benefit of old clients, so the marker is looked for anywhere in it.
+        String banner = reader.cString();
+        mariaDb = banner != null && containsIgnoreCaseAscii(banner, "mariadb");
         reader.skip(4);   // connection id
         byte[] scrambleFirst = reader.bytes(8);
         reader.skip(1);   // filler
