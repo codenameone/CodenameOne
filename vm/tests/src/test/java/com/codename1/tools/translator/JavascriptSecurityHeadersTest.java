@@ -253,6 +253,45 @@ class JavascriptSecurityHeadersTest {
     }
 
     @Test
+    void framesGetTheirOwnDirectiveBecauseChildSrcOnlyActsWhenFrameSrcIsAbsent() throws Exception {
+        // The printing bridge puts a PDF into an iframe through a blob: URL it made itself, and
+        // child-src governs frames only while no frame-src exists -- so under child-src 'self'
+        // alone a browser that does not match blob: through 'self' blocked the navigation and
+        // printing timed out reporting success.
+        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate(), "");
+        assertEquals("frame-src 'self' blob:", clause(csp, "frame-src"));
+        // And the blob concession is confined to frames: a blob WORKER is how injected script
+        // escapes script-src, so worker-src keeps refusing them.
+        assertEquals("worker-src 'self'", clause(csp, "worker-src"));
+    }
+
+    @Test
+    void theShippedPageCarriesNoInlineStyleAttribute() throws Exception {
+        // A style="" attribute is inline CSS with no hash that can authorize it, so a page
+        // carrying one cannot be served under this policy without 'unsafe-inline' in style-src --
+        // which would also authorize every injected <style>. The page hides its progress bar
+        // from the stylesheet instead, which is why the policy below needs no concession at all.
+        String html = indexTemplate();
+        assertTrue(html.indexOf("style=\"") < 0 && html.indexOf("style='") < 0,
+                "the shipped page must not use an inline style attribute");
+        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(html, "");
+        assertTrue(csp.indexOf("'unsafe-inline'") < 0,
+                "no inline-style concession should be needed: " + clause(csp, "style-src"));
+    }
+
+    @Test
+    void theGuidanceNamesWhatVideoRecordingNeeds() throws Exception {
+        // Two concessions the build cannot decide for the developer, because nothing in a
+        // compiled application says whether it records video. Listed rather than granted.
+        String readme = JavascriptSecurityHeaders.readme(
+                JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate(), ""));
+        assertTrue(readme.indexOf("cdn.jsdelivr.net") > 0 && readme.indexOf("unpkg.com") > 0,
+                "the muxer origins VideoIO fetches from must be named");
+        assertTrue(readme.indexOf("worker-src 'self' blob:") > 0,
+                "and the blob worker allowance RecordRTC's fallbacks need");
+    }
+
+    @Test
     void theWasmConcessionIsNarrowAndEvalIsNotGranted() throws Exception {
         String csp = JavascriptSecurityHeaders.contentSecurityPolicy(indexTemplate(), "");
         // The port's SQLite is WebAssembly, so this one is unavoidable.

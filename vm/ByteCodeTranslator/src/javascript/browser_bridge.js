@@ -3038,6 +3038,11 @@
     if (!s || !s.canvas || !el) {
       return null;
     }
+    // These are CSSOM property writes, not inline CSS, and a generated Content-Security-Policy
+    // does not govern them: style-src covers <style> elements and style="" attributes, and the
+    // spec has no hook in CSSStyleDeclaration's setters. A review round read this as blocked
+    // under the generated policy; the thing that really was blocked was the style="" attribute
+    // the page itself carried, which index.html now sets from its stylesheet instead.
     if (r.cssWidth != null && s.canvas.style) {
       s.canvas.style.width = r.cssWidth;
     }

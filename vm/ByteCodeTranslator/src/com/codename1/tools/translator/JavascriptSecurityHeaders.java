@@ -146,6 +146,14 @@ final class JavascriptSecurityHeaders {
                 // how injected script most easily escapes a script-src that would otherwise hold.
                 + "worker-src 'self'; "
                 + "child-src 'self'; "
+                // frame-src, explicitly, because child-src is what governs frames only while no
+                // frame-src is present -- and the printing bridge puts a PDF or other non-image
+                // document into an iframe through a blob: URL it created itself. Under
+                // child-src 'self' alone a browser that does not match blob: through 'self'
+                // blocks that navigation, the iframe never loads, and printing times out
+                // reporting success. blob: here is narrower than it looks: a blob URL is
+                // same-origin and opaque, and script-src still governs anything inside it.
+                + "frame-src 'self' blob:; "
                 // data: for the canvas and for generated images; the port creates blob URLs for
                 // media it decodes itself.
                 + "img-src 'self' data: blob:; "
@@ -401,7 +409,7 @@ final class JavascriptSecurityHeaders {
                 + "</IfModule>\n";
     }
 
-    private static String readme(String csp) {
+    static String readme(String csp) {
         return "# Deploying this application securely\n"
                 + "\n"
                 + "## Nothing here is active until you activate it\n"
@@ -437,6 +445,37 @@ final class JavascriptSecurityHeaders {
                 + "\n"
                 + "The same applies to `frame-src` for an embedded `BrowserComponent` pointing at\n"
                 + "another site, and to `img-src` / `media-src` for assets loaded from a CDN.\n"
+                + "\n"
+                + "## Two features need the policy widened, and the build cannot tell whether\n"
+                + "you use them\n"
+                + "\n"
+                + "Both are in `VideoIO` recording. Nothing in a compiled application declares\n"
+                + "that it records video, and both concessions are ones every other application\n"
+                + "is better off without, so they are listed here rather than granted by\n"
+                + "default.\n"
+                + "\n"
+                + "**Recording to MP4 or WebM** fetches its muxer from a CDN at the moment it\n"
+                + "is first needed, so `script-src 'self'` blocks it and recording fails with\n"
+                + "\"Unable to load VideoIO dependency\". Either authorize the origins:\n"
+                + "\n"
+                + "```\n"
+                + "script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com;\n"
+                + "```\n"
+                + "\n"
+                + "or -- better, because it removes a third party from your runtime rather than\n"
+                + "authorizing one -- vendor `mp4-muxer` and `webm-muxer` into the application\n"
+                + "and serve them from your own origin, where the default already allows them.\n"
+                + "\n"
+                + "**The RecordRTC fallback paths** (merging audio, Whammy and GIF encoding)\n"
+                + "build their workers from `blob:` URLs, which `worker-src 'self'` blocks:\n"
+                + "\n"
+                + "```\n"
+                + "worker-src 'self' blob:;\n"
+                + "```\n"
+                + "\n"
+                + "This one is a real loosening and is left out by default deliberately: a blob\n"
+                + "worker is the easiest way for injected script to escape a `script-src` that\n"
+                + "would otherwise hold it, so grant it only if you record video.\n"
                 + "\n"
                 + "## HTTPS is not optional\n"
                 + "\n"
