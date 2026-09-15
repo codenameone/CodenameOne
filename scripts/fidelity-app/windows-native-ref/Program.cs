@@ -209,12 +209,15 @@ public partial class App : Application
     [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+    [DllImport("user32.dll")] private static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 
     private const uint SPI_SETFOREGROUNDLOCKTIMEOUT = 0x2001;
     private const uint SPIF_SENDCHANGE = 0x02;
     private const uint WM_CLOSE = 0x0010;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP = 0x0004;
+    private const byte VK_ESCAPE = 0x1B;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
     [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(POINT p);
     [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
 
@@ -359,9 +362,26 @@ public partial class App : Application
             atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
             if (atCentre != hwnd)
             {
+                // Clear it and re-check rather than giving up. Start and Search both close on
+                // Esc, and the previous run failed here for a self-inflicted reason -- the
+                // activation click had landed on the taskbar and opened Start, which then
+                // covered the window.
+                Console.WriteLine($"NATIVEREF:INFO 0x{atCentre.ToInt64():X} "
+                    + $"({DescribeWindow(atCentre)}) came over the window after activating; "
+                    + "dismissing");
+                keybd_event(VK_ESCAPE, 0, 0, UIntPtr.Zero);
+                keybd_event(VK_ESCAPE, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                await Task.Delay(500);
+                BringWindowToTop(hwnd);
+                await Task.Delay(300);
+                atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
+            }
+            if (atCentre != hwnd)
+            {
                 _occluded = true;
                 _blockers.Add($"activating let 0x{atCentre.ToInt64():X} "
-                    + $"({DescribeWindow(atCentre)}) back over the window");
+                    + $"({DescribeWindow(atCentre)}) back over the window, and it would not "
+                    + "dismiss");
                 return;
             }
             await Task.Delay(300);
@@ -491,11 +511,26 @@ public partial class App : Application
         // The point is inside our client area but far from the widgets, so the click lands
         // on empty background: activating the window must not also press the control being
         // photographed.
-        if (GetWindowRect(hwnd, out RECT wr))
+        // The click point comes from the CLIENT rect, not the window rect, and is verified to
+        // belong to us before any button goes down. Computed from the window rect at four
+        // fifths down, the previous attempt landed on the TASKBAR and opened the Start menu --
+        // which then covered the window. Activating by clicking is only safe if you know what
+        // you are clicking on.
+        GetClientRect(hwnd, out RECT clientR);
+        var clientTopLeft = new POINT { X = 0, Y = 0 };
+        ClientToScreen(hwnd, ref clientTopLeft);
+        if (clientR.Right > clientR.Left && clientR.Bottom > clientR.Top)
         {
-            int cx = wr.Left + (wr.Right - wr.Left) * 4 / 5;
-            int cy = wr.Top + (wr.Bottom - wr.Top) * 4 / 5;
-            Console.WriteLine($"NATIVEREF:INFO clicking empty background at {cx},{cy} to activate "
+            int cx = clientTopLeft.X + (clientR.Right - clientR.Left) * 3 / 4;
+            int cy = clientTopLeft.Y + (clientR.Bottom - clientR.Top) / 2;
+            IntPtr atClick = GetAncestor(WindowFromPoint(new POINT { X = cx, Y = cy }), GA_ROOT);
+            if (atClick != hwnd)
+            {
+                Console.WriteLine($"NATIVEREF:WARN not clicking: {cx},{cy} belongs to "
+                    + $"0x{atClick.ToInt64():X} ({DescribeWindow(atClick)}), not to us");
+                return GetForegroundWindow() == hwnd;
+            }
+            Console.WriteLine($"NATIVEREF:INFO clicking our own client area at {cx},{cy} to activate "
                 + $"(foreground was {DescribeForegroundWindow()})");
             SetCursorPos(cx, cy);
             await Task.Delay(120);
@@ -503,6 +538,12 @@ public partial class App : Application
             await Task.Delay(60);
             mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
             await Task.Delay(500);
+
+            // Escape first, in case the desktop popped Start or Search. Those are the two
+            // surfaces that keep taking the foreground on this image, and both close on Esc.
+            keybd_event(VK_ESCAPE, 0, 0, UIntPtr.Zero);
+            keybd_event(VK_ESCAPE, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            await Task.Delay(300);
 
             // Retry the API after the click. SetForegroundWindow is allowed when the calling
             // process received the last input event, which a real click is -- so the attempt
