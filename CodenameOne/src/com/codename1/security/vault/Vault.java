@@ -1872,7 +1872,20 @@ public final class Vault {
                     // key this record describes. A failure here is reported rather than
                     // swallowed: the device is enrolled, but not under the policy that was asked
                     // for, and the caller has to know that.
-                    if (options.getPolicy() != UnlockPolicy.SESSION_ONLY) {
+                    if (options.getPolicy() == UnlockPolicy.SESSION_ONLY) {
+                        // A session-only import over a vault that already has a remembered
+                        // mechanism has to REMOVE it, not merely decline to add one. Skipping
+                        // straight past this left the old device record and its key in place, so
+                        // the import reported success while getPolicy() still answered the
+                        // previous remembering policy and unlockRemembered still opened the vault
+                        // without a password -- the opposite of what the caller configured.
+                        DeviceRecord standing = deviceRecord();
+                        if (standing != null) {
+                            Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                            requireKeyDeleted(deviceProtection(standing.policy),
+                                    "the previous device key could not be deleted");
+                        }
+                    } else {
                         try {
                             rememberNow(options.getPolicy());
                         } catch (RuntimeException rememberFailed) {

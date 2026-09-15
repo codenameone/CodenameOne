@@ -72,8 +72,17 @@ public class SecureStorageDeviceProtection extends DeviceProtection {
         ProtectionReport.Builder b = ProtectionReport.builder();
         // Asked of the store rather than assumed: the base SecureStorage returns ENTRY_UNKNOWN
         // for everything, which is exactly the platform that must not be described as protected.
+        // Two questions, and entryState answers only the first: whether this store can be
+        // consulted at all. Whether it can KEEP anything is what PERSISTENT means, and a store
+        // can answer the first and say no to the second -- Linux without a reachable Secret
+        // Service reports PERSISTENT=NO from protection() while entryState still answers
+        // ENTRY_ABSENT by looking at ordinary token storage. Taking hasStore for the answer made
+        // VaultCapabilities offer REMEMBER_DEVICE on a headless or keyring-less session where
+        // every attempt to create the device key fails.
         boolean hasStore = store.entryState(account("cn1.probe")) != SecureStorage.ENTRY_UNKNOWN;
-        b.set(Protection.PERSISTENT, hasStore);
+        boolean persists = hasStore
+                && store.protection().answer(Protection.PERSISTENT) != ProtectionReport.NO;
+        b.set(Protection.PERSISTENT, persists);
         // Asked of the store, not inferred from the fact that one exists. "A store answered"
         // and "that store encrypts" are different questions, and two ports answer NO to the
         // second on purpose: the JavaSE simulator, where this is reproducible obfuscation, and
@@ -81,7 +90,7 @@ public class SecureStorageDeviceProtection extends DeviceProtection {
         // hasStore let a remembered vault that required ENCRYPTED_AT_REST pass policy
         // enforcement on exactly those two. A store that says nothing still answers NO here,
         // which is the right default: an unproven store must not be described as protected.
-        b.set(Protection.ENCRYPTED_AT_REST, hasStore
+        b.set(Protection.ENCRYPTED_AT_REST, persists
                 && store.protection().answer(Protection.ENCRYPTED_AT_REST) == ProtectionReport.YES);
         // The key is bytes this class can read back, by construction. Saying otherwise would be
         // the single most misleading thing this file could do.

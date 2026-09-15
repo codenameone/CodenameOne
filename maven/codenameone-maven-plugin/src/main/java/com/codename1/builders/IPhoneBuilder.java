@@ -3394,7 +3394,13 @@ public class IPhoneBuilder extends Executor {
         // The default is deliberately not "false" here -- an unset hint has to be distinguishable
         // from one deliberately turned off.
         String gcmHint = request.getArg("ios.crypto.gcm", "");
-        if (vaultUnknown && !"true".equals(gcmHint) && !"false".equals(gcmHint)) {
+        // Only while the answer is actually open. An unreadable class or a refused archive
+        // can be scanned BEFORE a perfectly readable one that uses Vault, and then both
+        // flags are set -- at which point there is nothing ambiguous left to ask about and
+        // the expression below enables GCM anyway. Stopping the build there would fail a
+        // known vault application over unrelated input it happens to carry.
+        if (vaultUnknown && !usesVault
+                && !"true".equals(gcmHint) && !"false".equals(gcmHint)) {
             throw new BuildException("Part of this application could not be scanned (see the "
                     + "scan budget warning above), so the build cannot tell whether it uses "
                     + "com.codename1.security.vault. Set codename1.arg.ios.crypto.gcm=true if it "

@@ -2177,6 +2177,33 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aSessionOnlyImportRemovesAnExistingRememberedMechanism() {
+        // A session-only import over a vault that already has a remembered mechanism has to
+        // REMOVE it, not merely decline to add one. Skipping past left the old device record and
+        // its key in place, so the import reported success while getPolicy() still answered the
+        // previous policy and unlockRemembered still opened the vault without a password.
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault origin = Vault.named(freshName()).configure(remember);
+        origin.enroll(pw("p"), remember).get();
+
+        String name = freshName();
+        Vault joined = Vault.named(name).configure(remember);
+        assertTrue(joined.importSyncState(origin.exportSyncState(), pw("p")).get().booleanValue());
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, joined.getPolicy());
+
+        // The same device, refreshed by a caller configured session-only.
+        Vault sessionOnly = Vault.named(name).configure(fast());
+        assertTrue(sessionOnly.importSyncState(origin.exportSyncState(), pw("p")).get()
+                .booleanValue());
+        assertEquals(UnlockPolicy.SESSION_ONLY, sessionOnly.getPolicy(),
+                "a session-only import must not leave the old policy reported");
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()),
+                "and must not leave a mechanism that reopens the vault without a password");
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

@@ -728,14 +728,52 @@
   }
 
   function cn1VaultPrfCapable() {
-    // Presence of the API only. Whether a given authenticator implements the
-    // PRF extension is discoverable solely by performing a ceremony, so this
-    // bit says "worth offering", never "supported" -- the Java side treats it
-    // the same way.
+    // Presence of the API, plus the one PRF signal a browser exposes without a
+    // ceremony. Whether a given AUTHENTICATOR implements the extension is still
+    // only discoverable by performing one -- so this bit says "worth offering"
+    // rather than "supported", and the Java side treats it the same way.
+    //
+    // What it must not do is say yes on a browser that has WebAuthn and no PRF
+    // at all: that set CAP_WEBAUTHN_PRF, VaultCapabilities then advertised
+    // REQUIRE_USER_VERIFICATION, applications offered a policy to the user, and
+    // enrolment failed later when the ceremony came back with no prf.enabled.
+    // getClientCapabilities is the browser saying so up front where it exists.
     var w = global.window || global;
-    return !!(w.PublicKeyCredential && typeof w.PublicKeyCredential === 'function'
-      && w.navigator && w.navigator.credentials);
+    if (!(w.PublicKeyCredential && typeof w.PublicKeyCredential === 'function'
+        && w.navigator && w.navigator.credentials)) {
+      return false;
+    }
+    var caps = cn1VaultCachedClientCapabilities;
+    if (caps && typeof caps === 'object') {
+      // Present and false is a definite no; absent means the browser does not
+      // report this, and the ceremony stays the only way to find out.
+      if (caps.extensionPrf === false || caps['extension:prf'] === false) {
+        return false;
+      }
+    }
+    return true;
   }
+
+  // Filled in once, if the browser offers it. getClientCapabilities is async and
+  // this predicate is not, so the answer is fetched when the bridge loads and
+  // read here; before it arrives the predicate behaves exactly as it did, which
+  // is the pre-existing "worth offering" answer rather than a new false negative.
+  var cn1VaultCachedClientCapabilities = null;
+  (function () {
+    try {
+      var w = global.window || global;
+      if (w.PublicKeyCredential
+          && typeof w.PublicKeyCredential.getClientCapabilities === 'function') {
+        w.PublicKeyCredential.getClientCapabilities().then(function (caps) {
+          cn1VaultCachedClientCapabilities = caps;
+        }, function () {
+          // Unsupported or refused; the ceremony remains the only signal.
+        });
+      }
+    } catch (ignored) {
+      // Nothing here may prevent the bridge from loading.
+    }
+  })();
 
 
   // --------------------------------------------------------------------------
