@@ -1713,11 +1713,37 @@ Gates: `run-gauntlet.sh` GREEN (15 tortures byte-identical to JDK 25, both GC st
 modes); self-hosting Gate D PASS, **Gate A PASS -- 798 files byte-identical**, negative
 control PASS.
 
-**No wall-clock figure is quoted, and that is deliberate.** Every attempt to measure fell
-on a host with `fileproviderd` and `bird` between them burning ~130% CPU and a load
-average near 10. This file's own rule -- run `uptime` first, and this box cannot resolve
-5% -- makes any number taken there worthless. The codegen change is verified; the timing
-is not, and must be taken on a quiet machine before anything is claimed for it.
+### What it is worth: 1.71x on the shape it governs
+
+`ForEachBench` is deliberately narrow -- 400 passes over a 20,000-element ArrayList, so
+`next()` is the overwhelming majority of the work. A whole-program ratio cannot resolve a
+change to one method on this host, so the driver makes the method the program.
+
+Interleaved, each binary reporting its own min of 12 inner reps, 7 rounds, at load
+average 4.9:
+
+| arm | ms | |
+|---|---:|---|
+| before (framed `next()`) | 128-129 | |
+| after (frameless `next()`) | **75** | **1.71x** |
+| JDK 25, same source | 21 | |
+
+**7 of 7 rounds identical to +/-1ms, a 0.8% spread.** That is what makes the figure
+usable on a host that cannot normally resolve 5%: the effect is 71%, two orders of
+magnitude outside the round-to-round noise, and the arms were interleaved rather than run
+back to back.
+
+The JDK 25 column is the part worth acting on. **This shape went from 6.13x JDK 25 to
+3.57x**, and the residual is not frame overhead any more -- it is that HotSpot's escape
+analysis deletes the iterator object outright and iterates the backing array, which is
+exactly the specialization this round's `ForEachT` gate was written for. Removing a frame
+from `next()` cannot reach that; not calling `next()` at all can.
+
+**No whole-program figure is quoted, and that is deliberate.** The self-hosting corpus
+ratio is a few percent question on a box this file's own rule says cannot resolve 5%, and
+every window available had `fileproviderd` and `bird` between them burning ~130% CPU at a
+load average near 10. The microbenchmark survives that because of its effect size; a
+whole-program A/B would not, and has to wait for a quiet machine.
 
 ### Withdrawn in the same round: folding javac's synthetic accessors
 
