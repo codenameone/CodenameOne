@@ -46,6 +46,20 @@ APP_ROOTS = [
     os.path.join(ROOT, 'Ports', 'CLDC11', 'src'),
 ]
 # Every source the repository holds, which is where the foreign names live.
+# Where a word can earn its place as a real name rather than a typo. Wider
+# than the published sources on purpose: the guide names NSObject, UIView,
+# HKSampleQuery and NSLocale, and what tells those from a misspelling is that
+# the ports and the tooling really use them.
+#
+# The workflow does not trigger on all of these, and deliberately. This set
+# only ever SUPPRESSES a finding -- a word is reported when it is NOT vouched
+# for -- so a change here that runs without this job cannot let a dead link or
+# a misspelling through. Removing the last use of a name can only make the
+# next run report MORE, which is visible and cheap to answer. The half that
+# could go stale silently is the link index, and that reads APP_ROOTS, both of
+# which the workflow watches. Triggering on Ports/**, vm/** and maven/**
+# instead would run this job -- maven install, the demo build and the
+# screenshots -- for nearly every change in the repository.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                     for d in ('CodenameOne', 'Ports', 'vm', 'maven')]
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
