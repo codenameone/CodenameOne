@@ -2080,6 +2080,74 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRotationLockedDuringItsRewrapLeavesNoDeviceRecord() throws Exception {
+        // rememberNow snapshots the data key it was handed, and lock() zeroes that same array in
+        // place -- so a store that prompts can come back to find it wrapping zeroes. It then
+        // unwraps zeroes for its own read-back check, agrees with itself, and writes a device
+        // record of the right key VERSION holding nothing. Every later remembered unlock fails
+        // metadata authentication and nothing says why.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+
+        VaultError outcome = whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        return errorOf(vault.rotateDataKey(pw("p")));
+                    }
+                },
+                new Runnable() {
+                    public void run() {
+                        vault.lock();
+                    }
+                });
+
+        // The rotation itself is committed and stays reported as done -- that is deliberate, and
+        // aRotationThatCannotRewrapTheDeviceKeyStillReportsSuccess is why.
+        assertNull(outcome, "the rotation was committed before the rewrap was attempted");
+        // What must NOT survive is a device wrap made after the key was zeroed.
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()),
+                "a wrap built from a zeroed key must not be left behind to fail later");
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue(),
+                "and the password still opens the rotated vault");
+    }
+
+    @Test
+    void aDestructionVerifiesAgainstStorageAsItIsNotAsItWas() {
+        // The deletion loop walks a snapshot, and another context can store a secret after it was
+        // taken -- a second browser tab holding the same key. Verifying against that snapshot
+        // confirmed the entries this call knew about while the new one stayed on disk, under a
+        // report that everything local had been destroyed.
+        String name = freshName();
+        final Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        // A sibling name that does NOT exist when the snapshot is taken -- resolving it the
+        // usual way would create it, which puts it IN the snapshot and makes the test agree with
+        // the defect. The prefix comes from a real entry; the suffix is one nothing has written.
+        String probe = secretEntryName(vault, "probe");
+        final String late = probe.substring(0, probe.length() - "probe".length()) + "latecomer";
+        assertFalse(Storage.getInstance().exists(late), "the late entry must not exist yet");
+
+        // Written between the snapshot and the verification, which is what the other tab does.
+        TestCodenameOneImplementation.getInstance().setDuringStorageDelete(
+                vaultRecordName(name),
+                new Runnable() {
+                    public void run() {
+                        TestCodenameOneImplementation.getInstance()
+                                .putStorageEntry(late, encodeStorageString("ff00"));
+                    }
+                });
+        try {
+            assertEquals(VaultError.STORAGE_UNAVAILABLE, errorOf(vault.destroyLocalData()),
+                    "a secret that appeared during the deletion must not be reported as gone");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setDuringStorageDelete(null, null);
+        }
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

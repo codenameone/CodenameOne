@@ -853,7 +853,7 @@ public final class Vault {
                         storage.deleteStorageFile(deviceRecordKey());
                         storage.deleteStorageFile(metadataKey());
                         forgetEveryMechanism();
-                        requireEverythingGone(storage, entries, prefix);
+                        requireEverythingGone(storage, prefix);
                     } finally {
                         // In a finally, because once ANY of that has happened the live key and
                         // cached record describe a vault that is no longer on disk. A device key
@@ -1651,6 +1651,21 @@ public final class Vault {
                         // actually in. A caller that cares re-establishes it with remember(...).
                         try {
                             rememberNow(remembered.policy);
+                            // A lock landing inside that is worse than a failure, because it
+                            // SUCCEEDS. rememberNow snapshots the data key it was handed and
+                            // lock() zeroes that same array in place, so a store that prompts --
+                            // a passkey, a keystore with user verification -- can return to find
+                            // it wrapping zeroes. It then unwraps zeroes for its own read-back
+                            // check, agrees with itself, and writes a device record of the right
+                            // key VERSION holding nothing. Every later remembered unlock then
+                            // fails metadata authentication, and nothing reports why.
+                            //
+                            // The record goes, on the same reasoning as the catch below: the
+                            // rotation is committed and stays reported as done, and what is
+                            // discarded is a wrap that cannot open anything.
+                            if (generation != lockGeneration) {
+                                Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                            }
                         } catch (RuntimeException rewrapFailed) {
                             Storage.getInstance().deleteStorageFile(deviceRecordKey());
                         }
@@ -2698,9 +2713,21 @@ public final class Vault {
     /// the password still opens, on a call whose entire contract is that it is gone. Checked
     /// rather than assumed, the same way removeSecret answers with exists() instead of with the
     /// fact that it asked.
-    private void requireEverythingGone(Storage storage, String[] entries, String prefix) {
+    private void requireEverythingGone(Storage storage, String prefix) {
         StringBuilder left = new StringBuilder();
-        for (String entry : entries) {
+        // Re-enumerated, not the array the deletion loop walked. Another context can store a
+        // secret after that snapshot was taken -- a second browser tab holding the same key --
+        // and verifying against the snapshot would confirm the entries this call knew about
+        // while the new one stayed on disk, readable by that tab, under a report that everything
+        // local had been destroyed. What this cannot do is stop a write that lands after the
+        // check; it closes the window between the snapshot and the verification, which is the
+        // whole of the deletion, rather than an instant.
+        String[] now = storage.listEntries();
+        if (now == null) {
+            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                    "this device's storage could not be enumerated to confirm the deletion");
+        }
+        for (String entry : now) {
             if (entry != null && entry.startsWith(prefix) && storage.exists(entry)) {
                 left.append(left.length() == 0 ? "" : ", ").append("a secret");
                 break;
