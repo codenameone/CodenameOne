@@ -162,6 +162,15 @@ public final class DesktopTileRunner {
     /// of the value. Restyle a theme's background and the measurement follows; a
     /// second copy in the YAML would go stale silently and in the direction that
     /// looks like success.
+    /// Known limitation, recorded here because the number it produces looks fine:
+    /// Fluent's light control fill (#FBFBFB) is 8 levels off its page surface (#F3F3F3),
+    /// under the comparator's 10-per-channel content tolerance. So on Fluent light tiles
+    /// the mask sees the button's BORDER and TEXT and not its fill, and the reported
+    /// geometry bbox is the text's, not the control's. It does not bias the fidelity
+    /// score -- the native Fluent button is the same two colours, so both sides mask
+    /// identically -- but do not read a Fluent light width_ratio as a control width.
+    /// Adwaita is tighter still at 5. Lowering the tolerance is not the fix; it would
+    /// start counting anti-aliasing as content everywhere else.
     private static int tileBackground() {
         return UIManager.getInstance().getComponentStyle("Form").getBgColor();
     }
@@ -189,6 +198,19 @@ public final class DesktopTileRunner {
     private static boolean renderTile(ComponentSpec c, String state, String appearance,
                                       int w, int h, File outDir) throws Exception {
         Form f = new Form(new BorderLayout());
+        // A Form always builds a title area, and it is NOT free here. The desktop tile
+        // contract is "the widget at its natural size, anchored top-left on the theme's
+        // surface"; an unhidden title area both pushes the widget down and paints a strip
+        // of its own across the top of every tile. On Fluent and Aqua the strip is the
+        // same colour as the page so nothing looks wrong, and on Adwaita -- whose
+        // headerbar is #ebebeb against a #fafafa page -- it is 15 levels off the
+        // background, which is over the content mask's tolerance, so it was measured as
+        // widget content on every single GNOME tile.
+        //
+        // setHidden(true) takes it out of layout as well as out of the paint, which
+        // setVisible(false) alone does not.
+        f.getTitleArea().setHidden(true);
+        f.getTitleArea().setVisible(false);
         f.show();
         Component comp = Cn1WidgetRenderer.build(c, state, appearance);
         if (comp == null) {
@@ -199,9 +221,13 @@ public final class DesktopTileRunner {
         }
         comp.getAllStyles().setMargin(0, 0, 0, 0);
 
+        // NORTH, not CENTER: BorderLayout's centre region would centre the widget
+        // vertically in whatever space is left, and the contract is top-left.
         Container row = new Container(new FlowLayout());
+        row.getAllStyles().setMargin(0, 0, 0, 0);
+        row.getAllStyles().setPadding(0, 0, 0, 0);
         row.add(comp);
-        f.add(BorderLayout.CENTER, row);
+        f.add(BorderLayout.NORTH, row);
         f.setSize(new Dimension(w, h));
         f.layoutContainer();
 
