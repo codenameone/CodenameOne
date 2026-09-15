@@ -1315,6 +1315,31 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anAbsurdlyLargeSyncStateIsRefusedBeforeItIsDecoded() throws Exception {
+        // Sync state comes from whatever the application syncs against, and everything INSIDE the
+        // record is size-checked while the record itself was not -- so none of those limits
+        // applied until after the bytes had been decoded into a UTF-16 String at twice the size,
+        // cut into substrings, appended into StringBuilders and hex-decoded back into arrays,
+        // none of it authenticated by anything. The refusal has to come first, or the defence is
+        // the allocation it is defending against.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+
+        byte[] absurd = new byte[4 * 1024 * 1024 + 1];
+        java.util.Arrays.fill(absurd, (byte) 'x');
+        assertEquals(VaultError.CORRUPT, errorOf(vault.importSyncState(absurd, pw("p"))),
+                "a record larger than any vault can be must be refused");
+
+        // And the bound admits a real one: the vault this device already has round-trips.
+        String joined = freshName();
+        Vault other = Vault.named(joined).configure(fast());
+        assertTrue(other.importSyncState(vault.exportSyncState(), pw("p")).get().booleanValue(),
+                "the cap must not refuse a legitimate record");
+    }
+
+    @Test
     void aSecretReplacedByAnotherTabIsNotServedFromThisOnesCache() throws Exception {
         // Storage.readObject answers a PROCESS-LOCAL cache and nothing another context writes can
         // invalidate it. Once this process had read a secret it went on decrypting that same

@@ -1894,6 +1894,7 @@ public final class Vault {
                 // material in the heap for a vault it never adopted.
                 byte[] key = null;
                 try {
+                    requirePlausibleSyncState(state);
                     VaultMetadata incoming = VaultMetadata.parse(
                             Bytes.fromUtf8(state, 0, state == null ? 0 : state.length));
                     if (incoming == null) {
@@ -3122,6 +3123,32 @@ public final class Vault {
     private static boolean definitelyGone(String name) {
         return Storage.getInstance().entryState(name)
                 == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_ABSENT;
+    }
+
+    /// The largest sync state this will look at, before it looks at any of it.
+    ///
+    /// Sync state arrives from wherever the application syncs, which is a server it does not
+    /// control the health of. Everything inside the record is size-checked -- SecureEnvelope has
+    /// MAX_CIPHERTEXT, MAX_SALT and MAX_KEY_ID, VaultMetadata has MAX_ANCESTORS -- but the record
+    /// ITSELF was not, and none of those limits apply until after it has been decoded and parsed.
+    /// The decode alone is the amplification: bytes become a UTF-16 String at twice the size,
+    /// which is then cut into per-line substrings, appended into StringBuilders and hex-decoded
+    /// back into arrays, all of it retained until parse returns and none of it authenticated by
+    /// anything. A response of a few hundred megabytes is an out-of-memory in an application that
+    /// merely asked to sync.
+    ///
+    /// Four megabytes rather than a tighter figure because a legitimate record can be large: the
+    /// retired chain carries one envelope per rotation this vault has EVER done, at roughly 220
+    /// characters each, so this still admits something like eighteen thousand rotations -- a
+    /// daily rotation for fifty years. It is a bound on the absurd, not a quota.
+    private static final int MAX_SYNC_STATE = 4 * 1024 * 1024;
+
+    /// Refuses a sync state too large to be one, before anything decodes it.
+    private static void requirePlausibleSyncState(byte[] state) {
+        if (state != null && state.length > MAX_SYNC_STATE) {
+            throw new VaultException(VaultError.CORRUPT,
+                    "this sync state is larger than any vault record can be and was not read");
+        }
     }
 
     private Object readUncached(String name) {

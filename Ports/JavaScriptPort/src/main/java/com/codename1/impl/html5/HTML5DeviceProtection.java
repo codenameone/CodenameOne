@@ -154,7 +154,15 @@ public final class HTML5DeviceProtection extends DeviceProtection {
         // The eviction risk is real and is reported where it belongs: [#isStoragePersisted()]
         // answers it directly, [VaultError#QUOTA_EXCEEDED] is what an evicted origin produces,
         // and the class documentation says a browser makes no permanent guarantee.
-        b.set(Protection.PERSISTENT, storage);
+        // `crypto && storage`, not `storage` alone. What PERSISTENT claims here is that THIS
+        // MECHANISM can keep something across the process, and this mechanism is a device key --
+        // so without Web Crypto there is no key to keep and working IndexedDB is beside the
+        // point. An insecure HTTP origin is exactly that shape: IndexedDB opens, isSecureContext
+        // and crypto.subtle do not exist, and this used to answer YES. VaultCapabilities.supports
+        // tests only this flag, so it advertised REMEMBER_DEVICE as available and enrolment then
+        // failed inside ensureKey when it tried to generate the AES key -- a capability check
+        // that answers for storage rather than for the thing being stored.
+        b.set(Protection.PERSISTENT, crypto && storage);
         b.set(Protection.ENCRYPTED_AT_REST, crypto && storage);
         b.set(Protection.NON_EXTRACTABLE_KEY, crypto && storage);
         // No browser has an OS key store reachable from a page. This is a definite no, not an
