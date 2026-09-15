@@ -63,7 +63,7 @@ public @interface DesktopBuild {
     Toggle resizable() default Toggle.DEFAULT;
 
     /// Which native theme a desktop build installs, and the one hint that decides
-    /// whether a desktop application looks like the platform it is running on.
+    /// whether a desktop application looks like the platform it's running on.
     ///
     /// `auto` and `native` both mean "whatever this machine is" -- Fluent on
     /// Windows, Aqua on macOS, Adwaita on GNOME -- which is the only sensible
@@ -74,7 +74,7 @@ public @interface DesktopBuild {
     /// application's own theme is the only one.
     ///
     /// Read by the JavaSE port at runtime rather than by a builder, so unlike most
-    /// hints here it changes what the running application does rather than what is
+    /// hints here it changes what the running application does rather than what's
     /// produced for it.
     @Hint(name = "desktop.themeMode",
           valuePattern = "auto|native|fluent|aqua|adwaita|legacy|custom")

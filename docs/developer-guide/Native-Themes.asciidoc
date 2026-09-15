@@ -84,11 +84,11 @@ Liquid Glass theme, which the port shipped before an Aqua theme existed.
 |===
 
 The three desktop themes are generated from `native-themes/windows-fluent`,
-`native-themes/macos-aqua` and `native-themes/gnome-adwaita`. They are
-separate files rather than one file with per-platform blocks, and they are
+`native-themes/macos-aqua` and `native-themes/gnome-adwaita`. They're
+separate files rather than one file with per-platform blocks, and they're
 held to the same surface by `DesktopNativeThemeParityTest`: the same UIIDs,
 the same `#Constants`, and a `$Dark` counterpart for everything that paints
-a colour. That matters to you and not only to the themes -- an application
+a color. That matters to you and not only to the themes -- an application
 retunes a parent theme by redeclaring `#Constants`, so one vocabulary means
 the same CSS retunes all three platforms rather than only the one it was
 written against.
@@ -108,14 +108,15 @@ It compiles to `hover#` entries the same way `.pressed` compiles to
 declares none -- so a component with no hover rule keeps its normal style
 rather than falling back to a blank one.
 
-Hover has no meaning on a touch device and is not delivered there. On
-desktop it is driven by real pointer motion: the JavaSE, Windows and Linux
+Hover has no meaning on a touch device and isn't delivered there. On
+desktop it's driven by real pointer motion: the JavaSE, Windows and Linux
 ports all report motion with no button held, which is what
 `Form.pointerHover` resolves against.
 
-NOTE: macOS is the exception, and it is AppKit's rather than ours. AppKit
-draws no rollover state for buttons, fields, sliders, switches or popup
-buttons, so the Aqua theme deliberately leaves hover equal to normal. The
+NOTE: macOS is the exception, and the reason belongs to AppKit rather than
+to Codename One. AppKit draws no rollover state for buttons, fields,
+sliders, switches or popup buttons, so the Aqua theme leaves hover equal to
+normal. The
 captured native reference says the same, and the fidelity gate holds it
 there.
 
