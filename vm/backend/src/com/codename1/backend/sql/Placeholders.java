@@ -65,7 +65,7 @@ final class Placeholders {
     static String render(String sql, int paramCount, boolean dollars, boolean nestedComments,
                          boolean backslashEscapes, boolean hashComments,
                          boolean dollarQuotedStrings, boolean dashCommentNeedsSpace,
-                         boolean bracketIdentifiers, boolean executableComments)
+                         boolean bracketIdentifiers, int executableComments)
             throws IOException {
         StringBuilder out = null;
         int found = 0;
@@ -78,11 +78,19 @@ final class Placeholders {
         boolean gated = false;
         while(at < length) {
             char c = sql.charAt(at);
-            if(executableComments && c == '/' && at + 3 < length && sql.charAt(at + 1) == '*'
-                    && sql.charAt(at + 2) == '!' && sql.charAt(at + 3) >= '0'
-                    && sql.charAt(at + 3) <= '9') {
-                gated = true;
-            } else if(executableComments && gated && c == '*' && at + 1 < length
+            if(c == '/' && at + 1 < length && sql.charAt(at + 1) == '*') {
+                // The opener is three characters for "/*!" and four for MariaDB's
+                // "/*M!", and a GATE is digits immediately after it. Asking
+                // executableCommentOpener rather than spelling "/*!" here is what
+                // makes "/*M!100400 ... ? ... */" refused on MariaDB, where it
+                // really is version gated, and left alone on MySQL, where it is an
+                // ordinary comment.
+                int opener = executableCommentOpener(sql, at, length, executableComments);
+                if(opener > 0 && at + opener < length && sql.charAt(at + opener) >= '0'
+                        && sql.charAt(at + opener) <= '9') {
+                    gated = true;
+                }
+            } else if(executableComments != NO_EXECUTABLE_COMMENTS && gated && c == '*' && at + 1 < length
                     && sql.charAt(at + 1) == '/') {
                 gated = false;
             }
@@ -177,7 +185,7 @@ final class Placeholders {
     static int endOfStatement(String sql, boolean nestedComments, boolean backslashEscapes,
                               boolean hashComments, boolean dollarQuotedStrings,
                               boolean dashCommentNeedsSpace, boolean bracketIdentifiers,
-                              boolean executableComments) throws IOException {
+                              int executableComments) throws IOException {
         int at = 0;
         int end = 0;
         int length = sql.length();
@@ -217,9 +225,10 @@ final class Placeholders {
     static int countInsertRows(String sql, boolean nestedComments, boolean backslashEscapes,
                                boolean hashComments, boolean dollarQuotedStrings,
                                boolean dashCommentNeedsSpace, boolean bracketIdentifiers,
-                               boolean executableComments) throws IOException {
-        if(executableComments && hasVersionGate(sql, nestedComments, backslashEscapes,
-                hashComments, dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers)) {
+                               int executableComments) throws IOException {
+        if(executableComments != NO_EXECUTABLE_COMMENTS && hasVersionGate(sql, nestedComments,
+                backslashEscapes, hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                bracketIdentifiers, executableComments)) {
             // UNKNOWABLE, which is not the same as "no tuples to count".
             // "/*!50100 , (2) */" adds a row on a server past 5.1 and nothing on
             // an older one; "/*!99999 ..." adds nothing anywhere today. This
@@ -371,7 +380,7 @@ final class Placeholders {
                                          boolean dollarQuotedStrings,
                                          boolean dashCommentNeedsSpace,
                                          boolean bracketIdentifiers,
-                                         boolean executableComments) throws IOException {
+                                         int executableComments) throws IOException {
         int at = 0;
         int depth = 0;
         int length = sql.length();
@@ -399,7 +408,7 @@ final class Placeholders {
     private static int skipBlanks(String sql, int at, boolean nestedComments,
                                   boolean backslashEscapes, boolean hashComments,
                                   boolean dollarQuotedStrings, boolean dashCommentNeedsSpace,
-                                  boolean bracketIdentifiers, boolean executableComments)
+                                  boolean bracketIdentifiers, int executableComments)
             throws IOException {
         while(at < sql.length()) {
             char c = sql.charAt(at);
@@ -426,6 +435,48 @@ final class Placeholders {
     /** countInsertRows: the statement's row count depends on the server version. */
     static final int VERSION_GATED = -2;
 
+    /** No executable comments: every /* ... *""/ is an ordinary comment. */
+    static final int NO_EXECUTABLE_COMMENTS = 0;
+
+    /** MySQL's "/*!" only. */
+    static final int MYSQL_EXECUTABLE_COMMENTS = 1;
+
+    /**
+     * MySQL's "/*!" AND MariaDB's "/*M!", which only MariaDB runs.
+     *
+     * <p>The two are not interchangeable and the difference matters in both
+     * directions. Measured, "INSERT INTO t (v) VALUES (1) /*M! , (2) *""/"
+     * inserts one row on SQLite, PostgreSQL and MySQL -- where it is a comment
+     * -- and TWO on MariaDB, so a scanner blind to it counted one tuple for a
+     * statement that writes two and insert() returned a single key after
+     * committing both. Treating "/*M!" as executable on MySQL would be the
+     * mirror mistake: it is a comment there, so a valid single-row insert would
+     * be refused as multi-row.
+     */
+    static final int MARIADB_EXECUTABLE_COMMENTS = 2;
+
+    /**
+     * The length of the executable-comment opener at {@code at}, or 0 when what
+     * begins there is an ordinary comment for this engine.
+     *
+     * <p>"/*!" is three characters and "/*M!" is four, which is why the caller
+     * steps over a measured length rather than a constant.
+     */
+    private static int executableCommentOpener(String sql, int at, int length, int mode) {
+        if(mode == NO_EXECUTABLE_COMMENTS) {
+            return 0;
+        }
+        if(at + 2 < length && sql.charAt(at + 2) == '!') {
+            return 3;
+        }
+        if(mode == MARIADB_EXECUTABLE_COMMENTS && at + 3 < length
+                && (sql.charAt(at + 2) == 'M' || sql.charAt(at + 2) == 'm')
+                && sql.charAt(at + 3) == '!') {
+            return 4;
+        }
+        return 0;
+    }
+
     /**
      * Whether the statement carries a MySQL version-gated executable comment --
      * "/*!" followed by digits.
@@ -443,21 +494,28 @@ final class Placeholders {
                                           boolean backslashEscapes, boolean hashComments,
                                           boolean dollarQuotedStrings,
                                           boolean dashCommentNeedsSpace,
-                                          boolean bracketIdentifiers) throws IOException {
+                                          boolean bracketIdentifiers,
+                                          int executableComments) throws IOException {
         int at = 0;
         int length = sql.length();
         while(at < length) {
-            if(sql.charAt(at) == '/' && at + 3 < length && sql.charAt(at + 1) == '*'
-                    && sql.charAt(at + 2) == '!' && sql.charAt(at + 3) >= '0'
-                    && sql.charAt(at + 3) <= '9') {
-                return true;
+            if(sql.charAt(at) == '/' && at + 1 < length && sql.charAt(at + 1) == '*') {
+                // A gate is digits straight after the opener, and the opener is
+                // three characters for "/*!" and four for MariaDB's "/*M!".
+                int opener = executableCommentOpener(sql, at, length, executableComments);
+                if(opener > 0 && at + opener < length && sql.charAt(at + opener) >= '0'
+                        && sql.charAt(at + opener) <= '9') {
+                    return true;
+                }
             }
-            // executableComments is true here by construction -- only MySQL asks
-            // this question -- and passing it keeps skip stepping over the
-            // opener of an UNGATED "/*! ... */" rather than reading it as an
-            // ordinary comment, so what is inside stays scannable.
+            // The MODE travels rather than a constant: only the MySQL family
+            // asks this question, but MariaDB within it recognises one more
+            // opener, and passing it keeps skip stepping over the opener of an
+            // UNGATED executable comment rather than reading it as an ordinary
+            // one, so what is inside stays scannable.
             int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
-                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, true);
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers,
+                    executableComments);
             at = next > at ? next : at + 1;
         }
         return false;
@@ -493,7 +551,7 @@ final class Placeholders {
                                         boolean dollarQuotedStrings,
                                         boolean dashCommentNeedsSpace,
                                         boolean bracketIdentifiers,
-                                        boolean executableComments) throws IOException {
+                                        int executableComments) throws IOException {
         int at = 0;
         int blocks = 0;
         int cases = 0;
@@ -608,7 +666,7 @@ final class Placeholders {
     static boolean updatesOnConflict(String sql, boolean nestedComments,
                                      boolean backslashEscapes, boolean hashComments,
                                      boolean dollarQuotedStrings, boolean dashCommentNeedsSpace,
-                                     boolean bracketIdentifiers, boolean executableComments)
+                                     boolean bracketIdentifiers, int executableComments)
             throws IOException {
         int at = 0;
         int length = sql.length();
@@ -705,7 +763,7 @@ final class Placeholders {
     private static int skip(String sql, int at, boolean nestedComments,
                             boolean backslashEscapes, boolean hashComments,
                             boolean dollarQuotedStrings, boolean dashCommentNeedsSpace,
-                            boolean bracketIdentifiers, boolean executableComments)
+                            boolean bracketIdentifiers, int executableComments)
             throws IOException {
         char c = sql.charAt(at);
         int length = sql.length();
@@ -757,7 +815,8 @@ final class Placeholders {
             return end < 0 ? length : end + 1;
         }
         if(c == '/' && at + 1 < length && sql.charAt(at + 1) == '*') {
-            if(executableComments && at + 2 < length && sql.charAt(at + 2) == '!') {
+            int openerLength = executableCommentOpener(sql, at, length, executableComments);
+            if(openerLength > 0) {
                 // MySQL's EXECUTABLE comment. "/*! ... */" and "/*!50100 ... */"
                 // are not comments there at all: the delimiters are stripped and
                 // what is between them RUNS. Skipped as a comment,
@@ -767,7 +826,7 @@ final class Placeholders {
                 // The opener is stepped over as though it were whitespace, so the
                 // contents are scanned as the SQL they are; the closer below does
                 // the same.
-                int after = at + 3;
+                int after = at + openerLength;
                 while(after < length && sql.charAt(after) >= '0' && sql.charAt(after) <= '9') {
                     after++;
                 }
@@ -781,7 +840,7 @@ final class Placeholders {
             }
             return skipBlockComment(sql, at, nestedComments);
         }
-        if(executableComments && c == '*' && at + 1 < length && sql.charAt(at + 1) == '/') {
+        if(executableComments != NO_EXECUTABLE_COMMENTS && c == '*' && at + 1 < length && sql.charAt(at + 1) == '/') {
             // The other half of the executable comment above. Outside one, a
             // bare "*/" cannot occur in valid SQL.
             return at + 2;

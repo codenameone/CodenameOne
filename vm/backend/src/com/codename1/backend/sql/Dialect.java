@@ -511,8 +511,8 @@ public abstract class Dialect {
      * says "run this on MySQL and nowhere else", so what is inside one has to be
      * scanned as the statement it is.
      */
-    boolean executableComments() {
-        return false;
+    int executableComments() {
+        return Placeholders.NO_EXECUTABLE_COMMENTS;
     }
 
     /**
@@ -712,6 +712,15 @@ public abstract class Dialect {
         String textCollation() {
             return "utf8mb4_nopad_bin";
         }
+
+        int executableComments() {
+            // "/*M! ... */" as well as "/*! ... */". Only MariaDB runs the
+            // former: measured, "VALUES (1) /*M! , (2) */" inserts one row on
+            // SQLite, PostgreSQL and MySQL and TWO here, so a scanner blind to
+            // it counted one tuple for a statement writing two. Reading it as
+            // executable on MySQL would be the mirror mistake.
+            return Placeholders.MARIADB_EXECUTABLE_COMMENTS;
+        }
     }
 
     private static class MySqlDialect extends Dialect {
@@ -789,8 +798,8 @@ public abstract class Dialect {
             return true;
         }
 
-        boolean executableComments() {
-            return true;
+        int executableComments() {
+            return Placeholders.MYSQL_EXECUTABLE_COMMENTS;
         }
 
         /** MySQL has no DEFAULT VALUES; the empty lists are its spelling. */

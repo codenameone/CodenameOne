@@ -286,6 +286,19 @@ public class OrmCheck {
         check("gte on a date and a mixed-case column", "2",
                 String.valueOf(notes.query().gte("created", new Date(2000L)).count()));
         check("like", "1", String.valueOf(notes.query().like("title", "lo%").count()));
+        // AND ONLY ON TEXT. Measured, like("views", "12%") matches the row
+        // holding 123 on SQLite and MySQL and makes PostgreSQL throw "operator
+        // does not exist: integer ~~ text" -- one call, rows on two engines and
+        // an error on the third. So it is refused before the statement is built,
+        // which is the same answer everywhere.
+        String likeOnAnInt;
+        try {
+            notes.query().like("views", "12%").count();
+            likeOnAnInt = "accepted";
+        } catch(IllegalArgumentException err) {
+            likeOnAnInt = "refused";
+        }
+        check("like on a non-text field is refused on every engine", "refused", likeOnAnInt);
         check("in", "2",
                 String.valueOf(notes.query().in("title", new Object[] {"low", "mid"}).count()));
         // An empty set matches nothing: a filter that silently disappeared would
