@@ -85,6 +85,7 @@ public class OrmCheck {
                 aMultiRowInsertIsRefused(pool);
                 anExactNumericKeyIsStillAKey(pool);
                 aValueTheFieldCannotHoldIsRefused(em, pool);
+                aNulIsRefusedOnTheRawPathToo(pool);
             } finally {
                 notes.dropTable();
             }
@@ -206,6 +207,7 @@ public class OrmCheck {
             refusedNul = "refused";
         }
         check("a NUL in a string field is refused on every engine", "refused", refusedNul);
+
         // And a byte[] still carries one, because that is what a blob is for --
         // the payload above already holds a zero byte and round trips.
 
@@ -678,6 +680,50 @@ public class OrmCheck {
      * any day. PostgreSQL and MySQL reject both at the insert, which is the same
      * outcome one step earlier.
      */
+    /**
+     * The raw path refuses a NUL as well.
+     *
+     * <p>A caller writing its own SQL through Database or DataSource has the
+     * same claim on a portable answer as one going through a dao, and the ORM's
+     * check does not stand in front of it. PostgreSQL cannot hold a zero byte in
+     * a text value while SQLite and MySQL store one, so without this the same
+     * statement wrote a row on two engines and failed on the third.
+     */
+    private static void aNulIsRefusedOnTheRawPathToo(DataSource pool) throws Exception {
+        pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
+        pool.execute("CREATE TABLE cn1_rawnul (v "
+                + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT) + ")", null);
+        try {
+            String refused;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {"a" + ((char)0) + "b"});
+                refused = "accepted";
+            } catch (Exception err) {
+                refused = "refused";
+            }
+            check("a NUL bound through execute() is refused on every engine",
+                    "refused", refused);
+            // THE CONTROL: the same statement without one still writes, so this
+            // cannot pass by refusing every parameter.
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)", new Object[] {"ab"});
+            check("and the same statement without one still writes", "1",
+                    String.valueOf(pool.query("SELECT v FROM cn1_rawnul", null).size()));
+            // And a byte[] carrying a NUL is fine, because a blob is where one
+            // belongs on every engine.
+            pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
+            pool.execute("CREATE TABLE cn1_rawnul (v "
+                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BLOB)
+                    + ")", null);
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                    new Object[] {new byte[] {97, 0, 98}});
+            check("a NUL inside a byte[] is still bound", "1",
+                    String.valueOf(pool.query("SELECT v FROM cn1_rawnul", null).size()));
+        } finally {
+            pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
+        }
+    }
+
     private static void aValueTheFieldCannotHoldIsRefused(EntityManager em, DataSource pool)
             throws Exception {
         if(!"sqlite".equals(pool.dialect().getName())) {

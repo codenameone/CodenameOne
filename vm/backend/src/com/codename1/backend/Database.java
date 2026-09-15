@@ -490,7 +490,42 @@ public final class Database {
      * written for one engine working.
      */
     private String bind(String sql, Object[] params) throws IOException {
+        refuseNulInTextParameters(params);
         return dialect.bind(sql, params == null ? 0 : params.length);
+    }
+
+    /**
+     * Refuses a NUL inside a bound string, on every engine.
+     *
+     * <p>PostgreSQL cannot hold a zero byte in a text value -- it answers
+     * "invalid byte sequence for encoding UTF8: 0x00" -- while SQLite and MySQL
+     * store one, because both keep text with a length rather than a terminator.
+     * Measured on all three. So the same parameter wrote a row on two engines
+     * and failed on the third, which is the divergence this layer exists to
+     * remove.
+     *
+     * <p>Here rather than only in the ORM: {@link #execute}, {@link #query} and
+     * {@link #insert} all pass through this method, and a caller writing its own
+     * SQL through Database or DataSource has exactly the same claim on a
+     * portable answer as one going through a dao. The ORM keeps its own check
+     * because it can name the FIELD, which this cannot.
+     *
+     * <p>A byte[] parameter is untouched: that is where a NUL belongs, and all
+     * three store one.
+     */
+    private static void refuseNulInTextParameters(Object[] params) throws IOException {
+        if(params == null) {
+            return;
+        }
+        for(int iter = 0 ; iter < params.length ; iter++) {
+            if(params[iter] instanceof String && ((String)params[iter]).indexOf(0) >= 0) {
+                throw new IOException("Parameter " + (iter + 1) + " holds a NUL, which "
+                        + "PostgreSQL cannot store in a text column at all -- SQLite and "
+                        + "MySQL would take it, so this statement would succeed in "
+                        + "development and fail in production. Strip it, or bind a byte[], "
+                        + "where a NUL is an ordinary byte on every engine.");
+            }
+        }
     }
 
     /**
