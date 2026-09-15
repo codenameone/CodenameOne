@@ -206,9 +206,6 @@ public class ThemeData {
      * throughout, most visibly on its own typography page.</p>
      */
     public TextTheme textTheme() {
-        if (textTheme != null) {
-            return textTheme;
-        }
         if (resolvedTextTheme == null) {
             // No typography named means the Material 3 default, not "no type scale at
             // all". An empty TextTheme leaves every role without a size or a line
@@ -217,6 +214,17 @@ public class ThemeData {
             resolvedTextTheme = typography instanceof Typography
                     ? ((Typography) typography).resolve(brightness == Brightness.dark)
                     : Typography.material2021().resolve(brightness == Brightness.dark);
+            if (textTheme != null) {
+                // MERGED over the defaults, not used instead of them. A style handed in
+                // here states what it wants to change and inherits the rest, and the
+                // thing it most often does not state is the LINE HEIGHT: Reply restyles
+                // its roles with a font, a weight and a tracking, and Flutter keeps the
+                // type scale's height under them. Returning the app's styles raw dropped
+                // it, so every line was laid out at whatever the font measured -- three
+                // lines per mail card, 26 device pixels short each card, and a list that
+                // drifted further out of place the further down it went.
+                resolvedTextTheme = resolvedTextTheme.merge(textTheme);
+            }
         }
         return resolvedTextTheme;
     }
