@@ -35,6 +35,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 GUIDE = os.path.join(ROOT, 'docs', 'developer-guide')
 
 # Everything an application's own code can reference.
+# Every source the published javadoc is built from. The java.* compatibility
+# classes are part of it -- the guide links to java/util/List.html -- so a
+# typo there has to be caught the same way one in com.codename1 is.
 APP_ROOTS = [
     os.path.join(ROOT, 'CodenameOne', 'src'),
     os.path.join(ROOT, 'Ports', 'CLDC11', 'src'),
@@ -50,8 +53,8 @@ IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
 # ActionEvent.Type, LayeredLayout.LayeredLayoutConstraint.Inset -- so the dot
 # belongs in the pattern. Excluding it skipped those links entirely.
 JAVADOC = re.compile(
-    r'codenameone\.com/javadoc/(com/codename1/[A-Za-z0-9/]+(?:\.[A-Z][A-Za-z0-9]*)*)'
-    r'\.html')
+    r'codenameone\.com/javadoc/([a-z][A-Za-z0-9]*(?:/[A-Za-z0-9]+)*'
+    r'(?:\.[A-Z][A-Za-z0-9]*)*)\.html')
 # A backticked identifier, or a bare word in prose that is shaped like a class
 # name. The bare form needs both shapes: a name can lead with an acronym --
 # URLImage, GZIPInputStream, JSONParser -- and the CamelCase alternative alone
@@ -132,6 +135,27 @@ TOKEN = re.compile(DECLARATION.pattern + r'|[{}]')
 UNPUBLISHED_PACKAGE = 'com.codename1.impl'
 
 
+HIDDEN_DOC = re.compile(
+    r'(?:/\*\*(?:[^*]|\*(?!/))*?@hidden(?:[^*]|\*(?!/))*?\*/'
+    r'|(?:^[ \t]*///[^\n]*\n)*^[ \t]*///[^\n]*@hidden[^\n]*\n(?:[ \t]*///[^\n]*\n)*)'
+    r'[\s]*(?:@[A-Za-z][A-Za-z0-9.]*(?:\([^)]*\))?[\s]*)*'
+    r'(?:(?:public|protected|private|static|final|abstract|strictfp|sealed'
+    r'|non-sealed)\s+)*'
+    r'(?:@\s*interface|class|interface|enum)\s+(?P<name>[A-Z][A-Za-z0-9]*)',
+    re.M)
+
+
+def hidden_types(raw):
+    """Names javadoc will not publish because the doc says @hidden.
+
+    Visibility is not the whole answer: com.codename1.vpn.tunnel.TunnelHost and
+    TunnelBuffers are public and have no page, because the tag tells javadoc to
+    leave them out. Read from the raw source, since comments are what carries
+    the tag and the scan below runs on a stripped copy.
+    """
+    return {match.group('name') for match in HIDDEN_DOC.finditer(raw)}
+
+
 def declared_types(source):
     """Every type in one compilation unit, with its real nesting.
 
@@ -203,13 +227,17 @@ def class_index():
                 try:
                     with open(os.path.join(path, name), encoding='utf-8',
                               errors='ignore') as handle:
-                        # Comments hold sample code, and a "class MyListener"
-                        # written in a javadoc example is not a type anyone
-                        # can link to.
-                        source = strip_comments(handle.read())
+                        raw = handle.read()
                 except OSError:
                     continue
+                # Comments hold sample code, and a "class MyListener" written
+                # in a javadoc example is not a type anyone can link to -- but
+                # they also carry @hidden, which has to be read first.
+                hidden = hidden_types(raw)
+                source = strip_comments(raw)
                 for trail, published in declared_types(source):
+                    if any(step in hidden for step in trail):
+                        continue
                     if not published or trail[0] != outer:
                         # javadoc runs with -protected, so a package-private
                         # type has no page even though the source is here.
