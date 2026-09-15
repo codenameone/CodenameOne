@@ -75,6 +75,12 @@ class BackendOrmTest {
         urls.add(":memory:");
         addIfSet(urls, "CN1_DBCHECK_POSTGRES");
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
+        // MariaDB is its own arm, not a spelling of the MySQL one: the two do
+        // not share a case-sensitive NO PAD collation, so Database.open reads
+        // the handshake banner and picks Dialect.MARIADB or Dialect.MYSQL from
+        // what the SERVER says it is. Nothing else exercises that choice, and
+        // getting it wrong is an unknown-collation error on every CREATE TABLE.
+        addIfSet(urls, "CN1_DBCHECK_MARIADB");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
             fail("CN1_DBCHECK_POSTGRES and CN1_DBCHECK_MYSQL are unset, so only SQLite "
                     + "was exercised; the engines whose schema and generated keys differ "
