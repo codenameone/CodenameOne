@@ -28,8 +28,23 @@ CLASSES="${1:?usage: verify-selfhost.sh <classesDir> <AppName> <package>}"
 APP="${2:?}"
 PKG="${3:?}"
 
-PARPAR="$REPO/vm/selfhost/target/parpar"
-[ -x "$PARPAR" ] || { echo "no $PARPAR -- run build-selfhost.sh first"; exit 1; }
+# RESOLVE THE BINARY THAT EXISTS, preferring the release shape, and honour an explicit
+# CN1_SELFHOST_BIN. build-selfhost.sh -O3 writes parpar-O3 and a bare build-selfhost.sh
+# writes parpar, so hardcoding either one makes this die on a missing file rather than
+# on a divergence -- which is what it did for anyone who had only ever built -O3.
+# Optimisation level cannot change the emitted C (that is the property these gates
+# exist to check), so either binary is a valid subject; the name is printed so a run
+# is never ambiguous about which one it verified.
+if [ -z "${CN1_SELFHOST_BIN:-}" ]; then
+    for c in "$REPO/vm/selfhost/target/parpar-O3" "$REPO/vm/selfhost/target/parpar"; do
+        [ -x "$c" ] && { CN1_SELFHOST_BIN="$c"; break; }
+    done
+fi
+PARPAR="${CN1_SELFHOST_BIN:-}"
+[ -n "$PARPAR" ] && [ -x "$PARPAR" ] || {
+    echo "no self-hosted binary in $REPO/vm/selfhost/target -- run build-selfhost.sh first"
+    exit 1; }
+echo "verify-selfhost: subject $PARPAR"
 JAPI="$REPO/vm/selfhost/target/javaapi-classes"
 TR="$REPO/vm/ByteCodeTranslator/target/classes"
 ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"

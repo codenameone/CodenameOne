@@ -19,9 +19,21 @@
 #  - Ratios are refused unless every arm emitted identical C. A speed number from
 #    a translator that emits different output is meaningless.
 #
-# Memory is the peak phys_footprint reported by /usr/bin/time -l on macOS, which
-# is the same quantity vmmap calls "Physical footprint (peak)". NEVER ps rss:
-# vm/CLAUDE.md records 151/207/219 MB measured for one unchanged binary.
+# Memory is a PEAK, and which peak depends on the platform -- so every line that
+# reports one says which metric produced it, and so does the ratio line.
+#
+#   Darwin  peak phys_footprint, from /usr/bin/time -l. The same quantity vmmap
+#           calls "Physical footprint (peak)", and the one vm/CLAUDE.md requires.
+#   Linux   peak RSS (VmHWM), from /usr/bin/time -v or getrusage. Linux has no
+#           phys_footprint; RSS is the closest peak it exposes.
+#
+# The two are NOT the same quantity and a Darwin figure must never be compared to
+# a Linux one. Comparing arms WITHIN one run is fine and is all this script does:
+# every arm on a given host is measured the same way.
+#
+# NEVER ps rss: vm/CLAUDE.md records 151/207/219 MB measured for one unchanged
+# binary. /usr/bin/time's peak is a high-water mark the kernel keeps, which is a
+# different and reproducible thing.
 set -e
 cd "$(dirname "$0")"
 REPO="$(cd ../.. && pwd)"
@@ -57,6 +69,37 @@ DEFAULT_JAVAS="$(cn1_first_java),${JDK_8_HOME:-}/bin/java"
 IFS=',' read -r -a REF_JAVAS <<< "${SELFHOST_REF_JAVAS:-$DEFAULT_JAVAS}"
 
 W="$T/bench"; rm -rf "$W"; mkdir -p "$W"
+
+# --- peak-memory probe, resolved per platform -----------------------------------
+# cn1_time_peak runs a command under the platform's resource-usage wrapper and
+# echoes the peak in BYTES. It must not be silently skipped: a missing probe used
+# to leave PEAKS empty, which turns the ratio line into a division by nothing.
+case "$(uname -s)" in
+    Darwin)
+        CN1_MEM_METRIC="peak phys_footprint"
+        # BSD time -l; the figure is already in bytes.
+        cn1_time_peak() { local o=$1; shift
+            /usr/bin/time -l "$@" 2>"$o" >/dev/null || true
+            awk '/peak memory footprint/{print $1; found=1} END{if(!found) print ""}' "$o"; }
+        ;;
+    *)
+        CN1_MEM_METRIC="peak RSS (VmHWM)"
+        # GNU time -v reports "Maximum resident set size (kbytes)".
+        cn1_time_peak() { local o=$1; shift
+            /usr/bin/time -v "$@" 2>"$o" >/dev/null || true
+            awk -F: '/Maximum resident set size/{gsub(/ /,"",$2); print $2*1024; found=1}
+                     END{if(!found) print ""}' "$o"; }
+        ;;
+esac
+# Prove the probe works before measuring anything with it. A probe that answers
+# nothing reports every arm as 0 bytes, and 0/0 is not a regression, it is a bug
+# wearing a green tick.
+if [ -z "$(cn1_time_peak "$W/probe.txt" /bin/sh -c 'exit 0')" ]; then
+    echo "REFUSING: no peak-memory probe on this platform ($(uname -s))."
+    echo "  /usr/bin/time did not report $CN1_MEM_METRIC. Install GNU time (Debian:"
+    echo "  apt-get install -y time) or teach cn1_time_peak this platform."
+    exit 1
+fi
 
 # $1 = arm label, $2 = output dir; runs one translation
 invoke() {
@@ -101,7 +144,7 @@ done
 for i in "${!ARMS[@]}"; do echo "arm    : ${NAMES[$i]} -> ${ARMS[$i]}"; done
 echo "corpus : $CLASSES"
 echo "arms   : ${NAMES[*]}    rounds: $ROUNDS"
-echo "memory : peak phys_footprint (/usr/bin/time -l)"
+echo "memory : $CN1_MEM_METRIC"
 # STALENESS: a benchmark of yesterday's binary is worse than no benchmark, because
 # the number looks like a measurement. Refuse rather than warn.
 if [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" "$REPO/vm/JavaAPI/src" -type f -newer "$PARPAR" -print -quit 2>/dev/null)" ]; then
@@ -169,22 +212,28 @@ for round in $(seq 1 "$ROUNDS"); do
 for i in "${!ARMS[@]}"; do
     rm -rf "$W/run"; mkdir -p "$W/run"
     if [ "${ARMS[$i]}" = parpar ]; then
-        env CN1_RESOURCE_PATH="$REPO/vm/ByteCodeTranslator/src" /usr/bin/time -l "$PARPAR" \
-            clean "$JAPI;$CLASSES" "$W/run" "$APP" "$PKG" "$APP" 1.0 clean none 2>"$W/mem.txt" >/dev/null
+        PEAKS[$i]=$(env CN1_RESOURCE_PATH="$REPO/vm/ByteCodeTranslator/src" \
+            cn1_time_peak "$W/mem.txt" "$PARPAR" \
+            clean "$JAPI;$CLASSES" "$W/run" "$APP" "$PKG" "$APP" 1.0 clean none)
     else
-        /usr/bin/time -l "${ARMS[$i]}" -cp "$TR:$ASM" com.codename1.tools.translator.ByteCodeTranslator \
-            clean "$JAPI;$CLASSES" "$W/run" "$APP" "$PKG" "$APP" 1.0 clean none 2>"$W/mem.txt" >/dev/null
+        PEAKS[$i]=$(cn1_time_peak "$W/mem.txt" "${ARMS[$i]}" -cp "$TR:$ASM" \
+            com.codename1.tools.translator.ByteCodeTranslator \
+            clean "$JAPI;$CLASSES" "$W/run" "$APP" "$PKG" "$APP" 1.0 clean none)
     fi
-    PEAKS[$i]=$(awk '/peak memory footprint/{print $1}' "$W/mem.txt")
-    printf "mem  %-8s round %d peak %8.0f MB\n" "${NAMES[$i]}" "$round" \
+    if [ -z "${PEAKS[$i]}" ]; then
+        echo "REFUSING: the ${NAMES[$i]} arm produced no $CN1_MEM_METRIC reading."
+        tail -5 "$W/mem.txt"
+        exit 1
+    fi
+    printf "mem  %-8s round %d %s %8.0f MB\n" "${NAMES[$i]}" "$round" "$CN1_MEM_METRIC" \
         "$(python3 -c "print(${PEAKS[$i]}/1048576.0)")"
     [ "${PEAKS[$i]}" -gt "${PEAK_MAX[$i]}" ] && PEAK_MAX[$i]="${PEAKS[$i]}"
 done
 done
 for i in "${!ARMS[@]}"; do
     PEAKS[$i]="${PEAK_MAX[$i]}"
-    printf "mem  %-8s MAX over %d round(s) %8.0f MB\n" "${NAMES[$i]}" "$ROUNDS" \
-        "$(python3 -c "print(${PEAKS[$i]}/1048576.0)")"
+    printf "mem  %-8s MAX over %d round(s) %8.0f MB  (%s)\n" "${NAMES[$i]}" "$ROUNDS" \
+        "$(python3 -c "print(${PEAKS[$i]}/1048576.0)")" "$CN1_MEM_METRIC"
 done
 
 echo
@@ -192,5 +241,5 @@ for i in "${!ARMS[@]}"; do
     [ "$i" -eq 0 ] && continue
     python3 -c "
 t=${MINS[0]}/${MINS[$i]}; m=${PEAKS[0]}/${PEAKS[$i]}
-print(f'vs ${NAMES[$i]}: time {t:.2f}x ({\"parpar faster\" if t<1 else \"parpar slower\"}), memory {m:.2f}x ({\"parpar smaller\" if m<1 else \"parpar larger\"})')"
+print(f'vs ${NAMES[$i]}: time {t:.2f}x ({\"parpar faster\" if t<1 else \"parpar slower\"}), memory {m:.2f}x ({\"parpar smaller\" if m<1 else \"parpar larger\"}) [${CN1_MEM_METRIC}]')"
 done

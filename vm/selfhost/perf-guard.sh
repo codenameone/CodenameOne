@@ -35,8 +35,22 @@ set -e
 cd "$(dirname "$0")"
 ROUNDS="${1:-5}"
 T="$(cd ../.. && pwd)/vm/selfhost/target"
-: "${CN1_SELFHOST_BIN:=$T/parpar-O3}"
+# RESOLVE THE BINARY THAT EXISTS, preferring the release shape. build-selfhost.sh -O3
+# writes parpar-O3 and a bare build-selfhost.sh writes parpar, so hardcoding either one
+# makes this fail on a missing file rather than on a regression -- which is how the CI
+# step would have died on its first run, since that workflow builds without -O3.
+if [ -z "${CN1_SELFHOST_BIN:-}" ]; then
+    if [ -x "$T/parpar-O3" ]; then
+        CN1_SELFHOST_BIN="$T/parpar-O3"
+    elif [ -x "$T/parpar" ]; then
+        CN1_SELFHOST_BIN="$T/parpar"
+    else
+        echo "perf-guard: no self-hosted binary in $T -- run build-selfhost.sh first." >&2
+        exit 1
+    fi
+fi
 export CN1_SELFHOST_BIN
+echo "perf-guard: measuring $CN1_SELFHOST_BIN"
 MAX_TIME="${CN1_PERF_MAX_TIME:-2.00}"
 MAX_MEM="${CN1_PERF_MAX_MEM:-2.10}"
 OUT=$(mktemp -t cn1perf)
