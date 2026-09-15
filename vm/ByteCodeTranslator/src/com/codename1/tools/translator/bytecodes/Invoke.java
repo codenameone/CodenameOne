@@ -520,12 +520,85 @@ public class Invoke extends Instruction {
         // Static no-arg singleton/static-field accessor: GETSTATIC f; xRETURN.
         // Monomorphic by definition (static dispatch), no receiver -> no null concern.
         if (opcode == Opcodes.INVOKESTATIC) {
-            if (desc.length() < 3 || desc.charAt(0) != '(' || desc.charAt(1) != ')' || desc.charAt(2) == 'V') {
+            if (desc.length() < 3 || desc.charAt(0) != '(' || desc.endsWith(")V")) {
                 return null;
             }
             BytecodeMethod target = findMethodUp(Parser.getClassObject(Util.mangle(owner)));
             if (target == null || !target.isStatic()) {
                 return null;
+            }
+            if (desc.charAt(1) != ')') {
+                // ONE-OBJECT-ARGUMENT STATIC ACCESSOR -- in practice javac's synthetic
+                // access$NNN. An inner class reading a PRIVATE field of its outer class
+                // cannot emit a GETFIELD, so javac synthesizes
+                // `static int access$000(Outer o) { return o.field; }` and routes every
+                // read through it. The translator emits the accessor into the OUTER
+                // class's .c and the inner class into its own, so each read becomes a
+                // CROSS-TRANSLATION-UNIT CALL that only LTO can remove -- and the clean,
+                // desktop and CMake targets do not link with LTO.
+                //
+                // Measured on the self-hosting corpus before this fold: ArrayList 3
+                // (one of them on ArrayListIterator.next(), i.e. per element of every
+                // for-each loop in the program), ArrayDeque 8, TreeMap's sub-map family
+                // 26, IdentityHashMap 3, Hashtable 1, plus ASM and translator classes.
+                // Fixing it in the library instead -- widening those fields to
+                // package-private, which is why OpenJDK's ArrayList.elementData is not
+                // private -- fixes one class per edit and nothing in application code.
+                //
+                // The fold is exact rather than approximate. A static call with one
+                // argument and a non-void return pops one slot and pushes one; GETFIELD
+                // pops the objectref and pushes the field, which is the SAME stack
+                // effect, and it dereferences the same reference, so a null argument
+                // still throws at the same point. The body test below is the identical
+                // `ALOAD 0; GETFIELD f; xRETURN` shape used for instance getters --
+                // local 0 of a static method IS its first argument, so the existing
+                // matcher describes this case without modification.
+                //
+                // Restricted to a single argument that is a REFERENCE: GETFIELD needs an
+                // objectref, and a multi-argument method whose body reads only the first
+                // would strand the rest on the operand stack -- the same trap documented
+                // on the setter fold below.
+                if (countDescArguments(desc) != 1) {
+                    return null;
+                }
+                char argKind = desc.charAt(1);
+                if (argKind != 'L' && argKind != '[') {
+                    return null;
+                }
+                // MEMOIZED, AND THAT IS A CORRECTNESS REQUIREMENT RATHER THAN A SPEED
+                // ONE. The verdict is read from the TARGET's body, and optimize()
+                // rewrites bodies IN PLACE during code generation, so the same call
+                // site answers differently depending on whether the class holding its
+                // target happened to be emitted first -- and emission order is not
+                // stable across hosts, because the JVM and ParparVM do not iterate a
+                // HashMap in the same order. Measured: without this, Gate A reported 9
+                // of 798 files differing between the JVM translator and the
+                // self-hosted one, each side having folded a different subset.
+                //
+                // updateInlinableFieldDependencies() queries every invoke from
+                // ByteCodeClass.updateAllDependencies, which runs BEFORE any
+                // optimize(), so the first query reads raw bytecode and every later
+                // one reuses that verdict. It also stops the dependency scan and
+                // emission disagreeing, which would leave the caller's include list
+                // missing the field owner's header.
+                //
+                // Scoped to THIS branch on purpose. The instance-getter and
+                // static-forwarder folds above have the same order-dependence and
+                // predate this change; memoizing them too moves ~280 files of emitted
+                // C and can only fold MORE getters, which is the case vm/CLAUDE.md
+                // warns about for the boxed types (a folded `return value;` on a
+                // tagged immediate reads off a pointer with no fields). That is its
+                // own change, with its own measurement.
+                if (!staticAccessorComputed) {
+                    Field f = trivialGetterField(target);
+                    if (f != null) {
+                        staticAccessorCache = new Field(Opcodes.GETFIELD, f.getOwner(),
+                                f.getFieldName(), f.getDesc());
+                        staticAccessorCache.setMethod(getMethod());
+                    }
+                    staticAccessorComputed = true;
+                }
+                return staticAccessorCache;
             }
             // Follow trivial static FORWARDER chains: with pre-nestmates javac a
             // lazy-holder getter compiles to `INVOKESTATIC Holder.access$000()`
@@ -577,6 +650,9 @@ public class Invoke extends Instruction {
         }
         return null;
     }
+
+    private Field staticAccessorCache;
+    private boolean staticAccessorComputed;
 
     /**
      * The concretely-called method if this is a direct (provably monomorphic)
@@ -686,10 +762,14 @@ public class Invoke extends Instruction {
         if (count != 3) return null;
         if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0) return null;
         if (!(b instanceof Field) || b.getOpcode() != Opcodes.GETFIELD) return null;
-        int rc = c.getOpcode();
-        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
-                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
+        if (!isValueReturnOpcode(c.getOpcode())) return null;
         return (Field) b;
+    }
+
+    /** True for the xRETURN opcodes that return a value (i.e. not RETURN). */
+    private static boolean isValueReturnOpcode(int rc) {
+        return rc == Opcodes.IRETURN || rc == Opcodes.LRETURN || rc == Opcodes.FRETURN
+                || rc == Opcodes.DRETURN || rc == Opcodes.ARETURN;
     }
 
     /** Returns the GETSTATIC Field if the body is exactly GETSTATIC f; xRETURN. */

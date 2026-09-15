@@ -1901,3 +1901,24 @@ sites and would have passed whether or not the rewrite worked. It now drives eve
 down the fast path by BOTH routes -- a local that is the allocation, and a Holder whose
 instance field the whole program only ever stores `new ArrayList` into -- 17 fast paths in
 the torture, and every shape still byte-identical to the host.
+
+### Reinstated: the synthetic-accessor fold, which was never broken
+
+With the subject binary pinned, the fold withdrawn in Round 12 passes every gate it was
+said to fail. It was measured against a `parpar-O3` three hours older than the source;
+nothing about the optimization was wrong.
+
+Restored unchanged: the one-object-argument static accessor fold in
+`Invoke.asInlinableFieldAccess`, with the verdict memoized so it is always read from raw
+bytecode (`updateInlinableFieldDependencies` queries every invoke before any `optimize()`
+rewrites a body in place). Accessor CALL sites on the self-hosting corpus: **148 -> 127**.
+
+Gates: `run-gauntlet.sh` GREEN, Gate D PASS, **Gate A PASS -- 798 files byte-identical**,
+negative control PASS.
+
+The lesson is not about the fold. Six causes were ruled out by measurement before the real
+one was found, and every one of those probes was sound -- they were run against a binary
+that predated the code they were probing for. **A probe that prints nothing is not
+evidence that the code did not run.** The first thing to check is what the harness is
+actually executing, which `verify-selfhost.sh` had been printing on its first line the
+whole time.
