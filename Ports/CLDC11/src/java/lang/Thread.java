@@ -24,18 +24,16 @@
 package java.lang;
 /// A thread is a thread of execution in a program. The Java Virtual Machine allows an application to have multiple threads of execution running concurrently.
 public class Thread implements java.lang.Runnable{
-    /**
-     * This thread's ThreadLocal values, keyed by the ThreadLocal object itself.
-     *
-     * Package private and touched only by java.lang.ThreadLocal, which reaches it
-     * through Thread.currentThread() -- so every read and write is by the thread
-     * that owns it and no lock is needed. It used to live the other way round, one
-     * shared HashMap per ThreadLocal written by every thread at once, which
-     * corrupted that map's probe sequence and spun; see the comment on ThreadLocal.
-     *
-     * Null until the thread actually uses a ThreadLocal, and it dies with the
-     * thread, which is what stops the per-thread entries leaking.
-     */
+    /// This thread's ThreadLocal values, keyed by the ThreadLocal object itself.
+    ///
+    /// Package private and touched only by java.lang.ThreadLocal, which reaches it
+    /// through Thread.currentThread() -- so every read and write is by the thread
+    /// that owns it and no lock is needed. It used to live the other way round, one
+    /// shared HashMap per ThreadLocal written by every thread at once, which
+    /// corrupted that map's probe sequence and spun; see the comment on ThreadLocal.
+    ///
+    /// Null until the thread actually uses a ThreadLocal, and it dies with the
+    /// thread, which is what stops the per-thread entries leaking.
     java.util.HashMap threadLocalValues;
 
     /// The maximum priority that a thread can have.
