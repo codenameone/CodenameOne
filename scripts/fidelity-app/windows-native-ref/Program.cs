@@ -59,6 +59,23 @@ public static class Program
 
 public partial class App : Application
 {
+    /// Merges WinUI's default style dictionary.
+    ///
+    /// The template projects do this in App.xaml, which this app does not have -- it is pure
+    /// C# with no XAML file at all. Without it there are no control styles: a Button renders
+    /// as a flat square grey rectangle instead of a #FDFDFD Fluent capsule with 4px corners,
+    /// and nothing errors, because an unstyled control is still a perfectly valid control.
+    ///
+    /// This was three commits of chasing the wrong cause. The controls were unstyled, and the
+    /// resource index was missing too, so the missing PRI looked like the explanation; it
+    /// was not, and the build output carrying both framework PRIs while the button stayed
+    /// (194,194,194) is what finally ruled it out.
+    public App()
+    {
+        Resources ??= new ResourceDictionary();
+        Resources.MergedDictionaries.Add(new XamlControlsResources());
+    }
+
     private Window _window;
     private readonly List<string> _blockers = new();
     private string _outDir;
@@ -66,6 +83,8 @@ public partial class App : Application
     private string _stage = "(not started)";
     private string _clientBackground = "(not sampled)";
     private IntPtr _hwnd;
+    private FrameworkElement _probeControl;
+    private Windows.Foundation.Rect _probeBounds;
     private bool _isProbe;
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -101,6 +120,7 @@ public partial class App : Application
         root.Children.Add(button);
         _window.Content = root;
 
+        _probeControl = button;
         root.Loaded += async (_, _) => await OnReadyAsync(root, button, micaSupported);
         _window.Activate();
     }
@@ -147,6 +167,20 @@ public partial class App : Application
         // on it -- the previous run proved that precisely: COMException 0x8001010E,
         // RPC_E_WRONGTHREAD, at stage 'await-frames'. Everything after this point is Win32,
         // which does not care which thread calls it.
+        // Where the control actually is, taken on the UI thread while it is safe to ask. The
+        // capture then checks THAT rectangle rather than guessing at coordinates.
+        try
+        {
+            var t = _probeControl.TransformToVisual(root);
+            var origin = t.TransformPoint(new Windows.Foundation.Point(0, 0));
+            _probeBounds = new Windows.Foundation.Rect(origin.X, origin.Y,
+                _probeControl.ActualWidth, _probeControl.ActualHeight);
+        }
+        catch
+        {
+            _probeBounds = new Windows.Foundation.Rect(0, 0, 0, 0);
+        }
+
         _stage = "await-frames";
         var drawn = new TaskCompletionSource<bool>();
         int frames = 0;
@@ -442,6 +476,32 @@ public partial class App : Application
                     _clientBackground = $"#{bg.R:X2}{bg.G:X2}{bg.B:X2}";
                     Console.WriteLine($"NATIVEREF:INFO client background sample {_clientBackground}");
                 }
+                // The definitive styling check: a Fluent Button has rounded corners, so its
+                // corner pixel is the page behind it and its centre pixel is the fill. When
+                // those are equal the control is a plain rectangle, which is what an unstyled
+                // fallback looks like. This measures the control itself, rather than
+                // inferring from whether some build artefact was produced -- which is what
+                // sent the previous three attempts after the wrong cause.
+                if (_probeBounds.Width > 4 && _probeBounds.Height > 4)
+                {
+                    int bx = (int)_probeBounds.X, by = (int)_probeBounds.Y;
+                    int bw = (int)_probeBounds.Width, bh = (int)_probeBounds.Height;
+                    if (bx >= 0 && by >= 0 && bx + bw <= w && by + bh <= h)
+                    {
+                        var corner = image.GetPixel(bx, by);
+                        var mid = image.GetPixel(bx + bw / 2, by + bh / 2);
+                        Console.WriteLine($"NATIVEREF:INFO probe control {bw}x{bh} at {bx},{by} "
+                            + $"corner=#{corner.R:X2}{corner.G:X2}{corner.B:X2} "
+                            + $"centre=#{mid.R:X2}{mid.G:X2}{mid.B:X2}");
+                        if (corner == mid)
+                        {
+                            _blockers.Add($"the control is a plain rectangle (corner and centre "
+                                + $"both #{mid.R:X2}{mid.G:X2}{mid.B:X2}); a Fluent Button has "
+                                + "rounded corners, so its styles did not load");
+                        }
+                    }
+                }
+
                 if (cw > 0 && ch > 0 && cx >= 0 && cy >= 0 && cx + cw <= w && cy + ch <= h
                     && IsUniform(image, cx, cy, cw, ch))
                 {
