@@ -58,10 +58,20 @@
     --control-bg-color-dark: #1e1e1e;
     --text-color: #000000;              /* labelColor */
     --text-color-dark: #ffffff;
-    --secondary-text-color: #7f7f7f;    /* secondaryLabelColor */
-    --secondary-text-color-dark: #98989d;
+    --text-secondary-color: #7f7f7f;    /* secondaryLabelColor */
+    --text-secondary-color-dark: #98989d;
     --separator-color: #dcdcdc;         /* separatorColor */
     --separator-color-dark: #48484a;
+    --accent-pressed-color: #0060df;    /* controlAccentColor darkened on press */
+    --accent-pressed-color-dark: #0060df;
+    --view-bg-color: #ffffff;           /* textBackgroundColor */
+    --view-bg-color-dark: #1e1e1e;
+    --stroke-color: #c6c6c8;            /* the control outline, distinct from separatorColor */
+    --stroke-color-dark: #545456;
+    --headerbar-bg-color: #ececec;      /* the macOS title bar matches windowBackgroundColor */
+    --headerbar-bg-color-dark: #323232;
+    --destructive-color: #ff3b30;       /* systemRed */
+    --success-color: #34c759;           /* systemGreen */
 
     includeNativeBool: false;
     darkModeBool: true;
@@ -536,10 +546,10 @@ ListRendererFocus {
     Form { background-color: #323232; color: #ffffff; }
     Label { color: #ffffff; }
 
-    Button { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; }
-    Button.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; }
-    Button.pressed { color: #ffffff; background-color: #4a4a4a; border: 0.26mm solid #5c5c5c; }
-    Button.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #4a4a4a; }
+    Button { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    Button.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    Button.pressed { color: #ffffff; background-color: #4a4a4a; border: 0.26mm solid #5c5c5c; border-radius: 1.76mm; }
+    Button.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #4a4a4a; border-radius: 1.76mm; }
 
     RaisedButton { color: #ffffff; background-color: #007aff; }
     RaisedButton.hover { color: #ffffff; background-color: #1a88ff; }
@@ -550,10 +560,10 @@ ListRendererFocus {
     FlatButton.hover { color: #4da3ff; background-color: #3c3c3c; }
     FlatButton.pressed { color: #007aff; background-color: #4a4a4a; }
 
-    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #48484a; }
-    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #5c5c5e; }
-    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #007aff; }
-    TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; }
+    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #48484a; border-radius: 1.06mm; }
+    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #5c5c5e; border-radius: 1.06mm; }
+    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #007aff; border-radius: 1.06mm; }
+    TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; border-radius: 1.06mm; }
 
     CheckBox { color: #ffffff; }
     CheckBox.selected { color: #007aff; }
@@ -583,9 +593,9 @@ ListRendererFocus {
     DialogTitle { color: #ffffff; }
     DialogBody { color: #ffffff; }
 
-    ComboBox { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; }
-    ComboBox.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; }
-    ComboBox.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #6b6b6b; }
+    ComboBox { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    ComboBox.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    ComboBox.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
     Slider.hover { background-color: #666666; color: #007aff; }
     Slider.disabled { background-color: #3c3c3c; color: #6e6e6e; }
     ScrollThumb { background-color: #5a5a5a; }
@@ -595,5 +605,14 @@ ListRendererFocus {
     ListRenderer { color: #ffffff; background-color: transparent; }
     ListRenderer.selected { color: #ffffff; background-color: #0064e1; }
     ListRenderer.hover { color: #ffffff; background-color: #3c3c3c; }
-    ListRendererFocus { border: 0.53mm solid #007aff; }
+    ListRendererFocus { border: 0.53mm solid #007aff; border-radius: 1.41mm; }
+
+    /* cn1-derive is flattened against the LIGHT parent at compile time, so a UIID
+       that derives in the light block gets a concrete COPY of the light colours and
+       no $Dark entry at all. Without repeating the derive here, a dark-mode TextArea
+       keeps TextField's near-white background on a dark form. Repeat every derive. */
+    TextArea { cn1-derive: TextField; }
+    HorizontalScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
 }

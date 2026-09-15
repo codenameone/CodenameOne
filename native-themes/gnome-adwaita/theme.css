@@ -54,16 +54,26 @@
     --accent-fg-color-dark: #ffffff;
     --window-bg-color: #fafafa;
     --window-bg-color-dark: #242424;
-    --window-fg-color: #2e3436;
-    --window-fg-color-dark: #ffffff;
+    --text-color: #2e3436;
+    --text-color-dark: #ffffff;
     --view-bg-color: #ffffff;
     --view-bg-color-dark: #1e1e1e;
     --headerbar-bg-color: #ebebeb;
     --headerbar-bg-color-dark: #303030;
-    --card-bg-color: #ffffff;
-    --card-bg-color-dark: #2a2a2a;
+    --control-bg-color: #ffffff;
+    --control-bg-color-dark: #2a2a2a;
     --destructive-color: #e01b24;
     --success-color: #2ec27e;
+    --accent-pressed-color: #1c71d8;    /* accent_bg_color darkened on press */
+    --accent-pressed-color-dark: #1c71d8;
+    --text-secondary-color: #5e5c64;    /* the dim label colour */
+    --text-secondary-color-dark: #c0bfbc;
+    --stroke-color: #cdc7c2;            /* the control outline */
+    --stroke-color-dark: #3d3846;
+    --separator-color: #d8d4d0;         /* the divider line */
+    --separator-color-dark: #3d3846;
+    --selection-color: #3584e4;         /* Adwaita selects with the accent */
+    --selection-color-dark: #3584e4;
 
     includeNativeBool: false;
     darkModeBool: true;
@@ -93,13 +103,13 @@
 
 Form {
     background-color: var(--window-bg-color, #fafafa);
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     font-family: "native:MainRegular";
     font-size: 2.9mm;
 }
 
 Label {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainRegular";
     font-size: 2.9mm;
@@ -113,7 +123,7 @@ Label {
  */
 
 Button {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #e1e1e0;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -124,7 +134,7 @@ Button {
 }
 
 Button.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #d6d6d5;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -135,7 +145,7 @@ Button.hover {
 }
 
 Button.pressed {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #c8c8c7;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -203,7 +213,7 @@ RaisedButton.disabled {
 
 /* The flat button: no fill until hovered. */
 FlatButton {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -214,7 +224,7 @@ FlatButton {
 }
 
 FlatButton.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #e1e1e0;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -225,7 +235,7 @@ FlatButton.hover {
 }
 
 FlatButton.pressed {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #d6d6d5;
     border-radius: 1.59mm;
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
@@ -238,7 +248,7 @@ FlatButton.pressed {
 /* --- Text entry ------------------------------------------------------------------------ */
 
 TextField {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: var(--view-bg-color, #ffffff);
     border: 0.26mm solid #cdc7c2;
     border-radius: 1.59mm;
@@ -249,7 +259,7 @@ TextField {
 }
 
 TextField.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: var(--view-bg-color, #ffffff);
     border: 0.26mm solid #b8b0a8;
     border-radius: 1.59mm;
@@ -261,7 +271,7 @@ TextField.hover {
 
 /* Focused: the accent ring Adwaita draws round an active entry. */
 TextField.selected {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: var(--view-bg-color, #ffffff);
     border: 0.53mm solid var(--accent-color, #3584e4);
     border-radius: 1.59mm;
@@ -287,7 +297,7 @@ TextArea { cn1-derive: TextField; }
 /* --- Check, radio, switch -------------------------------------------------------------- */
 
 CheckBox {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     padding: 0.8mm;
     margin: 0.5mm;
@@ -296,11 +306,11 @@ CheckBox {
 }
 
 CheckBox.selected { color: var(--accent-color, #3584e4); background-color: transparent; }
-CheckBox.hover { color: var(--window-fg-color, #2e3436); background-color: #ededeb; }
+CheckBox.hover { color: var(--text-color, #2e3436); background-color: #ededeb; }
 CheckBox.disabled { color: #9a9996; background-color: transparent; }
 
 RadioButton {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     padding: 0.8mm;
     margin: 0.5mm;
@@ -309,7 +319,7 @@ RadioButton {
 }
 
 RadioButton.selected { color: var(--accent-color, #3584e4); background-color: transparent; }
-RadioButton.hover { color: var(--window-fg-color, #2e3436); background-color: #ededeb; }
+RadioButton.hover { color: var(--text-color, #2e3436); background-color: #ededeb; }
 RadioButton.disabled { color: #9a9996; background-color: transparent; }
 
 /* GtkSwitch: a 48x26px pill that fills with accent when on. */
@@ -450,7 +460,7 @@ TitleArea {
 }
 
 Title {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainBold";
     font-size: 2.9mm;
@@ -467,14 +477,14 @@ Toolbar {
 /* --- Dialog --------------------------------------------------------------------------- */
 
 Dialog {
-    background-color: var(--card-bg-color, #ffffff);
+    background-color: var(--control-bg-color, #ffffff);
     border-radius: 3.18mm;
     padding: 4.2mm;
     margin: 2.1mm;
 }
 
 DialogTitle {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainBold";
     font-size: 3.4mm;
@@ -482,7 +492,7 @@ DialogTitle {
 }
 
 DialogBody {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainRegular";
     font-size: 2.9mm;
@@ -508,7 +518,7 @@ DesktopHorizontalScroll { background-color: transparent; }
 DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
 
 ListRenderer {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: transparent;
     border-radius: 1.59mm;
     padding: 1.6mm 2.6mm 1.6mm 2.6mm;
@@ -522,7 +532,7 @@ ListRenderer.selected {
 }
 
 ListRenderer.hover {
-    color: var(--window-fg-color, #2e3436);
+    color: var(--text-color, #2e3436);
     background-color: #ededeb;
     border-radius: 1.59mm;
     padding: 1.6mm 2.6mm 1.6mm 2.6mm;
@@ -556,10 +566,10 @@ ListRendererFocus {
     FlatButton.hover { color: #ffffff; background-color: #383838; }
     FlatButton.pressed { color: #ffffff; background-color: #454545; }
 
-    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #3d3d3d; }
-    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #575757; }
-    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #3584e4; }
-    TextField.disabled { color: #919191; background-color: #282828; border: 0.26mm solid #363636; }
+    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #575757; border-radius: 1.59mm; }
+    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #3584e4; border-radius: 1.59mm; }
+    TextField.disabled { color: #919191; background-color: #282828; border: 0.26mm solid #363636; border-radius: 1.59mm; }
 
     CheckBox { color: #ffffff; }
     CheckBox.selected { color: #3584e4; }
@@ -589,9 +599,9 @@ ListRendererFocus {
     DialogTitle { color: #ffffff; }
     DialogBody { color: #ffffff; }
 
-    ComboBox { color: #ffffff; background-color: #383838; border: 0.26mm solid #3d3d3d; }
-    ComboBox.hover { color: #ffffff; background-color: #454545; border: 0.26mm solid #3d3d3d; }
-    ComboBox.disabled { color: #919191; background-color: #2e2e2e; border: 0.26mm solid #3d3d3d; }
+    ComboBox { color: #ffffff; background-color: #383838; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    ComboBox.hover { color: #ffffff; background-color: #454545; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
+    ComboBox.disabled { color: #919191; background-color: #2e2e2e; border: 0.26mm solid #3d3d3d; border-radius: 1.59mm; }
     Slider.hover { background-color: #575757; color: #3584e4; }
     Slider.disabled { background-color: #2e2e2e; color: #919191; }
     ScrollThumb { background-color: #5e5c64; }
@@ -601,5 +611,14 @@ ListRendererFocus {
     ListRenderer { color: #ffffff; background-color: transparent; }
     ListRenderer.selected { color: #ffffff; background-color: #3584e4; }
     ListRenderer.hover { color: #ffffff; background-color: #383838; }
-    ListRendererFocus { border: 0.53mm solid #3584e4; }
+    ListRendererFocus { border: 0.53mm solid #3584e4; border-radius: 1.59mm; }
+
+    /* cn1-derive is flattened against the LIGHT parent at compile time, so a UIID
+       that derives in the light block gets a concrete COPY of the light colours and
+       no $Dark entry at all. Without repeating the derive here, a dark-mode TextArea
+       keeps TextField's near-white background on a dark form. Repeat every derive. */
+    TextArea { cn1-derive: TextField; }
+    HorizontalScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
 }
