@@ -1310,3 +1310,86 @@ ceiling was a disabled gate beside a number guessed from Mac measurements for a 
 runner nobody has data from. Both are 99, the step is called "Performance report", and
 setting them from the runner's own spread is the follow-up. **A threshold chosen without
 data from the machine that will enforce it is not a ratchet, it is a future flake.**
+
+## The baseline, re-taken on the current tree -- and the headline needs a qualifier
+
+Nothing in this file had measured the shipping default since the worklist moved in
+Round 8. Re-taken, quiet machine (indexers idle, load decaying from 9 to 2.6 -- the first
+attempt was abandoned at load 8.7 with `mediaanalysisd` pinning 228%), 5 interleaved
+rounds, 834-file corpus, output byte-identical across all arms:
+
+| | wall (min of 5) | peak (MAX of 5) | peak (MEDIAN round) |
+|---|---:|---:|---:|
+| parpar | 1.40s | 1496 MB | 1124 MB |
+| jdk25 | 0.90s | 710 MB | 705 MB |
+| jdk8 | 1.14s | 551 MB | 543 MB |
+
+**vs JDK 25: 1.56x time. Memory 2.11x by MAX and 1.59x by MEDIAN.** Read that pair before
+reading anything else, because the two numbers disagree and only one of them has moved:
+
+    parpar peaks   1026 1089 1124 1342 1496 MB     spread 46%
+    jdk25  peaks    693  697  705  709  710 MB     spread  2%
+
+**The central tendency has not regressed at all** -- 1.59x by the median is exactly the
+FINAL headline. What is different is the VARIANCE, and it is entirely on our side. Round 5
+first saw this (1056-1225MB) and attributed it to parallel marking landing cycle
+completion at different points in the allocation stream; Round 6 reported it "gone"
+(810-860MB). On this corpus it is back and larger.
+
+That has a direct consequence for the CI gate: **a MAX-of-N metric over a distribution
+with a 46% spread is not a ratchet, it is a coin.** Either the gate reports a median, or
+its ceiling has to clear the whole spread -- which is most of the way to not being a gate.
+This is the concrete reason the ceilings are parked at 99 rather than tightened.
+
+Note also jdk25 moved 0.65s -> 0.90s and 525MB -> 705MB for the same work. That is the
+corpus growing (796 -> 834 files as master moved) plus a slower session, not a JVM
+regression -- which is exactly why only ratios are quoted.
+
+## ROUND 8'S WORKLIST KNEE DOES NOT SURVIVE n=10
+
+Round 8 moved the default from 1048576 to 262144 on **two samples per arm** (262144:
+760-786MB; 1048576: 812-858MB) and called 262144 the knee. Against a 46% run-to-run
+spread, two samples cannot separate those. Re-run properly -- both arms alternating,
+two passes of 5 rounds each, n=10:
+
+| worklist | median peak | max peak | min peak | spread | time (min) | time (median) | `__bss` |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 262144 (current default) | 1167 MB | 1438 MB | 977 MB | **47%** | 1.32s | 1.40s | 4.20 MB |
+| 1048576 | **1091 MB** | **1280 MB** | 987 MB | **30%** | 1.36s | 1.40s | 16.20 MB |
+
+**1M is better on memory on every summary that is not the minimum** -- median -6.5%, max
+-11% -- and it has **half the variance**, at an identical median wall clock. The direction
+Round 8 chose is the wrong one on this evidence.
+
+**The default is NOT being flipped back, and that is the point.** Round 8's countervailing
+argument is untouched by this and does not need a timing measurement: the array is
+STATIC, so its size is a reservation every generated application carries -- 16.2MB of
+`__bss` against 4.2MB, iOS and Android included. Choosing either constant is a bet about
+which target matters, and that bet has now been made twice from underpowered data and
+been wrong at least once. A third guess is not an improvement.
+
+### The actual fix is to stop choosing
+
+Size the worklist **at runtime from the machine**, allocate it once, and delete the static
+array. An application whose mark frontier never exceeds a few thousand entries would carry
+a pointer instead of a multi-megabyte reservation; a heap big enough to overflow would get
+a worklist big enough to hold its frontier. No compile-time constant, nothing to guess,
+and the knob that has now been set wrong twice stops existing.
+
+Two constraints any implementation has to respect, both already documented in
+`vm/CLAUDE.md` and neither optional:
+
+- **Nothing may allocate while a thread freeze is held.** The root scans run with a
+  mutator stopped mid-`malloc`, possibly holding the libc allocator lock, which is why the
+  worklist is fixed-size today. So the allocation must happen at GC INIT, before any
+  freeze, and a grow-on-overflow design must be barred from the frozen window rather than
+  merely unlikely to enter it.
+- **The serial drain reads the array without the worklist mutex**, by design, while
+  parallel workers `memcpy` batches under it. A capacity that can change has to be
+  published somewhere both agree on, or the growth has to be confined to the serial phase.
+
+The sizing input is the open question, and it is not a detail: `cn1_available_memory` is a
+flat 100MB placeholder on Linux, Windows and the non-Apple fallback, so a naive
+"RAM/N entries" rule would hand every non-Apple target the FLOOR -- which this table says
+is the worst arm. Deriving real physical memory there (`_SC_PHYS_PAGES` on Linux,
+`GlobalMemoryStatusEx` on Windows) is a prerequisite, not a follow-up.
