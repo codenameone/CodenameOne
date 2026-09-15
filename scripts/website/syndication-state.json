@@ -2123,6 +2123,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-15T00:01:11+00:00"
+      },
+      "devto": {
+        "id": 4661234,
+        "url": "https://dev.to/codenameone/we-stopped-waiting-for-platform-changes-to-find-us-4f15",
+        "syndicated_at": "2026-09-15T17:40:13+00:00"
       }
     }
   }
