@@ -207,6 +207,17 @@ public final class HTML5SecureStorage extends SecureStorage {
             }
             // The SETTLED record comes back, which is this tab's ciphertext only if it won.
             String settled = new String(answer, 1, answer.length - 1, "UTF-8");
+            // Mirrored into ordinary storage, which is the namespace every other operation on
+            // this class reads -- get, set, remove, entryState. The bridge record is a GATE and
+            // not the value: leaving the ciphertext only there made a created entry invisible to
+            // all of them, so Database.forgetManagedKey saw an existing managed key as absent and
+            // could never delete it, and remove() reported success while the entry lived on.
+            //
+            // Both tabs write the same settled bytes, so this is idempotent however the race
+            // went: the loser is writing the winner's record, not its own.
+            if (!Storage.getInstance().writeObject(encryptedKey(account), settled)) {
+                return null;
+            }
             String plain = open(account, settled);
             if (plain != null) {
                 // The plaintext entry a previous version may have left goes only once the
@@ -231,6 +242,12 @@ public final class HTML5SecureStorage extends SecureStorage {
     /// HTML5DeviceProtection uses, and for the same reason: a browser has several distinct ways
     /// to refuse and the Java side has to tell them apart.
     static native byte[] nativeSetIfAbsent(String entry, String sealed);
+
+    /// Releases the gate for one entry, so a later create can win it again.
+    ///
+    /// Without this, remove() would clear the value while the gate still held the old ciphertext,
+    /// and the next setIfAbsent would answer with a credential the caller had forgotten.
+    static native byte[] nativeForget(String entry);
 
     /// The status byte a native prefixes its payload with when it succeeded.
     private static final byte STATUS_OK = 0;
@@ -384,6 +401,16 @@ public final class HTML5SecureStorage extends SecureStorage {
         Storage storage = Storage.getInstance();
         storage.deleteStorageFile(encryptedKey(account));
         storage.deleteStorageFile(legacyKey(account));
+        // The gate as well, or the value is gone while the record that settled it remains -- and
+        // the next setIfAbsent would hand back a credential this call was told to forget.
+        try {
+            nativeForget(encryptedKey(account));
+        } catch (RuntimeException noBridge) {
+            // A build whose bridge predates this native. The entry is still removed from the
+            // namespace every read uses, which is what this method promises.
+            Log.p("SecureStorage could not release the create gate: " + reasonOf(noBridge),
+                    Log.WARNING);
+        }
         // Checked, because deleteStorageFile cannot report anything: it returns void. A forgotten
         // key that is still there would leave entryState answering PRESENT for a key the caller
         // believes is gone, and ManagedKeys then refuses to generate a replacement.

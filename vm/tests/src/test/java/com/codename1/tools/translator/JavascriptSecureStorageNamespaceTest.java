@@ -181,21 +181,36 @@ class JavascriptSecureStorageNamespaceTest {
         // derived from the translator rather than read back from the file that declares it.
         // methodIdentifier already carries the cn1_ prefix; adding another is what the first
         // version of this test did, and it reported the binding missing when it was correct.
-        String expected = JavascriptNameUtil.methodIdentifier(
-                "com/codename1/impl/html5/HTML5SecureStorage",
-                "nativeSetIfAbsent",
-                "(Ljava/lang/String;Ljava/lang/String;)[B");
         String portJs = read(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main",
                 "webapp", "port.js").toAbsolutePath().normalize());
-        assertTrue(portJs.indexOf(expected) > 0,
-                "port.js must bind the name the translator emits, which is:\n  " + expected);
-
-        // And the Java side must still declare it, or the binding is for nothing.
         String source = readSource();
-        assertTrue(source.indexOf("static native byte[] nativeSetIfAbsent(") > 0,
-                "HTML5SecureStorage must declare the native the binding names");
+        String[][] natives = {
+            {"nativeSetIfAbsent", "(Ljava/lang/String;Ljava/lang/String;)[B"},
+            {"nativeForget", "(Ljava/lang/String;)[B"},
+        };
+        for (String[] one : natives) {
+            String expected = JavascriptNameUtil.methodIdentifier(
+                    "com/codename1/impl/html5/HTML5SecureStorage", one[0], one[1]);
+            assertTrue(portJs.indexOf(expected) > 0,
+                    "port.js must bind the name the translator emits for " + one[0]
+                    + ", which is:\n  " + expected);
+            assertTrue(source.indexOf("static native byte[] " + one[0] + "(") > 0,
+                    "HTML5SecureStorage must declare " + one[0] + ", or the binding is for "
+                    + "nothing");
+        }
         assertTrue(source.indexOf("public String setIfAbsent(") > 0,
                 "and override setIfAbsent to use it, or the inherited check-then-write stands");
+
+        // The gate is a gate, not the value store: a created entry has to be visible to the
+        // ordinary reads as well, or forgetManagedKey cannot see a key that exists and remove()
+        // reports success over a record that survives.
+        String create = methodBody(source, "public String setIfAbsent(String account, String value)");
+        assertTrue(create.indexOf("writeObject(encryptedKey(account), settled)") > 0,
+                "the settled value must be mirrored into the namespace every read uses: " + create);
+        assertTrue(methodBody(source, "public boolean remove(String account)")
+                        .indexOf("nativeForget(") > 0,
+                "and remove() must release the gate, or a later create answers with what it "
+                + "forgot");
     }
 
     private static String read(Path path) {

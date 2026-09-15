@@ -1338,6 +1338,17 @@ bindNative([
   }));
 });
 
+// Releases the create gate, so remove() leaves nothing behind that a later setIfAbsent could
+// answer with.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeForget_java_lang_String_R_byte_1ARRAY"
+], function*(entry) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreForget",
+    entry: jvm.toNativeString(entry)
+  }));
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeEnsureKey_java_lang_String_R_byte_1ARRAY"
 ], function*(keyId) {

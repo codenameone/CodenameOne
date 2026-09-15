@@ -911,6 +911,24 @@
     });
   }
 
+  /// Releases the gate for one entry, so a later create can win it again.
+  ///
+  /// remove() clears the value from ordinary storage; without this the record that settled the
+  /// race would stay, and the next setIfAbsent would answer with a credential the caller had
+  /// just been told was forgotten.
+  function cn1SecureStoreForget(entry) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.delete(CN1_SECURE_STORE_PREFIX + String(entry));
+      }).then(function() {
+        // Durable before it is called done, for the reason on cn1VaultCommit: a delete that is
+        // still only in a transaction can be lost, and the gate would then outlive the value.
+        return cn1VaultCommit(tx);
+      });
+    });
+  }
+
   /// Keeps secure-storage records from colliding with the device key and the passkey records,
   /// which share this object store.
   var CN1_SECURE_STORE_PREFIX = 'cn1ss.';
@@ -1197,6 +1215,13 @@
           // store that answered "nothing here" lead to opposite decisions on
           // the Java side, and collapsing them is how a device key that was
           // there all along gets replaced.
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreForget') {
+        return cn1SecureStoreForget(request.entry).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
           return cn1VaultReply(cn1VaultStatusOf(error), null);
         });
       }

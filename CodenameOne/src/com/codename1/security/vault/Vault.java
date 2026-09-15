@@ -2002,7 +2002,20 @@ public final class Vault {
                                 // then no longer unwraps, and a password unlock is the way back.
                                 // That is narrower than losing the vault, which is what the
                                 // delete did.
-                                commitMetadata(incoming, local);
+                                //
+                                // And only while nothing has been sealed under what was just
+                                // published. This rollback puts the PREVIOUS record back, which
+                                // on a refresh that brought a rotation means putting back a key
+                                // chain that cannot reach the new key -- so a second tab that
+                                // unlocked the imported state and stored a secret during the
+                                // prompt would find its ciphertext permanently unreadable.
+                                // Secret writes do not touch the metadata, so the compare-and-set
+                                // inside commitMetadata cannot see them; vaultIsStillUntouched
+                                // can, and the first-import rollback beside this one already
+                                // asks it.
+                                if (vaultIsStillUntouched(incoming)) {
+                                    commitMetadata(incoming, local);
+                                }
                             }
                             lock();
                             throw rememberFailed;
