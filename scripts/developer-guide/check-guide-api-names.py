@@ -62,11 +62,6 @@ WORD = re.compile(r'`([A-Z][A-Za-z0-9]{3,})`'
                   r'|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b')
 IDENTIFIER = re.compile(r'\b[A-Z][A-Za-z0-9]{2,}\b')
 # Comments are prose, and prose carries the same typos the guide does.
-BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
-LINE_COMMENT = re.compile(r'(?<![:"\'])//[^\n]*')
-XML_COMMENT = re.compile(r'<!--.*?-->', re.S)
-
-
 def strip_comments(text):
     """Removes comments, which are prose and carry the same typos.
 
@@ -75,10 +70,46 @@ def strip_comments(text):
     them in let a typo vouch for itself: `ConectionRequest` was written into
     both the io chapter and the javadoc of com.codename1.io, and the second
     copy made this check pass over the first.
+
+    String literals are respected rather than pattern-matched around. A
+    lookbehind for ':' was not enough -- "file:///" carries a second slash
+    pair no lookbehind sees, and cutting the line there removed an opening
+    brace, unbalancing the nesting scan and losing every type declared after
+    it in that file.
     """
-    text = BLOCK_COMMENT.sub(' ', text)
-    text = LINE_COMMENT.sub(' ', text)
-    return XML_COMMENT.sub(' ', text)
+    out = []
+    at = 0
+    length = len(text)
+    while at < length:
+        ch = text[at]
+        if ch == '"' or ch == "'":
+            end = at + 1
+            while end < length:
+                if text[end] == '\\':
+                    end += 2
+                    continue
+                if text[end] == ch or text[end] == '\n':
+                    end += 1
+                    break
+                end += 1
+            out.append(text[at:end])
+            at = end
+        elif text.startswith('//', at):
+            newline = text.find('\n', at)
+            at = length if newline < 0 else newline
+        elif text.startswith('/*', at):
+            close = text.find('*/', at + 2)
+            out.append(' ')
+            at = length if close < 0 else close + 2
+        elif text.startswith('<!--', at):
+            close = text.find('-->', at + 4)
+            out.append(' ')
+            at = length if close < 0 else close + 3
+        else:
+            out.append(ch)
+            at += 1
+    return ''.join(out)
+
 
 
 # A type declaration, with the modifiers that decide whether javadoc publishes
