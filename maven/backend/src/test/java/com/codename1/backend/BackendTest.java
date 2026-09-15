@@ -185,6 +185,38 @@ class BackendTest {
     }
 
     @Test
+    @DisplayName("a negative shutdown timeout is refused, and zero is kept")
+    void refusesANegativeShutdownTimeout() throws Exception {
+        // HttpServer.stop reads this as a duration and makes its deadline now +
+        // drain, so a negative one is already past: the drain is skipped and
+        // every request in flight loses its socket mid-response. A typo in a
+        // properties file would turn graceful shutdown into truncated answers
+        // and report nothing.
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        settings.setProperty(Config.SERVER_SHUTDOWN_MILLIS, "-1");
+        IllegalStateException err = assertThrows(IllegalStateException.class,
+                () -> Backend.builder(Config.of(settings, "test"))
+                        .quiet()
+                        .handler(ok())
+                        .start());
+        assertTrue(err.getMessage().indexOf(Config.SERVER_SHUTDOWN_MILLIS) >= 0,
+                err.getMessage());
+
+        // ZERO IS NOT AN ERROR: it is the documented "stop immediately", the
+        // same meaning the pool's timeouts give it, and a server that used it
+        // must still start.
+        Properties immediate = new Properties();
+        immediate.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        immediate.setProperty(Config.SERVER_SHUTDOWN_MILLIS, "0");
+        Backend backend = Backend.builder(Config.of(immediate, "test"))
+                .quiet()
+                .handler(ok())
+                .start();
+        backend.stop();
+    }
+
+    @Test
     @DisplayName("a server with no handlers is refused rather than started")
     void refusesAServerThatWouldAnswerNothing() {
         // Every request would be a 404, which is not a server anybody meant to

@@ -530,7 +530,17 @@ public final class DataSource {
         if(path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
             path = path.substring(12);
         }
-        return ":memory:".equals(path);
+        // AN EMPTY PATH IS ONE OF THESE TOO. "jdbc:sqlite:" with nothing after it
+        // names no file, and SQLite answers that with a private temporary
+        // database PER CONNECTION -- measured: a table created on the first
+        // connection is "no such table" on the second. Classified as a file, it
+        // took the four-connection default and handed successive requests four
+        // different empty databases, which is exactly what pooling ":memory:"
+        // does and what this refuses it for.
+        //
+        // Reached only through the jdbc: spelling: DataSource.open rejects an
+        // empty URL outright before anything gets here.
+        return ":memory:".equals(path) || path.length() == 0;
     }
 
     /**
