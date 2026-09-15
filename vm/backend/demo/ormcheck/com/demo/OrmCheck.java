@@ -743,6 +743,18 @@ public class OrmCheck {
                 refusedNan = "refused";
             }
             check("NaN is refused on every engine", "refused", refusedNan);
+            // An INFINITY is the same story: SQLite and PostgreSQL store it and
+            // MySQL answers "Out of range value", so it cannot be written the
+            // same way on all three either.
+            String refusedInf;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {Double.valueOf(Double.POSITIVE_INFINITY)});
+                refusedInf = "accepted";
+            } catch (Exception err) {
+                refusedInf = "refused";
+            }
+            check("an infinity is refused on every engine", "refused", refusedInf);
             // A SECOND STATEMENT, which SQLite runs the first half of and
             // reports success for while the other two refuse it. Measured: the
             // DELETE never ran and nothing said so.
@@ -755,6 +767,19 @@ public class OrmCheck {
                 refusedTail = "refused";
             }
             check("a second statement is refused on every engine", "refused", refusedTail);
+            // INCLUDING ONE HIDDEN BEHIND A TRANSACTION BEGIN, which the block
+            // counting used to read as an unclosed trigger body -- SQLite then
+            // ran the BEGIN alone and returned the connection to the pool still
+            // inside a transaction.
+            String refusedBegin;
+            try {
+                pool.execute("BEGIN; INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {"begun"});
+                refusedBegin = "accepted";
+            } catch (Exception err) {
+                refusedBegin = "refused";
+            }
+            check("a statement after BEGIN is refused too", "refused", refusedBegin);
             // A TERMINATOR IS NOT A SECOND STATEMENT, and that already worked.
             pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?);", new Object[] {"terminated"});
             // THE CONTROLS, counted together so neither refusal can pass by

@@ -53,7 +53,8 @@ import java.util.Map;
  * The local run deliberately does not terminate TLS, and therefore does not serve
  * HTTP/2. Build the binary when those are what you need to exercise.
  *
- * Settings come from src/main/resources/application.properties, overridden by
+ * Settings come from application.properties in this module's ROOT -- next to its
+ * pom.xml, not under src/main/resources -- overridden by
  * application-&lt;profile&gt;.properties and then by the environment -- which is what
  * lets this run against an in-memory SQLite database here and a managed
  * PostgreSQL in production without a branch in the code:
