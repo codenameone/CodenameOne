@@ -102,7 +102,14 @@ CLASS_POSITION = re.compile(
     # a constant read off it, or its class literal. Both say the token is a
     # type as plainly as a constructor does: Images.DEFAULT and Images.class
     # were read as the plural of Image.
-    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\.\s*(?:[A-Z][A-Z0-9_]*\b|class\b)')
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\.\s*(?:[A-Z][A-Z0-9_]*\b|class\b)'
+    # And the places a type is written without being used: a declaration, a
+    # cast, a type argument, an array. "ARAnchors anchors" names a type that
+    # does not exist and was exempted as the plural of ARAnchor.
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s+[a-z][A-Za-z0-9]*\b'
+    r'|\(\s*([A-Z][A-Za-z0-9]{4,})\s*\)'
+    r'|<\s*([A-Z][A-Za-z0-9]{4,})\s*[,>]'
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\[\s*\]')
 # Every one of those carries a signal that the token is code -- backticks, a
 # link target, a member call. A bare capitalised word in prose carries none,
 # and asking for it is not a near miss away from a class name, it IS one:
