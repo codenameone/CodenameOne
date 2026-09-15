@@ -532,26 +532,35 @@ public final class Database {
         }
         for(int iter = 0 ; iter < params.length ; iter++) {
             if(params[iter] instanceof Double
-                    && ((Double)params[iter]).isNaN()) {
-                // THREE ENGINES, THREE ANSWERS, measured: SQLite's
-                // sqlite3_bind_double turns NaN into SQL NULL, PostgreSQL stores
-                // the NaN, and MySQL refuses the row with "Out of range value".
-                // There is no encoding that makes those agree -- MySQL cannot
-                // hold it at all -- so the value is refused rather than written
-                // as something different on each. A nullable field otherwise
-                // read back null on one engine and NaN on another, and a
-                // primitive field, whose column this ORM declares NOT NULL,
+                    && (((Double)params[iter]).isNaN() || ((Double)params[iter]).isInfinite())) {
+                // NEITHER NaN NOR AN INFINITY CAN BE WRITTEN THE SAME WAY ON
+                // ALL THREE, measured:
+                //
+                //   NaN        sqlite NULL       postgresql NaN        mysql refuses
+                //   +Infinity  sqlite Infinity   postgresql Infinity   mysql refuses
+                //
+                // MySQL answers "Out of range value" to both, so no encoding
+                // reconciles them and the value is refused rather than written
+                // as something different on each. For NaN a nullable field
+                // otherwise read back null on one engine and NaN on another, and
+                // a primitive field -- whose column this ORM declares NOT NULL --
                 // failed to insert on SQLite while succeeding on PostgreSQL.
-                throw new IOException("Parameter " + (iter + 1) + " is NaN, which the three "
-                        + "engines store three different ways: SQLite writes NULL, "
-                        + "PostgreSQL writes NaN and MySQL refuses the row. Decide what it "
-                        + "means -- a null column, or a sentinel you choose -- and bind that "
-                        + "instead.");
+                //
+                // Values.asDoubleObject still READS both, which is not
+                // inconsistent: a column PostgreSQL already holds one in is
+                // readable, and only writing has to agree across engines.
+                throw new IOException("Parameter " + (iter + 1) + " is "
+                        + params[iter] + ", which the engines do not store alike: MySQL "
+                        + "refuses NaN and infinities outright, SQLite turns NaN into NULL, "
+                        + "and PostgreSQL keeps both. Decide what it means -- a null column, "
+                        + "or a sentinel you choose -- and bind that instead.");
             }
-            if(params[iter] instanceof Float && ((Float)params[iter]).isNaN()) {
-                throw new IOException("Parameter " + (iter + 1) + " is NaN; see the message "
-                        + "for a NaN double -- the three engines store it three different "
-                        + "ways and none of them agree.");
+            if(params[iter] instanceof Float
+                    && (((Float)params[iter]).isNaN() || ((Float)params[iter]).isInfinite())) {
+                throw new IOException("Parameter " + (iter + 1) + " is " + params[iter]
+                        + "; see the message for a double -- MySQL refuses NaN and "
+                        + "infinities, SQLite turns NaN into NULL, and PostgreSQL keeps "
+                        + "both, so none of the three agree.");
             }
             if(params[iter] instanceof String && ((String)params[iter]).indexOf(0) >= 0) {
                 throw new IOException("Parameter " + (iter + 1) + " holds a NUL, which "

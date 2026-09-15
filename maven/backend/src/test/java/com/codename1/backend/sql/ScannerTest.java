@@ -144,6 +144,23 @@ class ScannerTest {
         assertTrue(Dialect.SQLITE.hasTrailingStatement(
                 "CREATE TRIGGER x AFTER INSERT ON t BEGIN UPDATE u SET v = 1; END; "
                         + "DROP TABLE u"));
+        // ATOMIC is a trigger body too, not a transaction.
+        assertFalse(Dialect.SQLITE.hasTrailingStatement(
+                "CREATE TRIGGER x AFTER INSERT ON t BEGIN ATOMIC UPDATE u SET v = 1; END"));
+
+        // A TRANSACTION BEGIN IS NOT A BLOCK. Counting it as one left the block
+        // open through end of input, so "BEGIN; INSERT ..." answered false and
+        // SQLite ran the BEGIN alone -- reporting success, dropping the insert,
+        // and handing the connection back to the pool inside a transaction.
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "BEGIN; INSERT INTO t (v) VALUES (1)"));
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "BEGIN TRANSACTION; INSERT INTO t (v) VALUES (1)"));
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "BEGIN IMMEDIATE; INSERT INTO t (v) VALUES (1)"));
+        // On its own it is one statement and stays allowed.
+        assertFalse(Dialect.SQLITE.hasTrailingStatement("BEGIN"));
+        assertFalse(Dialect.SQLITE.hasTrailingStatement("BEGIN;"));
     }
 
     @Test

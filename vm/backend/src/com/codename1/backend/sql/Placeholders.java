@@ -480,9 +480,13 @@ final class Placeholders {
      *
      * <p>BEGIN ... END is counted, because the semicolons inside a trigger body
      * belong to the one statement that contains them and SQLite compiles the
-     * whole of it. A bare BEGIN that opens a transaction leaves the count
-     * raised and makes this answer false, which errs toward allowing rather
-     * than toward refusing something valid.
+     * whole of it. A TRANSACTION BEGIN is not one of those: "BEGIN;" and
+     * "BEGIN TRANSACTION;" are statements in their own right, and counting them
+     * as blocks let "BEGIN; INSERT INTO t ..." through -- SQLite ran the BEGIN,
+     * reported success, dropped the insert and returned the connection to the
+     * pool inside an open transaction. The two are told apart by what follows
+     * the word: a terminator or a transaction keyword, against the statement a
+     * trigger body starts with.
      */
     static boolean hasTrailingStatement(String sql, boolean nestedComments,
                                         boolean backslashEscapes, boolean hashComments,
@@ -513,7 +517,28 @@ final class Placeholders {
                 return after < length;
             }
             if(isWord(sql, at, "begin")) {
-                blocks++;
+                // ONLY A BLOCK BEGIN COUNTS. "BEGIN;" and "BEGIN TRANSACTION;"
+                // open a TRANSACTION and are a whole statement on their own, so
+                // counting them left the block unclosed through end of input and
+                // made "BEGIN; INSERT INTO t ..." answer false -- SQLite then ran
+                // the BEGIN alone, reported success, dropped the insert, and
+                // handed the connection back to the pool still inside a
+                // transaction. An earlier version of this method said a bare
+                // BEGIN "errs toward allowing", which was the wrong trade: the
+                // cost is not a missed refusal, it is a poisoned pooled session.
+                //
+                // A trigger body's BEGIN is followed by the statement it
+                // contains -- or by ATOMIC -- and never by a terminator.
+                int after = skipBlanks(sql, at + 5, nestedComments, backslashEscapes,
+                        hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                        bracketIdentifiers, executableComments);
+                boolean transaction = after >= length || sql.charAt(after) == ';'
+                        || isWord(sql, after, "transaction") || isWord(sql, after, "work")
+                        || isWord(sql, after, "deferred") || isWord(sql, after, "immediate")
+                        || isWord(sql, after, "exclusive");
+                if(!transaction) {
+                    blocks++;
+                }
                 at += 5;
                 continue;
             }
