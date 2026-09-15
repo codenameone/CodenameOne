@@ -35,8 +35,11 @@ name: Desktop theme fidelity
         type: choice
         default: all
         options: [all, windows, macos, gnome]
+  # The two path lists are written out twice rather than shared with a YAML anchor.
+  # The anchor is valid YAML and GitHub Actions does not support it: the workflow
+  # parses locally, and every run fails with "a workflow file issue" and no log.
   pull_request:
-    paths: &gate_paths
+    paths:
       - '.github/workflows/scripts-fidelity-desktop.yml'
       - 'scripts/run-desktop-fidelity-tests.sh'
       - 'scripts/fidelity-app/common/**'
@@ -53,8 +56,21 @@ name: Desktop theme fidelity
       - 'Themes/MacOSAquaTheme.res'
   push:
     branches: [master]
-    paths: *gate_paths
-
+    paths:
+      - '.github/workflows/scripts-fidelity-desktop.yml'
+      - 'scripts/run-desktop-fidelity-tests.sh'
+      - 'scripts/fidelity-app/common/**'
+      - 'scripts/fidelity-app/desktop-runner/**'
+      - 'scripts/fidelity-app/goldens/**'
+      - 'scripts/fidelity-app/baseline/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'native-themes/windows-fluent/**'
+      - 'native-themes/gnome-adwaita/**'
+      - 'native-themes/macos-aqua/**'
+      - 'Themes/WindowsFluentTheme.res'
+      - 'Themes/GnomeAdwaitaTheme.res'
+      - 'Themes/MacOSAquaTheme.res'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
