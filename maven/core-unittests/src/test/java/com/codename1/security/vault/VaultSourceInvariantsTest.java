@@ -202,6 +202,50 @@ class VaultSourceInvariantsTest extends UITestBase {
     }
 
     @Test
+    void aFailedPolicyChangeUndoesItselfBeforeItPublishesTheFailure() {
+        // The rollback lived in a finally, which runs AFTER out.error. An error callback is free
+        // to call setPolicy again and background() starts a NEW THREAD per call, so that retry ran
+        // concurrently with the cleanup: the retry settled a record, the finally then wrote the
+        // old one back over it, and the caller had already been told the retry succeeded.
+        // Completing has to mean the persisted state is settled, which means the last write
+        // happens before the completion rather than after it.
+        //
+        // A shape check, for the reason the rotation's is: off the EDT background() runs the work
+        // synchronously inside setPolicy, so the AsyncResource is already complete before a test
+        // can attach a listener -- and except() then fires immediately and can only observe the
+        // state after everything, including the finally. A behavioural test here cannot tell the
+        // two orderings apart, which is precisely why the defect survived.
+        String whole = methodBody(readVaultSource(),
+                "public AsyncResource<Boolean> setPolicy(final UnlockPolicy policy)");
+        // From the catches onward. The guard ahead of the try publishes a failure too -- the
+        // device record cannot be read, so the call refuses before it changes anything -- and
+        // there is nothing to undo there. What this holds is the failures raised after the
+        // transition has begun.
+        int catches = whole.indexOf("} catch (VaultException");
+        assertTrue(catches > 0, "setPolicy must catch VaultException");
+        String body = whole.substring(catches);
+        int at = 0;
+        int checked = 0;
+        while (true) {
+            int error = body.indexOf("out.error(", at);
+            if (error < 0) {
+                break;
+            }
+            at = error + 1;
+            checked++;
+            // The undo must be the statement before it, not merely somewhere in the method: the
+            // finally still calls the same helper, and finding THAT one would pass over the
+            // ordering this exists to hold.
+            String before = body.substring(Math.max(0, error - 400), error);
+            assertTrue(before.indexOf("undoPolicyChange(") > 0,
+                    "every failure setPolicy publishes must be preceded by its rollback, or the "
+                    + "record is still half-changed when a callback sees it: " + before);
+        }
+        assertTrue(checked >= 2, "only " + checked + " out.error calls found in setPolicy, so "
+                + "this scanned almost nothing");
+    }
+
+    @Test
     void everyRememberNowCallAsksWhetherALockLandedInThePrompt() {
         // rememberNow snapshots the data key it is handed and lock() zeroes that same array in
         // place, so a store that PROMPTS -- a passkey, a keystore with user verification -- can

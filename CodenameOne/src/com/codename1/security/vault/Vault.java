@@ -2175,6 +2175,8 @@ public final class Vault {
                 // An array because the finally below reads it and this is a Java 5 source level;
                 // what it records is the one step of this transition that cannot be undone.
                 final boolean[] outgoingKeyGone = {false};
+                // One-shot, because the rollback now runs from the catches AND from the finally.
+                final boolean[] undone = {false};
                 try {
                     requirePolicySupported(policy);
                     // Judged against the policy being moved TO, and before options is mutated or
@@ -2252,6 +2254,13 @@ public final class Vault {
                     settled = true;
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
+                    // Rolled back BEFORE the failure is published. An error callback runs off
+                    // this completion and is free to call setPolicy again, and background()
+                    // starts a new thread per call -- so a retry from that callback used to run
+                    // concurrently with a finally that then wrote the old record back over what
+                    // the retry had just settled, while the caller had been told the retry
+                    // succeeded. Completing means the persisted state is settled.
+                    undoPolicyChange(configuredBefore, savedRecord, outgoingKeyGone[0], undone);
                     out.error(failed);
                 } catch (RuntimeException broke) {
                     // A worker that throws anything else must still ANSWER. These run detached,
@@ -2260,37 +2269,19 @@ public final class Vault {
                     // A hang is a worse failure than an error, and it is the one the caller
                     // cannot diagnose. Reached most easily by locking mid-operation, which nulls
                     // metadata under a worker that already passed requireUnlocked.
+                    undoPolicyChange(configuredBefore, savedRecord, outgoingKeyGone[0], undone);
                     out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
+                    // Still here as a backstop for any route out that is not one of those two.
+                    // Idempotent, so the common paths do not undo twice.
                     if (!settled) {
                         // Back to exactly what was found, by every route out that is not success
                         // -- which is what "nothing changed" has to mean for a call that reports
                         // failure. The inner handler around rememberNow restores the record too
                         // and that is deliberate redundancy: it is the one place that can put the
                         // record back before the OUTGOING key is deleted, and this runs after.
-                        options.policy(configuredBefore);
-                        if (savedRecord instanceof String && !outgoingKeyGone[0]) {
-                            // Logged and not thrown, which is the one place that is right. This
-                            // is a finally, and the failure it is cleaning up after has ALREADY
-                            // been delivered through out.error above -- so an exception raised
-                            // here reaches nobody: it escapes into the worker past an
-                            // AsyncResource that is already complete. The handler around
-                            // rememberNow does the same restore before the outgoing key is
-                            // deleted and DOES report a refusal, which is the path that can.
-                            if (!Storage.getInstance()
-                                    .writeObject(deviceRecordKey(), savedRecord)) {
-                                Log.p("Vault: the device record could not be restored after a "
-                                        + "failed policy change", Log.WARNING);
-                            }
-                        } else {
-                            // Not restored once the OUTGOING key has been deleted: on a port
-                            // where the two policies are different mechanisms -- a stored key and
-                            // a passkey in the browser -- that key is gone for good, and putting
-                            // its record back leaves a remembered unlock that names a key nothing
-                            // holds. It would fail at the next launch rather than here. Session
-                            // only is the honest state, and the password still opens the vault.
-                            Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                        }
+                        undoPolicyChange(configuredBefore, savedRecord, outgoingKeyGone[0],
+                                undone);
                     }
                 }
             }
@@ -3200,6 +3191,43 @@ public final class Vault {
                     "the vault was locked while this secret was being changed, and the entry "
                     + "this call created could not be removed again");
         }
+    }
+
+    /// Undoes a failed policy change: the configured policy and the device record as they were.
+    ///
+    /// Extracted so it can run BEFORE the AsyncResource is completed. It used to live in a
+    /// finally, which runs after out.error -- and an error callback is free to call setPolicy
+    /// again. background() starts a new thread per call, so that retry ran CONCURRENTLY with this
+    /// cleanup: the retry settled a new record, this then wrote the old one back over it, and the
+    /// caller had already been told the retry succeeded. Completing has to mean the persisted
+    /// state is settled, which means the last write happens first.
+    ///
+    /// Idempotent, because the finally still calls it as a backstop for any route out that is not
+    /// one of the two catches.
+    private void undoPolicyChange(UnlockPolicy configuredBefore, Object savedRecord,
+            boolean outgoingKeyGone, boolean[] alreadyUndone) {
+        if (alreadyUndone[0]) {
+            return;
+        }
+        alreadyUndone[0] = true;
+        options.policy(configuredBefore);
+        if (savedRecord instanceof String && !outgoingKeyGone) {
+            // Logged and not thrown. The failure this is cleaning up after is about to be
+            // delivered, or has been, and replacing it with a storage error would name the wrong
+            // one -- the handler around rememberNow does the same restore before the OUTGOING key
+            // is deleted and DOES report a refusal, which is the path that can.
+            if (!Storage.getInstance().writeObject(deviceRecordKey(), (String) savedRecord)) {
+                Log.p("Vault: the device record could not be restored after a failed policy "
+                        + "change", Log.WARNING);
+            }
+            return;
+        }
+        // Not restored once the OUTGOING key has been deleted: on a port where the two policies
+        // are different mechanisms -- a stored key and a passkey in the browser -- that key is
+        // gone for good, and putting its record back leaves a remembered unlock that names a key
+        // nothing holds. It would fail at the next launch rather than here. Session only is the
+        // honest state, and the password still opens the vault.
+        Storage.getInstance().deleteStorageFile(deviceRecordKey());
     }
 
     /// Puts the device record back, and refuses to claim it did when it did not.
