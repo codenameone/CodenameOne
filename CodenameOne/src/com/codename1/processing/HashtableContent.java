@@ -188,6 +188,13 @@ class MapContent implements StructuredContent {
         if (root instanceof String) {
             return new Vector();
         }
+        // Nor has any other scalar. An array of numbers now keeps its values,
+        // so a path can walk into one -- "/items/scores/value" -- and the cast
+        // to Map further down threw. ParparVM does not throw for a failed
+        // cast, so on a device it would have read the Double as a Map.
+        if (!(root instanceof Map) && !(root instanceof List)) {
+            return new Vector();
+        }
         // on arrays, auto select first element that contains 'name'.
         Object node = root;
         boolean oldList = node == null || (node instanceof Vector);
@@ -376,14 +383,20 @@ class MapContent implements StructuredContent {
     ///
     /// - `name`: the name, already stripped of its '@'
     ///
+    /// Nodes rather than strings, because a JSON field can be an object and
+    /// the step that reads one at the end of a path has to hand back the
+    /// object. Answering with its text gave `getAsArray("/items/@profile")`
+    /// the first key of the map instead of the map, while the child form of
+    /// the same path returned the map. A predicate reads the text off each.
+    ///
     /// #### Returns
     ///
-    /// the values, empty when this element has none
+    /// the value nodes, empty when this element has none
     static List attributeOrFields(StructuredContent element, String name) {
         List values = new ArrayList();
         String attribute = element.getAttribute(name);
         if (attribute != null) {
-            values.add(attribute);
+            values.add(new MapContent(attribute, element));
             return values;
         }
         // XML draws the distinction the expression language draws: "[@rank]"
@@ -398,10 +411,7 @@ class MapContent implements StructuredContent {
         }
         for (Object child : children) {
             if (child instanceof StructuredContent) {
-                String text = ((StructuredContent) child).getText();
-                if (text != null) {
-                    values.add(text);
-                }
+                values.add(child);
             }
         }
         return values;

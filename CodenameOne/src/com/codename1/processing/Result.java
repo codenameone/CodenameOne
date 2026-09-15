@@ -1172,11 +1172,11 @@ public final class Result {
                 // READS an attribute and a predicate that TESTS one agree on
                 // what an attribute is. On JSON they did not: "/players/@id"
                 // answered nothing while "id" sat there as a child.
-                for (Object value : MapContent.attributeOrFields(node, key)) {
-                    // the node rather than the set, so a caller can still walk
-                    // back to the parent of the attribute it read
-                    array.add(new MapContent((String) value, node));
-                }
+                // The nodes themselves, so a JSON field that is an object
+                // comes back as the object rather than as its first key. Each
+                // already knows the element it was read from, so a caller can
+                // still walk back to the parent of the attribute.
+                array.addAll(MapContent.attributeOrFields(node, key));
             }
             return array;
         } else if (key.charAt(0) == Result.ARRAY_END && tokens.size() >= 4) {

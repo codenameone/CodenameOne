@@ -89,7 +89,10 @@ class AttributeEvaluator extends AbstractEvaluator {
         // Every value, because a JSON field can be an array and a match on any
         // of them is a match -- the same rule child evaluation has always used.
         for (Object value : values) {
-            String attr = (String) value;
+            String attr = ((StructuredContent) value).getText();
+            if (attr == null) {
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(attr)) {
                 if (compareNumbers(attr, rvalue) < 0) {
                     return element;
@@ -115,7 +118,10 @@ class AttributeEvaluator extends AbstractEvaluator {
         // Every value, because a JSON field can be an array and a match on any
         // of them is a match -- the same rule child evaluation has always used.
         for (Object value : values) {
-            String attr = (String) value;
+            String attr = ((StructuredContent) value).getText();
+            if (attr == null) {
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(attr)) {
                 if (compareNumbers(attr, rvalue) > 0) {
                     return element;
@@ -149,7 +155,10 @@ class AttributeEvaluator extends AbstractEvaluator {
         }
         rvalue = stripQuotes(rvalue);
         for (Object value : values) {
-            String attr = (String) value;
+            String attr = ((StructuredContent) value).getText();
+            if (attr == null) {
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(attr)) {
                 if (compareNumbers(attr, rvalue) == 0) {
                     return element;

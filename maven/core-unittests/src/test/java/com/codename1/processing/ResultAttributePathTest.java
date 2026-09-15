@@ -407,6 +407,42 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void aScalarHasNoChildrenToWalkInto() {
+        // Keeping the numbers in an array made them traversable, and a path
+        // that continued past the field cast a Double to Map. It threw here;
+        // on a device ParparVM would not have thrown at all.
+        Result r = Result.fromContent(
+                "{\"items\":[{\"scores\":[1,2],\"n\":\"A\"}]}", Result.JSON);
+        assertEquals(0, r.getAsStringArray("/items/scores/value").length,
+                "walking past a scalar should find nothing, not throw");
+    }
+
+    @Test
+    void aStructuredFieldReadThroughAnAttributeStaysStructured() {
+        // The terminal step handed back the text of the field, so an object
+        // came out as its first KEY. The child form of the same path returns
+        // the object, and the two have to agree.
+        Result r = Result.fromContent(
+                "{\"items\":[{\"profile\":{\"name\":\"A\"}}]}", Result.JSON);
+        assertEquals(r.getAsArray("/items/profile").toString(),
+                r.getAsArray("/items/@profile").toString(),
+                "the attribute form and the child form disagree");
+    }
+
+    @Test
+    void digitsAreComparedByValueNotByCodePoint() {
+        // isNumeric accepts whatever Character.isDigit does, so a value can be
+        // written in another decimal script -- and those code points do not
+        // sort against ASCII in numeric order. Integer.parseInt read them as
+        // numbers before this branch replaced it.
+        Result r = Result.fromContent(
+                "<t><p id='\u0661' n='arabic'/><p id='1' n='ascii'/></t>",
+                Result.XML);
+        assertEquals(2, r.getAsStringArray("/t/p[@id=1]/@n").length,
+                "an Arabic-Indic one is still one");
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for

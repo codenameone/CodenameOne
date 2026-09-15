@@ -477,7 +477,7 @@ abstract class AbstractEvaluator implements Evaluator {
             if (value > 100000) {
                 break;
             }
-            value = value * 10 + (text.charAt(i) - '0');
+            value = value * 10 + Character.digit(text.charAt(i), 10);
         }
         return negative ? -value : value;
     }
@@ -511,12 +511,24 @@ abstract class AbstractEvaluator implements Evaluator {
     }
 
     /// Compares two whole-number digit strings by value.
+    ///
+    /// Digit by digit rather than by comparing the strings: isNumeric accepts
+    /// whatever Character.isDigit does, so a value can be written in
+    /// Arabic-Indic or any other decimal script, and those code points do not
+    /// sort in numeric order against ASCII. Integer.parseInt read them as
+    /// numbers, and so does this.
     private int compareDigits(String left, String right) {
         if (left.length() != right.length()) {
             return left.length() < right.length() ? -1 : 1;
         }
-        int order = left.compareTo(right);
-        return order < 0 ? -1 : (order > 0 ? 1 : 0);
+        for (int i = 0; i < left.length(); i++) {
+            int l = Character.digit(left.charAt(i), 10);
+            int r = Character.digit(right.charAt(i), 10);
+            if (l != r) {
+                return l < r ? -1 : 1;
+            }
+        }
+        return 0;
     }
 
     /// Compares two fractional digit strings, padding the shorter with zeros.
@@ -524,8 +536,8 @@ abstract class AbstractEvaluator implements Evaluator {
         int length = left.length() > right.length()
                 ? left.length() : right.length();
         for (int i = 0; i < length; i++) {
-            char l = i < left.length() ? left.charAt(i) : '0';
-            char r = i < right.length() ? right.charAt(i) : '0';
+            int l = i < left.length() ? Character.digit(left.charAt(i), 10) : 0;
+            int r = i < right.length() ? Character.digit(right.charAt(i), 10) : 0;
             if (l != r) {
                 return l < r ? -1 : 1;
             }
@@ -542,7 +554,7 @@ abstract class AbstractEvaluator implements Evaluator {
         }
         int point = text.indexOf('.');
         int end = point < 0 ? text.length() : point;
-        while (at < end && text.charAt(at) == '0') {
+        while (at < end && Character.digit(text.charAt(at), 10) == 0) {
             at++;
         }
         return text.substring(at, end);
@@ -555,7 +567,7 @@ abstract class AbstractEvaluator implements Evaluator {
             return "";
         }
         int end = text.length();
-        while (end > point + 1 && text.charAt(end - 1) == '0') {
+        while (end > point + 1 && Character.digit(text.charAt(end - 1), 10) == 0) {
             end--;
         }
         return text.substring(point + 1, end);
