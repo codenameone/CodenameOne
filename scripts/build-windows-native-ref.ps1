@@ -86,9 +86,14 @@ Write-Log "Running (mode=$env:NATIVEREF_MODE)"
 $exe = Join-Path $publishDir 'NativeRef.exe'
 if (-not (Test-Path $exe)) { throw "NativeRef.exe was not produced in $publishDir" }
 
-# The app is a WinExe, so its Console writes go to the parent console when there is one.
-& $exe
-$rc = $LASTEXITCODE
+# Start-Process -Wait, not `& $exe`. NativeRef is a WinExe (GUI subsystem), so PowerShell's
+# call operator does not wait for it and $LASTEXITCODE is whatever ran before -- which is
+# how run 34947076245 reported SUCCESS while the app itself had written
+# "NATIVEREF:BLOCKER this window never became foreground" and exited 20. A verification
+# harness that cannot fail is worth nothing, and this one could not.
+$proc = Start-Process -FilePath $exe -Wait -PassThru -NoNewWindow
+$rc = $proc.ExitCode
+Write-Log "app exited $rc"
 
 if ($rc -ne 0) {
   Write-Log "FAILED: the reference app exited $rc; see the BLOCKER lines above."

@@ -168,9 +168,12 @@ public partial class App : Application
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr pid);
+    [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint attach, uint attachTo, bool fAttach);
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
-    [DllImport("user32.dll")] private static extern int GetWindowTextW(IntPtr hWnd, [Out] char[] s, int max);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder s, int max);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
@@ -201,8 +204,24 @@ public partial class App : Application
             ShowWindow(hwnd, SW_SHOW);
             for (int i = 0; i < 20 && GetForegroundWindow() != hwnd; i++)
             {
-                BringWindowToTop(hwnd);
-                SetForegroundWindow(hwnd);
+                // Win32 refuses SetForegroundWindow from a process that is not already
+                // foreground -- which is every app on a CI desktop that has the out-of-box
+                // privacy dialog in front. Attaching to the foreground window's input
+                // thread lifts that restriction for the duration.
+                IntPtr fg = GetForegroundWindow();
+                uint fgThread = GetWindowThreadProcessId(fg, IntPtr.Zero);
+                uint thisThread = GetCurrentThreadId();
+                bool attached = fgThread != 0 && fgThread != thisThread
+                                && AttachThreadInput(fgThread, thisThread, true);
+                try
+                {
+                    BringWindowToTop(hwnd);
+                    SetForegroundWindow(hwnd);
+                }
+                finally
+                {
+                    if (attached) AttachThreadInput(fgThread, thisThread, false);
+                }
                 Thread.Sleep(150);
             }
             if (GetForegroundWindow() != hwnd)
@@ -272,9 +291,9 @@ public partial class App : Application
         try
         {
             var fg = GetForegroundWindow();
-            var buf = new char[256];
-            int n = GetWindowTextW(fg, buf, buf.Length);
-            var title = n > 0 ? new string(buf, 0, n) : "(untitled)";
+            var buf = new StringBuilder(256);
+            int n = GetWindowTextW(fg, buf, buf.Capacity);
+            var title = n > 0 ? buf.ToString() : "(untitled)";
             return $"foreground is 0x{fg.ToInt64():X} \"{title}\"";
         }
         catch
@@ -364,8 +383,31 @@ public partial class App : Application
 
     private static string Json(bool b) => b ? "true" : "false";
 
+    /// Escapes for JSON, control characters included. A window title arrived carrying
+    /// embedded NULs and wrote them raw into the manifest, which made it unparseable -- and
+    /// a raw control byte in a text file is precisely what scripts/check-control-characters.py
+    /// exists to prevent, because it turns the file binary to every tool that reads it.
     private static string Escape(string s)
-        => (s ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+    {
+        if (string.IsNullOrEmpty(s)) return string.Empty;
+        var sb = new StringBuilder(s.Length);
+        foreach (var c in s)
+        {
+            switch (c)
+            {
+                case '\\': sb.Append("\\\\"); break;
+                case '"': sb.Append("\\\""); break;
+                case '\n': sb.Append("\\n"); break;
+                case '\r': sb.Append("\\r"); break;
+                case '\t': sb.Append("\\t"); break;
+                default:
+                    if (char.IsControl(c)) sb.Append($"\\u{(int)c:X4}");
+                    else sb.Append(c);
+                    break;
+            }
+        }
+        return sb.ToString();
+    }
 
     private static string ReadRegistry(string name)
     {
