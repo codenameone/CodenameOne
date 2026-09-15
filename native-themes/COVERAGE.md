@@ -149,6 +149,61 @@ SwitchMorph (droplet stretch/squash).
 | Menu / ExposedDropdown | ComboBox / Command menu | not started |
 | Card / ElevatedCard | Container card UIIDs | not started |
 
+## Desktop: Windows Fluent, macOS Aqua, GNOME Adwaita
+
+The three desktop themes share one matrix, so they share one table. Scores are
+absent because the golden sets are not captured yet -- see below.
+
+### Covered components
+
+| Fidelity test | WinUI 3 | AppKit | GTK4 / libadwaita |
+|---|---|---|---|
+| DesktopButton | Button | NSButton (rounded) | GtkButton |
+| DesktopAccentButton | Button + AccentButtonStyle | NSButton (default) | GtkButton `.suggested-action` |
+| DesktopTextField | TextBox | NSTextField | GtkEntry |
+| DesktopCheckBox | CheckBox | NSButton (checkbox) | GtkCheckButton |
+| DesktopRadioButton | RadioButton | NSButton (radio) | GtkCheckButton in a group |
+| DesktopSwitch | ToggleSwitch | NSSwitch | GtkSwitch |
+| DesktopSlider | Slider | NSSlider | GtkScale |
+| DesktopProgressBar | ProgressBar | NSProgressIndicator | GtkProgressBar |
+| DesktopComboBox | ComboBox | NSPopUpButton | GtkDropDown |
+
+States: normal, hover, pressed, selected and disabled as each control supports
+them, in both appearances. 30 tiles per appearance, 60 per platform.
+
+### Known visual gaps (tracked, honest list)
+
+| Gap | Why it is open |
+|---|---|
+| Fluent reveal highlight | The gradient that follows the cursor across a control. Needs per-pixel pointer position at paint time; no CN1 primitive expresses it. |
+| Mica / Acrylic | A WINDOW attribute (`DwmSetWindowAttribute`), not a region operation, so it is not a theme rule at all. The right shape is a `desktopWindowBackdrop` theme constant read at window creation. |
+| Aqua vibrancy | `NSVisualEffectView` is composited by the window server and is invisible to `NSView.cacheDisplay`, which is the capture path that needs no Screen Recording consent. A missing golden is honest; a blank one scores 0% forever and reads as a theme bug. |
+| macOS hover | AppKit draws no rollover state for any control in this matrix. The Aqua theme leaves hover equal to normal, the captured reference says the same, and the gate holds it there. Not a gap in the theme -- a property of the platform. |
+| Adwaita has no Mica analogue | By design. Recorded so nobody goes looking for one. |
+| Window chrome | The tile contract is a widget in a tile. Desktop design languages are half window chrome, and none of it is scored yet. |
+
+### Fonts are the honest ceiling
+
+Segoe UI Variable and SF Pro are system-only and not redistributable, so the
+Windows and macOS sets can never be reproduced away from those platforms. Only
+GNOME can be made fully honest, Cantarell being redistributable and pinnable.
+Where a face cannot be matched the residual is named rather than dismissed as
+anti-aliasing.
+
+### Golden sets are not captured yet
+
+`scripts/fidelity-app/goldens/{windows-11-fluent,macos-aqua,gnome-adwaita}` are
+empty. Until they are seeded, `scripts/run-desktop-fidelity-tests.sh` exits 24
+and `scripts-fidelity-desktop.yml` stays dispatch-only rather than becoming a
+pull-request gate -- a workflow that is permanently red teaches people to ignore
+it, and one that passes on an unseeded set is a check satisfied by nothing having
+happened. Capture them with the `fidelity-desktop-native-ref` workflow in capture
+mode, review every frame, and commit them in one commit naming the run.
+
+Note the capture is 1x, unlike the mobile sets. Desktop tiles are specified in
+LOGICAL pixels and the CN1 side renders at 1x, so a 2x native tile would be
+compared against the CN1 tile's top-left quarter.
+
 ## UIIDs the framework assigns
 
 `ToggleButton` shipped unstyled for as long as both themes existed: the UIID is
