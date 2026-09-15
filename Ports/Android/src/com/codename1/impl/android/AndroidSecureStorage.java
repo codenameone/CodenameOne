@@ -370,6 +370,18 @@ public final class AndroidSecureStorage extends SecureStorage {
      * turns a permanent, silent corruption into a transient failure -- {@code ManagedKeys} raises
      * KEY_UNAVAILABLE and the next launch, whose process reads the file fresh, finds the key.</p>
      *
+     * <p>That last paragraph described what this was supposed to do and not what it did. The
+     * loser blocked on the lock, re-read through {@code get(account)} -- its own stale cache --
+     * saw nothing, and wrote its own value over the winner's. The first process meanwhile kept
+     * using the value it had cached and may already have encrypted data under it, so the outcome
+     * was exactly the permanent corruption the gate exists to prevent, just narrowed to the
+     * window where both processes had opened the preferences before either wrote.</p>
+     *
+     * <p>So the recheck under the lock cannot be the preferences: whatever decides it has to be
+     * visible across processes, and the gate file already is. The winner marks it, and a caller
+     * that finds the mark but reads nothing reports nothing -- which is the transient failure
+     * above, now actually delivered.</p>
+     *
      * @param account the account to create
      * @param value the value to store when there is none
      * @return the value now stored, or null when this caller did not store it and cannot read what
@@ -401,7 +413,29 @@ public final class AndroidSecureStorage extends SecureStorage {
             if (stored != null) {
                 return stored;
             }
-            return set(account, value) ? value : null;
+            if (handle.length() > 0) {
+                // Marked, so some process has already stored this account -- and this one cannot
+                // see it, because the read above went through a SharedPreferences instance that
+                // was cached before that write. Reporting nothing is the honest answer and the
+                // documented one; writing here is what overwrote a key the winner was already
+                // encrypting under.
+                return null;
+            }
+            if (!set(account, value)) {
+                return null;
+            }
+            try {
+                // After the write, never before: a mark left by a store that then failed would
+                // make the account permanently uncreatable, which is worse than the race. If
+                // marking fails the value is still stored, so this still answers with it -- the
+                // next caller is then no worse off than it was before any of this existed.
+                handle.seek(0);
+                handle.write(1);
+                handle.getChannel().force(true);
+            } catch (java.io.IOException cannotMark) {
+                Log.e(cannotMark);
+            }
+            return value;
         } catch (java.io.IOException cannotLock) {
             Log.e(cannotLock);
             return super.setIfAbsent(account, value);

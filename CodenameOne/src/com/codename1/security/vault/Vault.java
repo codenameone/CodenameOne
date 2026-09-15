@@ -23,7 +23,6 @@
 package com.codename1.security.vault;
 
 import com.codename1.io.Storage;
-import com.codename1.security.Base32;
 import com.codename1.security.CryptoException;
 import com.codename1.security.Hash;
 import com.codename1.security.Hmac;
@@ -1357,7 +1356,12 @@ public final class Vault {
                 try {
                     requireUnlocked();
                     byte[] raw = SecureRandom.bytes(20);
-                    char[] code = Base32.encode(raw).toCharArray();
+                    // Into a clearable array, not through Base32.encode's String. A recovery code
+                    // is the one credential that reopens this vault without the password, and the
+                    // String that method returns cannot be zeroed by anybody -- so the array
+                    // handed back was never the only copy the javadoc says it is, and a heap dump
+                    // taken long after lock() still held a working credential.
+                    char[] code = Bytes.base32Chars(raw);
                     Bytes.zero(raw);
                     byte[] derived = recoveryKey(code);
                     VaultMetadata next = metadata.copy();
@@ -2725,11 +2729,14 @@ public final class Vault {
         return application + ":" + safeName();
     }
 
+    /// Decoded straight into the array the caller gets, with no String in between.
+    ///
+    /// Every getSecret answer comes through here. Going via Bytes.fromUtf8 put the whole secret
+    /// into an immutable String -- and into the StringBuilder behind it -- neither of which the
+    /// finally below, or the caller's own wipe of the returned array, can reach. The plaintext
+    /// stayed findable in a heap dump after the vault was locked or destroyed.
     private static char[] chars(byte[] utf8) {
-        String s = Bytes.fromUtf8(utf8, 0, utf8.length);
-        char[] out = new char[s.length()];
-        s.getChars(0, s.length(), out, 0);
-        return out;
+        return Bytes.charsFromUtf8(utf8, 0, utf8.length);
     }
 
     /// Runs work off the EDT so a caller can `get()` the result from the EDT without freezing it.

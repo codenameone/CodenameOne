@@ -145,6 +145,114 @@ final class Bytes {
     /// Decodes bytes this class produced back to a `String`. Malformed sequences become U+FFFD
     /// rather than raising, because the caller has already authenticated the bytes: a decode
     /// failure at this point means a bug, and throwing from inside a decrypt would leak where.
+    /// UTF-8 decoded straight into a clearable array, for anything that must not linger.
+    ///
+    /// The same decoder as [#fromUtf8], with the sink changed: a String is immutable and a
+    /// StringBuilder's buffer is unreachable, so a secret that passes through either survives in
+    /// the heap after every array the caller can reach has been zeroed -- which is exactly the
+    /// promise getSecret and createRecoveryCode make about the characters they hand back. The
+    /// encode side already avoids this and says so; this is the other half.
+    ///
+    /// One char per input byte is a safe ceiling: ASCII is the densest case at one char per byte,
+    /// and a four-byte sequence produces only a surrogate pair.
+    static char[] charsFromUtf8(byte[] data, int offset, int length) {
+        if (data == null || length <= 0) {
+            return new char[0];
+        }
+        char[] scratch = new char[length];
+        int put = 0;
+        int at = offset;
+        int end = offset + length;
+        while (at < end) {
+            int first = data[at++] & 0xff;
+            int cp;
+            int extra;
+            if (first < 0x80) {
+                cp = first;
+                extra = 0;
+            } else if ((first & 0xe0) == 0xc0) {
+                cp = first & 0x1f;
+                extra = 1;
+            } else if ((first & 0xf0) == 0xe0) {
+                cp = first & 0x0f;
+                extra = 2;
+            } else if ((first & 0xf8) == 0xf0) {
+                cp = first & 0x07;
+                extra = 3;
+            } else {
+                scratch[put++] = REPLACEMENT;
+                continue;
+            }
+            if (at + extra > end) {
+                scratch[put++] = REPLACEMENT;
+                break;
+            }
+            boolean valid = true;
+            for (int iter = 0; iter < extra; iter++) {
+                int next = data[at + iter] & 0xff;
+                if ((next & 0xc0) != 0x80) {
+                    valid = false;
+                    break;
+                }
+                cp = (cp << 6) | (next & 0x3f);
+            }
+            if (!valid) {
+                scratch[put++] = REPLACEMENT;
+                continue;
+            }
+            at += extra;
+            if (cp > 0x10ffff) {
+                scratch[put++] = REPLACEMENT;
+            } else if (cp >= 0x10000) {
+                cp -= 0x10000;
+                scratch[put++] = (char) (0xd800 + (cp >> 10));
+                scratch[put++] = (char) (0xdc00 + (cp & 0x3ff));
+            } else {
+                scratch[put++] = (char) cp;
+            }
+        }
+        char[] exact = new char[put];
+        System.arraycopy(scratch, 0, exact, 0, put);
+        zero(scratch);
+        return exact;
+    }
+
+    /// Base32, encoded straight into a clearable array.
+    ///
+    /// Byte for byte what [com.codename1.security.Base32#encode] produces -- BytesTest holds the
+    /// two against each other over random input, because a private copy of an encoding is only
+    /// safe while it cannot drift from the one the decoder expects. It exists at all because that
+    /// method returns a String, and a recovery code is the one credential that reopens the vault.
+    static char[] base32Chars(byte[] data) {
+        if (data == null || data.length == 0) {
+            return new char[0];
+        }
+        char[] alphabet = BASE32_ALPHABET;
+        int output = ((data.length + 4) / 5) * 8;
+        char[] out = new char[output];
+        int put = 0;
+        int bits = 0;
+        int value = 0;
+        for (byte one : data) {
+            value = (value << 8) | (one & 0xff);
+            bits += 8;
+            while (bits >= 5) {
+                out[put++] = alphabet[(value >>> (bits - 5)) & 0x1f];
+                bits -= 5;
+            }
+        }
+        if (bits > 0) {
+            out[put++] = alphabet[(value << (5 - bits)) & 0x1f];
+        }
+        while (put < output) {
+            out[put++] = '=';
+        }
+        return out;
+    }
+
+    private static final char[] BASE32_ALPHABET =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".toCharArray();
+
     static String fromUtf8(byte[] data, int offset, int length) {
         if (data == null || length <= 0) {
             return "";
