@@ -26,15 +26,16 @@ package java.lang;
 public class Thread implements java.lang.Runnable{
     /// This thread's ThreadLocal values, keyed by the ThreadLocal object itself.
     ///
-    /// Package private and touched only by java.lang.ThreadLocal, which reaches it
-    /// through Thread.currentThread() -- so every read and write is by the thread
-    /// that owns it and no lock is needed. It used to live the other way round, one
-    /// shared HashMap per ThreadLocal written by every thread at once, which
-    /// corrupted that map's probe sequence and spun; see the comment on ThreadLocal.
+    /// Keyed WEAKLY by the ThreadLocal object itself, so nothing here keeps one
+    /// alive; see the comment on ThreadLocal. Package private and touched only by
+    /// that class, which reaches it through Thread.currentThread() -- so every read
+    /// and write is by the thread that owns it and no lock is needed. It used to
+    /// live the other way round, one shared HashMap per ThreadLocal written by
+    /// every thread at once, which corrupted that map's probe sequence and spun.
     ///
     /// Null until the thread actually uses a ThreadLocal, and it dies with the
     /// thread, which is what stops the per-thread entries leaking.
-    java.util.HashMap threadLocalValues;
+    ThreadLocal.Entry[] threadLocalValues;
 
     /// The maximum priority that a thread can have.
     /// See Also:Constant Field Values

@@ -189,9 +189,39 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        processClass(cls, ctx, true);
+    }
+
+    /// @param fromThisModule whether `cls` came out of this module's own
+    ///     `target/classes`, and so must still have a source file behind it.
+    ///     False for the classpath scan, whose entities live in a DEPENDENCY and
+    ///     legitimately have no source under these roots.
+    private void processClass(AnnotatedClass cls, ProcessorContext ctx, boolean fromThisModule)
+            throws ProcessingException {
         if (cls.isSynthetic()) return;
         AnnotationValues entityAnn = cls.getClassAnnotation(ENTITY_DESC);
         if (entityAnn == null) return;
+        // A DELETED ENTITY LEAVES ITS CLASS FILE BEHIND. Maven does not clean
+        // target/classes between incremental builds, so an entity whose source was
+        // deleted or renamed is still there, still annotated, and is still accepted
+        // here -- which keeps `accepted` non-empty, so finish() never reaches
+        // removeAStaleBootstrap and regenerates the dao and the bootstrap entry for
+        // a class the developer removed. The backend then registers it and can
+        // recreate its table, and nothing says why until someone runs mvn clean.
+        //
+        // The same check RestControllerAnnotationProcessor uses for the same
+        // problem, and it is conservative in the right direction: only a class it
+        // can positively show has no source is skipped, so a live one is never
+        // dropped.
+        //
+        // NOT applied to the classpath scan. An entity is the one class both halves
+        // of an application own, so the natural place for it is a module they both
+        // depend on -- and those classes have no source under THIS module's roots
+        // by construction. Filtering them here would delete the main use case.
+        if (fromThisModule && !BuildHintAnnotationProcessor.hasBackingSource(
+                cls, ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
+            return;
+        }
         if (cls.isAbstract() || cls.isInterface()) {
             ctx.error(cls, "@Entity requires a concrete class; " + cls.getBinaryName()
                     + " is abstract or an interface");
@@ -800,7 +830,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if (cls == null || accepted.containsKey(cls.getBinaryName())) {
             return;
         }
-        processClass(cls, ctx);
+        processClass(cls, ctx, false);
     }
 
     /// The kind constants on `com.codename1.backend.sql.Dialect`, mirrored here
