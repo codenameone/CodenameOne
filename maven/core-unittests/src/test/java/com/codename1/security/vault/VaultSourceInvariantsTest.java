@@ -166,10 +166,23 @@ class VaultSourceInvariantsTest extends UITestBase {
                 "public AsyncResource<Boolean> rotateDataKey(final char[] password)");
         assertTrue(body.indexOf("requireSameKey(") > 0,
                 "the rotation must recheck the key generation it captured");
+        // And before the COMMIT, not merely before the swap. That is the stronger property and
+        // the weaker one was actively harmful: a check sitting between commitMetadata and
+        // adoptKey threw over a rotation that had already durably happened, so the caller saw a
+        // failure, skipped the database rekey the javadoc asks for, and the next unlock loaded a
+        // vault key that could no longer open that database. Refusing is only an option while
+        // nothing is persisted.
+        int commit = body.indexOf("commitMetadata(");
+        assertTrue(commit > 0, "the rotation must commit its metadata");
+        assertTrue(body.lastIndexOf("requireSameKey(", commit) > 0,
+                "the recheck must come before the commit, while a refusal still means the "
+                + "rotation did not happen: " + body);
         int adopt = body.indexOf("adoptKey(");
         assertTrue(adopt > 0, "the rotation must adopt the fresh key");
-        assertTrue(body.lastIndexOf("requireSameKey(", adopt) > 0,
-                "the recheck must come BEFORE the swap, or it guards nothing: " + body);
+        assertTrue(body.indexOf("requireSameKey(", commit) < 0
+                        || body.indexOf("requireSameKey(", commit) > adopt,
+                "and there must be no key check between the commit and the swap, which would "
+                + "report a committed rotation as a failure: " + body);
     }
 
     @Test

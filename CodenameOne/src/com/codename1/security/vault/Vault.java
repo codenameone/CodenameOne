@@ -1728,6 +1728,12 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the key was being rotated");
                     }
+                    // The key check belongs HERE, with the lock check above it, because this is
+                    // the last point at which nothing is durable. The seal above takes real time
+                    // -- a KDF at the configured profile -- and a replacement landing inside it
+                    // means the retired envelope wrapped the zeroed array. Refusing now means the
+                    // rotation simply did not happen.
+                    requireSameKey(keyAt);
                     stampMac(next, meta, fresh);
                     commitMetadata(meta, next);
                     // Read back and confirm the record on disk is the one just written, BEFORE
@@ -1768,9 +1774,21 @@ public final class Vault {
                                 "the vault was locked while the key was being rotated; the "
                                 + "rotation is stored and the vault is closed");
                     }
-                    // And once more before the swap: the seal above takes real time, and a
-                    // replacement landing inside it would have retired zeroes.
-                    requireSameKey(keyAt);
+                    // Deliberately NOT another requireSameKey. The rotation is committed by
+                    // this point, and a version of this asked the question here: a redundant
+                    // unlockWithPassword publishing between the read-back and this line moved
+                    // keyGeneration, so the guard threw over a rotation that had already durably
+                    // happened. The caller saw a failed rotation and skipped the database rekey
+                    // the javadoc tells it to do, the next unlock loaded the new vault key, and
+                    // the database could not be opened again -- a data loss produced by the
+                    // check rather than by the race.
+                    //
+                    // Adopting is also the correct answer rather than merely the harmless one.
+                    // Whatever a concurrent unlock published was derived from the metadata this
+                    // rotation has just replaced, so it is superseded by construction; `fresh` is
+                    // the key the persisted record now describes. Refusing would leave the vault
+                    // OPEN holding a key its own metadata no longer names, which is worse than
+                    // either outcome the check was choosing between.
                     adoptKey(fresh);
                     fresh = null;
                     metadata = next;
