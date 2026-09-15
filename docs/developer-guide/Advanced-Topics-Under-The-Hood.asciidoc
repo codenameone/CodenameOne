@@ -1475,8 +1475,6 @@ reaches the theme, and the build log names it. Android Studio puts ordinary app 
 attribute produces no theming, and that log line is where it says so. The names the build accepts are read
 from the installed platform, so any `android:` theme attribute works, not a fixed list.
 
-TIP: A boolean theme attribute takes its value directly. Write `<color name="windowLightStatusBar">true</color>`
-for dark text on a light status bar.
 
 === Intercepting URLs on iOS & Android
 

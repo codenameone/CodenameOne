@@ -5416,13 +5416,20 @@ public class AndroidGradleBuilder extends Executor {
         File colors = new File(valsDir, "colors.xml");
         String colorsStr = "";
         try {
-            // Gradle runs against androidSDKDir here, so the platform that
-            // links these resources is one this process can read.
-            Set<String> frameworkAttributes =
-                    frameworkThemeAttributes(androidSDKDir, Integer.parseInt(targetNumber));
+            // The minimum is the compile SDK, not the target: gradle may
+            // select a platform newer than anything installed and let AGP
+            // download it, and an attribute introduced there would look
+            // unknown here and be dropped although aapt2 resolves it. Asking
+            // compileSdkInt rather than naming the floors keeps this correct
+            // when a new raise is added to it.
+            int effectiveCompileSdk = compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                    targetNumber, usesNearbyRanging,
+                    usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion, usesCallVoip,
+                    usesCustomTunnel);
+            Set<String> frameworkAttributes = frameworkThemeAttributes(androidSDKDir, effectiveCompileSdk);
             if (frameworkAttributes == null && colors.exists()) {
-                log("No installed Android platform reaches API " + targetNumber + ", so every color in "
-                        + "colors.xml is passed to the theme unchecked");
+                log("No installed Android platform reaches the compile SDK (" + effectiveCompileSdk
+                        + "), so every color in colors.xml is passed to the theme unchecked");
             }
             ThemeColors themeColors = buildThemeColorItems(colors, frameworkAttributes);
             colorsStr = themeColors.items;
@@ -10494,7 +10501,7 @@ public class AndroidGradleBuilder extends Executor {
      * @param color the color value for {@code android.adaptiveIconBackground}
      */
     static void writeAdaptiveIconBackgroundColor(File valsDir, String color) throws IOException {
-        if (declaresColor(new File(valsDir, "colors.xml"), "ic_launcher_background")) {
+        if (declaresColor(new File(valsDir, "colors.xml"), ADAPTIVE_ICON_BACKGROUND_COLOR)) {
             return;
         }
         String iconBackgroundColors = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
@@ -10554,6 +10561,15 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     /**
+     * The color resource the generated adaptive launcher icon names as its
+     * background. It is an icon resource by construction -- this builder emits
+     * the {@code @color/} reference to it from
+     * {@code mipmap-anydpi-v26/ic_launcher.xml} -- so it is never a theme
+     * attribute, whoever declared it.
+     */
+    static final String ADAPTIVE_ICON_BACKGROUND_COLOR = "ic_launcher_background";
+
+    /**
      * What {@code res/values/colors.xml} contributed to the generated theme:
      * the rendered {@code <item>} entries, and the color names that were left
      * out because they are not Android theme attributes.
@@ -10583,10 +10599,11 @@ public class AndroidGradleBuilder extends Executor {
      * through to fail the link. It remains an ordinary {@code @color/} resource
      * either way.</p>
      *
-     * <p>A color whose value is {@code true} or {@code false} is a boolean
-     * theme item such as {@code android:windowLightStatusBar}, so the value is
-     * written literally instead of as a {@code @color/} reference, which would
-     * not resolve.</p>
+     * <p>A boolean theme attribute cannot arrive this way and is not handled:
+     * a {@code <color>} element holding {@code true} fails to compile at all
+     * ("error: invalid color"), so the file never reaches the theme
+     * generation. {@code android.windowLightStatusBar} is the build hint for
+     * the one such attribute this builder supports.</p>
      *
      * @param colorsFile the developer's colors.xml; a file that does not exist
      *                   contributes nothing
@@ -10611,18 +10628,20 @@ public class AndroidGradleBuilder extends Executor {
                 continue;
             }
             String k = key.getNodeValue();
-            if (frameworkAttributes != null && !frameworkAttributes.contains(k)) {
+            // Unconditional, and before the framework check, because this one
+            // does not depend on being able to read a platform: the adaptive
+            // icon this builder generates references the color, which is what
+            // makes it an icon resource rather than a theme attribute. Leaving
+            // it to the framework check would put it back in the theme on
+            // every build whose compile platform is unreadable from here --
+            // which is the build server -- and that is issue #5837 again.
+            if (ADAPTIVE_ICON_BACKGROUND_COLOR.equals(k)
+                    || (frameworkAttributes != null && !frameworkAttributes.contains(k))) {
                 skipped.add(k);
                 continue;
             }
-            String value = color.getTextContent() == null ? "" : color.getTextContent().trim();
-            if ("true".equals(value) || "false".equals(value)) {
-                colorsStr.append("<item name=\"android:").append(k).append("\">").append(value)
-                        .append("</item>\n");
-            } else {
-                colorsStr.append("<item name=\"android:").append(k).append("\">@color/").append(k)
-                        .append("</item>\n");
-            }
+            colorsStr.append("<item name=\"android:").append(k).append("\">@color/").append(k)
+                    .append("</item>\n");
         }
         return new ThemeColors(colorsStr.toString(), skipped);
     }

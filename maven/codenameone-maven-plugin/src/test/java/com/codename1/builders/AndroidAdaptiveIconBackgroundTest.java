@@ -101,13 +101,23 @@ class AndroidAdaptiveIconBackgroundTest {
     }
 
     @Test
-    void aBooleanValuedAttributeIsWrittenLiterally(@TempDir File valsDir) throws Exception {
-        // android:windowLightStatusBar is a boolean theme item. "@color/x"
-        // would not resolve to a boolean, so the value passes through as-is.
-        File colors = write(valsDir, "<color name=\"windowLightStatusBar\">true</color>");
+    void theGeneratedIconBackgroundIsNeverPromoted(@TempDir File valsDir) throws Exception {
+        // Issue #5837 itself, and it must hold with no platform to check
+        // against -- which is every build whose compile SDK this process
+        // cannot read, including the build server. The adaptive icon
+        // references this color, so it is an icon resource, not an attribute.
+        File colors = write(valsDir, "<color name=\"colorPrimary\">#ff00ff00</color>\n"
+                + "    <color name=\"ic_launcher_background\">#000000</color>");
 
-        assertTrue(items(colors).contains("<item name=\"android:windowLightStatusBar\">true</item>"),
-                "a true/false value is a boolean theme item, not a color reference");
+        AndroidGradleBuilder.ThemeColors unchecked =
+                AndroidGradleBuilder.buildThemeColorItems(colors, null);
+
+        assertFalse(unchecked.items.contains("ic_launcher_background"),
+                "promoting it is the resource-linking failure this whole change exists to stop");
+        assertTrue(unchecked.items.contains("<item name=\"android:colorPrimary\">@color/colorPrimary</item>"),
+                "every other name is still passed through unchecked");
+        assertEquals(Arrays.asList("ic_launcher_background"), unchecked.skipped,
+                "and the build log says which color was left out");
     }
 
     @Test
@@ -124,6 +134,8 @@ class AndroidAdaptiveIconBackgroundTest {
         assertTrue(themeColors.items.contains("<item name=\"android:somethingUnknown\">@color/somethingUnknown</item>"),
                 "an unchecked build passes every name through, as it always did");
         assertTrue(themeColors.skipped.isEmpty(), "nothing was checked, so nothing was skipped");
+        assertTrue(themeColors.items.contains("<item name=\"android:colorPrimary\">@color/colorPrimary</item>"),
+                "including the ones that are attributes");
     }
 
     @Test
