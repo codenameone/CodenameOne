@@ -276,12 +276,25 @@ final class VaultMetadata {
                     }
                     String one = value.substring(from, comma);
                     if (one.length() > 0) {
+                        if (out.ancestors.size() >= MAX_ANCESTORS) {
+                            // Bounded on the way IN as well as on the way out. Stamping trims to
+                            // this, so a record carrying more was not written by any vault -- and
+                            // an import stores the incoming record verbatim, so enforcing the cap
+                            // only where we stamp let a sync server grow this device's record
+                            // without limit, one import at a time.
+                            throw new VaultException(VaultError.CORRUPT,
+                                    "vault record carries more than " + MAX_ANCESTORS
+                                    + " generations of ancestry");
+                        }
                         out.ancestors.add(one);
                     }
                     from = comma + 1;
                 }
             } else if (key.startsWith("retired.")) {
-                out.retired.put(Integer.valueOf(parseInt(key.substring(8))), hex(value));
+                // Through the same bound as key.version, so a retired entry cannot name a
+                // version the format says no vault reaches.
+                out.retired.put(Integer.valueOf(requireSaneVersion(parseInt(key.substring(8)))),
+                        hex(value));
             } else {
                 // Kept rather than dropped: see the class note on round-tripping.
                 unknown.append(line).append('\n');

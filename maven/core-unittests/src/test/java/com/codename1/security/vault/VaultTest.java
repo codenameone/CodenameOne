@@ -1921,6 +1921,51 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRecordCarryingMoreAncestryThanTheFormatAllowsIsRefused() {
+        // The cap is applied when a record is STAMPED, and an import stores the incoming record
+        // verbatim -- so enforcing it only on the way out let a sync server grow this device's
+        // stored record without limit, one import at a time. Not an amplification the way the
+        // key version was, but the same shape: a value inside an untrusted record deciding how
+        // much this device keeps.
+        String name = freshName();
+        Vault first = Vault.named(name).configure(fast());
+        first.enroll(pw("p"), fast()).get();
+        byte[] state = first.exportSyncState();
+
+        StringBuilder ancestry = new StringBuilder();
+        for (int iter = 0; iter <= VaultMetadata.MAX_ANCESTORS + 5; iter++) {
+            if (iter > 0) {
+                ancestry.append(',');
+            }
+            ancestry.append("00112233445566").append((char) ('a' + (iter % 6)));
+        }
+        String forged = new String(state, java.nio.charset.StandardCharsets.UTF_8)
+                + "ancestors=" + ancestry + "\n";
+
+        Vault other = Vault.named(freshName()).configure(fast());
+        assertEquals(VaultError.CORRUPT,
+                errorOf(other.importSyncState(
+                        forged.getBytes(java.nio.charset.StandardCharsets.UTF_8), pw("p"))),
+                "a record carrying more ancestry than a vault ever writes is malformed");
+    }
+
+    @Test
+    void anOrdinaryAncestryStillParses() {
+        // The bound must not refuse what this vault itself produces, which is what fills the
+        // ancestry in the first place.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        for (int iter = 0; iter < 5; iter++) {
+            assertTrue(vault.changePassword(pw("p"), pw("p")).get().booleanValue());
+        }
+        byte[] state = vault.exportSyncState();
+        Vault joined = Vault.named(freshName()).configure(fast());
+        assertTrue(joined.importSyncState(state, pw("p")).get().booleanValue(),
+                "five password changes is ordinary ancestry");
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:
