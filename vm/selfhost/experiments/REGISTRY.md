@@ -1393,3 +1393,109 @@ flat 100MB placeholder on Linux, Windows and the non-Apple fallback, so a naive
 "RAM/N entries" rule would hand every non-Apple target the FLOOR -- which this table says
 is the worst arm. Deriving real physical memory there (`_SC_PHYS_PAGES` on Linux,
 `GlobalMemoryStatusEx` on Windows) is a prerequisite, not a follow-up.
+
+---
+
+# Round 10: the census redirects the optimization work
+
+Round 9 left a corrected baseline (1.56x time, 1.59x memory by median) and a plan whose
+memory half was ranked by analogy. This round replaced that ranking with a measurement,
+and the measurement moved almost everything.
+
+## Where the heap actually is, at exit, 499.49MB occupied
+
+```
+[LIVE:exit] occupied 3844008 objects 499.49MB
+            traced 1800985 (47%)  fresh 0%  aging 1333162 (35%)  dead 708439 (18%)
+            bibop 327.77MB  legacy 171.72MB
+[JHEAP:exit] pages=6782 reserved=423.88MB live=327.77MB slack=96.11MB
+             legacy objects=488784 bytes=171.72MB | PROCESS footprint=842.38MB
+             MALLOC inUse=645.50MB allocated=710.23MB idle=64.73MB
+```
+
+| class | MB | objects | B/obj |
+|---|---:|---:|---:|
+| char[] | 164.04 | 651,737 | 263 |
+| java.lang.Object[] | 105.53 | 642,910 | 172 |
+| java.lang.String | 42.28 | 476,028 | 93 |
+| java.lang.StringBuilder | 29.84 | 195,552 | 160 |
+| byte[] | 23.63 | 27,882 | 888 |
+| int[] | 22.34 | 190,113 | 123 |
+| java.util.HashMap | 16.00 | 174,786 | 96 |
+| ArrayList.ArrayListIterator | 15.16 | 331,205 | 48 |
+
+Four classes are 68% of the live heap. Two of the plan's items die here:
+
+- **32-bit references are not the big swing.** `Object[]` is the only substantially
+  reference-dense population and is 105MB gross; halving its payload is ~40MB of an
+  842MB footprint, for a change that rewrites every generated object struct and breaks
+  every port native that reads a reference field. The census was written to answer
+  exactly this question before the work started, and the answer is no.
+- **BiBOP slack (96MB, 23% of the arena) is downstream, not a lever.** It is free slots
+  inside pages retained because they still hold at least one occupied slot. With 53% of
+  occupied slots holding unreachable objects, the slack is a symptom of the float.
+
+## THE AGING SLACK IS WORTH NOTHING, AND THE CENSUS BUCKET PREDICTED OTHERWISE
+
+35% of occupied bytes (about 175MB) sit in the "aging" bucket -- marked last cycle,
+unreachable this cycle, held one more cycle by `CN1_GC_AGING_SLACK`. That looks like the
+single largest memory item in the collector, and its own comment says so.
+
+Measured, `CN1_GC_AGING_SLACK` 1 vs 0, alternating arms, four passes of five rounds:
+
+| slack | n | median peak | mean peak | range |
+|---|---:|---:|---:|---|
+| 1 (default) | 15 | 1153 MB | 1218 MB | 1053-1503 |
+| 0 | 20 | 1135 MB | 1166 MB | 957-1460 |
+
+**Two-sided permutation test on the means: p = 0.34.** Not a result. This CONFIRMS
+Round 5, which found the same knob worthless under parallel marking, and refutes the
+hypothesis this round started from.
+
+**The lesson generalises and is the most useful thing in this round: a census bucket's
+SIZE does not predict the PEAK.** Freeing 175MB one cycle earlier does not lower the high
+water mark, because the peak is set by how far the mutator runs ahead between cycles, not
+by how long the collector holds what it has already decided is dead. That is the same
+mechanism parallel marking exploited -- shorter cycles cut time and memory together --
+and it reframes the memory problem: **the levers are cycle length and allocation VOLUME,
+not retention.**
+
+It also explains the 46% run-to-run spread directly. The peak depends on where in the
+allocation stream a cycle happens to finish, which is timing.
+
+## So: allocation volume. The array header is 20% of it
+
+Per cycle, 551,580 of 1,401,234 allocated objects are arrays. At a 40-byte header that is
+21.0MB of the 105.3MB allocated per cycle before any payload.
+
+`dimensions` (max 4) and `primitiveSize` (max 8) were both `int`, and the struct already
+wasted 4 bytes of tail padding before `data`. Narrowed to a byte each, `data` moves into
+that padding and the header goes **40 -> 32**.
+
+Measured on allocation volume, which unlike peak is stable to 0.25-0.50% across reps --
+three reps per arm, alternating:
+
+| | before | after |
+|---|---:|---:|
+| bytes allocated | 804.5 MB | **777.0 MB** |
+| bytes per object | 100.88 | **97.24** |
+
+**-27.5MB per run, -3.42% of allocation volume, -3.61% per object.** Object count rose
+0.19% between arms, so bytes-per-object is the honest figure; it matches the prediction
+(a fifth off a fifth of all bytes is ~4%).
+
+Unlike every GC tuning result in this file, this one is not specific to a corpus or a
+configuration: it is 8 bytes off every array in every generated application.
+
+**Peak footprint is deliberately NOT quoted for it.** Single-sample peaks across the two
+arms read 857MB and 956MB -- in the wrong direction -- which is exactly what a 46% spread
+does to a one-shot comparison. The effect is real and below this harness's noise floor on
+that metric; allocation volume is the metric that can carry the claim.
+
+### The next item the same census names
+
+`ArrayListIterator`: 100,566 objects allocated per cycle at 48 bytes = 4.6MB/cycle, 4.4%
+of allocation volume, every one of them a for-each loop's iterator that a lowered indexed
+loop would not allocate at all -- on top of the two interface dispatches per element it
+removes, each a five-load chase. `ForEachScan` in `experiments/concat/` exists to size
+which receivers are provably indexable before that is written.
