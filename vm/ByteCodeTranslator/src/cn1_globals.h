@@ -1495,6 +1495,16 @@ struct ThreadLocalData {
     struct ThreadLocalData* gcDeadNext;
     JAVA_BOOLEAN gcQueuedForDrain;
     JAVA_BOOLEAN gcReleaseRequested;
+    // THREAD IDENTITY, AND DELIBERATELY OUTSIDE THE CONSERVATIVE-ROOTS GUARD BELOW.
+    // These two say "this TLD belongs to a real registered thread", which is a question
+    // every configuration asks: CN1_RESUME_THREAD reads gcPthreadValid unconditionally
+    // to decide whether it may republish threadActive. They used to sit inside the
+    // #ifdef, so -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS did not compile -- four errors in
+    // nativeMethods.c, all of them CN1_RESUME_THREAD -- and had not for long enough that
+    // nobody could tell when it broke. That is the same failure that retired the nursery
+    // arm: a documented configuration no gate builds stops building and nothing says so.
+    pthread_t    gcPthread;              // pthread_self() of THIS thread (set at startup)
+    JAVA_BOOLEAN gcPthreadValid;         // gcPthread has been filled in
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // PHASE 3b: state for conservatively scanning this thread's native C stack as a
     // GC root source (so object-bearing FRAMELESS methods, whose object roots live in
@@ -1504,8 +1514,6 @@ struct ThreadLocalData {
     //       safepoint runs CN1_GC_PARK_CAPTURE just before publishing threadActive=0.
     //   (2) SIGNAL stop: the GC pthread_kills any thread it could not cooperatively
     //       park; the async-signal-safe handler captures SP+regs and spins here.
-    pthread_t    gcPthread;              // pthread_self() of THIS thread (set at startup)
-    JAVA_BOOLEAN gcPthreadValid;         // gcPthread has been filled in
     // cooperative-park capture
     jmp_buf      gcRegisterSnapshot;     // setjmp flushes callee-saved regs -> scanned
     void* volatile gcStackPointerAtPark; // SP-ish low bound captured at the park point

@@ -4310,7 +4310,7 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
     // of the fused child header is stored, the data region is fully memcpy'd,
     // and ONLY THEN is the class pointer published -- until that store the
     // parentCls==0 guard keeps a signal-stopped scan from tracing the body.
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+#ifndef CN1_DISABLE_BIBOP
     JAVA_OBJECT so = cn1BibopFastAllocNoZero(threadStateData, total, &class__java_lang_String, CN1_BIBOP_CIDX(total));
 #else
     JAVA_OBJECT so = JAVA_NULL;

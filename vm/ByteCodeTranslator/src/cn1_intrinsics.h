@@ -107,7 +107,7 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // parentCls==0 guard keeps a signal-stopped scan from tracing the body).
 // Mirrors the out-of-line native, which stays the fallback + source of truth.
 static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb) {
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+#ifndef CN1_DISABLE_BIBOP
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
     if(__builtin_expect(class__java_lang_String.initialized, 1)) {
         int count = t->java_lang_StringBuilder_count;

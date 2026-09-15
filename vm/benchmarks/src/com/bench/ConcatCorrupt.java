@@ -15,22 +15,30 @@ package com.bench;
  * traffic, and every element is re-verified each round. A wrong length or a
  * wrong element is the corruption, reported at the round that produced it.
  *
- * WHAT THIS IS AND IS NOT. It is a REGRESSION GUARD, not a proof. Under the
- * shipping configuration the hazard above does not exist: the source Strings are
- * C parameters of the native, so conservative root scanning of that frame's
- * native stack keeps them and their fused byte[] alive across the allocation,
- * and the interior pointers resolve to the owning block. That was established
- * the hard way -- a GC bracket was added to these natives on the strength of the
- * hazard and then withdrawn, because the premise was wrong.
+ * THE HAZARD DOES NOT EXIST IN ANY CONFIGURATION THIS VM BUILDS, and that is
+ * MEASURED, not assumed. The sources are rooted twice over: as C parameters of
+ * the native they are covered by the conservative scan of that frame, and with
+ * conservative roots compiled out they are still in the caller's operand-stack
+ * slots, which are scanned precisely. Both arms were run --
  *
- * Which means this driver passing proves the property still holds, and cannot by
- * itself prove the natives root anything themselves. Two changes would make it
- * bite, and it is here for both: turning conservative roots off
- * (-DCN1_DISABLE_CONSERVATIVE_GC_ROOTS, which also needs the translator run with
- * -Dcn1.frameless.objects=false -Dcn1.frameless.instance=false), or rewriting
- * cn1FusedConcatN so the sources stop being live C locals across the allocation.
- * Do not quote a green run here as evidence that the natives are correct in
- * isolation; quote it as evidence that conservative rooting still covers them.
+ *     default (conservative roots)                      corrupt=0
+ *     -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS, with the
+ *     translator at -Dcn1.frameless.objects=false
+ *                  -Dcn1.frameless.instance=false       corrupt=0
+ *
+ * -- and both match HotSpot byte-for-byte. A GC bracket was once added to these
+ * natives on the strength of the hazard and then withdrawn because the premise
+ * was wrong; this is the measurement that says so, rather than the argument.
+ *
+ * SO BE HONEST ABOUT WHAT A GREEN RUN MEANS. Its NON-VACUITY IS UNPROVEN: there
+ * is no arm in which it has been seen to fail, so it cannot be cited as proof
+ * that the natives root their own arguments. What it is worth is two things a
+ * checksum cannot give. It is a regression guard on the rooting property, which
+ * would break if cn1FusedConcatN were rewritten to stop keeping its sources live
+ * across the allocation. And it is a genuine heap-integrity torture in its own
+ * right -- 256 int[] held live and fully re-verified across 400,000
+ * concatenations -- which catches any corruption under that allocation shape,
+ * whatever its cause. Read a pass as the second of those, not the first.
  *
  * Output must match HotSpot byte-for-byte.
  */

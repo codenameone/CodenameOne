@@ -999,7 +999,6 @@ static void init_gc_thresholds() {
     }
 }
 
-//#define DEBUG_GC_OBJECTS_IN_HEAP
 
 struct clazz class_array1__JAVA_BOOLEAN = {
     DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_BOOLEAN, "boolean[]", JAVA_TRUE, 1, &class__java_lang_Boolean, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
@@ -4625,166 +4624,6 @@ void codenameOneGCMark() {
 #endif
 }
 
-#ifdef DEBUG_GC_OBJECTS_IN_HEAP
-int totalAllocatedHeap = 0;
-int getObjectSize(JAVA_OBJECT o) {
-    int* ptr = (int*)o;
-    ptr--;
-    return *ptr;
-}
-
-int classTypeCountPreSweep[cn1_array_3_id_java_util_Vector + 1];
-int sizeInHeapForTypePreSweep[cn1_array_3_id_java_util_Vector + 1];
-int nullSpacesPreSweep = 0;
-int preSweepRam;
-void preSweepCount(CODENAME_ONE_THREAD_STATE) {
-    preSweepRam = totalAllocatedHeap;
-    memset(classTypeCountPreSweep, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
-    memset(sizeInHeapForTypePreSweep, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
-    int t = currentSizeOfAllObjectsInHeap;
-    int nullSpacesPreSweep = 0;
-    for(int iter = 0 ; iter < t ; iter++) {
-        JAVA_OBJECT o = allObjectsInHeap[iter];
-        if(o != JAVA_NULL) {
-            classTypeCountPreSweep[o->__codenameOneParentClsReference->classId]++;
-            sizeInHeapForTypePreSweep[o->__codenameOneParentClsReference->classId] += getObjectSize(o);
-        } else {
-            nullSpacesPreSweep++;
-        }
-    }
-}
-
-void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-#endif
-    
-    // this should be the last class used
-    int classTypeCount[cn1_array_3_id_java_util_Vector + 1];
-    int sizeInHeapForType[cn1_array_3_id_java_util_Vector + 1];
-    memset(classTypeCount, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
-    memset(sizeInHeapForType, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
-    int nullSpaces = 0;
-    const char** arrayOfNames = malloc(sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
-    memset(arrayOfNames, 0, sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
-    
-    int t = currentSizeOfAllObjectsInHeap;
-    for(int iter = 0 ; iter < t ; iter++) {
-        JAVA_OBJECT o = allObjectsInHeap[iter];
-        if(o != JAVA_NULL) {
-            classTypeCount[o->__codenameOneParentClsReference->classId]++;
-            sizeInHeapForType[o->__codenameOneParentClsReference->classId] += getObjectSize(o);
-            if(o->__codenameOneParentClsReference->classId > cn1_array_start_offset) {
-                if(arrayOfNames[o->__codenameOneParentClsReference->classId] == 0) {
-                    arrayOfNames[o->__codenameOneParentClsReference->classId] = o->__codenameOneParentClsReference->clsName;
-                }
-            }
-        } else {
-            nullSpaces++;
-        }
-    }
-    int actualTotalMemory = 0;
-    #if defined(__OBJC__)
-    NSLog(@"\n\n**** There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i ****", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
-    #endif
-    for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
-        if(classTypeCount[iter] > 0) {
-            if(classTypeCountPreSweep[iter] - classTypeCount[iter] > 0) {
-                if(iter > cn1_array_start_offset) {
-#if defined(__APPLE__) && defined(__OBJC__)
-                    #if defined(__OBJC__)
-                    NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
-                    #endif
-#endif
-                } else {
-                    JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
-#if defined(__APPLE__) && defined(__OBJC__)
-                    #if defined(__OBJC__)
-                    NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], toNSString(threadStateData, str), sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
-                    #endif
-#endif
-                }
-            }
-            actualTotalMemory += sizeInHeapForType[iter];
-        }
-    }
-    #if defined(__OBJC__)
-    //NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
-    #endif
-    #if defined(__OBJC__)
-    NSLog(@"**** GC cycle complete ****");
-    #endif
-    
-    free(arrayOfNames);
-#if defined(__APPLE__) && defined(__OBJC__)
-    [pool release];
-#endif
-}
-
-void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-#endif
-    
-    // this should be the last class used
-    int classTypeCount[cn1_array_3_id_java_util_Vector + 1];
-    int sizeInHeapForType[cn1_array_3_id_java_util_Vector + 1];
-    memset(classTypeCount, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
-    memset(sizeInHeapForType, 0, sizeof(int) * cn1_array_3_id_java_util_Vector + 1);
-    int nullSpaces = 0;
-    const char** arrayOfNames = malloc(sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
-    memset(arrayOfNames, 0, sizeof(char*) * cn1_array_3_id_java_util_Vector + 1);
-    
-    int t = currentSizeOfAllObjectsInHeap;
-    for(int iter = 0 ; iter < t ; iter++) {
-        JAVA_OBJECT o = allObjectsInHeap[iter];
-        if(o != JAVA_NULL) {
-            classTypeCount[o->__codenameOneParentClsReference->classId]++;
-            sizeInHeapForType[o->__codenameOneParentClsReference->classId] += getObjectSize(o);
-            if(o->__codenameOneParentClsReference->classId > cn1_array_start_offset) {
-                if(arrayOfNames[o->__codenameOneParentClsReference->classId] == 0) {
-                    arrayOfNames[o->__codenameOneParentClsReference->classId] = o->__codenameOneParentClsReference->clsName;
-                }
-            }
-        } else {
-            nullSpaces++;
-        }
-    }
-    int actualTotalMemory = 0;
-    #if defined(__OBJC__)
-    NSLog(@"There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
-    #endif
-    for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
-        if(classTypeCount[iter] > 0) {
-            float f = ((float)classTypeCount[iter]) / ((float)t) * 100.0f;
-            float f2 = ((float)sizeInHeapForType[iter]) / ((float)totalAllocatedHeap) * 100.0f;
-            if(iter > cn1_array_start_offset) {
-#if defined(__APPLE__) && defined(__OBJC__)
-                #if defined(__OBJC__)
-                NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], (int)f, sizeInHeapForType[iter], (int)f2);
-                #endif
-#endif
-            } else {
-                JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
-#if defined(__APPLE__) && defined(__OBJC__)
-                #if defined(__OBJC__)
-                NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], toNSString(threadStateData, str), (int)f, sizeInHeapForType[iter], (int)f2);
-                #endif
-#endif
-            }
-            actualTotalMemory += sizeInHeapForType[iter];
-        }
-    }
-    #if defined(__OBJC__)
-    NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
-    #endif
-    
-    free(arrayOfNames);
-#if defined(__APPLE__) && defined(__OBJC__)
-    [pool release];
-#endif
-}
-#endif
 
 /**
  * The sweep GC phase iterates the memory block and deletes unmarked memory
@@ -4956,9 +4795,6 @@ void codenameOneGCSweep() {
     // flight and no mutator owning these pages.
     cn1BibopSweep(threadStateData);
 #endif
-#ifdef DEBUG_GC_OBJECTS_IN_HEAP
-    preSweepCount(threadStateData);
-#endif
     //int counter = 0;
     int t = currentSizeOfAllObjectsInHeap;
     for(int iter = 0 ; iter < t ; iter++) {
@@ -5066,10 +4902,6 @@ void codenameOneGCSweep() {
     // we had a thread that really ripped into the GC so we only release that thread now after cleaning RAM
     cn1GcReleaseBlockedThreads();
     
-#ifdef DEBUG_GC_OBJECTS_IN_HEAP
-    //printObjectTypesInHeap(threadStateData);
-    printObjectsPostSweep(threadStateData);
-#endif
 #ifdef CN1_RESOLVE_DIAG
     { extern void cn1ResolveDiagReport(void); cn1ResolveDiagReport(); }
 #endif
@@ -5561,6 +5393,23 @@ BOOL isAppSuspended = 0;
 // declines to skip.
 _Atomic int bibopGcEpoch = 1;
 
+// The collector's cycle claim: IDLE -> RUNNING by the collector, IDLE -> FROZEN by
+// the exit census, and RUNNING -> IDLE when a cycle finishes. Every transition is a
+// compare-exchange, so the two participants can never both believe they hold the
+// heap -- which a freeze flag read separately from gcCurrentlyRunning could not
+// guarantee, because the collector can be preempted between the two.
+//
+// HOISTED ABOVE THE BiBOP GUARD FOR THE SAME REASON AS bibopGcEpoch DIRECTLY ABOVE,
+// and it is the same bug a second time. Its own comment already said it was "defined
+// UNCONDITIONALLY ... so a build without CN1_ALLOC_CENSUS must still link" -- while
+// sitting inside #ifndef CN1_DISABLE_BIBOP, which made that sentence false for the one
+// configuration that tests it. nativeMethods.m claims on every cycle with no #ifdef
+// around it, so -DCN1_DISABLE_BIBOP failed to LINK on an undefined _cn1GcCycleState.
+// That arm is what run-bibop-adaptive.sh builds as its "legacy" comparison, so the
+// script could not have run either; no workflow runs it, which is why nobody knew.
+// The cost is one uncontended CAS per collection.
+_Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
+
 #ifndef CN1_DISABLE_BIBOP
 // =========================================================================
 // BiBOP: non-moving segregated-fits page heap + mark-sweep for SMALL non-array
@@ -5824,16 +5673,6 @@ static void cn1BibopDoInit() {
 #endif
 }
 
-// The collector's cycle claim: IDLE -> RUNNING by the collector, IDLE -> FROZEN by
-// the exit census, and RUNNING -> IDLE when a cycle finishes. Every transition is a
-// compare-exchange, so the two participants can never both believe they hold the
-// heap -- which a freeze flag read separately from gcCurrentlyRunning could not
-// guarantee, because the collector can be preempted between the two.
-//
-// Defined UNCONDITIONALLY although only the census freezes: nativeMethods.m claims
-// on every cycle, so a build without CN1_ALLOC_CENSUS must still link. The cost is
-// one uncontended CAS per collection.
-_Atomic int cn1GcCycleState = CN1_GC_CYCLE_IDLE;
 
 #ifdef CN1_ALLOC_CENSUS
 // Registered from cn1BibopDoInit under CN1_HEAP_REPORT. A batch program usually
@@ -11268,7 +11107,7 @@ cn1GcMallocRetry:
 #ifdef CN1_GC_INSTRUMENT
     extern long long cn1_instr_allocCount; cn1_instr_allocCount++;
 #endif
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+#ifndef CN1_DISABLE_BIBOP
     // Small objects AND small arrays: serve from the per-thread BiBOP page heap,
     // which skips placeObjectInHeapCollection / allObjectsInHeap entirely. Arrays
     // are single-block (header + contiguous data, see allocArray) so a slot holds
@@ -11362,21 +11201,12 @@ cn1GcMallocRetry:
             CN1_STALL_ADD(__stallLow, CN1_STALL_LOWMEM, threadStateData);
         }
     }
-#ifdef DEBUG_GC_OBJECTS_IN_HEAP
-    totalAllocatedHeap += size;
-    int* ptr = (int*)malloc(size + sizeof(int));
-    *ptr = size;
-    ptr++;
-    JAVA_OBJECT o = (JAVA_OBJECT)ptr;
-    JAVA_BOOLEAN needsZeroing = JAVA_TRUE;
-#else
     // calloc instead of malloc+memset: the allocator returns zero-filled memory,
     // and for large/array allocations the kernel can hand back lazily-zeroed
     // (copy-on-write zero) pages, avoiding an eager memset pass over memory that
     // is about to be written anyway. Object-header fields are set explicitly below.
     JAVA_OBJECT o = (JAVA_OBJECT)calloc(1, size);
     JAVA_BOOLEAN needsZeroing = JAVA_FALSE;
-#endif
 #ifdef CN1_GC_CONFORM
     // Not before the VM is up: an injected failure during bootstrap tests the bootstrap,
     // not the retry path, and the process cannot survive it either way.
@@ -11763,12 +11593,6 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             free(md);
         }
     }
-#ifdef DEBUG_GC_OBJECTS_IN_HEAP
-    int* ptr = (int*)obj;
-    ptr--;
-    totalAllocatedHeap -= *ptr;
-    free(ptr);
-#else
 #ifdef CN1_GC_VERIFY
     // QA: poison + quarantine rather than free, so a dangling reference reads a
     // recognizably dead object instead of whatever the allocator recycles into
@@ -11779,7 +11603,6 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     }
 #endif
     free(obj);
-#endif
 }
 
 typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
@@ -13175,7 +12998,7 @@ static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE) {
 // reference must never be stored anywhere that can outlive the owner. Reading
 // it, passing it as a transient call argument, or returning copies is fine.
 JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz* cls) {
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+#ifndef CN1_DISABLE_BIBOP
     if(totalSize <= CN1_BIBOP_MAX_OBJECT && constantPoolObjects != 0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
        && !threadStateData->nativeAllocationMode
@@ -13595,7 +13418,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
 // This is the "1 alloc instead of byte[]+String" fast path shared by Long/Integer.toString and the
 // String.cn1Concat helpers -- the bulk of a string-building workload's GC garbage.
 JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst) {
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+#ifndef CN1_DISABLE_BIBOP
     if(__builtin_expect(class__java_lang_String.initialized, 1)) {
         int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
         int total = off + CN1_FUSED_ARR_BYTES(len, sizeof(JAVA_ARRAY_BYTE));

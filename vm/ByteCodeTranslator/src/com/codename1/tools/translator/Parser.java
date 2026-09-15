@@ -606,6 +606,19 @@ public class Parser extends ClassVisitor {
             arrayId++;
         }
 
+        // THE HIGHEST CLASS ID THIS TRANSLATION CAN PRODUCE, emitted rather than guessed.
+        // Anything sizing a per-class-id table needs this bound, and the only previous way
+        // to spell it was to name a class and hope it was last: the heap histogram sized
+        // its tables with cn1_array_3_id_java_util_Vector, which stops existing the moment
+        // an application does not reach java.util.Vector, so that diagnostic failed to
+        // compile on any app that culls it. arrayId is one past the last id handed out,
+        // so the last valid id is arrayId - 1. Nothing consumes this yet -- the histogram
+        // that needed it was deleted as superseded -- and it is emitted anyway because the
+        // NEXT per-class-id table wants a bound that is a fact rather than a guess.
+        bld.append("#define cn1_max_class_id ");
+        bld.append(arrayId - 1);
+        bld.append("\n");
+
         bld.append("\n\n");
 
         bld.append("// maps to offsets in the constant pool below\nextern int methodNameLookup[];\n");

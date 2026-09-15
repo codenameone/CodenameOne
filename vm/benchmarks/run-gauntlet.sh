@@ -26,9 +26,10 @@ J8="${JDK_8_HOME:?set JDK_8_HOME}"
 #
 # ConcatCorrupt is heap integrity ACROSS the fused string-concat natives, which take
 # raw interior pointers into their source strings' byte[] and then ALLOCATE. Read its
-# javadoc before trusting it: under conservative roots the sources are rooted by the
-# native stack scan, so it is a REGRESSION GUARD on that property and not a proof that
-# the natives root anything themselves.
+# javadoc before trusting it: the sources turn out to be rooted in BOTH configurations
+# (conservatively via the native frame, precisely via the caller's stack slots), so its
+# non-vacuity is UNPROVEN. It earns its place as a heap-integrity torture -- 256 int[]
+# verified across 400,000 concatenations -- not as proof of a rooting claim.
 TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
