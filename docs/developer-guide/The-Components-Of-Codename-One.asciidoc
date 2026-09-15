@@ -1087,11 +1087,11 @@ Here is a simple example of a `MultiList` containing a highly popular subject ma
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava167Snippet.java[tag=the-components-of-codename-one-java-167,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/MultiListFigure.java[tag=the-components-of-codename-one-java-167,indent=0]
 ----
 
 .Basic usage of the MultiList & DefaultListModel]
-image::img/components-multilist.png[Basic usage of the MultiList and DefaultListModel,scaledwidth=20%]
+image::img/generated/components-multilist.png[Basic usage of the MultiList and DefaultListModel,scaledwidth=20%]
 
 `createListEntry` is trivial:
 
@@ -1540,6 +1540,23 @@ For a single call the helper writes four files at the root of the extension bund
 
 Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
 
+`IOSShareExtensionBuilder` lives in the Codename One Maven plugin rather than
+in the framework, so this runs at build time and isn't one of the compiled
+examples:
+
+[listing]
+----
+new IOSShareExtensionBuilder()
+        .setExtensionName("MyShareExtension")
+        .setDisplayName("Share to MyApp")
+        .setHostBundleId("com.example.myapp")
+        .setAppGroupId("group.com.example.myapp")
+        .acceptText(true)
+        .acceptURLs(true)
+        .acceptImages(true)
+        .writeAppext(new File("src/main/resources/MyShareExtension.ios.appext"));
+----
+
 
 The next iOS build picks up the `.ios.appext` archive automatically; no Xcode steps are required.
 
@@ -1547,7 +1564,18 @@ If you prefer a directory layout (for example, to commit the generated sources o
 
 ==== Reading the payload from the host app
 
-The host app reads the most recent payload from the same App Group at startup or when it resumes:
+The host app has to be in that App Group too. `setAppGroupId` writes the
+entitlement for the extension only, so add the same identifier to the
+application with the `ios.app_groups` build hint -- the two sides are reading
+and writing one container, and a mismatch produces an empty
+dictionary rather than an error:
+
+[listing]
+----
+codename1.arg.ios.app_groups=group.com.example.myapp
+----
+
+It then reads the most recent payload at startup or when it resumes:
 
 [source,objective-c]
 ----
@@ -1586,11 +1614,11 @@ Since `Tabs` are a `Container` its a common mistake to try and add a `Tab` using
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava080Snippet.java[tag=the-components-of-codename-one-java-080,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/TabsFigure.java[tag=the-components-of-codename-one-java-080,indent=0]
 ----
 
 .Simple usage of Tabs
-image::img/components-tabs.png[Simple usage of Tabs,scaledwidth=20%]
+image::img/generated/components-tabs.png[Simple usage of Tabs,scaledwidth=20%]
 
 A common usage for `Tabs` is the swipe to proceed effect which is common in iOS applications. In the code below you use https://www.codenameone.com/javadoc/com/codename1/ui/RadioButton.html[RadioButton] and https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] with hidden tabs to produce that effect:
 
@@ -2025,6 +2053,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
+
+[listing]
+----
+public void execute(String js, SuccessCallback<JSRef> callback)
+----
 
 
 The first parameter is a JavaScript expression. This JavaScript *MUST* call either `callback.onSuccess(result)` or `callback.onError(message, errCode)` at some point in order for your callback to be called.
@@ -2524,7 +2557,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .The Calendar component
-image::img/components-calendar.png[The Calendar component,scaledwidth=20%]
+image::img/generated/components-calendar.png[The Calendar component,scaledwidth=20%]
 
 === ToastBar
 

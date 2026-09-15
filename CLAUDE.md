@@ -75,7 +75,7 @@ Located in `vm/`, ParparVM is Codename One's iOS VM that translates Java bytecod
 - Concurrent garbage collector (non-blocking)
 - Generates standard Xcode projects
 - No JNI overhead - direct C code invocation
-- Targets Java 5 with Java 8 syntax via retrolambda
+- Targets Java 5, parsing Java 8 class files directly
 
 **Build output:** Valid Xcode project that can be opened, debugged, and profiled with native tools.
 

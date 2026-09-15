@@ -1259,11 +1259,12 @@ public final class Display extends CN1Constants {
         }
     }
 
-    /// Checks if this platform uses input modes.  No current platforms return true for this.  It is a holdover from J2ME.
+    /// Checks if this platform uses input modes. It is a holdover from the feature phone
+    /// era and no supported platform returns true for it.
     ///
     /// #### Returns
     ///
-    /// True if the platform supports input modes.  Only true for J2ME and RIM.
+    /// True if the platform supports input modes, which no supported platform does.
     public boolean platformUsesInputMode() {
         return impl.platformUsesInputMode();
     }
@@ -1385,7 +1386,7 @@ public final class Display extends CN1Constants {
     }
 
     /// This method represents the event thread for the UI library on which
-    /// all events are carried out. It differs from the MIDP event thread to
+    /// all events are carried out. It differs from the platform's own event thread to
     /// prevent blocking of actual input and drawing operations. This also
     /// enables functionality such as "true" modal dialogs etc...
     /// Whether the dispatch loop should run another turn, renouncing `edtDispatching` in the
@@ -5371,7 +5372,7 @@ public final class Display extends CN1Constants {
     ///
     /// - Platform - Similar to microedition.platform
     ///
-    /// - OS - returns what is the underlying platform e.g. - iOS, Android, RIM, SE...
+    /// - OS - returns what is the underlying platform e.g. - iOS, Android, SE...
     ///
     /// - OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
     ///
@@ -6852,7 +6853,7 @@ public final class Display extends CN1Constants {
     ///
     /// #### Returns
     ///
-    /// the name of the platform e.g. ios, rim, win, and, me, HTML5
+    /// the name of the platform e.g. ios, and, win, mac, linux, HTML5
     public String getPlatformName() {
         return impl.getPlatformName();
     }

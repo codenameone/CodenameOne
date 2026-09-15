@@ -1457,7 +1457,8 @@ class InviteResilienceTest extends UITestBase {
         Invites.flush();
 
         // The server accepts it. The connection has to hand back the ORIGINAL
-        // entry, or nothing is retired.
+        // entry, or nothing is retired -- so that key is what this test reads
+        // off the queued request and then drives the retire with.
         Invites.InviteConnection req = null;
         for (int i = 0; i < implementation.getQueuedRequests().size(); i++) {
             ConnectionRequest r = implementation.getQueuedRequests().get(i);
@@ -1468,20 +1469,42 @@ class InviteResilienceTest extends UITestBase {
             }
         }
         assertNotNull(req, "the queued registration was never sent");
+        // THE assertion of this test. The body went out rewritten so its
+        // consent flag is current; the acknowledgement key must still be the
+        // string sitting in the outbox, because that is what outbox.remove()
+        // is matched against.
+        assertEquals(stored, req.outboxEntryForTest(),
+                "the drain used the rewritten body as the acknowledgement key, so "
+                        + "outbox.remove() will match nothing and the registration is resent for ever");
+
+        // Driven on a connection of our own rather than on the queued one.
+        //
+        // setAutoProcessConnections(false) suppresses only the implementation's
+        // addConnectionToQueue hook, which is empty; NetworkManager still puts
+        // the request on its pending queue and a network thread still executes
+        // it against the mock transport, which answers with an empty body. That
+        // thread calls readResponse() on the very object this test was fishing
+        // out, so the canned payload below was intermittently overwritten with
+        // "" between readResponse() and postResponse() -- acknowledges() then
+        // saw no code, nothing was retired, and the test failed about one run
+        // in five. A connection this test constructs itself was never handed to
+        // NetworkManager and nothing else can touch it.
+        Invites.InviteConnection driven = new Invites.InviteConnection(
+                Invites.MATCH_DIRECT, false, true, req.outboxEntryForTest(), 0);
         try {
             // The shape the mint endpoint really answers with: it echoes the
             // code it registered. {"registered":true} was an invention of this
             // fixture -- the service has no such field -- and retiring the
             // durable entry on it meant retiring on any 200 at all, including
             // a captive portal's.
-            req.readResponse(new ByteArrayInputStream(
+            driven.readResponse(new ByteArrayInputStream(
                     ("{\"code\":\"" + invite.getCode() + "\",\"url\":\"https://"
                             + "cloud.codenameone.com/i/" + invite.getCode() + "\"}")
                             .getBytes("UTF-8")));
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
-        req.postResponse();
+        driven.postResponse();
 
         assertEquals(0, InviteStore.readOutbox().size(),
                 "the acknowledged registration stayed in the outbox and will be resent for ever");

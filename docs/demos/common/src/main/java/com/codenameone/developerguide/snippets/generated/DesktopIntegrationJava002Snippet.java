@@ -85,7 +85,7 @@ class DesktopIntegrationJava002Snippet {
         Command about = new Command("About My App");
         about.setDesktopMenu(Command.DESKTOP_MENU_ABOUT);   // application menu
 
-        Command open = new Command("Open Filenull");
+        Command open = new Command("Open File...");
         open.setDesktopMenu(Command.DESKTOP_MENU_FILE);     // File menu
 
         Command quit = new Command("Quit");

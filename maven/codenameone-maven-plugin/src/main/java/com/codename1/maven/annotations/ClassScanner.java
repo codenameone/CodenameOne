@@ -158,6 +158,7 @@ public final class ClassScanner {
                     internalName, superInternalName, interfaces, access,
                     classAnnotations, methods, fields, source);
             out.setSourceFile(sourceFile);
+            out.setSourceName(sourceNameOf(internalName));
             return out;
         }
 
@@ -170,6 +171,43 @@ public final class ClassScanner {
         }
 
         private String sourceFile;
+
+        /**
+         * The InnerClasses entries, which are the only authority on whether a `$`
+         * in a name is nesting.
+         *
+         * `$` is legal in a top-level class name, so Wrong$Type may be a member
+         * class or may be a class somebody called Wrong$Type -- and the two are
+         * written differently in Java source, where only the first is
+         * Wrong.Type. javac records a member class here and does not record a
+         * name that merely contains the character, so this is the difference.
+         * outerName and innerName are null for an anonymous or local class,
+         * which has no source name to write at all.
+         */
+        private final Map<String, String[]> nesting = new LinkedHashMap<String, String[]>();
+
+        @Override
+        public void visitInnerClass(String name, String outerName, String innerName,
+                                    int innerAccess) {
+            if (name != null && outerName != null && innerName != null) {
+                nesting.put(name, new String[] { outerName, innerName });
+            }
+        }
+
+        /**
+         * The name this class is written with in Java source: the enclosing
+         * chain joined with dots, or the binary name when it is top level.
+         *
+         * The attribute of a member class carries an entry for every step of its
+         * chain, so A$B$C resolves to A.B.C from its own class file alone.
+         */
+        private String sourceNameOf(String internal) {
+            String[] entry = nesting.get(internal);
+            if (entry == null) {
+                return internal == null ? null : internal.replace('/', '.');
+            }
+            return sourceNameOf(entry[0]) + "." + entry[1];
+        }
 
         @Override
         public void visit(int version, int access, String name, String signature,

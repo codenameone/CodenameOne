@@ -1,0 +1,89 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codenameone.developerguide.snippets.generated;
+
+import com.codename1.gpu.*;
+import com.codename1.ui.*;
+import com.codename1.ui.animations.*;
+import com.codename1.ui.events.*;
+import com.codename1.ui.geom.*;
+import com.codename1.ui.layouts.*;
+import com.codename1.ui.list.*;
+import com.codename1.ui.plaf.*;
+import com.codename1.ui.util.*;
+import com.codename1.components.*;
+import com.codename1.charts.models.*;
+import com.codename1.charts.renderers.*;
+import com.codename1.charts.views.*;
+import com.codename1.capture.*;
+import com.codename1.io.*;
+import com.codename1.l10n.*;
+import com.codename1.location.*;
+import com.codename1.maps.*;
+import com.codename1.media.*;
+import com.codename1.messaging.*;
+import com.codename1.payment.*;
+import com.codename1.processing.*;
+import com.codename1.properties.*;
+import com.codename1.push.*;
+import com.codename1.security.*;
+import com.codename1.social.*;
+import com.codename1.ui.spinner.*;
+import java.io.*;
+import com.codename1.io.rest.*;
+import com.codename1.xml.*;
+import com.codename1.ui.tree.*;
+import com.codename1.ui.table.*;
+import com.codename1.db.*;
+import com.codename1.io.gzip.*;
+import com.codename1.util.*;
+import com.codename1.system.*;
+import com.codename1.annotations.*;
+import com.codename1.io.services.*;
+import java.util.*;
+
+
+class IoJava200Snippet {
+
+    // tag::io-java-200[]
+    void openDatabase() throws IOException {
+        // A plain identifier is the portable form: it creates the file on first
+        // use and every platform decides where it lands. Where
+        // Database.isCustomPathSupported() answers true a "file://" path works
+        // instead; where it does not, a name with a separator in it throws.
+        //
+        // Its own database, not the propertiesdemo.db the SQLMap walkthrough
+        // later in this chapter creates -- SQLMap.createTable will not migrate
+        // a Contact table this left behind with fewer columns.
+        Database db = Database.openOrCreate("opendemo.db");
+        try {
+            // A fresh database is empty, so create before reading or writing.
+            db.execute("CREATE TABLE IF NOT EXISTS Person ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
+            db.execute("INSERT INTO Person (name) VALUES (?)", new String[] { "Ada" });
+        } finally {
+            Util.cleanup(db);
+        }
+    }
+    // end::io-java-200[]
+}

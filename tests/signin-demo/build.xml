@@ -158,46 +158,7 @@
             />
     </target>
 
-    <target name="test-for-rim-device" depends="clean,copy-rim-override,copy-libs,compile-test,clean-override">
-        <codeNameOne 
-            jarFile="dist/unitTests.jar"
-            displayName="${codename1.displayName}"
-            packageName = "${codename1.packageName}"
-            mainClassName = "${codename1.mainName}"
-            version="${codename1.version}"
-            icon="${codename1.icon}"
-            vendor="${codename1.vendor}"
-            subtitle="${codename1.secondaryTitle}"
-            buildArgs="build.unitTest=1"
-            targetType="rim"
-            sigtoolDb="${codename1.rim.signtoolDb}"
-            certPassword="${codename1.rim.certificatePassword}"
-            sigtoolCsk="${codename1.rim.signtoolCsk}"
-            automated="${automated}"
-            />
-        <delete>
-            <fileset dir="${build.classes.dir}" includes="**/*.class"/>
-        </delete>
-    </target>
 
-     <target name="test-for-j2me-device" depends="clean,j2me-native-theme-init,copy-j2me-native,copy-j2me-override,copy-libs,compile-test,clean-j2me-native,clean-override">
-        <codeNameOne
-            jarFile="dist/unitTests.jar"
-            displayName="${codename1.displayName}"
-            packageName = "${codename1.packageName}"
-            mainClassName = "${codename1.mainName}"
-            version="${codename1.version}"
-            icon="${codename1.icon}"
-            vendor="${codename1.vendor}"
-            subtitle="${codename1.secondaryTitle}"
-            targetType="me"            
-            buildArgs="build.unitTest=1"
-            automated="${automated}"
-            />
-        <delete>
-            <fileset dir="${build.classes.dir}" includes="**/*.class"/>
-        </delete>
-    </target>
 
     
     <target name="build-for-ios-device-release" depends="clean,copy-ios-override,copy-libs,jar,clean-override">
@@ -270,18 +231,6 @@
         </copy>
     </target>
     
-    <target name="copy-rim-override">
-        <mkdir dir="${build.classes.dir}" />
-        <mkdir dir="override" />
-        <copy todir="${build.classes.dir}">
-            <fileset dir="override" includes="**/*_rim.ovr"/>
-            <fileset dir="override" includes="**/*_phone.ovr"/>
-        </copy>
-        <copy todir="${build.classes.dir}">
-            <fileset dir="native/rim" includes="**/*"/>
-            <fileset dir="lib/impl/native/rim" includes="**/*"/>
-        </copy>
-    </target>
 
     <target name="copy-desktop-override">
         <mkdir dir="${build.classes.dir}" />
@@ -297,18 +246,6 @@
         </copy>
     </target>
 
-    <target name="copy-j2me-override">
-        <mkdir dir="${build.classes.dir}" />
-        <mkdir dir="override" />
-        <copy todir="${build.classes.dir}">
-            <fileset dir="override" includes="**/*_me.ovr"/>
-            <fileset dir="override" includes="**/*_phone.ovr"/>
-        </copy>
-        <copy todir="${build.classes.dir}">
-            <fileset dir="native/j2me" includes="**/*"/>
-            <fileset dir="lib/impl/native/j2me" includes="**/*"/>
-        </copy>
-    </target>
 
     <target name="clean-override">
         <delete>
@@ -354,27 +291,6 @@
             />
     </target>    
     
-    <target name="build-for-rim-device" depends="clean,copy-rim-override,copy-libs,jar,clean-override">
-        <codeNameOne 
-            jarFile="${dist.jar}"
-            displayName="${codename1.displayName}"
-            packageName = "${codename1.packageName}"
-            mainClassName = "${codename1.mainName}"
-            version="${codename1.version}"
-            icon="${codename1.icon}"
-            vendor="${codename1.vendor}"
-            subtitle="${codename1.secondaryTitle}"
-
-            targetType="rim"
-            sigtoolDb="${codename1.rim.signtoolDb}"
-            certPassword="${codename1.rim.certificatePassword}"
-            sigtoolCsk="${codename1.rim.signtoolCsk}"
-            automated="${automated}"
-            />
-        <delete>
-            <fileset dir="${build.classes.dir}" includes="**/*.class"/>
-        </delete>
-    </target>
 
     <target name="build-for-mac-os-x-desktop" depends="clean,copy-desktop-override,copy-libs,jar,clean-override">
         <codeNameOne 
@@ -414,35 +330,9 @@
         </delete>
     </target>
 
-    <target name="build-for-j2me-device" depends="clean,j2me-native-theme-init,copy-j2me-native,copy-j2me-override,copy-libs,jar,clean-j2me-native,clean-override">
-        <codeNameOne
-            jarFile="${dist.jar}"
-            displayName="${codename1.displayName}"
-            packageName = "${codename1.packageName}"
-            mainClassName = "${codename1.mainName}"
-            version="${codename1.version}"
-            icon="${codename1.icon}"
-            vendor="${codename1.vendor}"
-            subtitle="${codename1.secondaryTitle}"
-            targetType="me"            
-            automated="${automated}"
-            />
-        <delete>
-            <fileset dir="${build.classes.dir}" includes="**/*.class"/>
-        </delete>
-    </target>
       
-    <target name="j2me-native-theme-init">
-        <available file="${codename1.j2me.nativeTheme}" property="j2me-native-theme.available" />
-    </target>
     
-    <target name="copy-j2me-native" if="j2me-native-theme.available">
-        <copy file="${codename1.j2me.nativeTheme}" tofile="src/nativeJ2METheme.res" />
-    </target>
 
-    <target name="clean-j2me-native" if="j2me-native-theme.available">
-        <delete file="src/nativeJ2METheme.res" />
-    </target>
       
     <target name="-pre-init">
         <property name="application.args" value="${codename1.packageName}.${codename1.mainName}"/>
@@ -452,8 +342,6 @@
         <mkdir dir="native/android" />
         <mkdir dir="native/internal_tmp" />
         <mkdir dir="native/ios" />
-        <mkdir dir="native/j2me" />
-        <mkdir dir="native/rim" />
         <mkdir dir="native/win" />
         <mkdir dir="native/javascript" />
         <mkdir dir="lib/impl/cls" />
@@ -461,8 +349,6 @@
         <mkdir dir="lib/impl/native" />
         <mkdir dir="lib/impl/native/android" />
         <mkdir dir="lib/impl/native/ios" />
-        <mkdir dir="lib/impl/native/j2me" />
-        <mkdir dir="lib/impl/native/rim" />
         <mkdir dir="lib/impl/native/win" />
         <mkdir dir="lib/impl/native/javascript" />
         <installLibs lib="lib" dest="lib/impl" />

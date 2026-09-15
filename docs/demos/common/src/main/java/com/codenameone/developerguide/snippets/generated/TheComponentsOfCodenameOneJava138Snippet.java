@@ -81,7 +81,7 @@ class TheComponentsOfCodenameOneJava138Snippet {
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-138[]
         FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
-        fab.addActionListener(e -> ToastBar.showErrorMessage("Not implemented yetnull"));
+        fab.addActionListener(e -> ToastBar.showErrorMessage("Not implemented yet..."));
         fab.bindFabToContainer(form.getContentPane());
         // end::the-components-of-codename-one-java-138[]
     }

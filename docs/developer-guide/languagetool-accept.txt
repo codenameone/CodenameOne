@@ -744,3 +744,18 @@ Bodymovin
 # A point in an animation where a property's value is pinned, with the values in
 # between interpolated. The universal term across every animation toolchain.
 keyframes?
+
+# -----------------------------------------------------------------------------
+# Server-side backend (Backend.asciidoc).
+# -----------------------------------------------------------------------------
+# Two of the JVM server frameworks the backend chapter positions itself against.
+# Product names, so the dictionary has neither.
+Quarkus
+Micronaut
+# A service that rescales images, in the chapter's list of small edge-shaped
+# services the backend suits. Ordinary English formation the dictionary lacks.
+resizer
+# The Linux readiness-notification interface the request loop is built on.
+epoll
+# A benchmark of one narrow operation, as against a whole application.
+microbenchmark

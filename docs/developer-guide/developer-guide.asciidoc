@@ -119,6 +119,10 @@ include::Video-IO.asciidoc[]
 
 include::Video-Capture-Constraints.asciidoc[]
 
+= Server side
+
+include::Backend.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

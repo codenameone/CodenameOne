@@ -3278,6 +3278,21 @@ public final class Invites {
             return isKilled();
         }
 
+        // The acknowledgement key this request was queued with, so a test can
+        // assert that drainOutbox() handed over the ORIGINAL entry rather than
+        // the body it rewrote on the way out -- the one thing that decides
+        // whether outbox.remove() matches anything.
+        //
+        // Read rather than driven: a request sitting in the mock transport's
+        // queue is also live on a NetworkManager thread, and calling
+        // readResponse()/postResponse() on it from a test races that thread for
+        // the payload field. See arewrittenRegistrationStillRetiresItsOriginal-
+        // OutboxEntry, which did exactly that and failed roughly one run in
+        // five.
+        String outboxEntryForTest() {
+            return outboxEntry;
+        }
+
         // Package private so a test can drive the outcome this class exists to
         // get right without standing up a server.
         boolean isFailed() {

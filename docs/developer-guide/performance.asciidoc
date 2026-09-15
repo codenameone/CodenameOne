@@ -535,11 +535,29 @@ This led to the discovery that you're loading the same resource file over and ov
 
 In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:
 
+[listing]
+----
+public ShareButton() {
+    setUIID("ShareButton");
+    FontImage.setMaterialIcon(this, FontImage.MATERIAL_SHARE);
+    addActionListener(this);
+    shareServices.addElement(new SMSShare());
+    shareServices.addElement(new EmailShare());
+    shareServices.addElement(new FacebookShare());
+}
+----
+
 
 This seems reasonable until you realize that the constructors for `SMSShare`, `EmailShare` & `FacebookShare` load the icons for each of those...
 
 These icons are in a shared resource file that you load and don't cache. The initial workaround was to cache this resource but a better solution was to convert this code:
 
+[listing]
+----
+public SMSShare() {
+    super("SMS", Resources.getSystemResource().getImage("sms.png"));
+}
+----
 
 Into this code:
 

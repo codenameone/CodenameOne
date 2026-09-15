@@ -314,7 +314,7 @@ public class Log {
     ///
     /// #### Deprecated
     ///
-    /// this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
+    /// this hasn't been maintained in ages, use sendLog() instead
     public static String getLogContent() {
         try {
             String text = "";

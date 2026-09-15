@@ -36,6 +36,12 @@ ROOT_GROUP_ID = "com.example.myapp"
 ROOT_ARTIFACT_ID = "myappname"
 ROOT_VERSION = "1.0-SNAPSHOT"
 PLATFORMS = ("android", "ios", "javase", "javascript", "linux", "win")
+# The backend module is shaped like a platform module and validated like one, but it
+# must NOT depend on the generated common module: common is compiled against
+# codenameone-core and a server has no display. Requiring it here would enforce the
+# mistake the module's own comment warns against, so it is validated separately with
+# that one check turned off.
+BACKEND = "backend"
 
 
 def fail(message):
@@ -84,7 +90,7 @@ def validate_root_pom(archive):
     reject_initializr_coordinates(data, "pom.xml")
 
 
-def validate_platform_pom(archive, platform):
+def validate_platform_pom(archive, platform, require_common_dependency=True):
     path = platform + "/pom.xml"
     data, project = read_pom(archive, path)
     parent = project.find("m:parent", NS)
@@ -115,8 +121,10 @@ def validate_platform_pom(archive, platform):
                               "${project.groupId}", path + "/common-dependency", "groupId")
                 require_equal(direct_text(dependency, "version", path + "/common-dependency"),
                               "${project.version}", path + "/common-dependency", "version")
-    if not common_dependency_found:
+    if require_common_dependency and not common_dependency_found:
         fail(path + " does not depend on ${project.groupId}:${cn1app.name}-common:${project.version}")
+    if not require_common_dependency and common_dependency_found:
+        fail(path + " must not depend on the generated common module")
 
     reject_initializr_coordinates(data, path)
 
@@ -141,7 +149,8 @@ def main():
         # common/pom.xml is deliberately not stored in common.zip: GeneratorModel
         # injects the selected template's common POM after reading this artifact.
         # The generated common POM is covered by its runtime guard and matrix tests.
-        expected_poms = {"pom.xml"} | {platform + "/pom.xml" for platform in PLATFORMS}
+        expected_poms = ({"pom.xml"} | {platform + "/pom.xml" for platform in PLATFORMS}
+                         | {BACKEND + "/pom.xml"})
         if embedded_poms != expected_poms:
             fail("Initializr artifact POM set differs from the validated platform set: found "
                  + repr(sorted(embedded_poms)) + ", expected " + repr(sorted(expected_poms)))
@@ -149,6 +158,7 @@ def main():
         validate_root_pom(archive)
         for platform in PLATFORMS:
             validate_platform_pom(archive, platform)
+        validate_platform_pom(archive, BACKEND, require_common_dependency=False)
 
     print("Initializr embedded POM coordinates are consistent across all platform modules.")
 

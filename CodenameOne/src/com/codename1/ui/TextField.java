@@ -411,7 +411,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public static void addInputMode(String name, Hashtable values, boolean firstUpcase) {
         initInputModes();
         inputModes.put(name, values);
@@ -428,7 +428,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public static String[] getDefaultInputModeOrder() {
         return defaultInputModeOrder;
     }
@@ -442,7 +442,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public static void setDefaultInputModeOrder(String[] order) {
         defaultInputModeOrder = order;
     }
@@ -533,7 +533,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public static int getDefaultChangeInputModeKey() {
         return defaultChangeInputModeKey;
     }
@@ -546,7 +546,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public static void setDefaultChangeInputModeKey(int k) {
         defaultChangeInputModeKey = k;
     }
@@ -658,7 +658,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     @Override
     public String getInputMode() {
         return inputMode;
@@ -674,7 +674,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public void setInputMode(String inputMode) {
         this.inputMode = inputMode;
         repaint();
@@ -692,7 +692,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     protected boolean isChangeInputMode(int keyCode) {
         return keyCode == defaultChangeInputModeKey;
     }
@@ -717,7 +717,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public void setInputModeOrder(String[] order) {
         inputModeOrder = order;
         inputMode = order[0];
@@ -1107,7 +1107,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     protected boolean isImmediateInputMode(String mode) {
         return "123".equals(mode);
     }
@@ -1227,7 +1227,7 @@ public class TextField extends TextArea {
     ///
     /// #### Deprecated
     ///
-    /// this is a method for use only on old J2ME devices and is ignored everywhere else
+    /// input modes are a feature phone holdover; this is ignored on every supported platform
     public void insertChars(String c) {
         String currentText = getText();
         //if the contraint is numeric only, don't insert a char that isn't

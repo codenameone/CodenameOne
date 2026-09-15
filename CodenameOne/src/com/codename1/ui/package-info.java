@@ -84,7 +84,7 @@
 ///
 /// ### Calendar
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-calendar.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-calendar.png)
 /// `com.codename1.ui.Calendar` presents a visual date picker. Notice that we recommend using
 /// the
 /// `com.codename1.ui.spinner.Picker` class which is superior when running on the device for most use cases.
@@ -172,7 +172,7 @@
 ///
 /// ### Tabs
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-tabs.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-tabs.png)
 /// `com.codename1.ui.Tabs` places components/containers into tabbable entries, allows swiping
 /// between choices thru touch
 ///

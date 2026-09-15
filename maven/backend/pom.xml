@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The server-side backend runtime, as an artifact.
+
+  vm/backend holds one shared source tree and two implementations of the classes
+  under it: impl/javase (JDK) and impl/parparvm (natives). This module publishes
+  both halves, because a project needs each at a different moment.
+
+    codenameone-backend                     shared + impl/javase, COMPILED.
+                                            This is what a backend module compiles
+                                            against and what `cn1:backend` runs on
+                                            the JVM  -  the fast local loop.
+
+    codenameone-backend:parparvm-sources    shared + impl/parparvm as SOURCE, plus
+                                            the C the natives live in. This is what
+                                            `cn1:backend-package` hands to the
+                                            translator; it cannot be the compiled
+                                            jar, because the translator reads
+                                            bytecode compiled against vm/JavaAPI
+                                            rather than against a JDK.
+
+  Java 8 source and target: the shared half also has to compile against the
+  JavaAPI bootclasspath on the translated side, and that surface is Java 8.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-backend</artifactId>
+    <packaging>jar</packaging>
+    <name>Codename One Backend Runtime</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <backend.dir>${project.basedir}/../../vm/backend</backend.dir>
+    </properties>
+
+    <dependencies>
+        <!-- Only for the local Java SE arm, and only for SQLite: the PostgreSQL
+             and MySQL clients speak their wire protocols directly and need no
+             driver. Optional so a project that uses neither pulls in nothing. -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.0</version>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>${backend.dir}/src</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-javase-implementation</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${backend.dir}/impl/javase</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>parparvm-sources-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- Source, not classes: the translator compiles
+                                     these against vm/JavaAPI, which is a different
+                                     bootclasspath from the one above. The C files
+                                     ride along because a native's Java method is
+                                     kept alive by its C symbol being present. -->
+                                <jar destfile="${project.build.directory}/${project.build.finalName}-parparvm-sources.jar">
+                                    <fileset dir="${backend.dir}/src" includes="**/*.java"/>
+                                    <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java"/>
+                                    <zipfileset dir="${backend.dir}/native" includes="*.c"
+                                                prefix="cn1-native"/>
+                                </jar>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-parparvm-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/${project.build.finalName}-parparvm-sources.jar</file>
+                                    <type>jar</type>
+                                    <classifier>parparvm-sources</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

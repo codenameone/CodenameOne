@@ -39,7 +39,7 @@ import java.util.Vector;
 class CSSElement extends HTMLElement {
 
     /// A constant representing both the attribute value of 'font-variant' and the font name that should be given to small-caps fonts
-    /// Since J2ME doesn't support small-caps fonts, when a small-caps font varinat is requested
+    /// Since small-caps fonts are not supported, when a small-caps font varinat is requested
     /// the font-family is changed to "smallcaps" which should be loaded to HTMLComponent and the theme as a bitmap font
     /// If no smallcaps font is found at all, then the family stays the same, but if even only one is found - the best match will be used.
     final static String SMALL_CAPS_STRING = "small-caps";

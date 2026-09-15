@@ -717,11 +717,27 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 - (void)drawScreen;
 - (void)drawFrame:(CGRect)rect;
 - (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
+/// Drains the queue and draws even when the application is not frontmost.
+/// Display.screenshot() calls this: a capture must not wait for the normal
+/// paint cycle, which may never come while the window is not key -- and the
+/// screenshot suite runs exactly there.
+///
+/// Declared here, and not only in the watchOS/macOS arm above, because
+/// IOSNative.m messages it across a translation unit. With no prototype clang
+/// assumes the method returns id and infers the argument types from the call
+/// site, so nothing checks them against the definition.
+-(void)flushBufferForReadback:(int)x y:(int)y width:(int)width height:(int)height;
 
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event;
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event;
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event;
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event;
+
+/// Dismisses the native editing peer when a pointer release lands outside its
+/// bounds. CN1TapGestureRecognizer.m sends this from another translation unit,
+/// so it needs a prototype: the argument is a CGPoint, a struct passed by
+/// value, and an inferred argument type is not checked against the definition.
+-(void)foldKeyboard:(CGPoint)point;
 
 #if !TARGET_OS_TV
 - (void)datePickerChangeDate:(UIDatePicker *)sender;

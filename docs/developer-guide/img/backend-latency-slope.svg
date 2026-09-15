@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="770" height="380" viewBox="0 0 770 380">
+  <rect x="0" y="0" width="770" height="380" fill="#ffffff"/>
+  <text x="385" y="26" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Latency at the median and the 99th percentile</text>
+  <text x="385" y="46" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#555555">two pinned cores, 64 connections, plaintext route. Logarithmic scale: a steeper line is a longer tail.</text>
+  <line x1="240" y1="300.0" x2="710" y2="300.0" stroke="#e6e6e6" stroke-width="1"/>
+  <text x="234" y="303.0" font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#777777">50 us</text>
+  <line x1="240" y1="265.4" x2="710" y2="265.4" stroke="#e6e6e6" stroke-width="1"/>
+  <text x="234" y="268.4" font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#777777">100 us</text>
+  <line x1="240" y1="230.8" x2="710" y2="230.8" stroke="#e6e6e6" stroke-width="1"/>
+  <text x="234" y="233.8" font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#777777">200 us</text>
+  <line x1="240" y1="185.0" x2="710" y2="185.0" stroke="#e6e6e6" stroke-width="1"/>
+  <text x="234" y="188.0" font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#777777">500 us</text>
+  <line x1="240" y1="150.4" x2="710" y2="150.4" stroke="#e6e6e6" stroke-width="1"/>
+  <text x="234" y="153.4" font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#777777">1 ms</text>
+  <line x1="240" y1="115.8" x2="710" y2="115.8" stroke="#e6e6e6" stroke-width="1"/>
+  <text x="234" y="118.8" font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#777777">2 ms</text>
+  <line x1="240" y1="70.0" x2="710" y2="70.0" stroke="#e6e6e6" stroke-width="1"/>
+  <text x="234" y="73.0" font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#777777">5 ms</text>
+  <text x="250" y="326" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#333333">p50</text>
+  <text x="700" y="326" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#333333">p99</text>
+  <line x1="250" y1="270.6" x2="700" y2="219.8" stroke="#1f6feb" stroke-width="2.5"/>
+  <circle cx="250" cy="270.6" r="4" fill="#1f6feb"/>
+  <circle cx="700" cy="219.8" r="4" fill="#1f6feb"/>
+  <text x="220" y="273.6" font-family="Arial, sans-serif" font-size="11" text-anchor="end" fill="#1f6feb">Codename One native (musl)</text>
+  <text x="714" y="222.8" font-family="Arial, sans-serif" font-size="11" fill="#1f6feb">249 us</text>
+  <line x1="250" y1="286.9" x2="700" y2="80.4" stroke="#8250df" stroke-width="2.5"/>
+  <circle cx="250" cy="286.9" r="4" fill="#8250df"/>
+  <circle cx="700" cy="80.4" r="4" fill="#8250df"/>
+  <text x="220" y="289.9" font-family="Arial, sans-serif" font-size="11" text-anchor="end" fill="#8250df">Codename One native (glibc)</text>
+  <text x="714" y="83.4" font-family="Arial, sans-serif" font-size="11" fill="#8250df">4.1 ms</text>
+  <line x1="250" y1="263.4" x2="700" y2="102.1" stroke="#1a7f37" stroke-width="2.5"/>
+  <circle cx="250" cy="263.4" r="4" fill="#1a7f37"/>
+  <circle cx="700" cy="102.1" r="4" fill="#1a7f37"/>
+  <text x="220" y="266.4" font-family="Arial, sans-serif" font-size="11" text-anchor="end" fill="#1a7f37">Go fasthttp</text>
+  <text x="714" y="105.1" font-family="Arial, sans-serif" font-size="11" fill="#1a7f37">2.6 ms</text>
+  <line x1="250" y1="217.7" x2="700" y2="126.9" stroke="#bf3989" stroke-width="2.5"/>
+  <circle cx="250" cy="217.7" r="4" fill="#bf3989"/>
+  <circle cx="700" cy="126.9" r="4" fill="#bf3989"/>
+  <text x="220" y="220.7" font-family="Arial, sans-serif" font-size="11" text-anchor="end" fill="#bf3989">Same handler on the JVM</text>
+  <text x="714" y="129.9" font-family="Arial, sans-serif" font-size="11" fill="#bf3989">1.6 ms</text>
+  <text x="385" y="358" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#555555">The flat line is the point: with the response pooled the collector never runs, so the tail stays near the median.</text>
+</svg>

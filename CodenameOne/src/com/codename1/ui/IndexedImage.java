@@ -93,7 +93,7 @@ class IndexedImage extends Image {
         initOpaque();
     }
 
-    /// Packs the image loaded by MIDP
+    /// Packs the image loaded from the given resource name
     ///
     /// #### Parameters
     ///

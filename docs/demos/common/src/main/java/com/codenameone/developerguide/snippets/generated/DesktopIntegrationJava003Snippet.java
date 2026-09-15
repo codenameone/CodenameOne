@@ -84,7 +84,7 @@ class DesktopIntegrationJava003Snippet {
         save.setDesktopMenu(Command.DESKTOP_MENU_FILE);
         save.setDesktopShortcut('S');   // Cmd+S on macOS, Ctrl+S on Windows/Linux
 
-        Command saveAs = new Command("Save Asnull");
+        Command saveAs = new Command("Save As...");
         saveAs.setDesktopMenu(Command.DESKTOP_MENU_FILE);
         saveAs.setDesktopShortcut('S',
                 Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY | Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT);

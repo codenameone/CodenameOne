@@ -1,0 +1,12 @@
+# The fasthttp baseline, built the same way as the net/http one: static,
+# stripped, CGO off, so all three binaries in the comparison are the same shape.
+FROM golang:alpine AS build
+WORKDIR /src
+COPY bench-server-fasthttp.go .
+RUN go mod init benchfast >/dev/null 2>&1 || true
+RUN go get github.com/valyala/fasthttp@latest
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/bench-fasthttp bench-server-fasthttp.go
+
+FROM alpine:3.20
+COPY --from=build /out/bench-fasthttp /bench-fasthttp
+ENTRYPOINT ["/bench-fasthttp"]

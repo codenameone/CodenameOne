@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>${groupId}</groupId>
+        <artifactId>${rootArtifactId}</artifactId>
+        <version>${version}</version>
+    </parent>
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
+    <packaging>jar</packaging>
+
+    <name>${artifactId}</name>
+
+    <!--
+      The server side of this app, in the same language as the rest of it.
+
+      Two commands matter here:
+
+        The property is not optional: the backend module lives in a profile, so
+        without it Maven reports "Could not find the selected project in the
+        reactor"; the module is not in the default one.
+
+        mvn -pl backend -Dcodename1.platform=backend cn1:backend
+            runs it on this JVM, in seconds
+        mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
+            builds a native binary to deploy
+
+      The first is the development loop. The second produces a single executable
+      with no runtime to install, which is what lets the deployed container be the
+      size of the binary and a serverless cold start be a process exec.
+
+      This module deliberately does NOT depend on codenameone-core: a server has no
+      display, and the compiler saying so at the point of the import is more useful
+      than a crash at start-up. Share types with the app by putting them in a module
+      both depend on, or by declaring a @RestClient contract: the same interface
+      generates the app's client and this module's dispatcher.
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+        <!--
+             The SQLite driver for `cn1:backend`, the local JVM run. It is optional in
+             codenameone-backend, so Maven does not pass it down here, and without it
+             Database.open(":memory:") fails with "No suitable driver" in the loop the
+             guide documents. The native build links SQLite in and does not use this.
+             Delete it if this server never opens a SQLite database.
+        -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.0</version>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <version>${cn1.plugin.version}</version>
+                <!--
+                     No <mainClass>: the entry point is generated from the
+                     @RestController classes in this module. Set one only if this
+                     server writes its own main instead.
+                -->
+                <executions>
+                    <execution>
+                        <id>cn1-process-annotations</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <!-- Generates a router and an entry point from the
+                                 @RestController classes in this module. A no-op for
+                                 a server that writes its own main instead. -->
+                            <goal>process-annotations</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

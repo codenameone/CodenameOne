@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.util;
 
 import org.junit.jupiter.api.Test;
@@ -16,6 +38,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +54,29 @@ public class IOSShareExtensionBuilderTest {
                 .acceptText(true)
                 .acceptURLs(true)
                 .acceptImages(true);
+    }
+
+    /// The plist must not name a storyboard the archive does not contain.
+    /// buildFileMap writes four files and none of them is a storyboard, so a
+    /// declared NSExtensionMainStoryboard leaves iOS unable to build the
+    /// extension's interface -- it installs and fails to launch.
+    @Test
+    void plistDoesNotDeclareAStoryboardThatIsNeverEmitted() {
+        IOSShareExtensionBuilder b = new IOSShareExtensionBuilder()
+                .setExtensionName("MyShareExtension")
+                .setHostBundleId("com.example.myapp")
+                .setAppGroupId("group.com.example.myapp")
+                .acceptText(true);
+        java.util.Map<String, byte[]> files = b.buildFileMap();
+        String plist = new String(files.get("Info.plist"), java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(plist.contains("NSExtensionMainStoryboard"),
+                "the plist names a storyboard; was:\n" + plist);
+        assertTrue(plist.contains("NSExtensionPrincipalClass"),
+                "without a storyboard the principal class is what iOS instantiates");
+        for (String name : files.keySet()) {
+            assertFalse(name.endsWith(".storyboard"),
+                    "unexpected storyboard in the archive: " + name);
+        }
     }
 
     @Test

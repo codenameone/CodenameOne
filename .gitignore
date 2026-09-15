@@ -2,8 +2,6 @@
 /CodenameOne/javadoc/
 /CodenameOneDesigner/nbproject/private/
 /Ports/Android/nbproject/private/
-/Ports/BlackBerryOS_4_2/nbproject/private/
-/Ports/BlackBerryOS_5/nbproject/private/
 /Ports/JavaSE/nbproject/private/
 /Factory/nbproject/private/
 /vm/ByteCodeTranslator/nbproject/private/
@@ -14,10 +12,6 @@
 /CodenameOne/dist/
 /Ports/Android/build/
 /Ports/Android/dist/
-/Ports/BlackBerryOS_4_2/build/
-/Ports/BlackBerryOS_5/build/
-/Ports/BlackBerryOS_4_2/dist/
-/Ports/BlackBerryOS_5/dist/
 /Ports/JavaSE/build/
 *.skin
 *.jar
@@ -70,7 +64,6 @@ node_modules
 /tests/core/dist/
 /tests/core/build/
 /tests/signin-demo/nbproject/private/
-/Ports/J2ME/nbproject/private/
 /Ports/CLDC11/nbproject/private/
 /Ports/Android/CompatLibs/nbproject/private/
 /Ports/UWP/nbproject/private/

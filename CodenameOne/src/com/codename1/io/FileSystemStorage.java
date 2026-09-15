@@ -103,10 +103,9 @@ public final class FileSystemStorage {
     public static final int ROOT_TYPE_MAINSTORAGE = 1;
     /// Represents the type for the get root type method, this type generally represents an
     /// SD card although due to variability in phone standards an SD card might be
-    /// detected incorrectly. E.g. newer Nokia devices such as N97 have a large storage
-    /// area that is marked as "E:" but is really internal storage. If an SD card isn't
-    /// physically in the phone the "F:" won't be returned and it will be impossible to
-    /// detect that "E:" is not the actual SD card.
+    /// detected incorrectly. A device can expose a large internal storage area that it
+    /// reports the same way it would report a removable card, in which case there is no
+    /// way to tell the two apart from here.
     public static final int ROOT_TYPE_SDCARD = 2;
     /// Returned for different types of root for which there is no specific knowledge one
     /// way or the other.
