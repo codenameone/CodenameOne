@@ -209,22 +209,6 @@ public final class Db {
     }
 
     /**
-     * Makes LIKE compare case SENSITIVELY, as the other two engines do.
-     *
-     * <p>SQLite folds ASCII case in LIKE by default, so like("title", "lo%")
-     * matched a stored "LOW" here and matched nothing on PostgreSQL -- the
-     * portable query builder answering different rows depending on which
-     * database was configured. The pragma is per CONNECTION, so every pooled
-     * one is set as it is opened.
-     *
-     * <p>Only ASCII is affected either way: SQLite's built-in LIKE has never
-     * folded anything else, and neither does this.
-     */
-    public void useCaseSensitiveLike() throws IOException {
-        execute("PRAGMA case_sensitive_like=ON", null);
-    }
-
-    /**
      * How long a blocked writer waits for a competing one before giving up. Without
      * this, two connections writing at once produce SQLITE_BUSY immediately rather
      * than queueing.

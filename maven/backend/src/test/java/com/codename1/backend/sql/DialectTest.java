@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -451,5 +452,36 @@ class DialectTest {
                 Dialect.MARIADB.columnType(Dialect.TEXT));
         assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin",
                 Dialect.MYSQL.columnType(Dialect.TEXT));
+    }
+
+    @Test
+    @DisplayName("SQLite renders GLOB for like(), and translates the pattern with it")
+    void likeIsCaseSensitiveWithoutAPragma() {
+        // SQLite's LIKE folds ASCII case and PostgreSQL's does not. The pragma
+        // that would fix it is connection wide, and measured, it changes what an
+        // existing schema accepts: a table declared CHECK(v LIKE 'A%') takes
+        // 'abc' by default and refuses it with the pragma on. GLOB is case
+        // sensitive and scoped to the one comparison.
+        assertEquals(" GLOB ?", Dialect.SQLITE.likeOperator());
+        assertEquals(" LIKE ?", Dialect.POSTGRES.likeOperator());
+        assertEquals(" LIKE ?", Dialect.MYSQL.likeOperator());
+
+        // The wildcards are spelled differently, so the pattern travels with the
+        // operator.
+        assertEquals("lo*", Dialect.SQLITE.likePattern("lo%"));
+        assertEquals("a?b", Dialect.SQLITE.likePattern("a_b"));
+        // And GLOB's own metacharacters, which are literals in a LIKE pattern,
+        // are bracketed so they stay literal -- the half a careless translation
+        // drops, and where it starts matching everything.
+        assertEquals("lo[*]", Dialect.SQLITE.likePattern("lo*"));
+        assertEquals("a[?]b", Dialect.SQLITE.likePattern("a?b"));
+        assertEquals("a[[]b", Dialect.SQLITE.likePattern("a[b"));
+        // Everything else passes through, including the backslash that LIKE
+        // treats as ordinary when no ESCAPE clause names it.
+        assertEquals("a\\b", Dialect.SQLITE.likePattern("a\\b"));
+        assertNull(Dialect.SQLITE.likePattern(null));
+        // The other two leave it alone.
+        assertEquals("lo%", Dialect.POSTGRES.likePattern("lo%"));
+        assertEquals("lo%", Dialect.MYSQL.likePattern("lo%"));
     }
 }
