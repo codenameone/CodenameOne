@@ -91,8 +91,18 @@ if (-not (Test-Path $exe)) { throw "NativeRef.exe was not produced in $publishDi
 # how run 34947076245 reported SUCCESS while the app itself had written
 # "NATIVEREF:BLOCKER this window never became foreground" and exited 20. A verification
 # harness that cannot fail is worth nothing, and this one could not.
-$proc = Start-Process -FilePath $exe -Wait -PassThru -NoNewWindow
+# Redirected to files, then echoed. A WinExe's console writes do not reach the job log
+# through Start-Process, so the previous run's BLOCKER line survived only inside the
+# uploaded artifact -- diagnostics that can only be read by downloading an artifact are
+# diagnostics most people will never read.
+$outLog = Join-Path $publishDir 'nativeref.out.log'
+$errLog = Join-Path $publishDir 'nativeref.err.log'
+$proc = Start-Process -FilePath $exe -Wait -PassThru -NoNewWindow `
+    -RedirectStandardOutput $outLog -RedirectStandardError $errLog
 $rc = $proc.ExitCode
+foreach ($f in @($outLog, $errLog)) {
+  if (Test-Path $f) { Get-Content $f | ForEach-Object { Write-Host $_ } }
+}
 Write-Log "app exited $rc"
 
 if ($rc -ne 0) {

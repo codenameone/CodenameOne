@@ -186,6 +186,7 @@ public partial class App : Application
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
 
+    private const int SW_MINIMIZE = 6;
     private const int SW_SHOW = 5;
     private const int SW_RESTORE = 9;
 
@@ -263,6 +264,22 @@ public partial class App : Application
 
             var centre = new POINT { X = r.Left + w / 2, Y = r.Top + h / 2 };
             IntPtr atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
+
+            // The runner desktop ships with a "Microsoft account" out-of-box window that
+            // sits above even an always-on-top presenter, so asking politely for the
+            // foreground is not enough. Minimise whatever is covering us, and keep going in
+            // case several are stacked. This is a throwaway CI desktop whose only purpose is
+            // to photograph this window; there is nothing here to be polite to.
+            for (int i = 0; i < 5 && atCentre != hwnd && atCentre != IntPtr.Zero; i++)
+            {
+                Console.WriteLine($"NATIVEREF:INFO minimising 0x{atCentre.ToInt64():X} "
+                    + $"({DescribeWindow(atCentre)}) which is covering the capture area");
+                ShowWindow(atCentre, SW_MINIMIZE);
+                Thread.Sleep(250);
+                BringWindowToTop(hwnd);
+                atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
+            }
+
             _occluded = atCentre != hwnd;
             if (_occluded)
             {
@@ -314,17 +331,21 @@ public partial class App : Application
     /// the screen instead of leaving someone to guess from the picture.
     private static string DescribeForegroundWindow()
     {
+        var fg = GetForegroundWindow();
+        return $"foreground is 0x{fg.ToInt64():X} \"{DescribeWindow(fg)}\"";
+    }
+
+    private static string DescribeWindow(IntPtr h)
+    {
         try
         {
-            var fg = GetForegroundWindow();
             var buf = new StringBuilder(256);
-            int n = GetWindowTextW(fg, buf, buf.Capacity);
-            var title = n > 0 ? buf.ToString() : "(untitled)";
-            return $"foreground is 0x{fg.ToInt64():X} \"{title}\"";
+            int n = GetWindowTextW(h, buf, buf.Capacity);
+            return n > 0 ? buf.ToString() : "(untitled)";
         }
         catch
         {
-            return "foreground window could not be identified";
+            return "(unidentifiable)";
         }
     }
 
