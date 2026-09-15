@@ -404,6 +404,23 @@ public final class Backend {
             int workerCount = workers >= 0 ? workers : config.getInt(Config.SERVER_WORKERS, 16);
             int drain = shutdownMillis >= 0 ? shutdownMillis
                     : config.getInt(Config.SERVER_SHUTDOWN_MILLIS, 10000);
+            if(drain < 0) {
+                // HttpServer.stop takes this as a duration and computes its
+                // deadline as now + drain, so a negative one is a deadline
+                // already past: the drain is skipped and every request in flight
+                // has its socket closed mid-response. A typo in a properties
+                // file would turn graceful shutdown into truncated answers and
+                // say nothing. Zero is kept as the documented "do not wait",
+                // like the pool's timeouts.
+                //
+                // Only the CONFIGURED value can be negative here: a negative
+                // passed to the builder means "not set" to the ternary above,
+                // the sentinel port, backlog and workers all use.
+                throw new IllegalStateException(Config.SERVER_SHUTDOWN_MILLIS + " is "
+                        + drain + ", and a shutdown timeout cannot be negative -- it would "
+                        + "close the sockets of every request in flight instead of waiting "
+                        + "for them. Use 0 to stop immediately on purpose.");
+            }
             Tls context = resolveTls();
             HttpServer server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
                         new HttpServer.Handler() {

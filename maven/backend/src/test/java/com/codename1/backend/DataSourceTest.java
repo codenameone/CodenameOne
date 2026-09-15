@@ -266,6 +266,23 @@ class DataSourceTest {
                 () -> DataSource.open("jdbc:sqlite::resource:some/where.db"));
         assertThrows(IOException.class, () -> DataSource.open(":resource:some/where.db"));
 
+        // AN EMPTY PATH IS PRIVATE PER CONNECTION TOO. "jdbc:sqlite:" names no
+        // file and SQLite answers with a temporary database of its own for each
+        // connection -- measured: a table created on one is "no such table" on
+        // the next. Pooling it hands successive requests different empty
+        // databases, which is what ":memory:" is refused for.
+        assertThrows(IOException.class, () -> DataSource.open("jdbc:sqlite:", 2));
+        DataSource lone = DataSource.open("jdbc:sqlite:");
+        try {
+            assertEquals(1, lone.getMaxSize());
+            lone.execute("CREATE TABLE t (a INTEGER)", null);
+            lone.execute("INSERT INTO t (a) VALUES (?)", new Object[] {Long.valueOf(1)});
+            // The same connection on the next borrow, which is the whole point.
+            assertEquals(1, lone.query("SELECT a FROM t", null).size());
+        } finally {
+            lone.close();
+        }
+
         // The two spellings both runtimes agree about still work.
         assertThrows(IOException.class, () -> DataSource.open(":memory:", 2));
         DataSource pool = DataSource.open("jdbc:sqlite::memory:");
