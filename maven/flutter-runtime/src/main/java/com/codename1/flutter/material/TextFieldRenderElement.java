@@ -425,6 +425,21 @@ public class TextFieldRenderElement extends RenderElement {
         } else if (d.getBorder() == com.codename1.flutter.InputBorder.none) {
             all.setBorder(com.codename1.ui.plaf.Border.createEmpty());
         }
+        // The SAME border in every state. A Codename One theme gives a text field one
+        // border unselected and a different one -- often none -- selected, which is a
+        // reasonable default for a native-looking field and wrong for this one: a
+        // reference text field keeps its decoration whether it has focus or not, and only
+        // its caret and the highlight colour change.
+        //
+        // Left to the theme it looked like the box belonged to whichever field was NOT
+        // being used. Measured on Shrine's login, the outline's top and bottom edges were
+        // at y=1191 and y=1363 on arrival, and moved to y=979 and y=1151 -- the other
+        // field entirely -- on tapping into the password box.
+        com.codename1.ui.plaf.Border rest = target.getUnselectedStyle().getBorder();
+        if (rest != null) {
+            target.getSelectedStyle().setBorder(rest);
+            target.getPressedStyle().setBorder(rest);
+        }
         com.codename1.flutter.EdgeInsets pad = insetsOf(resolvePadding(d, themed));
         if (pad != null) {
             all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
