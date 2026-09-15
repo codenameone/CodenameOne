@@ -377,6 +377,64 @@ ProgressBarFull {
     margin: 0.8mm;
 }
 
+/* --- ComboBox ------------------------------------------------------------------------- */
+/*
+ * Declared because the fidelity matrix asks for it and nothing was styling it: the tile
+ * rendered from UIManager's blank defaults and was pixel-identical in normal and hover,
+ * which is what an unstyled control looks like when you only glance at it. A native
+ * NSPopUpButton / GtkDropDown / WinUI ComboBox reads as a button with a label, which is what
+ * the Codename One side has to offer against it.
+ */
+
+ComboBox {
+    color: #2e3436;
+    background-color: #e1e1e0;
+    border: 0.26mm solid #cdc7c2;
+    border-radius: 1.59mm;
+    padding: 1.3mm 4.2mm 1.3mm 4.2mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+}
+
+ComboBox.hover {
+    color: #2e3436;
+    background-color: #d6d6d5;
+    border: 0.26mm solid #cdc7c2;
+    border-radius: 1.59mm;
+    padding: 1.3mm 4.2mm 1.3mm 4.2mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+}
+
+ComboBox.disabled {
+    color: #9a9996;
+    background-color: #ededeb;
+    border: 0.26mm solid #cdc7c2;
+    border-radius: 1.59mm;
+    padding: 1.3mm 4.2mm 1.3mm 4.2mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+}
+
+/* A native slider highlights its track under the pointer. Without this the hover tile was
+   byte-identical to the normal one. */
+Slider.hover {
+    color: #3584e4;
+    background-color: #c8c8c7;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
+Slider.disabled {
+    color: #9a9996;
+    background-color: #ededeb;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
 /* --- Header bar ------------------------------------------------------------------------ */
 /*
  * AdwHeaderBar is the window's title bar, not a strip below it. It carries a 1px bottom
@@ -530,6 +588,11 @@ ListRendererFocus {
     DialogTitle { color: #ffffff; }
     DialogBody { color: #ffffff; }
 
+    ComboBox { color: #ffffff; background-color: #383838; border: 0.26mm solid #3d3d3d; }
+    ComboBox.hover { color: #ffffff; background-color: #454545; border: 0.26mm solid #3d3d3d; }
+    ComboBox.disabled { color: #919191; background-color: #2e2e2e; border: 0.26mm solid #3d3d3d; }
+    Slider.hover { background-color: #575757; color: #3584e4; }
+    Slider.disabled { background-color: #2e2e2e; color: #919191; }
     ScrollThumb { background-color: #5e5c64; }
     ScrollThumb.hover { background-color: #77767b; }
     ScrollThumb.pressed { background-color: #9a9996; }

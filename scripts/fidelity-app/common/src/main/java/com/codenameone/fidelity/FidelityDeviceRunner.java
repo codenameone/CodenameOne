@@ -164,8 +164,8 @@ public class FidelityDeviceRunner {
     // ---- CN1 render ----
 
     private void renderCn1(final ComponentSpec c, final String appearance) {
-        final int w = pixels(spec.tileWidthMm(c), true);
-        final int h = pixels(spec.tileHeightMm(c), false);
+        final int w = tileWidth(c);
+        final int h = tileHeight(c);
         final List states = c.getStates();
         final List wrappers = new ArrayList();
         final List names = new ArrayList();
@@ -189,7 +189,20 @@ public class FidelityDeviceRunner {
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
                             com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-                    if ("ios".equals(platform)) {
+                    if (isDesktopPlatform()) {
+                        // Desktop follows the iOS rule, not the Android one: there is no
+                        // 48dp touch target to centre a control inside, because a pointer
+                        // does not need one. Every widget anchors top-left at its natural
+                        // size, which is also how the native reference apps lay them out.
+                        //
+                        // The exceptions are the controls a desktop toolkit stretches: a
+                        // slider and a progress bar take the tile's width, because a native
+                        // one fills its container rather than sizing to content.
+                        if ("DesktopSlider".equals(c.getId()) || "DesktopProgressBar".equals(c.getId())) {
+                            comp.setPreferredW(w);
+                        }
+                        st.setMargin(0, 0, 0, 0);
+                    } else if ("ios".equals(platform)) {
                         // iOS: the native reference renders full-width widgets filling
                         // the tile (handled by newTile's BorderLayout) and content-sized
                         // controls pinned top-left at frame (0,0). Slider/progress are
@@ -293,8 +306,8 @@ public class FidelityDeviceRunner {
     // numerically against the TabSelectionMorph model in TabSelectionMorphTest.
 
     private void renderCn1Frames(final ComponentSpec c, final String appearance) {
-        final int w = pixels(spec.tileWidthMm(c), true);
-        final int h = pixels(spec.tileHeightMm(c), false);
+        final int w = tileWidth(c);
+        final int h = tileHeight(c);
         final List frames = c.getFrames();
         // One form + one capture PER FRAME: all the frames of a morph on a single
         // form can exceed the phone's screen height, and a tile below the fold
@@ -422,8 +435,8 @@ public class FidelityDeviceRunner {
     // shipped through the same WebSocket path as the CN1 tiles.
 
     private void renderNative(final ComponentSpec c, final String appearance) {
-        int w = pixels(spec.tileWidthMm(c), true);
-        int h = pixels(spec.tileHeightMm(c), false);
+        int w = tileWidth(c);
+        int h = tileHeight(c);
         String kind = c.getNativeKind(platform);
         String text = c.getText();
         if (text == null) {
@@ -805,6 +818,38 @@ public class FidelityDeviceRunner {
         return px > 0 ? px : mm;
     }
 
+    /// True when this run is capturing for a desktop platform.
+    private boolean isDesktopPlatform() {
+        return "win".equals(platform) || "mac".equals(platform) || "linux".equals(platform)
+                || "windows".equals(platform) || "macos".equals(platform) || "gnome".equals(platform);
+    }
+
+    /// Tile width in device pixels, in whichever unit the platform is specified in.
+    ///
+    /// Mobile rows are sized in millimetres because a phone control has to occupy the same
+    /// amount of thumb on every device. Desktop rows are sized in LOGICAL PIXELS because
+    /// that is how the toolkits themselves are specified, and converting them through
+    /// millimetres would round twice and land a pixel or two off -- which the absolute
+    /// position metric charges for in full.
+    private int tileWidth(ComponentSpec c) {
+        return isDesktopPlatform() ? logicalPixels(spec.tileWidthPx(c)) : pixels(spec.tileWidthMm(c), true);
+    }
+
+    private int tileHeight(ComponentSpec c) {
+        return isDesktopPlatform() ? logicalPixels(spec.tileHeightPx(c)) : pixels(spec.tileHeightMm(c), false);
+    }
+
+    /// Converts logical pixels to device pixels at the display's scale.
+    ///
+    /// A logical pixel is 1/96 inch by definition, which is exactly how WinUI, GTK and AppKit
+    /// are specified, so this is a scale conversion rather than a DPI one: at 100% it is the
+    /// identity, at 200% it doubles.
+    private int logicalPixels(int logical) {
+        int perInch = Display.getInstance().convertToPixels(254, true);   // px in 25.4mm * 10
+        int px = perInch > 0 ? Math.round(logical * (perInch / 10f) / 96f) : logical;
+        return px > 0 ? px : logical;
+    }
+
     private void settle() {
         try {
             Thread.sleep(SETTLE_MS);
@@ -895,6 +940,15 @@ public class FidelityDeviceRunner {
         }
         if (platform != null && platform.startsWith("and")) {
             return "/AndroidMaterialTheme.res";
+        }
+        if ("win".equals(platform) || "windows".equals(platform)) {
+            return "/WindowsFluentTheme.res";
+        }
+        if ("mac".equals(platform) || "macos".equals(platform)) {
+            return "/MacOSAquaTheme.res";
+        }
+        if ("linux".equals(platform) || "gnome".equals(platform)) {
+            return "/GnomeAdwaitaTheme.res";
         }
         return Display.getInstance().getProperty("cn1.modernThemeResource", null);
     }
