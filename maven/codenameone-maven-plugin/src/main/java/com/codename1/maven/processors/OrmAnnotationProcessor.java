@@ -150,9 +150,28 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         // the very builds that had already supplied it. That is not theoretical
         // -- it failed this repository's own contract build, which passes the
         // property on the command line.
-        String settled = System.getProperty("cn1.backendOrm");
+        // ONLY true OR false. Anything else is refused rather than read as one of
+        // them: "true".equalsIgnoreCase(v) makes every other spelling mean FALSE,
+        // so -Dcn1.backendOrm=ture silently selected the client flavour AND
+        // skipped the ambiguity guard below, which is the one case that guard
+        // exists for. In a backend module carrying both runtimes the client
+        // sources then compile, because the core classes really are there, and
+        // the packaged server comes out with none of its backend registrations --
+        // a typo, a green build, and a server that does nothing.
+        String settled = System.getProperty(BACKEND_ORM_PROPERTY);
         if (settled != null && settled.length() > 0) {
-            backend = "true".equalsIgnoreCase(settled);
+            if ("true".equalsIgnoreCase(settled)) {
+                backend = true;
+                return;
+            }
+            if ("false".equalsIgnoreCase(settled)) {
+                backend = false;
+                return;
+            }
+            ctx.error("-D" + BACKEND_ORM_PROPERTY + "=" + settled + " is not a value "
+                    + "this understands. It selects which ORM the @Entity classes in "
+                    + "this module are stored through, and the only answers are true "
+                    + "for the server-side backend and false for the client.");
             return;
         }
         if (onCompileClasspath(ctx, BACKEND_DATABASE)
@@ -173,27 +192,28 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         this.forcedFlavour = Boolean.valueOf(serverSide);
     }
 
+    /// Settles the flavour outright when the classpath cannot. Read in one
+    /// place, [#start], so there is one spelling of what it accepts.
+    private static final String BACKEND_ORM_PROPERTY = "cn1.backendOrm";
+
     /// The two classes whose presence tells the runtimes apart.
     private static final String BACKEND_DATABASE = "com/codename1/backend/Database.class";
     private static final String CLIENT_DATABASE = "com/codename1/db/Database.class";
 
     /// Which runtime this module's entities are stored through.
     ///
-    /// `-Dcn1.backendOrm` settles it outright, which is what a module carrying
-    /// BOTH runtimes needs -- the shared-contract module in this repository is
-    /// compiled against the core and the backend at once, so the classpath
-    /// cannot answer for it.
+    /// Reached only when `-Dcn1.backendOrm` was NOT set -- [#start] settles that
+    /// case, and validates it -- and only when the classpath is unambiguous,
+    /// which [#start] also checks. Reading the property here as well was one
+    /// spelling of "true" in two places, and the second one had no way to
+    /// report a value it did not understand.
     ///
-    /// Otherwise: the backend flavour when the backend's `Database` is on the
+    /// The backend flavour when the backend's `Database` is on the
     /// compile classpath and the core's is not. A client module has the core
     /// and not the backend, so it takes the other branch and nothing about
     /// existing projects changes. A module with BOTH never reaches here --
     /// [#start] refuses it rather than letting this pick a half.
     private static boolean isBackendModule(ProcessorContext ctx) {
-        String forced = System.getProperty("cn1.backendOrm");
-        if (forced != null && forced.length() > 0) {
-            return "true".equalsIgnoreCase(forced);
-        }
         return onCompileClasspath(ctx, BACKEND_DATABASE)
                 && !onCompileClasspath(ctx, CLIENT_DATABASE);
     }
