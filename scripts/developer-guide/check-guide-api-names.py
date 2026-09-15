@@ -108,8 +108,16 @@ CLASS_POSITION = re.compile(
     # does not exist and was exempted as the plural of ARAnchor.
     r'|\b([A-Z][A-Za-z0-9]{4,})\s+[a-z][A-Za-z0-9]*\b'
     r'|\(\s*([A-Z][A-Za-z0-9]{4,})\s*\)'
-    r'|<\s*([A-Z][A-Za-z0-9]{4,})\s*[,>]'
-    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\[\s*\]')
+    # Any type argument, not only the first: Map<String, ARAnchors> names one
+    # after a comma. The delimiters are matched by look-around rather than
+    # consumed, or the comma that ends one argument is eaten by the match for
+    # the argument before it and the last one is never seen.
+    r'|(?<=[<,])\s*([A-Z][A-Za-z0-9]{4,})\s*(?=[,>])'
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\[\s*\]'
+    # And an annotation use, which names a type as surely as a declaration
+    # does: `@Routes` is not the plural of anything, it is a type that does
+    # not exist.
+    r'|@([A-Z][A-Za-z0-9]{4,})\b')
 # Every one of those carries a signal that the token is code -- backticks, a
 # link target, a member call. A bare capitalised word in prose carries none,
 # and asking for it is not a near miss away from a class name, it IS one:
