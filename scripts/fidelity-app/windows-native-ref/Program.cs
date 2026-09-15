@@ -203,6 +203,14 @@ public partial class App : Application
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr pid);
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint attach, uint attachTo, bool fAttach);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(uint action, uint param, IntPtr pv, uint winIni);
+    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr hWnd);
+
+    private const uint SPI_SETFOREGROUNDLOCKTIMEOUT = 0x2001;
+    private const uint SPIF_SENDCHANGE = 0x02;
+    private const uint WM_CLOSE = 0x0010;
     [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(POINT p);
     [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
 
@@ -277,9 +285,20 @@ public partial class App : Application
             // to photograph this window; there is nothing here to be polite to.
             for (int i = 0; i < 5 && atCentre != hwnd && atCentre != IntPtr.Zero; i++)
             {
-                Console.WriteLine($"NATIVEREF:INFO minimising 0x{atCentre.ToInt64():X} "
+                // Closed, not just minimised. Minimising moved it out of the frame but it
+                // KEPT the foreground -- measured: "the window is unoccluded but never became
+                // active (foreground is 0x1020A \"Microsoft account\")" with that same
+                // window already minimised. A window that is gone cannot hold the foreground.
+                // Minimise remains the fallback for anything that refuses to close.
+                Console.WriteLine($"NATIVEREF:INFO clearing 0x{atCentre.ToInt64():X} "
                     + $"({DescribeWindow(atCentre)}) which is covering the capture area");
-                ShowWindow(atCentre, SW_MINIMIZE);
+                PostMessage(atCentre, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                await Task.Delay(400);
+                if (IsWindow(atCentre))
+                {
+                    Console.WriteLine($"NATIVEREF:INFO 0x{atCentre.ToInt64():X} would not close; minimising");
+                    ShowWindow(atCentre, SW_MINIMIZE);
+                }
                 await Task.Delay(250);
                 BringWindowToTop(hwnd);
                 atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
@@ -397,6 +416,13 @@ public partial class App : Application
     /// foreground window's input thread lifts that restriction for the duration.
     private static async Task<bool> TryTakeForegroundAsync(IntPtr hwnd)
     {
+        // Windows enforces a foreground LOCK TIMEOUT: after another process has been
+        // activated, SetForegroundWindow is refused for a period regardless of the
+        // input-thread attach. Setting it to zero is the documented way to opt out, and on a
+        // CI desktop whose only job is to photograph one window there is nothing to protect
+        // the user from.
+        SystemParametersInfo(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, IntPtr.Zero, SPIF_SENDCHANGE);
+
         for (int i = 0; i < 20 && GetForegroundWindow() != hwnd; i++)
         {
             IntPtr fg = GetForegroundWindow();
