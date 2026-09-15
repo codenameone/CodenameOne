@@ -54,6 +54,11 @@ class ContainsEvaluator extends AbstractEvaluator {
         // getChild() is a bit of a hack here because the content object
         // calls getParent()
         StructuredContent child = element.getChild(0);
+        if (child == null) {
+            // Nothing below this element, so nothing for the predicate to
+            // look at. Result.fromContent refuses a null outright.
+            return new String[0];
+        }
         Result result = Result.fromContent(child);
         v = result.getAsStringArray(lvalue);
         return v;
@@ -73,7 +78,11 @@ class ContainsEvaluator extends AbstractEvaluator {
         // if the rvalue is wrapped with "()", the caller explicitly expects the lvalue to be an array of values,
         // otherwise try to do a "string contains" match first if there's only one lvalue
         if (rvalue.indexOf("(") == -1 && lvalues.length == 1) {
-            if (lvalues[0].toLowerCase().indexOf(rvalue.toLowerCase()) != -1) {
+            // A node can have no text -- an empty array kept among an array's
+            // values is one -- and there is nothing for "contains" to look
+            // inside. Both branches below used to dereference it.
+            if (lvalues[0] != null
+                    && lvalues[0].toLowerCase().indexOf(rvalue.toLowerCase()) != -1) {
                 return element;
             }
         }
@@ -83,7 +92,7 @@ class ContainsEvaluator extends AbstractEvaluator {
         for (String r : rvalues) {
             for (i = 0; i < lvlen; i++) {
                 String l = lvalues[i];
-                if (l.equalsIgnoreCase(r)) {
+                if (l != null && l.equalsIgnoreCase(r)) {
                     break;
                 }
             }

@@ -121,6 +121,12 @@ class MapContent implements StructuredContent {
             }
         } else if (root instanceof List) {
             return PrettyPrinter.print((List) root);
+        } else if (root == null) {
+            // A null entry of an array is wrapped like any other, and this
+            // used to dereference it: [[null]] threw from here. Empty rather
+            // than null, because toString must not answer null -- getText is
+            // where "there is no text" is said.
+            return "";
         } else {
             return root.toString();
         }
@@ -162,12 +168,16 @@ class MapContent implements StructuredContent {
         }
 
         for (Object o : array) {
-            // There is a bug that needs to be addressed, should always have
-            // Maps.
-            // for now prevent the critical cast exception.
-            if (o instanceof Map) {
-                children.add(new MapContent(o, this));
-            } else if (o instanceof String) {
+            // Maps and strings were the only shapes kept, so an array of
+            // numbers or booleans -- "scores":[1,2] -- came back EMPTY, from
+            // the child form of a path as well as the attribute form. The
+            // JSON parser hands those back as Double, Long and Boolean, and a
+            // value is a value whatever its type; MapContent reads it through
+            // getText() either way.
+            //
+            // null is still dropped: there is no value to read from it, and
+            // the absence tests are what ask about that.
+            if (o != null) {
                 children.add(new MapContent(o, this));
             }
         }
@@ -184,9 +194,22 @@ class MapContent implements StructuredContent {
         if (root instanceof String) {
             return new Vector();
         }
+        // Nor has any other scalar. An array of numbers now keeps its values,
+        // so a path can walk into one -- "/items/scores/value" -- and the cast
+        // to Map further down threw. ParparVM does not throw for a failed
+        // cast, so on a device it would have read the Double as a Map.
+        if (!(root instanceof Map) && !(root instanceof List)) {
+            return new Vector();
+        }
         // on arrays, auto select first element that contains 'name'.
+        //
+        // Past the guard above, root is a Map or a List and cannot be null, so
+        // the two null checks this method used to make on it are gone: one
+        // decided oldList and the other guarded the cast below. The cast is
+        // safe for the same reason -- a List only gets here through an entry
+        // the loop kept, and it keeps one only when it is a Map.
         Object node = root;
-        boolean oldList = node == null || (node instanceof Vector);
+        boolean oldList = node instanceof Vector;
         if (node instanceof List) {
             Object tmp = null;
             for (Object entry : (List) node) {
@@ -206,13 +229,6 @@ class MapContent implements StructuredContent {
                 }
             }
             node = tmp;
-        }
-        if (node == null) {
-            if (oldList) {
-                return new Vector();
-            } else {
-                return new ArrayList();
-            }
         }
         node = ((Map) node).get(name);
         if (node == null) {
@@ -251,7 +267,20 @@ class MapContent implements StructuredContent {
     @Override
     public StructuredContent getChild(int index) {
         if (root instanceof List) {
-            return new MapContent(((List) root).get(index), this);
+            List entries = (List) root;
+            if (index < 0 || index >= entries.size()) {
+                // An empty list has no first child, and getText() asks for
+                // one: a nested [[]] threw from there rather than reading as
+                // the nothing it is.
+                return null;
+            }
+            return new MapContent(entries.get(index), this);
+        }
+        if (!(root instanceof Map)) {
+            // A scalar has no children. The cast below used to be reached for
+            // one and throw -- and ParparVM does not throw for a failed cast,
+            // so on a device it would have read a Double as a Map instead.
+            return null;
         }
         Map h = (Map) root;
         if (index < 0 || index >= h.size()) {
@@ -343,6 +372,63 @@ class MapContent implements StructuredContent {
         return null;
     }
 
+    /// The values an `@name` expression asks for, whatever the format holds.
+    ///
+    /// XML keeps one in an attribute. JSON has no attributes at all -- the
+    /// method above answers null for every name -- and the field the
+    /// expression names is a child there, which is what the developer guide
+    /// has always said an attribute expression does on a JSON document.
+    ///
+    /// A list rather than one value, because a JSON field can be an array:
+    /// `{"tags":["first","target"]}` has two, and answering with the first
+    /// hid the second from a predicate and dropped it from a path that read
+    /// the field. Child evaluation has always walked all of them.
+    ///
+    /// One place, because everything that reads an attribute has to agree:
+    /// the predicates that compare one, the predicate that tests for one, and
+    /// the step that reads one at the end of a path. They did not -- only the
+    /// existence test looked at the child -- so `/players[@rank]/name` found
+    /// both players while `/players[@rank='1']/name` and `/players/@id` found
+    /// none.
+    ///
+    /// - `element`: the element to read
+    ///
+    /// - `name`: the name, already stripped of its '@'
+    ///
+    /// Nodes rather than strings, because a JSON field can be an object and
+    /// the step that reads one at the end of a path has to hand back the
+    /// object. Answering with its text gave `getAsArray("/items/@profile")`
+    /// the first key of the map instead of the map, while the child form of
+    /// the same path returned the map. A predicate reads the text off each.
+    ///
+    /// #### Returns
+    ///
+    /// the value nodes, empty when this element has none
+    static List attributeOrFields(StructuredContent element, String name) {
+        List values = new ArrayList();
+        String attribute = element.getAttribute(name);
+        if (attribute != null) {
+            values.add(new MapContent(attribute, element));
+            return values;
+        }
+        // XML draws the distinction the expression language draws: "[@rank]"
+        // asks about an attribute and "[rank]" about a child element, so the
+        // child is only the answer where there are no attributes to be had.
+        if (!(element instanceof MapContent)) {
+            return values;
+        }
+        List children = element.getChildren(name);
+        if (children == null) {
+            return values;
+        }
+        for (Object child : children) {
+            if (child instanceof StructuredContent) {
+                values.add(child);
+            }
+        }
+        return values;
+    }
+
     /*
      * (non-Javadoc)
      *
@@ -376,12 +462,23 @@ class MapContent implements StructuredContent {
         if (root instanceof String) {
             return (String) root;
         }
+        // A scalar is its own text. The parser hands numbers back as Double
+        // or Long and booleans as Boolean, and every one of those is a value
+        // a path can read or a predicate can compare.
+        if (root != null && !(root instanceof Map) && !(root instanceof List)) {
+            return root.toString();
+        }
         StructuredContent sc = getChild(0);
         if (sc == null) {
             return null;
         }
         if (sc.getNativeRoot() instanceof String) {
             return (String) sc.getNativeRoot();
+        }
+        if (sc.getNativeRoot() == null) {
+            // A null entry has no text, which is not the same as the empty
+            // string toString has to answer with.
+            return null;
         }
         return sc.toString();
     }
