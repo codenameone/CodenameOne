@@ -113,16 +113,6 @@ public final class Database {
         this.mysql = mysql;
         this.describedAs = describedAs;
         this.dialect = dialect;
-        if(sqlite != null) {
-            // HERE, AND NOT IN A FACTORY. SQLite's LIKE folds ASCII case and the
-            // other two engines do not, so this decides what a query MEANS --
-            // and it had been set in DataSource.configure, then in open(), and
-            // each time some other way of getting a Database kept the old
-            // behaviour: of(Db) wraps a handle the caller opened and reaches
-            // neither. The constructor is the one thing every path runs, so it
-            // is the only place the answer cannot be missed.
-            sqlite.useCaseSensitiveLike();
-        }
     }
 
     /** A unit of work run inside {@link #transaction}. */

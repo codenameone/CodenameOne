@@ -307,6 +307,33 @@ public abstract class Dialect {
     }
 
     /**
+     * The operator a portable {@code like} renders to, and the pattern it binds.
+     *
+     * <p>SQLite's LIKE folds ASCII case and PostgreSQL's does not, so the same
+     * query answered different rows depending on the engine. The obvious fix --
+     * PRAGMA case_sensitive_like -- is connection wide, and that reaches further
+     * than the ORM: measured, a table declared CHECK(v LIKE 'A%') accepts 'abc'
+     * under the default and REFUSES it once the pragma is on, so merely opening
+     * an existing database would change what writes it accepts, and an
+     * expression index built on LIKE would no longer agree with its own rows.
+     *
+     * <p>So SQLite renders GLOB instead, which is case sensitive, always
+     * present, and scoped to the one comparison being made. The pattern is
+     * translated to match: see {@link #likePattern}.
+     */
+    public String likeOperator() {
+        return " LIKE ?";
+    }
+
+    /**
+     * {@code pattern} as {@link #likeOperator} expects it. Unchanged except on
+     * SQLite, where GLOB spells its wildcards differently.
+     */
+    public String likePattern(String pattern) {
+        return pattern;
+    }
+
+    /**
      * One ORDER BY term, with NULLs placed the same way on every engine.
      *
      * <p>The engines disagree by default, measured over one null and two values:
@@ -507,6 +534,40 @@ public abstract class Dialect {
     // ------------------------------------------------------------------
 
     private static final class SqliteDialect extends Dialect {
+        public String likeOperator() {
+            return " GLOB ?";
+        }
+
+        /**
+         * A LIKE pattern as GLOB spells it; see {@link Dialect#likeOperator}.
+         *
+         * <p>GLOB's wildcards are * and ?, and a literal one of those -- or of
+         * the [ that opens its character classes -- is written by bracketing it.
+         * LIKE has no escape character unless ESCAPE names one, which this
+         * builder does not offer, so every other character is literal and
+         * passes through.
+         */
+        public String likePattern(String pattern) {
+            if(pattern == null) {
+                return null;
+            }
+            StringBuilder out = new StringBuilder(pattern.length() + 8);
+            for(int iter = 0 ; iter < pattern.length() ; iter++) {
+                char c = pattern.charAt(iter);
+                if(c == '%') {
+                    out.append('*');
+                } else if(c == '_') {
+                    out.append('?');
+                } else if(c == '*' || c == '?' || c == '[') {
+                    out.append('[').append(c).append(']');
+                } else {
+                    out.append(c);
+                }
+            }
+            return out.toString();
+        }
+
+
         public String getName() {
             return "sqlite";
         }

@@ -104,7 +104,13 @@ public final class Query<T> {
      * value holding a quote is a value and not a statement.
      */
     public Query<T> like(String field, String pattern) {
-        return condition(field, " LIKE ?", required(field, pattern));
+        // OPERATOR AND PATTERN BOTH FROM THE DIALECT: SQLite renders GLOB, which
+        // is case sensitive where its LIKE is not, and spells its wildcards
+        // differently. See Dialect.likeOperator for why the connection-wide
+        // pragma was the wrong tool.
+        required(field, pattern);
+        return condition(field, table.dialect.likeOperator(),
+                table.dialect.likePattern(pattern));
     }
 
     /** field IS NULL. */

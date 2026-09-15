@@ -328,17 +328,26 @@ public class OrmCheck {
         notes.insert(note("high", 10, true, 2000L));
         notes.insert(note("mid", 5, false, 3000L));
 
-        // AND SO IS LIKE, NOW. SQLite folds ASCII case in LIKE by default while
-        // PostgreSQL does not, so "lo%" matched "LOW" on SQLite alone -- the
-        // same query answering different rows depending on the engine. Closed
-        // by setting PRAGMA case_sensitive_like on every pooled SQLite
-        // connection, which is why this expects one answer rather than one per
-        // engine as an earlier version of this check did.
+        // AND SO IS LIKE. SQLite folds ASCII case in LIKE while PostgreSQL does
+        // not, so "lo%" matched "LOW" on SQLite alone. Closed by rendering GLOB
+        // there rather than by turning on PRAGMA case_sensitive_like, which is
+        // connection wide and would change what an existing schema's
+        // CHECK(v LIKE ...) accepts. The wildcards are translated with it, so a
+        // pattern written for LIKE keeps meaning what it says.
         notes.insert(note("LOW", 2, false, 4000L));
         check("LIKE is case sensitive on every engine", "1",
                 String.valueOf(notes.query().like("title", "lo%").count()));
         check("and matches the other case on its own", "1",
                 String.valueOf(notes.query().like("title", "LO%").count()));
+        // The single-character wildcard travels too.
+        check("the _ wildcard matches one character", "1",
+                String.valueOf(notes.query().like("title", "lo_").count()));
+        // And a literal * or [ in a pattern stays literal, which is where a
+        // careless LIKE-to-GLOB translation would start matching everything.
+        check("a literal asterisk is not a wildcard", "0",
+                String.valueOf(notes.query().like("title", "lo*").count()));
+        check("and nor is a literal bracket", "0",
+                String.valueOf(notes.query().like("title", "lo[w]").count()));
         notes.query().eq("title", "LOW").delete();
         // A CHARACTER AS A QUERY VALUE. The column holds the code unit, so a
         // query that bound one-character text compared 120 with "x" and matched
