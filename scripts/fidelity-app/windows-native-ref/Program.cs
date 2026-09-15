@@ -98,11 +98,11 @@ public partial class App : Application
         root.Children.Add(button);
         _window.Content = root;
 
-        root.Loaded += (_, _) => OnReady(root, button, micaSupported);
+        root.Loaded += async (_, _) => await OnReadyAsync(root, button, micaSupported);
         _window.Activate();
     }
 
-    private void OnReady(FrameworkElement root, Button button, bool micaSupported)
+    private async Task OnReadyAsync(FrameworkElement root, Button button, bool micaSupported)
     {
         var ui = new UISettings();
         bool transparency = ui.AdvancedEffectsEnabled;
@@ -143,7 +143,7 @@ public partial class App : Application
         // are not expanded into the output, and if that mattered the controls would come
         // back unstyled or absent rather than failing loudly. A picture is the only thing
         // that distinguishes "built" from "drew a Fluent button".
-        CaptureWindow(root);
+        await CaptureWindowAsync(root);
 
         WriteManifest(micaSupported, transparency, animations, accent, rasterScale, fontFamily, segoeVariable);
 
@@ -181,6 +181,8 @@ public partial class App : Application
     private const uint GA_ROOT = 2;
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
+    [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hWnd, out RECT r);
+    [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hWnd, ref POINT p);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder s, int max);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -198,7 +200,7 @@ public partial class App : Application
     /// the XAML visual tree, so RenderTargetBitmap would silently return the widget without
     /// its material. This is the direct analogue of the iOS reference capturing a real
     /// UIWindow rather than re-rendering a layer off-screen.
-    private void CaptureWindow(FrameworkElement root)
+    private async Task CaptureWindowAsync(FrameworkElement root)
     {
         try
         {
@@ -231,7 +233,7 @@ public partial class App : Application
                 {
                     if (attached) AttachThreadInput(fgThread, thisThread, false);
                 }
-                Thread.Sleep(150);
+                await Task.Delay(150);
             }
             // Foreground is NOT the question a screen capture cares about; occlusion is.
             // The runner desktop keeps a "Microsoft account" out-of-box window that will not
@@ -257,10 +259,34 @@ public partial class App : Application
                 return;
             }
 
-            // Let the compositor finish the frame before reading the screen back, or the
-            // grab races the first present and returns the desktop.
+            // Wait for real presented frames, not for wall-clock time. CompositionTarget.Rendering
+            // ticks once per composed frame, so counting them proves XAML actually drew
+            // rather than merely that time passed.
+            var drawn = new TaskCompletionSource<bool>();
+            int frames = 0;
+            EventHandler<object> onFrame = null;
+            onFrame = (_, _) =>
+            {
+                if (++frames >= 3)
+                {
+                    CompositionTarget.Rendering -= onFrame;
+                    drawn.TrySetResult(true);
+                }
+            };
+            CompositionTarget.Rendering += onFrame;
+            await Task.WhenAny(drawn.Task, Task.Delay(5000));
+            CompositionTarget.Rendering -= onFrame;
+            Console.WriteLine($"NATIVEREF:INFO composed frames observed: {frames}");
+            if (frames == 0)
+            {
+                _blockers.Add("XAML never presented a frame, so the client area would be "
+                    + "captured empty while DWM still draws the title bar -- which is what a "
+                    + "blocked UI thread looks like");
+                return;
+            }
+
             DwmFlush();
-            Thread.Sleep(400);
+            await Task.Delay(400);
 
             var centre = new POINT { X = r.Left + w / 2, Y = r.Top + h / 2 };
             IntPtr atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
@@ -275,7 +301,7 @@ public partial class App : Application
                 Console.WriteLine($"NATIVEREF:INFO minimising 0x{atCentre.ToInt64():X} "
                     + $"({DescribeWindow(atCentre)}) which is covering the capture area");
                 ShowWindow(atCentre, SW_MINIMIZE);
-                Thread.Sleep(250);
+                await Task.Delay(250);
                 BringWindowToTop(hwnd);
                 atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
             }
@@ -310,10 +336,21 @@ public partial class App : Application
                 var path = Path.Combine(_outDir, name + ".png");
                 image.Save(path, System.Drawing.Imaging.ImageFormat.Png);
                 Console.WriteLine($"NATIVEREF:wrote {name} {w}x{h}");
-                if (IsUniform(image))
+                // Deliberately the CLIENT area, not the whole window. The title bar is drawn
+                // by DWM whatever the app does, so a whole-window uniformity test passes an
+                // utterly empty window -- which is exactly what it did: a captured
+                // cn1-native-ref frame with a correct Windows 11 title bar and nothing at
+                // all beneath it.
+                GetClientRect(hwnd, out RECT cr);
+                var origin = new POINT { X = 0, Y = 0 };
+                ClientToScreen(hwnd, ref origin);
+                int cx = origin.X - r.Left, cy = origin.Y - r.Top;
+                int cw = cr.Right - cr.Left, ch = cr.Bottom - cr.Top;
+                if (cw > 0 && ch > 0 && cx >= 0 && cy >= 0 && cx + cw <= w && cy + ch <= h
+                    && IsUniform(image, cx, cy, cw, ch))
                 {
-                    _blockers.Add($"{name} is a single flat colour: the window rendered "
-                        + "nothing, which is what a missing resource index looks like");
+                    _blockers.Add($"{name} has an empty client area ({cw}x{ch} of one flat "
+                        + "colour): the window chrome drew but the content did not");
                 }
             }
 
@@ -351,12 +388,12 @@ public partial class App : Application
 
     /// A uniformly coloured tile is the classic captured-before-present result, and it
     /// scores as a perfect match against another blank tile rather than as a failure.
-    private static bool IsUniform(System.Drawing.Bitmap image)
+    private static bool IsUniform(System.Drawing.Bitmap image, int x0, int y0, int w, int h)
     {
-        var first = image.GetPixel(0, 0);
-        int stepX = Math.Max(1, image.Width / 32), stepY = Math.Max(1, image.Height / 32);
-        for (int y = 0; y < image.Height; y += stepY)
-            for (int x = 0; x < image.Width; x += stepX)
+        var first = image.GetPixel(x0, y0);
+        int stepX = Math.Max(1, w / 32), stepY = Math.Max(1, h / 32);
+        for (int y = y0; y < y0 + h; y += stepY)
+            for (int x = x0; x < x0 + w; x += stepX)
                 if (image.GetPixel(x, y) != first) return false;
         return true;
     }
