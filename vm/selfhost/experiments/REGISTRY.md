@@ -1499,3 +1499,88 @@ of allocation volume, every one of them a for-each loop's iterator that a lowere
 loop would not allocate at all -- on top of the two interface dispatches per element it
 removes, each a five-load chase. `ForEachScan` in `experiments/concat/` exists to size
 which receivers are provably indexable before that is written.
+
+## Sizing the next two items, and refuting one of them
+
+The three scanners in `experiments/concat/` were run over the translator + ASM corpus
+(the same one every figure above uses). Both planned follow-ups changed shape.
+
+### For-each lowering: REFUTED as planned, and the win was already taken
+
+`ForEachScan`: **434 for-each sites**, by the static type of the `iterator()` receiver:
+
+    353  java/util/List          61  java/util/Set           8  java/util/ArrayList
+      5  java/util/Collection     4  java/util/TreeSet       3  (Deque, HashSet, DirectoryStream)
+
+81% are `List`-typed, which reads like an overwhelming case for lowering them to an
+indexed loop. It is not, for a reason this runtime settles on its own: **`LinkedList`
+exists in `vm/JavaAPI`** (`extends AbstractSequentialList implements List`), so an
+indexed loop over a `List` is O(n^2) whenever one shows up. Only the 8 `ArrayList`-typed
+sites are provably indexable from the static type alone.
+
+The closed world does better than that -- `Parser.resolveConcreteIteratorType` resolves
+`List` to the single reachable implementation once the cull removes `LinkedList`, which
+is why `lowerIteratorCalls` works at all. **But that pass has already taken the dispatch
+win**: the census names `ArrayList.ArrayListIterator` specifically, which is proof the
+devirtualization is firing. What a control-flow rewrite would add on top is the
+ALLOCATION, and nothing else.
+
+So the item is not "lower for-each to an indexed loop" -- that is unsafe where it is
+tempting and redundant where it is safe. It is **"stop allocating the iterator"**:
+100,566 objects per cycle, 4.4% of allocation volume. The iterator is created inside
+`ArrayList.iterator()`, so the existing stack-allocation escape analysis has nothing to
+work on at the call site; removing it needs the `return new T(this)` body materialised at
+the caller first. `lowerIteratorCalls` already RECOGNISES that body shape to devirtualize,
+so the recognition exists and only the inlining does not.
+
+### char[] is 26.9% of everything allocated, and the fast path for it is dead code here
+
+Allocation volume over a whole run, 774.1MB across 8,366,066 objects:
+
+| class | MB | objects | share |
+|---|---:|---:|---:|
+| char[] | 208.6 | 1,285,250 | **26.9%** |
+| java.lang.Object[] | 187.3 | 1,415,038 | 24.2% |
+| java.lang.String | 53.1 | 833,989 | 6.9% |
+
+`char[]` is the single largest allocation item in the VM, and most of it is StringBuilder:
+a chain that grows past the default capacity allocates a new buffer per doubling, plus one
+more in `toString`. `String.cn1ConcatN` exists precisely to collapse that into ONE fused
+allocation whose length is computed from the parts up front.
+
+**It is reached 8 times in the whole emitted corpus.** `ConcatScan` counts 304 all-String
+chains that it could serve. The reason is structural: the lowering lives in
+`Parser.visitInvokeDynamicInsn`, so it only fires on JDK 9+ `StringConcatFactory`
+invokedynamic -- and `IndyScan` reports **0 indy concat sites** here, because this corpus
+is Java 8 bytecode, which is what Codename One applications compile to. The fast path is
+dead on the bytecode shape that actually ships.
+
+`ConcatScan`, same corpus: 666 concat sites, 473 fusible, 1519 appends,
+`{2=210, 3=126, 4=43, 5+=93}`, append arg types `{String=1305, int=165, Object=28, char=15}`,
+non-fusible reasons `{store/return=181, branch=11, no toString=1}`.
+
+**Discount that 473 before quoting it.** The emitted C shows 301 StringBuilder sites are
+ALREADY stack-allocated by `stackAllocStringBuilders`, 174 of those with a stack-resident
+fused buffer, against 123 still reaching `CN1_FAST_NEW`. A stack builder with a stack
+buffer allocates nothing but its final String, so the incremental prize is the heap sites
+plus the growth chains of stack builders that outgrew their fixed buffer -- not all 473.
+
+### AND THERE IS A STANDING PRECONDITION ON RETRYING IT
+
+This was attempted on this branch and **withdrawn as a miscompile** (f00db7e6fb). Matching
+the chain on the builder's owner type alone mistakes calls on a *different* builder for
+calls on the allocated one:
+
+    consume(new StringBuilder(), existing.append(a).append(b).toString())
+
+fuses the wrong chain and hands `consume()` the wrong arguments. It was the third
+correctness defect out of that one pass, after maxStack under-reservation (a C stack
+overflow) and running after the cull (calls emitted into deleted methods). The commit sets
+the condition for its return explicitly: **receiver identity tracked through the operand
+stack**, which this translator does not have.
+
+Note what that implies about scope. `stackAllocStringBuilders` avoids the same trap by
+tracking through a LOCAL SLOT, which is why it is sound and also why it bails so often. Any
+fusion that reaches the chains it cannot take is, by construction, reaching the chains that
+live on the operand stack -- so it inherits exactly the defect that was withdrawn. The
+infrastructure comes first, or it does not go in.
