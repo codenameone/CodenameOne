@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.charts.transitions;
 
 import com.codename1.charts.ChartComponent;
@@ -64,6 +86,22 @@ class SeriesTransitionTest extends UITestBase {
         transition.updateChart();
 
         assertTrue(chartComponent.repaintCalled);
+    }
+
+    @Test
+    void cleanupRunsOnceWhenAnImmediateUpdateEndsAnAnimation() {
+        // cleanup() is overridable and a subclass can release something in it.
+        // updateChart() ends the transition itself, and a frame already queued
+        // behind it reaches animate()'s terminal branch, which called cleanup()
+        // a second time on the same pass.
+        TestSeriesTransition transition = new TestSeriesTransition(chartComponent, SeriesTransition.EASING_LINEAR, 10000);
+
+        transition.animateChart();
+        transition.updateChart();
+        assertEquals(1, transition.cleanupCount, "the immediate update did not clean up");
+
+        assertFalse(transition.animate(), "the transition is still animating");
+        assertEquals(1, transition.cleanupCount, "a queued frame cleaned up a second time");
     }
 
     @Test
@@ -164,6 +202,7 @@ class SeriesTransitionTest extends UITestBase {
     private static class TestSeriesTransition extends SeriesTransition {
         private final List<Integer> progressUpdates = new ArrayList<>();
         private boolean cleanupCalled;
+        private int cleanupCount;
 
         TestSeriesTransition(ChartComponent chart, int easing, int duration) {
             super(chart, easing, duration);
@@ -177,6 +216,7 @@ class SeriesTransitionTest extends UITestBase {
         @Override
         protected void cleanup() {
             cleanupCalled = true;
+            cleanupCount++;
         }
     }
 }

@@ -74,7 +74,12 @@ public class XYSeriesTransition extends SeriesTransition {
         copyValues(series, startVals);
 
         endVals = new XYSeries("End");
-        copyValues(cachedSeries, endVals);
+        // getBuffer() rather than the field: it is created lazily, so a
+        // transition nobody has written to still has a null one and this
+        // threw rather than doing nothing. An empty buffer copies no
+        // values, which leaves the series exactly as it is -- the right
+        // answer for "apply no pending changes".
+        copyValues(getBuffer(), endVals);
 
 
     }

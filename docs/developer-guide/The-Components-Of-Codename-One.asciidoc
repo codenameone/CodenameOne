@@ -2543,6 +2543,37 @@ app for specific examples, but here is a high-level view of some code that creat
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava213Snippet.java[tag=the-components-of-codename-one-java-213,indent=0]
 ----
 
+==== Animating a change in the data
+
+Replacing a series' numbers and repainting redraws the chart in one jump. The
+`com.codename1.charts.transitions` package tweens the change instead: pick the
+transition that matches the model -- `XYSeriesTransition` for one `XYSeries`,
+`XYMultiSeriesTransition` for a whole `XYMultipleSeriesDataset`,
+`XYValueSeriesTransition` for an `XYValueSeries` -- and write the new numbers
+into its buffer rather than into the series itself.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ChartTransitionSnippet.java[tag=chart-transition,indent=0]
+----
+
+The buffer holds the shape you want to end up with, so put every point in it
+and not only the ones that moved: a point the buffer doesn't mention keeps
+whatever the series already had, while a point the series doesn't have yet
+grows in from zero. `animateChart()` registers the transition with the chart's
+top-level container and drives it to that shape over `setDuration(...)`
+milliseconds, easing as `setEasing(...)` says -- `EASING_LINEAR`, `EASING_IN`,
+`EASING_OUT` or `EASING_IN_OUT`. The buffer is drained when the animation
+finishes, so the same transition can be used again for the next update.
+
+`updateChart()` applies the buffer the same way and repaints at once, with no
+animation, which is what you want for a change the user didn't trigger.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ChartTransitionSnippet.java[tag=chart-transition-immediate,indent=0]
+----
+
 === Calendar
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Calendar.html[Calendar] class allows you to display a traditional calendar picker and optionally highlight days in various ways.
