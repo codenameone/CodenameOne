@@ -57,10 +57,22 @@ import java.io.OutputStream;
  * Generates the app screenshots used before the Advanced Theming chapter.
  */
 public final class PreAdvancedThemingScreenshots {
-    private static final int PORTRAIT_WIDTH = 320;
-    private static final int PORTRAIT_HEIGHT = 480;
-    private static final int LANDSCAPE_WIDTH = 480;
-    private static final int LANDSCAPE_HEIGHT = 320;
+    /// 409 wide, which is what FigureDevice.ANDROID renders at, so a layout
+    /// diagram sits beside a screenshot of a real component at the same
+    /// scale. These were 320x480, the HVGA size a simulator defaulted to in
+    /// 2009, and narrower than any phone the guide describes.
+    ///
+    /// The 2:3 shape is kept rather than the phone's 1:2.25. Rendered at the
+    /// phone's full height these become mostly white: a flow layout puts five
+    /// small blocks at the top and leaves the rest empty, which is a worse
+    /// picture of the layout than the small one was. What they draw is
+    /// unchanged either way -- these are schematic diagrams of where a layout
+    /// manager puts things, labelled blocks on white, and a real theme would
+    /// bury that under component chrome.
+    private static final int PORTRAIT_WIDTH = 409;
+    private static final int PORTRAIT_HEIGHT = 613;
+    private static final int LANDSCAPE_WIDTH = 613;
+    private static final int LANDSCAPE_HEIGHT = 409;
     private static final int BLUE = 0x0b57d0;
     private static final int GREEN = 0x06a806;
     private static final int WHITE = 0xffffff;
