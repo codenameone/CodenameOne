@@ -253,6 +253,7 @@ public final class Database {
      * never the reverse -- and Db's monitor is reentrant for the callbacks.
      */
     public synchronized int execute(String sql, Object[] params) throws IOException {
+        params = portableParameters(params);
         String rendered = bind(sql, params);
         if(sqlite != null) {
             return sqlite.execute(rendered, params);
@@ -265,6 +266,7 @@ public final class Database {
 
     /** Runs a query and returns every row as a column-name to value map. */
     public synchronized List query(String sql, Object[] params) throws IOException {
+        params = portableParameters(params);
         String rendered = bind(sql, params);
         if(sqlite != null) {
             return sqlite.query(rendered, params);
@@ -530,6 +532,40 @@ public final class Database {
      * <p>A byte[] parameter is untouched: that is where a NUL belongs, and all
      * three store one.
      */
+    /**
+     * {@code params} with the values the engines encode differently replaced by
+     * ones they agree on.
+     *
+     * <p>A Boolean is the case. The generated entity access already binds 0 or 1
+     * -- every engine stores a boolean as an integer here, which is what lets
+     * one decoding path read it back -- but a caller writing its own SQL binds
+     * the Boolean itself, and then the encoders disagree: measured, SQLite and
+     * MySQL bind it as 1 while PostgreSQL sends "t" and its own SMALLINT column
+     * refuses it with "invalid input syntax for type smallint". The raw path has
+     * the same claim on a portable answer as the ORM, so it gets the same
+     * encoding.
+     *
+     * <p>The caller's array is never written to: a new one is made only when
+     * there is something to change, so the common case allocates nothing and a
+     * caller reusing its array across calls is unaffected.
+     */
+    private static Object[] portableParameters(Object[] params) {
+        if(params == null) {
+            return null;
+        }
+        Object[] out = params;
+        for(int iter = 0 ; iter < params.length ; iter++) {
+            if(params[iter] instanceof Boolean) {
+                if(out == params) {
+                    out = new Object[params.length];
+                    System.arraycopy(params, 0, out, 0, params.length);
+                }
+                out[iter] = Long.valueOf(((Boolean)params[iter]).booleanValue() ? 1L : 0L);
+            }
+        }
+        return out;
+    }
+
     private static void refuseNulInTextParameters(Object[] params) throws IOException {
         if(params == null) {
             return;

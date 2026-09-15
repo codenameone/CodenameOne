@@ -554,8 +554,33 @@ final class Placeholders {
                 continue;
             }
             if(isWord(sql, at, "end")) {
-                // Innermost first: an END closes the CASE it belongs to before
-                // it can close the block around it.
+                // WHAT FOLLOWS THE END SAYS WHAT IT CLOSES. "END IF", "END WHILE",
+                // "END LOOP" and "END REPEAT" finish a procedural construct
+                // inside the body, not the body -- so counting them against the
+                // BEGIN closed a trigger early and
+                // "BEGIN IF NEW.v IS NULL THEN SET NEW.v = 0; END IF; END" was
+                // refused as two statements when it is one.
+                //
+                // "END CASE" closes a CASE statement, so it spends the CASE and
+                // the word with it -- otherwise the trailing CASE would be
+                // counted as a new one opening.
+                int after = skipBlanks(sql, at + 3, nestedComments, backslashEscapes,
+                        hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                        bracketIdentifiers, executableComments);
+                if(after < length && (isWord(sql, after, "if") || isWord(sql, after, "while")
+                        || isWord(sql, after, "loop") || isWord(sql, after, "repeat"))) {
+                    at = after;
+                    continue;
+                }
+                if(after < length && isWord(sql, after, "case")) {
+                    if(cases > 0) {
+                        cases--;
+                    }
+                    at = after + 4;
+                    continue;
+                }
+                // Innermost first: a bare END closes the CASE expression it
+                // belongs to before it can close the block around it.
                 if(cases > 0) {
                     cases--;
                 } else if(blocks > 0) {

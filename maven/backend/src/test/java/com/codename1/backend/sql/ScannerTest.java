@@ -172,6 +172,23 @@ class ScannerTest {
         assertTrue(Dialect.SQLITE.hasTrailingStatement(
                 "CREATE TRIGGER x AFTER INSERT ON t BEGIN UPDATE t SET v = "
                         + "CASE WHEN v IS NULL THEN 1 ELSE v END; END; DROP TABLE u"));
+        // END IF, END WHILE, END LOOP and END REPEAT finish a construct INSIDE
+        // the body, not the body -- so counting them against the BEGIN closed a
+        // trigger early and refused one statement as two.
+        assertFalse(Dialect.MYSQL.hasTrailingStatement(
+                "CREATE TRIGGER x BEFORE INSERT ON t FOR EACH ROW BEGIN "
+                        + "IF NEW.v IS NULL THEN SET NEW.v = 0; END IF; END"));
+        assertFalse(Dialect.MYSQL.hasTrailingStatement(
+                "CREATE PROCEDURE p() BEGIN WHILE i < 10 DO SET i = i + 1; END WHILE; END"));
+        // A real second statement after one is still two.
+        assertTrue(Dialect.MYSQL.hasTrailingStatement(
+                "CREATE TRIGGER x BEFORE INSERT ON t FOR EACH ROW BEGIN "
+                        + "IF NEW.v IS NULL THEN SET NEW.v = 0; END IF; END; DROP TABLE u"));
+        // END CASE spends the CASE and the word with it, or the trailing CASE
+        // would read as a new one opening.
+        assertFalse(Dialect.MYSQL.hasTrailingStatement(
+                "CREATE PROCEDURE p() BEGIN CASE v WHEN 1 THEN SET x = 1; END CASE; END"));
+
         // And a CASE outside any block neither opens nor closes one.
         assertFalse(Dialect.SQLITE.hasTrailingStatement(
                 "SELECT CASE WHEN v IS NULL THEN 1 ELSE v END FROM t"));
