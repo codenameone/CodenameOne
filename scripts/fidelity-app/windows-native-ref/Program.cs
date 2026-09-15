@@ -140,12 +140,40 @@ public partial class App : Application
             Console.WriteLine($"NATIVEREF:WARN rasterization scale is {rasterScale}, not 1.0");
         }
 
+        // Waiting for XAML to paint happens FIRST, before anything awaits, because it is the
+        // only part of this that touches XAML at all. CompositionTarget.Rendering must be
+        // subscribed from the UI thread, and after an await the continuation is not reliably
+        // on it -- the previous run proved that precisely: COMException 0x8001010E,
+        // RPC_E_WRONGTHREAD, at stage 'await-frames'. Everything after this point is Win32,
+        // which does not care which thread calls it.
+        _stage = "await-frames";
+        var drawn = new TaskCompletionSource<bool>();
+        int frames = 0;
+        EventHandler<object> onFrame = null;
+        onFrame = (_, _) =>
+        {
+            if (++frames >= 3)
+            {
+                CompositionTarget.Rendering -= onFrame;
+                drawn.TrySetResult(true);
+            }
+        };
+        CompositionTarget.Rendering += onFrame;
+        await Task.WhenAny(drawn.Task, Task.Delay(5000));
+        Console.WriteLine($"NATIVEREF:INFO composed frames observed: {frames}");
+        if (frames == 0)
+        {
+            _blockers.Add("XAML never presented a frame, so the client area would be "
+                + "captured empty while DWM still draws the title bar -- which is what a "
+                + "blocked UI thread looks like");
+        }
+
         // Capture a real tile even in probe mode. A green build is not a rendered one:
         // AppxGeneratePriEnabled is off (see NativeRef.csproj), so WinUI's own .pri files
         // are not expanded into the output, and if that mattered the controls would come
         // back unstyled or absent rather than failing loudly. A picture is the only thing
         // that distinguishes "built" from "drew a Fluent button".
-        await CaptureWindowAsync(root);
+        await CaptureWindowAsync();
 
         WriteManifest(micaSupported, transparency, animations, accent, rasterScale, fontFamily, segoeVariable);
 
@@ -202,7 +230,7 @@ public partial class App : Application
     /// the XAML visual tree, so RenderTargetBitmap would silently return the widget without
     /// its material. This is the direct analogue of the iOS reference capturing a real
     /// UIWindow rather than re-rendering a layer off-screen.
-    private async Task CaptureWindowAsync(FrameworkElement root)
+    private async Task CaptureWindowAsync()
     {
         try
         {
@@ -264,37 +292,9 @@ public partial class App : Application
                 return;
             }
 
-            // Wait for real presented frames, not for wall-clock time. CompositionTarget.Rendering
-            // ticks once per composed frame, so counting them proves XAML actually drew
-            // rather than merely that time passed.
-            _stage = "await-frames";
-            var drawn = new TaskCompletionSource<bool>();
-            int frames = 0;
-            EventHandler<object> onFrame = null;
-            onFrame = (_, _) =>
-            {
-                if (++frames >= 3)
-                {
-                    CompositionTarget.Rendering -= onFrame;
-                    drawn.TrySetResult(true);
-                }
-            };
-            CompositionTarget.Rendering += onFrame;
-            await Task.WhenAny(drawn.Task, Task.Delay(5000));
-            // Deliberately no unsubscribe here. The handler removes itself on the UI thread
-            // once it has counted enough frames, and doing it again from whichever thread
-            // this continuation landed on is a XAML call off the UI thread -- which is the
-            // shape of an empty-message COMException. If the timeout won instead, the
-            // handler simply outlives a process that is about to exit.
-            Console.WriteLine($"NATIVEREF:INFO composed frames observed: {frames}");
-            if (frames == 0)
-            {
-                _blockers.Add("XAML never presented a frame, so the client area would be "
-                    + "captured empty while DWM still draws the title bar -- which is what a "
-                    + "blocked UI thread looks like");
-                return;
-            }
-
+            // Everything from here down is Win32, which is thread agnostic. The XAML part --
+            // waiting for presented frames -- deliberately happens before this method is
+            // called, while we are still provably on the UI thread.
             DwmFlush();
             await Task.Delay(400);
 
