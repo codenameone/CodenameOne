@@ -515,6 +515,31 @@ public final class Config {
                 filled += read;
             }
             if(filled == out.length) {
+                // AND NOTHING BEYOND IT. The size came from the stat, and a file
+                // rewritten in place while this runs is longer by the time the
+                // read reaches the end -- so filling the buffer proves only that
+                // the FIRST `size` bytes arrived, not that they are the whole
+                // file. A rewrite that truncates and repopulates would hand back
+                // a valid-looking prefix, or an empty one, with everything past
+                // the old length missing: the same silent loss the short read
+                // below produces, arrived at from the other side.
+                //
+                // One byte is enough to tell. At end of file the read answers
+                // zero or less, which is the ordinary case and costs a syscall.
+                //
+                // The growth itself has no test and cannot have one from here:
+                // FileIo captures the size when the descriptor opens, so a test
+                // would have to append between that open and this read. What
+                // IS covered is that an ordinary file still loads -- every
+                // ConfigTest case goes through this line -- so the guard cannot
+                // be refusing everything.
+                byte[] beyond = new byte[1];
+                if(FileIo.read(fd, beyond, 0, 1) > 0) {
+                    throw new IOException(path + " grew while it was being read, so what "
+                            + "was loaded is the first " + out.length + " bytes of a file "
+                            + "that is now longer. It is being rewritten underneath this "
+                            + "process; start again once it has settled.");
+                }
                 return out;
             }
             // A PREFIX IS NOT A SHORTER FILE. It parses perfectly well -- every
