@@ -201,74 +201,74 @@
       "width_ratio": 1.1311
     },
     "DesktopSlider_disabled_dark": {
-      "center_offset": 0.0,
-      "height_ratio": 1.5,
+      "center_offset": 1.0,
+      "height_ratio": 1.6,
       "width_ratio": 1.0926
     },
     "DesktopSlider_disabled_light": {
-      "center_offset": 0.0,
-      "height_ratio": 1.3636,
+      "center_offset": 1.0,
+      "height_ratio": 1.4545,
       "width_ratio": 1.0926
     },
     "DesktopSlider_hover_dark": {
-      "center_offset": 3.0,
-      "height_ratio": 1.6,
+      "center_offset": 4.0,
+      "height_ratio": 1.7,
       "width_ratio": 1.0741
     },
     "DesktopSlider_hover_light": {
-      "center_offset": 2.0,
-      "height_ratio": 1.3333,
+      "center_offset": 3.0,
+      "height_ratio": 1.4167,
       "width_ratio": 1.0741
     },
     "DesktopSlider_normal_dark": {
-      "center_offset": 0.0,
-      "height_ratio": 1.5,
+      "center_offset": 1.0,
+      "height_ratio": 1.6,
       "width_ratio": 1.0926
     },
     "DesktopSlider_normal_light": {
-      "center_offset": 1.0,
-      "height_ratio": 1.25,
+      "center_offset": 0.0,
+      "height_ratio": 1.3333,
       "width_ratio": 1.0926
     },
     "DesktopSwitch_disabled_dark": {
-      "center_offset": 9.62,
-      "height_ratio": 0.875,
-      "width_ratio": 0.4318
+      "center_offset": 8.86,
+      "height_ratio": 0.9583,
+      "width_ratio": 0.4773
     },
     "DesktopSwitch_disabled_light": {
-      "center_offset": 1.5,
-      "height_ratio": 0.875,
-      "width_ratio": 0.9091
+      "center_offset": 2.92,
+      "height_ratio": 0.9583,
+      "width_ratio": 0.9773
     },
     "DesktopSwitch_hover_dark": {
-      "center_offset": 5.7,
-      "height_ratio": 0.875,
-      "width_ratio": 0.8864
+      "center_offset": 7.43,
+      "height_ratio": 0.9583,
+      "width_ratio": 0.9545
     },
     "DesktopSwitch_hover_light": {
-      "center_offset": 5.41,
-      "height_ratio": 0.875,
-      "width_ratio": 0.9091
+      "center_offset": 7.11,
+      "height_ratio": 0.9583,
+      "width_ratio": 0.9773
     },
     "DesktopSwitch_normal_dark": {
-      "center_offset": 1.58,
-      "height_ratio": 0.875,
-      "width_ratio": 0.8864
+      "center_offset": 3.2,
+      "height_ratio": 0.9583,
+      "width_ratio": 0.9545
     },
     "DesktopSwitch_normal_light": {
-      "center_offset": 1.5,
-      "height_ratio": 0.875,
-      "width_ratio": 0.9091
+      "center_offset": 2.92,
+      "height_ratio": 0.9583,
+      "width_ratio": 0.9773
     },
     "DesktopSwitch_selected_dark": {
-      "center_offset": 1.58,
-      "height_ratio": 0.875,
-      "width_ratio": 0.8864
+      "center_offset": 3.2,
+      "height_ratio": 0.9583,
+      "width_ratio": 0.9545
     },
     "DesktopSwitch_selected_light": {
-      "center_offset": 2.12,
-      "height_ratio": 0.875,
-      "width_ratio": 0.9318
+      "center_offset": 3.91,
+      "height_ratio": 0.9583,
+      "width_ratio": 1.0
     },
     "DesktopTextField_disabled_dark": {
       "center_offset": 0.0,
@@ -336,26 +336,26 @@
     "DesktopProgressBar_normal_light": 76.01,
     "DesktopRadioButton_disabled_dark": 86.19,
     "DesktopRadioButton_disabled_light": 87.08,
-    "DesktopRadioButton_hover_dark": 82.39,
-    "DesktopRadioButton_hover_light": 85.05,
-    "DesktopRadioButton_normal_dark": 78.93,
-    "DesktopRadioButton_normal_light": 80.18,
+    "DesktopRadioButton_hover_dark": 82.38,
+    "DesktopRadioButton_hover_light": 85.04,
+    "DesktopRadioButton_normal_dark": 78.97,
+    "DesktopRadioButton_normal_light": 80.21,
     "DesktopRadioButton_selected_dark": 83.59,
     "DesktopRadioButton_selected_light": 85.08,
-    "DesktopSlider_disabled_dark": 83.74,
-    "DesktopSlider_disabled_light": 84.11,
-    "DesktopSlider_hover_dark": 74.99,
-    "DesktopSlider_hover_light": 77.83,
-    "DesktopSlider_normal_dark": 85.19,
-    "DesktopSlider_normal_light": 86.68,
-    "DesktopSwitch_disabled_dark": 88.32,
-    "DesktopSwitch_disabled_light": 94.95,
-    "DesktopSwitch_hover_dark": 84.17,
-    "DesktopSwitch_hover_light": 90.51,
-    "DesktopSwitch_normal_dark": 91.26,
-    "DesktopSwitch_normal_light": 93.22,
-    "DesktopSwitch_selected_dark": 85.67,
-    "DesktopSwitch_selected_light": 82.09,
+    "DesktopSlider_disabled_dark": 85.06,
+    "DesktopSlider_disabled_light": 85.51,
+    "DesktopSlider_hover_dark": 70.83,
+    "DesktopSlider_hover_light": 72.98,
+    "DesktopSlider_normal_dark": 87.29,
+    "DesktopSlider_normal_light": 88.97,
+    "DesktopSwitch_disabled_dark": 85.96,
+    "DesktopSwitch_disabled_light": 94.73,
+    "DesktopSwitch_hover_dark": 82.3,
+    "DesktopSwitch_hover_light": 89.51,
+    "DesktopSwitch_normal_dark": 89.93,
+    "DesktopSwitch_normal_light": 92.41,
+    "DesktopSwitch_selected_dark": 84.74,
+    "DesktopSwitch_selected_light": 81.38,
     "DesktopTextField_disabled_dark": 93.03,
     "DesktopTextField_disabled_light": 82.97,
     "DesktopTextField_hover_dark": 71.5,
