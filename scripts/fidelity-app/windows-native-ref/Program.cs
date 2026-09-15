@@ -520,7 +520,18 @@ public partial class App : Application
                     {
                         continue;
                     }
-                    await WaitForFramesAsync(2);
+                    // Applied TWICE, with frames in between, and it is not superstition.
+                    // The runner reports animations_enabled: true, and WinUI drives a
+                    // PointerOver transition over several frames rather than switching
+                    // brushes outright -- so a capture taken too early lands on frame zero
+                    // of the transition, which IS the normal appearance. That produced dark
+                    // hover tiles for Button, TextBox and ComboBox byte-identical to their
+                    // normal tiles while the light ones differed, a difference no platform
+                    // has. Re-applying also covers the other candidate cause, a template
+                    // re-application resetting the group back to Normal.
+                    await WaitForFramesAsync(3);
+                    await OnUiAsync(() => ApplyState(widget, state, spec.Kind, name));
+                    await WaitForFramesAsync(5);
                     await CaptureTileAsync(name);
                 }
             }

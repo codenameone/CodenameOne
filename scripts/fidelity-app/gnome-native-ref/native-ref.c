@@ -410,6 +410,25 @@ static GtkWidget *make_widget(const char *kind) {
     return NULL;
 }
 
+/* Sets a state flag on a widget and every descendant.
+ *
+ * A composite control draws through CHILD css nodes -- a GtkDropDown is a GtkToggleButton
+ * in a box -- and the node Adwaita styles for :hover is the button's, not the container's.
+ * Setting the flag only on the outer widget leaves the visible part unstyled, so the tile
+ * comes out identical to normal and looks like "this platform has no hover" when the real
+ * answer is "the flag was put on the wrong node".
+ *
+ * Applied to the whole subtree so the answer the capture records is the platform's. Where
+ * a control genuinely has no style for the state -- Adwaita restyles a GtkEntry on focus,
+ * not on hover -- the tile is still identical, and that is then a real finding, which the
+ * manifest reports by name. */
+static void set_state_flags_recursive(GtkWidget *w, GtkStateFlags flag) {
+    gtk_widget_set_state_flags(w, flag, FALSE);
+    for (GtkWidget *c = gtk_widget_get_first_child(w); c; c = gtk_widget_get_next_sibling(c)) {
+        set_state_flags_recursive(c, flag);
+    }
+}
+
 /* Applies one state. Returns 0 when the state cannot be expressed, which is a reason to
  * skip the tile rather than to write a mislabelled one. */
 static int apply_state(GtkWidget *w, const char *state, const char *kind) {
@@ -419,11 +438,11 @@ static int apply_state(GtkWidget *w, const char *state, const char *kind) {
     if (strcmp(state, "hover") == 0) {
         /* PRELIGHT is exactly what the CSS :hover pseudo-class resolves from, so Adwaita
          * restyles the widget for real rather than the app drawing its idea of a hover. */
-        gtk_widget_set_state_flags(w, GTK_STATE_FLAG_PRELIGHT, FALSE);
+        set_state_flags_recursive(w, GTK_STATE_FLAG_PRELIGHT);
         return 1;
     }
     if (strcmp(state, "pressed") == 0) {
-        gtk_widget_set_state_flags(w, GTK_STATE_FLAG_ACTIVE, FALSE);
+        set_state_flags_recursive(w, GTK_STATE_FLAG_ACTIVE);
         return 1;
     }
     if (strcmp(state, "disabled") == 0) {
