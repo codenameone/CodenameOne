@@ -148,6 +148,15 @@ jobs:
           distribution: temurin
           java-version: '8'
 
+      # Needed by the BUILD as well as by the run. The fidelity app is a Codename One
+      # application, so its build runs the cn1 css goal, which rasterizes through CEF and
+      # needs a display -- it fails with "An error occurred while compiling the CSS files"
+      # on a bare runner. Installed before the build for that reason, not only before the
+      # simulator starts.
+      - name: Install xvfb
+        if: matrix.platform == 'gnome'
+        run: bash scripts/ci/apt-get-install.sh xvfb
+
       - name: Build the core, the simulator and the fidelity app
         shell: bash
         env:
@@ -170,13 +179,11 @@ jobs:
           # needs, so this half runs on the 21 installed first ("invalid target release:
           # 17" otherwise). Two JDKs in one job is the reason both setup-java steps exist.
           cd ../scripts/fidelity-app
-          JAVA_HOME="$JDK21" ./mvnw -B -q -pl common,desktop-runner -DskipTests install
-
-      # The simulator needs a display; the hosted Windows and macOS images have a
-      # session, Linux does not.
-      - name: Install xvfb
-        if: matrix.platform == 'gnome'
-        run: bash scripts/ci/apt-get-install.sh xvfb
+          XVFB=()
+          if [ "$(uname -s)" = "Linux" ]; then
+            XVFB=(xvfb-run -a)
+          fi
+          JAVA_HOME="$JDK21" "${XVFB[@]}" ./mvnw -B -q -pl common,desktop-runner -DskipTests install
 
       - name: Score the theme against the native reference
         shell: bash
