@@ -91,6 +91,24 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      mariadb:
+        # The LTS, and the version that rejects MySQL's NO PAD collation -- which
+        # is the whole reason this service is here. Its own is utf8mb4_nopad_bin,
+        # which MySQL in turn does not have.
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: cn1secret
+          MARIADB_DATABASE: cn1
+          MARIADB_USER: cn1
+          MARIADB_PASSWORD: cn1secret
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
       mysql:
         # 8.0 rather than 8, because 8.4 no longer LOADS mysql_native_password
         # and a service container cannot be given server flags to turn it back
@@ -260,6 +278,12 @@ jobs:
           # the behaviour the database layer is supposed to have.
           CN1_DBCHECK_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
           CN1_DBCHECK_MYSQL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
+          # MARIADB REACHED THROUGH A mysql:// URL, deliberately: the dialect is
+          # chosen from the server's handshake banner rather than from the
+          # scheme, and this is the case that proves it. The two families have
+          # no case-sensitive NO PAD collation in common, so picking the wrong
+          # one is an unknown-collation error on every CREATE TABLE.
+          CN1_DBCHECK_MARIADB: mysql://cn1:cn1secret@127.0.0.1:3307/cn1?sslmode=disable
           # WITHOUT THIS THE BACKEND TESTS CAN SKIP AND THE JOB STAYS GREEN.
           # BackendTestSupport.skipOrFail turns a backend build failure into a
           # JUnit assumption abort, because a developer machine with no C
