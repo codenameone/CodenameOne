@@ -740,65 +740,129 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private void resetPlainKey() {
-        java.util.List<String> removed = new java.util.ArrayList<String>();
-        // Deleting the key and dropping the ciphertexts it protected are one step, under
-        // the same lock readers and writers hold. Clearing outside it left a window
-        // where a writer had already encrypted under the old key and was about to store
-        // a value this was about to wipe -- or worse, stored it just after.
+        // The accounts this process can see that the failed key protected. Read first, because
+        // this is only the WORK LIST -- an account only another process has written is not one
+        // this reset knows about, and its gate is therefore never touched.
+        //
+        // Only what the failed key protected. A device upgraded from API 22 can hold unmigrated
+        // Base64 legacy entries in this same file alongside iv:ciphertext ones, and a legacy
+        // value was never encrypted under the keystore key that has just become unusable -- it is
+        // still perfectly readable. The blanket clear took those with it, which can permanently
+        // orphan a managed database whose key had not been migrated yet. Recognised by the IV
+        // separator, the same way get() recognises one.
+        java.util.List<String> candidates = new java.util.ArrayList<String>();
         synchronized (PLAIN_KEY_LOCK) {
-            try {
-                // Same reasoning as plainKey(): this tier does not touch the shared
-                // KeyStore instance.
-                KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
-                ks.load(null);
-                ks.deleteEntry(PLAIN_KEY_ID);
-            } catch (Exception e) {
-                Log.e(e);
-            }
             SharedPreferences prefs = plainPrefs();
             if (prefs != null) {
-                // Only what the failed key protected. A device upgraded from API 22 can hold
-                // unmigrated Base64 legacy entries in this same file alongside iv:ciphertext
-                // ones, and a legacy value was never encrypted under the keystore key that has
-                // just become unusable -- it is still perfectly readable. The blanket clear took
-                // those with it, which can permanently orphan a managed database whose key had
-                // not been migrated yet. Recognised by the IV separator, the same way get()
-                // recognises one.
-                //
-                // Also commit(), for the same reason as elsewhere: this method's whole purpose is
-                // to make the key deletion and the ciphertext deletion one step, and an
-                // asynchronous clear can be reordered after a writer's pending write.
-                SharedPreferences.Editor editor = prefs.edit();
-                for (String account : prefs.getAll().keySet()) {
-                    Object value = prefs.getAll().get(account);
+                // entrySet rather than keySet plus get: SpotBugs flags the second as
+                // WMI_WRONG_MAP_ITERATOR, and the gate is zero-findings.
+                for (java.util.Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+                    Object value = entry.getValue();
                     if (!(value instanceof String) || ((String) value).indexOf(':') >= 0) {
-                        editor.remove(account);
-                        removed.add(account);
+                        candidates.add(entry.getKey());
                     }
                 }
-                editor.commit();
             }
         }
-        // Every gate mark too, for the reason remove() clears one: this drops the value of EVERY
-        // account, so marks left standing would refuse to let any of them be created again. Best
-        // effort and logged rather than fatal -- this path is already the recovery from a key
-        // that can no longer decrypt anything.
+
+        // EVERY gate lock first, and only then the monitor. That is the order setIfAbsent takes
+        // -- gate, then PLAIN_KEY_LOCK through set() -- so the two cannot invert, and this holds
+        // no monitor while it is acquiring gates, so a setIfAbsent already holding one runs to
+        // completion rather than deadlocking against this.
         //
-        // OUTSIDE the monitor above, and that placement is the point. setIfAbsent takes the gate
-        // file's lock and then reaches PLAIN_KEY_LOCK through set(); taking them in the other
-        // order here would be a lock inversion. Within one JVM it is not even a hang -- a second
-        // lock on a file this process already holds raises OverlappingFileLockException, which is
-        // a RuntimeException and would escape a catch written for IOException -- so the ordering
-        // is what keeps this correct rather than the catch below.
-        //
-        // The cost of being outside it is a window: another process can take a gate, create a
-        // replacement value and mark it, between the clear above and this sweep -- and the sweep
-        // would then truncate that new mark, after which a third process with a stale cache sees
-        // an empty gate and overwrites a value already in use. So a gate is only cleared when the
-        // account behind it has no value left, which is the condition this method set out to
-        // produce and which a replacement written in that window no longer meets.
-        clearGatesFor(removed);
+        // Holding them across the whole reset is what makes it CORRECT rather than merely narrow.
+        // The previous version cleared the values under the monitor and swept the marks
+        // afterwards, re-checking each account under its gate before clearing its mark -- and
+        // that re-check was a SharedPreferences lookup, which this class documents elsewhere as
+        // unable to see another process's write. A replacement created in the window therefore
+        // read as absent, its mark was truncated, and a third process with its own stale cache
+        // could then pass setIfAbsent and overwrite a managed database or vault key already in
+        // use. With the gates held there is no window and nothing to re-check: no other process
+        // can create a replacement for any of these accounts while this runs.
+        java.util.List<java.io.RandomAccessFile> handles =
+                new java.util.ArrayList<java.io.RandomAccessFile>();
+        java.util.List<java.nio.channels.FileLock> locks =
+                new java.util.ArrayList<java.nio.channels.FileLock>();
+        java.util.List<String> held = new java.util.ArrayList<String>();
+        try {
+            for (String account : candidates) {
+                java.io.File gate = gateFile(account);
+                if (gate == null) {
+                    continue;
+                }
+                try {
+                    java.io.RandomAccessFile handle = new java.io.RandomAccessFile(gate, "rw");
+                    handles.add(handle);
+                    locks.add(handle.getChannel().lock());
+                    held.add(account);
+                } catch (java.io.IOException cannotLock) {
+                    // This account keeps its mark, which is better than clearing one this reset
+                    // cannot hold -- that is the whole defect above.
+                    Log.e(cannotLock);
+                } catch (RuntimeException cannotLock) {
+                    // OverlappingFileLockException among them, which would mean this process
+                    // already holds that gate. Refusing to clear is the safe answer either way.
+                    Log.e(cannotLock);
+                }
+            }
+
+            synchronized (PLAIN_KEY_LOCK) {
+                try {
+                    // Same reasoning as plainKey(): this tier does not touch the shared KeyStore
+                    // instance.
+                    KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+                    ks.load(null);
+                    ks.deleteEntry(PLAIN_KEY_ID);
+                } catch (Exception e) {
+                    Log.e(e);
+                }
+                SharedPreferences prefs = plainPrefs();
+                if (prefs != null) {
+                    // commit(), for the reason it always was: deleting the key and dropping the
+                    // ciphertexts it protected is one step, and an asynchronous clear can be
+                    // reordered after a writer's pending write.
+                    SharedPreferences.Editor editor = prefs.edit();
+                    for (String account : candidates) {
+                        editor.remove(account);
+                    }
+                    editor.commit();
+                }
+            }
+
+            // The marks, while the gates are still held. An account whose gate could not be
+            // locked above is not in this list and keeps its mark.
+            for (int iter = 0; iter < held.size(); iter++) {
+                try {
+                    java.io.RandomAccessFile handle = handles.get(iter);
+                    handle.setLength(0);
+                    handle.getChannel().force(true);
+                } catch (java.io.IOException cannotClear) {
+                    // Best effort and logged rather than fatal: this path is already the recovery
+                    // from a key that can no longer decrypt anything, and a mark left standing
+                    // refuses a later create rather than corrupting one.
+                    Log.e(cannotClear);
+                    Log.p("SecureStorage could not clear the gate mark for " + held.get(iter),
+                            Log.WARNING);
+                }
+            }
+        } finally {
+            for (java.nio.channels.FileLock lock : locks) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            for (java.io.RandomAccessFile handle : handles) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+        }
     }
+
 
     /// Clears the mark and deletes the value as one step, under the lock setIfAbsent takes.
     private boolean removeUnderGate(java.io.File gate, SharedPreferences prefs, String account) {
@@ -838,71 +902,6 @@ public final class AndroidSecureStorage extends SecureStorage {
             // prevents it; this is here so that being wrong about that is a refused clear
             // rather than an exception thrown out of a cleanup path.
             Log.e(cannotRemove);
-            return false;
-        } finally {
-            if (lock != null) {
-                try {
-                    lock.release();
-                } catch (java.io.IOException ignored) {
-                    Log.e(ignored);
-                }
-            }
-            if (handle != null) {
-                try {
-                    handle.close();
-                } catch (java.io.IOException ignored) {
-                    Log.e(ignored);
-                }
-            }
-        }
-    }
-
-    /// Clears the gate mark for each account whose value this reset removed.
-    ///
-    /// By account rather than by walking the directory, and re-checked under the gate's own lock,
-    /// because this runs outside PLAIN_KEY_LOCK and another process can take a gate and create a
-    /// replacement value in the window. Truncating a mark that belongs to that replacement is
-    /// what would let a third process with a stale preferences cache overwrite a value already in
-    /// use. The condition for clearing is the one this method set out to produce -- the account
-    /// has no value -- and a replacement written in the window no longer meets it.
-    private void clearGatesFor(java.util.List<String> accounts) {
-        for (String account : accounts) {
-            java.io.File gate = gateFile(account);
-            if (gate == null || !gate.isFile()) {
-                continue;
-            }
-            if (!clearGateIfStillUnused(gate, account)) {
-                Log.p("SecureStorage could not clear the gate mark for " + account, Log.WARNING);
-            }
-        }
-    }
-
-    private boolean clearGateIfStillUnused(java.io.File gate, String account) {
-        java.io.RandomAccessFile handle = null;
-        java.nio.channels.FileLock lock = null;
-        try {
-            handle = new java.io.RandomAccessFile(gate, "rw");
-            lock = handle.getChannel().lock();
-            // Gate lock first and then the monitor, which is the order setIfAbsent takes; the
-            // other way round is the inversion this method is placed outside the monitor to avoid.
-            synchronized (PLAIN_KEY_LOCK) {
-                SharedPreferences prefs = plainPrefs();
-                if (prefs != null && prefs.contains(account)) {
-                    // Somebody re-created it while this reset was running. Their mark is theirs.
-                    return true;
-                }
-            }
-            handle.setLength(0);
-            handle.getChannel().force(true);
-            return true;
-        } catch (java.io.IOException cannotClear) {
-            Log.e(cannotClear);
-            return false;
-        } catch (RuntimeException cannotClear) {
-            // OverlappingFileLockException among them. The lock ordering above is what
-            // prevents it; this is here so that being wrong about that is a refused clear
-            // rather than an exception thrown out of a cleanup path.
-            Log.e(cannotClear);
             return false;
         } finally {
             if (lock != null) {
