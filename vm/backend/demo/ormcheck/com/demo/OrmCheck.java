@@ -314,6 +314,19 @@ public class OrmCheck {
         // NULL sorts LOWEST now on all three, which is what two of them already
         // did. `body` is null on every row this method inserted except none, so
         // the ordering is done on a column that really has one.
+        // TEXT ORDER IS BYTE ORDER ON ALL THREE. SQLite compares text by bytes,
+        // so "Z" sorts before "a"; a PostgreSQL database initialised with a
+        // locale-aware collation puts "a" first. Measured through raw SQL the
+        // two still disagree -- that is the engine's own default and not this
+        // ORM's business -- but a query the builder wrote has to answer the
+        // same everywhere, so it pins COLLATE "C" there.
+        notes.query().delete();
+        notes.insert(note("Zeta", 1, false, 1000L));
+        notes.insert(note("alpha", 2, false, 2000L));
+        check("upper case sorts before lower, as bytes do", "Zeta",
+                notes.query().orderBy("title", true).first().title);
+        check("and the other way descending", "alpha",
+                notes.query().orderBy("title", false).first().title);
         notes.query().delete();
         notes.insert(note("first", 1, false, 1000L));
         Note withBody = note("second", 2, false, 2000L);

@@ -331,6 +331,76 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void refusesAnIdentifierNoEngineStoresWhole() throws Exception {
+        // Measured with a 70-character name: SQLite accepts it, PostgreSQL
+        // accepts it and TRUNCATES to 63 bytes, MySQL refuses it. The
+        // truncation is the dangerous one -- two names differing only past the
+        // cut become one table and nothing reports it -- so the tightest limit
+        // is the limit, and it is said at build time rather than at the first
+        // CREATE TABLE in production.
+        StringBuilder longName = new StringBuilder("t_");
+        while (longName.length() < 70) {
+            longName.append('x');
+        }
+        File classes = compileFixture(
+                "com.example.Wide",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity(table=\"" + longName + "\")\n"
+                        + "public class Wide {\n"
+                        + "    @Id public long id;\n"
+                        + "    public Wide() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertTrue("a table name past every engine's limit should be refused",
+                ctx.hasErrors());
+        assertTrue("the message should give the length: " + ctx.getErrors(),
+                ctx.getErrors().toString().indexOf("70 bytes") >= 0);
+    }
+
+    @Test
+    public void refusesAnOverLongColumnName() throws Exception {
+        StringBuilder longName = new StringBuilder("c_");
+        while (longName.length() < 70) {
+            longName.append('y');
+        }
+        File classes = compileFixture(
+                "com.example.WideColumn",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class WideColumn {\n"
+                        + "    @Id public long id;\n"
+                        + "    @Column(name=\"" + longName + "\") public String v;\n"
+                        + "    public WideColumn() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertTrue("a column name past every engine's limit should be refused",
+                ctx.hasErrors());
+    }
+
+    @Test
+    public void keepsAnIdentifierThatFits() throws Exception {
+        // The boundary, so the check cannot pass by refusing everything: 63
+        // bytes is the limit and must still build.
+        StringBuilder atLimit = new StringBuilder("t_");
+        while (atLimit.length() < 63) {
+            atLimit.append('z');
+        }
+        File classes = compileFixture(
+                "com.example.Fits",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity(table=\"" + atLimit + "\")\n"
+                        + "public class Fits {\n"
+                        + "    @Id public long id;\n"
+                        + "    public Fits() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertFalse("63 bytes fits and must still build: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
     public void refusesAnExplicitTypeOnAGeneratedKey() throws Exception {
         // A generated key's declaration is one indivisible form per engine --
         // SQLite's AUTOINCREMENT is legal only after the exact words INTEGER
