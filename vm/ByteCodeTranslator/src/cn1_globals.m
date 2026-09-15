@@ -13795,6 +13795,24 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
+// Ceiling on a CPU-DERIVED marker count. It applies to both derived branches and to
+// neither explicit override: -DCN1_GC_MARK_THREADS is a deliberate choice (the A/B arms
+// use it) and is honoured as given.
+//
+// Four, because that is where the measurement flattens -- 4 markers and 8 markers are
+// the same wall clock and the same peak on the self-hosting corpus, so anything above it
+// is cost without return. And the cost is not small: gcMarkPoolEnsure creates a
+// PERSISTENT helper per marker, each reserving CN1_THREAD_STACK_BYTES (16MB) of stack,
+// and every one of them is woken on each collection to contend for the same worklist.
+//
+// The POSIX branch had this cap and the Windows branch did not. That asymmetry was
+// harmless only while the serial default made both branches unreachable; making
+// CPU-derived marking the default is what turned it into a real exposure, and on a
+// 32- or 64-logical-CPU Windows host it would reserve roughly 480MB or 1GB of stack
+// address space for helpers the measurements say do nothing.
+#ifndef CN1_GC_MARK_THREAD_CAP
+#define CN1_GC_MARK_THREAD_CAP 4
+#endif
 // Resolve the total number of markers (the GC thread + helper threads). Computed once.
 static int gcMarkResolveThreadCount() {
 #ifdef CN1_GC_MARK_THREADS
@@ -13851,11 +13869,14 @@ static int gcMarkResolveThreadCount() {
     const char* np = getenv("NUMBER_OF_PROCESSORS");
     long ncpu = np != 0 ? atol(np) : 2;
     int n = (int)(ncpu - 1);
+    if(n > CN1_GC_MARK_THREAD_CAP) {
+        n = CN1_GC_MARK_THREAD_CAP;
+    }
 #else
     long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
     int n = (int)(ncpu - 1);
-    if(n > 4) {
-        n = 4;
+    if(n > CN1_GC_MARK_THREAD_CAP) {
+        n = CN1_GC_MARK_THREAD_CAP;
     }
 #endif
     if(n < 1) {
