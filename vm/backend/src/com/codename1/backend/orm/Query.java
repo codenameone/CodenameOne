@@ -111,6 +111,23 @@ public final class Query<T> {
         // differently. See Dialect.likeOperator for why the connection-wide
         // pragma was the wrong tool.
         required(field, pattern);
+        // TEXT ONLY. A pattern against a numeric column is coerced by SQLite and
+        // MySQL -- measured, like("views", "12%") matches the row holding 123 --
+        // and REFUSED by PostgreSQL, whose error is "operator does not exist:
+        // integer ~~ text". So the same call answers rows on two engines and
+        // throws on the third, which is worse than either. It is a mistake on
+        // every engine anyway: a pattern describes text.
+        column(field);
+        int index = table.definition.indexOfField(field);
+        if(table.columns[index].getKind() != Dialect.TEXT) {
+            throw new IllegalArgumentException("like() needs a text field, and "
+                    + table.definition.type().getName() + "." + field + " is stored as "
+                    + table.dialect.columnType(table.columns[index].getKind())
+                    + ". SQLite and MySQL coerce it to text -- like(\"views\", \"12%\") "
+                    + "matches the row holding 123 -- and PostgreSQL refuses the "
+                    + "comparison outright, so the same query answers rows on two engines "
+                    + "and throws on the third.");
+        }
         return condition(field, table.dialect.likeOperator(),
                 table.dialect.likePattern(pattern));
     }

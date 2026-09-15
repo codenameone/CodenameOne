@@ -326,6 +326,29 @@ class ScannerTest {
         rows("INSERT INTO t (a) VALUES (1) /*!50100 , (2) */", 1, 1, Dialect.VERSION_GATED);
         rows("INSERT INTO t (a) VALUES (1) /*!99999 , (2) */", 1, 1, Dialect.VERSION_GATED);
 
+        // MariaDB has a SECOND executable opener, "/*M! ... */", which only it
+        // runs. Measured against live servers: this statement inserts one row on
+        // SQLite, PostgreSQL and MySQL and TWO on MariaDB, so the mode travels
+        // with the dialect rather than being a property of "the MySQL family".
+        rows("INSERT INTO t (a) VALUES (1) /*M! , (2) */", 1, 1, 1);
+        assertEquals(2, Dialect.MARIADB.countInsertRows("INSERT INTO t (a) VALUES (1) /*M! , (2) */"));
+        // Lower case too -- MariaDB accepts /*m!.
+        assertEquals(2, Dialect.MARIADB.countInsertRows("INSERT INTO t (a) VALUES (1) /*m! , (2) */"));
+        // And it is gated the same way, three characters further along.
+        assertEquals(Dialect.VERSION_GATED,
+                Dialect.MARIADB.countInsertRows("INSERT INTO t (a) VALUES (1) /*M!100400 , (2) */"));
+        // The plain "/*!" opener still works on MariaDB; adding one did not
+        // replace the other.
+        assertEquals(2, Dialect.MARIADB.countInsertRows("INSERT INTO t (a) VALUES (1) /*! , (2) */"));
+        // A parameter inside a MariaDB gate is refused, as it is inside a MySQL
+        // one: the server prepares it with no parameter at all.
+        assertThrows(IOException.class,
+                () -> Dialect.MARIADB.bind("SELECT 1 /*M!100400 + ? */", 1));
+        // "/*M!" is NOT executable on MySQL, which reads it as an ordinary
+        // comment -- reading it as executable there would be the mirror mistake.
+        assertEquals("SELECT 1 /*M!100400 + ? */",
+                Dialect.MYSQL.bind("SELECT 1 /*M!100400 + ? */", 0));
+
         // A placeholder INSIDE a version gate is refused rather than counted:
         // MySQL prepares "SELECT 1 /*!99999 + ? */" with no parameters at all on
         // a server the gate excludes, so counting the one supplied here reaches

@@ -146,6 +146,13 @@ class EntityManagerTest {
             // generated SQL quotes it.
             assertEquals(2, notes.query().gte("created", new Date(2000L)).count());
             assertEquals(1, notes.query().like("title", "lo%").count());
+            // like() is TEXT ONLY: measured, the same pattern against an int
+            // column matches by coercion on SQLite and MySQL and is a type error
+            // on PostgreSQL, so it is refused here rather than answering
+            // differently per engine. The message names the stored type.
+            IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                    () -> notes.query().like("views", "12%"));
+            assertTrue(err.getMessage().contains("like() needs a text field"), err.getMessage());
             assertEquals(2, notes.query().in("title", new Object[] {"low", "mid"}).count());
             // An empty set matches nothing. A filter that silently disappeared
             // would return every row in the table.
