@@ -865,6 +865,7 @@ public class Parser extends ClassVisitor {
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
                         fuseMtd.lowerIteratorCalls();
+                        fuseMtd.elideToCharArrayScans();
                     }
                 }
             }

@@ -2677,6 +2677,175 @@ public class BytecodeMethod implements SignatureSet {
         }
     }
 
+    /**
+     * ELIDE String.toCharArray() WHERE THE ARRAY IS ONLY EVER READ.
+     *
+     * toCharArray() is 22.8% of all char[] allocations on the self-hosting corpus --
+     * 293,175 of 1,285,250 -- and most of those arrays exist only to be scanned and
+     * dropped. The array is a COPY by contract, so the allocation cannot be removed by
+     * sharing it: com.codename1.io.Util.toCharArray exists precisely because some JVMs
+     * returned the backing store, calls that "a serious security hole in the JVM", and
+     * detects it at runtime with `s.toCharArray() == s.toCharArray()`. Handing back the
+     * backing array would make every String mutable through its own accessor AND flip
+     * that expression. It would also do nothing for a COMPACT string, which has a byte[]
+     * and no char[] to hand back.
+     *
+     * So do not build the array. Where the result is stored to a local whose every use
+     * is a read, the local can hold the STRING instead and each read becomes a call:
+     *
+     *     ALOAD a; ARRAYLENGTH          ->  ALOAD a; String.length()
+     *     ALOAD a; &lt;index&gt;; CALOAD      ->  ALOAD a; &lt;index&gt;; String.charAt(I)
+     *
+     * and the toCharArray() call itself is deleted so the ASTORE stores the receiver.
+     * Nothing aliases or mutates an array that does not exist, and on a compact string
+     * charAt is a byte load and a mask.
+     *
+     * THE SUBSTITUTIONS ARE STACK-NEUTRAL BY CONSTRUCTION -- CALOAD and charAt are both
+     * pop-2/push-1, ARRAYLENGTH and length are both pop-1/push-1 -- so maxStack does not
+     * move and no local is added. That is deliberate: of the three correctness defects
+     * that got the earlier bytecode rewrites on this branch withdrawn, one was maxStack
+     * under-reservation and one was running after the cull. This pass avoids the first by
+     * changing no stack depth, and the second by running from Parser BEFORE
+     * eliminateUnusedMethods, registering each created call the way addInstruction would.
+     *
+     * The third was receiver identity, and the answer here is to refuse anything not
+     * trivially provable rather than to track the operand stack. A use qualifies ONLY as
+     * `ALOAD slot` immediately followed by ARRAYLENGTH, or by a single constant/local int
+     * push and then CALOAD. `a[b[i]]`, a computed index, or any other shape disqualifies
+     * the whole site. That covers the indexed loop and the array for-each, which is what
+     * the scanner found in practice, and nothing it cannot prove.
+     *
+     * Parameter slots are excluded for the same reason lowerIteratorCalls excludes them:
+     * a parameter reaches its slot with no ASTORE, so a single store does not mean a
+     * single value.
+     *
+     * ONE ACCEPTED SEMANTIC DIFFERENCE: on a null receiver the NullPointerException now
+     * arises at the first length()/charAt() rather than at toCharArray(). Both are inside
+     * this method and both are an NPE; only the line number can differ. On this VM the
+     * distinction is already academic -- no null check is emitted for either
+     * (CN1_INCLUDE_NPE_CHECKS is off), so both are a native fault the iOS handler
+     * converts. Sites with no uses at all are skipped rather than reasoned about, so the
+     * call is never removed from a method that does nothing else with it.
+     */
+    public void elideToCharArrayScans() {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke) || ins.getOpcode() != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            if (!"java/lang/String".equals(inv.getOwner())
+                    || !"toCharArray".equals(inv.getName())
+                    || !"()[C".equals(inv.getDesc())) {
+                continue;
+            }
+            int st = nextExecutable(i + 1);
+            if (st < 0) {
+                continue;
+            }
+            Instruction store = instructions.get(st);
+            if (!(store instanceof VarOp) || store.getOpcode() != Opcodes.ASTORE) {
+                continue;
+            }
+            int slot = ((VarOp) store).getIndex();
+            if (slot < firstNonParameterSlot() || countStoresTo(slot) != 1) {
+                continue;
+            }
+            if (!charArrayUsesAreReadOnly(slot, st)) {
+                continue;
+            }
+            rewriteCharArrayReads(slot, st);
+            instructions.remove(i);
+            i--;
+        }
+    }
+
+    /// True when EVERY use of {@code slot} after {@code storeIdx} is one of the two
+    /// read shapes this pass can rewrite, and there is at least one. Validation is a
+    /// separate pass from the rewrite on purpose: a site that fails halfway must leave
+    /// the instruction stream untouched.
+    private boolean charArrayUsesAreReadOnly(int slot, int storeIdx) {
+        int uses = 0;
+        for (int i = storeIdx + 1; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof VarOp) || ((VarOp) ins).getIndex() != slot) {
+                continue;
+            }
+            if (ins.getOpcode() != Opcodes.ALOAD) {
+                return false;
+            }
+            if (classifyCharArrayRead(i) < 0) {
+                return false;
+            }
+            uses++;
+        }
+        return uses > 0;
+    }
+
+    /// @return the index of the ARRAYLENGTH or CALOAD this ALOAD feeds, or -1 when the
+    ///         shape is anything else -- which includes the array escaping into a call,
+    ///         a store, a return, or an index expression this pass refuses to reason about
+    private int classifyCharArrayRead(int aloadIdx) {
+        int n = nextExecutable(aloadIdx + 1);
+        if (n < 0) {
+            return -1;
+        }
+        if (instructions.get(n).getOpcode() == Opcodes.ARRAYLENGTH) {
+            return n;
+        }
+        // a[i]: exactly ONE simple int push may sit between the ALOAD and the CALOAD.
+        // Anything else -- a call, another array read, arithmetic -- is refused rather
+        // than tracked, because tracking the operand stack is what this pass is
+        // deliberately not doing.
+        if (!isSimpleIntPush(instructions.get(n))) {
+            return -1;
+        }
+        int c = nextExecutable(n + 1);
+        if (c < 0 || instructions.get(c).getOpcode() != Opcodes.CALOAD) {
+            return -1;
+        }
+        return c;
+    }
+
+    private boolean isSimpleIntPush(Instruction ins) {
+        int op = ins.getOpcode();
+        if (ins instanceof VarOp && op == Opcodes.ILOAD) {
+            return true;
+        }
+        return op == Opcodes.ICONST_0 || op == Opcodes.ICONST_1 || op == Opcodes.ICONST_2
+                || op == Opcodes.ICONST_3 || op == Opcodes.ICONST_4 || op == Opcodes.ICONST_5
+                || op == Opcodes.BIPUSH || op == Opcodes.SIPUSH;
+    }
+
+    private void rewriteCharArrayReads(int slot, int storeIdx) {
+        for (int i = storeIdx + 1; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof VarOp) || ((VarOp) ins).getIndex() != slot
+                    || ins.getOpcode() != Opcodes.ALOAD) {
+                continue;
+            }
+            int target = classifyCharArrayRead(i);
+            if (target < 0) {
+                continue;   // cannot happen: validated above
+            }
+            boolean isLength = instructions.get(target).getOpcode() == Opcodes.ARRAYLENGTH;
+            Invoke call = isLength
+                    ? new Invoke(Opcodes.INVOKEVIRTUAL, "java/lang/String", "length", "()I", false)
+                    : new Invoke(Opcodes.INVOKEVIRTUAL, "java/lang/String", "charAt", "(I)C", false);
+            instructions.set(target, call);
+            // Register it exactly as addInstruction() would; see retypeIteratorUses for
+            // why the list entry alone is not enough.
+            call.setMethod(this);
+            call.addDependencies(dependentClasses);
+            if (dependencyGraph != null) {
+                String uses = call.getMethodUsed();
+                if (uses != null) {
+                    dependencyGraph.recordMethodCall(this, uses);
+                }
+            }
+        }
+    }
+
     public Set<LocalVariable> getLocalVariables() {
         return localVariables;
     }

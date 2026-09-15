@@ -30,7 +30,11 @@ J8="${JDK_8_HOME:?set JDK_8_HOME}"
 # (conservatively via the native frame, precisely via the caller's stack slots), so its
 # non-vacuity is UNPROVEN. It earns its place as a heap-integrity torture -- 256 int[]
 # verified across 400,000 concatenations -- not as proof of a rooting claim.
-TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt"
+#
+# ToCharT gates the toCharArray() elision pass: three shapes it must rewrite and four it
+# must REFUSE (mutation, two escapes, a computed index). Rewriting a refused shape is a
+# wrong answer rather than a crash, which is precisely what a checksum catches.
+TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
