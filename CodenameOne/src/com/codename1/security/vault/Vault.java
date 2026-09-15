@@ -1011,7 +1011,17 @@ public final class Vault {
                         throw new VaultException(VaultError.CORRUPT,
                                 "the stored secret is not in a format this build wrote");
                     }
-                    plain = openAnyVersion(sealed, binding(metadata, secretName, PURPOSE_SECRET));
+                    // Snapshotted, not read off the field. lock() nulls metadata, and reading
+                    // it here after requireUnlocked had already passed produced a
+                    // NullPointerException that the terminal handler reported as UNKNOWN -- an
+                    // ordinary lock described as an unknown fault, on a path whose documented
+                    // answer is LOCKED. putSecret takes its snapshot for the same reason.
+                    VaultMetadata meta = metadata;
+                    if (meta == null) {
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this secret was being read");
+                    }
+                    plain = openAnyVersion(sealed, binding(meta, secretName, PURPOSE_SECRET));
                     requireSameGeneration(generation);
                     out.complete(chars(plain));
                 } catch (VaultException failed) {
@@ -1151,8 +1161,16 @@ public final class Vault {
             public void run() {
                 try {
                     requireUnlocked();
+                    // Snapshotted for the reason getSecret gives: lock() nulls this field, and
+                    // reading it after requireUnlocked has passed reports an ordinary lock as an
+                    // unknown fault.
+                    VaultMetadata meta = metadata;
+                    if (meta == null) {
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while this record was being opened");
+                    }
                     byte[] plain = openAnyVersion(sealed,
-                            binding(metadata, recordId, PURPOSE_RECORD));
+                            binding(meta, recordId, PURPOSE_RECORD));
                     if (generation != lockGeneration) {
                         Bytes.zero(plain);
                         requireSameGeneration(generation);
@@ -1425,6 +1443,7 @@ public final class Vault {
         background(new Runnable() {
             @Override
             public void run() {
+                char[] owned = null;
                 try {
                     requireUnlocked();
                     byte[] raw = SecureRandom.bytes(20);
@@ -1435,18 +1454,34 @@ public final class Vault {
                     // taken long after lock() still held a working credential.
                     char[] code = Bytes.base32Chars(raw);
                     Bytes.zero(raw);
+                    // Owned from here, so every way out that is not delivery wipes it. Sealing,
+                    // stamping and commitMetadata can all throw after the code exists -- a
+                    // storage conflict, a quota refusal -- and the catch reported the error while
+                    // a credential that reopens this vault, and that the caller never received,
+                    // stayed in the heap. The javadoc says the returned characters are the only
+                    // copy; until this it was not even the only copy on the failure path.
+                    owned = code;
+                    // Snapshotted once, for the reason getSecret gives: lock() nulls the field,
+                    // and four separate reads of it between here and the commit each gave a
+                    // concurrent lock its own way to surface as an unknown fault. Found by the
+                    // rule in VaultSourceInvariantsTest rather than by review.
+                    VaultMetadata current = metadata;
+                    if (current == null) {
+                        throw new VaultException(VaultError.LOCKED,
+                                "the vault was locked while a recovery code was being created");
+                    }
                     byte[] derived = recoveryKey(code);
-                    VaultMetadata next = metadata.copy();
+                    VaultMetadata next = current.copy();
                     next.recoveryWrap = SecureEnvelope.seal(derived, next.dataKeyId,
                             next.dataKeyVersion,
                             wrapBinding(next, PURPOSE_RECOVERY), dataKey);
                     Bytes.zero(derived);
-                    next.counter = metadata.counter + 1;
+                    next.counter = current.counter + 1;
                     // Checked before the write: a recovery code refused after persisting its
                     // wrap would be a code the vault accepts and the caller never received.
-                    stampMac(next, metadata, dataKey);
+                    stampMac(next, current, dataKey);
                     requireSameGeneration(generation);
-                    VaultMetadata previous = metadata;
+                    VaultMetadata previous = current;
                     commitMetadata(previous, next);
                     if (generation != lockGeneration) {
                         // Asked again, because the check above is before a storage write and a
@@ -1464,6 +1499,8 @@ public final class Vault {
                                 "the vault was locked while a recovery code was being created");
                     }
                     metadata = next;
+                    // Delivered, so the finally must not wipe what the caller now holds.
+                    owned = null;
                     out.complete(code);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -1475,6 +1512,8 @@ public final class Vault {
                     // cannot diagnose. Reached most easily by locking mid-operation, which nulls
                     // metadata under a worker that already passed requireUnlocked.
                     out.error(asVaultException(broke, "this vault operation could not complete"));
+                } finally {
+                    Bytes.zero(owned);
                 }
             }
         });

@@ -164,6 +164,43 @@ class VaultSourceInvariantsTest extends UITestBase {
         }
     }
 
+    @Test
+    void noWorkerReadsTheSharedMetadataFieldAfterItsGuard() {
+        // lock() nulls `metadata`, so a worker that dereferences the FIELD after requireUnlocked
+        // has passed gets a NullPointerException -- which the terminal handler reports as
+        // UNKNOWN, an ordinary lock described as an unknown fault on paths whose documented
+        // answer is LOCKED. Every such path snapshots into a local first. This has now been the
+        // finding three separate times (putSecret, rememberNow, then getSecret and open), which
+        // is why it is a rule rather than three fixes.
+        String source = readVaultSource();
+        java.util.List<String> offenders = new java.util.ArrayList<String>();
+        int at = 0;
+        while (true) {
+            int sig = source.indexOf("\n    public AsyncResource<", at);
+            if (sig < 0) {
+                break;
+            }
+            int nameEnd = source.indexOf('(', sig);
+            String name = source.substring(source.lastIndexOf(' ', nameEnd) + 1, nameEnd);
+            at = nameEnd;
+            String body = methodBody(source, source.substring(sig + 1, nameEnd) + "(");
+            int guard = body.indexOf("requireUnlocked()");
+            if (guard < 0) {
+                continue;
+            }
+            // `binding(metadata` and `openAnyVersion(..., binding(metadata` are the shapes that
+            // bit; a snapshot reads `VaultMetadata meta = metadata;` which is not a use.
+            String after = body.substring(guard);
+            if (after.indexOf("binding(metadata") > 0 || after.indexOf("metadata.") > 0) {
+                offenders.add(name);
+            }
+        }
+        assertTrue(offenders.isEmpty(),
+                "these dereference the shared metadata field after their guard, so a concurrent "
+                + "lock() reports UNKNOWN instead of LOCKED: " + offenders
+                + ". Snapshot it into a local first.");
+    }
+
     /// Methods that write and deliberately do not re-check the lock generation afterwards.
     ///
     /// Not an allow-list of what to scan -- the scan below is over every public asynchronous
