@@ -81,6 +81,17 @@ public partial class App : Application
         bool micaSupported = MicaController.IsSupported();
         _window.SystemBackdrop = backdrop;
 
+        // Always-on-top as well as foreground. The foreground check happens before the
+        // BitBlt, and without this a dialog appearing in between could still slide over the
+        // window in the gap -- which is a race that would show up as an occasional wrong
+        // capture rather than a consistent one, and those are far worse to diagnose.
+        var hwndEarly = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        var idEarly = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwndEarly);
+        if (AppWindow.GetFromWindowId(idEarly).Presenter is OverlappedPresenter op)
+        {
+            op.IsAlwaysOnTop = true;
+        }
+
         var root = new StackPanel { Orientation = Orientation.Vertical, Spacing = 12, Margin = new Thickness(24) };
         var button = new Button { Content = "Default" };
         root.Children.Add(button);
@@ -154,6 +165,18 @@ public partial class App : Application
     [DllImport("gdi32.dll")] private static extern bool BitBlt(IntPtr dst, int x, int y, int w, int h,
         IntPtr src, int sx, int sy, uint rop);
     [DllImport("dwmapi.dll")] private static extern int DwmFlush();
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
+    [DllImport("user32.dll")] private static extern int GetWindowTextW(IntPtr hWnd, [Out] char[] s, int max);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int Left, Top, Right, Bottom; }
+
+    private const int SW_SHOW = 5;
+    private const int SW_RESTORE = 9;
 
     private const uint SRCCOPY = 0x00CC0020;
     private const uint CAPTUREBLT = 0x40000000;
@@ -168,9 +191,33 @@ public partial class App : Application
         try
         {
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
-            var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            var appWindow = AppWindow.GetFromWindowId(id);
-            int w = appWindow.Size.Width, h = appWindow.Size.Height;
+
+            // Reading the SCREEN means reading whatever is on top of it. The first run that
+            // got this far captured the Windows out-of-box privacy dialog sitting over this
+            // app, reported zero blockers, and looked entirely plausible -- a 768x519 image
+            // full of real controls. So the window is forced to the front and the result is
+            // verified, rather than assumed from the fact that we asked for it.
+            ShowWindow(hwnd, SW_RESTORE);
+            ShowWindow(hwnd, SW_SHOW);
+            for (int i = 0; i < 20 && GetForegroundWindow() != hwnd; i++)
+            {
+                BringWindowToTop(hwnd);
+                SetForegroundWindow(hwnd);
+                Thread.Sleep(150);
+            }
+            if (GetForegroundWindow() != hwnd)
+            {
+                _blockers.Add("this window never became foreground, so a screen capture "
+                    + $"would be of whatever is on top of it ({DescribeForegroundWindow()})");
+                return;
+            }
+
+            if (!GetWindowRect(hwnd, out RECT r))
+            {
+                _blockers.Add("GetWindowRect failed; the window region is unknown");
+                return;
+            }
+            int w = r.Right - r.Left, h = r.Bottom - r.Top;
             if (w <= 0 || h <= 0)
             {
                 _blockers.Add($"the window has no size ({w}x{h}); nothing was composited");
@@ -182,7 +229,7 @@ public partial class App : Application
             DwmFlush();
             Thread.Sleep(400);
 
-            var pos = appWindow.Position;
+            var pos = new { X = r.Left, Y = r.Top };
             IntPtr screen = GetDC(IntPtr.Zero);
             IntPtr mem = CreateCompatibleDC(screen);
             IntPtr bmp = CreateCompatibleBitmap(screen, w, h);
@@ -215,6 +262,24 @@ public partial class App : Application
         catch (Exception e)
         {
             _blockers.Add($"capture threw {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    /// Names whatever is actually in front, so a capture failure says which window stole
+    /// the screen instead of leaving someone to guess from the picture.
+    private static string DescribeForegroundWindow()
+    {
+        try
+        {
+            var fg = GetForegroundWindow();
+            var buf = new char[256];
+            int n = GetWindowTextW(fg, buf, buf.Length);
+            var title = n > 0 ? new string(buf, 0, n) : "(untitled)";
+            return $"foreground is 0x{fg.ToInt64():X} \"{title}\"";
+        }
+        catch
+        {
+            return "foreground window could not be identified";
         }
     }
 
