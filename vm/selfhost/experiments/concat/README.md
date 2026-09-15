@@ -49,3 +49,50 @@ away, because a naive fusion is wrong in each:
 ## Status
 
 Detector only. No translator pass is wired to it yet.
+
+
+## ToCharArrayScan
+
+Answers "how many `String.toCharArray()` sites never needed the array".
+
+```
+javac -cp <asm> -d . ToCharArrayScan.java
+java  -cp .:<asm> ToCharArrayScan <classes-dir> [<classes-dir> ...]
+```
+
+`toCharArray()` is **22.8% of all char[] allocations** on the self-hosting corpus --
+293,175 of 1,285,250 -- and most of those arrays exist only to be scanned. The worst
+single offender is the translator's own `Parser.encodeStringSlashU`, which materialises
+the array, reads it in a loop, and in the common case returns the original String and
+throws the copy away.
+
+**Returning the backing array uncopied is NOT the fix.** That makes a String mutable
+through its own accessor. `com.codename1.io.Util.toCharArray` exists precisely because
+some JVMs did exactly that, calls it "a serious security hole in the JVM", and DETECTS
+it at runtime with `s.toCharArray() == s.toCharArray()` -- an expression whose result
+the change would also flip.
+
+The safe transformation is to not build the array at all: where the result is stored to
+a local whose every use is `CALOAD` or `ARRAYLENGTH`, each `a[i]` is `s.charAt(i)` and
+each `a.length` is `s.length()`. No array exists, so nothing can alias or mutate one,
+and on a compact string `charAt` is a byte load and a mask.
+
+### Measured
+
+| corpus | sites | elidable | escapes | mutated | not stored to a local |
+|---|---|---|---|---|---|
+| ByteCodeTranslator + ASM | 2 | 1 | 0 | 1 | 0 |
+| CN1 framework core | 36 | 5 | 7 | 0 | 24 |
+| vm/JavaAPI runtime | 11 | 3 | 1 | 1 | 6 |
+
+**Nine elidable sites in total**, so this is a small, cheap pass rather than a large
+one -- and the honest caveat is that static site counts do not predict dynamic volume:
+ONE of those nine (`Parser.encodeStringSlashU`) accounts for all 293,175 calls on the
+self-hosting corpus. A hot scan loop is invisible until it is not.
+
+### Validated
+
+The classifier is checked against a hand-written class with one case per bucket
+(read-only for-each, indexed scan, returned, `CASTORE`d, passed straight to a call) and
+reports exactly 5 sites / 2 elidable / 1 escape / 1 mutated / 1 not-stored. A scanner
+whose buckets nobody has watched fill is not a measurement.
