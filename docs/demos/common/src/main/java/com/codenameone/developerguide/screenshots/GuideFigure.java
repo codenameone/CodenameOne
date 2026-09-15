@@ -58,4 +58,17 @@ public interface GuideFigure {
     /// - `form`: the form [#build] returned, now shown and laid out
     default void afterShow(Form form) {
     }
+
+    /// Whether this figure's subject fills the screen it was given.
+    ///
+    /// The crop normally stops below the content, so a figure is the part of the
+    /// screen with something on it rather than a phone-shaped picture that is
+    /// mostly empty. That reads a component's preferred height, and a few
+    /// components fill whatever they are given while declaring a small one --
+    /// an ImageViewer asks for the size of its image, a CodeEditor for the size
+    /// of its text -- so the honest answer for those is the whole viewport, and
+    /// the measured one was a 70 pixel sliver.
+    default boolean fillsViewport() {
+        return false;
+    }
 }
