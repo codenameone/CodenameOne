@@ -49,6 +49,18 @@ class RouteTransitionsTest {
         return (CommonTransitions) t;
     }
 
+    /// The Apple push is NOT a CommonTransitions: a slide holds the two pages a fixed
+    /// screen apart and moves the pair, and this platform moves them different distances
+    /// on different curves.
+    private static com.codename1.ui.animations.CupertinoPageTransition apple(
+            Route<?> r, TargetPlatform p) {
+        Transition t = RouteTransitions.forRoute(r, p);
+        assertNotNull(t, "every route must be given a transition");
+        assertTrue(t instanceof com.codename1.ui.animations.CupertinoPageTransition,
+                "expected a CupertinoPageTransition, got " + t);
+        return (com.codename1.ui.animations.CupertinoPageTransition) t;
+    }
+
     private static MaterialPageRoute<Object> page() {
         return new MaterialPageRoute<Object>();
     }
@@ -58,14 +70,16 @@ class RouteTransitionsTest {
     @Test
     void applePlatformsSlideThePageInFromTheSide() {
         for (TargetPlatform p : new TargetPlatform[] {TargetPlatform.iOS, TargetPlatform.macOS}) {
-            CommonTransitions t = of(page(), p);
-            assertTrue(t.isHorizontalSlide(), p + " should slide horizontally");
-            // CommonTransitions names the direction after the OUTGOING page: forward
-            // moves the source right, bringing the new page in from the LEADING edge,
-            // which is the way back. A push comes from the trailing edge.
-            assertFalse(t.isForwardSlide(),
-                    p + " should bring the new page in from the trailing edge");
-            assertEquals(500, t.getTransitionSpeed(), p + " uses kTransitionDuration");
+            com.codename1.ui.animations.CupertinoPageTransition t = apple(page(), p);
+            assertEquals(500, t.getDuration(), p + " uses kTransitionDuration");
+            // A push brings the new page in over the old one; copy(true) is the pop,
+            // which swaps which page crosses the screen and which drifts back.
+            assertFalse(t.isBack(), p + " builds the push, not the pop");
+            Transition backwards = t.copy(true);
+            assertTrue(backwards
+                    instanceof com.codename1.ui.animations.CupertinoPageTransition);
+            assertTrue(((com.codename1.ui.animations.CupertinoPageTransition) backwards)
+                    .isBack(), p + " copy(true) is the pop");
         }
     }
 
@@ -119,7 +133,7 @@ class RouteTransitionsTest {
     /// which would be no animation at all.
     @Test
     void aRouteWithNoStatedDurationTakesThePlatformDefault() {
-        assertEquals(500, of(page(), TargetPlatform.iOS).getTransitionSpeed());
+        assertEquals(500, apple(page(), TargetPlatform.iOS).getDuration());
         assertEquals(300, of(page(), TargetPlatform.android).getTransitionSpeed());
     }
 }
