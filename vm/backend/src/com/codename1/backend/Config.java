@@ -517,9 +517,17 @@ public final class Config {
             if(filled == out.length) {
                 return out;
             }
-            byte[] shorter = new byte[filled];
-            System.arraycopy(out, 0, shorter, 0, filled);
-            return shorter;
+            // A PREFIX IS NOT A SHORTER FILE. It parses perfectly well -- every
+            // complete line in it is a setting -- so the ones past the cut point
+            // simply vanish, and a deployment whose TLS certificate and key sit
+            // near the end of application.properties came up in PLAINTEXT with
+            // nothing to read about it. The file can genuinely shrink between
+            // the stat and the read, which is a file being rewritten underneath
+            // the server; refusing is the right answer to that too.
+            throw new IOException(path + " is " + out.length + " bytes and only " + filled
+                    + " could be read. A configuration file read in part is not a shorter "
+                    + "configuration file: the settings past the cut would silently fall "
+                    + "back to their defaults.");
         } finally {
             FileIo.close(fd);
         }

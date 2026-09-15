@@ -199,7 +199,7 @@ class DialectTest {
         // the other two are unbounded, and its default collation is case and
         // accent insensitive, so eq() matched a different row here than there.
         // See stringColumnsAreNotCappedOnMySql below.
-        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin",
                 Dialect.MYSQL.columnType(Dialect.TEXT));
         assertEquals("INTEGER", Dialect.SQLITE.columnType(Dialect.BIGINT));
         assertEquals("BIGINT", Dialect.POSTGRES.columnType(Dialect.BIGINT));
@@ -234,7 +234,7 @@ class DialectTest {
         // application-assigned string key is a VARCHAR there and TEXT elsewhere.
         // NOT NULL because SQLite would otherwise admit a null key; see
         // assignedKeysAreNotNull.
-        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL PRIMARY KEY",
+        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL PRIMARY KEY",
                 Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
         assertEquals("TEXT NOT NULL PRIMARY KEY", Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT));
     }
@@ -361,7 +361,7 @@ class DialectTest {
         assertTrue(Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT).contains("NOT NULL"));
         assertTrue(Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT).contains("NOT NULL"));
         assertEquals("TEXT NOT NULL PRIMARY KEY", Dialect.SQLITE.assignedKeyColumn(Dialect.TEXT));
-        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL PRIMARY KEY",
+        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL PRIMARY KEY",
                 Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
     }
 
@@ -395,7 +395,7 @@ class DialectTest {
         // engines and was rejected -- or silently truncated -- by the third.
         // The blob branch of this very switch already took LONGBLOB for the
         // same reason; the string branch had been left on TEXT.
-        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin",
                 Dialect.MYSQL.columnType(Dialect.TEXT));
         assertEquals("LONGBLOB", Dialect.MYSQL.columnType(Dialect.BLOB));
         assertEquals("TEXT", Dialect.SQLITE.columnType(Dialect.TEXT));
@@ -405,8 +405,10 @@ class DialectTest {
         // an unbounded column at all. See Table.MAX_ASSIGNED_TEXT_KEY. It also
         // pins a BINARY collation: MySQL's default is case and accent
         // insensitive, so "A" and "a" were the same primary key there while
-        // SQLite and PostgreSQL stored two rows.
-        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL PRIMARY KEY",
+        // SQLite and PostgreSQL stored two rows. _0900_ rather than the older
+        // utf8mb4_bin because that one is still PAD SPACE: under it "token" and
+        // "token " were one key as well.
+        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL PRIMARY KEY",
                 Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
     }
 

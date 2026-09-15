@@ -618,7 +618,9 @@ public abstract class Dialect {
                     // 2 rows on MySQL against 1 on SQLite and PostgreSQL. eq and
                     // in() are the operations an application builds its
                     // behaviour on, so they have to mean one thing.
-                    return "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin";
+                    // The NO PAD collation here too, so a trailing space is
+                    // part of an ordinary value exactly as it is part of a key.
+                    return "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin";
             }
         }
 
@@ -688,7 +690,20 @@ public abstract class Dialect {
                 // the table or database charset is not utf8mb4, and the other
                 // two engines are UTF-8 throughout, so naming it is what makes
                 // the three agree rather than depending on server defaults.
-                return "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin "
+                // utf8mb4_0900_bin rather than utf8mb4_bin, because the older
+                // binary collation is still PAD SPACE: measured, "token" and
+                // "token " are the same primary key under utf8mb4_bin and the
+                // second insert answers "Duplicate entry 'token '", while
+                // SQLite and PostgreSQL keep them apart. The _0900_ collations
+                // are NO PAD and keep the trailing space, which is what the
+                // other two do.
+                //
+                // This is the one place the backend needs MySQL 8.0: the _0900_
+                // collations arrived with it. 5.7 has been out of support since
+                // October 2023, and the alternative -- VARBINARY -- would stop
+                // the column being text at all and change what every read of it
+                // returns.
+                return "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin "
                         + "NOT NULL PRIMARY KEY";
             }
             return columnType(kind) + " NOT NULL PRIMARY KEY";

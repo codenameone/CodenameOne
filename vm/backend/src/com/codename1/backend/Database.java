@@ -658,6 +658,10 @@ public final class Database {
         if(sqlite != null) {
             sqlite.enableWriteAheadLog();
             sqlite.setBusyTimeout(busyTimeoutMillis);
+            // Per connection, like the two above: SQLite's LIKE folds ASCII case
+            // and the other two do not, so the same query answered different
+            // rows depending on the engine behind it.
+            sqlite.useCaseSensitiveLike();
         }
     }
 
