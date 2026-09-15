@@ -161,6 +161,22 @@ class ScannerTest {
         // On its own it is one statement and stays allowed.
         assertFalse(Dialect.SQLITE.hasTrailingStatement("BEGIN"));
         assertFalse(Dialect.SQLITE.hasTrailingStatement("BEGIN;"));
+
+        // A CASE EXPRESSION ENDS WITH "END" TOO. Counting that against the
+        // trigger body closed the body early, so the semicolon after it read as
+        // a boundary and one statement was refused as two.
+        assertFalse(Dialect.SQLITE.hasTrailingStatement(
+                "CREATE TRIGGER x AFTER INSERT ON t BEGIN UPDATE t SET v = "
+                        + "CASE WHEN v IS NULL THEN 1 ELSE v END; END"));
+        // With a real second statement after it, still two.
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "CREATE TRIGGER x AFTER INSERT ON t BEGIN UPDATE t SET v = "
+                        + "CASE WHEN v IS NULL THEN 1 ELSE v END; END; DROP TABLE u"));
+        // And a CASE outside any block neither opens nor closes one.
+        assertFalse(Dialect.SQLITE.hasTrailingStatement(
+                "SELECT CASE WHEN v IS NULL THEN 1 ELSE v END FROM t"));
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "SELECT CASE WHEN v IS NULL THEN 1 ELSE v END FROM t; DROP TABLE u"));
     }
 
     @Test

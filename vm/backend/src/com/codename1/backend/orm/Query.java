@@ -141,7 +141,10 @@ public final class Query<T> {
     public Query<T> orderBy(String field, boolean ascending) {
         String quoted = column(field);
         order = order.length() == 0 ? " ORDER BY " : order + ", ";
-        order = order + quoted + (ascending ? " ASC" : " DESC");
+        // The DIALECT renders the term, because where a null sorts is not the
+        // same on the three by default and MySQL cannot even spell the standard
+        // way of saying it. See Dialect.orderBy.
+        order = order + table.dialect.orderBy(quoted, ascending);
         return this;
     }
 
