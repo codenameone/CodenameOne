@@ -94,6 +94,7 @@ public partial class App : Application
     private IntPtr _hwnd;
     private FrameworkElement _probeControl;
     private Grid _tileHost;
+    private bool _animationsDisabled;
     private Windows.Foundation.Rect _probeBounds;
     private bool _isProbe;
 
@@ -235,6 +236,16 @@ public partial class App : Application
                   ?? throw new InvalidOperationException("NATIVEREF_OUT is not set");
         Directory.CreateDirectory(_outDir);
         _isProbe = (Environment.GetEnvironmentVariable("NATIVEREF_MODE") ?? "probe") != "capture";
+
+        // Before the window exists, so nothing has animated yet.
+        bool off = false;
+        _animationsDisabled = SystemParametersInfo(SPI_SETCLIENTAREAANIMATION, 0, ref off, SPIF_SENDCHANGE);
+        if (!_animationsDisabled)
+        {
+            _blockers.Add("could not turn system UI animations off (SPI_SETCLIENTAREAANIMATION "
+                + $"failed, GetLastError={Marshal.GetLastWin32Error()}); tiles would not be "
+                + "reproducible between runs");
+        }
 
         _window = new Window { Title = "cn1-native-ref" };
 
@@ -390,6 +401,24 @@ public partial class App : Application
         Console.Out.Flush();
         Environment.Exit(_blockers.Count > 0 ? 20 : 0);
     }
+
+    /// Turns the system's UI animations off for this session.
+    ///
+    /// SPI_SETCLIENTAREAANIMATION is what UISettings.AnimationsEnabled reports and what
+    /// XAML's theme transitions check, so setting it false makes a control snap to its
+    /// state instead of animating into it.
+    ///
+    /// Needed because the capture must be reproducible byte for byte. With animations on,
+    /// two runs of the same commit produced eight tiles that differed -- the check-box
+    /// check drawing in, the switch knob sliding, the slider thumb and the progress bar --
+    /// because the frame was grabbed at different points along each transition. The
+    /// protocol in goldens/README.md is that nondeterminism is fixed in the app or by
+    /// pinning an environment knob, never with a tolerance file, and this is the knob.
+    private const uint SPI_SETCLIENTAREAANIMATION = 0x1043;
+    private const uint SPIF_SENDCHANGE = 0x02;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(uint action, uint param, ref bool value, uint winIni);
 
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
@@ -1157,6 +1186,7 @@ public partial class App : Application
         sb.AppendLine($"    \"segoe_ui_variable_installed\": {Json(segoeVariable)}");
         sb.AppendLine("  },");
         sb.AppendLine($"  \"tiles_written\": {_tilesWritten},");
+        sb.AppendLine($"  \"animations_disabled_by_app\": {(_animationsDisabled ? "true" : "false")},");
         sb.Append("  \"backdrop_by_appearance\": {");
         sb.Append(string.Join(", ", _backdropByAppearance.Select(kv => $"\"{Escape(kv.Key)}\": \"{Escape(kv.Value)}\"")));
         sb.AppendLine("},");
