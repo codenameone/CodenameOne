@@ -31,6 +31,8 @@ import java.util.List;
 public class FidelitySpec {
     private int defaultTileWidthMm = 60;
     private int defaultTileHeightMm = 14;
+    private int defaultTileWidthPx = 240;
+    private int defaultTileHeightPx = 56;
     private String backgroundHex = "ffffff";
     private List appearances = new ArrayList();
     private List components = new ArrayList();
@@ -49,6 +51,22 @@ public class FidelitySpec {
 
     public void setDefaultTileHeightMm(int defaultTileHeightMm) {
         this.defaultTileHeightMm = defaultTileHeightMm;
+    }
+
+    public int getDefaultTileWidthPx() {
+        return defaultTileWidthPx;
+    }
+
+    public void setDefaultTileWidthPx(int defaultTileWidthPx) {
+        this.defaultTileWidthPx = defaultTileWidthPx;
+    }
+
+    public int getDefaultTileHeightPx() {
+        return defaultTileHeightPx;
+    }
+
+    public void setDefaultTileHeightPx(int defaultTileHeightPx) {
+        this.defaultTileHeightPx = defaultTileHeightPx;
     }
 
     public String getBackgroundHex() {
@@ -83,5 +101,22 @@ public class FidelitySpec {
     /** Effective tile height for a component, honouring its per-component override. */
     public int tileHeightMm(ComponentSpec component) {
         return component.getTileHeightMm() > 0 ? component.getTileHeightMm() : defaultTileHeightMm;
+    }
+
+    /// Effective tile width in LOGICAL PIXELS for a desktop component.
+    ///
+    /// Desktop tiles are sized in logical pixels rather than millimetres; see
+    /// ComponentSpec.getTileWidthPx for why. The default of 240x56 is a comfortable frame for
+    /// a single control at desktop metrics: WinUI's default button is 32px high, GTK4's about
+    /// 34, AppKit's 21, so 56 leaves room for the tallest of them plus the margin that
+    /// positions it, without so much empty background that the comparison is dominated by
+    /// pixels neither side draws.
+    public int tileWidthPx(ComponentSpec component) {
+        return component.getTileWidthPx() > 0 ? component.getTileWidthPx() : defaultTileWidthPx;
+    }
+
+    /** Effective tile height in logical pixels for a desktop component. */
+    public int tileHeightPx(ComponentSpec component) {
+        return component.getTileHeightPx() > 0 ? component.getTileHeightPx() : defaultTileHeightPx;
     }
 }
