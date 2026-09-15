@@ -802,6 +802,57 @@ class DatabaseUsageScanTest {
     }
 
     @Test
+    void aBudgetRefusalLeavesTheVaultQuestionOpenRatherThanAnsweringNo() throws IOException {
+        // A refused scan read an unknown fraction of the archive. The handler already assumes the
+        // database and its cipher ARE used, on the reasoning that unknown is not absent and being
+        // wrong that way costs a fatter binary -- but the vault cannot be guessed the same way,
+        // because being wrong THAT way links a private CommonCrypto SPI into a binary Apple
+        // scans. So it answers neither, and says so.
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            // Past PERM_SCAN_MAX_ENTRIES, so the scan is refused before it can finish.
+            for (int iter = 0; iter <= Executor.PERM_SCAN_MAX_ENTRIES + 10; iter++) {
+                innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/f" + iter + ".txt"));
+                innerZip.write(new byte[]{1});
+                innerZip.closeEntry();
+            }
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "huge.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "a refused archive is assumed to use the database");
+        assertTrue(usage.usesDatabaseCipher(), "and its cipher");
+        assertFalse(usage.usesVault(),
+                "a refusal must not be reported as a positive vault answer either");
+        assertTrue(usage.isVaultUnknown(),
+                "it must be reported as OPEN, so the builder can ask rather than guess");
+    }
+
+    @Test
+    void aCompleteScanLeavesNothingOpen() throws IOException {
+        // The other direction: an ordinary submission must not set the flag, or the builder would
+        // stop every build asking a question the scan had already answered.
+        writeFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/ui/Form");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.isVaultUnknown(), "a scan that finished answers the question");
+    }
+
+    @Test
     void theVaultPackageDoesNotProveItsOwnUse() throws IOException {
         // The staged tree is the application merged with the framework, so every vault class is
         // in it whether or not anything calls one -- and each carries its own package name in its

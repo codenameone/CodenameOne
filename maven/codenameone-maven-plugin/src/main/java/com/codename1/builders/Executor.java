@@ -743,10 +743,17 @@ public abstract class Executor {
 
         private final boolean vault;
 
+        private final boolean vaultUnknown;
+
         DatabaseUsage(boolean database, boolean cipher, boolean vault) {
+            this(database, cipher, vault, false);
+        }
+
+        DatabaseUsage(boolean database, boolean cipher, boolean vault, boolean vaultUnknown) {
             this.database = database;
             this.cipher = cipher;
             this.vault = vault;
+            this.vaultUnknown = vaultUnknown;
         }
 
         /// The answer from two roots, since a build can stage classes and libraries separately.
@@ -763,7 +770,7 @@ public abstract class Executor {
                 return this;
             }
             return new DatabaseUsage(database || other.database, cipher || other.cipher,
-                    vault || other.vault);
+                    vault || other.vault, vaultUnknown || other.vaultUnknown);
         }
 
         /// Whether anything outside the framework references `com.codename1.db`.
@@ -784,6 +791,23 @@ public abstract class Executor {
         /// yes for every application ever built.
         public boolean usesVault() {
             return vault;
+        }
+
+        /// Whether part of the submission could not be read, so vault use cannot be ruled out.
+        ///
+        /// A budget refusal stops a scan partway, and the code that handles it assumes the
+        /// database and its cipher ARE used -- the comment there says why: a refusal means the
+        /// rest of the archive is unknown rather than absent, and being wrong in that direction
+        /// costs a fatter binary. The vault answer cannot be guessed the same way. Wrong one way
+        /// it ships an application whose vault has no AES-GCM on iOS; wrong the other it links a
+        /// private CommonCrypto SPI into a binary Apple scans, for an application that may never
+        /// have touched the vault.
+        ///
+        /// So neither guess is made here. This reports that the question is open and leaves the
+        /// decision to the builder that has to act on it, which is the only place that knows what
+        /// the developer asked for.
+        public boolean isVaultUnknown() {
+            return vaultUnknown;
         }
     }
 
@@ -903,13 +927,13 @@ public abstract class Executor {
     ///
     /// what the application's own classes reference, never null
     protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
-        boolean[] found = {false, false, false};
+        boolean[] found = {false, false, false, false};
         if (classesDir != null && classesDir.isDirectory()) {
             // One budget for the whole scan, so a hundred small archives cannot
             // add up to what one big one is refused for.
             scanForDatabaseUsage(classesDir, "", found, new PermScanBudget());
         }
-        return new DatabaseUsage(found[0], found[1], found[2]);
+        return new DatabaseUsage(found[0], found[1], found[2], found[3]);
     }
 
     private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found,
@@ -1039,9 +1063,15 @@ public abstract class Executor {
             // minimum SDK), which is the loud, recoverable half of the trade.
             found[0] = true;
             found[1] = true;
+            // NOT found[2]. The same "unknown, not absent" reasoning applies, and the cost of
+            // being wrong does not: charging the vault links a private CommonCrypto SPI into an
+            // iOS binary Apple scans. Recorded as open instead, for the builder to resolve --
+            // see DatabaseUsage.isVaultUnknown.
+            found[3] = true;
             log("WARNING: " + archive + " was refused by the scan budget ("
                     + refused.getMessage() + "); assuming it uses an encrypted database, "
-                    + "because what it contains past that point cannot be known");
+                    + "because what it contains past that point cannot be known. Whether it uses "
+                    + "the vault is left undecided for the same reason");
         } catch (IOException cannotRead) {
             // An archive that cannot be opened says nothing either way, and refusing to build over
             // it would fail every application carrying a jar this cannot parse.

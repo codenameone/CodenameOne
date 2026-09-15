@@ -575,23 +575,32 @@ public final class AndroidSecureStorage extends SecureStorage {
         //
         // Under the same lock as the write and the reset, so a removal cannot be
         // interleaved with a set that recreates the entry it was clearing.
-        // The MARK goes first, and the value only if that succeeded. Since setIfAbsent started
-        // marking the gate, a mark left behind by a removal is a permanent refusal: the next
-        // setIfAbsent finds no value, sees the mark, and reports that somebody else owns an
-        // account nothing is stored under -- forever. forgetDevice() followed by rememberDevice()
-        // could then never establish a device key again without clearing application data.
+        // ONE critical section over both halves, not two. Clearing the mark under the gate lock
+        // and then releasing it before deleting the value left a window in between: a
+        // setIfAbsent in another process could take the freed lock, find no mark and the value
+        // still present, hand that value back as the one now stored -- and then have it deleted
+        // by the removal still in progress here. For a vault device key that means a device wrap
+        // written under a key that no longer exists, and the next remembered unlock fails.
         //
-        // In this order because the other one cannot be recovered from: a cleared mark with the
-        // value still present is read back by the next setIfAbsent and returned, while a removed
-        // value under a surviving mark is the refusal above.
-        if (!clearGate(account)) {
-            return false;
+        // Inside the section the mark goes first and the value only if that succeeded, because
+        // only one of the two orders can be recovered from: a cleared mark with the value still
+        // present is read back by the next setIfAbsent and returned, while a removed value under
+        // a surviving mark refuses that account forever -- forgetDevice() followed by
+        // rememberDevice() could never establish a device key again without clearing application
+        // data.
+        //
+        // What this does NOT close is setIfAbsent's unlocked fast path: a caller that reads a
+        // value just before it is removed is using something that was true when it read it, and
+        // no lock here can change that. What it closes is the LOCKED read seeing a state this
+        // method is halfway through producing.
+        java.io.File gate = gateFile(account);
+        if (gate == null) {
+            // No gate to coordinate through, so setIfAbsent never wrote a mark either.
+            synchronized (PLAIN_KEY_LOCK) {
+                return prefs.edit().remove(account).commit();
+            }
         }
-        boolean removed;
-        synchronized (PLAIN_KEY_LOCK) {
-            removed = prefs.edit().remove(account).commit();
-        }
-        return removed;
+        return removeUnderGate(gate, prefs, account);
     }
 
     /**
@@ -730,21 +739,41 @@ public final class AndroidSecureStorage extends SecureStorage {
         clearEveryGate();
     }
 
-    /// Truncates one account's gate mark, under the lock setIfAbsent takes.
-    ///
-    /// Truncated, never deleted: what excludes a second writer is the lock held ON this file, and
-    /// removing it while another process holds that lock would have the next caller create a
-    /// different file and lock that instead, which is two writers again. Zero length is the same
-    /// file, so the lock still means what it meant.
-    ///
-    /// Answers true when there is nothing to clear, which includes having no context to find the
-    /// directory from -- setIfAbsent could not have written a mark in that case either.
-    private boolean clearGate(String account) {
-        java.io.File gate = gateFile(account);
-        if (gate == null || !gate.isFile()) {
-            return true;
+    /// Clears the mark and deletes the value as one step, under the lock setIfAbsent takes.
+    private boolean removeUnderGate(java.io.File gate, SharedPreferences prefs, String account) {
+        java.io.RandomAccessFile handle = null;
+        java.nio.channels.FileLock lock = null;
+        try {
+            handle = new java.io.RandomAccessFile(gate, "rw");
+            lock = handle.getChannel().lock();
+            handle.setLength(0);
+            handle.getChannel().force(true);
+            synchronized (PLAIN_KEY_LOCK) {
+                return prefs.edit().remove(account).commit();
+            }
+        } catch (java.io.IOException cannotRemove) {
+            Log.e(cannotRemove);
+            return false;
+        } catch (RuntimeException cannotRemove) {
+            // OverlappingFileLockException among them; see truncateUnderLock.
+            Log.e(cannotRemove);
+            return false;
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
         }
-        return truncateUnderLock(gate);
     }
 
     private void clearEveryGate() {
@@ -766,6 +795,12 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
+    /// Truncates one gate mark, under the lock setIfAbsent takes.
+    ///
+    /// Truncated, never deleted: what excludes a second writer is the lock held ON this file, and
+    /// removing it while another process holds that lock would have the next caller create a
+    /// different file and lock that instead, which is two writers again. Zero length is the same
+    /// file, so the lock still means what it meant.
     private boolean truncateUnderLock(java.io.File gate) {
         java.io.RandomAccessFile handle = null;
         java.nio.channels.FileLock lock = null;

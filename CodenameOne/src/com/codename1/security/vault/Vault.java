@@ -205,7 +205,15 @@ public final class Vault {
     public ProtectionReport protection() {
         DeviceProtection device = deviceProtection();
         ProtectionReport.Builder b = ProtectionReport.builder();
-        boolean enrolled = state() != NOT_ENROLLED;
+        // Three states, because there are three. `state() != NOT_ENROLLED` folded STATE_UNKNOWN --
+        // a record that is present and could not be read -- into "enrolled", so an unreadable
+        // vault reported PERSISTENT=YES and, with no device record, ENCRYPTED_AT_REST=YES. Those
+        // were not observed: nothing here has seen what the record says. A caller asking
+        // provides() then acted on protections that may not exist, which is the one thing this
+        // report's three-state contract is for.
+        int stored = state();
+        int enrolled = stored == STATE_UNKNOWN ? ProtectionReport.UNKNOWN
+                : (stored != NOT_ENROLLED ? ProtectionReport.YES : ProtectionReport.NO);
         b.set(Protection.PERSISTENT, enrolled);
         if (deviceRecord() == null) {
             // No stored key, so the only thing at rest is ciphertext under a password-derived key.
@@ -221,8 +229,9 @@ public final class Vault {
             // From the store: a wrapping key kept in the clear beside the ciphertext means the
             // records are encrypted and the protection is not.
             b.set(Protection.ENCRYPTED_AT_REST,
-                    enrolled ? deviceReport.answer(Protection.ENCRYPTED_AT_REST)
-                            : ProtectionReport.NO);
+                    enrolled == ProtectionReport.YES
+                            ? deviceReport.answer(Protection.ENCRYPTED_AT_REST)
+                            : enrolled);
             b.set(Protection.NON_EXTRACTABLE_KEY, deviceReport.answer(Protection.NON_EXTRACTABLE_KEY));
             b.set(Protection.OS_PROTECTED, deviceReport.answer(Protection.OS_PROTECTED));
             b.set(Protection.HARDWARE_BACKED, deviceReport.answer(Protection.HARDWARE_BACKED));
@@ -482,6 +491,13 @@ public final class Vault {
         background(new Runnable() {
             @Override
             public void run() {
+                // Owned here and released in the finally, exactly as unlockRemembered does. This
+                // is the real data key from the moment the wrap opens, and every check after that
+                // point can throw -- requireAuthenticRecord on an edited record, requireProtections
+                // on a requirement the application added since enrolment. The catch cleared only
+                // the password, so the vault stayed shut while the key it had just derived sat in
+                // the heap until collection.
+                byte[] key = null;
                 try {
                     VaultMetadata meta = requireMetadata();
                     if (meta.passwordWrap == null) {
@@ -489,10 +505,9 @@ public final class Vault {
                                 "this vault has no password wrap");
                     }
                     SecureEnvelope envelope = SecureEnvelope.parse(meta.passwordWrap);
-                    byte[] key = envelope.openWithPassword(password,
+                    key = envelope.openWithPassword(password,
                             wrapBinding(meta, PURPOSE_PASSWORD));
                     if (generation != lockGeneration) {
-                        Bytes.zero(key);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while it was being unlocked");
                     }
@@ -514,6 +529,9 @@ public final class Vault {
                     // same check without any such mechanism existing.
                     requireProtections(getPolicy());
                     publishKey(generation, meta, key);
+                    // Ownership transferred: the vault holds this array now, so the finally must
+                    // not wipe it. Load bearing, not a dead store -- see unlockRemembered.
+                    key = null;
                     passwordNeedsRewrap = envelope.getKdf().needsUpgrade();
                     touch();
                     out.complete(Boolean.TRUE);
@@ -528,6 +546,7 @@ public final class Vault {
                     // metadata under a worker that already passed requireUnlocked.
                     out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
+                    Bytes.zero(key);
                     Bytes.zero(password);
                 }
             }
@@ -1418,6 +1437,11 @@ public final class Vault {
             @Override
             public void run() {
                 byte[] derived = null;
+                // Owned and released like unlockWithPassword's, and for the same reason: the
+                // checks after the wrap opens can all throw, and the finally used to release
+                // everything except the key itself. The review named the password path; this one
+                // is the same six lines.
+                byte[] key = null;
                 try {
                     VaultMetadata meta = requireMetadata();
                     if (meta.recoveryWrap == null) {
@@ -1425,10 +1449,9 @@ public final class Vault {
                                 "this vault has no recovery code");
                     }
                     derived = recoveryKey(code);
-                    byte[] key = SecureEnvelope.parse(meta.recoveryWrap).open(derived,
+                    key = SecureEnvelope.parse(meta.recoveryWrap).open(derived,
                             wrapBinding(meta, PURPOSE_RECOVERY));
                     if (generation != lockGeneration) {
-                        Bytes.zero(key);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while it was being unlocked");
                     }
@@ -1438,6 +1461,8 @@ public final class Vault {
                     // happened to configure.
                     requireProtections(getPolicy());
                     publishKey(generation, meta, key);
+                    // Ownership transferred; the finally must not wipe what the vault now holds.
+                    key = null;
                     touch();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -1451,6 +1476,7 @@ public final class Vault {
                     // metadata under a worker that already passed requireUnlocked.
                     out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
+                    Bytes.zero(key);
                     Bytes.zero(derived);
                     Bytes.zero(code);
                 }

@@ -1818,6 +1818,43 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anUnreadableVaultReportsUnknownRatherThanProtected() {
+        // ProtectionReport has three states and this used two: `state() != NOT_ENROLLED` folded
+        // STATE_UNKNOWN -- a record that is present and cannot be read -- into "enrolled", so an
+        // unreadable vault reported PERSISTENT=YES and ENCRYPTED_AT_REST=YES. Neither was
+        // observed; nothing had seen what the record says. A caller asking provides() then acted
+        // on protections that may not exist.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertEquals(ProtectionReport.YES, vault.protection().answer(Protection.PERSISTENT));
+
+        // Corrupt the stored record so it is present and unreadable.
+        String entry = vaultRecordName(name);
+        assertTrue(Storage.getInstance().writeObject(entry, "not a vault record at all"));
+
+        Vault reopened = Vault.named(name).configure(fast());
+        assertEquals(Vault.STATE_UNKNOWN, reopened.state(),
+                "the record is there and cannot be read, which is the case under test");
+        ProtectionReport report = reopened.protection();
+        assertEquals(ProtectionReport.UNKNOWN, report.answer(Protection.PERSISTENT),
+                "nothing has observed whether this vault persists anything");
+        assertEquals(ProtectionReport.UNKNOWN, report.answer(Protection.ENCRYPTED_AT_REST),
+                "nor whether what it holds is encrypted at rest");
+        assertFalse(report.provides(Protection.ENCRYPTED_AT_REST),
+                "and provides() must not answer yes for something unobserved");
+    }
+
+    @Test
+    void aVaultWithNoRecordStillReportsANegativeRatherThanUnknown() {
+        // The other direction, so the fix above is not simply "answer UNKNOWN more often": a
+        // device with no vault on it has genuinely observed that there is nothing here.
+        Vault vault = Vault.named(freshName()).configure(fast());
+        assertEquals(Vault.NOT_ENROLLED, vault.state());
+        assertEquals(ProtectionReport.NO, vault.protection().answer(Protection.PERSISTENT));
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

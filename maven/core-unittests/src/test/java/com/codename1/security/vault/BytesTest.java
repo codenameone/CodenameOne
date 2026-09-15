@@ -123,6 +123,35 @@ class BytesTest extends UITestBase {
                 "Base32.encode returns a String nobody can zero");
     }
 
+    @Test
+    void everyUnlockOwnsItsKeyUntilItIsPublished() {
+        // The data key exists from the moment a wrap opens, and every check after that point can
+        // throw -- an edited record, a requirement added since enrolment. A key held in a local
+        // inside the try is then left to the collector, which is the one thing this package
+        // promises not to do. Whether an array was wiped is not observable from outside, so like
+        // the String checks above this is a check on the shape of the code.
+        String source = readVaultSource();
+        String[] unlocks = {
+            "public AsyncResource<Boolean> unlockWithPassword(final char[] password)",
+            "public AsyncResource<Boolean> unlockRemembered()",
+            "public AsyncResource<Boolean> unlockWithRecoveryCode(final char[] code)",
+        };
+        for (String signature : unlocks) {
+            String body = methodBody(source, signature);
+            String name = signature.substring(signature.indexOf(' ') + 1);
+            assertTrue(body.indexOf("byte[] key = null;") > 0,
+                    name + " must own its key outside the try so a finally can release it");
+            int publish = body.indexOf("publishKey(");
+            assertTrue(publish > 0, name + " must publish through publishKey");
+            assertTrue(body.indexOf("key = null;", publish) > publish,
+                    name + " must release ownership after publishKey, or the finally wipes the "
+                    + "array the vault is now using");
+            int last = body.lastIndexOf("finally");
+            assertTrue(last > 0 && body.indexOf("Bytes.zero(key)", last) > last,
+                    name + " must wipe the key in its finally");
+        }
+    }
+
     private static String readVaultSource() {
         java.io.File f = new java.io.File("../../CodenameOne/src/com/codename1/security/vault/"
                 + "Vault.java");
