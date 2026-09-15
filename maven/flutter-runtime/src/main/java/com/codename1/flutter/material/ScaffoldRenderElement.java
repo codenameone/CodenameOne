@@ -377,11 +377,44 @@ public class ScaffoldRenderElement extends RenderElement {
      * without this its bar would be pushed down by a notch that has already been
      * accounted for.</p>
      */
+    /**
+     * The body, under the ambient theme's body text style.
+     *
+     * <p>A Scaffold IS a Material in Flutter, and a Material is what establishes the
+     * default text style for what it contains. That matters under a NESTED theme: a
+     * {@code Theme} is an inherited widget and wraps nothing, so on its own it changes
+     * what {@code Theme.of} answers while the ambient text style stays as whoever built
+     * it last left it -- the application's.</p>
+     *
+     * <p>Without this a page that installs a theme of its own took its sizes from that
+     * theme and everything else from the application's, because a Text merges its own
+     * style OVER the ambient one and overrides only the fields it sets. Measured on the
+     * typography demo, whose 96sp display role states no height and no family: it
+     * inherited the application's Montserrat at a line height of 1.43 -- a body role's
+     * height on a display role -- and its two wrapped lines sat 141 logical pixels apart
+     * against the reference's 115.</p>
+     */
+    private com.codename1.flutter.Widget underThemeTextStyle(
+            com.codename1.flutter.Widget body) {
+        com.codename1.flutter.TextStyle style = null;
+        try {
+            ThemeData theme = Theme.of(this);
+            style = theme == null || theme.textTheme() == null
+                    ? null : theme.textTheme().bodyMedium();
+        } catch (Throwable ignore) {
+            // A Scaffold outside any theme still has to render its body.
+            style = null;
+        }
+        return style == null ? body
+                : com.codename1.flutter.widgets.DefaultTextStyle.wrap(style, body);
+    }
+
     private com.codename1.flutter.Widget bodyWidget() {
         com.codename1.flutter.Widget body = scaffold().getBody();
         if (body == null) {
             return body;
         }
+        body = underThemeTextStyle(body);
         // Flutter's own rule for the body slot: the top padding goes when there
         // is an app bar to stand in for it, and the BOTTOM padding goes when
         // there is a bottom bar or a footer standing in for that. What is left
