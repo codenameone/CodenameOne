@@ -131,7 +131,9 @@ CLASS_POSITION = re.compile(
     # And an annotation use, which names a type as surely as a declaration
     # does: `@Routes` is not the plural of anything, it is a type that does
     # not exist.
-    r'|@([A-Z][A-Za-z0-9]{4,})\b')
+    r'|@([A-Z][A-Za-z0-9]{4,})\b'
+    # A method reference names its receiver type: Images::createImage.
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*::')
 # What a class extends or implements. Read as a whole clause rather than as an
 # alternative above, because an implements list holds several names and a
 # pattern that matched the first consumed it, leaving the rest unseen.
