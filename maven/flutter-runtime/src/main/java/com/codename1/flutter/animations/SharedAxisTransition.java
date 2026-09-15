@@ -81,18 +81,39 @@ public class SharedAxisTransition extends AnimatedWidget
         return child;
     }
 
+    /// The pattern's three curves: arrive, leave, and the one both scales run on.
+    private static final com.codename1.flutter.animation.Cubic DECELERATE =
+            new com.codename1.flutter.animation.Cubic(0.0, 0.0, 0.2, 1.0);
+    private static final com.codename1.flutter.animation.Cubic ACCELERATE =
+            new com.codename1.flutter.animation.Cubic(0.4, 0.0, 1.0, 1.0);
+    private static final com.codename1.flutter.animation.Cubic STANDARD =
+            new com.codename1.flutter.animation.Cubic(0.4, 0.0, 0.2, 1.0);
+
     @Override
     public Widget build(BuildContext context) {
         double in = value(animation, 1);
         double out = value(secondaryAnimation, 0);
 
-        double opacity = FadeScaleTransition.interval(in, 0.3, 1.0)
-                * (1 - FadeScaleTransition.interval(out, 0.0, 0.3));
+        // Every leg is EASED, and on three different curves: the incoming content
+        // decelerates in, the outgoing accelerates out, and both scales run on the
+        // standard curve. Running them linearly -- which this did -- is most of what
+        // makes a shared axis read as a cut with a dissolve bolted on rather than as one
+        // surface handing over to another.
+        double opacity = DECELERATE.transform(
+                        FadeScaleTransition.interval(in, 0.3, 1.0))
+                * (1 - ACCELERATE.transform(
+                        FadeScaleTransition.interval(out, 0.0, 0.3)));
 
         Opacity layer = new Opacity();
         layer.opacity(opacity);
         if (transitionType == SharedAxisTransitionType.scaled) {
-            double scale = 0.80 + 0.20 * in;
+            // The child on its way OUT keeps growing, to 110%; only the one arriving
+            // comes up from 80%. Ours held the outgoing child at 100% for the whole
+            // run, so the surface being replaced simply faded where it should have
+            // continued through the screen.
+            double scale = out > 0
+                    ? 1.00 + 0.10 * STANDARD.transform(out)
+                    : 0.80 + 0.20 * STANDARD.transform(in);
             layer.child(Transform.scale(null, Double.valueOf(scale), null, null, null, null,
                     null, null, child));
             return layer;
