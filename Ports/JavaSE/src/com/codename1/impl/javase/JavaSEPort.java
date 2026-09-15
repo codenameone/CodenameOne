@@ -230,6 +230,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static Set<String> availableFontNamesLowercase;
     private static final String PREF_AUTO_UPDATE_DEFAULT_BUNDLE = "cn1.autoDefaultResourceBundle";
     public final static boolean IS_MAC;
+    /// True when the desktop JVM is running on Linux.
+    ///
+    /// There was no such flag, and getPlatformName() answered "win" for anything that was
+    /// not a Mac -- so a Codename One desktop app on Linux reported itself as Windows. That
+    /// was invisible while no desktop theme existed, and is not once one does: the theme
+    /// resolver, the platform- resource layer and Resources.openLayered all key off that
+    /// name, so a Linux user would have been handed the Fluent theme and any platform-win-
+    /// resource override.
+    public final static boolean IS_LINUX;
     private static boolean isIOS;
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
@@ -763,13 +772,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             IS_MAC = false;
         }
+        IS_LINUX = n != null && n.startsWith("Linux");
         isWindows = File.separatorChar == '\\';        
         if (System.getProperty("apple.laf.useScreenMenuBar") == null) {
             System.setProperty("apple.laf.useScreenMenuBar", "true");
         }
         
-        if(isWindows) {
-            fontFaceSystem = "ArialUnicodeMS";
+        // The platform UI font, not Arial. A desktop native theme asks for
+        // "native:MainRegular" and gets whatever this names, so leaving it at Arial meant
+        // every desktop theme was measured in a face the platform does not use: Windows 11
+        // draws its controls in Segoe UI Variable, GNOME in Cantarell or Adwaita Sans, macOS
+        // in SF Pro. Text metrics are most of a fidelity score, so this is not cosmetic.
+        if (isWindows) {
+            fontFaceSystem = "Segoe UI Variable Text";
+        } else if (IS_MAC) {
+            fontFaceSystem = "SF Pro Text";
+        } else if (IS_LINUX) {
+            fontFaceSystem = "Cantarell";
         } else {
             fontFaceSystem = "Arial";
         }
@@ -3121,6 +3140,56 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             // Default for an Android skin is Material 3.
             return "AndroidMaterialTheme";
+        }
+        return resolveDesktopNativeTheme(platformName);
+    }
+
+    /// Resolves the desktop native theme for a host platform name.
+    ///
+    /// Returns null when the developer has asked for no framework theme, which leaves the
+    /// existing behaviour exactly as it was. That default is deliberate and matches how the
+    /// modern mobile themes shipped: a desktop application written before these themes
+    /// existed keeps the look it was built and tested against until it opts in, because
+    /// flipping it silently would move every screen of every shipping desktop app.
+    ///
+    /// `auto` and `native` mean "whatever this machine is", which is the only sensible
+    /// reading of a native theme on desktop, where one binary runs on all three. The
+    /// platform names are the ones getPlatformName answers with: "win", "mac", "linux".
+    private static String resolveDesktopNativeTheme(String platformName) {
+        if (platformName == null) {
+            return null;
+        }
+        String mode = buildHint("desktop.themeMode");
+        if (mode == null) {
+            mode = sharedNativeThemeHint();
+        }
+        if (mode == null || "legacy".equalsIgnoreCase(mode)) {
+            // What a desktop app has always had. Not a recommendation, just continuity.
+            return null;
+        }
+        if ("custom".equalsIgnoreCase(mode)) {
+            return null;
+        }
+        if ("fluent".equalsIgnoreCase(mode)) {
+            return "WindowsFluentTheme";
+        }
+        if ("aqua".equalsIgnoreCase(mode)) {
+            return "MacOSAquaTheme";
+        }
+        if ("adwaita".equalsIgnoreCase(mode)) {
+            return "GnomeAdwaitaTheme";
+        }
+        if ("auto".equalsIgnoreCase(mode) || "native".equalsIgnoreCase(mode)
+                || "modern".equalsIgnoreCase(mode)) {
+            if ("mac".equals(platformName)) {
+                return "MacOSAquaTheme";
+            }
+            if ("linux".equals(platformName)) {
+                return "GnomeAdwaitaTheme";
+            }
+            if ("win".equals(platformName)) {
+                return "WindowsFluentTheme";
+            }
         }
         return null;
     }
@@ -8542,6 +8611,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             {"AndroidMaterialTheme", "Android Material"},
             {"android_holo_light", "Android Holo Light"},
             {"androidTheme", "Android Legacy"},
+            {"WindowsFluentTheme", "Windows 11 Fluent"},
+            {"MacOSAquaTheme", "macOS Aqua"},
+            {"GnomeAdwaitaTheme", "GNOME Adwaita"},
             {"embedded", "Use skin's embedded theme"}
         };
         String current = Preferences.userNodeForPackage(JavaSEPort.class)
@@ -10847,10 +10919,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             frame.setSize(new Dimension(300, 400));
             m = panel;
             window = frame;
+            // The desktop pseudo-skin. This used to be a straight choice between the
+            // UWP-era winTheme stub and iOS 7 -- neither of which is what a desktop looks
+            // like on any platform, and the iOS 7 branch is why a Codename One desktop app
+            // has always previewed as a flat iPhone.
+            //
+            // Now it asks the same resolver the generated desktop app does, so the simulator
+            // previews what the app will actually ship with. The uwpDesktopSkin preference
+            // still forces the old stub for anyone relying on it, and a developer who has
+            // opted into nothing still gets iOS 7, unchanged.
             if (pref.getBoolean("uwpDesktopSkin", false)) {
                 setNativeTheme("/winTheme.res");
             } else {
-                setNativeTheme("/iOS7Theme.res");
+                String desktopTheme = resolveDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"));
+                setNativeTheme(desktopTheme != null ? "/" + desktopTheme + ".res" : "/iOS7Theme.res");
             }
         }
         setInvokePointerHover(desktopSkin || invokePointerHover);
@@ -16978,6 +17060,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(getSkin() == null) {
             if(IS_MAC) {
                 return "mac";
+            }
+            if(IS_LINUX) {
+                return "linux";
             }
             return "win";
         }

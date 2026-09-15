@@ -366,6 +366,17 @@ ProgressBar {
     margin: 0.8mm;
 }
 
+/* The FILLED portion. Without this UIID the fill falls back to UIManager's blank default,
+   which paints the completed part of the bar white -- the track styled and the progress
+   not. Slider has the same split (SliderFull), and it is easy to declare one and forget
+   the other. */
+ProgressBarFull {
+    background-color: #3584e4;
+    color: #3584e4;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
 /* --- Header bar ------------------------------------------------------------------------ */
 /*
  * AdwHeaderBar is the window's title bar, not a strip below it. It carries a 1px bottom
@@ -509,6 +520,7 @@ ListRendererFocus {
     Slider { background-color: #454545; }
     SliderFull { background-color: #3584e4; color: #3584e4; }
     ProgressBar { background-color: #454545; }
+    ProgressBarFull { background-color: #3584e4; color: #3584e4; }
 
     TitleArea { background-color: #303030; border-bottom: 0.26mm solid #1b1b1b; }
     Title { color: #ffffff; }
