@@ -95,6 +95,7 @@ public partial class App : Application
     private FrameworkElement _probeControl;
     private Grid _tileHost;
     private bool _animationsDisabled;
+    private byte[] _lastWrittenTile;
     private Windows.Foundation.Rect _probeBounds;
     private bool _isProbe;
 
@@ -415,10 +416,21 @@ public partial class App : Application
     /// protocol in goldens/README.md is that nondeterminism is fixed in the app or by
     /// pinning an environment knob, never with a tolerance file, and this is the knob.
     private const uint SPI_SETCLIENTAREAANIMATION = 0x1043;
-    private const uint SPIF_SENDCHANGE = 0x02;
+    // SPIF_SENDCHANGE is already declared below, beside the foreground-lock call that
+    // also uses it.
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SystemParametersInfo(uint action, uint param, ref bool value, uint winIni);
+
+    /// Renders a window's own content into a DC, independent of what is on screen.
+    ///
+    /// PW_RENDERFULLCONTENT (2) is the flag that makes it work for a DirectComposition
+    /// surface, which is what WinUI 3 draws into; without it the call returns an empty
+    /// bitmap for exactly this kind of app.
+    [DllImport("user32.dll")]
+    private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint flags);
+
+    private const uint PW_RENDERFULLCONTENT = 0x00000002;
 
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
@@ -567,7 +579,7 @@ public partial class App : Application
                     await WaitForFramesAsync(3);
                     await OnUiAsync(() => ApplyState(widget, state, spec.Kind, name));
                     await WaitForFramesAsync(5);
-                    await CaptureTileAsync(name);
+                    await CaptureSettledTileAsync(name);
                 }
             }
         }
@@ -695,50 +707,134 @@ public partial class App : Application
         await OnUiAsync(() => { CompositionTarget.Rendering -= onFrame; return true; });
     }
 
+    /// Captures a tile only once two consecutive captures agree, so the frame written is
+    /// provably settled rather than assumed to be.
+    ///
+    /// Turning system animations off was not enough, and the measurement is why this exists
+    /// rather than a longer sleep. SPI_SETCLIENTAREAANIMATION governs theme TRANSITIONS;
+    /// the check-box check, the switch knob, the slider thumb and the progress bar animate
+    /// through storyboards in their own control templates, which it does not reach. Two runs
+    /// of the same commit still differed on exactly those eight tiles -- by 1 to 58 pixels
+    /// out of 13440, the moving edge of each one.
+    ///
+    /// A fixed delay would be a guess at how long each storyboard takes, wrong on a loaded
+    /// runner, and silently wrong in the direction that looks fine. Comparing consecutive
+    /// captures asks the question directly and answers it per tile, and a tile that never
+    /// settles is a blocker rather than a coin flip written into a golden set.
+    private async Task CaptureSettledTileAsync(string name)
+    {
+        const int MaxAttempts = 8;
+        // Before the FIRST grab, not only between grabs. Splitting the old capture into
+        // grab-and-compare dropped this delay, and two fast grabs then both landed before
+        // the new tile had been composited -- which the loop accepted, because an unpainted
+        // window is trivially stable. It wrote #E0E0E0 for both appearances and the
+        // backdrop assertion caught it, which is the whole reason that assertion exists.
+        await Task.Delay(120);
+        byte[] previous = null;
+        for (int attempt = 0; attempt < MaxAttempts; attempt++)
+        {
+            byte[] current = GrabClientArea(name);
+            if (current is null)
+            {
+                return;
+            }
+            if (previous != null && previous.AsSpan().SequenceEqual(current))
+            {
+                if (_lastWrittenTile != null && _lastWrittenTile.AsSpan().SequenceEqual(current))
+                {
+                    // Stable AND identical to the tile before it: the window is showing the
+                    // previous tile, not this one. Two different widgets cannot render the
+                    // same bytes, so this is a swap that has not landed rather than a
+                    // coincidence, and waiting is the right response.
+                    previous = null;
+                    await Task.Delay(200);
+                    continue;
+                }
+                WriteTile(name, current);
+                _lastWrittenTile = current;
+                return;
+            }
+            previous = current;
+            await Task.Delay(120);
+        }
+        _blockers.Add($"{name}: never produced two identical consecutive captures in "
+            + $"{MaxAttempts} attempts, so whatever is still moving would be frozen at a "
+            + "random point in a golden set");
+    }
+
     /// BitBlts the client area, which is held at exactly one tile, and writes it.
-    private async Task CaptureTileAsync(string name)
+    /// One BitBlt of the client area, returned as raw pixels. No file is written: the
+    /// caller compares consecutive grabs and only writes when they agree.
+    private byte[] GrabClientArea(string name)
     {
         DwmFlush();
-        await Task.Delay(60);
         GetClientRect(_hwnd, out RECT clientRect);
-        var origin = new POINT { X = 0, Y = 0 };
-        ClientToScreen(_hwnd, ref origin);
         int w = clientRect.Right - clientRect.Left;
         int h = clientRect.Bottom - clientRect.Top;
         if (w <= 0 || h <= 0)
         {
             _blockers.Add($"{name}: the client area has no size ({w}x{h})");
-            return;
+            return null;
         }
+        // PrintWindow, NOT a screen BitBlt, and this is the difference between a
+        // reproducible set and a flaky one.
+        //
+        // A screen grab reads whatever is in front of those coordinates. The probe already
+        // reports that this window cannot take the foreground on a hosted runner -- the
+        // shell's own Search window holds it -- so the grab depends on nothing wandering
+        // over the region in the moment it runs. Two runs of the same commit differed on
+        // every tile, and one whole run came back #E0E0E0 in both appearances: not the
+        // window at all.
+        //
+        // PrintWindow renders the window's OWN content and does not care what is on top or
+        // whether it is foreground. It cannot see the Mica backdrop, which is drawn behind
+        // the window by the compositor -- but the tile paints an opaque
+        // SolidBackgroundFillColorBase over that region anyway, so the matrix never needed
+        // it. The probe capture still uses the screen BitBlt, because Mica is precisely
+        // what it is there to answer.
+        // PrintWindow renders the WHOLE window, title bar included, from the window's own
+        // origin -- so the bitmap has to be window sized and the client area cropped out of
+        // it afterwards. Rendering into a client-sized bitmap would have captured the title
+        // bar and called it a widget.
+        if (!GetWindowRect(_hwnd, out RECT wr))
+        {
+            _blockers.Add($"{name}: GetWindowRect failed");
+            return null;
+        }
+        int ww = wr.Right - wr.Left, wh = wr.Bottom - wr.Top;
+        var clientOrigin = new POINT { X = 0, Y = 0 };
+        ClientToScreen(_hwnd, ref clientOrigin);
+        int offX = clientOrigin.X - wr.Left, offY = clientOrigin.Y - wr.Top;
+
         IntPtr screen = GetDC(IntPtr.Zero);
         IntPtr mem = CreateCompatibleDC(screen);
-        IntPtr bmp = CreateCompatibleBitmap(screen, w, h);
+        IntPtr bmp = CreateCompatibleBitmap(screen, ww, wh);
         IntPtr old = SelectObject(mem, bmp);
-        bool ok = BitBlt(mem, 0, 0, w, h, screen, origin.X, origin.Y, SRCCOPY | CAPTUREBLT);
+        bool ok = PrintWindow(_hwnd, mem, PW_RENDERFULLCONTENT);
         SelectObject(mem, old);
         try
         {
             if (!ok)
             {
-                _blockers.Add($"{name}: BitBlt of the client area failed");
-                return;
+                _blockers.Add($"{name}: PrintWindow of the client area failed");
+                return null;
             }
-            using var image = System.Drawing.Image.FromHbitmap(bmp);
+            using var whole = System.Drawing.Image.FromHbitmap(bmp);
+            if (offX < 0 || offY < 0 || offX + w > whole.Width || offY + h > whole.Height)
+            {
+                _blockers.Add($"{name}: the client area ({offX},{offY} {w}x{h}) does not lie "
+                    + $"inside the window bitmap ({whole.Width}x{whole.Height})");
+                return null;
+            }
+            using var image = whole.Clone(new System.Drawing.Rectangle(offX, offY, w, h), whole.PixelFormat);
             if (IsUniform(image, 0, 0, image.Width, image.Height))
             {
                 _blockers.Add($"{name}: captured a uniform image, so nothing was composited");
-                return;
+                return null;
             }
-            var path = Path.Combine(_outDir, name + ".png");
-            image.Save(path, System.Drawing.Imaging.ImageFormat.Png);
-            _tilesWritten++;
-            Console.WriteLine($"NATIVEREF:wrote {name} {w}x{h}");
-            NoteIfIdenticalToNormal(name, path);
-            // Bottom-right corner: every widget in the matrix anchors top-left and none is
-            // as tall as the tile, so this pixel is always backdrop.
-            var corner = image.GetPixel(image.Width - 1, image.Height - 1);
-            var appearanceKey = name.Substring(name.LastIndexOf('_') + 1);
-            _backdropByAppearance[appearanceKey] = $"#{corner.R:X2}{corner.G:X2}{corner.B:X2}";
+            using var ms = new MemoryStream();
+            image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            return ms.ToArray();
         }
         finally
         {
@@ -746,6 +842,23 @@ public partial class App : Application
             DeleteDC(mem);
             ReleaseDC(IntPtr.Zero, screen);
         }
+    }
+
+    /// Writes a settled grab and records the two things the manifest reports about it.
+    private void WriteTile(string name, byte[] png)
+    {
+        var path = Path.Combine(_outDir, name + ".png");
+        File.WriteAllBytes(path, png);
+        _tilesWritten++;
+        using var ms = new MemoryStream(png);
+        using var image = new System.Drawing.Bitmap(ms);
+        Console.WriteLine($"NATIVEREF:wrote {name} {image.Width}x{image.Height}");
+        NoteIfIdenticalToNormal(name, path);
+        // Bottom-right corner: every widget in the matrix anchors top-left and none is
+        // as tall as the tile, so this pixel is always backdrop.
+        var corner = image.GetPixel(image.Width - 1, image.Height - 1);
+        var appearanceKey = name.Substring(name.LastIndexOf('_') + 1);
+        _backdropByAppearance[appearanceKey] = $"#{corner.R:X2}{corner.G:X2}{corner.B:X2}";
     }
 
     /// Grabs what DWM actually put on the screen, which is the only way the Mica backdrop

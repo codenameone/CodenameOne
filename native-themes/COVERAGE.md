@@ -151,8 +151,20 @@ SwitchMorph (droplet stretch/squash).
 
 ## Desktop: Windows Fluent, macOS Aqua, GNOME Adwaita
 
-The three desktop themes share one matrix, so they share one table. Scores are
-absent because the golden sets are not captured yet -- see below.
+The three desktop themes share one matrix, so they share one table.
+
+First measured scores, against golden sets captured on hosted runners:
+
+| Theme | Golden set | Pairs | Mean | Range |
+|---|---|---:|---:|---|
+| Windows Fluent | `windows-11-fluent` | 60 | 80.8% | 60.7 - 93.5 |
+| GNOME Adwaita | `gnome-adwaita` | 60 | 84.7% | 60.5 - 95.4 |
+| macOS Aqua | not captured yet | - | - | - |
+
+These are starting points, not results. All three themes were written without a
+reference to check them against, so this is the first time any of them has been
+measured; the ratchet moves them up from here and cannot move them down. The
+progress bar and the text field are the weakest rows on both platforms.
 
 ### Covered components
 
@@ -190,15 +202,19 @@ GNOME can be made fully honest, Cantarell being redistributable and pinnable.
 Where a face cannot be matched the residual is named rather than dismissed as
 anti-aliasing.
 
-### Golden sets are not captured yet
+### Golden sets
 
-`scripts/fidelity-app/goldens/{windows-11-fluent,macos-aqua,gnome-adwaita}` are
-empty. Until they are seeded, `scripts/run-desktop-fidelity-tests.sh` exits 24
-and `scripts-fidelity-desktop.yml` stays dispatch-only rather than becoming a
-pull-request gate -- a workflow that is permanently red teaches people to ignore
-it, and one that passes on an unseeded set is a check satisfied by nothing having
-happened. Capture them with the `fidelity-desktop-native-ref` workflow in capture
-mode, review every frame, and commit them in one commit naming the run.
+Windows and GNOME are captured, reviewed, baselined and gating on pull requests.
+macOS is not: the capture app is verified end to end and the set is one dispatch
+away, but the hosted macOS runner queue did not yield a slot. Until it does, the
+macOS leg is excluded from the automatic trigger rather than allowed to run
+against an empty directory -- `scripts/run-desktop-fidelity-tests.sh macos` exits
+24 and says what to dispatch.
+
+Seeding it is what promotes it: drop `macos` out of the job's `if` in the same
+commit that adds the goldens. The protocol is in
+`scripts/fidelity-app/goldens/README.md`, including the measured reproducibility
+residual on the Windows set.
 
 Note the capture is 1x, unlike the mobile sets. Desktop tiles are specified in
 LOGICAL pixels and the CN1 side renders at 1x, so a 2x native tile would be

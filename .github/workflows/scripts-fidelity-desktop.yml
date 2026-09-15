@@ -13,26 +13,19 @@ name: Desktop theme fidelity
 # Each theme is scored on ITS OWN runner. A Fluent theme measured on a Mac would be measured
 # in the wrong system font, and text metrics are most of a fidelity score.
 #
-# DISPATCH ONLY, and that is deliberate rather than an oversight. The golden sets are not
-# seeded: scripts/fidelity-app/goldens/{windows-11-fluent,macos-aqua,gnome-adwaita} stay empty
-# until someone dispatches fidelity-desktop-native-ref.yml in capture mode, reviews the frames
-# and commits them. Until then every run exits 24, "no native references" -- the correct
-# answer, and a useless gate. An automatic trigger now would mean one of two bad things: a
-# workflow that is permanently red, which teaches people to ignore it, or an unseeded run
-# reported as a pass, which is a check satisfied by nothing having happened.
+# A PULL-REQUEST GATE for the two platforms whose goldens are committed, and dispatch only
+# for the one whose are not. That split is the point: a leg with no golden set exits 24 on
+# every run, and wiring it to a trigger would mean either a permanently red workflow, which
+# teaches people to ignore it, or an unseeded run reported as a pass, which is a check
+# satisfied by nothing having happened.
 #
-# So the triggers arrive WITH the goldens, in the same commit. That commit adds:
+#   windows-11-fluent  seeded from run 34998745240, baselined, gating
+#   gnome-adwaita      seeded from run 34990802562, baselined, gating
+#   macos-aqua         NOT SEEDED -- the macOS runner queue has not yielded a slot; the
+#                      capture app is verified and the set is one dispatch away
 #
-#   pull_request:
-#     paths: [ 'native-themes/windows-fluent/**', 'native-themes/macos-aqua/**',
-#              'native-themes/gnome-adwaita/**', 'scripts/fidelity-app/**',
-#              'scripts/run-desktop-fidelity-tests.sh', 'scripts/common/java/**' ]
-#   push:
-#     branches: [master]
-#     paths: [ ...the same... ]
-#
-# Everything below that line is already written against a seeded set, so seeding is the only
-# work left. Dispatch it by hand meanwhile -- it scores whatever is committed.
+# Seeding macos-aqua is what promotes it: drop the platform out of the `if` below in the
+# same commit that adds the goldens, and it gates like the other two.
 
 'on':
   workflow_dispatch:
@@ -42,7 +35,42 @@ name: Desktop theme fidelity
         type: choice
         default: all
         options: [all, windows, macos, gnome]
-
+  # The two path lists are written out twice rather than shared with a YAML anchor.
+  # The anchor is valid YAML and GitHub Actions does not support it: the workflow
+  # parses locally, and every run fails with "a workflow file issue" and no log.
+  pull_request:
+    paths:
+      - '.github/workflows/scripts-fidelity-desktop.yml'
+      - 'scripts/run-desktop-fidelity-tests.sh'
+      - 'scripts/fidelity-app/common/**'
+      - 'scripts/fidelity-app/desktop-runner/**'
+      - 'scripts/fidelity-app/goldens/**'
+      - 'scripts/fidelity-app/baseline/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'native-themes/windows-fluent/**'
+      - 'native-themes/gnome-adwaita/**'
+      - 'native-themes/macos-aqua/**'
+      - 'Themes/WindowsFluentTheme.res'
+      - 'Themes/GnomeAdwaitaTheme.res'
+      - 'Themes/MacOSAquaTheme.res'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/scripts-fidelity-desktop.yml'
+      - 'scripts/run-desktop-fidelity-tests.sh'
+      - 'scripts/fidelity-app/common/**'
+      - 'scripts/fidelity-app/desktop-runner/**'
+      - 'scripts/fidelity-app/goldens/**'
+      - 'scripts/fidelity-app/baseline/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'native-themes/windows-fluent/**'
+      - 'native-themes/gnome-adwaita/**'
+      - 'native-themes/macos-aqua/**'
+      - 'Themes/WindowsFluentTheme.res'
+      - 'Themes/GnomeAdwaitaTheme.res'
+      - 'Themes/MacOSAquaTheme.res'
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -51,23 +79,56 @@ permissions:
   contents: read
 
 jobs:
+  # Which legs run is decided HERE and emitted as the matrix, rather than with an `if` on
+  # the scoring job. A job-level `if` cannot see the matrix context -- GitHub rejects the
+  # whole file with "Unrecognized named-value: 'matrix'", and the only symptom is a run
+  # that fails instantly with "this run likely failed because of a workflow file issue"
+  # and no log at all. Building the matrix in a prior job keeps the decision in one place
+  # and costs one ubuntu minute.
+  select:
+    name: select legs
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - id: pick
+        shell: bash
+        env:
+          # On a dispatch, whatever was asked for. On a trigger, only the platforms whose
+          # golden sets are committed -- macos is absent until its set lands.
+          TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.targets || 'gated' }}
+        run: |
+          set -eo pipefail
+          case "$TARGETS" in
+            gated)   legs='gnome windows' ;;
+            all)     legs='gnome windows macos' ;;
+            gnome|windows|macos) legs="$TARGETS" ;;
+            *) echo "unknown targets '$TARGETS'" >&2; exit 2 ;;
+          esac
+          entries=''
+          for leg in $legs; do
+            case "$leg" in
+              gnome)   runner=ubuntu-latest ;;
+              windows) runner=windows-latest ;;
+              macos)   runner=macos-15 ;;
+            esac
+            entries="$entries{\"platform\":\"$leg\",\"runner\":\"$runner\"},"
+          done
+          matrix="{\"include\":[${entries%,}]}"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "any=$([ -n "$entries" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "legs: $legs"
+
   fidelity-desktop:
     name: ${{ matrix.platform }}
-    if: >-
-      github.event.inputs.targets == 'all'
-      || github.event.inputs.targets == matrix.platform
+    needs: select
+    if: needs.select.outputs.any == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: gnome
-            runner: ubuntu-latest
-          - platform: windows
-            runner: windows-latest
-          - platform: macos
-            runner: macos-15
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     env:
       CN1SS_FIDELITY_EPSILON: '2.0'
     steps:
@@ -87,25 +148,42 @@ jobs:
           distribution: temurin
           java-version: '8'
 
-      - name: Build the core, the simulator and the fidelity app
-        shell: bash
-        run: |
-          set -eo pipefail
-          cd maven
-          mvn -B -q -DskipTests -pl core install
-          mvn -B -q -DskipTests -Plocal-dev-javase -pl javase install
-          # codenameone-maven-plugin is what the fidelity app's own build runs, and
-          # nothing above installs it, so the app build cannot resolve it on a clean
-          # runner. -am brings javase with it, which needs the same profile.
-          mvn -B -q -DskipTests -Plocal-dev-javase -pl codenameone-maven-plugin -am install
-          cd ../scripts/fidelity-app
-          ./mvnw -B -q -pl common,desktop-runner -DskipTests install
-
-      # The simulator needs a display; the hosted Windows and macOS images have a
-      # session, Linux does not.
+      # Needed by the BUILD as well as by the run. The fidelity app is a Codename One
+      # application, so its build runs the cn1 css goal, which rasterizes through CEF and
+      # needs a display -- it fails with "An error occurred while compiling the CSS files"
+      # on a bare runner. Installed before the build for that reason, not only before the
+      # simulator starts.
       - name: Install xvfb
         if: matrix.platform == 'gnome'
         run: bash scripts/ci/apt-get-install.sh xvfb
+
+      - name: Build the core, the simulator and the fidelity app
+        shell: bash
+        env:
+          JDK21: ${{ steps.jdk21.outputs.path }}
+        run: |
+          set -eo pipefail
+          cd maven
+          # ONE invocation with -am, not module builds in sequence. `-pl core` on its own
+          # cannot resolve codenameone-factory, which is a sibling module rather than a
+          # published artifact, so the first real run failed there before anything else
+          # ran. -am builds each module's dependencies, which pulls in factory and
+          # cn1-binaries.
+          #
+          # codenameone-maven-plugin is in the list because the fidelity app's own build
+          # runs it, and nothing else installs it on a clean runner.
+          mvn -B -q -DskipTests -Plocal-dev-javase \
+              -pl javase,codenameone-maven-plugin -am install
+
+          # The fidelity app targets 17 and JAVA_HOME is still the JDK 8 the framework
+          # needs, so this half runs on the 21 installed first ("invalid target release:
+          # 17" otherwise). Two JDKs in one job is the reason both setup-java steps exist.
+          cd ../scripts/fidelity-app
+          XVFB=()
+          if [ "$(uname -s)" = "Linux" ]; then
+            XVFB=(xvfb-run -a)
+          fi
+          JAVA_HOME="$JDK21" "${XVFB[@]}" ./mvnw -B -q -pl common,desktop-runner -DskipTests install
 
       - name: Score the theme against the native reference
         shell: bash

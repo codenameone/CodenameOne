@@ -153,6 +153,19 @@ fi
 export CN1SS_FIDELITY_SPEC="$SPEC_FILE"
 export CN1SS_FIDELITY_PLATFORM="$PLATFORM"
 
+# Without this the ratchet is not a gate. cn1ss_process_fidelity runs FidelityGate either
+# way, but only TURNS a gate failure into a non-zero return when CN1SS_FAIL_ON_MISMATCH=1
+# -- otherwise it logs "reported regressions ... not failing" and returns success.
+#
+# Measured before it was set: raising one baseline entry by five points produced the
+# correct "[gate] FAIL: 1 fidelity regression(s)" on stdout and an exit status of 0. A
+# workflow would have gone green on a regression it had just printed.
+#
+# Defaulted rather than forced, so a local exploratory run can still see every score
+# without the run aborting, which is what the other suites do too (run-tv-ui-tests.sh,
+# run-watch-ui-tests.sh).
+export CN1SS_FAIL_ON_MISMATCH="${CN1SS_FAIL_ON_MISMATCH:-1}"
+
 # One --actual entry per TILE, "<test name>=<png>". The comparator takes files, not
 # a directory, and handing it a directory is not a usage error it reports -- it is
 # an entry whose path does not exist, so the run dies inside the helper with nothing
@@ -171,6 +184,10 @@ if [ "${#COMPARE_ENTRIES[@]}" -eq 0 ]; then
 fi
 rf_log "Scoring ${#COMPARE_ENTRIES[@]} tile(s) against $GOLDEN_SET"
 
+# set -e does not apply to the last command of a script in the way that matters here:
+# the status has to be captured and re-raised deliberately, so a gate failure leaves this
+# script with a non-zero status rather than whatever the last log line returned.
+rc=0
 cn1ss_process_fidelity \
   "Desktop fidelity ($PLATFORM, $GOLDEN_SET)" \
   "$WORK_DIR/compare.json" \
@@ -180,4 +197,8 @@ cn1ss_process_fidelity \
   "$PREVIEW_DIR" \
   "$ARTIFACTS_DIR" \
   "$BASELINE_FILE" \
-  "${COMPARE_ENTRIES[@]}"
+  "${COMPARE_ENTRIES[@]}" || rc=$?
+if [ "$rc" -ne 0 ]; then
+  rf_log "FAILED: the fidelity gate reported a regression (rc=$rc)."
+  exit "$rc"
+fi
