@@ -150,6 +150,8 @@ jobs:
 
       - name: Build the core, the simulator and the fidelity app
         shell: bash
+        env:
+          JDK21: ${{ steps.jdk21.outputs.path }}
         run: |
           set -eo pipefail
           cd maven
@@ -163,8 +165,12 @@ jobs:
           # runs it, and nothing else installs it on a clean runner.
           mvn -B -q -DskipTests -Plocal-dev-javase \
               -pl javase,codenameone-maven-plugin -am install
+
+          # The fidelity app targets 17 and JAVA_HOME is still the JDK 8 the framework
+          # needs, so this half runs on the 21 installed first ("invalid target release:
+          # 17" otherwise). Two JDKs in one job is the reason both setup-java steps exist.
           cd ../scripts/fidelity-app
-          ./mvnw -B -q -pl common,desktop-runner -DskipTests install
+          JAVA_HOME="$JDK21" ./mvnw -B -q -pl common,desktop-runner -DskipTests install
 
       # The simulator needs a display; the hosted Windows and macOS images have a
       # session, Linux does not.
