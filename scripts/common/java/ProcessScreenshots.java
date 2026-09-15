@@ -195,6 +195,9 @@ public class ProcessScreenshots {
         // over a declared solid/gradient/photo backdrop are masked against that
         // backdrop, so their widget bbox is real instead of the full tile.
         Map<String, String[]> specByComponent = loadSpecInfo(specPath, referenceDir, specPlatform);
+        // Per-directory cache of the backdrop colour each appearance's tiles were
+        // painted on. See resolveTileBackground().
+        Map<Path, Map<String, Integer>> tileBackgrounds = new java.util.HashMap<>();
         java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
@@ -262,7 +265,8 @@ public class ProcessScreenshots {
                         // background colour is known from the appearance (the tile
                         // backdrop we render), so a near-white CN1 fill still counts
                         // as widget content rather than being mistaken for blank bg.
-                        int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
+                        int bg = resolveTileBackground(tileBackgrounds, cn1Path, testName);
+                        details.put("tile_bg", String.format("#%06X", bg));
                         double[] sf;
                         boolean glass = false;
                         String[] specInfo = resolveSpecInfo(specByComponent, testName);
@@ -594,7 +598,22 @@ public class ProcessScreenshots {
             }
             return null;
         }
-        boolean android = platform != null && platform.startsWith("and");
+        // Whether this platform has the translucent-material model the glass masking
+        // implements. Only iOS does. This used to ask "is it Android?" and give the
+        // iOS treatment to everything else, which was correct while iOS and Android
+        // were the only two platforms and became wrong the moment a desktop platform
+        // name could reach here: a desktop row declaring material: glass would be
+        // masked against the iOS photo backdrop, which is not the surface behind it.
+        // Fluent's Mica and Aqua's vibrancy are declared out of scope in
+        // native-themes/COVERAGE.md, so the right answer for desktop today is the
+        // conservative one -- and an unrecognised platform gets it too, rather than
+        // inheriting iOS's by falling through.
+        // A null platform means --spec-platform was not passed, which happens when an
+        // archived artifact set is re-scored by hand (cn1ss.sh only passes the flag when
+        // CN1SS_FIDELITY_PLATFORM is set; the iOS and Android runners always set it).
+        // Keep the historical iOS answer there rather than silently restating an old
+        // set's numbers -- the fall-through this fixes is about NAMED platforms.
+        boolean glassPlatform = platform == null || platform.startsWith("ios");
         Map<String, String[]> out = new LinkedHashMap<>();
         try {
             boolean inComponents = false;
@@ -618,8 +637,8 @@ public class ProcessScreenshots {
                 }
                 if (trimmed.startsWith("- ")) {
                     if (id != null && platformOk) {
-                        String mat = normalizeMaterial(material, android);
-                        String bd = android ? null : effectiveBackdrop(backdrop, mat);
+                        String mat = normalizeMaterial(material, glassPlatform);
+                        String bd = glassPlatform ? effectiveBackdrop(backdrop, mat) : null;
                         out.put(id, new String[]{mat, bd});
                     }
                     id = null;
@@ -687,7 +706,7 @@ public class ProcessScreenshots {
 
     /// A spec entry without a material declaration maps to null so that test
     /// keeps the legacy heuristic; glass/lens degrade to normal on Android.
-    private static String normalizeMaterial(String material, boolean android) {
+    private static String normalizeMaterial(String material, boolean glassPlatform) {
         if (material == null || material.isEmpty()) {
             return null;
         }
@@ -695,7 +714,7 @@ public class ProcessScreenshots {
             System.err.println("WARNING: unknown material '" + material + "' in spec; treating as normal");
             return "normal";
         }
-        if (android && !material.equals("normal")) {
+        if (!glassPlatform && !material.equals("normal")) {
             return "normal";
         }
         return material;
@@ -1081,6 +1100,75 @@ public class ProcessScreenshots {
 
     /// Bounding box {x, y, w, h} of the widget (pixels >CONTENT_TAU off bg).
     /// Returns w=0 when there is no meaningful content.
+    /// The colour the tiles were painted on, which the content mask uses to tell
+    /// widget pixels from empty backdrop.
+    ///
+    /// Mobile tiles are painted on white or black and this used to be hardcoded to
+    /// exactly that. No desktop platform paints on either: Fluent's light surface is
+    /// #F3F3F3 and its dark one #202020, Aqua's is #ECECEC, Adwaita's #FAFAFA. Only
+    /// Adwaita's light surface is within the mask's 10-per-channel tolerance of white,
+    /// so for five of the six desktop appearance/platform pairs every backdrop pixel
+    /// was classified as widget -- measured at roughly 80% of each tile.
+    ///
+    /// That does not fail loudly. It INFLATES the score, because the two tiles agree
+    /// about the backdrop that now makes up most of what is being compared, which is
+    /// the worst way for a measurement to be wrong.
+    ///
+    /// DesktopTileRunner writes tile-backgrounds.properties beside the tiles, reading
+    /// the value back out of the theme it installed rather than from a second copy
+    /// that could drift. When the file is absent -- every mobile set, and any older
+    /// artifact set being re-scored -- the historical white/black assumption applies
+    /// unchanged.
+    private static int resolveTileBackground(Map<Path, Map<String, Integer>> cache,
+                                             Path cn1Path, String testName) {
+        Path dir = cn1Path.getParent();
+        Map<String, Integer> byAppearance = dir == null ? null : cache.get(dir);
+        if (byAppearance == null && dir != null) {
+            byAppearance = loadTileBackgrounds(dir);
+            cache.put(dir, byAppearance);
+        }
+        if (byAppearance != null) {
+            // Longest key first, so an appearance named "dark" cannot shadow one
+            // named "high-contrast-dark".
+            List<String> keys = new ArrayList<>(byAppearance.keySet());
+            keys.sort((a, b) -> b.length() - a.length());
+            for (String k : keys) {
+                if (testName.endsWith("_" + k)) {
+                    return byAppearance.get(k).intValue();
+                }
+            }
+        }
+        return testName.contains("_dark") ? 0x000000 : 0xffffff;
+    }
+
+    private static Map<String, Integer> loadTileBackgrounds(Path dir) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        Path f = dir.resolve("tile-backgrounds.properties");
+        if (!Files.exists(f)) {
+            return out;
+        }
+        try {
+            for (String line : Files.readAllLines(f, java.nio.charset.StandardCharsets.UTF_8)) {
+                String t = line.trim();
+                int eq = t.indexOf('=');
+                if (t.isEmpty() || t.startsWith("#") || eq <= 0) {
+                    continue;
+                }
+                String key = t.substring(0, eq).trim();
+                String val = t.substring(eq + 1).trim();
+                if (val.startsWith("#")) {
+                    val = val.substring(1);
+                }
+                out.put(key, Integer.valueOf((int) (Long.parseLong(val, 16) & 0xffffffL)));
+            }
+        } catch (Exception ex) {
+            // A malformed sidecar must not silently restore the wrong hardcoded
+            // background, which is the bug this exists to fix.
+            throw new IllegalStateException("unreadable " + f + ": " + ex.getMessage(), ex);
+        }
+        return out;
+    }
+
     private static int[] contentBBox(BufferedImage img, int bgRgb) {
         int w = img.getWidth(), h = img.getHeight();
         int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;

@@ -113,6 +113,7 @@ public final class DesktopTileRunner {
         if (appearances == null || appearances.isEmpty()) {
             appearances = java.util.Arrays.asList(new String[]{"light"});
         }
+        StringBuffer backgrounds = new StringBuffer();
         for (Object ao : appearances) {
             String appearance = (String) ao;
             boolean dark = "dark".equals(appearance);
@@ -121,6 +122,8 @@ public final class DesktopTileRunner {
             // so flipping afterwards leaves the glyphs coloured for the other scheme.
             CN.setDarkMode(Boolean.valueOf(dark));
             installTheme(themeRes);
+            backgrounds.append(appearance).append('=')
+                    .append(toHex(tileBackground())).append('\n');
 
             List components = spec.getComponents();
             for (int i = 0; i < components.size(); i++) {
@@ -139,7 +142,48 @@ public final class DesktopTileRunner {
                 }
             }
         }
+        writeBackgrounds(backgrounds.toString(), outDir);
         return count;
+    }
+
+    /// The colour the tiles are painted on, read back from the theme that was just
+    /// installed rather than written down anywhere.
+    ///
+    /// The comparator needs this to tell widget pixels from backdrop, and it used to
+    /// assume white for light and black for dark -- which is true of the mobile tiles
+    /// and true of no desktop platform. Fluent's light surface is #F3F3F3 and its dark
+    /// one #202020, Aqua's is #ECECEC, Adwaita's #FAFAFA. Against a hardcoded white
+    /// the mask's tolerance (10 per channel) is exceeded by all but one of them, so
+    /// roughly 80% of every tile -- the empty backdrop -- was classified as widget
+    /// content. That does not fail; it inflates the score, because both tiles agree
+    /// about the backdrop they are both mostly made of.
+    ///
+    /// Reading it from the theme rather than declaring it in the spec keeps one copy
+    /// of the value. Restyle a theme's background and the measurement follows; a
+    /// second copy in the YAML would go stale silently and in the direction that
+    /// looks like success.
+    private static int tileBackground() {
+        return UIManager.getInstance().getComponentStyle("Form").getBgColor();
+    }
+
+    private static String toHex(int rgb) {
+        String h = Integer.toHexString(rgb & 0xffffff);
+        while (h.length() < 6) {
+            h = "0" + h;
+        }
+        return "#" + h.toUpperCase();
+    }
+
+    private static void writeBackgrounds(String body, File outDir) throws Exception {
+        OutputStream out = new FileOutputStream(new File(outDir, "tile-backgrounds.properties"));
+        try {
+            out.write(("# Written by DesktopTileRunner; read by ProcessScreenshots --mode fidelity.\n"
+                    + "# The backdrop colour each appearance's tiles were painted on, taken from the\n"
+                    + "# installed theme's Form style. See tileBackground().\n"
+                    + body).getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
     }
 
     private static boolean renderTile(ComponentSpec c, String state, String appearance,
