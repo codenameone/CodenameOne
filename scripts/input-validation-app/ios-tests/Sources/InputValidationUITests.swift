@@ -149,9 +149,10 @@ final class InputValidationUITests: XCTestCase {
         // repeats a slow start can leave in front of it are harmless.
         //
         // Stopped by the driver's keytype.stop gate, written as soon as the step
-        // resolves either way. The app exits a second and a half after the suite
-        // finishes, and typing into a process that has left fails the XCUITest run
-        // even though every event landed.
+        // resolves either way, AND by a deadline inside the app's exit grace. The
+        // app exits SUITE_EXIT_DELAY_MS (8 seconds) after the suite finishes, and
+        // typing into a process that has left fails the XCUITest run even though
+        // every event landed.
         //
         // The GATE is checked before every key, not once per pass. It is the leading
         // signal -- the driver writes it as soon as the step resolves, about a second
@@ -165,7 +166,27 @@ final class InputValidationUITests: XCTestCase {
         //
         // The sleep is sliced for the same reason: a whole second of not looking is
         // most of the margin the gate buys.
-        for _ in 0..<15 {
+        // BOUNDED BY THE APP'S EXIT GRACE, not by a pass count, and that is what
+        // this loop was missing rather than another gate check.
+        //
+        // GestureSuite.SUITE_EXIT_DELAY_MS is 8 seconds: the app leaves 8 seconds
+        // after CN1IV:SUITE:FINISHED whatever this loop is doing. A pass here costs
+        // three keystrokes and a one-second sleep, and a keystroke is not cheap --
+        // MEASURED on the failing run, one `Type '1' key` to the next `Type 'c' key`
+        // was 1.5 seconds, because every key waits for the app to idle while the
+        // simulator is also serving accessibility snapshots. So a pass is up to five
+        // and a half seconds and fifteen of them are eighty, against a grace of
+        // eight. Missing the stop gate therefore did not risk typing into a departed
+        // app, it GUARANTEED it -- the loop was always going to outlive the app by a
+        // factor of ten, and the only thing keeping runs green was the gate winning
+        // a race it wins most of the time.
+        //
+        // The deadline keeps the whole loop inside the grace, so the worst case is
+        // that the app is still there and nobody typed into a ghost. The gate is
+        // still checked before every key, because when it arrives it is the earlier
+        // and cheaper signal.
+        let deadline = Date().addingTimeInterval(6.0)
+        while Date() < deadline {
             if stopRequested("keytype", syncDir: syncDir) {
                 return
             }
@@ -173,13 +194,13 @@ final class InputValidationUITests: XCTestCase {
                 if stopRequested("keytype", syncDir: syncDir) {
                     return
                 }
-                guard app.state == .runningForeground else {
+                guard app.state == .runningForeground, Date() < deadline else {
                     return
                 }
                 app.typeKey(key, modifierFlags: [])
             }
             for _ in 0..<10 {
-                if stopRequested("keytype", syncDir: syncDir) {
+                if stopRequested("keytype", syncDir: syncDir) || Date() >= deadline {
                     return
                 }
                 Thread.sleep(forTimeInterval: 0.1)
