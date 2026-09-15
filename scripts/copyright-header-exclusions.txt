@@ -42,3 +42,5 @@ CodenameOne/src/com/codename1/processing/AbstractEvaluator.java | Eric Coolman c
 CodenameOne/src/com/codename1/processing/IndexEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/HashtableContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/TextEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+CodenameOne/src/com/codename1/processing/ContainsEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+CodenameOne/src/com/codename1/processing/XMLContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text

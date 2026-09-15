@@ -123,6 +123,13 @@ class XMLContent implements StructuredContent {
      */
     @Override
     public StructuredContent getChild(int index) {
+        if (index < 0 || root.getNumChildren() <= index) {
+            // An element with no children has no first child, and callers ask
+            // for one: a "%" predicate over an empty element threw from
+            // Element.getChildAt rather than finding nothing. The JSON side
+            // answers null here for the same question.
+            return null;
+        }
         return new XMLContent(root.getChildAt(index));
     }
 

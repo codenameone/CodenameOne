@@ -536,6 +536,37 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void aContainsPredicateSurvivesAValueWithNoText() {
+        // The "%" predicate reads its values as text, and a nested array kept
+        // among an array's values has none. Both of its branches -- the
+        // substring shortcut and the parenthesised list -- dereferenced it.
+        Result r = Result.fromContent(
+                "{\"items\":[{\"values\":[[]],\"n\":\"A\"}]}", Result.JSON);
+        assertEquals(0, r.getAsStringArray("/items[values % x]/n").length,
+                "the substring form threw on a value with no text");
+        assertEquals(0, r.getAsStringArray("/items[values % (x)]/n").length,
+                "the list form threw on a value with no text");
+
+        // And it still matches when there is something to match.
+        Result tags = Result.fromContent(
+                "{\"items\":[{\"tags\":[\"alpha\",\"beta\"],\"n\":\"A\"}]}",
+                Result.JSON);
+        assertEquals(1, tags.getAsStringArray("/items[tags % (beta)]/n").length,
+                "a real contains stopped matching");
+    }
+
+    @Test
+    void aContainsPredicateSurvivesAnEmptyXmlElement() {
+        // The XML side of the same question, which has always thrown:
+        // XMLContent.getChild indexed the child list without checking it, and
+        // the predicate asks for a first child before it knows there is one.
+        Result r = Result.fromContent(
+                "<t><p tags='alphabet' n='A'/></t>", Result.XML);
+        assertEquals(0, r.getAsStringArray("/t/p[tags % alpha]/@n").length,
+                "an element with no children threw");
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for
