@@ -1584,3 +1584,101 @@ tracking through a LOCAL SLOT, which is why it is sound and also why it bails so
 fusion that reaches the chains it cannot take is, by construction, reaching the chains that
 live on the operand stack -- so it inherits exactly the defect that was withdrawn. The
 infrastructure comes first, or it does not go in.
+
+---
+
+# Round 11: the String allocation surface, and an instrument that was lying
+
+Four targets came out of Round 10's attribution. Working through them produced one real
+win, one win on a different axis than expected, two refutations -- and the discovery
+that the instrument every allocation figure in this file rests on had a hole in it.
+
+## THE CENSUS WAS BLIND TO EVERY FUSED OBJECT
+
+`CN1_ALLOC_CENSUS` -- the `[ALLOC]` table -- was hooked at three entry points:
+`cn1BibopFastAlloc`, `cn1BibopFastAllocNoZero`, `codenameOneGcMalloc`. `cn1AllocFused`
+and `cn1FusedLatin1Begin` call `cn1BibopAlloc` directly, which is hooked by **neither**.
+So every one-block object was invisible: `String.cn1ConcatN`, `StringBuilder.toString`,
+and anything else built fused. On this corpus that is **~50MB of 856MB unreported**, and
+`vm/CLAUDE.md`'s claim that "CN1_ALLOC_CENSUS counts at every entry point" was false.
+
+The understated total is the smaller problem. **Any change that MOVES allocations onto
+the fused path looked like a reduction.** A fused substring first measured **-6.06%
+objects and -3.61% bytes**, essentially all of it the instrument going dark; the honest
+figure is -3.10% allocations and no byte change. This is the same trap this file already
+documents for `[GC-INSTR] outOfLineAllocs`, which misses the inlined bump path -- and it
+bit anyway, because the census was believed to be the one that did not have it.
+
+**A second, self-inflicted error on top.** The first fix re-attributed the fused payload
+to the array class so the census would "read like" the two-object path -- which added a
+phantom second COUNT and cancelled exactly the saving being measured, reporting -0.23%.
+The census reports what happened; it is not the place to preserve an old shape.
+
+Both entry points are hooked now. Every figure below is measured with both arms counted.
+
+## Corpus confirmation changed a target
+
+The Round 10 attribution was taken on the translator, which is string-heavy in an
+unusual way. Static call sites settle it:
+
+| | CN1 framework core | ByteCodeTranslator |
+|---|---:|---:|
+| `substring(` | **866** | 106 |
+| `replace('` | 13 | **77** |
+| `trim()` | 340 | -- |
+
+`String.replace(char,char)` was the second largest char[] source at 293,958 allocations
+and is **not worth chasing**: it is a mangling idiom, not an application one. `substring`
+is the reverse and was taken instead. A runtime check on `CommonWorkloads` -- the ten
+shapes every generated port app runs -- was attempted and is useless here: 455 char[]
+allocations total, because its builders are already stack-allocated.
+
+## What was implemented
+
+**Fused substring.** The Java slice constructor allocates twice; `cn1SubstringFused`
+builds the String and its characters as one block, preserving the parent's coder (a
+slice of a Latin-1 string is Latin-1 by construction, so unlike `StringBuilder.toString`
+there is nothing to scan for). Counters rather than inference: 302,438 calls, 253,000
+fused, 49,438 too large and correctly falling back.
+
+    allocations  8,879,218 -> 8,603,893   -3.10%  (275,325 fewer)
+    bytes            855.7 MB -> 856.2 MB  +0.06%  (no change)
+
+Bytes do not move and that is not hidden: the array header still exists, just inline,
+and one larger block rounds up a BiBOP size class about as much as the second slot cost.
+What it buys is 275,325 fewer allocator calls and slots to sweep, plus contiguity.
+
+**A stack buffer a StringBuilder will not outgrow.** The escape analysis already parks a
+non-escaping builder's buffer on the C stack, but sized by the ctor -- 32 chars -- and
+`enlargeBuffer` always goes to the heap, so the first append past 32 abandoned it and
+then climbed the 1.5x ladder. Floor raised to 128 units, swept rather than guessed:
+
+| floor | allocations | bytes (MB) | char[] allocs | stack/site |
+|---|---:|---:|---:|---:|
+| 64 | 8,566,580 | 848.6 | 1,023,428 | 168 B |
+| **128** | **8,528,201** | **845.5** | **984,019** | 296 B |
+| 256 | 8,552,324 | 845.2 | 1,008,454 | 552 B |
+
+**128 is the knee**, and 256 being worse on allocations is not noise: at 552 B/site the
+per-method 2KB stack budget caps more sites back to the ctor's 32, so fewer sites get a
+buffer at all. **The floor and the budget interact; tuning either alone reads wrong.**
+
+Against the 32-unit baseline: **allocations -1.29%, bytes -1.18%, char[] allocations
+-9.92%, char[] bytes -5.54%.** The first change in this whole sequence to move bytes.
+
+Only StringBuilder is enlarged, and that restriction is the correctness argument rather
+than caution: `value.length` IS the capacity there, unobservable except through
+`capacity()`, which the JDK does not specify beyond the minimum. For any other `@Fused`
+class the array length may be semantic.
+
+## Refuted, and recorded so they are not re-attempted
+
+- **Compacting `String(char[],int,int)`** -- the busiest String constructor, 355,212
+  calls. Measured **+1.00%**, worse. `toCharNoCopy()` returns the backing array with NO
+  COPY when it is a char[] of the right length; a byte[]-backed String cannot take that
+  path and falls through to `toCharArray()`, which allocates. Compaction is not a storage
+  argument, it is a question about CONSUMERS: it pays where the string is read as a
+  string and costs where it is read as characters.
+- **Eliding `toCharArray()` in the translator** -- built, gated, non-vacuous, and worth
+  **+0.01%**, because its target had already been removed by the `String(String)` fix two
+  commits earlier. Kept for the 9 sites an application would hit; see that commit.
