@@ -49,28 +49,65 @@ import com.codename1.ui.animations.Animation;
  */
 final class InkFeedback {
 
-    /// How long the splash takes to cover the target once the finger lands.
-    private static final long SPLASH_MS = 320;
-    /// Fade of the splash once the press is confirmed (Flutter's ~150ms).
-    private static final long FADE_MS = 180;
-    /// Fade of the flat press highlight, both directions.
-    private static final long HIGHLIGHT_MS = 90;
-
-    /// Opacity of the splash and of the flat press highlight, out of 255.
+    /// Growth of the ripple while the finger is still down.
     ///
-    /// Material 3 puts the pressed state layer at 10% of onSurface, and the splash rides
-    /// on top of it rather than replacing it - so these are deliberately low and only add
-    /// up to ~13% where the splash has arrived. Anything heavier stops reading as ink and
-    /// starts reading as the row having changed colour.
-    private static final int SPLASH_ALPHA = 18;    // ~7%
-    private static final int HIGHLIGHT_ALPHA = 15; // ~6%
+    /// A full second, and that is the point: unconfirmed growth is slow enough to read as
+    /// a circle travelling outward. Growing it in a third of a second instead -- which
+    /// this did -- means the disc has already covered the target before the eye finds it,
+    /// so the whole effect registers as the row flashing a flat grey rather than as ink.
+    private static final long UNCONFIRMED_MS = 1000;
+    /// Growth once the press is confirmed: the SAME progress, finished at this rate.
+    private static final long RADIUS_MS = 225;
+    /// Fade of the ink in.
+    private static final long FADE_IN_MS = 75;
+    /// Fade of the ink out, once confirmed.
+    private static final long FADE_OUT_MS = 375;
+    /// ... of which the ink holds full opacity for this fraction before it starts to go.
+    private static final double FADE_OUT_HOLD = 225.0 / 375.0;
+    /// Fade of the flat press highlight, both directions.
+    private static final long HIGHLIGHT_MS = 200;
+
+    /// The ripple begins as a disc this fraction of its target, never at nothing, and
+    /// finishes slightly past the target so no seam shows at the edge.
+    private static final double START_RADIUS_FRACTION = 0.30;
+    private static final double RADIUS_OVERSHOOT = 5;
+
+    /// Default ink, as ARGB. The alpha travels WITH the colour because a caller's
+    /// explicit splash colour carries its own, and masking it off left every custom ink
+    /// at the default weight.
+    ///
+    /// Deliberately NOT ThemeData's splashColor/highlightColor defaults (40% of a light
+    /// grey). Those are the Material 2 fallbacks; what a Material 3 ink actually paints
+    /// is a state layer at a fraction of onSurface, and it is far lighter. Measured
+    /// against the reference on a pressed mail card: 100ms into the press its card is
+    /// still clean white, while the 40% wash covered the whole card -- text, sender and
+    /// icon all visibly greyed -- which reads as the row having changed colour rather
+    /// than as ink.
+    private static final int LIGHT_SPLASH_ARGB = 0x12000000;
+    private static final int LIGHT_HIGHLIGHT_ARGB = 0x0F000000;
+    private static final int DARK_INK_ARGB = 0x12FFFFFF;
 
     private double originX;
     private double originY;
     private double targetRadius;
-    private int inkColor = 0x000000;
+    private int splashArgb = LIGHT_SPLASH_ARGB;
+    private int highlightArgb = LIGHT_HIGHLIGHT_ARGB;
 
-    /// Wall-clock start of the growth phase, and of the fade once released.
+    /// Where the radius and the highlight had got to when the finger lifted.
+    ///
+    /// The confirmed growth does not restart: it carries the same normalized progress on
+    /// at the faster rate, so a ripple released early finishes from where it stood rather
+    /// than jumping back to the start.
+    private double progressAtRelease;
+    private double highlightAtRelease;
+
+    /// Start of the growth phase, and of the fade once released, on the ANIMATION clock.
+    ///
+    /// Not the wall clock. Ink is an animation like any other, and reading the wall clock
+    /// made this one the only thing on screen that a frozen clock could not hold still:
+    /// asked for the frame at 100ms the ripple showed however far real time had carried
+    /// it, so it saturated within two frames and then sat there. On a device that reads
+    /// as ink that arrives too fast; in a test it is simply not reproducible.
     private long startedAt;
     private long releasedAt;
     private boolean held;
@@ -98,10 +135,16 @@ final class InkFeedback {
         }
         originX = x;
         originY = y;
-        inkColor = resolveInkColor(c, config);
+        boolean light = isLight(backgroundUnder(c));
+        splashArgb = resolveArgb(config.getSplashColor(), config.getHighlightColor(),
+                light ? LIGHT_SPLASH_ARGB : DARK_INK_ARGB);
+        highlightArgb = resolveArgb(config.getHighlightColor(), config.getSplashColor(),
+                light ? LIGHT_HIGHLIGHT_ARGB : DARK_INK_ARGB);
         targetRadius = radiusFor(c, config, x, y);
-        startedAt = System.currentTimeMillis();
+        startedAt = com.codename1.flutter.animation.MotionClock.now();
         releasedAt = 0;
+        progressAtRelease = 0;
+        highlightAtRelease = 0;
         held = true;
         active = true;
         attach(c);
@@ -114,7 +157,10 @@ final class InkFeedback {
             return;
         }
         held = false;
-        releasedAt = System.currentTimeMillis();
+        long now = com.codename1.flutter.animation.MotionClock.now();
+        progressAtRelease = clamp01((now - startedAt) / (double) UNCONFIRMED_MS);
+        highlightAtRelease = clamp01((now - startedAt) / (double) HIGHLIGHT_MS);
+        releasedAt = now;
         // The clock may have stopped itself while the press was held (see animate()); the
         // fade still needs frames, so make sure it is running again.
         attach(c);
@@ -142,14 +188,23 @@ final class InkFeedback {
         if (!active) {
             return;
         }
-        long now = System.currentTimeMillis();
-        double grow = clamp01((now - startedAt) / (double) SPLASH_MS);
-        // Held: the highlight is fully in and the splash keeps growing. Released: the
-        // splash finishes wherever it is and both fade together.
-        double fade = held ? 0 : clamp01((now - releasedAt) / (double) FADE_MS);
+        long now = com.codename1.flutter.animation.MotionClock.now();
+        // One normalized progress for the radius, advanced at whichever rate applies:
+        // slowly while the finger is down, then finished quickly once the tap is
+        // confirmed. It never restarts, so the circle does not jump on release.
+        double progress = held
+                ? clamp01((now - startedAt) / (double) UNCONFIRMED_MS)
+                : clamp01(progressAtRelease + (now - releasedAt) / (double) RADIUS_MS);
+        double fadeIn = clamp01((now - startedAt) / (double) FADE_IN_MS);
+        // The ink holds full opacity for the first stretch of the fade and only then
+        // starts to go, so a quick tap still shows a complete ripple.
+        double fadeOut = held ? 0
+                : clamp01((clamp01((now - releasedAt) / (double) FADE_OUT_MS)
+                        - FADE_OUT_HOLD) / (1 - FADE_OUT_HOLD));
+        double ink = fadeIn * (1 - fadeOut);
         double highlight = held
                 ? clamp01((now - startedAt) / (double) HIGHLIGHT_MS)
-                : (1 - fade);
+                : clamp01(highlightAtRelease - (now - releasedAt) / (double) HIGHLIGHT_MS);
 
         int oldColor = g.getColor();
         int oldAlpha = g.getAlpha();
@@ -169,14 +224,17 @@ final class InkFeedback {
         // corner is wider than the box by construction.
         g.clipRect(cx, cy, w, h);
         try {
-            g.setColor(inkColor);
             if (highlight > 0) {
-                g.setAlpha((int) Math.round(HIGHLIGHT_ALPHA * highlight));
+                g.setColor(highlightArgb & 0xFFFFFF);
+                g.setAlpha((int) Math.round(((highlightArgb >>> 24) & 0xFF) * highlight));
                 g.fillRect(cx, cy, w, h);
             }
-            double r = targetRadius * easeOut(grow);
-            if (r > 0) {
-                g.setAlpha((int) Math.round(SPLASH_ALPHA * (held ? 1 : 1 - fade)));
+            double start = targetRadius * START_RADIUS_FRACTION;
+            double r = start + (targetRadius + RADIUS_OVERSHOOT - start)
+                    * com.codename1.flutter.animation.Curves.ease.transform(progress);
+            if (r > 0 && ink > 0) {
+                g.setColor(splashArgb & 0xFFFFFF);
+                g.setAlpha((int) Math.round(((splashArgb >>> 24) & 0xFF) * ink));
                 int d = (int) Math.round(r * 2);
                 g.fillArc((int) Math.round(cx + originX - r),
                         (int) Math.round(cy + originY - r), d, d, 0, 360);
@@ -187,7 +245,7 @@ final class InkFeedback {
             g.setClip(clipX, clipY, clipW, clipH);
         }
 
-        if (!held && fade >= 1) {
+        if (!held && fadeOut >= 1) {
             active = false;
             detach(c);
         }
@@ -208,8 +266,8 @@ final class InkFeedback {
                 // component is actually being painted, so ink on a component that scrolls
                 // away or stops repainting would stay "active" forever and keep this
                 // clock - and its repaint - running for the life of the form.
-                long now = System.currentTimeMillis();
-                if (active && !held && now - releasedAt >= FADE_MS) {
+                long now = com.codename1.flutter.animation.MotionClock.now();
+                if (active && !held && now - releasedAt >= FADE_OUT_MS) {
                     active = false;
                 }
                 // The gesture turned into a drag. Codename One then delivers the rest of
@@ -233,7 +291,7 @@ final class InkFeedback {
                 // leave this clock repainting forever. Once the splash has fully covered
                 // the target there is nothing left to animate anyway, so stop asking for
                 // frames and let the static ink stand until release.
-                if (active && held && now - startedAt >= SPLASH_MS + HIGHLIGHT_MS) {
+                if (active && held && now - startedAt >= UNCONFIRMED_MS) {
                     detach(target);
                     return false;
                 }
@@ -294,13 +352,21 @@ final class InkFeedback {
      * derived from the surface it sits on — dark ink on light surfaces and light ink on
      * dark ones, which is what Material's onSurface state layer amounts to.
      */
-    private static int resolveInkColor(Component c, InkResponse config) {
-        com.codename1.flutter.Color explicit = config.getSplashColor() != null
-                ? config.getSplashColor() : config.getHighlightColor();
-        if (explicit != null) {
-            return (int) (explicit.value() & 0xFFFFFF);
+    /// The first colour that was actually given, ALPHA INCLUDED, else the default.
+    ///
+    /// A caller states one of the two far more often than both, and the reference falls
+    /// back to the other one rather than to its theme default in that case -- an ink that
+    /// names only a splash colour should not highlight in an unrelated grey.
+    private static int resolveArgb(com.codename1.flutter.Color preferred,
+            com.codename1.flutter.Color fallback, int defaultArgb) {
+        com.codename1.flutter.Color explicit = preferred != null ? preferred : fallback;
+        if (explicit == null) {
+            return defaultArgb;
         }
-        return isLight(backgroundUnder(c)) ? 0x000000 : 0xFFFFFF;
+        int argb = (int) explicit.value();
+        // A colour given with no alpha at all is opaque by construction, and painting ink
+        // at full opacity hides the row under it. Treat it as the default weight.
+        return (argb >>> 24) == 0 ? (defaultArgb & 0xFF000000) | (argb & 0xFFFFFF) : argb;
     }
 
     /// The colour actually behind this tap area: the overlay itself is transparent, so ask
@@ -322,10 +388,6 @@ final class InkFeedback {
         return (r * 299 + g * 587 + b * 114) / 1000 >= 128;
     }
 
-    private static double easeOut(double t) {
-        double inv = 1 - t;
-        return 1 - inv * inv;
-    }
 
     private static double clamp01(double v) {
         return v < 0 ? 0 : (v > 1 ? 1 : v);
