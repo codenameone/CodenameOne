@@ -32,6 +32,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /// The two encoders that exist so a secret never becomes a String.
 ///
+/// The checks on how Vault USES them live in VaultSourceInvariantsTest, with the other
+/// properties that are about the shape of the code rather than about behaviour.
+///
 /// A String cannot be zeroed and a StringBuilder's buffer cannot be reached, so anything routed
 /// through either survives in the heap after every array the caller can wipe has been wiped --
 /// which is the opposite of what `getSecret` and `createRecoveryCode` promise about the
@@ -100,92 +103,6 @@ class BytesTest extends UITestBase {
                     new String(Bytes.charsFromUtf8(one, 0, one.length)),
                     "disagreed on malformed input");
         }
-    }
-
-    @Test
-    void theTwoSecretPathsDoNotRouteThroughAString() {
-        // The encoders above are correct; this is the part that says they are USED. "No String is
-        // created" is a property of the shape of the code and not of anything a caller can
-        // observe -- a test cannot take a heap dump -- so it is checked as such, the way the
-        // browser store's migration ordering is. Without it, reverting either call site to the
-        // String form leaves every other test in this class passing.
-        String source = readVaultSource();
-        String chars = methodBody(source, "private static char[] chars(byte[] utf8)");
-        assertTrue(chars.indexOf("Bytes.charsFromUtf8") > 0,
-                "getSecret's decode must go straight into a clearable array: " + chars);
-        assertTrue(chars.indexOf("new String") < 0 && chars.indexOf("Bytes.fromUtf8") < 0,
-                "a String here cannot be wiped by the caller or by the finally: " + chars);
-
-        String recovery = methodBody(source, "public AsyncResource<char[]> createRecoveryCode()");
-        assertTrue(recovery.indexOf("Bytes.base32Chars") > 0,
-                "the recovery code must be encoded into a clearable array");
-        assertTrue(recovery.indexOf("Base32.encode(") < 0,
-                "Base32.encode returns a String nobody can zero");
-    }
-
-    @Test
-    void everyPathThatDerivesAKeyOwnsItUntilItIsPublished() {
-        // The data key exists from the moment a wrap opens, and every check after that point can
-        // throw -- an edited record, a requirement added since enrolment. A key held in a local
-        // inside the try is then left to the collector, which is the one thing this package
-        // promises not to do. Whether an array was wiped is not observable from outside, so like
-        // the String checks above this is a check on the shape of the code.
-        String source = readVaultSource();
-        String[] unlocks = {
-            "public AsyncResource<Boolean> unlockWithPassword(final char[] password)",
-            "public AsyncResource<Boolean> unlockRemembered()",
-            "public AsyncResource<Boolean> unlockWithRecoveryCode(final char[] code)",
-            // Not an unlock, and the same contract: it derives the data key from a password wrap
-            // and publishes it, so every failure between those two points has to release it.
-            "public AsyncResource<Boolean> importSyncState(final byte[] state, "
-                + "final char[] password)",
-        };
-        for (String signature : unlocks) {
-            String body = methodBody(source, signature);
-            String name = signature.substring(signature.indexOf(' ') + 1);
-            assertTrue(body.indexOf("byte[] key = null;") > 0,
-                    name + " must own its key outside the try so a finally can release it");
-            int publish = body.indexOf("publishKey(");
-            assertTrue(publish > 0, name + " must publish through publishKey");
-            assertTrue(body.indexOf("key = null;", publish) > publish,
-                    name + " must release ownership after publishKey, or the finally wipes the "
-                    + "array the vault is now using");
-            int last = body.lastIndexOf("finally");
-            assertTrue(last > 0 && body.indexOf("Bytes.zero(key)", last) > last,
-                    name + " must wipe the key in its finally");
-        }
-    }
-
-    private static String readVaultSource() {
-        java.io.File f = new java.io.File("../../CodenameOne/src/com/codename1/security/vault/"
-                + "Vault.java");
-        assertTrue(f.isFile(), "Vault.java not found at " + f.getAbsolutePath());
-        try {
-            byte[] raw = java.nio.file.Files.readAllBytes(f.toPath());
-            return new String(raw, "UTF-8");
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    /// The body of one method, by brace counting from its signature.
-    private static String methodBody(String source, String signature) {
-        int at = source.indexOf(signature);
-        assertTrue(at >= 0, "could not find " + signature);
-        int open = source.indexOf('{', at);
-        int depth = 0;
-        for (int iter = open; iter < source.length(); iter++) {
-            char c = source.charAt(iter);
-            if (c == '{') {
-                depth++;
-            } else if (c == '}') {
-                depth--;
-                if (depth == 0) {
-                    return source.substring(open, iter + 1);
-                }
-            }
-        }
-        throw new IllegalStateException("unterminated " + signature);
     }
 
     @Test
