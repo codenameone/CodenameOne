@@ -383,13 +383,35 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
             return cursor < size;
         }
 
+        /**
+         * SPLIT SO THIS METHOD CAN BE FRAMELESS, which is the whole point of the shape
+         * below. BytecodeMethod.isFramelessEligible() rejects any method containing
+         * ATHROW (isFramelessObjectOpcode excludes it deliberately), and next() is the
+         * hottest method in any for-each loop -- ArrayListIterator is 41.6MB of aging
+         * heap on the self-hosting corpus. Carrying the three throws inline cost it a
+         * full named shadow frame (DEFINE_INSTANCE_METHOD_STACK: frame push, locals
+         * array, SP, frame pop) on EVERY element of EVERY loop, purely to satisfy
+         * exception paths that essentially never run.
+         *
+         * So the guards stay exactly where they were and only the throws move. Each
+         * `return nextSlow()` below is an unconditional-taken-never branch: clang sinks
+         * it, and what is left is three compares, an add and a load. NOT ONE CHECK IS
+         * DROPPED -- see the bounds-check note below, which is the 145-test failure this
+         * class already paid for once.
+         *
+         * nextSlow() re-tests the three conditions IN THE SAME ORDER, so the exception a
+         * caller sees is identical to the one the inline throws produced. It must stay
+         * in that order: the middle case is NoSuchElementException and the outer two are
+         * ConcurrentModificationException, so reordering them silently changes which
+         * exception a past-the-end iterator on a concurrently modified list reports.
+         */
         public E next() {
             if (modCount != expectedModCount) {
-                throw new ConcurrentModificationException();
+                return nextSlow();
             }
             int i = cursor;
             if (i >= size) {
-                throw new NoSuchElementException();
+                return nextSlow();
             }
             // The i < size test is only a bounds check while the list's
             // firstIndex + size <= array.length invariant holds, so the array
@@ -409,11 +431,31 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
             E[] a = array;
             int idx = firstIndex + i;
             if (idx < 0 || idx >= a.length) {
-                throw new ConcurrentModificationException();
+                return nextSlow();
             }
             cursor = i + 1;
             lastReturned = i;
             return a[idx];
+        }
+
+        /**
+         * The exception half of {@link #next()}, kept out of line so next() contains no
+         * ATHROW and stays frameless. Reached only when one of next()'s three guards
+         * failed, and it re-tests all three in the same order so it raises exactly the
+         * exception the inline throws used to.
+         *
+         * The trailing throw is not dead code and is not a fallback for "no condition
+         * held": another thread can move modCount between next()'s test and this one, in
+         * which case ConcurrentModificationException is the right answer anyway.
+         */
+        private E nextSlow() {
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+            }
+            if (cursor >= size) {
+                throw new NoSuchElementException();
+            }
+            throw new ConcurrentModificationException();
         }
 
         public void remove() {

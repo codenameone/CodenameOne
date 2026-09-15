@@ -1682,3 +1682,90 @@ class the array length may be semantic.
 - **Eliding `toCharArray()` in the translator** -- built, gated, non-vacuous, and worth
   **+0.01%**, because its target had already been removed by the `String(String)` fix two
   commits earlier. Kept for the 9 sites an application would hit; see that commit.
+
+## Round 12: ATHROW was the only thing keeping the hottest iterator method framed
+
+`ArrayListIterator.next()` runs once per element of every for-each loop over an
+ArrayList, and it carried a full named shadow frame -- `DEFINE_INSTANCE_METHOD_STACK`,
+i.e. frame push, locals array, SP, frame pop -- on every one of those calls.
+
+The cause was a single opcode. `isFramelessEligible()` rejects any method containing
+ATHROW (`isFramelessObjectOpcode` excludes it deliberately), and `next()` contains three
+throws that essentially never execute: the modCount check, the past-the-end check and
+the bounds check on the backing array.
+
+Splitting the throws into a private `nextSlow()` -- guards unchanged, in place, only the
+`throw` statements moved out of line -- makes the method eligible. Confirmed in the
+emitted C for the same source:
+
+| | frame macro |
+|---|---|
+| before | `DEFINE_INSTANCE_METHOD_STACK(3, 4, 0, 691, 628)` |
+| after | `DEFINE_METHOD_STACK_FRAMELESS(3, 4, 0)` |
+
+**No check is dropped.** `nextSlow()` re-tests the three conditions in the SAME ORDER, so
+the exception a caller sees is identical; the middle one is NoSuchElementException and
+the outer two are ConcurrentModificationException, so the order is load bearing. This is
+deliberately not the "drop the bounds check" shortcut that cost this class 145 screenshot
+tests -- see the comment in `ArrayList.java`, which is still the governing note.
+
+Gates: `run-gauntlet.sh` GREEN (15 tortures byte-identical to JDK 25, both GC stop
+modes); self-hosting Gate D PASS, **Gate A PASS -- 798 files byte-identical**, negative
+control PASS.
+
+**No wall-clock figure is quoted, and that is deliberate.** Every attempt to measure fell
+on a host with `fileproviderd` and `bird` between them burning ~130% CPU and a load
+average near 10. This file's own rule -- run `uptime` first, and this box cannot resolve
+5% -- makes any number taken there worthless. The codegen change is verified; the timing
+is not, and must be taken on a quiet machine before anything is claimed for it.
+
+### Withdrawn in the same round: folding javac's synthetic accessors
+
+An inner class reading a PRIVATE field of its outer class cannot emit a GETFIELD, so
+javac synthesizes `static int access$000(Outer o) { return o.field; }` and routes every
+read through it. The translator emits the accessor into the outer class's `.c` and the
+inner class into its own, so each read is a CROSS-TRANSLATION-UNIT CALL that only LTO can
+remove -- and the clean, desktop and CMake targets do not link with LTO.
+
+`Invoke.asInlinableFieldAccess` already folds trivial getters, but its INVOKESTATIC
+branch requires a NO-ARGUMENT descriptor, so it only ever saw `GETSTATIC` forwarders and
+never these. Teaching it the one-object-argument shape is exact rather than approximate:
+a static call with one argument and a non-void return pops one slot and pushes one, which
+is GETFIELD's stack effect, and it dereferences the same reference, so a null argument
+still throws at the same point.
+
+Measured on this corpus, it worked: 9 files changed, 167 lines of emitted C collapsing to
+77, every removed line an accessor call and no added line containing one -- ArrayList 3
+call sites (one of them in `next()` itself), ArrayDeque 9, TreeMap's sub-map family, plus
+`Parser` and `SourceManifest`, i.e. ordinary application code and not a library special
+case.
+
+**It is withdrawn because Gate A went red: 9 of 798 files differed between the JVM
+translator and the self-hosted one, on exactly those 9 files.** The JVM side folded and
+the ParparVM side did not. What is ruled out, each measured rather than argued:
+
+- Not optimize-order. Memoizing the verdict so it is always read from raw bytecode --
+  `updateInlinableFieldDependencies` queries every invoke before any `optimize()` --
+  changed nothing; both versions failed identically on the same 9 files.
+- Not a stale self-hosted binary. The binary was rebuilt and verified to CONTAIN the
+  diagnostic strings.
+- Not a swallowed diagnostic. `System.err` reaches fd 1 on the clean target (verified
+  with a probe), and `verify-selfhost.sh` captures both streams.
+- Not the string predicates. `"(Ljava/util/ArrayList;)I".endsWith(")V")`,
+  `"access$000".startsWith("access$")` and `endsWith("ArrayList")` all answer correctly
+  on ParparVM, checked on the target.
+- Not `DISABLE_INLINE`. `System.getProperty`/`getenv` both return null on the target,
+  under `env -i` as the gate runs it, so the flag is false on both sides.
+- Not dead-code elimination. The method is emitted in full, not as a `return 0;` stub.
+
+What is left is that the self-hosted translator never queries those instructions at all:
+a probe at the very top of the INVOKESTATIC branch printed 65 lines on the JVM side and
+**zero** on the ParparVM side, for the same corpus. That is a real divergence in the
+translator's own behaviour under ParparVM and it is worth more than the optimization
+was -- but it is unexplained, so the fold does not land on top of it.
+
+**The precondition on retrying: root-cause the divergence FIRST.** The next probe to
+write is in `ByteCodeClass.updateAllDependencies`, counting the invokes it actually
+visits per class on each host -- the question is whether the instruction list differs, or
+whether that loop is reached at all. Landing the fold before that answer exists would be
+shipping a translator whose output depends on which host ran it.
