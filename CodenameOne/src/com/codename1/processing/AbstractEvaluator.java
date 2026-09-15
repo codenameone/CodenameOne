@@ -405,12 +405,119 @@ abstract class AbstractEvaluator implements Evaluator {
     ///
     /// negative, zero or positive, as `compareTo` does
     protected int compareNumbers(String left, String right) {
-        // Exponents are written out first rather than parsed. A document can
-        // carry one -- an XML attribute holds whatever text it likes -- and
-        // through a double, 9007199254740992e0 and 9007199254740993e0 are one
-        // value while 1e309 and 2e309 are both infinity.
-        return compareFixedPoint(withoutExponent(left.trim()),
-                                 withoutExponent(right.trim()));
+        // Exponents are written out rather than parsed. A document can carry
+        // one -- an XML attribute holds whatever text it likes -- and through
+        // a double, 9007199254740992e0 and 9007199254740993e0 are one value
+        // while 1e309 and 2e309 are both infinity.
+        String l = left.trim();
+        String r = right.trim();
+        if (isBeyondExpansion(l) || isBeyondExpansion(r)) {
+            return compareBeyondExpansion(l, r);
+        }
+        return compareFixedPoint(withoutExponent(l), withoutExponent(r));
+    }
+
+    /// Whether writing this value out would take more digits than it is worth.
+    private boolean isBeyondExpansion(String text) {
+        int marker = exponentMarker(text);
+        if (marker < 0) {
+            return false;
+        }
+        long exponent = parseExponent(text.substring(marker + 1));
+        return exponent > EXPONENT_LIMIT || exponent < -EXPONENT_LIMIT;
+    }
+
+    /// Orders two values at least one of which is too large to write out.
+    ///
+    /// By sign, then by the power of ten the first significant digit sits at,
+    /// then by the digits. No expansion, and exact for any exponent a long
+    /// holds -- which is every exponent anything can produce.
+    private int compareBeyondExpansion(String left, String right) {
+        boolean leftNegative = left.charAt(0) == '-';
+        boolean rightNegative = right.charAt(0) == '-';
+        String leftDigits = significantOf(left);
+        String rightDigits = significantOf(right);
+        if (leftDigits.length() == 0 || rightDigits.length() == 0) {
+            // One of them is zero, and zero is below every positive value and
+            // above every negative one.
+            if (leftDigits.length() == rightDigits.length()) {
+                return 0;
+            }
+            if (leftDigits.length() == 0) {
+                return rightNegative ? 1 : -1;
+            }
+            return leftNegative ? -1 : 1;
+        }
+        if (leftNegative != rightNegative) {
+            return leftNegative ? -1 : 1;
+        }
+        long leftOrder = orderOf(left);
+        long rightOrder = orderOf(right);
+        int magnitude;
+        if (leftOrder != rightOrder) {
+            magnitude = leftOrder < rightOrder ? -1 : 1;
+        } else {
+            magnitude = compareFraction(leftDigits, rightDigits);
+        }
+        return leftNegative ? -magnitude : magnitude;
+    }
+
+    /// The power of ten the first significant digit of this value sits at.
+    private long orderOf(String text) {
+        int marker = exponentMarker(text);
+        long exponent = marker < 0 ? 0
+                : parseExponent(text.substring(marker + 1));
+        String mantissa = marker < 0 ? text : text.substring(0, marker);
+        int at = 0;
+        if (at < mantissa.length()
+                && (mantissa.charAt(at) == '-' || mantissa.charAt(at) == '+')) {
+            at++;
+        }
+        int point = mantissa.indexOf('.');
+        int whole = (point < 0 ? mantissa.length() : point) - at;
+        int leading = 0;
+        for (int i = at; i < mantissa.length(); i++) {
+            char c = mantissa.charAt(i);
+            if (c == '.') {
+                continue;
+            }
+            if (Character.digit(c, 10) != 0) {
+                break;
+            }
+            leading++;
+        }
+        return exponent + whole - leading - 1;
+    }
+
+    /// The significant digits of a value, ignoring sign, point and exponent.
+    private String significantOf(String text) {
+        int marker = exponentMarker(text);
+        String mantissa = marker < 0 ? text : text.substring(0, marker);
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < mantissa.length(); i++) {
+            char c = mantissa.charAt(i);
+            if (Character.digit(c, 10) >= 0) {
+                if (digits.length() > 0 || Character.digit(c, 10) != 0) {
+                    digits.append(c);
+                }
+            }
+        }
+        int end = digits.length();
+        while (end > 0 && Character.digit(digits.charAt(end - 1), 10) == 0) {
+            end--;
+        }
+        return digits.substring(0, end);
+    }
+
+    /// Where the exponent begins, or -1.
+    private int exponentMarker(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == 'e' || c == 'E') {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// Rewrites a number in exponent form as plain digits.
@@ -421,18 +528,11 @@ abstract class AbstractEvaluator implements Evaluator {
     ///
     /// the same value with the point moved and the exponent gone
     private String withoutExponent(String text) {
-        int marker = -1;
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == 'e' || c == 'E') {
-                marker = i;
-                break;
-            }
-        }
+        int marker = exponentMarker(text);
         if (marker < 0) {
             return text;
         }
-        int exponent = parseExponent(text.substring(marker + 1));
+        int exponent = (int) parseExponent(text.substring(marker + 1));
         String mantissa = text.substring(0, marker);
         String sign = "";
         if (mantissa.length() > 0
@@ -465,22 +565,39 @@ abstract class AbstractEvaluator implements Evaluator {
     }
 
     /// Reads the exponent's digits, which [#isNumeric] has already checked.
-    private int parseExponent(String text) {
+    ///
+    /// Exactly, for every exponent a long holds -- which is every exponent
+    /// anything can produce. Stopping partway through the digits made
+    /// 1e1000020 and 1e1000029 the same exponent, so an equality predicate
+    /// for one selected the other, and saturating them to a shared ceiling
+    /// did the same thing one step later. Only a number written with more
+    /// than eighteen digits of exponent is clamped, and it is then clamped to
+    /// a value no real one reaches.
+    private long parseExponent(String text) {
         boolean negative = text.length() > 0 && text.charAt(0) == '-';
         int at = negative || (text.length() > 0 && text.charAt(0) == '+')
                 ? 1 : 0;
-        int value = 0;
+        while (at < text.length() && Character.digit(text.charAt(at), 10) == 0) {
+            at++;
+        }
+        if (text.length() - at > 18) {
+            return negative ? -HUGE_EXPONENT : HUGE_EXPONENT;
+        }
+        long value = 0;
         for (int i = at; i < text.length(); i++) {
-            // Bounded rather than wrapped: an exponent past this writes more
-            // digits than any document holds, and the comparison only needs
-            // the two to stay ordered.
-            if (value > 100000) {
-                break;
-            }
             value = value * 10 + Character.digit(text.charAt(i), 10);
         }
         return negative ? -value : value;
     }
+
+    /// Stands in for an exponent of more than eighteen digits.
+    private static final long HUGE_EXPONENT = 1000000000000000000L;
+
+    /// The largest exponent worth writing out as digits.
+    ///
+    /// Ten thousand places is already far past anything a document carries,
+    /// and past it the digits are compared instead of expanded.
+    private static final long EXPONENT_LIMIT = 10000;
 
     /// Compares two numbers written without an exponent, digit by digit.
     ///

@@ -443,6 +443,28 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void anExponentTooBigToWriteOutIsStillOrdered() {
+        // Writing 1e1000029 out is a million digits nobody wants, and
+        // stopping partway through the exponent -- or saturating it to a
+        // shared ceiling -- made it equal to 1e1000020. Past the expansion
+        // limit the values are ordered by sign, by the power of ten the first
+        // digit sits at, and then by the digits.
+        Result r = Result.fromContent(
+                "<t><p v='1e1000020' n='small'/><p v='1e1000029' n='big'/>"
+                + "<p v='-1e1000029' n='neg'/><p v='0' n='zero'/></t>",
+                Result.XML);
+
+        assertEquals("big", r.getAsString("/t/p[@v='1e1000029']/@n"));
+        assertEquals("small", r.getAsString("/t/p[@v='1e1000020']/@n"));
+        assertEquals("big", r.getAsString("/t/p[@v > '1e1000025']/@n"),
+                "ordering across the expansion limit is wrong");
+        assertEquals("neg", r.getAsString("/t/p[@v < '-1e999999']/@n"),
+                "a negative past the limit is on the wrong side");
+        assertEquals("zero", r.getAsString("/t/p[@v=0]/@n"),
+                "zero stopped being zero");
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for
