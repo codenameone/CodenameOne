@@ -677,12 +677,12 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Because of the way GridBag works there's no terse syntax for it, although one should be possible.
 
-.GridbagLayout sample from the Java tutorial running on Codename One
-image::img/generated/gridbag-layout.png[GridbagLayout sample from the Java tutorial running on Codename One,scaledwidth=20%]
+.GridBagLayout sample from the Java tutorial running on Codename One
+image::img/generated/gridbag-layout.png[GridBagLayout sample from the Java tutorial running on Codename One,scaledwidth=20%]
 
 ==== Group Layout
 
-https://www.codenameone.com/javadoc/com/codename1/ui/layouts/GroupLayout.html[GroupLayout] is a layout that would be familiar to the users of https://netbeans.org/features/java/swing.html[the NetBeans GUI builder (Matisse)]. Its a layout manager that's hard to use for manual coding but is powerful for some elaborate use cases. Although `MiGLayout` and `LayeredLayout` might be superior options.
+https://www.codenameone.com/javadoc/com/codename1/ui/layouts/GroupLayout.html[GroupLayout] is a layout that would be familiar to the users of https://netbeans.org/features/java/swing.html[the NetBeans GUI builder (Matisse)]. Its a layout manager that's hard to use for manual coding but is powerful for some elaborate use cases. Although `MigLayout` and `LayeredLayout` might be superior options.
 
 It was originally added during the LWUIT days as part of an internal try to port Matisse to LWUIT. It's still useful to this day as developers copy and paste Matisse code into Codename One and produce elaborate layouts with drag.
 

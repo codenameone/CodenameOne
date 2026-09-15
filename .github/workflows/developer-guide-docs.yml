@@ -7,6 +7,17 @@ on:
       - 'docs/developer-guide/**'
       - 'docs/demos/**'
       - 'scripts/developer-guide/**'
+      # The API-name check derives the published pages from the javadoc's own
+      # sources, and the guide links into the java.* compatibility classes --
+      # java/util/List.html among them. A change that renames or deletes one
+      # of those without touching docs/ would otherwise skip this job and
+      # leave a dead link behind.
+      - 'Ports/CLDC11/**'
+      # And the script that decides what javadoc publishes at all. The check
+      # mirrors its source roots, its excluded package and its -protected
+      # setting, so a change to any of those moves which links are alive
+      # without touching a page.
+      - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/developer-guide-docs.yml'
       # The build hint table is rendered rather than committed, so a change to
       # anything it is rendered FROM changes what this guide contains without
@@ -340,6 +351,12 @@ jobs:
           # docs/website/**. Putting those paths here would run this whole job
           # (maven install, demo build, screenshots) for every blog post.
           python3 scripts/developer-guide/check-guide-links.py
+          # A class name the guide gets slightly wrong sends the reader looking
+          # for something that is not there, and nothing else here reads the
+          # names: EnclodedImage, ConectionRequest, GenenricListCellRenderer,
+          # BubbleTransiton, SwipableContainer, GridbagLayout,
+          # InifiniteContainer, DataChangeListener and MiGLayout all shipped.
+          python3 scripts/developer-guide/check-guide-api-names.py
 
       - name: Build Developer Guide HTML and PDF
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
