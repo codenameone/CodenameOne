@@ -95,13 +95,18 @@ final class RouteTransitions {
         if (route.isContainerTransform()) {
             String source = route.containerTransformSource();
             if (source != null) {
-                // The real thing: the page grows out of the bounds of what was tapped and
-                // folds back into it on the way out, which is what makes a card feel like
-                // it BECAME the page rather than being replaced by one. Codename One does
-                // this natively -- BubbleTransition expands the destination from a named
-                // component in the outgoing Form.
-                return new com.codename1.ui.animations.BubbleTransition(
-                        ms > 0 ? ms : ZOOM_PAGE_MS, source);
+                // The page grows out of the bounds of what was tapped and folds back into
+                // it on the way out, which is what makes a card feel like it BECAME the
+                // page rather than being replaced by one.
+                //
+                // Not BubbleTransition, which was the closest thing to hand and is a
+                // circular reveal: a hole opening in the screen, always round, always from
+                // the centre of the destination. Material's container transform is a
+                // rounded RECTANGLE travelling from the tapped bounds with its corners
+                // straightening and the two contents crossing over inside it, which is a
+                // different shape and a different anchor.
+                return com.codename1.ui.animations.ContainerTransformTransition.create(
+                        source, ms > 0 ? ms : ZOOM_PAGE_MS);
             }
             // Nothing to grow from -- the tapped surface has no component of its own.
             // A cross-fade at least reads as one surface becoming another.
