@@ -136,8 +136,6 @@ public final class HTML5SecureStorage extends SecureStorage {
         return b.toString();
     }
 
-    private static final String HEX = "0123456789abcdef";
-
     /// One entry, read past Storage's process-local cache.
     ///
     /// readObject answers that cache before it looks at storage and nothing another context

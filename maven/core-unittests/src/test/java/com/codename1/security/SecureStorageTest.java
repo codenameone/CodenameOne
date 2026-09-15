@@ -270,4 +270,35 @@ class SecureStorageTest extends UITestBase {
                 "a very long alias still has to produce a file name");
     }
 
+
+    @Test
+    void twoLongAccountsThatCollideOnHashCodeGetDifferentGates() {
+        // gateName truncates a long account and appended String.hashCode, which is a 32-bit
+        // non-cryptographic hash whose collisions are trivial to write down. Two accounts sharing
+        // one gate is not just contention: the gate carries a mark saying the account behind it
+        // has been created, so the second finds a mark with no value of its own and reports that
+        // somebody else owns it -- for good.
+        StringBuilder prefix = new StringBuilder();
+        for (int iter = 0; iter < 130; iter++) {
+            prefix.append('a');
+        }
+        // "Aa" and "BB" are the textbook String.hashCode collision.
+        String first = prefix + "Aa";
+        String second = prefix + "BB";
+        assertEquals(first.hashCode(), second.hashCode(),
+                "these must collide on hashCode, or this test proves nothing");
+
+        assertNotEquals(SecureStorage.gateName(first), SecureStorage.gateName(second),
+                "a hashCode collision must not become a shared gate");
+    }
+
+    @Test
+    void anOrdinaryAccountNameIsUnchangedByTheDigestPath() {
+        // Only long names take it, so the common case must not move: a rename there would orphan
+        // every gate an installed application already has.
+        String ordinary = "cn1.managed.db.notes";
+        assertTrue(SecureStorage.gateName(ordinary).endsWith(ordinary),
+                "a short account keeps its own name in the gate: "
+                + SecureStorage.gateName(ordinary));
+    }
 }

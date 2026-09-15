@@ -297,11 +297,41 @@ public class SecureStorage {
     protected static String gateName(String account) {
         String encoded = sanitizeNamespace(account == null ? "" : account);
         if (encoded.length() > MAX_GATE_NAME) {
-            encoded = encoded.substring(0, MAX_GATE_NAME)
-                    + "-" + Integer.toHexString(account.hashCode());
+            // A DIGEST of the account, not its hashCode. String.hashCode is a 32-bit
+            // non-cryptographic hash whose collisions are trivial to write down -- "Aa" and "BB"
+            // is the textbook pair -- so two accounts sharing the truncated prefix and colliding
+            // there shared one gate. That is not merely a lock they contend on: the gate carries
+            // a mark saying the account behind it has been created, so once the first account
+            // writes it the second finds a mark with no value of its own and reports that
+            // somebody else owns it, for good. Its managed database or vault key could then never
+            // be created.
+            encoded = encoded.substring(0, MAX_GATE_NAME) + "-" + digestOf(account);
         }
         return "cn1ss-gate-" + applicationNamespace() + "-" + encoded;
     }
+
+    /// The leading bytes of SHA-256 over the account, in hex.
+    ///
+    /// Twelve bytes is far past any accidental collision for the number of accounts one
+    /// application has, and finding a deliberate one means finding a SHA-256 prefix collision.
+    /// Falls back on the old hashCode only where no digest is available at all, which keeps a
+    /// port that cannot hash working rather than failing to name a file.
+    private static String digestOf(String account) {
+        try {
+            byte[] digest = Hash.sha256(account.getBytes("UTF-8"));
+            StringBuilder b = new StringBuilder(24);
+            for (int iter = 0; iter < 12 && iter < digest.length; iter++) {
+                int v = digest[iter] & 0xff;
+                b.append(HEX_DIGITS.charAt(v >> 4));
+                b.append(HEX_DIGITS.charAt(v & 0x0f));
+            }
+            return b.toString();
+        } catch (Exception noDigest) {
+            return Integer.toHexString(account.hashCode());
+        }
+    }
+
+    private static final String HEX_DIGITS = "0123456789abcdef";
 
     /// Leaves room for the application namespace and the prefix inside a 255 byte file name.
     private static final int MAX_GATE_NAME = 120;

@@ -721,6 +721,7 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private void resetPlainKey() {
+        java.util.List<String> removed = new java.util.ArrayList<String>();
         // Deleting the key and dropping the ciphertexts it protected are one step, under
         // the same lock readers and writers hold. Clearing outside it left a window
         // where a writer had already encrypted under the old key and was about to store
@@ -737,10 +738,26 @@ public final class AndroidSecureStorage extends SecureStorage {
             }
             SharedPreferences prefs = plainPrefs();
             if (prefs != null) {
-                // Also commit(), for the same reason: this method's whole purpose is to
-                // make the key deletion and the ciphertext deletion one step, and an
+                // Only what the failed key protected. A device upgraded from API 22 can hold
+                // unmigrated Base64 legacy entries in this same file alongside iv:ciphertext
+                // ones, and a legacy value was never encrypted under the keystore key that has
+                // just become unusable -- it is still perfectly readable. The blanket clear took
+                // those with it, which can permanently orphan a managed database whose key had
+                // not been migrated yet. Recognised by the IV separator, the same way get()
+                // recognises one.
+                //
+                // Also commit(), for the same reason as elsewhere: this method's whole purpose is
+                // to make the key deletion and the ciphertext deletion one step, and an
                 // asynchronous clear can be reordered after a writer's pending write.
-                prefs.edit().clear().commit();
+                SharedPreferences.Editor editor = prefs.edit();
+                for (String account : prefs.getAll().keySet()) {
+                    Object value = prefs.getAll().get(account);
+                    if (!(value instanceof String) || ((String) value).indexOf(':') >= 0) {
+                        editor.remove(account);
+                        removed.add(account);
+                    }
+                }
+                editor.commit();
             }
         }
         // Every gate mark too, for the reason remove() clears one: this drops the value of EVERY
@@ -754,7 +771,14 @@ public final class AndroidSecureStorage extends SecureStorage {
         // lock on a file this process already holds raises OverlappingFileLockException, which is
         // a RuntimeException and would escape a catch written for IOException -- so the ordering
         // is what keeps this correct rather than the catch below.
-        clearEveryGate();
+        //
+        // The cost of being outside it is a window: another process can take a gate, create a
+        // replacement value and mark it, between the clear above and this sweep -- and the sweep
+        // would then truncate that new mark, after which a third process with a stale cache sees
+        // an empty gate and overwrites a value already in use. So a gate is only cleared when the
+        // account behind it has no value left, which is the condition this method set out to
+        // produce and which a replacement written in that window no longer meets.
+        clearGatesFor(removed);
     }
 
     /// Clears the mark and deletes the value as one step, under the lock setIfAbsent takes.
@@ -773,7 +797,9 @@ public final class AndroidSecureStorage extends SecureStorage {
             Log.e(cannotRemove);
             return false;
         } catch (RuntimeException cannotRemove) {
-            // OverlappingFileLockException among them; see truncateUnderLock.
+            // OverlappingFileLockException among them. The lock ordering above is what
+            // prevents it; this is here so that being wrong about that is a refused clear
+            // rather than an exception thrown out of a cleanup path.
             Log.e(cannotRemove);
             return false;
         } finally {
@@ -794,42 +820,41 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
-    private void clearEveryGate() {
-        try {
-            // getContext() here too: resetPlainKey runs when a keystore key has been
-            // invalidated, which a background service can hit before any Activity exists. Through
-            // getActivity() this threw after the preferences had already been cleared, the catch
-            // swallowed it, and every gate stayed marked with its entry gone -- so setIfAbsent
-            // answered null for every account from then on, including once an Activity started.
-            java.io.File dir = new java.io.File(context()
-                    .getApplicationContext().getFilesDir(), "cn1securestorage");
-            java.io.File[] gates = dir.listFiles();
-            if (gates == null) {
-                return;
+    /// Clears the gate mark for each account whose value this reset removed.
+    ///
+    /// By account rather than by walking the directory, and re-checked under the gate's own lock,
+    /// because this runs outside PLAIN_KEY_LOCK and another process can take a gate and create a
+    /// replacement value in the window. Truncating a mark that belongs to that replacement is
+    /// what would let a third process with a stale preferences cache overwrite a value already in
+    /// use. The condition for clearing is the one this method set out to produce -- the account
+    /// has no value -- and a replacement written in the window no longer meets it.
+    private void clearGatesFor(java.util.List<String> accounts) {
+        for (String account : accounts) {
+            java.io.File gate = gateFile(account);
+            if (gate == null || !gate.isFile()) {
+                continue;
             }
-            for (java.io.File gate : gates) {
-                if (gate.isFile() && !truncateUnderLock(gate)) {
-                    Log.p("SecureStorage could not clear the gate mark for " + gate.getName(),
-                            Log.WARNING);
-                }
+            if (!clearGateIfStillUnused(gate, account)) {
+                Log.p("SecureStorage could not clear the gate mark for " + account, Log.WARNING);
             }
-        } catch (Throwable noContext) {
-            Log.e(noContext);
         }
     }
 
-    /// Truncates one gate mark, under the lock setIfAbsent takes.
-    ///
-    /// Truncated, never deleted: what excludes a second writer is the lock held ON this file, and
-    /// removing it while another process holds that lock would have the next caller create a
-    /// different file and lock that instead, which is two writers again. Zero length is the same
-    /// file, so the lock still means what it meant.
-    private boolean truncateUnderLock(java.io.File gate) {
+    private boolean clearGateIfStillUnused(java.io.File gate, String account) {
         java.io.RandomAccessFile handle = null;
         java.nio.channels.FileLock lock = null;
         try {
             handle = new java.io.RandomAccessFile(gate, "rw");
             lock = handle.getChannel().lock();
+            // Gate lock first and then the monitor, which is the order setIfAbsent takes; the
+            // other way round is the inversion this method is placed outside the monitor to avoid.
+            synchronized (PLAIN_KEY_LOCK) {
+                SharedPreferences prefs = plainPrefs();
+                if (prefs != null && prefs.contains(account)) {
+                    // Somebody re-created it while this reset was running. Their mark is theirs.
+                    return true;
+                }
+            }
             handle.setLength(0);
             handle.getChannel().force(true);
             return true;
@@ -837,9 +862,9 @@ public final class AndroidSecureStorage extends SecureStorage {
             Log.e(cannotClear);
             return false;
         } catch (RuntimeException cannotClear) {
-            // OverlappingFileLockException among them. The ordering above is what prevents it;
-            // this is here so that being wrong about that is a refused removal rather than an
-            // exception thrown out of a cleanup path.
+            // OverlappingFileLockException among them. The lock ordering above is what
+            // prevents it; this is here so that being wrong about that is a refused clear
+            // rather than an exception thrown out of a cleanup path.
             Log.e(cannotClear);
             return false;
         } finally {
