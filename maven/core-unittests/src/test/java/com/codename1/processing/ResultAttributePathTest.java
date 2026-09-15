@@ -458,10 +458,29 @@ class ResultAttributePathTest {
         assertEquals("small", r.getAsString("/t/p[@v='1e1000020']/@n"));
         assertEquals("big", r.getAsString("/t/p[@v > '1e1000025']/@n"),
                 "ordering across the expansion limit is wrong");
+        assertEquals("small", r.getAsString("/t/p[@v < '1e1000025']/@n"),
+                "ordering across the expansion limit is wrong");
         assertEquals("neg", r.getAsString("/t/p[@v < '-1e999999']/@n"),
                 "a negative past the limit is on the wrong side");
         assertEquals("zero", r.getAsString("/t/p[@v=0]/@n"),
                 "zero stopped being zero");
+    }
+
+    @Test
+    void anExponentLongerThanAnyNumberTypeIsStillExact() {
+        // Reading the exponent into a long only moves the edge again: past
+        // eighteen digits every value collapsed to one, so
+        // 1e10000000000000000000 and 1e10000000000000000001 compared equal.
+        // The exponent is text and stays text.
+        Result r = Result.fromContent(
+                "<t><p v='1e10000000000000000000' n='low'/>"
+                + "<p v='1e10000000000000000001' n='high'/></t>", Result.XML);
+
+        assertEquals("high", r.getAsString("/t/p[@v='1e10000000000000000001']/@n"));
+        assertEquals("low", r.getAsString("/t/p[@v='1e10000000000000000000']/@n"));
+        assertEquals("high",
+                r.getAsString("/t/p[@v > '1e10000000000000000000']/@n"),
+                "two exponents past every number type did not order");
     }
 
     @Test

@@ -423,8 +423,20 @@ abstract class AbstractEvaluator implements Evaluator {
         if (marker < 0) {
             return false;
         }
-        long exponent = parseExponent(text.substring(marker + 1));
-        return exponent > EXPONENT_LIMIT || exponent < -EXPONENT_LIMIT;
+        String exponent = text.substring(marker + 1).trim();
+        int at = exponent.length() > 0
+                && (exponent.charAt(0) == '-' || exponent.charAt(0) == '+')
+                ? 1 : 0;
+        while (at < exponent.length()
+                && Character.digit(exponent.charAt(at), 10) == 0) {
+            at++;
+        }
+        // By length rather than by value, so no ceiling is involved: more
+        // digits than the limit has cannot be inside it.
+        int digits = exponent.length() - at;
+        return digits > EXPONENT_LIMIT_DIGITS
+                || (digits == EXPONENT_LIMIT_DIGITS
+                    && exponent.substring(at).compareTo(EXPONENT_LIMIT_TEXT) > 0);
     }
 
     /// Orders two values at least one of which is too large to write out.
@@ -451,22 +463,21 @@ abstract class AbstractEvaluator implements Evaluator {
         if (leftNegative != rightNegative) {
             return leftNegative ? -1 : 1;
         }
-        long leftOrder = orderOf(left);
-        long rightOrder = orderOf(right);
-        int magnitude;
-        if (leftOrder != rightOrder) {
-            magnitude = leftOrder < rightOrder ? -1 : 1;
-        } else {
+        int magnitude = compareIntegerText(orderOf(left), orderOf(right));
+        if (magnitude == 0) {
             magnitude = compareFraction(leftDigits, rightDigits);
         }
         return leftNegative ? -magnitude : magnitude;
     }
 
     /// The power of ten the first significant digit of this value sits at.
-    private long orderOf(String text) {
+    ///
+    /// As a signed digit string rather than a number, because the exponent it
+    /// is built from has no bound: clamping one to any ceiling makes every
+    /// value past that ceiling equal, which is the defect this replaced.
+    private String orderOf(String text) {
         int marker = exponentMarker(text);
-        long exponent = marker < 0 ? 0
-                : parseExponent(text.substring(marker + 1));
+        String exponent = marker < 0 ? "0" : text.substring(marker + 1);
         String mantissa = marker < 0 ? text : text.substring(0, marker);
         int at = 0;
         if (at < mantissa.length()
@@ -486,7 +497,107 @@ abstract class AbstractEvaluator implements Evaluator {
             }
             leading++;
         }
-        return exponent + whole - leading - 1;
+        return addSmall(exponent, whole - leading - 1);
+    }
+
+    /// Adds a small whole number to an integer written as text.
+    ///
+    /// Digit by digit, so an exponent of any length keeps every digit it was
+    /// written with. `delta` is the handful of places the mantissa shifts the
+    /// point by, never more than the mantissa is long.
+    private String addSmall(String text, int delta) {
+        String value = text.trim();
+        boolean negative = value.length() > 0 && value.charAt(0) == '-';
+        if (value.length() > 0
+                && (value.charAt(0) == '-' || value.charAt(0) == '+')) {
+            value = value.substring(1);
+        }
+        int at = 0;
+        while (at < value.length() - 1 && Character.digit(value.charAt(at), 10) == 0) {
+            at++;
+        }
+        value = value.substring(at);
+        // Signed arithmetic, one step at a time: the magnitudes are what the
+        // digits hold, and delta is small enough that stepping is exact and
+        // bounded by the mantissa's length.
+        int steps = delta < 0 ? -delta : delta;
+        boolean up = (delta > 0) != negative;
+        for (int i = 0; i < steps; i++) {
+            if (up) {
+                value = incrementDigits(value);
+            } else if (isZeroDigits(value)) {
+                negative = !negative;
+                value = "1";
+            } else {
+                value = decrementDigits(value);
+            }
+        }
+        if (isZeroDigits(value)) {
+            negative = false;
+        }
+        return negative ? "-" + value : value;
+    }
+
+    /// Adds one to a string of digits.
+    private String incrementDigits(String digits) {
+        StringBuilder out = new StringBuilder(digits);
+        int at = out.length() - 1;
+        while (at >= 0) {
+            int digit = Character.digit(out.charAt(at), 10) + 1;
+            if (digit < 10) {
+                out.setCharAt(at, (char) ('0' + digit));
+                return out.toString();
+            }
+            out.setCharAt(at, '0');
+            at--;
+        }
+        return "1" + out.toString();
+    }
+
+    /// Subtracts one from a string of digits that is not zero.
+    private String decrementDigits(String digits) {
+        StringBuilder out = new StringBuilder(digits);
+        int at = out.length() - 1;
+        while (at >= 0) {
+            int digit = Character.digit(out.charAt(at), 10);
+            if (digit > 0) {
+                out.setCharAt(at, (char) ('0' + (digit - 1)));
+                break;
+            }
+            out.setCharAt(at, '9');
+            at--;
+        }
+        int lead = 0;
+        while (lead < out.length() - 1 && out.charAt(lead) == '0') {
+            lead++;
+        }
+        return out.substring(lead);
+    }
+
+    /// Whether every character is a zero digit.
+    private boolean isZeroDigits(String digits) {
+        for (int i = 0; i < digits.length(); i++) {
+            if (Character.digit(digits.charAt(i), 10) != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Compares two whole numbers written as signed text, at any length.
+    private int compareIntegerText(String left, String right) {
+        boolean leftNegative = left.length() > 0 && left.charAt(0) == '-';
+        boolean rightNegative = right.length() > 0 && right.charAt(0) == '-';
+        String leftDigits = leftNegative ? left.substring(1) : left;
+        String rightDigits = rightNegative ? right.substring(1) : right;
+        if (isZeroDigits(leftDigits) && isZeroDigits(rightDigits)) {
+            return 0;
+        }
+        if (leftNegative != rightNegative) {
+            return leftNegative ? -1 : 1;
+        }
+        int magnitude = compareDigits(leftDigits, rightDigits);
+        return leftNegative ? -magnitude : magnitude;
     }
 
     /// The significant digits of a value, ignoring sign, point and exponent.
@@ -532,7 +643,7 @@ abstract class AbstractEvaluator implements Evaluator {
         if (marker < 0) {
             return text;
         }
-        int exponent = (int) parseExponent(text.substring(marker + 1));
+        int exponent = parseExponent(text.substring(marker + 1));
         String mantissa = text.substring(0, marker);
         String sign = "";
         if (mantissa.length() > 0
@@ -564,40 +675,32 @@ abstract class AbstractEvaluator implements Evaluator {
         return sign + out.toString();
     }
 
-    /// Reads the exponent's digits, which [#isNumeric] has already checked.
+    /// Reads a small exponent's digits, which [#isNumeric] has already checked.
     ///
-    /// Exactly, for every exponent a long holds -- which is every exponent
-    /// anything can produce. Stopping partway through the digits made
-    /// 1e1000020 and 1e1000029 the same exponent, so an equality predicate
-    /// for one selected the other, and saturating them to a shared ceiling
-    /// did the same thing one step later. Only a number written with more
-    /// than eighteen digits of exponent is clamped, and it is then clamped to
-    /// a value no real one reaches.
-    private long parseExponent(String text) {
+    /// Only reached for an exponent inside the expansion limit, so it fits an
+    /// int by construction. Every larger one is compared as text instead --
+    /// reading it into a number at all is what made 1e1000020 and 1e1000029
+    /// the same value, whether by stopping partway through the digits or by
+    /// clamping them to a shared ceiling.
+    private int parseExponent(String text) {
         boolean negative = text.length() > 0 && text.charAt(0) == '-';
         int at = negative || (text.length() > 0 && text.charAt(0) == '+')
                 ? 1 : 0;
-        while (at < text.length() && Character.digit(text.charAt(at), 10) == 0) {
-            at++;
-        }
-        if (text.length() - at > 18) {
-            return negative ? -HUGE_EXPONENT : HUGE_EXPONENT;
-        }
-        long value = 0;
+        int value = 0;
         for (int i = at; i < text.length(); i++) {
             value = value * 10 + Character.digit(text.charAt(i), 10);
         }
         return negative ? -value : value;
     }
 
-    /// Stands in for an exponent of more than eighteen digits.
-    private static final long HUGE_EXPONENT = 1000000000000000000L;
-
     /// The largest exponent worth writing out as digits.
     ///
     /// Ten thousand places is already far past anything a document carries,
     /// and past it the digits are compared instead of expanded.
-    private static final long EXPONENT_LIMIT = 10000;
+    private static final String EXPONENT_LIMIT_TEXT = "10000";
+
+    /// How long that limit is, so the test can be made on length first.
+    private static final int EXPONENT_LIMIT_DIGITS = 5;
 
     /// Compares two numbers written without an exponent, digit by digit.
     ///
