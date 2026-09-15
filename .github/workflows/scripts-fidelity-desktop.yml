@@ -79,28 +79,56 @@ permissions:
   contents: read
 
 jobs:
+  # Which legs run is decided HERE and emitted as the matrix, rather than with an `if` on
+  # the scoring job. A job-level `if` cannot see the matrix context -- GitHub rejects the
+  # whole file with "Unrecognized named-value: 'matrix'", and the only symptom is a run
+  # that fails instantly with "this run likely failed because of a workflow file issue"
+  # and no log at all. Building the matrix in a prior job keeps the decision in one place
+  # and costs one ubuntu minute.
+  select:
+    name: select legs
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - id: pick
+        shell: bash
+        env:
+          # On a dispatch, whatever was asked for. On a trigger, only the platforms whose
+          # golden sets are committed -- macos is absent until its set lands.
+          TARGETS: ${{ github.event_name == 'workflow_dispatch' && inputs.targets || 'gated' }}
+        run: |
+          set -eo pipefail
+          case "$TARGETS" in
+            gated)   legs='gnome windows' ;;
+            all)     legs='gnome windows macos' ;;
+            gnome|windows|macos) legs="$TARGETS" ;;
+            *) echo "unknown targets '$TARGETS'" >&2; exit 2 ;;
+          esac
+          entries=''
+          for leg in $legs; do
+            case "$leg" in
+              gnome)   runner=ubuntu-latest ;;
+              windows) runner=windows-latest ;;
+              macos)   runner=macos-15 ;;
+            esac
+            entries="$entries{\"platform\":\"$leg\",\"runner\":\"$runner\"},"
+          done
+          matrix="{\"include\":[${entries%,}]}"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "any=$([ -n "$entries" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "legs: $legs"
+
   fidelity-desktop:
     name: ${{ matrix.platform }}
-    # On a dispatch, whatever was asked for. On a trigger, only the platforms whose
-    # golden sets are committed -- macos is absent from that list until its set lands.
-    if: >-
-      (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.targets == 'all'
-            || github.event.inputs.targets == matrix.platform))
-      || (github.event_name != 'workflow_dispatch'
-          && contains(fromJSON('["windows", "gnome"]'), matrix.platform))
+    needs: select
+    if: needs.select.outputs.any == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: gnome
-            runner: ubuntu-latest
-          - platform: windows
-            runner: windows-latest
-          - platform: macos
-            runner: macos-15
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     env:
       CN1SS_FIDELITY_EPSILON: '2.0'
     steps:
