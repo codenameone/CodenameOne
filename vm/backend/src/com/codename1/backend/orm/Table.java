@@ -209,10 +209,13 @@ final class Table {
     Object[] insertParams(Object entity) throws IOException {
         Object[] out = new Object[insertColumns.length];
         for(int iter = 0 ; iter < insertColumns.length ; iter++) {
-            Object value = definition.get(entity, insertColumns[iter]);
+            Object raw = definition.get(entity, insertColumns[iter]);
             // The key is among these only when the application assigns it,
-            // which is exactly the case key() has something to say about.
-            out[iter] = insertColumns[iter] == idIndex ? key(value) : value;
+            // which is exactly the case key() has something to say about; every
+            // other column still goes through the shared value check.
+            out[iter] = insertColumns[iter] == idIndex
+                    ? key(raw)
+                    : value(raw, columns[insertColumns[iter]].getField());
         }
         return out;
     }
@@ -226,7 +229,8 @@ final class Table {
     Object[] updateParams(Object entity) throws IOException {
         Object[] out = new Object[updateColumns.length + 1];
         for(int iter = 0 ; iter < updateColumns.length ; iter++) {
-            out[iter] = definition.get(entity, updateColumns[iter]);
+            out[iter] = value(definition.get(entity, updateColumns[iter]),
+                    columns[updateColumns[iter]].getField());
         }
         out[updateColumns.length] = key(definition.get(entity, idIndex));
         return out;
@@ -255,10 +259,38 @@ final class Table {
     static final int MAX_ASSIGNED_TEXT_KEY = 255;
 
     /**
+     * {@code value} as a bound column value, or a refusal when the three engines
+     * would not agree about it.
+     *
+     * <p>A NUL inside a string is the case: SQLite and MySQL store it happily --
+     * both keep text with a length rather than a terminator -- while PostgreSQL
+     * refuses the row outright with "invalid byte sequence for encoding UTF8:
+     * 0x00", because its text type cannot hold a zero byte at all. So an entity
+     * that inserted through a whole SQLite development cycle failed the first
+     * time it met the production database. Refused on every engine instead, at
+     * the point the value is bound, so the answer does not depend on which one
+     * is behind it.
+     *
+     * <p>A blob is untouched: a byte[] is exactly where a NUL belongs, and all
+     * three store one. It is TEXT that cannot carry it.
+     */
+    Object value(Object value, String field) throws IOException {
+        if(value instanceof String && ((String)value).indexOf(0) >= 0) {
+            throw new IOException("The value for " + field + " holds a NUL, which "
+                    + "PostgreSQL cannot store in a text column at all -- SQLite and MySQL "
+                    + "would take it, so this row would insert in development and fail in "
+                    + "production. Strip it, or declare the field as byte[], where a NUL is "
+                    + "an ordinary byte on every engine.");
+        }
+        return value;
+    }
+
+    /**
      * {@code value} as a bound key, or a refusal when no engine pair could agree
      * about it. See {@link #MAX_ASSIGNED_TEXT_KEY}.
      */
     Object key(Object value) throws IOException {
+        value = value(value, columns[idIndex].getField());
         if(value instanceof String
                 && !columns[idIndex].isGenerated()
                 && columns[idIndex].getDeclaredType() == null

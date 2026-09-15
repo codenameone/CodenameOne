@@ -190,6 +190,25 @@ public class OrmCheck {
                         ? -1 : largeBack.body.length()));
         notes.delete(large);
 
+        // A NUL INSIDE A STRING. SQLite and MySQL store it -- both keep text
+        // with a length rather than a terminator -- while PostgreSQL refuses the
+        // row with "invalid byte sequence for encoding UTF8: 0x00". So this
+        // inserted through a whole SQLite development cycle and failed the first
+        // time it met production. Refused on every engine now, before binding.
+        Note nul = new Note();
+        nul.title = "has a nul";
+        nul.body = "a" + ((char)0) + "b";
+        String refusedNul;
+        try {
+            notes.insert(nul);
+            refusedNul = "accepted";
+        } catch (Exception err) {
+            refusedNul = "refused";
+        }
+        check("a NUL in a string field is refused on every engine", "refused", refusedNul);
+        // And a byte[] still carries one, because that is what a blob is for --
+        // the payload above already holds a zero byte and round trips.
+
         // And a value in the boxed column comes back as that value.
         back.revision = Long.valueOf(7);
         back.grade = Character.valueOf('A');
@@ -396,6 +415,26 @@ public class OrmCheck {
             check("a key of 256 characters is refused on every engine", "refused", refused);
             check("and nothing was written", "null",
                     String.valueOf(coupons.findById(tooLong.code)));
+
+            // CASE, which MySQL's default collation folds away. Measured: with
+            // the collation left to the server, inserting "A" after "a" gives
+            // "Duplicate entry 'a' for key 'PRIMARY'" there while SQLite and
+            // PostgreSQL store two rows. Two keys an application issued as
+            // distinct became one, on one engine.
+            Coupon upper = new Coupon();
+            upper.code = "CaseKey";
+            upper.discount = 3;
+            coupons.insert(upper);
+            Coupon lower = new Coupon();
+            lower.code = "casekey";
+            lower.discount = 4;
+            coupons.insert(lower);
+            check("keys differing only in case are two rows", "3",
+                    String.valueOf(coupons.findById("CaseKey").discount));
+            check("and the other is its own row", "4",
+                    String.valueOf(coupons.findById("casekey").discount));
+            coupons.delete(upper);
+            coupons.delete(lower);
 
             check("delete by a string key reports the row", "true",
                     String.valueOf(coupons.delete(ten)));
