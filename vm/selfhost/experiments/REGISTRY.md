@@ -1057,3 +1057,63 @@ Census at exit went from `traced 31% / aging 40% / dead 29%` to
   GcMarkCompleteness -- all pass.
 - Output byte-identical to the JVM translator across every benchmark arm and every
   A/B run; the emitted file count is checked on every run.
+
+---
+
+# Round 7: pushed, and what review found
+
+## The performance is now gated, not just recorded
+
+`vm/selfhost/perf-guard.sh` fails when the JDK 25 ratio exceeds 2.00x time or 2.10x
+memory. Both defaults it protects were set by a measurement that a later configuration
+change invalidated, and -- this is the point -- NEITHER REGRESSION WOULD FAIL A SINGLE
+FUNCTIONAL TEST IN THIS TREE. Losing parallel marking costs ~5x wall clock and losing
+the 1M worklist costs ~25% of peak, and both look like ordinary code.
+
+The ceilings carry headroom over measured (1.25-1.35x time, 1.59-1.85x memory) while
+sitting well under the 5.09x / 2.35x they exist to catch. The bench refuses to print a
+ratio unless every arm emitted identical C, so a green guard is also a correctness
+result.
+
+## Re-verified across the master merge
+
+A merge that touches GC code can cost the gains silently, so the ratios were re-measured
+either side of it: time 1.35x -> 1.33-1.34x, memory medians ~2% apart. Held.
+
+Note how load distorts ABSOLUTE numbers -- jdk25's own peak read 525MB on a quiet box
+and 709MB on a loaded one, for the same work. Only ratios measured in one sitting mean
+anything here.
+
+## Two review findings, both real, both mine to have caused
+
+**The Windows marker pool was uncapped.** The POSIX branch capped a CPU-derived count at
+4 and the `_WIN32` branch did not. Harmless while the hardcoded serial default made both
+branches unreachable -- defaulting to CPU-derived marking is what turned it into an
+exposure. gcMarkPoolEnsure creates a persistent helper per marker, each reserving 16MB of
+stack, so a 64-logical-CPU Windows host would reserve ~1GB for helpers the measurements
+say do nothing past 4.
+
+**The staleness guard could not see a DELETION.** It tested existence plus `find -newer`;
+a removed or renamed file makes no remaining file newer, so maven never re-ran, `mvn
+clean` never ran, and the deleted file survived in target/classes. The JVM translator
+then keeps embedding a runtime resource that is gone from the tree -- and because BOTH
+sides of the self-host comparison consume that same stale copy, GATE A STILL PASSES. A
+gate that cannot fail on a deleted file is not covering deletions. Fixed with a manifest
+diff, which the JavaAPI block twenty lines below already used for this exact reason.
+
+### The negative control caught a bug in the FIX
+
+The first version staged the manifest inside `target/`, which `mvn clean` deletes -- so
+it was gone before it could be compared, the guard rebuilt on every run, and then failed
+on the missing file. Only the "must stay SILENT when nothing changed" half of the control
+exposed that; "fires on a deletion" passed happily. Now verified three ways: fires on a
+deleted resource, fires when it is restored, silent when nothing changed.
+
+## One failure correctly NOT chased
+
+`BackendJavaSeRuntimeTest.javaSeSelfTest` fails locally and is master's new backend
+module meeting a partially-installed local Maven repository. The whole branch touches
+nothing under `backend/`, `demo/` or `maven/` -- verified by listing every changed file
+against master -- and CI's build-test (17) and (21) pass. The test SKIPS on a fresh
+worktree and runs on a populated one, so a worktree A/B is confounded by build state
+rather than by code; scope is the honest discriminator here, not the worktree.

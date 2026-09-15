@@ -13865,13 +13865,25 @@ static int gcMarkResolveThreadCount() {
     // elsewhere in the branch GC changes (nursery / tagged-int / BiBOP sweep).
     int n = 1;
 #elif defined(_WIN32)
-    // no sysconf in the Win32 shim; NUMBER_OF_PROCESSORS is always set on Windows
-    const char* np = getenv("NUMBER_OF_PROCESSORS");
-    long ncpu = np != 0 ? atol(np) : 2;
-    int n = (int)(ncpu - 1);
-    if(n > CN1_GC_MARK_THREAD_CAP) {
-        n = CN1_GC_MARK_THREAD_CAP;
-    }
+    // WINDOWS STAYS SERIAL BY DEFAULT, and this is not caution for its own sake -- it is
+    // the one configuration where making marking parallel was MEASURED to break.
+    //
+    // `ParparVM Java Tests (Windows)` / screenshot-capture (arm64) went from green to
+    // red on the commit that made marking CPU-derived: the translated app reported
+    // pass=113 fail=24 not-run=54 and emitted 132 of 166 screenshots, i.e. it stopped
+    // part-way through the suite, while the same job is green on master and was green on
+    // this branch immediately before. Every arm that validates parallel marking --
+    // the GC suite at 1 and 4 markers on arm64 and x64, and every measurement behind the
+    // defaults above -- runs on POSIX threads. Windows does not: it goes through the
+    // Win32 pthread SHIM, which the parallel marker had never run on, because this
+    // branch was hardcoded to one marker.
+    //
+    // So the shim is unvalidated for this, not proven broken, and the honest default is
+    // the behaviour Windows already shipped. -DCN1_GC_MARK_THREADS=N turns it on there
+    // for whoever debugs the shim; re-enabling it by default needs that Windows job
+    // green, not a local measurement on another platform.
+    (void)CN1_GC_MARK_THREAD_CAP;
+    int n = 1;
 #else
     long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
     int n = (int)(ncpu - 1);

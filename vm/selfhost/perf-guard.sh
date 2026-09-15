@@ -22,6 +22,15 @@
 #
 # Before these two landed the same corpus measured 5.09x time and 2.35x memory, so both
 # ceilings sit well clear of noise and well below the regression they exist to catch.
+#
+# VALIDATED BY WATCHING IT FAIL, against a deliberately regressed build
+# (-DCN1_GC_SERIAL_MARK): reports time=31.74x memory=2.42x, prints both REGRESSION lines
+# and exits 1.
+#
+# DO NOT PIPE IT. `perf-guard.sh | tee log` reports $? from tee, not from this script, so
+# the run looks green while the gate is screaming -- which is exactly how the failure
+# above first read as a pass. Redirect instead (`perf-guard.sh > log 2>&1`), or set
+# `set -o pipefail` in the caller.
 set -e
 cd "$(dirname "$0")"
 ROUNDS="${1:-5}"
