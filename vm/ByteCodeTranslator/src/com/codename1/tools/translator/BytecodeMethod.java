@@ -2199,7 +2199,29 @@ public class BytecodeMethod implements SignatureSet {
         }
 
         if(includeStaticInitializer) {
-            b.append("__STATIC_INITIALIZER_");
+            // GUARD IT. This is the INTERFACE thunk, and it used to call the class
+            // initializer UNCONDITIONALLY -- every other class-init site in the
+            // translator tests the flag first (see the frameless prologue above,
+            // TypeInstruction and FusedConstructor). The initializer returns
+            // immediately once loaded, but it is a huge function that clang will never
+            // inline, so the call itself was the cost: an unconditional, non-inlinable
+            // call on the hottest dispatch path this VM has.
+            //
+            // Iterator.hasNext() and Iterator.next() are interface thunks, so a
+            // for-each paid it TWICE PER ELEMENT. Profiled on the self-hosting corpus,
+            // __STATIC_INITIALIZER_java_util_Iterator alone was 4.4% of main-thread
+            // self time doing nothing but returning.
+            //
+            // The flag is the right thing to test and the ordering is not incidental:
+            // class__X.initialized is RELEASE-stored after the vtable and the
+            // classToInterfaceMap rows are written, and this thunk is about to index
+            // exactly those rows -- so the ACQUIRE load here is what makes them visible.
+            // Testing __X_LOADED__ instead would be a weaker gate that publishes
+            // nothing; that distinction is why the inline guards were moved onto this
+            // flag in the first place.
+            b.append("if(__builtin_expect(!__atomic_load_n(&class__");
+            b.append(cls);
+            b.append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
             b.append(cls);
             b.append("(threadStateData);\n    ");
         }
