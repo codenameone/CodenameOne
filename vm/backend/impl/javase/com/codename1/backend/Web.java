@@ -164,6 +164,35 @@ public final class Web {
         return request("POST", url, headers, json == null ? new byte[0] : json.getBytes("UTF-8"));
     }
 
+    /*
+     * BOUND THE RESPONSE HEADER BLOCK OURSELVES, rather than inheriting whatever
+     * this JDK happens to default to.
+     *
+     * A body ceiling does not cover the headers: libcurl caps one header LINE and
+     * nothing caps how many arrive, so an upstream streaming legal header lines can
+     * exhaust the process before a body exists at all. On the translated arm
+     * libcurl's own 300KB aggregate cap answers that. On this arm the equivalent is
+     * the JDK's, and its default is NOT something to rely on -- it is a property
+     * whose value has changed across 8u releases, and on a JDK 8u that does not set
+     * one, SelfTest's "an oversized header block is refused" case reported
+     * "accepted 7": the block was read in full and this process was as exposed as
+     * having no bound at all. Same code, same test, a different JDK.
+     *
+     * Set here so the answer is this project's on every JDK, and matched to
+     * libcurl's 300KB so the two arms refuse at the same size. A value the operator
+     * has already chosen is left alone -- this is a floor under a missing default,
+     * not a policy that overrides one.
+     *
+     * The property is read once when the HTTP protocol handler initialises, so it
+     * has to be set before the first connection; a static initialiser on the class
+     * that makes every outbound request is the last point that is still true.
+     */
+    static {
+        if(System.getProperty("sun.net.http.maxHeaderSize") == null) {
+            System.setProperty("sun.net.http.maxHeaderSize", "307200");
+        }
+    }
+
     /**
      * The ceiling on one outbound response body, from CN1_WEB_MAX_RESPONSE_MB.
      *
