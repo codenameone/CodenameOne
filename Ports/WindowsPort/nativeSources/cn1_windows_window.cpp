@@ -1275,10 +1275,6 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
     ExitProcess(3);
 }
 
-} /* extern "C" */
-
-#endif /* _WIN32 */
-
 /* ---------------------------------------------------------------- dark mode */
 
 /* True when the user has chosen the dark app theme.
@@ -1295,6 +1291,15 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
  * The signature is ParparVM's and is checked by nothing at build time -- a wrong name
  * compiles, links, and leaves the Java method looking unused to the dead-code pass,
  * which then removes it. scripts/check-native-signatures.sh is what catches that.
+ *
+ * And it has to sit INSIDE this file's extern "C" block, which is why it is here rather
+ * than at the end of the file. This is a .cpp, so a definition outside that block gets
+ * C++ mangling -- the symbol is then present in the object and absent under the name the
+ * translated C calls, and the whole application fails at link with "undefined symbol:
+ * com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean". The
+ * signature verifier cannot see this: the name is spelled correctly in the source, and
+ * linkage is not something it reads. The same trap applies to the #ifdef _WIN32 guard
+ * above, which this was also written outside of.
  */
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean(CODENAME_ONE_THREAD_STATE) {
     DWORD value = 1;
@@ -1311,3 +1316,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_bo
     }
     return value == 0 ? JAVA_TRUE : JAVA_FALSE;
 }
+
+} /* extern "C" */
+
+#endif /* _WIN32 */
