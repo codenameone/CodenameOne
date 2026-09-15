@@ -67,16 +67,32 @@ public class FadeThroughTransition extends AnimatedWidget {
         return child;
     }
 
+    /// The pattern's own curves: it leaves on one and arrives on the other.
+    private static final com.codename1.flutter.animation.Cubic IN_CURVE =
+            new com.codename1.flutter.animation.Cubic(0.0, 0.0, 0.2, 1.0);
+    private static final com.codename1.flutter.animation.Cubic OUT_CURVE =
+            new com.codename1.flutter.animation.Cubic(0.4, 0.0, 1.0, 1.0);
+
     @Override
     public Widget build(BuildContext context) {
         double in = value(animation, 1);
         double out = value(secondaryAnimation, 0);
 
         // Incoming: nothing for the first 30%, then fade up while scaling 92% -> 100%.
-        double opacity = FadeScaleTransition.interval(in, 0.3, 1.0);
-        double scale = 0.92 + 0.08 * FadeScaleTransition.interval(in, 0.3, 1.0);
-        // Outgoing: fade away over the first 30% of the secondary run.
-        opacity *= 1 - FadeScaleTransition.interval(out, 0.0, 0.3);
+        // Outgoing: fade away over that first 30%.
+        //
+        // Both eased, and on DIFFERENT curves -- the pattern leaves fast and arrives
+        // slow, and running either leg linearly is most of what makes it read as a cut
+        // rather than as a dissolve. The old page is the one you actually watch: it
+        // carries the whole screen for the first 30% while the new one is still
+        // invisible, and linearly it is only 44% gone a third of the way in where the
+        // curve has it at 58%.
+        double enter = IN_CURVE.transform(
+                FadeScaleTransition.interval(in, 0.3, 1.0));
+        double opacity = enter;
+        double scale = 0.92 + 0.08 * enter;
+        opacity *= 1 - OUT_CURVE.transform(
+                FadeScaleTransition.interval(out, 0.0, 0.3));
 
         Opacity layer = new Opacity();
         layer.opacity(opacity);
