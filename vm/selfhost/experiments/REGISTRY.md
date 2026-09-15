@@ -1922,3 +1922,43 @@ that predated the code they were probing for. **A probe that prints nothing is n
 evidence that the code did not run.** The first thing to check is what the harness is
 actually executing, which `verify-selfhost.sh` had been printing on its first line the
 whole time.
+
+### CORRECTION to the Round 13 table: that was measured without LTO, and it ships with it
+
+The Round 13 figures (indexed 19ms, 1.27x JDK 25) are real but they are **not the shipping
+shape**, and the conclusion drawn from them -- "the residual is no longer dispatch" -- was
+wrong about what the residual was. `translate-and-build.sh` links without LTO by default.
+The indexed loop reads three ArrayList fields (`size`, `array`, `firstIndex`) and calls
+`Integer.intValue()`, all defined in OTHER translation units, so without LTO the loop that
+was supposed to have no calls in it has **four calls per element**.
+
+iOS ships ThinLTO -- `LLVM_LTO = YES_THIN` in both Xcode templates and `-flto=thin` on the
+CMake Release targets -- so that is the configuration the number should come from.
+Interleaved, min of 12 inner reps, 7 rounds:
+
+| arm | ms | vs JDK 25 |
+|---|---:|---|
+| indexed, no LTO | 19-20 | 1.27x slower |
+| **indexed, ThinLTO** | **4-6** | **~3x FASTER** |
+| JDK 25 | 15 | 1.00 |
+
+Confirmed structurally, not just by the clock: `get_field_java_util_ArrayList_size` and
+`get_field_java_util_ArrayList_array` are **absent from the symbol table** of the ThinLTO
+binary and present in the non-LTO one.
+
+Non-vacuity checked, because min-of-N over an unchanging list invites a compiler to compute
+the sum once: doubling the outer pass count doubles the time (4-6ms -> 10ms), so the work
+is not hoisted across reps.
+
+**Why it beats JDK 25 rather than merely matching it** is the representation, not the
+codegen. `Integer.valueOf(i)` is a TAGGED IMMEDIATE here for every value, so the loop
+walks one array of words and shifts -- no dereference per element. HotSpot's Integer cache
+covers only -128..127, so 19,872 of these 20,000 elements are distinct heap objects and
+every `intValue()` is a load from a scattered allocation. That is the "fixed in-place RAM,
+zero copying" advantage doing real work, and it is invisible on any benchmark whose
+elements are not boxed.
+
+**The measurement lesson, which is the same one as the stale binary above:** a ratio is
+only about the VM if the arm being measured is the arm that ships. Two figures in one
+session were quoted from a configuration nobody runs -- an -O1 gate binary would have been
+a third. `ForEachBench`'s javadoc now carries the LTO requirement and the scaling check.
