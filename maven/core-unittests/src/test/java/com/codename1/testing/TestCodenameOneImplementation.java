@@ -3442,6 +3442,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     private boolean storageEnumerationUnavailable;
 
+    /**
+     * Makes {@link #listStorageEntries()} answer an EMPTY array, which is what the JavaScript
+     * port does when IndexedDB refuses the enumeration -- it catches the IOException and returns
+     * {@code new String[]{}}. Indistinguishable from a store that holds nothing, which is the
+     * whole difficulty.
+     *
+     * @param empty whether enumeration should report an empty store
+     */
+    public void setStorageEnumerationEmpty(boolean empty) {
+        storageEnumerationEmpty = empty;
+    }
+
+    private boolean storageEnumerationEmpty;
+
     @Override
     public OutputStream createStorageOutputStream(String name) {
         if (duringStorageWrite != null && name != null && name.equals(duringStorageWriteFor)) {
@@ -3477,6 +3491,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public String[] listStorageEntries() {
         if (storageEnumerationUnavailable) {
             return null;
+        }
+        if (storageEnumerationEmpty) {
+            return new String[0];
         }
         return storageEntries.keySet().toArray(new String[0]);
     }

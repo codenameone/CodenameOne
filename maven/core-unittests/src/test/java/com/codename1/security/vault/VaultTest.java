@@ -2204,6 +2204,34 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anEmptyListingThatContradictsTheRecordIsNotBelieved() {
+        // JavaSE says so with null; the browser does not. HTML5Implementation catches the
+        // IndexedDB IOException and answers an EMPTY array, which is indistinguishable from a
+        // store holding nothing -- so a transient failure skipped every secret and went on to
+        // delete the record and the device key, orphaning those ciphertexts for good. The vault's
+        // own record is still on disk at that point, so a listing reporting nothing while that
+        // record exists is contradicting something observable.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertTrue(vault.putSecret("token", pw("abc123")).get().booleanValue());
+
+        TestCodenameOneImplementation.getInstance().setStorageEnumerationEmpty(true);
+        try {
+            assertEquals(VaultError.STORAGE_UNAVAILABLE, errorOf(vault.destroyLocalData()),
+                    "an empty listing beside a record that exists must not be taken at face "
+                    + "value");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageEnumerationEmpty(false);
+        }
+
+        // Nothing was removed, so the vault and its secret are both still here.
+        Vault reopened = Vault.named(name).configure(fast());
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+        assertArrayEquals(pw("abc123"), reopened.getSecret("token").get());
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

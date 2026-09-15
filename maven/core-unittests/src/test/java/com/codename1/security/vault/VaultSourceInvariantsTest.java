@@ -146,6 +146,24 @@ class VaultSourceInvariantsTest extends UITestBase {
                 "reading the field here stamps the value AFTER any replacement: " + args);
     }
 
+    @Test
+    void theIdleTimeoutIsMeasuredOnAClockNobodyCanSet() {
+        // currentTimeMillis is the wall clock and it moves: a user correcting the date, or an NTP
+        // step, sends it backwards, and the idle subtraction then goes negative -- so the vault
+        // stays unlocked until the clock catches up, which can turn a one-minute timeout into
+        // hours. A test cannot move the system clock, so what is held here is that neither side
+        // of the comparison reads it. ShieldToken measures its own expiry the same way.
+        String source = readVaultSource();
+        for (String signature : new String[]{
+                "private void checkAutoLock()", "private void touch()"}) {
+            String body = methodBody(source, signature);
+            assertTrue(body.indexOf("System.nanoTime()") > 0,
+                    signature + " must measure on the monotonic clock: " + body);
+            assertTrue(body.indexOf("currentTimeMillis") < 0,
+                    signature + " must not read the wall clock: " + body);
+        }
+    }
+
     /// Methods that write and deliberately do not re-check the lock generation afterwards.
     ///
     /// Not an allow-list of what to scan -- the scan below is over every public asynchronous

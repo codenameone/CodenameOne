@@ -844,7 +844,16 @@ public final class Vault {
                     // JavaSE answers getStorageDir().list(), and File.list() is null for a
                     // directory that does not exist or cannot be read.
                     String[] entries = storage.listEntries();
-                    if (entries == null) {
+                    if (entries == null || (entries.length == 0
+                            && storage.exists(metadataKey()))) {
+                        // Null is JavaSE, where File.list() says so. The second half is the
+                        // browser, where it does not: HTML5Implementation catches the IndexedDB
+                        // IOException and answers an EMPTY array, which is indistinguishable from
+                        // a store that holds nothing -- so a transient failure here skipped every
+                        // secret and went on to delete the record and the device key, orphaning
+                        // the ciphertexts for good. This vault's own record is still on disk at
+                        // this point, so a listing that reports nothing while that record exists
+                        // is contradicting something we can see, and is not to be believed.
                         throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                                 "this device's storage cannot be enumerated, so the secrets in "
                                 + "this vault cannot be found to delete; nothing was removed");
@@ -2398,13 +2407,21 @@ public final class Vault {
 
     private void checkAutoLock() {
         long idle = options.getAutoLockMillis();
-        if (idle > 0 && dataKey != null && System.currentTimeMillis() - lastActivity > idle) {
+        if (idle > 0 && dataKey != null
+                && (System.nanoTime() - lastActivity) / 1000000L > idle) {
             lock();
         }
     }
 
+    /// Records activity on a MONOTONIC clock.
+    ///
+    /// System.currentTimeMillis() is the wall clock and it moves: a user correcting the date, or
+    /// an NTP step, sends it backwards, and the subtraction in checkAutoLock then goes negative
+    /// -- so the vault stays open until the clock catches up, which can turn a one-minute idle
+    /// timeout into hours. nanoTime has no relationship to the date and cannot be set;
+    /// ShieldToken measures its own expiry this way for the same reason.
     private void touch() {
-        lastActivity = System.currentTimeMillis();
+        lastActivity = System.nanoTime();
     }
 
     /// The lock generation, for a handle to notice that it has been invalidated.
