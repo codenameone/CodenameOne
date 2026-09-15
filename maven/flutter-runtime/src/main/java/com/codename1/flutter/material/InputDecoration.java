@@ -170,6 +170,25 @@ public class InputDecoration {
             Boolean filled, com.codename1.flutter.Color fillColor) {
         InputDecoration d = new InputDecoration();
         d.hintText(hintText);
+        // No border and no padding are what COLLAPSED means -- they are the whole point
+        // of the factory, not defaults it happens to inherit. Keeping only the hint left
+        // the result indistinguishable from a plain InputDecoration, so every collapsed
+        // field still drew the full outlined box: Reply's compose screen boxed its
+        // subject and its message body, where the reference has neither.
+        d.border(com.codename1.flutter.InputBorder.none);
+        d.contentPadding(com.codename1.flutter.EdgeInsets.all(0));
+        if (border instanceof com.codename1.flutter.InputBorder) {
+            d.border((com.codename1.flutter.InputBorder) border);
+        }
+        if (hintStyle instanceof com.codename1.flutter.TextStyle) {
+            d.hintStyle((com.codename1.flutter.TextStyle) hintStyle);
+        }
+        if (filled != null) {
+            d.filled(filled.booleanValue());
+        }
+        if (fillColor != null) {
+            d.fillColor(fillColor);
+        }
         return d;
     }
 }
