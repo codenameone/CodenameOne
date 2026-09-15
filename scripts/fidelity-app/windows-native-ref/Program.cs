@@ -332,10 +332,28 @@ public partial class App : Application
             bool isForeground = await TryTakeForegroundAsync(hwnd);
             if (!isForeground)
             {
-                _blockers.Add("the window is unoccluded but never became active "
-                    + $"({DescribeForegroundWindow()}), so its title bar and backdrop would "
-                    + "be captured in the inactive style");
-                return;
+                // Recorded, not fatal -- and that distinction is the point of the measurement
+                // that prompted it. Sampling the earlier capture's title bar found its
+                // darkest glyph at (145,145,145); an active Windows 11 title bar draws that
+                // text near black, so the window really is rendering inactive.
+                //
+                // What that costs depends on what is being photographed. The title bar and
+                // the Mica backdrop are drawn differently for an inactive window. WinUI
+                // CONTROLS are not: unlike AppKit, which greys every control in an inactive
+                // window and is exactly why the macOS probe treats activation as fatal.
+                //
+                // So a widget tile is unaffected and a window-chrome tile would not be, and
+                // the tiles this reference set needs first are widget tiles. Blocking on it
+                // would refuse usable captures for a property they do not depend on, which is
+                // the same mistake the occlusion check had to be rewritten to stop making.
+                //
+                // TO VERIFY before any window-chrome or Mica tile is captured: the claim that
+                // WinUI controls render identically inactive is reasoned from the platform's
+                // behaviour, not yet measured here. Capture the same control active and
+                // inactive and diff them.
+                Console.WriteLine("NATIVEREF:WARN could not take the foreground "
+                    + $"({DescribeForegroundWindow()}); widget tiles are unaffected, window "
+                    + "chrome and Mica would be. Recorded in the manifest.");
             }
             // Activating can re-order windows, so confirm nothing slid back over us.
             atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
@@ -349,7 +367,23 @@ public partial class App : Application
             await Task.Delay(300);
             Console.WriteLine("NATIVEREF:INFO active and unoccluded");
 
-            var pos = new { X = r.Left, Y = r.Top };
+            // The tile is the CLIENT area, not the whole window. A widget reference wants the
+            // widgets; the title bar is chrome we cannot reliably activate on this image, and
+            // including it would bake an inactive title bar into every tile. A window-chrome
+            // tile, when there is one, is a separate capture with its own requirements.
+            GetClientRect(hwnd, out RECT clientRect);
+            var clientOrigin = new POINT { X = 0, Y = 0 };
+            ClientToScreen(hwnd, ref clientOrigin);
+            int clientW = clientRect.Right - clientRect.Left;
+            int clientH = clientRect.Bottom - clientRect.Top;
+            if (clientW <= 0 || clientH <= 0)
+            {
+                _blockers.Add($"the client area has no size ({clientW}x{clientH})");
+                return;
+            }
+            w = clientW;
+            h = clientH;
+            var pos = new { X = clientOrigin.X, Y = clientOrigin.Y };
             _stage = "bitblt";
             IntPtr screen = GetDC(IntPtr.Zero);
             IntPtr mem = CreateCompatibleDC(screen);
@@ -374,16 +408,14 @@ public partial class App : Application
                 // utterly empty window -- which is exactly what it did: a captured
                 // cn1-native-ref frame with a correct Windows 11 title bar and nothing at
                 // all beneath it.
-                // Sample the client background well away from the button and record it.
+                // The captured tile is now exactly the client area, so these offsets are
+                // simply the whole image.
+                // Sample the background well away from the button and record it.
                 // Whether the Mica backdrop is actually reaching the window is otherwise an
                 // eyeball judgement on a PNG: a flat theme fill and a Mica surface over a
                 // pale desktop look similar at a glance, and "mica_supported: true" only
                 // says the OS could draw it, not that this window got it.
-                GetClientRect(hwnd, out RECT cr);
-                var origin = new POINT { X = 0, Y = 0 };
-                ClientToScreen(hwnd, ref origin);
-                int cx = origin.X - r.Left, cy = origin.Y - r.Top;
-                int cw = cr.Right - cr.Left, ch = cr.Bottom - cr.Top;
+                int cx = 0, cy = 0, cw = w, ch = h;
                 if (cw > 0 && ch > 0 && cx >= 0 && cy >= 0 && cx + cw <= w && cy + ch <= h)
                 {
                     var bg = image.GetPixel(cx + cw * 3 / 4, cy + ch * 3 / 4);
@@ -471,6 +503,15 @@ public partial class App : Application
             await Task.Delay(60);
             mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
             await Task.Delay(500);
+
+            // Retry the API after the click. SetForegroundWindow is allowed when the calling
+            // process received the last input event, which a real click is -- so the attempt
+            // that was refused a moment ago may now be granted.
+            for (int i = 0; i < 10 && GetForegroundWindow() != hwnd; i++)
+            {
+                SetForegroundWindow(hwnd);
+                await Task.Delay(150);
+            }
         }
         return GetForegroundWindow() == hwnd;
     }
