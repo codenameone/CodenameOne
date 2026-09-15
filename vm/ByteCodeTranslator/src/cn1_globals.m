@@ -13015,6 +13015,13 @@ JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz
 }
 
 JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {
+    // primitiveSize and dim are stored in a BYTE each (see struct JavaArrayPrototype).
+    // Every in-tree caller passes a sizeof() of at most 8 and a dimension of at most 4, so
+    // this cannot fire today -- it is here because the failure it guards is silent: a
+    // truncated primitiveSize is a wrong element stride, and a wrong stride reads and
+    // writes past the payload with nothing thrown.
+    CODENAME_ONE_ASSERT(primitiveSize > 0 && primitiveSize <= 255);
+    CODENAME_ONE_ASSERT(dim > 0 && dim <= 255);
     int actualSize = length * primitiveSize;
     JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, sizeof(struct JavaArrayPrototype) + actualSize + sizeof(void*), type);
     (*array).length = length;
@@ -13031,6 +13038,9 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
 }
 
 JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim, int alignment) {
+    // See allocArray: both are stored in a byte each and truncation is silent.
+    CODENAME_ONE_ASSERT(primitiveSize > 0 && primitiveSize <= 255);
+    CODENAME_ONE_ASSERT(dim > 0 && dim <= 255);
     int actualSize = length * primitiveSize;
     int requestedAlignment = alignment;
     if (requestedAlignment < (int)sizeof(void*)) {
