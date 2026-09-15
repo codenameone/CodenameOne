@@ -426,14 +426,33 @@ public final class AndroidSecureStorage extends SecureStorage {
             }
             try {
                 // After the write, never before: a mark left by a store that then failed would
-                // make the account permanently uncreatable, which is worse than the race. If
-                // marking fails the value is still stored, so this still answers with it -- the
-                // next caller is then no worse off than it was before any of this existed.
+                // make the account permanently uncreatable, which is worse than the race.
                 handle.seek(0);
                 handle.write(1);
                 handle.getChannel().force(true);
             } catch (java.io.IOException cannotMark) {
+                // Fails CLOSED. An earlier version logged this and answered with the value on
+                // the reasoning that it was stored either way -- which gives away the entire
+                // mechanism, because the mark is the ONLY thing that stops the stale-cache case
+                // two branches above. A second process whose SharedPreferences was cached before
+                // this write reads no value AND no mark, takes the gate, and stores a different
+                // managed database or vault key over this one -- while this caller has been told
+                // it owns the first and is already encrypting under it. That data is then
+                // orphaned for good.
+                //
+                // So the candidate is withdrawn and this reports nothing. Even if the removal
+                // itself fails, answering null is what makes it safe: the caller never uses this
+                // value, so nothing is encrypted under it and a later winner overwriting it
+                // costs nothing. The retry is the caller's, and it is a retry rather than a loss.
                 Log.e(cannotMark);
+                if (!remove(account)) {
+                    // Already covered by the paragraph above: this leaves a value stored under
+                    // no mark, and answering null is what keeps that harmless, because the caller
+                    // never uses it and so nothing is encrypted under it.
+                    Log.p("SecureStorage: the unmarked candidate could not be withdrawn",
+                            Log.WARNING);
+                }
+                return null;
             }
             return value;
         } catch (java.io.IOException cannotLock) {
