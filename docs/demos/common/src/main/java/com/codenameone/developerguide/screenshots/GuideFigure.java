@@ -41,4 +41,21 @@ public interface GuideFigure {
     /// Builds the form to photograph. Called on the Codename One EDT with the
     /// theme and appearance already installed.
     Form build();
+
+    /// Puts the form into the state worth photographing, after it has been
+    /// shown and laid out. Does nothing by default.
+    ///
+    /// Anything a component only accepts once it is initialised belongs here
+    /// rather than in [#build]: a Tree ignores expandPath until it has been
+    /// added and shown, so a figure that expanded it while building came out
+    /// as a single collapsed root. The same is true of anything that has to
+    /// measure itself first -- selecting a row, scrolling to a component,
+    /// opening a side menu.
+    ///
+    /// The renderer lays the form out again afterwards, so a change made here
+    /// is reflected in the picture.
+    ///
+    /// - `form`: the form [#build] returned, now shown and laid out
+    default void afterShow(Form form) {
+    }
 }

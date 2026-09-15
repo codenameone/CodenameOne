@@ -124,7 +124,7 @@
 ///
 /// ### Dialog
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-dialog-modal-south.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-dialog-modal-south.png)
 /// `com.codename1.ui.Dialog` allows us to notify/ask the user in a modal/modless way.
 ///
 /// ### InfiniteContainer
@@ -204,7 +204,7 @@
 ///
 /// ### Tree
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-tree-xml.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-tree-xml.png)
 /// `com.codename1.ui.tree.Tree` displays data in a tree like hierarchy
 ///
 /// ### ChartComponent
@@ -226,7 +226,7 @@
 ///
 /// ### InteractionDialog
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-interaction-dialog.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-interaction-dialog.png)
 /// `com.codename1.components.InteractionDialog` an "always on top" `com.codename1.ui.Dialog`
 /// used for non-form modal UI patterns. You can make static `Dialog.show(...)` use
 /// `InteractionDialog` by default with the theme constant `defaultInteractionDialogModeBool`

@@ -26,6 +26,7 @@ package com.codenameone.developerguide.screenshots;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
@@ -74,6 +75,12 @@ public final class GuideFigureRenderer {
             if (variant.device() != device) {
                 continue;
             }
+            // Same reason as the toolbar global further down: a figure whose
+            // subject is the blur has to set this, and it is static, so without
+            // a restore the next figure in the list is rendered blurred by a
+            // setting it never asked for and nothing says so. Read outside the
+            // try so the restore can still see it.
+            float blurRadius = Dialog.getDefaultBlurBackgroundRadius();
             try {
                 Display.getInstance().setDarkMode(Boolean.valueOf(variant.darkMode()));
                 UIManager.getInstance().refreshTheme();
@@ -94,8 +101,21 @@ public final class GuideFigureRenderer {
                     Toolbar.setGlobalToolbar(globalToolbar);
                 }
                 prepare(form, device);
-                verifyAppearance(variant, form);
-                write(sink, variant.fileName(), form, device);
+                // After the layout, because a component that has not been
+                // measured yet refuses most of what a figure wants to say:
+                // Tree.expandPath does nothing before the tree is shown.
+                variant.figure().afterShow(form);
+                form.revalidate();
+                // afterShow is allowed to put something in front of the form --
+                // a Dialog is a Form of its own and becomes the current one,
+                // painting the tinted or blurred parent behind itself. Taking
+                // the picture from the form that was built would photograph the
+                // screen the dialog is covering. For every other figure the
+                // current form IS the form that was built.
+                Form shown = Display.getInstance().getCurrent();
+                Form target = shown != null ? shown : form;
+                verifyAppearance(variant, target);
+                write(sink, variant.fileName(), target, device);
                 rendered++;
             } catch (Throwable err) {
                 // One figure that cannot render must not take the rest with it:
@@ -104,6 +124,8 @@ public final class GuideFigureRenderer {
                 // after build.
                 failures.append("\n  ").append(variant.fileName()).append(": ")
                         .append(err.getClass().getName()).append(": ").append(err.getMessage());
+            } finally {
+                Dialog.setDefaultBlurBackgroundRadius(blurRadius);
             }
         }
         System.out.println("Rendered " + rendered + " figure(s) for " + device.key());
@@ -178,6 +200,28 @@ public final class GuideFigureRenderer {
         form.getContentPane().setHeight(
                 Math.max(0, device.height() - form.getTitleArea().getHeight()));
         form.revalidate();
+        settle();
+    }
+
+    /// Lets the work show() deferred actually run.
+    ///
+    /// show() posts the rest of a form's initialisation and returns, and this
+    /// renderer used to photograph the form immediately -- so anything a
+    /// component only sets up once it is really on screen had not happened
+    /// yet. A Tree looked shown and still ignored expandPath, because the
+    /// rows existed without the client properties expandPath matches on.
+    ///
+    /// invokeAndBlock runs the EDT while the block below finishes, which is
+    /// the only way to drain that queue from the EDT itself. Twice, because
+    /// the work drained by the first pass can post more of its own.
+    private static void settle() {
+        for (int i = 0; i < 2; i++) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                }
+            });
+        }
     }
 
     /// Height to keep, so a figure is the part of the screen that has something
@@ -196,6 +240,12 @@ public final class GuideFigureRenderer {
     /// So: a preferred height is used when the component states one, and a
     /// component that states none is taken at the height it was given.
     private static int figureHeight(Form form, FigureDevice device) {
+        if (form instanceof Dialog) {
+            // A dialog's picture is the whole screen: the tint, the blur and the
+            // form underneath are the subject as much as the dialog is, and the
+            // dialog itself sits wherever it was positioned within that.
+            return device.height();
+        }
         Container content = form.getContentPane();
         int bottom = 0;
         for (int i = 0; i < content.getComponentCount(); i++) {
@@ -209,7 +259,47 @@ public final class GuideFigureRenderer {
         // falling back to the content pane's stretched height, which produced a
         // toolbar with a blank page underneath.
         int used = content.getAbsoluteY() + bottom + content.getStyle().getPaddingBottom();
+        // Not everything a figure shows is in the content pane. An
+        // InteractionDialog floats in the layered pane, so measuring only the
+        // content left the figure cropped to the one label underneath it and the
+        // dialog that is the whole point of the picture fell outside the frame.
+        used = Math.max(used, layeredBottom(form));
         return Math.min(device.height(), Math.max(1, used));
+    }
+
+    /// How far down anything floating over the content reaches.
+    ///
+    /// Recursive because the layered pane is not flat: InteractionDialog asks
+    /// for a pane keyed by its own class and lands a couple of levels below the
+    /// root one, so looking only at direct children found nothing and cropped
+    /// the figure to the content underneath.
+    private static int layeredBottom(Form form) {
+        return deepBottom(form, form.getContentPane());
+    }
+
+    /// The whole form is walked rather than one named pane, because an overlay
+    /// does not necessarily live where the obvious reading says it does:
+    /// InteractionDialog asks for a pane keyed by its own class, which is not
+    /// under getLayeredPane(), so both of the narrower searches tried here found
+    /// nothing while the dialog was plainly being painted. The content pane is
+    /// skipped because the block above already measures it, and measuring it
+    /// this way instead would take its stretched full-height child and crop
+    /// nothing at all.
+    private static int deepBottom(Container parent, Container skip) {
+        int bottom = 0;
+        for (int i = 0; i < parent.getComponentCount(); i++) {
+            Component child = parent.getComponentAt(i);
+            if (child == skip) { //NOPMD CompareObjectsWithEquals
+                continue;
+            }
+            if (child.getWidth() > 0 && child.getHeight() > 0) {
+                bottom = Math.max(bottom, child.getAbsoluteY() + child.getHeight());
+            }
+            if (child instanceof Container) {
+                bottom = Math.max(bottom, deepBottom((Container) child, skip));
+            }
+        }
+        return bottom;
     }
 
     private static void write(ScreenshotSink sink, String fileName, Form form, FigureDevice device)
