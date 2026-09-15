@@ -5282,14 +5282,8 @@ public class AndroidGradleBuilder extends Executor {
                     createIconFile(new File(mipmapXXXhdpiDir, "ic_launcher_background.png"), adaptiveBackground, 432, 432);
                     adaptiveIconBackgroundRef = "@mipmap/ic_launcher_background";
                 } else {
-                    String adaptiveIconBackground = request.getArg("android.adaptiveIconBackground", "#ffffff");
-                    String iconBackgroundColors = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                            + "<resources>\n"
-                            + "    <color name=\"ic_launcher_background\">" + adaptiveIconBackground + "</color>\n"
-                            + "</resources>\n";
-                    try (OutputStream output = Files.newOutputStream(new File(valsDir, "ic_launcher_background.xml").toPath())) {
-                        output.write(iconBackgroundColors.getBytes(StandardCharsets.UTF_8));
-                    }
+                    writeAdaptiveIconBackgroundColor(valsDir,
+                            request.getArg("android.adaptiveIconBackground", "#ffffff"));
                     adaptiveIconBackgroundRef = "@color/ic_launcher_background";
                 }
 
@@ -5419,24 +5413,10 @@ public class AndroidGradleBuilder extends Executor {
 
         File colors = new File(valsDir, "colors.xml");
         String colorsStr = "";
-        if (colors.exists()) {
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-
-            try {
-                //Using factory get an instance of document builder
-                DocumentBuilder db = dbf.newDocumentBuilder();
-                Document dom = db.parse(colors);
-                NodeList nl = dom.getElementsByTagName("color");
-                for (int i = 0; i < nl.getLength(); i++) {
-                    Node color = nl.item(i);
-                    NamedNodeMap attr = color.getAttributes();
-                    Node key = attr.getNamedItem("name");
-                    String k = key.getNodeValue();
-                    colorsStr += "<item name=\"android:" + k + "\">@color/" + k + "</item>\n";
-                }
-            } catch (Exception e) {
-                error("Failed to create DocumentBuilder", e);
-            }
+        try {
+            colorsStr = buildThemeColorItems(colors);
+        } catch (Exception e) {
+            error("Failed to create DocumentBuilder", e);
         }
 
         String themeName = "android:Theme.Black";
@@ -10471,6 +10451,94 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Writes the adaptive launcher icon background color into its own values
+     * file rather than into the shared {@code res/values/colors.xml}.
+     *
+     * <p>That separation is the whole point of this method. Every
+     * {@code <color>} declared in {@code colors.xml} is promoted by
+     * {@link #buildThemeColorItems(File)} into an {@code android:<name>} item
+     * of the generated theme, which means aapt2 resolves the name as
+     * {@code android:attr/<name>}. {@code ic_launcher_background} is not an
+     * Android theme attribute, so putting it in {@code colors.xml} fails
+     * resource linking with "style attribute
+     * 'android:attr/ic_launcher_background' not found" before an APK is ever
+     * produced -- the whole build dies over a launcher icon color (issue
+     * #5837). A separate file carries the same {@code @color/} reference and
+     * is never promoted.</p>
+     *
+     * <p>If the developer's own {@code colors.xml} already declares the name
+     * -- an Android Studio project template does exactly that -- theirs is
+     * left alone, because two files declaring one color name is a duplicate
+     * resource error.</p>
+     *
+     * @param valsDir the generated {@code res/values} directory
+     * @param color the color value for {@code android.adaptiveIconBackground}
+     */
+    static void writeAdaptiveIconBackgroundColor(File valsDir, String color) throws IOException {
+        if (declaresColor(new File(valsDir, "colors.xml"), "ic_launcher_background")) {
+            return;
+        }
+        String iconBackgroundColors = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                + "<resources>\n"
+                + "    <color name=\"ic_launcher_background\">" + color + "</color>\n"
+                + "</resources>\n";
+        try (OutputStream output = Files.newOutputStream(
+                new File(valsDir, "ic_launcher_background.xml").toPath())) {
+            output.write(iconBackgroundColors.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * Answers whether the given values file already declares a color of that
+     * name. A missing or unparsable file declares nothing.
+     */
+    static boolean declaresColor(File valuesFile, String name) {
+        if (!valuesFile.exists()) {
+            return false;
+        }
+        try {
+            Document dom = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(valuesFile);
+            NodeList nl = dom.getElementsByTagName("color");
+            for (int i = 0; i < nl.getLength(); i++) {
+                Node key = nl.item(i).getAttributes().getNamedItem("name");
+                if (key != null && name.equals(key.getNodeValue())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Renders the developer's {@code res/values/colors.xml} as {@code <item>}
+     * entries for the generated theme. Every color becomes an
+     * {@code android:<name>} item, so each name has to be an Android theme
+     * attribute -- that contract is what the developer guide documents for
+     * this file, and it is why nothing the builder generates for its own use
+     * may be written into it. Returns an empty string when the file is absent.
+     */
+    static String buildThemeColorItems(File colorsFile) throws Exception {
+        if (!colorsFile.exists()) {
+            return "";
+        }
+        StringBuilder colorsStr = new StringBuilder();
+        DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+        Document dom = db.parse(colorsFile);
+        NodeList nl = dom.getElementsByTagName("color");
+        for (int i = 0; i < nl.getLength(); i++) {
+            Node color = nl.item(i);
+            NamedNodeMap attr = color.getAttributes();
+            Node key = attr.getNamedItem("name");
+            String k = key.getNodeValue();
+            colorsStr.append("<item name=\"android:").append(k).append("\">@color/").append(k)
+                    .append("</item>\n");
+        }
+        return colorsStr.toString();
     }
 
     /**
