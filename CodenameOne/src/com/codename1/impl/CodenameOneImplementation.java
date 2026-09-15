@@ -13142,6 +13142,31 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// One storage entry is definitely absent.
+    public static final int STORAGE_ENTRY_ABSENT = 0;
+
+    /// One storage entry is definitely present.
+    public static final int STORAGE_ENTRY_PRESENT = 1;
+
+    /// This port could not tell whether the entry is there.
+    public static final int STORAGE_ENTRY_UNKNOWN = 2;
+
+    /// Whether one storage entry exists, keeping "could not tell" distinct from "no".
+    ///
+    /// `storageFileExists` returns a boolean and therefore cannot express the third answer, so a
+    /// port that hits a transient backend failure has to report one of the two it has -- and
+    /// every port that catches reports `false`. The browser is the clearest case: a temporary
+    /// IndexedDB error becomes "this entry is not here", which for a vault's own metadata record
+    /// means "this device is not enrolled". An enrolment then follows, writing fresh metadata
+    /// under a NEW data key over a vault whose secrets were all sealed under the old one.
+    ///
+    /// The default derives the third state away, which is exactly right for every port whose
+    /// existence check cannot fail -- a file system stat either answers or throws. A port
+    /// overrides this only when its storage can fail in a way it can recognise.
+    public int storageEntryState(String name) {
+        return storageFileExists(name) ? STORAGE_ENTRY_PRESENT : STORAGE_ENTRY_ABSENT;
+    }
+
     /// Returns the port-specific device protection used by
     /// [com.codename1.security.vault.Vault] to remember an unlocked vault across restarts.
     ///

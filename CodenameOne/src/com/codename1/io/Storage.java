@@ -257,6 +257,31 @@ public class Storage {
         return implementation != null && implementation.storageFileExists(name);
     }
 
+    /// Whether one entry exists, keeping "could not tell" distinct from "no".
+    ///
+    /// `exists` answers a boolean and a port with no answer has to pick one of the two, which is
+    /// always `false` -- so a caller that treats absence as a decision cannot tell a storage
+    /// failure from an empty store. Answers one of
+    /// `CodenameOneImplementation.STORAGE_ENTRY_ABSENT`, `STORAGE_ENTRY_PRESENT` or
+    /// `STORAGE_ENTRY_UNKNOWN`; UNKNOWN when there is no implementation at all, because that is
+    /// also not evidence of absence.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the entry name
+    ///
+    /// #### Returns
+    ///
+    /// one of the three `STORAGE_ENTRY_` constants
+    public int entryState(String name) {
+        name = fixFileName(name);
+        CodenameOneImplementation implementation = Util.getImplementation();
+        if (implementation == null) {
+            return CodenameOneImplementation.STORAGE_ENTRY_UNKNOWN;
+        }
+        return implementation.storageEntryState(name);
+    }
+
     /// Lists the names of the storage files
     ///
     /// #### Returns

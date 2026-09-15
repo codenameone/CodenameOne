@@ -10110,6 +10110,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return false;
     }
 
+    /// The same question with the third answer kept, which this port is the reason for.
+    ///
+    /// IndexedDB can refuse transiently -- a connection closing during a page lifecycle change,
+    /// storage evicted under pressure, a private-mode quota -- and the boolean above has nowhere
+    /// to put that, so it reports the entry as ABSENT. A caller that reads absence as a decision
+    /// then acts on a storage failure: for a vault's metadata record, "not here" means "this
+    /// device is not enrolled", and the enrolment that follows writes fresh metadata under a new
+    /// data key over secrets that were all sealed under the old one.
+    @Override
+    public int storageEntryState(String name) {
+        try {
+            return JavaScriptStorageAdapter.storageFileExists(createStorageBackend(), name)
+                    ? STORAGE_ENTRY_PRESENT : STORAGE_ENTRY_ABSENT;
+        } catch (IOException ex) {
+            consoleLog("Error checking storage for storageEntryState");
+            consoleLog(ex.getMessage());
+            return STORAGE_ENTRY_UNKNOWN;
+        }
+    }
+
     @Override
     public int getStorageEntrySize(String name) {
         try {

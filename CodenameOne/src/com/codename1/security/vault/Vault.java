@@ -815,7 +815,7 @@ public final class Vault {
                     // still names a key that no longer exists, unlockRemembered() is broken, and
                     // forgetDevice() reported TRUE. Refusing leaves the remembered unlock WORKING,
                     // which is the state the caller can retry from.
-                    if (storage.exists(deviceRecordKey())) {
+                    if (!definitelyGone(deviceRecordKey())) {
                         throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                                 "this device's remembered-unlock record could not be removed, so "
                                 + "the key it names has been left in place rather than orphaned");
@@ -875,7 +875,7 @@ public final class Vault {
                     // directory that does not exist or cannot be read.
                     String[] entries = storage.listEntries();
                     if (entries == null || (entries.length == 0
-                            && storage.exists(metadataKey()))) {
+                            && !definitelyGone(metadataKey()))) {
                         // Null is JavaSE, where File.list() says so. The second half is the
                         // browser, where it does not: HTML5Implementation catches the IndexedDB
                         // IOException and answers an EMPTY array, which is indistinguishable from
@@ -1104,7 +1104,10 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this secret was being removed");
                     }
-                    out.complete(Boolean.valueOf(!Storage.getInstance().exists(entry)));
+                    // definitelyGone, not !exists: a port that cannot tell answers false, which
+                    // this line read as "removed" and reported as success over a secret that is
+                    // still on the device.
+                    out.complete(Boolean.valueOf(definitelyGone(entry)));
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (RuntimeException broke) {
@@ -2009,7 +2012,7 @@ public final class Vault {
                             // record that survived leaves getPolicy() answering the old
                             // remembering policy while unlockRemembered follows it to a key that
                             // has since been deleted.
-                            if (Storage.getInstance().exists(deviceRecordKey())) {
+                            if (!definitelyGone(deviceRecordKey())) {
                                 throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                                         "the device record could not be removed, so this import "
                                         + "cannot make the vault session-only");
@@ -2165,7 +2168,7 @@ public final class Vault {
                         // leaves getPolicy() answering the old remembering policy, and a later
                         // move BACK to it then finds current.policy == policy and skips the
                         // enrolment -- a remembered unlock permanently without its key.
-                        if (Storage.getInstance().exists(deviceRecordKey())) {
+                        if (!definitelyGone(deviceRecordKey())) {
                             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                                     "the device record could not be removed, so this vault is "
                                     + "not session-only");
@@ -2657,7 +2660,12 @@ public final class Vault {
             // NOT_ENROLLED, which would overwrite the record and orphan everything it protects.
             // The STATE_UNKNOWN guard in enrollNow already exists for exactly this; it just
             // never got the chance to fire.
-            if (Storage.getInstance().exists(metadataKey())) {
+            // entryState for the same reason readUncached uses it: a port that cannot tell
+            // answers false here, and false is the branch that returns null and reports
+            // NOT_ENROLLED. UNKNOWN goes with PRESENT, because neither is evidence of absence
+            // and this is the decision enroll() is allowed to act on.
+            if (Storage.getInstance().entryState(metadataKey())
+                    != com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_ABSENT) {
                 throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
                         "a vault record exists here and could not be read");
             }
@@ -2726,8 +2734,10 @@ public final class Vault {
             return DeviceRecord.parse((String) stored) == null
                     ? ProtectionReport.UNKNOWN : ProtectionReport.YES;
         }
-        return Storage.getInstance().exists(deviceRecordKey())
-                ? ProtectionReport.UNKNOWN : ProtectionReport.NO;
+        // Only a definite ABSENT is NO. A port that could not tell used to answer false here
+        // and this reported NO -- "this device has no remembered unlock" -- which a caller is
+        // entitled to act on. UNKNOWN is what the three-state report exists to carry.
+        return definitelyGone(deviceRecordKey()) ? ProtectionReport.NO : ProtectionReport.UNKNOWN;
     }
 
     private void writeDeviceRecord(DeviceRecord record) {
@@ -2946,7 +2956,7 @@ public final class Vault {
                     + "unlock that was already here has been put back unchanged");
         }
         storage.deleteStorageFile(deviceRecordKey());
-        if (storage.exists(deviceRecordKey())) {
+        if (!definitelyGone(deviceRecordKey())) {
             // The delete is void-returning and both real ports can drop one silently, so this
             // message -- "nothing that can reopen it without a password was left behind" -- was a
             // claim nothing had checked. A record that survives here is a fresh passwordless
@@ -3027,15 +3037,18 @@ public final class Vault {
                     "this device's storage could not be enumerated to confirm the deletion");
         }
         for (String entry : now) {
-            if (entry != null && entry.startsWith(prefix) && storage.exists(entry)) {
+            // definitelyGone and not exists: a port that cannot tell answers false to exists(),
+            // and false here meant "this secret went" -- the one claim destroyLocalData must not
+            // make without evidence.
+            if (entry != null && entry.startsWith(prefix) && !definitelyGone(entry)) {
                 left.append(left.length() == 0 ? "" : ", ").append("a secret");
                 break;
             }
         }
-        if (storage.exists(deviceRecordKey())) {
+        if (!definitelyGone(deviceRecordKey())) {
             left.append(left.length() == 0 ? "" : ", ").append("the device wrap");
         }
-        if (storage.exists(metadataKey())) {
+        if (!definitelyGone(metadataKey())) {
             left.append(left.length() == 0 ? "" : ", ").append("the vault record");
         }
         if (left.length() > 0) {
@@ -3091,8 +3104,33 @@ public final class Vault {
     /// Composed from the public stream primitives rather than by clearing the cache, because
     /// clearCache() is all-or-nothing: it would evict everything the APPLICATION has cached, on
     /// every vault mutation, to answer a question about one entry.
+    /// Whether one entry is PROVEN gone, which is not the same as `!exists(name)`.
+    ///
+    /// Every "did the delete happen" check in this class asked exists() and read false as yes. A
+    /// port that cannot tell answers false, so a storage failure was reported as a successful
+    /// removal -- a secret, a device record or a whole vault reported destroyed while it was
+    /// still there. UNKNOWN is grouped with PRESENT at every one of those sites, because only a
+    /// definite ABSENT is evidence that something went.
+    private static boolean definitelyGone(String name) {
+        return Storage.getInstance().entryState(name)
+                == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_ABSENT;
+    }
+
     private Object readUncached(String name) {
-        if (!Storage.getInstance().exists(name)) {
+        // entryState and not exists(), because exists() answers a boolean and a port that cannot
+        // tell has to pick one -- and every port that catches picks false. On the browser a
+        // transient IndexedDB refusal therefore reported this vault's metadata record as ABSENT,
+        // which every caller here reads as "this device is not enrolled": enroll() then writes
+        // fresh metadata under a NEW data key over a vault whose secrets were all sealed under
+        // the old one, and nothing in the process ever reports a failure. The read below already
+        // distinguishes the two; the existence gate in front of it did not, and short-circuited
+        // before it could.
+        int state = Storage.getInstance().entryState(name);
+        if (state == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_UNKNOWN) {
+            throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
+                    "this device's storage could not say whether the vault record is there");
+        }
+        if (state == com.codename1.impl.CodenameOneImplementation.STORAGE_ENTRY_ABSENT) {
             return null;
         }
         java.io.InputStream in = null;

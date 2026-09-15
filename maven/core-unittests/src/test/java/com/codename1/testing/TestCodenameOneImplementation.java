@@ -3430,6 +3430,30 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Runnable duringStorageWrite;
 
     /**
+     * Makes {@link #storageEntryState(String)} answer UNKNOWN for one entry, which is what the
+     * JavaScript port does when IndexedDB refuses the lookup.
+     *
+     * {@code storageFileExists} keeps answering {@code false} for it, because that is precisely
+     * the conflation being reproduced: a port whose existence check fails has only two answers
+     * and reports the entry as absent.
+     *
+     * @param name the entry whose existence cannot be determined, or null to clear
+     */
+    public void setStorageExistenceUnknown(String name) {
+        existenceUnknownFor = name;
+    }
+
+    private String existenceUnknownFor;
+
+    @Override
+    public int storageEntryState(String name) {
+        if (existenceUnknownFor != null && existenceUnknownFor.equals(name)) {
+            return STORAGE_ENTRY_UNKNOWN;
+        }
+        return super.storageEntryState(name);
+    }
+
+    /**
      * Makes {@link #listStorageEntries()} answer null, which is what JavaSE does: it returns
      * {@code getStorageDir().list()}, and {@code File.list()} is null for a directory that does
      * not exist or that cannot be read.

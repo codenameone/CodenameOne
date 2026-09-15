@@ -317,6 +317,23 @@ public final class HTML5SecureStorage extends SecureStorage {
                         Log.WARNING);
             }
             if (!Storage.getInstance().writeObject(encryptedKey(account), sealed)) {
+                // The gate goes with it, for the reason setIfAbsent gives. The put succeeded, so
+                // the new ciphertext is settled in the gate store while this call reports failure
+                // -- and a later setIfAbsent loses its own add against that record, mirrors it
+                // into ordinary storage, and makes the value from a set() the caller was told did
+                // not happen visible as though it had. Deleting rather than restoring, because
+                // put overwrote what was there and this class does not hold the previous
+                // ciphertext; what remains is the ordinary entry, which is the pre-call state
+                // every read already sees.
+                //
+                // These two are the whole set: nativeSet here and nativeSetIfAbsent in the create
+                // are the only writers of the gate store, and nativeForget is the only remover.
+                try {
+                    nativeForget(encryptedKey(account));
+                } catch (RuntimeException noBridge) {
+                    Log.p("SecureStorage could not release the create gate after a failed write: "
+                            + reasonOf(noBridge), Log.WARNING);
+                }
                 return false;
             }
             // The legacy entry goes only after the encrypted one is in place. A store that failed

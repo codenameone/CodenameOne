@@ -916,14 +916,13 @@ class DatabaseUsageScanTest {
 
     @Test
     void everyVaultTypeThatReachesGcmIsStillDetected() throws IOException {
-        // The narrowing above must not drop an entry point. These four are the public types whose
+        // The narrowing above must not drop an entry point. These three are the public types whose
         // use reaches the GCM implementation, and each on its own has to answer yes -- including
         // SecureStorageDeviceProtection, which seals and opens envelopes itself and can therefore
         // be reached without ever naming Vault.
         String[] reachesGcm = {
             "com/codename1/security/vault/Vault",
             "com/codename1/security/vault/SecureEnvelope",
-            "com/codename1/security/vault/KeyHandle",
             "com/codename1/security/vault/SecureStorageDeviceProtection"
         };
         for (int iter = 0; iter < reachesGcm.length; iter++) {
@@ -935,6 +934,25 @@ class DatabaseUsageScanTest {
             assertTrue(executor.scanForDatabaseUsage(root).usesVault(),
                     reachesGcm[iter] + " reaches AES-GCM and must be detected");
         }
+    }
+
+    @Test
+    void theAbstractKeyHandleIsNotItselfGcmUse() throws IOException {
+        // KeyHandle was on the list and should not have been. It is fully abstract -- every
+        // method including seal and open -- so a class-file reference to it carries no GCM
+        // implementation, and an application declaring a KeyHandle-typed API, or subclassing it
+        // for its own non-GCM purpose, was charged the private CommonCrypto SPI for a type
+        // reference alone.
+        //
+        // Nothing is lost by the omission, and this is the fact that makes it safe rather than a
+        // judgement call: Vault.operationalKey is the ONLY producer of a KeyHandle anywhere in
+        // the framework, so an application holding one has named Vault, which IS on the list.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/security/vault/KeyHandle");
+
+        assertFalse(executor.scanForDatabaseUsage(root).usesVault(),
+                "an abstract type with no implementation is not use of the implementation");
     }
 
     @Test

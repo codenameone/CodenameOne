@@ -699,7 +699,12 @@ public abstract class Executor {
     private static final String[] VAULT_GCM_CLASSES = {
         VAULT_PACKAGE + "/Vault",
         VAULT_PACKAGE + "/SecureEnvelope",
-        VAULT_PACKAGE + "/KeyHandle",
+        // KeyHandle is deliberately NOT here. It is fully abstract -- every method including
+        // seal and open -- so a class-file reference to it carries no GCM implementation, and an
+        // application declaring a KeyHandle-typed API or subclassing it for its own non-GCM
+        // purpose was charged the cipher for a type reference alone. Nothing is lost by the
+        // omission: Vault.operationalKey is the ONLY producer of a KeyHandle anywhere in the
+        // framework, so an application holding one has named Vault, which is on this list.
         VAULT_PACKAGE + "/VaultKeyHandle",
         // Public, and it seals and opens envelopes itself, so an application can reach GCM
         // through it without ever naming Vault.

@@ -1315,6 +1315,56 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aVaultWhoseRecordCannotBeLookedUpIsNotReportedAsUnenrolled() throws Exception {
+        // The browser's storageFileExists catches the IndexedDB IOException and answers false, so
+        // a transient refusal read as "this entry is not here" -- and for the vault's own
+        // metadata record that means "this device is not enrolled". state() said NOT_ENROLLED,
+        // enroll() is allowed over NOT_ENROLLED, and it would write fresh metadata under a NEW
+        // data key over a vault whose every secret was sealed under the old one. Nothing in that
+        // sequence reports a failure at any point.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+        vault.putSecret("api", pw("token")).get();
+
+        String record = metadataName(name);
+        Vault reopened = Vault.named(name).configure(fast());
+        TestCodenameOneImplementation.getInstance().setStorageExistenceUnknown(record);
+        try {
+            assertEquals(Vault.STATE_UNKNOWN, reopened.state(),
+                    "a lookup that failed is not evidence that the vault is not there");
+            // CONFLICT rather than TEMPORARILY_UNREADABLE, and that is the right answer: the
+            // STATE_UNKNOWN arm of enrollNow's refusal says a record may be here and it will not
+            // overwrite what it cannot read. What matters is that the refusal happens at all --
+            // NOT_ENROLLED is the one answer that lets enrolment proceed.
+            assertEquals(VaultError.CONFLICT,
+                    errorOf(reopened.enroll(pw("other"), fast())),
+                    "and enrolling over it must be refused rather than overwriting the vault");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageExistenceUnknown(null);
+        }
+
+        // The vault and its secret are untouched, which is the whole point.
+        Vault after = Vault.named(name).configure(fast());
+        assertTrue(after.unlockWithPassword(pw("p")).get().booleanValue());
+        assertEquals("token", new String(after.getSecret("api").get()));
+    }
+
+    /// The storage entry the vault's metadata record lands in.
+    ///
+    /// It carries no suffix -- the device record and every secret are the metadata key PLUS one
+    /// -- so it is identified by being the one entry for this vault that has none.
+    private static String metadataName(String vaultName) {
+        for (String entry : Storage.getInstance().listEntries()) {
+            if (entry.indexOf(vaultName) > 0 && entry.endsWith(vaultName)) {
+                return entry;
+            }
+        }
+        throw new IllegalStateException("no vault record for " + vaultName);
+    }
+
+    @Test
     void forgettingADeviceWhoseRecordWillNotGoLeavesTheKeyAlone() throws Exception {
         // deleteStorageFile returns void on every port and both real ones can drop one silently
         // -- JavaSE discards File.delete()'s boolean, the browser catches the IndexedDB error --
