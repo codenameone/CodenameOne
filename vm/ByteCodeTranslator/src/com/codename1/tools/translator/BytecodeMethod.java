@@ -2593,6 +2593,355 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     /**
+     * Contributes this method's collection-field stores to the whole-program map
+     * {@link Parser#concreteCollectionFieldType} answers from.
+     *
+     * A store counts only when the value is a fresh allocation whose class is right
+     * there in the instruction stream -- {@code NEW X; DUP; <args>; INVOKESPECIAL
+     * X.<init>; PUTFIELD} -- because that is the only shape where the concrete class
+     * is known without following the value anywhere. Everything else (a parameter, a
+     * field read, another method's return) poisons the entry, which is what makes the
+     * map an answer rather than a guess: a field survives only if EVERY writer in the
+     * program agreed.
+     */
+    public void collectCollectionFieldStores(java.util.Map<String, String> out) {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Field)) {
+                continue;
+            }
+            int op = ins.getOpcode();
+            if (op != Opcodes.PUTFIELD && op != Opcodes.PUTSTATIC) {
+                continue;
+            }
+            Field f = (Field) ins;
+            String desc = f.getDesc();
+            if (desc == null || !desc.startsWith("Ljava/util/")) {
+                continue;
+            }
+            String allocated = null;
+            int src = prevExecutable(i - 1);
+            if (src >= 0) {
+                Instruction s = instructions.get(src);
+                if (s instanceof Invoke && s.getOpcode() == Opcodes.INVOKESPECIAL
+                        && "<init>".equals(((Invoke) s).getName())) {
+                    allocated = ((Invoke) s).getOwner();
+                }
+            }
+            Parser.recordCollectionFieldStore(out, f.getOwner(), f.getFieldName(), allocated);
+        }
+    }
+
+    /// The class a for-each receiver provably holds, or null. Slashed internal form.
+    ///
+    /// Two shapes, and both give an EXACT class rather than a bound, which is what
+    /// lets the rewrite below skip any runtime test. A field is answered by the
+    /// whole-program store map; a local by its single assignment being an allocation.
+    /// A declared type would NOT do: `List` admits ~100 implementations, and even a
+    /// field declared `ArrayList` admits a subclass that overrides iterator().
+    private String provableCollectionClass(int receiverIdx) {
+        Instruction recv = instructions.get(receiverIdx);
+        if (recv instanceof Field && recv.getOpcode() == Opcodes.GETFIELD) {
+            Field f = (Field) recv;
+            return Parser.concreteCollectionFieldType(f.getOwner(), f.getFieldName());
+        }
+        if (recv instanceof VarOp && recv.getOpcode() == Opcodes.ALOAD) {
+            int slot = ((VarOp) recv).getIndex();
+            // Same reasoning as lowerIteratorCalls: a parameter reaches its slot with
+            // no ASTORE, so one store does not mean one value unless the slot cannot
+            // be a parameter.
+            if (slot < firstNonParameterSlot() || countStoresTo(slot) != 1) {
+                return null;
+            }
+            for (int i = 0; i < instructions.size(); i++) {
+                Instruction ins = instructions.get(i);
+                if (ins instanceof VarOp && ins.getOpcode() == Opcodes.ASTORE
+                        && ((VarOp) ins).getIndex() == slot) {
+                    int src = prevExecutable(i - 1);
+                    if (src < 0) {
+                        return null;
+                    }
+                    Instruction sv = instructions.get(src);
+                    if (sv instanceof Invoke && sv.getOpcode() == Opcodes.INVOKESPECIAL
+                            && "<init>".equals(((Invoke) sv).getName())) {
+                        return ((Invoke) sv).getOwner();
+                    }
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// True if this instruction reads or writes the given local slot.
+    private static boolean touchesSlot(Instruction ins, int slot) {
+        if (ins instanceof VarOp) {
+            return ((VarOp) ins).getIndex() == slot;
+        }
+        if (ins instanceof IInc) {
+            return ((IInc) ins).getVar() == slot;
+        }
+        return false;
+    }
+
+    /// Index of the LabelInstruction carrying this label, or -1. Compared by identity:
+    /// ASM Labels are unique objects, so this is exact rather than name-based.
+    private int indexOfLabel(Label l) {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction && ((LabelInstruction) ins).getLabel() == l) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * FOR-EACH OVER A PROVABLE ArrayList BECOMES AN INDEXED LOOP, WITH NO ITERATOR AND
+     * NO RUNTIME TYPE TEST.
+     *
+     * javac lowers `for (T x : coll)` to an Iterator: one allocation, then TWO
+     * INVOKEINTERFACE dispatches per element -- the most expensive call shape the VM
+     * has, a lookup in the owning class's interface map before the vtable read. Where
+     * the collection is provably a java.util.ArrayList the whole thing is just a walk
+     * over a backing array, so this rewrites it into one:
+     *
+     *     iterator(); ASTORE it              ->  ASTORE c (the COLLECTION, same slot)
+     *                                            ICONST_0; ISTORE i
+     *   L: ALOAD it; hasNext(); IFEQ end     ->  L: ILOAD i; ALOAD c; GETFIELD size
+     *                                                IF_ICMPGE end
+     *      ALOAD it; next()                  ->     ALOAD c; GETFIELD array
+     *                                                ALOAD c; GETFIELD firstIndex
+     *                                                ILOAD i; IADD; AALOAD; IINC i 1
+     *      <body> GOTO L                           <body> GOTO L
+     *
+     * THE BODY IS NOT TOUCHED, which is what makes this safe where a loop duplicator
+     * is not. Only the header and the element fetch are rewritten, in place, so every
+     * label keeps its identity: `break` still jumps to the same end label, `continue`
+     * to the same condition label, an early `return` is untouched, a try/catch inside
+     * the body keeps the exception range it was given, and a nested loop is simply
+     * body. There is nothing to clone, so there is nothing to clone wrongly.
+     *
+     * NO CLASS GUARD IS EMITTED, because none is needed: the receiver's class is
+     * PROVEN, not tested. {@link #provableCollectionClass} answers only when the whole
+     * closed world stores exactly one concrete class into that field, or when the
+     * local's single assignment is the allocation itself.
+     *
+     * THE ELEMENT READ IS UNCHECKED, and that is sound rather than a gamble. At each
+     * read `i < size` holds, and ArrayList maintains `firstIndex + size <=
+     * array.length`, so `array[firstIndex + i]` is inside the array. Java arrays cannot
+     * be resized, so a concurrent structural modification can only make the read return
+     * a stale element -- never an out-of-range access. What IS given up is
+     * ConcurrentModificationException: modCount is not consulted, so a loop that
+     * mutates its own collection now yields stale elements instead of throwing. That is
+     * a deliberate, agreed trade; `ForEachT` in vm/benchmarks therefore excludes the
+     * mutating shape, and the exclusion is documented there rather than left implicit.
+     *
+     * Like the other rewrites on this branch it MUST run before the unused-method cull,
+     * so the field reads it creates exist while reachability is computed and the
+     * iterator() it deletes can be culled.
+     */
+    public void lowerForEachToIndexed() {
+        boolean rewrote = false;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke)) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            int op = inv.getOpcode();
+            if (op != Opcodes.INVOKEINTERFACE && op != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            if (!"iterator".equals(inv.getName()) || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
+                continue;
+            }
+            int recvIdx = prevExecutable(i - 1);
+            if (recvIdx < 0) {
+                continue;
+            }
+            String coll = provableCollectionClass(recvIdx);
+            // ArrayList ONLY, and by exact name. A subclass would reach this through a
+            // different allocation, and every other collection has a different backing
+            // shape -- LinkedList has no array at all.
+            if (!"java/util/ArrayList".equals(coll)) {
+                continue;
+            }
+            if (rewriteForEachAt(i)) {
+                rewrote = true;
+            }
+        }
+        if (rewrote) {
+            // ONE floor, not a per-loop increment. The rewritten sequences are deeper
+            // than what they replace -- the condition goes from 1 to 2 and the element
+            // fetch from 1 to 3 -- but that depth is local to a loop header, and at an
+            // inner loop's condition the outer loop's element is already stored, so it
+            // does not accumulate. Adding 4 per rewrite instead would have grown
+            // ByteCodeClass's frame by 152 slots for its 38 loops, which is a real cost
+            // on a frameless method (the stack is a C array in the caller's frame) and
+            // a recursion hazard. A maxStack UNDER-reservation is silent, though, and
+            // is one of the reasons an earlier rewrite on this branch was withdrawn --
+            // so the floor is set above the measured need rather than at it.
+            maxStack = maxStack + 4;
+        }
+    }
+
+    /// The shape check and the splice for one candidate. Returns false -- changing
+    /// nothing -- for any loop that is not exactly the canonical javac for-each.
+    private boolean rewriteForEachAt(int iterIdx) {
+        int storeIdx = nextExecutable(iterIdx + 1);
+        if (storeIdx < 0) {
+            return false;
+        }
+        Instruction store = instructions.get(storeIdx);
+        if (!(store instanceof VarOp) || store.getOpcode() != Opcodes.ASTORE) {
+            return false;
+        }
+        int itSlot = ((VarOp) store).getIndex();
+        if (itSlot < firstNonParameterSlot()) {
+            return false;
+        }
+        // The condition label must follow the store immediately; anything executable in
+        // between is not the shape javac emits.
+        int condLabelIdx = -1;
+        for (int k = storeIdx + 1; k < instructions.size(); k++) {
+            Instruction in = instructions.get(k);
+            if (in instanceof LabelInstruction) {
+                condLabelIdx = k;
+                break;
+            }
+            if (in instanceof LineNumber || in instanceof TryCatch) {
+                continue;
+            }
+            break;
+        }
+        if (condLabelIdx < 0) {
+            return false;
+        }
+        int ld1 = nextExecutable(condLabelIdx + 1);
+        int hn = ld1 < 0 ? -1 : nextExecutable(ld1 + 1);
+        int ifq = hn < 0 ? -1 : nextExecutable(hn + 1);
+        int ld2 = ifq < 0 ? -1 : nextExecutable(ifq + 1);
+        int nx = ld2 < 0 ? -1 : nextExecutable(ld2 + 1);
+        if (nx < 0) {
+            return false;
+        }
+        if (!isALoadOf(ld1, itSlot) || !isIteratorCall(hn, "hasNext", "()Z")) {
+            return false;
+        }
+        Instruction jump = instructions.get(ifq);
+        if (!(jump instanceof Jump) || jump.getOpcode() != Opcodes.IFEQ) {
+            return false;
+        }
+        if (!isALoadOf(ld2, itSlot) || !isIteratorCall(nx, "next", "()Ljava/lang/Object;")) {
+            return false;
+        }
+        Label endLabel = ((Jump) jump).getLabel();
+        if (endLabel == null) {
+            return false;
+        }
+        int endIdx = indexOfLabel(endLabel);
+        if (endIdx <= nx) {
+            return false;
+        }
+        // THE ITERATOR SLOT IS CHECKED OVER THIS LOOP'S LIFETIME, NOT OVER THE METHOD.
+        // Counting ASTOREs and ALOADs across the whole method looks safer and is much
+        // worse: javac REUSES one slot for the iterators of sequential for-each loops,
+        // so a method with two of them counts two stores and four loads and every loop
+        // in it is refused. That is not a corner -- it cost 38 of ~88 eligible sites on
+        // the self-hosting corpus, and ByteCodeClass and BytecodeMethod are full of the
+        // shape. What actually has to hold is narrower: between the store and the end
+        // label the slot is read exactly at hasNext() and next() and written nowhere,
+        // and after the loop it is redefined before it is ever read again.
+        for (int k = storeIdx + 1; k < endIdx; k++) {
+            if (k == ld1 || k == ld2) {
+                continue;
+            }
+            if (touchesSlot(instructions.get(k), itSlot)) {
+                // A third read inside the loop is the body calling it.remove(), which
+                // an indexed loop cannot express. Refuse rather than guess.
+                return false;
+            }
+        }
+        for (int k = endIdx; k < instructions.size(); k++) {
+            Instruction in = instructions.get(k);
+            if (!touchesSlot(in, itSlot)) {
+                continue;
+            }
+            // A redefinition ends this value's life and the slot may be reused freely;
+            // anything else would read the COLLECTION where the iterator used to be.
+            if (in instanceof VarOp && in.getOpcode() == Opcodes.ASTORE) {
+                break;
+            }
+            return false;
+        }
+
+        int idxSlot = maxLocals;
+        final String AL = "java/util/ArrayList";
+
+        // Splice from the BACK so the indices computed above stay valid.
+        //
+        // Element fetch: ALOAD c; GETFIELD array; ALOAD c; GETFIELD firstIndex;
+        //                ILOAD i; IADD; AALOAD; IINC i 1
+        // The IINC lands after the element is on the stack and touches no stack slot,
+        // so it is correct here and also correct for `continue`, which re-enters the
+        // condition with the index already advanced -- exactly what next() did.
+        instructions.set(nx, newField(Opcodes.GETFIELD, AL, "array", "[Ljava/lang/Object;"));
+        instructions.add(nx + 1, new IInc(idxSlot, 1));
+        instructions.add(nx + 1, new BasicInstruction(Opcodes.AALOAD, 0));
+        instructions.add(nx + 1, new BasicInstruction(Opcodes.IADD, 0));
+        instructions.add(nx + 1, new VarOp(Opcodes.ILOAD, idxSlot));
+        instructions.add(nx + 1, newField(Opcodes.GETFIELD, AL, "firstIndex", "I"));
+        instructions.add(nx + 1, new VarOp(Opcodes.ALOAD, itSlot));
+
+        // Condition: ILOAD i; ALOAD c; GETFIELD size; IF_ICMPGE end
+        Jump ge = new Jump(Opcodes.IF_ICMPGE, endLabel);
+        instructions.set(ifq, ge);
+        instructions.set(hn, newField(Opcodes.GETFIELD, AL, "size", "I"));
+        instructions.add(hn, new VarOp(Opcodes.ALOAD, itSlot));
+        instructions.set(ld1, new VarOp(Opcodes.ILOAD, idxSlot));
+        LabelInstruction.labelIsUsed(endLabel);
+
+        // ICONST_0; ISTORE i, right after the collection is stored.
+        instructions.add(storeIdx + 1, new VarOp(Opcodes.ISTORE, idxSlot));
+        instructions.add(storeIdx + 1, new BasicInstruction(Opcodes.ICONST_0, 0));
+
+        // Drop the iterator() call: the collection is already on the stack, so the
+        // ASTORE that followed it now stores the COLLECTION into the same slot.
+        instructions.remove(iterIdx);
+
+        localVariables.add(new LocalVariable("v" + idxSlot, "I", "I", null, null, idxSlot));
+        maxLocals = idxSlot + 1;
+        return true;
+    }
+
+    private boolean isALoadOf(int idx, int slot) {
+        Instruction ins = instructions.get(idx);
+        return ins instanceof VarOp && ins.getOpcode() == Opcodes.ALOAD
+                && ((VarOp) ins).getIndex() == slot;
+    }
+
+    private boolean isIteratorCall(int idx, String name, String desc) {
+        Instruction ins = instructions.get(idx);
+        if (!(ins instanceof Invoke)) {
+            return false;
+        }
+        Invoke iv = (Invoke) ins;
+        return "java/util/Iterator".equals(iv.getOwner()) && name.equals(iv.getName())
+                && desc.equals(iv.getDesc());
+    }
+
+    /// A GETFIELD registered the way addInstruction() would have: without the owning
+    /// method and the dependency edge the cull cannot see the field being read and the
+    /// generated C does not compile.
+    private Field newField(int opcode, String owner, String name, String desc) {
+        Field f = new Field(opcode, owner, name, desc);
+        f.setMethod(this);
+        f.addDependencies(dependentClasses);
+        return f;
+    }
+
+    /**
      * ITERATOR LOWERING: give a for-each loop the concrete Iterator type its
      * collection really returns, so the calls stop going through the interface.
      *

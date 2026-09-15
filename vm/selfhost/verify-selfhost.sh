@@ -67,6 +67,25 @@ if [ -n "$newest_src" ]; then
     exit 1
 fi
 
+# THE SUBJECT BINARY GETS THE SAME STALENESS GUARD, AND IT IS NOT A HYPOTHETICAL.
+# The chooser above prefers parpar-O3, while `build-selfhost.sh` with no arguments
+# writes parpar -- so a parpar-O3 left over from an earlier session is verified in
+# place of what was just built, and it reports a translator change as a VM divergence
+# on exactly the files that change was supposed to touch. That cost a correct
+# optimization: it was measured, it failed gate A against a binary three hours older
+# than the source, and it was withdrawn. Printing the subject is not enough, because
+# the name says nothing about the binary's age.
+newest_bin_src="$(find "$REPO/vm/ByteCodeTranslator/src" -type f -newer "$PARPAR" -print -quit 2>/dev/null || true)"
+if [ -n "$newest_bin_src" ]; then
+    echo "STALE: subject $PARPAR is older than $newest_bin_src" >&2
+    echo "gate A would compare the new translator against an old BINARY. Run:" >&2
+    echo "  $REPO/vm/selfhost/build-selfhost.sh          # writes target/parpar" >&2
+    echo "  $REPO/vm/selfhost/build-selfhost.sh -O3      # writes target/parpar-O3" >&2
+    echo "or pin one with CN1_SELFHOST_BIN=<path>. Building only one of the two leaves" >&2
+    echo "the other stale, and the chooser prefers parpar-O3." >&2
+    exit 1
+fi
+
 W="$REPO/vm/selfhost/target/verify"
 rm -rf "$W"; mkdir -p "$W"
 OUT="$W/out"

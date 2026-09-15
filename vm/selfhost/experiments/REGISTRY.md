@@ -1795,3 +1795,109 @@ write is in `ByteCodeClass.updateAllDependencies`, counting the invokes it actua
 visits per class on each host -- the question is whether the instruction list differs, or
 whether that loop is reached at all. Landing the fold before that answer exists would be
 shipping a translator whose output depends on which host ran it.
+
+## Round 13: the iterator is DELETED, not devirtualized -- and the gate was lying
+
+The for-each loop no longer calls anything. Where the receiver is a provable
+java.util.ArrayList the translator rewrites the loop into a walk over the backing
+array: no Iterator allocated, no hasNext(), no next(), and NO RUNTIME CLASS TEST,
+because the class is proven rather than checked.
+
+    iterator(); ASTORE it            ->  ASTORE c (the COLLECTION, same slot)
+                                         ICONST_0; ISTORE i
+  L: ALOAD it; hasNext(); IFEQ end   ->  L: ILOAD i; ALOAD c; GETFIELD size
+                                            IF_ICMPGE end
+     ALOAD it; next()                ->     ALOAD c; GETFIELD array
+                                            ALOAD c; GETFIELD firstIndex
+                                            ILOAD i; IADD; AALOAD; IINC i 1
+
+**The body is never touched.** Only the header and the element fetch are rewritten, in
+place, so every label keeps its identity -- `break` still targets the same end label,
+`continue` the same condition label, an early `return` is untouched, a try/catch inside
+the body keeps its exception range, and a nested loop is just body. The earlier plan to
+emit the body twice under a class guard is not needed and not done: there is nothing to
+clone, so there is nothing to clone wrongly.
+
+### Proving the class instead of testing it
+
+The blocker was never the rewrite, it was the receiver's type. `resolveConcreteIteratorType`
+asks the DECLARED type, and `List` has ~100 reachable `iterator()` implementations, so it
+resolves **13 of 295** for-each sites on this corpus. What the receiver actually HOLDS is a
+different question, and in a closed world it is answerable:
+
+| receiver shape | sites | provable |
+|---|---:|---|
+| instance field | 141 | **75 hold only `new ArrayList`**, 23 polymorphic, 28 stored from a call/parameter |
+| local | 13 | 13 (single assignment is the allocation) |
+| parameter | 51 | not attempted |
+| method return | ~60 | not attempted |
+
+A whole-program pass records, for every field of a `java.util.*` type, the concrete class
+of every store. Only `NEW X; ...; INVOKESPECIAL X.<init>; PUTFIELD` counts; a store of a
+parameter or of another method's return poisons the entry. A field survives only if EVERY
+writer in the program agreed, which is a complete answer rather than a common case --
+there is no reflection and no class loading here.
+
+**71 sites rewritten** on the self-hosting corpus (ByteCodeClass 38, BytecodeMethod 28,
+Parser, ByteCodeTranslator, NativeSignatureVerifier), against 0 before.
+
+The slot rule mattered more than expected. Counting ASTOREs and ALOADs of the iterator
+slot across the whole METHOD looks safer and is much worse: javac reuses one slot for the
+iterators of sequential for-each loops, so a method with two of them refuses both. That
+alone cost **38 of the 71** sites. The check is now the loop's lifetime -- between the
+store and the end label the slot is read exactly at hasNext() and next(), and after the
+loop it is redefined before it is read again. A third read inside the loop is
+`it.remove()`, which an indexed loop cannot express, and is still refused.
+
+### What it is worth
+
+`ForEachBench`, interleaved, each binary reporting its own min of 12 inner reps, 7 rounds,
+at load average 29 (the effect is large enough to survive it; the spread is 1ms):
+
+| arm | ms | vs JDK 25 |
+|---|---:|---|
+| original (framed next()) | 88-92 | 5.9x |
+| frameless next() (Round 12) | 53 | 3.5x |
+| **indexed, no iterator** | **19** | **1.27x** |
+| JDK 25 | 15 | 1.00 |
+
+4.6x over the original and 2.8x over Round 12. The remaining 1.27x is no longer the
+iterator -- it is gone -- so the next question on this shape is boxing, not dispatch.
+
+Unchecked element read, and it is sound rather than optimistic: at each read `i < size`
+holds and ArrayList maintains `firstIndex + size <= array.length`, so the access is inside
+the array; Java arrays cannot be resized, so a concurrent structural modification yields a
+STALE element, never an out-of-range access. What is given up is
+ConcurrentModificationException, deliberately and by agreement.
+
+### THE GATE WAS VERIFYING A THREE-HOUR-OLD BINARY
+
+Gate A failed on 6 of 798 files -- exactly the files the pass touches -- and the JVM side
+had rewritten them while the "self-hosted" side had not. Six causes were ruled out by
+measurement before the real one: `verify-selfhost.sh` prefers `target/parpar-O3`, and
+`build-selfhost.sh` with no arguments writes `target/parpar`. Every run all evening built
+`parpar` and then verified a `parpar-O3` from three hours earlier.
+
+**This had already cost a correct optimization.** Round 12 withdrew the synthetic-accessor
+fold -- 9 files, 167 lines of emitted C collapsing to 77 -- because gate A "failed" on it.
+It failed against the same stale binary. That withdrawal should be revisited; the finding
+it was based on was an artefact.
+
+Two things were wrong with how that was chased. The script PRINTS its subject
+(`verify-selfhost: subject ...`) precisely so a run is never ambiguous, and that line was
+never read. And every probe written to chase it printed nothing on the parpar side, which
+was read as "the code path does not execute" when it meant "this binary predates the code".
+`verify-selfhost.sh` now refuses a subject older than the translator sources, and the
+refusal is demonstrated rather than assumed -- pointing it at the stale `parpar-O3` fails
+with the reason instead of running.
+
+Gates on the final tree: `run-gauntlet.sh` GREEN (15 tortures byte-identical to JDK 25,
+both GC stop modes), Gate D PASS, **Gate A PASS -- 798 files byte-identical**, negative
+control PASS.
+
+`ForEachT` had to be rebuilt to be worth anything. Its receiver matrix passes the list as
+a PARAMETER, which the analysis refuses, so it exercised the fast path once in twenty
+sites and would have passed whether or not the rewrite worked. It now drives every shape
+down the fast path by BOTH routes -- a local that is the allocation, and a Holder whose
+instance field the whole program only ever stores `new ArrayList` into -- 17 fast paths in
+the torture, and every shape still byte-identical to the host.

@@ -9,12 +9,21 @@ import java.util.List;
 /**
  * Semantics gate for for-each loop specialization.
  *
- * The planned optimization emits a for-each body TWICE -- a clamp-free indexed loop
- * over ArrayList's backing array when the receiver's class matches, and the existing
- * iterator path otherwise. Everything here must stay byte-identical to the host JVM
- * through that change. The shapes are chosen to be the ones a loop duplicator gets
- * wrong: control flow that leaves the body, control flow that re-enters it, nesting,
- * and receivers that must NOT take the fast path.
+ * Where the receiver is a PROVABLE java.util.ArrayList the translator deletes the
+ * iterator entirely and walks the backing array, with no runtime class test, because
+ * the class is proven rather than checked. The body is not duplicated -- only the loop
+ * header and the element fetch are rewritten in place. Everything here must stay
+ * byte-identical to the host JVM through that change. The shapes are the ones such a
+ * rewrite gets wrong: control flow that leaves the body, control flow that re-enters
+ * it, nesting, and receivers that must NOT take the fast path.
+ *
+ * IT MUST DRIVE BOTH PATHS OR IT PROVES NOTHING. The receiver matrix below passes its
+ * list as a PARAMETER, which the analysis deliberately refuses -- so the matrix alone
+ * exercised the fast path exactly once out of twenty sites and would have passed
+ * whether or not the rewrite worked at all. The two blocks after it exist for that:
+ * `*Local` builds the ArrayList as a local (resolved by single assignment) and Holder
+ * reads it from an instance field (resolved by the whole-program store map), so every
+ * shape above runs down the fast path by BOTH routes and has to agree with the host.
  *
  * DELIBERATELY NOT COVERED HERE: mutation during iteration. The specialization drops
  * the modCount check by design, so a mutating loop yields stale elements instead of
@@ -125,6 +134,182 @@ public class ForEachT {
         return n;
     }
 
+    // ---------------------------------------------------------------------------
+    // FAST-PATH DRIVERS. Same shapes, but with a receiver the translator can prove.
+
+    /**
+     * Fills a list the caller allocated. The list MUST be allocated in the caller and
+     * kept in a local there: a local assigned from a method call is not a proven
+     * receiver (the analysis refuses it deliberately), and an earlier version of this
+     * file did exactly that and drove the fast path zero times.
+     */
+    private static void fill(List<Integer> l, int n) {
+        for (int i = 0; i < n; i++) { l.add(Integer.valueOf(i)); }
+    }
+
+    /**
+     * Every shape over a LOCAL whose single assignment is `new ArrayList`, which is the
+     * first of the two ways the receiver's class is proven. Written out rather than
+     * delegating: passing the list to a helper would put it in a parameter and take the
+     * slow path, which is exactly the vacuity this block exists to remove.
+     */
+    static long localShapes(int n, int stop) {
+        long acc = 0;
+
+        List<Integer> a = new ArrayList<Integer>();
+        fill(a, n);
+        for (Integer v : a) { acc += v.intValue(); }
+
+        List<Integer> b = new ArrayList<Integer>();
+        fill(b, n);
+        for (Integer v : b) { if (v.intValue() == stop) { break; } acc += v.intValue() * 3; }
+
+        List<Integer> c = new ArrayList<Integer>();
+        fill(c, n);
+        for (Integer v : c) { if ((v.intValue() & 1) == 0) { continue; } acc += v.intValue() * 5; }
+
+        List<Integer> d = new ArrayList<Integer>();
+        fill(d, n);
+        for (Integer v : d) { if (v.intValue() == stop) { return acc * 7; } acc += v.intValue(); }
+
+        return acc;
+    }
+
+    /** early return out of a fast-path loop, reached on its own so the value is used */
+    static long localReturn(int n, int stop) {
+        List<Integer> l = new ArrayList<Integer>();
+        fill(l, n);
+        long acc = 0;
+        for (Integer v : l) {
+            if (v.intValue() == stop) { return acc; }
+            acc += v.intValue();
+        }
+        return acc + 1;
+    }
+
+    /** two fast-path loops over one local, then a nested pair */
+    static long localSequentialAndNested(int n) {
+        List<Integer> l = new ArrayList<Integer>();
+        fill(l, n);
+        long acc = 0;
+        for (Integer v : l) { acc += v.intValue(); }
+        for (Integer v : l) { acc += v.intValue() * 2; }
+        List<Integer> inner = new ArrayList<Integer>();
+        fill(inner, 3);
+        for (Integer v : l) {
+            for (Integer w : inner) { acc += v.intValue() * w.intValue(); }
+        }
+        return acc;
+    }
+
+    /**
+     * try/catch INSIDE a fast-path body. Exception ranges are label-relative, so a
+     * rewrite that disturbs the body's labels silently drops the handler. The throw is
+     * explicit: ParparVM answers 0 for integer division by zero instead of throwing, so
+     * a div-by-zero here would diverge for a reason unrelated to for-each.
+     */
+    static long localTry(int n) {
+        List<Integer> l = new ArrayList<Integer>();
+        fill(l, n);
+        long acc = 0;
+        for (Integer v : l) {
+            try {
+                if (v.intValue() == 5) { throw new IllegalStateException("five"); }
+                acc += v.intValue();
+            } catch (IllegalStateException e) {
+                acc += 7;
+            }
+        }
+        return acc;
+    }
+
+    /** the loop variable reassigned inside a fast-path body */
+    static long localReassigns(int n) {
+        List<Integer> l = new ArrayList<Integer>();
+        fill(l, n);
+        long acc = 0;
+        for (Integer v : l) {
+            v = Integer.valueOf(v.intValue() * 2);
+            acc += v.intValue();
+        }
+        return acc;
+    }
+
+    /**
+     * The second route to a proven receiver: an INSTANCE FIELD into which the whole
+     * program only ever stores `new ArrayList`. This is the route that matters most --
+     * 75 of the 141 field-receiver for-each sites on the self-hosting corpus resolve
+     * this way, against 13 for locals -- and nothing else here would exercise it.
+     */
+    static final class Holder {
+        private final List<Integer> items = new ArrayList<Integer>();
+
+        Holder(int n) {
+            for (int i = 0; i < n; i++) { items.add(Integer.valueOf(i)); }
+        }
+
+        long plain() {
+            long acc = 0;
+            for (Integer v : items) { acc += v.intValue(); }
+            return acc;
+        }
+
+        long withBreak(int stop) {
+            long acc = 0;
+            for (Integer v : items) { if (v.intValue() == stop) { break; } acc += v.intValue(); }
+            return acc;
+        }
+
+        long withContinue() {
+            long acc = 0;
+            for (Integer v : items) { if ((v.intValue() % 3) == 0) { continue; } acc += v.intValue(); }
+            return acc;
+        }
+
+        long withReturn(int stop) {
+            long acc = 0;
+            for (Integer v : items) { if (v.intValue() == stop) { return acc; } acc += v.intValue(); }
+            return acc + 1;
+        }
+
+        long nested() {
+            long acc = 0;
+            for (Integer v : items) {
+                for (Integer w : items) { acc += v.intValue() ^ w.intValue(); }
+            }
+            return acc;
+        }
+
+        long withTry() {
+            long acc = 0;
+            for (Integer v : items) {
+                try {
+                    if (v.intValue() == 5) { throw new IllegalStateException("five"); }
+                    acc += v.intValue();
+                } catch (IllegalStateException e) {
+                    acc += 7;
+                }
+            }
+            return acc;
+        }
+
+        long sequential() {
+            long acc = 0;
+            for (Integer v : items) { acc += v.intValue(); }
+            for (Integer v : items) { acc += v.intValue() * 2; }
+            return acc;
+        }
+
+        long reassigns() {
+            long acc = 0;
+            for (Integer v : items) {
+                v = Integer.valueOf(v.intValue() * 2);
+                acc += v.intValue();
+            }
+            return acc;
+        }
+    }
+
     public static void main(String[] args) {
         long ck = 0;
         List<Integer> al = arrayList(64);
@@ -158,6 +343,33 @@ public class ForEachT {
         }
         ck += nested(al, ll);
         ck += nested(ll, al);
+
+        // FAST PATH, route 1: a local whose single assignment is the allocation.
+        System.out.println("local shapes=" + localShapes(64, 13)
+            + " ret=" + localReturn(64, 21)
+            + " seqNest=" + localSequentialAndNested(64)
+            + " try=" + localTry(64)
+            + " reas=" + localReassigns(64));
+        ck += localShapes(64, 13) * 23 + localReturn(64, 21) * 29
+            + localSequentialAndNested(64) * 31 + localTry(64) * 37
+            + localReassigns(64) * 41;
+        // and the empty and single-element cases down the same path
+        System.out.println("local edge empty=" + localShapes(0, 13) + " one=" + localShapes(1, 13));
+        ck += localShapes(0, 13) * 43 + localShapes(1, 13) * 47;
+
+        // FAST PATH, route 2: an instance field the whole program only stores new ArrayList into.
+        Holder h = new Holder(64);
+        System.out.println("field plain=" + h.plain() + " break=" + h.withBreak(13)
+            + " cont=" + h.withContinue() + " ret=" + h.withReturn(21)
+            + " nest=" + h.nested() + " try=" + h.withTry()
+            + " seq=" + h.sequential() + " reas=" + h.reassigns());
+        ck += h.plain() * 53 + h.withBreak(13) * 59 + h.withContinue() * 61
+            + h.withReturn(21) * 67 + h.nested() * 71 + h.withTry() * 73
+            + h.sequential() * 79 + h.reassigns() * 83;
+        Holder he = new Holder(0);
+        System.out.println("field empty plain=" + he.plain() + " nest=" + he.nested());
+        ck += he.plain() * 89 + he.nested() * 97;
+
         System.out.println("checksum=" + ck);
     }
 }

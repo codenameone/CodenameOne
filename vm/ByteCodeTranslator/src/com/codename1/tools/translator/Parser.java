@@ -165,6 +165,63 @@ public class Parser extends ClassVisitor {
         return null;
     }
 
+    /**
+     * "owner.field" -> the ONE concrete class every store into that field allocates,
+     * or {@link #POLYMORPHIC} when the stores disagree or any of them is not a plain
+     * allocation. Built once by {@link #buildConcreteCollectionFields()}.
+     *
+     * This is the closed-world answer to the question that blocks for-each lowering.
+     * A field declared {@code List} has ~100 reachable implementations of
+     * {@code iterator()}, so resolving on its DECLARED type answers nothing -- measured
+     * on the self-hosting corpus, the declared type resolves 13 of 295 for-each sites.
+     * What it actually holds is a different question: 141 of those sites read a field,
+     * and 75 of them read a field into which the whole program only ever stores
+     * {@code new ArrayList}. There is no reflection and no class loading here, so that
+     * is not a guess about the common case -- it is the complete set of writers.
+     *
+     * Only a direct {@code NEW X; DUP; ...; INVOKESPECIAL X.<init>} store counts. A
+     * store of a parameter or of another method's return value is recorded as
+     * POLYMORPHIC rather than chased: it is 28 of the 141 sites, and a transitive
+     * version of this analysis is a separate change that has to answer what happens
+     * when the chase hits a cycle.
+     */
+    private static Map<String, String> concreteCollectionFields;
+
+    /** Sentinel: this field is written with something other than one known allocation. */
+    private static final String POLYMORPHIC = "?";
+
+    private static void buildConcreteCollectionFields() {
+        Map<String, String> m = new HashMap<String, String>();
+        for (ByteCodeClass bc : classes) {
+            for (BytecodeMethod mtd : bc.getMethods()) {
+                mtd.collectCollectionFieldStores(m);
+            }
+        }
+        concreteCollectionFields = m;
+    }
+
+    /// The concrete class every store into {@code owner.name} allocates, or null when
+    /// that is not a single known class. Slashed internal form, java/util/ArrayList.
+    public static synchronized String concreteCollectionFieldType(String owner, String name) {
+        if (concreteCollectionFields == null) {
+            return null;
+        }
+        String v = concreteCollectionFields.get(owner + "." + name);
+        return POLYMORPHIC.equals(v) ? null : v;
+    }
+
+    /// Records one store, collapsing to {@link #POLYMORPHIC} on any disagreement.
+    public static void recordCollectionFieldStore(Map<String, String> m, String owner,
+            String name, String allocated) {
+        String key = owner + "." + name;
+        String prev = m.get(key);
+        if (prev == null) {
+            m.put(key, allocated == null ? POLYMORPHIC : allocated);
+        } else if (allocated == null || !prev.equals(allocated)) {
+            m.put(key, POLYMORPHIC);
+        }
+    }
+
     private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     private int stringConcatCounter;
@@ -862,8 +919,16 @@ public class Parser extends ClassVisitor {
             // nowhere near the rewrite. Running here, the references exist before
             // anything is eliminated. See BytecodeMethod.lowerIteratorCalls.
             if (BytecodeMethod.optimizerOn) {
+                // The concrete-collection-field map is whole-program, so it has to be
+                // complete before the first rewrite consults it -- hence its own pass
+                // over every class rather than a lazy fill inside the loop below.
+                buildConcreteCollectionFields();
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
+                        // BEFORE lowerIteratorCalls, which retypes the very calls this
+                        // recognises: after it they are INVOKEVIRTUAL on the concrete
+                        // iterator and the for-each shape no longer matches.
+                        fuseMtd.lowerForEachToIndexed();
                         fuseMtd.lowerIteratorCalls();
                         fuseMtd.elideToCharArrayScans();
                     }
