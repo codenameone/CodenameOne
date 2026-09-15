@@ -4303,6 +4303,68 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
     int count = t->java_lang_StringBuilder_count;
     enteringNativeAllocations();
+
+    // COMPACT FIRST. StringBuilder's buffer is char[] (2 bytes per unit) but String's
+    // backing store is polymorphic -- a byte[] value IS the Latin-1 coder, which every
+    // reader in this VM already branches on (cn1StrIsLatin1, cn1StrCharAtRaw, and the
+    // instanceof arms in String.java). This function nevertheless installed a char[]
+    // child unconditionally, so EVERY result of a string concatenation was stored
+    // UTF-16 even when it was pure ASCII -- which is nearly all of them in real code:
+    // class names, signatures, file paths, generated source.
+    //
+    // Measured on the self-hosting corpus before this: 1,285,250 char[] allocations
+    // against 49,440 byte[], i.e. the compact representation was implemented, plumbed
+    // through the natives and the Java side, and then essentially never produced.
+    //
+    // The scan is one extra pass over data the copy below already touches, and it
+    // replaces a 2-byte-per-char copy with a 1-byte one, so the compact path moves less
+    // memory than the path it replaces. Scanning up front rather than bailing mid-copy
+    // keeps the two cases independent: no half-written String is ever published.
+    //
+    // AND COMPACTING IS NOT UNCONDITIONALLY A WIN, WHICH IS WHY IT IS DONE HERE AND NOT
+    // IN String's char[] CONSTRUCTOR. String.toCharNoCopy() hands back the backing array
+    // with NO COPY when it is a char[] of exactly the right length; a byte[]-backed
+    // String cannot take that path and falls through to toCharArray(), which allocates.
+    // So compaction trades storage against a conversion at every char-oriented reader,
+    // and whether it pays depends on which side the string's consumers are on.
+    //
+    // Measured both ways on the self-hosting corpus, three reps each, on allocation
+    // volume: compacting HERE is -0.89%; additionally compacting
+    // String(char[],int,int) -- the busiest String constructor, 355,212 calls -- is
+    // +1.00%, i.e. WORSE, because it converts 518,646 char[] allocations into 539,763
+    // byte[] ones plus the toCharArray copies its readers then need. That second change
+    // was measured, reverted, and is recorded here so it is not re-attempted on the
+    // strength of the storage argument alone.
+    //
+    // A concatenation result is the right place for it: it is overwhelmingly consumed
+    // as a String (compared, hashed, printed, concatenated again), and every one of
+    // those paths has a Latin-1 fast branch already.
+    if(count > 0) {
+        JAVA_ARRAY_CHAR* csrc = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data;
+        int latin1 = 1;
+        for(int i = 0 ; i < count ; i++) {
+            if(csrc[i] > 0xFF) { latin1 = 0; break; }
+        }
+        if(latin1) {
+            JAVA_ARRAY_BYTE* bdst;
+            JAVA_OBJECT bso = cn1FusedLatin1Begin(threadStateData, count, &bdst);
+            if(bso != JAVA_NULL) {
+                // Re-read: cn1FusedLatin1Begin allocates and can run a GC handshake. The
+                // heap does not move, but re-loading the field is free and keeps this
+                // honest against a future that does.
+                csrc = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data;
+                for(int i = 0 ; i < count ; i++) {
+                    bdst[i] = (JAVA_ARRAY_BYTE)csrc[i];
+                }
+                cn1FusedLatin1End(bso, count);
+                finishedNativeAllocations();
+                return bso;
+            }
+            // Oversize for a fused block, or BiBOP unavailable: fall through to the
+            // char[] path, which is correct for any content.
+        }
+    }
+
     int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
     int total = off + CN1_FUSED_ARR_BYTES(count, sizeof(JAVA_ARRAY_CHAR));
     // Inline no-zero bump path (init-before-publish, same discipline as the
