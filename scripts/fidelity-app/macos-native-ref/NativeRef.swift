@@ -118,6 +118,17 @@ final class RefApp: NSObject, NSApplicationDelegate {
     /// Backdrop colour sampled from each appearance's tiles. See assertAppearancesDiffer().
     var backdropByAppearance: [String: String] = [:]
 
+    /// Hash of each "<id>_normal_<appearance>" tile, and the states that came out
+    /// identical to it. Reported in the manifest the way the Windows and GNOME references
+    /// report theirs.
+    ///
+    /// On this platform that list is long and expected: AppKit draws no rollover state for
+    /// any control in this matrix, so every hover tile matches its normal one. Saying so
+    /// per tile is the point -- "the theme may leave hover equal here" is a claim a theme
+    /// author should be able to check rather than take on trust from a comment.
+    var normalHashes: [String: String] = [:]
+    var identicalToNormal: [String] = []
+
     func applicationDidFinishLaunching(_ note: Notification) {
         // .regular so the app can actually become frontmost. An NSWindow that is not key
         // draws EVERY AppKit control in its inactive, greyed style -- the same class of
@@ -357,6 +368,7 @@ final class RefApp: NSObject, NSApplicationDelegate {
                 backdropByAppearance[String(appearance)] = String(format: "#%02X%02X%02X",
                     Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255))
             }
+            noteIfIdenticalToNormal(name, png)
         } catch {
             blocker("\(name) could not be written: \(error)")
         }
@@ -386,6 +398,31 @@ final class RefApp: NSObject, NSApplicationDelegate {
                 }
                 write(img, name)
             }
+        }
+    }
+
+    /// Records whether a state tile is byte-identical to its own normal tile.
+    func noteIfIdenticalToNormal(_ name: String, _ png: Data) {
+        let parts = name.split(separator: "_").map(String.init)
+        guard parts.count == 3 else { return }
+        let (id, state, appearance) = (parts[0], parts[1], parts[2])
+        let key = "\(id)_\(appearance)"
+        // FNV-1a rather than CryptoKit: this needs to tell "same bytes" from "different
+        // bytes" and nothing more, and it keeps the file free of another import.
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in png {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        let digest = String(hash, radix: 16)
+        if state == "normal" {
+            normalHashes[key] = digest
+            return
+        }
+        if normalHashes[key] == digest {
+            identicalToNormal.append(name)
+            print("NATIVEREF:INFO \(name) is identical to its normal tile; AppKit does not "
+                + "restyle this control for this state")
         }
     }
 
@@ -512,6 +549,7 @@ final class RefApp: NSObject, NSApplicationDelegate {
             "reduce_transparency": \(UserDefaults(suiteName: "com.apple.universalaccess")?.bool(forKey: "reduceTransparency") ?? false),
             "increase_contrast": \(UserDefaults(suiteName: "com.apple.universalaccess")?.bool(forKey: "increaseContrast") ?? false)
           },
+          "states_identical_to_normal": [\(identicalToNormal.map { "\"\($0)\"" }.joined(separator: ", "))],
           "capture": {
             "method": "\(captureMethod)",
             "vibrancy_capturable": false,
