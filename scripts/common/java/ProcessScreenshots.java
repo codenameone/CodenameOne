@@ -320,7 +320,8 @@ public class ProcessScreenshots {
                             sf = structuralFidelity(natc, cn1c, bg);
                         }
                         double meanDelta = meanChannelDelta(natc, cn1c);
-                        details.put("fidelity_percent", round2(sf[0]));
+                        boolean blankPair = sf[0] == BOTH_BLANK;
+                        details.put("fidelity_percent", blankPair ? 0.0d : round2(sf[0]));
                         details.put("shape_sim", round4(sf[1]));
                         details.put("size_agreement", round4(sf[2]));
                         details.put("glass", glass);
@@ -343,7 +344,20 @@ public class ProcessScreenshots {
                         details.put("geometry", geometryMetrics(natc, cn1c, bg, geoRef));
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
-                        record.put("status", "compared");
+                        if (blankPair) {
+                            // Reported as an uncomparable pair, which FidelityGate already
+                            // fails on and already refuses to write a baseline for. It still
+                            // falls through to the preview emission below -- a blank pair is
+                            // precisely the case where someone needs to SEE both tiles.
+                            record.put("status", "blank_pair");
+                            record.put("message", "Neither the native golden nor the CN1 render"
+                                    + " has any widget content against the tile background "
+                                    + String.format("#%06X", bg) + ". That is a harness failure"
+                                    + " (an empty render, a capture taken before first paint, or"
+                                    + " a widget positioned outside its tile), not a match.");
+                        } else {
+                            record.put("status", "compared");
+                        }
                     }
                     record.put("details", details);
                     if (emitBase64) {
@@ -468,6 +482,11 @@ public class ProcessScreenshots {
     /// differently or off by a few pixels -> high 90s; a genuinely different or
     /// mis-sized widget -> lower, in proportion to the mismatched area.
     private static final int CONTENT_TAU = 10;
+
+    /// Sentinel returned by structuralFidelity() when NEITHER tile has widget content.
+    /// Negative so it can never be confused with a score, and handled by the caller as
+    /// a status rather than a number. See the both-blank branch.
+    private static final double BOTH_BLANK = -1.0d;
     private static final int MIN_CONTENT_PIXELS = 4;
 
     private static double[] structuralFidelity(PNGImage nativeImg, PNGImage cn1, int bgRgb) {
@@ -478,7 +497,15 @@ public class ProcessScreenshots {
         boolean emptyN = boxN[2] <= 0;
         boolean emptyC = boxC[2] <= 0;
         if (emptyN && emptyC) {
-            return new double[]{100.0d, 1.0d, 1.0d};   // both blank -> trivially identical
+            // NOT "trivially identical", which is what this used to return, at 100%.
+            // Two tiles with no widget in either of them is the signature of a harness
+            // failure -- a renderer that produced empty frames, a capture that ran
+            // before first paint, a widget positioned outside its tile -- and the one
+            // thing it is not is a perfect render. Scoring it 100 puts the highest
+            // possible number on the case where nothing was measured, and because the
+            // ratchet only fails on a DROP, that number then becomes a baseline no
+            // real render can reach.
+            return new double[]{BOTH_BLANK, 0.0d, 0.0d};
         }
         if (emptyN || emptyC) {
             return new double[]{0.0d, 0.0d, 0.0d};      // one has a widget, the other does not
