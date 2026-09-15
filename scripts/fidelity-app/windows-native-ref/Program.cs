@@ -180,7 +180,11 @@ public partial class App : Application
         // capture then checks THAT rectangle rather than guessing at coordinates.
         try
         {
-            var t = _probeControl.TransformToVisual(root);
+            // Relative to the WINDOW, not to root. TransformToVisual(root) gives the offset
+            // inside root's own coordinate space, which excludes root's margin -- so the
+            // button reported 0,0 and the sampler read the page background at both points,
+            // #F3F3F3 twice, and called a correctly styled control unstyled.
+            var t = _probeControl.TransformToVisual(null);
             var origin = t.TransformPoint(new Windows.Foundation.Point(0, 0));
             _probeBounds = new Windows.Foundation.Rect(origin.X, origin.Y,
                 _probeControl.ActualWidth, _probeControl.ActualHeight);
@@ -497,7 +501,9 @@ public partial class App : Application
                     int bw = (int)_probeBounds.Width, bh = (int)_probeBounds.Height;
                     if (bx >= 0 && by >= 0 && bx + bw <= w && by + bh <= h)
                     {
-                        var corner = image.GetPixel(bx, by);
+                        // One pixel in from the corner: exactly on it can land on the
+                        // antialiased edge, which is neither the page nor the fill.
+                        var corner = image.GetPixel(bx + 1, by + 1);
                         var mid = image.GetPixel(bx + bw / 2, by + bh / 2);
                         Console.WriteLine($"NATIVEREF:INFO probe control {bw}x{bh} at {bx},{by} "
                             + $"corner=#{corner.R:X2}{corner.G:X2}{corner.B:X2} "
