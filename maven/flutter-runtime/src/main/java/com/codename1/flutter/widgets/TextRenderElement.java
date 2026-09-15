@@ -444,9 +444,29 @@ public class TextRenderElement extends RenderElement {
         /// dividers land on the text they were meant to separate.
         double lineHeightPx;
 
-        /** The height of one line: the style's, or the font's when it sets none. */
+        /** The height of one line: the style's, or the FACE's when it sets none. */
         double lineHeight(Font f) {
-            return lineHeightPx > 0 ? lineHeightPx : (f == null ? 0 : f.getHeight());
+            if (lineHeightPx > 0) {
+                return lineHeightPx;
+            }
+            if (f == null) {
+                return 0;
+            }
+            // Ascent + descent, NOT getHeight(). The reference's line box for a style
+            // that states no height is the face's own ascent and descent; getHeight() is
+            // the platform's recommended line SPACING, which adds external leading on top
+            // of that and is a different quantity.
+            //
+            // Measured on the typography demo, whose type scale states no height for any
+            // role: two wrapped lines of a 96sp style sat 141 logical pixels apart here
+            // against the reference's 115 -- a ratio of 1.47 where the face asks for
+            // 1.198 -- and the error repeats on every line of every such style, so the
+            // page drifted further out of register the further down it went.
+            int ascent = f.getAscent();
+            int descent = Math.abs(f.getDescent());
+            int box = ascent + descent;
+            // A port that does not answer for the face still has to lay text out.
+            return box > 0 ? box : f.getHeight();
         }
         /** The ink's own alpha; see applyStyle. */
         int fgAlpha = 255;
