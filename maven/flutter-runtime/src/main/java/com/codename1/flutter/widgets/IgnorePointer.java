@@ -29,9 +29,9 @@ import com.codename1.flutter.Widget;
 /**
  * Prevents its subtree from receiving pointer events — Flutter's {@code IgnorePointer}.
  *
- * <p>Structural pass-through for this milestone: the single {@code child}
- * renders unchanged (see {@link PassThroughRenderElement}); the captured
- * parameters are held for a later render pass.</p>
+ * <p>The child renders unchanged and its subtree is made deaf to touch, so a handler
+ * ABOVE this widget receives a press that lands on top of the child -- which is the whole
+ * point of it. See {@link IgnorePointerRenderElement}.</p>
  */
 public class IgnorePointer extends Widget implements HasChild {
 
@@ -40,6 +40,15 @@ public class IgnorePointer extends Widget implements HasChild {
     private Widget child;
 
     public void ignoring(Boolean v) { this.ignoring = v; }
+
+    /// Whether the subtree is deaf to touch. Null means the default, which is true.
+    ///
+    /// #### Returns
+    ///
+    /// the ignoring flag as given, or null when it was never set
+    public Boolean getIgnoring() {
+        return ignoring;
+    }
     public void ignoringSemantics(Boolean v) { this.ignoringSemantics = v; }
 
     public void child(Widget v) {
@@ -53,6 +62,6 @@ public class IgnorePointer extends Widget implements HasChild {
 
     @Override
     public Element createElement() {
-        return new PassThroughRenderElement(this);
+        return new IgnorePointerRenderElement(this);
     }
 }

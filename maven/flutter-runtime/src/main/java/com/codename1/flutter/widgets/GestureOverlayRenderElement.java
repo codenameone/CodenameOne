@@ -221,6 +221,8 @@ public class GestureOverlayRenderElement extends RenderElement {
         /** Where the press landed, for the slop test in {@link #pointerReleased}. */
         private int pressX;
         private int pressY;
+        /// When the press landed, so a drag can report how fast it was going.
+        private long pressAt;
 
         OverlayComponent() {
             setUIID("FlutterGesture");
@@ -241,6 +243,7 @@ public class GestureOverlayRenderElement extends RenderElement {
             suppressTap = false;
             pressX = x;
             pressY = y;
+            pressAt = com.codename1.ui.animations.AnimationTime.now();
             forwardTo = interactiveTargetAt(x, y);
             if (forwardTo != null) {
                 // The press belongs to something inside us. We stay CN1's event target, so
@@ -343,8 +346,52 @@ public class GestureOverlayRenderElement extends RenderElement {
                 if (g != null) {
                     fire(g.getOnTap());
                 }
+            } else if (wasDrag) {
+                fireVerticalDragEnd(x, y);
             }
             suppressTap = false;
+        }
+
+        /**
+         * Reports the end of a vertical drag, with the speed it finished at.
+         *
+         * <p>A gesture that turned out to be a drag used to end in silence: the callback
+         * was stored and never invoked, anywhere. Flick gestures therefore did nothing at
+         * all, and the ones that matter are the ones with no other route -- the gallery's
+         * splash screen is entered with a downward flick and left with an upward one, and
+         * with neither working it could be neither opened as intended nor left.</p>
+         *
+         * <p>Velocity is measured over the WHOLE press rather than the last few moves.
+         * That understates a flick that began slowly, which is the safe direction to be
+         * wrong in: it misses a gesture rather than inventing one, and every caller here
+         * compares against a threshold.</p>
+         */
+        private void fireVerticalDragEnd(int x, int y) {
+            GestureDetector g = gesture();
+            if (g == null || g.getOnVerticalDragEnd() == null) {
+                return;
+            }
+            double dy = y - pressY;
+            if (Math.abs(dy) <= Math.abs(x - pressX)) {
+                // Mostly sideways: not this gesture.
+                return;
+            }
+            long ms = com.codename1.ui.animations.AnimationTime.now() - pressAt;
+            if (ms <= 0) {
+                ms = 1;
+            }
+            double scale = com.codename1.flutter.rendering.Dp.scale();
+            double lpPerSecond = (scale > 0 ? dy / scale : dy) * 1000.0 / ms;
+            com.codename1.flutter.gestures.DragEndDetails d =
+                    new com.codename1.flutter.gestures.DragEndDetails(
+                            new com.codename1.flutter.gestures.Velocity(
+                                    new com.codename1.flutter.Offset(0.0, lpPerSecond)),
+                            Double.valueOf(lpPerSecond));
+            try {
+                g.getOnVerticalDragEnd().call(d);
+            } catch (Throwable t) {
+                com.codename1.flutter.FlutterErrorReport.record(t);
+            }
         }
     }
 

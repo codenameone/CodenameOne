@@ -137,6 +137,15 @@ public class GestureDetector extends Widget {
         return onTap;
     }
 
+    /// The vertical drag-end callback, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the callback given to {@code onVerticalDragEnd}
+    public com.codename1.flutter.gestures.GestureDragEndCallback getOnVerticalDragEnd() {
+        return onVerticalDragEnd;
+    }
+
     public Funcs.VoidFunc0 getOnLongPress() {
         return onLongPress;
     }
