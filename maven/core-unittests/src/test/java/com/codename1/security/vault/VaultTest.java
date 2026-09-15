@@ -1743,6 +1743,81 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anOperationalKeyHonoursTheIdleTimeout() throws Exception {
+        // autoLockAfter is documented as checked on next use, and a KeyHandle IS a use -- but the
+        // handle tested liveness by reading the vault's counters directly, and nothing on that
+        // path reached checkAutoLock. An application working only through handles never evaluated
+        // the timeout at all: the cached subkey went on sealing and opening indefinitely.
+        String name = freshName();
+        VaultOptions brief = fast().autoLockAfter(150);
+        Vault vault = Vault.named(name).configure(brief);
+        vault.enroll(pw("p"), brief).get();
+        KeyHandle handle = vault.operationalKey("cache").get();
+        AssociatedData binding = AssociatedData.of("app", "v", "r", "cache");
+        assertNotNull(handle.seal("early".getBytes(), binding).get());
+
+        Thread.sleep(400);
+
+        // Asked through the HANDLE, with nothing touching the vault directly first -- which is
+        // the whole of the case.
+        assertTrue(handle.isDestroyed(), "the idle timeout has passed, so the handle is not live");
+        assertEquals(VaultError.LOCKED, errorOf(handle.seal("late".getBytes(), binding)));
+        assertFalse(vault.isUnlocked(), "and the vault itself is locked, not merely the handle");
+    }
+
+    @Test
+    void handleUseCountsAsActivityForTheIdleTimeout() {
+        // The other half, and the reason the fix above is not simply "make handles lock". A
+        // caller working through a handle is active, so evaluating the timeout on that path
+        // without also refreshing it would lock them out in the middle of the work the timeout
+        // exists to measure.
+        String name = freshName();
+        VaultOptions brief = fast().autoLockAfter(400);
+        Vault vault = Vault.named(name).configure(brief);
+        vault.enroll(pw("p"), brief).get();
+        KeyHandle handle = vault.operationalKey("cache").get();
+        AssociatedData binding = AssociatedData.of("app", "v", "r", "cache");
+
+        // Well past the timeout in total, but never idle for it.
+        for (int iter = 0; iter < 6; iter++) {
+            assertNotNull(handle.seal(("chunk" + iter).getBytes(), binding).get(),
+                    "continuous handle use must not trip the idle lock");
+            try {
+                Thread.sleep(120);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertFalse(handle.isDestroyed());
+    }
+
+    @Test
+    void aHandleLockedMidOperationDiscardsItsResult() {
+        // The liveness check happens before the work, and the work is where the time goes -- so a
+        // lock() landing inside it was not noticed and the operation completed afterwards anyway,
+        // which is precisely what lock() documents cannot happen. Every operation the vault
+        // performs itself already asks again at the end; the handle's did not.
+        String name = freshName();
+        final Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        KeyHandle handle = vault.operationalKey("cache").get();
+        AssociatedData binding = AssociatedData.of("app", "v", "r", "cache");
+
+        // Landed inside the crypto, which is the only place between the check and the result.
+        TestCodenameOneImplementation.getInstance().setDuringAes(new Runnable() {
+            public void run() {
+                vault.lock();
+            }
+        });
+        try {
+            assertEquals(VaultError.LOCKED, errorOf(handle.seal("secret".getBytes(), binding)),
+                    "a seal that finished after lock() returned must not hand back ciphertext");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setDuringAes(null);
+        }
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

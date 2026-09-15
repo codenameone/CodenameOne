@@ -4296,13 +4296,38 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         testSecureRandom().nextBytes(out);
     }
 
+    /**
+     * Runs {@code action} once, inside the next AES operation.
+     *
+     * <p>The crypto is where a vault operation spends its time between checking that it may
+     * proceed and producing a result, so it is the only place a test can land a concurrent
+     * {@code lock()} deterministically. Fired once and then cleared.</p>
+     *
+     * @param action what to do inside the next AES call, or null to cancel
+     */
+    public void setDuringAes(Runnable action) {
+        duringAes = action;
+    }
+
+    private Runnable duringAes;
+
+    private void fireDuringAes() {
+        if (duringAes != null) {
+            Runnable once = duringAes;
+            duringAes = null;
+            once.run();
+        }
+    }
+
     @Override
     public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        fireDuringAes();
         return testAes(transformation, key, iv, aad, plaintext, javax.crypto.Cipher.ENCRYPT_MODE);
     }
 
     @Override
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        fireDuringAes();
         return testAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
     }
 

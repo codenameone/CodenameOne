@@ -2260,8 +2260,26 @@ public final class Vault {
     }
 
     /// The lock generation, for a handle to notice that it has been invalidated.
+    ///
+    /// Evaluates the idle timeout first. `autoLockAfter` is documented as checked on next use,
+    /// and a [KeyHandle] IS a use -- but the handle tested liveness by reading these counters
+    /// directly, and nothing on that path reached checkAutoLock. An application that worked only
+    /// through handles therefore never evaluated the timeout at all: the cached subkey went on
+    /// sealing and opening indefinitely, while the vault reported itself unlocked to anyone who
+    /// asked it directly and locked itself the moment they did.
     int generation() {
+        checkAutoLock();
         return lockGeneration;
+    }
+
+    /// Counts a handle operation as activity, exactly as requireUnlocked does for the vault's own.
+    ///
+    /// Necessary BECAUSE of the check above, not beside it: evaluating the timeout on a path that
+    /// does not also refresh it would lock a caller out in the middle of the work the timeout
+    /// exists to measure -- so making handles honour the idle lock without this would replace one
+    /// defect with a worse one.
+    void noteHandleUse() {
+        touch();
     }
 
     /// The key generation, for a handle to notice that the key it derives from has been replaced.

@@ -238,6 +238,28 @@ public final class SecureEnvelope {
                 keyVersion, body.length + TAG_LENGTH);
         byte[] associated = Bytes.concat(header, associatedData);
         byte[] ciphertext;
+        // Unconditional, and that is correct on every port this ships to, Android included.
+        //
+        // A review round read this as a crash on Android API 19-20 -- the builder's default
+        // minimum SDK -- on the grounds that AndroidImplementation.androidAes constructs
+        // javax.crypto.spec.GCMParameterSpec, "a class introduced in API 21", giving a
+        // NoClassDefFoundError that no catch here or in the worker would see because an Error is
+        // not a RuntimeException. The last part is true and the premise is not: the platform's
+        // own data/api-versions.xml, which is the authority this repo already uses for questions
+        // of when an Android API appeared, records
+        //
+        //     <class name="javax/crypto/spec/GCMParameterSpec" since="19">
+        //     <method name="updateAAD([B)V" since="19">     (inside javax/crypto/Cipher)
+        //
+        // identically in every installed platform from android-30 through android-37.2. The whole
+        // GCM surface this path touches arrived in API 19, which is the floor rather than above
+        // it, so there is no missing class to fail on.
+        //
+        // And if a device ever did lack the ALGORITHM rather than the class, the failure is not
+        // the one described either: Cipher.getInstance throws NoSuchAlgorithmException, a checked
+        // GeneralSecurityException, which androidAes wraps in a RuntimeException -- caught here as
+        // a CryptoException or by the worker's terminal handler, reported as a vault error with
+        // the AsyncResource completed. No hard crash, and no caller left waiting forever.
         try {
             ciphertext = Cipher.aesEncrypt(Cipher.AES_GCM, new SecretKey("AES", key),
                     nonce, associated, body);

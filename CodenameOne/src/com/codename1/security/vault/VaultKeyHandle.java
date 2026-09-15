@@ -98,7 +98,9 @@ final class VaultKeyHandle extends KeyHandle {
     public AsyncResource<byte[]> seal(byte[] plaintext, AssociatedData aad) {
         AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         try {
-            out.complete(SecureEnvelope.seal(live(), purpose, version, aad, plaintext));
+            byte[] key = live();
+            int at = owner.generation();
+            out.complete(stillOurs(at, SecureEnvelope.seal(key, purpose, version, aad, plaintext)));
         } catch (VaultException failed) {
             out.error(failed);
         }
@@ -113,8 +115,9 @@ final class VaultKeyHandle extends KeyHandle {
             // live() first either way: it is the liveness check, and a destroyed or locked
             // handle must answer LOCKED rather than reach into the vault for an older key.
             byte[] current = live();
+            int at = owner.generation();
             if (envelope.getKeyVersion() == version) {
-                out.complete(envelope.open(current, aad));
+                out.complete(stillOurs(at, envelope.open(current, aad)));
             } else {
                 // Every subkey is derived from the data key, so a rotation changes this handle's
                 // material and a record sealed before it no longer opens under the live one --
@@ -125,7 +128,7 @@ final class VaultKeyHandle extends KeyHandle {
                 // it at the first rotation.
                 byte[] older = owner.subkeyAtVersion(purpose, envelope.getKeyVersion());
                 try {
-                    out.complete(envelope.open(older, aad));
+                    out.complete(stillOurs(at, envelope.open(older, aad)));
                 } finally {
                     Bytes.zero(older);
                 }
@@ -141,7 +144,8 @@ final class VaultKeyHandle extends KeyHandle {
         AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         try {
             Hmac hmac = Hmac.create(Hash.SHA256, live());
-            out.complete(hmac.doFinal(data == null ? new byte[0] : data));
+            int at = owner.generation();
+            out.complete(stillOurs(at, hmac.doFinal(data == null ? new byte[0] : data)));
         } catch (VaultException failed) {
             out.error(failed);
         }
@@ -153,9 +157,11 @@ final class VaultKeyHandle extends KeyHandle {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         try {
             Hmac hmac = Hmac.create(Hash.SHA256, live());
+            int at = owner.generation();
             byte[] computed = hmac.doFinal(data == null ? new byte[0] : data);
             boolean same = Bytes.constantTimeEquals(computed, tag);
             Bytes.zero(computed);
+            requireStillOurs(at);
             out.complete(Boolean.valueOf(same));
         } catch (VaultException failed) {
             out.error(failed);
@@ -173,6 +179,36 @@ final class VaultKeyHandle extends KeyHandle {
     public boolean isDestroyed() {
         return material == null || generation != owner.generation()
                 || keyGeneration != owner.keyGeneration();
+    }
+
+    /// The result, or a refusal if the vault stopped being ours while it was being produced.
+    ///
+    /// The liveness check happens before the work, and the work is where the time goes -- so a
+    /// lock() landing inside it was not noticed and the operation completed afterwards anyway,
+    /// which is precisely what [Vault#lock()] documents cannot happen. Every operation the vault
+    /// performs itself already asks again at the end; these did not.
+    ///
+    /// Note what is NOT the risk here, because the review that found this named it: lock() does
+    /// not zero this handle's bytes. The material is a subkey derived into an array this object
+    /// owns, not a reference to the vault's data key, so the crypto above cannot run against a
+    /// buffer being cleared underneath it. What it can do is hand back a result the caller is no
+    /// longer entitled to, and that is what this refuses.
+    private byte[] stillOurs(int at, byte[] produced) {
+        try {
+            requireStillOurs(at);
+        } catch (VaultException locked) {
+            Bytes.zero(produced);
+            throw locked;
+        }
+        return produced;
+    }
+
+    private void requireStillOurs(int at) {
+        if (at != owner.generation() || isDestroyed()) {
+            throw new VaultException(VaultError.LOCKED,
+                    "the vault was locked while this key handle was being used, so the result "
+                    + "was discarded");
+        }
     }
 
     /// The material, or a refusal. Checked on every operation rather than only at creation,
@@ -193,6 +229,7 @@ final class VaultKeyHandle extends KeyHandle {
                     + "locked, or the data key it derives from was rotated or replaced by a sync "
                     + "import. Ask the vault for a new handle");
         }
+        owner.noteHandleUse();
         return material;
     }
 }
