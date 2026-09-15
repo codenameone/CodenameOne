@@ -43,8 +43,25 @@
 # four-CPU hypervisor guest is a weak generator of store interleavings. These
 # runners are native arm64 hardware, which is where the corruption was seen.
 #
-# NOTHING HERE CHANGES A DEFAULT. The pool is switched on for this workflow only,
-# through CN1_TEST_EXTRA_CFLAGS; every other build still compiles it out.
+# THIS WORKFLOW SETTLED IT, AND THE DEFAULT HAS NOW MOVED. It used to read "nothing
+# here changes a default -- the pool is switched on for this workflow only"; that is no
+# longer true, and leaving it saying so would repeat the exact failure described above,
+# where a comment outlived the decision it recorded.
+#
+# gcMarkResolveThreadCount now derives the marker count from the CPU count (capped at 4)
+# on POSIX. The evidence is this workflow green at 1 and 4 markers on native arm64 Linux
+# and on x64, plus a self-hosting translation measuring ~5x wall clock and ~10% peak
+# memory against the serial default -- both moving together, because a shorter cycle
+# gives the mutator less time to run ahead.
+#
+# WINDOWS IS DELIBERATELY EXCLUDED and still defaults to one marker. Every arm here runs
+# on POSIX threads; Windows goes through the Win32 pthread shim, which the parallel
+# marker had never executed on. Enabling it there turned
+# `ParparVM Java Tests (Windows)` / screenshot-capture (arm64) red -- the translated app
+# emitted 132 of 166 screenshots and stopped part-way through the suite -- so that shim
+# is unvalidated for this, and re-enabling it needs THAT job green rather than a
+# measurement from another platform. -DCN1_GC_MARK_THREADS=N turns it on for whoever
+# picks up the shim.
 name: ParparVM parallel mark (arm64 Linux)
 
 on:

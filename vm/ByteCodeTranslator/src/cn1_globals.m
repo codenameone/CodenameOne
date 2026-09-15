@@ -1779,11 +1779,12 @@ static void cn1GcBuildVirtualThreadSnapshot(void);
 static void cn1GcScanParkedVirtualThreads(CODENAME_ONE_THREAD_STATE);
 static int cn1GcParkedVirtualThreadsScanned;
 #ifdef CN1_NURSERY
-// Reset per cycle exactly like the flag above. The young generation is a ROOT SOURCE for
-// the major mark -- see cn1NurseryMarkYoungRoots -- and it is global state, so it is
-// scanned once per cycle rather than once per thread.
-static int cn1GcNurseryYoungRootsScanned;
-void cn1NurseryMarkYoungRoots(CODENAME_ONE_THREAD_STATE);
+// The young generation is a ROOT SOURCE for the major mark (see
+// cn1NurseryMarkYoungRoots). It is scanned ONCE PER PAUSED THREAD, over that thread's
+// OWN young blocks -- not once per cycle over all of them. A nursery is thread-local
+// and only its owner mutates it, so the owner being paused is exactly what makes the
+// walk safe; see the call site.
+void cn1NurseryMarkYoungRoots(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* owner);
 #endif
 static void cn1GcSignalStopThreads(struct ThreadLocalData* self);
 static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
@@ -1877,21 +1878,32 @@ static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
 // drain had missed. The rescan is a correctness backstop for a worklist that cannot hold
 // the frontier; the fix is to hold the frontier.
 //
-//   worklist   wall (3 reps)         peak
-//   65536      0.97 / 1.01 / 1.24s   1050-1265MB
-//   1048576    0.90 / 0.90 / 0.90s    791-839MB
-//   4194304    0.88 / 0.90 / 0.90s    777-831MB
+//   worklist   wall (3 reps)         peak          __bss
+//   65536      0.97 / 1.01 / 1.24s   1050-1265MB    1.26MB
+//   262144     1.24 / 1.28s          760-786MB      4.41MB
+//   1048576    0.90 / 0.90 / 0.90s    791-839MB    16.99MB
+//   4194304    0.88 / 0.90 / 0.90s    777-831MB    ~67MB
 //
-// ~25% off peak memory AND a tighter, slightly faster wall clock -- the same
-// move-together behaviour parallel marking showed, for the same reason: work the
-// collector does not waste is cycle time the mutator does not spend running ahead.
-// 4M is not better than 1M and costs 32MB of table instead of 8MB.
+// ~25% off peak memory AND a tighter wall clock -- the same move-together behaviour
+// parallel marking showed, for the same reason: work the collector does not waste is
+// cycle time the mutator does not spend running ahead.
+//
+// 262144 IS THE DEFAULT BECAUSE IT IS THE KNEE. Re-measured head to head it is as good
+// as 1M on both axes (760-786MB against 791-858MB) for a QUARTER of the table. The
+// array is static, so its size is a reservation every generated application carries --
+// iOS and Android included, not just a desktop translation -- and 17MB of that for no
+// measured gain is not a trade worth making on a phone.
+//
+// The reservation is zerofill, so it costs no on-disk bytes (all three binaries are
+// byte-identical in size at 4,529,096) and no resident memory until an entry is
+// actually touched. That is why a size this large is affordable at all; it is not a
+// reason to be careless with it, because the pages a big heap DOES touch are real.
 //
 // PRIOR ROUNDS FOUND THE OPPOSITE ("a bigger worklist is neutral-to-worse everywhere it
 // has been tried") and they were measured under SERIAL marking, where the collector was
 // the bottleneck for a different reason. Like the marker-count and aging-slack results,
 // this one is only true for the configuration it was measured in.
-#define CN1_GC_MARK_WORKLIST_SIZE 1048576
+#define CN1_GC_MARK_WORKLIST_SIZE 262144
 #endif
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
 static int gcMarkWorklistTop;
@@ -4064,13 +4076,22 @@ void codenameOneGCMark() {
                 // The young generation, as a root source. Without this the collector
                 // cannot see a live nursery object at all and frees the heap objects it
                 // references; see cn1NurseryMarkYoungRoots for why the promotion barrier
-                // does not already cover this direction. Inside the stopped-thread region
-                // on purpose, so a mutator cannot be bump-allocating into a block while
-                // it is walked.
-                if(!cn1GcNurseryYoungRootsScanned) {
-                    cn1GcNurseryYoungRootsScanned = 1;
-                    cn1NurseryMarkYoungRoots(d);
-                }
+                // does not already cover this direction.
+                //
+                // SCANS ONLY `t`, THE THREAD THIS ITERATION HAS PAUSED. An earlier version
+                // ran once per cycle over EVERY thread's young blocks and claimed the
+                // stopped-thread region made that safe. It does not: this loop pauses
+                // threads ONE AT A TIME and releases each before the next is scanned, so a
+                // global walk here races every other mutator -- which can bump-allocate,
+                // run its own minor collection, clear start bits and recycle blocks while
+                // the walk reads them. That is a missed root or a dereference of a
+                // recycled header, and the comment asserting otherwise was the worse half
+                // of the bug.
+                //
+                // A nursery is thread-local and only its owner touches it, so scanning
+                // each thread's own blocks while that thread is paused is both safe and
+                // complete: every thread is paused in some iteration.
+                cn1NurseryMarkYoungRoots(d, t);
 #endif
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
                 cn1GcSelfCheckThreadStack(t, stackSize);
@@ -11069,7 +11090,6 @@ static int cn1GcParkedVirtualThreadsScanned = 0;
 static void cn1GcBuildVirtualThreadSnapshot(void) {
     cn1GcParkedVirtualThreadsScanned = 0;
 #ifdef CN1_NURSERY
-    cn1GcNurseryYoungRootsScanned = 0;
 #endif
     int n = cn1VirtualThreadSnapshot(cn1GcVtSnapshot, CN1_VT_SNAPSHOT_MAX);
     if(n > CN1_VT_SNAPSHOT_MAX) {
@@ -12009,16 +12029,23 @@ static void cn1ForceVisitedPrune(int key) {
 // because already-marked children are no-ops in gcMarkObject.
 //
 // CN1_GC_MARK_WORKLIST_SIZE is overridable at compile time (e.g. via -D in the Xcode
-// build settings or the maven plugin). 65536 entries is ~1MB on 64-bit. Sized so the
+// build settings or the maven plugin). THE DEFAULT IS 262144 ENTRIES (~4MB on 64-bit,
+// zerofill), raised from 65536 -- see the measurement table beside the #define in the
+// forward-declaration block, which is where the value actually lives. Sized so the
 // constant pool alone fits comfortably (HelloCodenameOne has ~15K entries, real apps
 // can have more). Smaller sizes still work via the heap-rescan slow path, but the
 // rescan adds non-trivial cost and the path is harder to test, so the default errs
-// on the side of avoiding overflow for any normal app.
+// on the side of avoiding overflow for any normal app -- and on a real heap the
+// overflow was measured doing 10.1M slot walks across 68 passes for zero useful work.
 // (The #define itself is hoisted to the forward-declaration block far above, next to
 // gcMarkWorklistTop, because the grace pass needs it; this #ifndef is what keeps a
 // -D override authoritative in both places.)
+// THE TWO LITERALS MUST MATCH. This is the fallback for the hoisted #define far above;
+// they were both 65536, so a divergence was impossible to notice. The moment they
+// differ, whichever block the preprocessor reaches first silently wins, and reordering
+// or deleting the hoisted one would drop the default back without a single warning.
 #ifndef CN1_GC_MARK_WORKLIST_SIZE
-#define CN1_GC_MARK_WORKLIST_SIZE 65536
+#define CN1_GC_MARK_WORKLIST_SIZE 262144
 #endif
 
 struct gcMarkWorklistEntry {
@@ -13426,33 +13453,35 @@ JAVA_OBJECT cn1NurseryAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* p
 // reachable ones, because reachability within the young generation is what a MINOR
 // collection determines and this runs without one. The cost is retaining heap objects
 // held by young garbage until the next minor collection, which is one trigger's worth.
-void cn1NurseryMarkYoungRoots(CODENAME_ONE_THREAD_STATE) {
+void cn1NurseryMarkYoungRoots(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* owner) {
     int i;
 #ifdef CN1_NURSERY_DEBUG
-    // SELF-COUNT, for the same reason every other gate here has one: this sits behind an
-    // #ifdef inside a per-thread loop inside another #ifdef, and a pass that never runs
-    // produces exactly the same output as a pass that found nothing.
     static long long __yrPasses = 0, __yrBlocks = 0, __yrObjects = 0;
     __yrPasses++;
 #endif
-    if(cn1NurseryStartBits == 0) {
+    if(cn1NurseryStartBits == 0 || owner == 0 || owner->nurseryYoungBlocks == 0) {
         return;
     }
-    for(i = 0 ; i < cn1NurseryBlockCount ; i++) {
-        size_t __b, __e, __g;
-        if(!cn1NurseryBlocks[i].young) {
+    // OWNER'S BLOCKS ONLY, and the caller must have this thread PAUSED. nurseryYoungBlocks
+    // is the owner's own list, mutated only by the owner (cn1NurseryAlloc appends,
+    // cn1NurseryMinorCollect clears it), so reading it while the owner runs would race
+    // both the list and the blocks it names.
+    for(i = 0 ; i < owner->nurseryYoungCount ; i++) {
+        int blk = owner->nurseryYoungBlocks[i];
+        size_t b, e, g;
+        if(blk < 0 || blk >= cn1NurseryBlockCount) {
             continue;
         }
-        __b = (size_t)i * CN1_NURSERY_BITS_PER_BLOCK;
-        __e = __b + CN1_NURSERY_BITS_PER_BLOCK;
-        for(__g = __b ; __g < __e ; __g++) {
+        b = (size_t)blk * CN1_NURSERY_BITS_PER_BLOCK;
+        e = b + CN1_NURSERY_BITS_PER_BLOCK;
+        for(g = b ; g < e ; g++) {
             JAVA_OBJECT o;
             gcMarkFunctionPointer fp;
-            if(!(__atomic_load_n(&cn1NurseryStartBits[__g >> 3], __ATOMIC_ACQUIRE)
-                    & (unsigned char)(1u << (__g & 7)))) {
+            if(!(__atomic_load_n(&cn1NurseryStartBits[g >> 3], __ATOMIC_ACQUIRE)
+                    & (unsigned char)(1u << (g & 7)))) {
                 continue;
             }
-            o = (JAVA_OBJECT)(cn1NurseryArenaStart + __g * CN1_NURSERY_GRANULE);
+            o = (JAVA_OBJECT)(cn1NurseryArenaStart + g * CN1_NURSERY_GRANULE);
             if(o->__heapPosition != -1 || o->__codenameOneParentClsReference == 0) {
                 continue;   // promoted objects are registered and marked the normal way
             }
