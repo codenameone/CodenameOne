@@ -575,14 +575,22 @@ public final class AndroidSecureStorage extends SecureStorage {
         //
         // Under the same lock as the write and the reset, so a removal cannot be
         // interleaved with a set that recreates the entry it was clearing.
+        // The MARK goes first, and the value only if that succeeded. Since setIfAbsent started
+        // marking the gate, a mark left behind by a removal is a permanent refusal: the next
+        // setIfAbsent finds no value, sees the mark, and reports that somebody else owns an
+        // account nothing is stored under -- forever. forgetDevice() followed by rememberDevice()
+        // could then never establish a device key again without clearing application data.
+        //
+        // In this order because the other one cannot be recovered from: a cleared mark with the
+        // value still present is read back by the next setIfAbsent and returned, while a removed
+        // value under a surviving mark is the refusal above.
+        if (!clearGate(account)) {
+            return false;
+        }
         boolean removed;
         synchronized (PLAIN_KEY_LOCK) {
             removed = prefs.edit().remove(account).commit();
         }
-        // The lock file is deliberately left alone. It gates nothing by existing -- what excludes
-        // a second writer is the lock held on it, which the system drops when the process ends --
-        // and removing it while another process holds that lock would have the next caller create
-        // a different file and lock that instead, which is two writers again.
         return removed;
     }
 
@@ -706,6 +714,90 @@ public final class AndroidSecureStorage extends SecureStorage {
                 // make the key deletion and the ciphertext deletion one step, and an
                 // asynchronous clear can be reordered after a writer's pending write.
                 prefs.edit().clear().commit();
+            }
+        }
+        // Every gate mark too, for the reason remove() clears one: this drops the value of EVERY
+        // account, so marks left standing would refuse to let any of them be created again. Best
+        // effort and logged rather than fatal -- this path is already the recovery from a key
+        // that can no longer decrypt anything.
+        //
+        // OUTSIDE the monitor above, and that placement is the point. setIfAbsent takes the gate
+        // file's lock and then reaches PLAIN_KEY_LOCK through set(); taking them in the other
+        // order here would be a lock inversion. Within one JVM it is not even a hang -- a second
+        // lock on a file this process already holds raises OverlappingFileLockException, which is
+        // a RuntimeException and would escape a catch written for IOException -- so the ordering
+        // is what keeps this correct rather than the catch below.
+        clearEveryGate();
+    }
+
+    /// Truncates one account's gate mark, under the lock setIfAbsent takes.
+    ///
+    /// Truncated, never deleted: what excludes a second writer is the lock held ON this file, and
+    /// removing it while another process holds that lock would have the next caller create a
+    /// different file and lock that instead, which is two writers again. Zero length is the same
+    /// file, so the lock still means what it meant.
+    ///
+    /// Answers true when there is nothing to clear, which includes having no context to find the
+    /// directory from -- setIfAbsent could not have written a mark in that case either.
+    private boolean clearGate(String account) {
+        java.io.File gate = gateFile(account);
+        if (gate == null || !gate.isFile()) {
+            return true;
+        }
+        return truncateUnderLock(gate);
+    }
+
+    private void clearEveryGate() {
+        try {
+            java.io.File dir = new java.io.File(AndroidNativeUtil.getActivity()
+                    .getApplicationContext().getFilesDir(), "cn1securestorage");
+            java.io.File[] gates = dir.listFiles();
+            if (gates == null) {
+                return;
+            }
+            for (java.io.File gate : gates) {
+                if (gate.isFile() && !truncateUnderLock(gate)) {
+                    Log.p("SecureStorage could not clear the gate mark for " + gate.getName(),
+                            Log.WARNING);
+                }
+            }
+        } catch (Throwable noContext) {
+            Log.e(noContext);
+        }
+    }
+
+    private boolean truncateUnderLock(java.io.File gate) {
+        java.io.RandomAccessFile handle = null;
+        java.nio.channels.FileLock lock = null;
+        try {
+            handle = new java.io.RandomAccessFile(gate, "rw");
+            lock = handle.getChannel().lock();
+            handle.setLength(0);
+            handle.getChannel().force(true);
+            return true;
+        } catch (java.io.IOException cannotClear) {
+            Log.e(cannotClear);
+            return false;
+        } catch (RuntimeException cannotClear) {
+            // OverlappingFileLockException among them. The ordering above is what prevents it;
+            // this is here so that being wrong about that is a refused removal rather than an
+            // exception thrown out of a cleanup path.
+            Log.e(cannotClear);
+            return false;
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
             }
         }
     }
