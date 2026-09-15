@@ -43,14 +43,18 @@ name: Desktop native reference capture
         type: choice
         options: [windows-11-arm, windows-latest]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # NOT cancel-in-progress, unlike every PR-gating workflow here. Those cancel because a
-  # superseded commit's result is worthless. A capture run is the opposite: it exists to
-  # produce evidence, the macOS leg can sit queued for the better part of an hour, and a
-  # second dispatch -- to iterate on the Windows leg, say -- would destroy the very answer
-  # the first one was dispatched for. Queue behind instead.
-  cancel-in-progress: false
+# No concurrency group at all, which took two tries to get right.
+#
+# Cancelling in progress -- copied from the PR-gating workflows, where a superseded commit's
+# result is genuinely worthless -- is wrong here: a capture run exists to produce evidence,
+# and a second dispatch to iterate on one platform would destroy the answer the first was
+# dispatched for.
+#
+# But merely turning cancellation off is not enough, because the group still serialises.
+# Measured: a Windows-only dispatch sat in `pending` behind an unrelated run whose macOS leg
+# had been waiting an hour for a runner, so the cheap 3-minute leg could not iterate at all.
+# The legs are independent and a human dispatches this a few times a day; there is no
+# pile-up to protect against, and any grouping only couples platforms that share nothing.
 
 permissions:
   contents: read
