@@ -104,6 +104,16 @@ public partial class App : Application
 
     private int _tilesWritten;
 
+    /// Hash of each "<id>_normal_<appearance>" tile, and the states that came out
+    /// byte-identical to it.
+    ///
+    /// Identical is not automatically wrong: a platform genuinely may not restyle a
+    /// control for a state (AppKit draws no hover at all). It is only wrong when it is a
+    /// SURPRISE, so it is recorded in the manifest instead of being left for whoever
+    /// later wonders why a theme's hover rule scores the same either way.
+    private readonly Dictionary<string, string> _normalHashes = new();
+    private readonly List<string> _identicalToNormal = new();
+
     /// One row of the desktop matrix. Kind is the native_win key in fidelity-tests.yaml,
     /// and the ids and states are that file's too: the two lists must agree or the
     /// comparator pairs a CN1 render against nothing.
@@ -481,7 +491,14 @@ public partial class App : Application
                             // tiles are painted on and would be compared against the wrong
                             // thing.
                             Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
-                            RequestedTheme = dark ? ElementTheme.Dark : ElementTheme.Light,
+                            // NOT RequestedTheme here. The root already carries it and the
+                            // tile inherits, and setting it a second time on a child that is
+                            // about to be added re-runs template application AFTER the visual
+                            // state has been set -- which silently resets PointerOver to
+                            // Normal. Measured: with it, the dark hover tiles for Button,
+                            // TextBox and ComboBox came out byte-identical to their normal
+                            // tiles while the light ones differed, which is not a difference
+                            // any platform actually has.
                         };
                         host.Children.Add(w);
                         _tileHost.Children.Clear();
@@ -546,6 +563,35 @@ public partial class App : Application
         return tcs.Task;
     }
 
+    /// Records whether a state tile is byte-identical to its own normal tile.
+    private void NoteIfIdenticalToNormal(string name, string path)
+    {
+        var parts = name.Split('_');
+        if (parts.Length != 3)
+        {
+            return;
+        }
+        string id = parts[0], state = parts[1], appearance = parts[2];
+        string key = $"{id}_{appearance}";
+        string hash;
+        using (var md5 = System.Security.Cryptography.MD5.Create())
+        using (var fs = File.OpenRead(path))
+        {
+            hash = Convert.ToHexString(md5.ComputeHash(fs));
+        }
+        if (state == "normal")
+        {
+            _normalHashes[key] = hash;
+            return;
+        }
+        if (_normalHashes.TryGetValue(key, out var normalHash) && normalHash == hash)
+        {
+            _identicalToNormal.Add(name);
+            Console.WriteLine($"NATIVEREF:INFO {name} is byte-identical to its normal tile; "
+                + "WinUI does not restyle this control for this state");
+        }
+    }
+
     /// Waits for n genuinely composed frames. Not Task.Delay: on a loaded runner a fixed
     /// sleep is either wasteful or too short, and too short here means capturing the
     /// previous tile.
@@ -608,6 +654,7 @@ public partial class App : Application
             image.Save(path, System.Drawing.Imaging.ImageFormat.Png);
             _tilesWritten++;
             Console.WriteLine($"NATIVEREF:wrote {name} {w}x{h}");
+            NoteIfIdenticalToNormal(name, path);
         }
         finally
         {
@@ -1054,6 +1101,10 @@ public partial class App : Application
         sb.AppendLine($"    \"control_family\": \"{Escape(fontFamily)}\",");
         sb.AppendLine($"    \"segoe_ui_variable_installed\": {Json(segoeVariable)}");
         sb.AppendLine("  },");
+        sb.AppendLine($"  \"tiles_written\": {_tilesWritten},");
+        sb.Append("  \"states_identical_to_normal\": [");
+        sb.Append(string.Join(", ", _identicalToNormal.Select(n => $"\"{Escape(n)}\"")));
+        sb.AppendLine("],");
         sb.Append("  \"blockers\": [");
         sb.Append(string.Join(", ", _blockers.Select(b => $"\"{Escape(b)}\"")));
         sb.AppendLine("]");

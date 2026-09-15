@@ -52,6 +52,79 @@ static const char *out_dir = NULL;
 static int is_probe = 1;
 static int tiles_written = 0;
 
+/* Checksum of each "<id>_normal_<appearance>" tile, and the states that came out
+ * identical to it.
+ *
+ * Identical is not automatically wrong: Adwaita genuinely does not restyle a GtkEntry
+ * on hover, only on focus. It is wrong only when it is a SURPRISE, so it is recorded
+ * in the manifest rather than left for whoever later wonders why a theme's hover rule
+ * scores the same either way. */
+#define CN1_MAX_IDENTICAL 64
+static char normal_keys[CN1_MAX_IDENTICAL][128];
+static char normal_sums[CN1_MAX_IDENTICAL][80];
+static int normal_count = 0;
+static char identical[CN1_MAX_IDENTICAL][128];
+static int identical_count = 0;
+
+static void note_if_identical_to_normal(const char *name, const char *path) {
+    char id[96], state[32], appearance[32];
+    const char *u2 = strrchr(name, '_');
+    if (!u2) {
+        return;
+    }
+    g_strlcpy(appearance, u2 + 1, sizeof(appearance));
+    size_t head = (size_t) (u2 - name);
+    char without[128];
+    if (head >= sizeof(without)) {
+        return;
+    }
+    memcpy(without, name, head);
+    without[head] = 0;
+    const char *u1 = strrchr(without, '_');
+    if (!u1) {
+        return;
+    }
+    g_strlcpy(state, u1 + 1, sizeof(state));
+    size_t idlen = (size_t) (u1 - without);
+    if (idlen >= sizeof(id)) {
+        return;
+    }
+    memcpy(id, without, idlen);
+    id[idlen] = 0;
+
+    gchar *contents = NULL;
+    gsize len = 0;
+    if (!g_file_get_contents(path, &contents, &len, NULL)) {
+        return;
+    }
+    gchar *sum = g_compute_checksum_for_data(G_CHECKSUM_MD5, (const guchar *) contents, len);
+    g_free(contents);
+
+    char key[128];
+    snprintf(key, sizeof(key), "%s_%s", id, appearance);
+    if (strcmp(state, "normal") == 0) {
+        if (normal_count < CN1_MAX_IDENTICAL) {
+            g_strlcpy(normal_keys[normal_count], key, sizeof(normal_keys[0]));
+            g_strlcpy(normal_sums[normal_count], sum, sizeof(normal_sums[0]));
+            normal_count++;
+        }
+        g_free(sum);
+        return;
+    }
+    for (int i = 0; i < normal_count; i++) {
+        if (strcmp(normal_keys[i], key) == 0 && strcmp(normal_sums[i], sum) == 0) {
+            if (identical_count < CN1_MAX_IDENTICAL) {
+                g_strlcpy(identical[identical_count], name, sizeof(identical[0]));
+                identical_count++;
+            }
+            printf("NATIVEREF:INFO %s is identical to its normal tile; Adwaita does not "
+                   "restyle this control for this state\n", name);
+            break;
+        }
+    }
+    g_free(sum);
+}
+
 /* The tile the widget is anchored top-left in. Mirrors tile_width_px / tile_height_px in
  * fidelity-tests.yaml; if those change, this must change with them. */
 #define TILE_W 240
@@ -178,8 +251,8 @@ static void write_manifest(GtkWindow *win, GtkWidget *probe_widget) {
         "  },\n"
         "  \"window\": {\n"
         "    \"active\": %s\n"
-        "  }\n"
-        "}\n",
+        "  },\n"
+        "  \"tiles_written\": %d,\n",
         g_getenv("CN1SS_FIDELITY_GOLDEN_SET") ? g_getenv("CN1SS_FIDELITY_GOLDEN_SET") : "gnome-adwaita",
         is_probe ? "probe" : "capture",
         gtk_get_major_version(), gtk_get_minor_version(), gtk_get_micro_version(),
@@ -194,7 +267,24 @@ static void write_manifest(GtkWindow *win, GtkWidget *probe_widget) {
         animations ? "true" : "false",
         font_name_esc,
         font_esc,
-        gtk_window_is_active(win) ? "true" : "false");
+        gtk_window_is_active(win) ? "true" : "false",
+        tiles_written);
+
+    /* Written as two more passes rather than squeezed into the format above: both are
+     * variable-length arrays, and the manifest previously carried NO blockers field at
+     * all -- so a consumer reading it could not tell "no blockers" from "this manifest
+     * does not report them", which the Windows one does report. */
+    fprintf(f, "  \"states_identical_to_normal\": [");
+    for (int i = 0; i < identical_count; i++) {
+        fprintf(f, "%s\"%s\"", i ? ", " : "", identical[i]);
+    }
+    fprintf(f, "],\n  \"blockers\": [");
+    for (int i = 0; i < blocker_count; i++) {
+        char *esc = json_escape(blockers[i]);
+        fprintf(f, "%s\"%s\"", i ? ", " : "", esc ? esc : "");
+        g_free(esc);
+    }
+    fprintf(f, "]\n}\n");
     fclose(f);
     g_free(font);
     g_free(font_esc);
@@ -258,6 +348,7 @@ static void capture_widget(GtkWindow *win, GtkWidget *w, const char *name) {
     } else {
         tiles_written++;
         printf("NATIVEREF:wrote %s %dx%d\n", name, width, height);
+        note_if_identical_to_normal(name, path);
     }
     g_object_unref(tex);
     gsk_render_node_unref(node);
