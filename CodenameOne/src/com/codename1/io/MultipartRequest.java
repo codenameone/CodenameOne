@@ -151,7 +151,7 @@ public class MultipartRequest extends ConnectionRequest {
     }
 
     /// Sending large files requires flushing the writer once in a while to prevent
-    /// Out Of Memory Errors, Some J2ME implementation are not able to flush the
+    /// Out Of Memory Errors, some platforms are not able to flush the
     /// streams causing the upload to fail.
     /// This method can indicate to the upload to not use the flushing mechanism.
     public static void setCanFlushStream(boolean flush) {

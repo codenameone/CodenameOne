@@ -23,6 +23,8 @@
 
 package com.codename1.tools.translator.bytecodes;
 
+import com.codename1.tools.translator.Util;
+
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
@@ -79,7 +81,7 @@ public class Field extends Instruction implements AssignableExpression {
     }
     
     public String getFieldFromThis() {
-        return "get_field_" + owner.replace('/', '_').replace('$', '_') + 
+        return "get_field_" + Util.mangle(owner) + 
                 "_" + name + "(__cn1ThisObject)";
         
     }
@@ -88,14 +90,14 @@ public class Field extends Instruction implements AssignableExpression {
         // Instance field setters only need value/target operands.
         // special case for this
         if(arg == 0) {
-            return "    set_field_" + owner.replace('/', '_').replace('$', '_') + 
+            return "    set_field_" + Util.mangle(owner) + 
                     "_" + name + "(__cn1ThisObject, __cn1ThisObject);\n";
         }
         if(isObject()) {
-            return "    set_field_" + owner.replace('/', '_').replace('$', '_') + 
+            return "    set_field_" + Util.mangle(owner) + 
                     "_" + name + "(__cn1Arg" + arg + ", __cn1ThisObject);\n";
         }
-        return "    set_field_" + owner.replace('/', '_').replace('$', '_') + 
+        return "    set_field_" + Util.mangle(owner) + 
                 "_" + name + "(__cn1Arg" + arg + ", __cn1ThisObject);\n";        
     }
 
@@ -124,7 +126,7 @@ public class Field extends Instruction implements AssignableExpression {
                 break;
         }
         b.append("(get_field_");
-        b.append(owner.replace('/', '_').replace('$', '_'));
+        b.append(Util.mangle(owner));
         b.append("_");
         b.append(name);
         b.append("(__cn1ThisObject));\n");
@@ -143,14 +145,14 @@ public class Field extends Instruction implements AssignableExpression {
             }
             if (opcode == Opcodes.GETSTATIC) {
                 b.append("get_static_");
-                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(owner));
                 b.append("_");
-                b.append(name.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(name));
                 b.append("()");
             } else {
                 
                 b.append("get_field_");
-                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(owner));
                 b.append("_");
                 b.append(name);
                 StringBuilder sb3 = new StringBuilder();
@@ -224,17 +226,17 @@ public class Field extends Instruction implements AssignableExpression {
                         break;
                 }
                 b.append("(get_static_");
-                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(owner));
                 b.append("_");
-                b.append(name.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(name));
                 b.append("());\n");
                 break;
             case Opcodes.PUTSTATIC: {
                 //b.append("SAFE_RETAIN(1);\n    ");
                 b.append("set_static_");
-                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(owner));
                 b.append("_");
-                b.append(name.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(name));
                 if (isObject()) {
                     b.append("(threadStateData, ");
                 } else {
@@ -300,7 +302,7 @@ public class Field extends Instruction implements AssignableExpression {
                 }
                 
                 b.append("(get_field_");
-                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(owner));
                 b.append("_");
                 b.append(name);
                 
@@ -317,7 +319,7 @@ public class Field extends Instruction implements AssignableExpression {
             case Opcodes.PUTFIELD: {
                 //b.append("SAFE_RETAIN(1);\n    ");
                 b.append("set_field_");
-                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(owner));
                 b.append("_");
                 b.append(name);
                 b.append("(");

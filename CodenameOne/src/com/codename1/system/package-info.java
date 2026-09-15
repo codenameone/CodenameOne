@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 /// Low level calls into the Codename One system, including
 /// [support for making platform native API calls](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html). Notice
 /// that when we say "native" we do not mean C/C++ always but rather the platforms "native" environment. So in the
@@ -39,7 +61,7 @@
 ///
 /// Notice that for this to work you must implement the native code on all supported platforms!
 ///
-/// To implement the native code use the following convention. For Java based platforms (Android, RIM, J2ME):
+/// To implement the native code use the following convention. For Java based platforms (Android):
 ///
 /// Just create a Java class that resides in the same package as the NativeInterface you created
 /// and bares the same name with Impl appended e.g.: MyNativeImpl. So for these platforms the code
@@ -49,7 +71,7 @@
 ///             package com.my.code;
 ///             public class MyNativeImpl implements MyNative {
 ///                   public String helloWorld(String hi) {
-///                        // code that can invoke Android/RIM/J2ME respectively
+///                        // code that can invoke the Android API
 ///                   }
 ///             }
 ///
@@ -82,8 +104,5 @@
 ///
 /// Android native implementation would need: View createPeer();
 ///
-/// While RIM would expect: Field createPeer()
-///
 /// The iphone would need to return a pointer to a view e.g.: - (UIView*)createPeer;
-/// J2ME doesn't support native peers hence any method that returns a native peer would always return null.
 package com.codename1.system;

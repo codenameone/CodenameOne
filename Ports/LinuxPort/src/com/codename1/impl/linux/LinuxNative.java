@@ -41,6 +41,16 @@ public final class LinuxNative {
 
     /** Writes a line to the native debug log (OutputDebugString + stderr). */
     public static native void nativeLog(String message);
+    /**
+     * The desktop's colour scheme: 1 dark, 0 light, -1 unknown.
+     *
+     * Three states rather than a boolean because on Linux "unknown" is real -- a
+     * session with no settings daemon has no answer, and reporting that as light
+     * would be a guess presented as a fact. LinuxImplementation.isDarkMode() maps
+     * -1 to null, which UIManager's dark-mode resolution tests for explicitly.
+     */
+    public static native int systemColorScheme();
+
 
     /* ------------------------------------------------------------- VideoIO */
     /** True when the GStreamer runtime backing VideoIO is available (libgstreamer-1.0 loadable). */

@@ -711,6 +711,20 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             if (moveMask != 0) {
                 cn1WinPushEvent(CN1_EVENT_POINTER_DRAGGED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
                         moveMask | cn1WinTouchFlag());
+            } else {
+                /* No button held: this is hover, and it used to be dropped here.
+                 * Component's hover style is driven by Form.pointerHover, which
+                 * has nothing else to fire it, so every hover rule in a desktop
+                 * theme was inert.
+                 *
+                 * Droppable rather than protected, which is the right side of
+                 * that line: on overflow the ring discards the newest event, and
+                 * a lost hover costs nothing because hover is idempotent -- the
+                 * next motion re-establishes it. A lost RELEASE, by contrast,
+                 * leaves a button held for good, which is why that one is
+                 * protected. */
+                cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
+                        cn1WinTouchFlag());
             }
             return 0;
         }
@@ -1264,3 +1278,36 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
 } /* extern "C" */
 
 #endif /* _WIN32 */
+
+/* ---------------------------------------------------------------- dark mode */
+
+/* True when the user has chosen the dark app theme.
+ *
+ * AppsUseLightTheme under HKCU\...\Themes\Personalize is what the Settings app writes
+ * and what every Windows application reads. The name is the trap: it says "use LIGHT",
+ * so 0 is dark and 1 is light, and a MISSING value is light -- the key does not exist
+ * before Windows 10 1607, and reading a failure as "dark" would put every older system
+ * on a dark theme it cannot render.
+ *
+ * RegGetValueW rather than RegOpenKeyEx + RegQueryValueEx: it opens, queries, type
+ * checks and closes in one call, so there is no key handle to leak on an error path.
+ *
+ * The signature is ParparVM's and is checked by nothing at build time -- a wrong name
+ * compiles, links, and leaves the Java method looking unused to the dead-code pass,
+ * which then removes it. scripts/check-native-signatures.sh is what catches that.
+ */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+    LSTATUS st = RegGetValueW(HKEY_CURRENT_USER,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            L"AppsUseLightTheme",
+            RRF_RT_REG_DWORD,
+            NULL,
+            &value,
+            &size);
+    if (st != ERROR_SUCCESS) {
+        return JAVA_FALSE;
+    }
+    return value == 0 ? JAVA_TRUE : JAVA_FALSE;
+}

@@ -972,15 +972,19 @@ class BytecodeInstructionIntegrationTest {
     }
 
     @Test
-    void readFileAsStringBuilderReadsContent() throws Exception {
+    void readFileAsStringReadsContent() throws Exception {
         File temp = File.createTempFile("readfile", ".txt");
         Files.write(temp.toPath(), "Hello World".getBytes(StandardCharsets.UTF_8));
 
-        Method m = ByteCodeTranslator.class.getDeclaredMethod("readFileAsStringBuilder", File.class);
+        // readFileAsStringBuilder until the translator had to compile against
+        // ParparVM's own JavaAPI in order to translate itself: StringBuilder there
+        // has no indexOf/replace, so replaceInFile works on a String instead and
+        // this helper returns one.
+        Method m = ByteCodeTranslator.class.getDeclaredMethod("readFileAsString", File.class);
         m.setAccessible(true);
-        StringBuilder sb = (StringBuilder) m.invoke(null, temp);
+        String contents = (String) m.invoke(null, temp);
 
-        assertEquals("Hello World", sb.toString());
+        assertEquals("Hello World", contents);
         temp.delete();
     }
 

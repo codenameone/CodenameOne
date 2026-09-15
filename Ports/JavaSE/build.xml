@@ -87,7 +87,6 @@
         <copy file="../../Themes/iPhoneTheme.res" todir="../../../codenameone-skins/ipad3" />
         <copy file="../../Themes/iPhoneTheme.res" todir="../../../codenameone-skins/iphone3gs" />
         <copy file="../../Themes/iPhoneTheme.res" todir="../../../codenameone-skins/iphone5" />
-        <copy file="../../Themes/blackberry_theme.res" todir="../../../codenameone-skins/torch" />
         <copy file="../../Themes/android_holo_light.res" todir="../../../codenameone-skins/xoom" />
         <copy file="../../Themes/winTheme.res" todir="../../../codenameone-skins/lumia" />
         <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/iphone5_os7" />
@@ -167,6 +166,9 @@
             <fileset dir="../../Themes">
                 <include name="iOSModernTheme.res"/>
                 <include name="AndroidMaterialTheme.res"/>
+                <include name="GnomeAdwaitaTheme.res"/>
+                <include name="WindowsFluentTheme.res"/>
+                <include name="MacOSAquaTheme.res"/>
                 <include name="iPhoneTheme.res"/>
                 <include name="androidTheme.res"/>
                 <include name="android_holo_light.res"/>
@@ -176,6 +178,9 @@
             <fileset dir="../../Themes">
                 <include name="iOSModernTheme.res"/>
                 <include name="AndroidMaterialTheme.res"/>
+                <include name="GnomeAdwaitaTheme.res"/>
+                <include name="WindowsFluentTheme.res"/>
+                <include name="MacOSAquaTheme.res"/>
                 <include name="iPhoneTheme.res"/>
                 <include name="androidTheme.res"/>
                 <include name="android_holo_light.res"/>

@@ -134,8 +134,8 @@ public class SettingsThemeTest {
         // The controls sit EAST of the name, on the name's own line, which is
         // where the Add button of an inactive row sits. They used to be a band of
         // their own below the name, held right by a TableLayout whose left 72%
-        // was an empty spacer; that band cost a full row of height on a page that
-        // now has to fit its rows between a pinned search box and a pager.
+        // was an empty spacer; that band cost a full row of height per active
+        // row, which is height multiplied by the length of the catalog.
         assertFalse(source.contains("widthPercentage(72), new Container()"));
         assertTrue(source.contains("header.add(BorderLayout.EAST, activeHintEditor(row, meta, value, effectiveType))"));
         // The delete control is EAST of the editor. The button itself moved into
@@ -153,21 +153,25 @@ public class SettingsThemeTest {
         String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
         assertTrue(source.contains("boolean fillsViewport = section == Section.BUILD_HINTS;"));
         assertTrue(source.contains("pageViewport.setScrollableY(!fillsViewport);"));
-        assertTrue(source.contains("private final class HintList extends InfiniteContainer"),
-                "The rows must come from an InfiniteContainer: it scrolls, it handles rows "
-                        + "of differing heights, and it builds them a batch at a time instead "
-                        + "of turning the whole catalog into components.");
+        assertTrue(source.contains("private final class HintList extends Container"),
+                "The rows must come from a plain scrollable Container holding the whole "
+                        + "result set. A paging container draws its scrollbar from the rows "
+                        + "it has fetched, so the thumb is sized against a fraction of the "
+                        + "catalog and resizes every time a batch lands -- which is the "
+                        + "bouncing thumb issue #5602 came back about.");
+        assertFalse(source.contains("extends InfiniteContainer"),
+                "InfiniteContainer is for data of unknown length arriving over a network. "
+                        + "The catalog is 615 known rows already in memory, and building all "
+                        + "of them is not measurably slower than building 20.");
         assertTrue(source.contains("hintList.reload()"),
                 "A new result set must reload the list rather than being appended to it.");
     }
 
     /// Two ways the list could show something that is not the result set.
     ///
-    /// The scroll offset survives `InfiniteContainer.refresh()`, because that
-    /// class overrides `resetScroll()` with an empty body so pull to refresh
-    /// does not jump -- so a search run from halfway down the scrolled catalog
-    /// left the offset past the end of a short result and the list came up
-    /// blank under a header counting two matches.
+    /// A search run from halfway down the scrolled catalog has to come back to
+    /// the top: leaving the old offset in place puts it past the end of a short
+    /// result, and the list comes up blank under a header counting two matches.
     ///
     /// And a hint the catalog has never heard of is in the list only because
     /// the project declares it, so rebuilding its row after the declaration was
@@ -177,10 +181,12 @@ public class SettingsThemeTest {
     public void theListCannotShowResultsThatAreNoLongerThere() throws Exception {
         String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
         assertTrue(source.contains("void reload() {"));
-        assertTrue(Pattern.compile("void reload\\(\\) \\{\\s*refresh\\(\\);\\s*setScrollY\\(0\\);",
+        assertTrue(Pattern.compile(
+                        "void reload\\(\\) \\{\\s*removeAll\\(\\);.*?setScrollY\\(0\\);",
                         Pattern.DOTALL).matcher(source).find(),
-                "Reloading has to put the reader back at the first result; refresh() alone "
-                        + "leaves the offset of the result set that was replaced.");
+                "Reloading has to replace every row and put the reader back at the first "
+                        + "result; keeping the old offset leaves a short result set scrolled "
+                        + "past its own end, so the header counts matches over a blank list.");
         assertTrue(source.contains("if (isBrowsableHint(meta)) {"),
                 "Removing a hint the browse list does not offer has to take the result set "
                         + "again -- rebuilding its row in place leaves a row for a hint that "

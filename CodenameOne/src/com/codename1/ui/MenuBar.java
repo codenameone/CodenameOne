@@ -227,7 +227,7 @@ public class MenuBar extends Container implements ActionListener {
         softCommand = new Command[soft.length];
     }
 
-    /// This method removes empty J2ME softbuttons that don't have a command
+    /// This method removes empty softbuttons that don't have a command
     public void removeEmptySoftbuttons() {
         if (left != null && left.getParent() != null && "".equals(left.getText())) {
             left.getParent().removeComponent(left);

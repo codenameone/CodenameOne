@@ -3873,6 +3873,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return autoProcessConnections;
     }
 
+    /// Records requests without calling the implementation's own
+    /// `addConnectionToQueue` hook.
+    ///
+    /// It does NOT stop the request from being executed, and the name reads as
+    /// though it does. `CodenameOneImplementation.addConnectionToQueue` is an
+    /// empty method, so the only thing this flag suppresses is a no-op:
+    /// `NetworkManager.addToQueue` calls that hook and then puts the request on
+    /// its own pending queue regardless, where a network thread picks it up and
+    /// runs it against this mock -- answering with an empty body when no
+    /// `TestConnection` is registered for the URL.
+    ///
+    /// So a request handed back by [#getQueuedRequests] may be live on a
+    /// network thread at the same moment the test is holding it. Reading it is
+    /// safe; driving it is not. Calling `readResponse`/`postResponse` on a
+    /// queued request races that thread for the request's own fields, which is
+    /// how an invite registration test that fished one out of this list failed
+    /// about one run in five. Construct a request of your own to drive a
+    /// response through, and use this list to assert what was sent.
     public void setAutoProcessConnections(boolean autoProcessConnections) {
         this.autoProcessConnections = autoProcessConnections;
     }

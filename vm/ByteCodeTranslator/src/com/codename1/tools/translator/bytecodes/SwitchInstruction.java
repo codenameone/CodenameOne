@@ -55,13 +55,13 @@ public class SwitchInstruction extends Instruction {
             b.append(keys[iter]);
             if(TryCatch.isTryCatchInMethod()) {
                 b.append(": JUMP_TO(label_");
-                b.append(labels[iter].toString());
+                b.append(LabelInstruction.labelName(labels[iter]));
                 b.append(", ");
                 b.append(LabelInstruction.getLabelCatchDepth(labels[iter], instructions));
                 b.append(");\n");
             } else {
                 b.append(": goto label_");
-                b.append(labels[iter].toString());
+                b.append(LabelInstruction.labelName(labels[iter]));
                 b.append(";\n");
             }
         }
@@ -69,13 +69,13 @@ public class SwitchInstruction extends Instruction {
         if(dflt != null) {
             if(TryCatch.isTryCatchInMethod()) {
                 b.append("        default: JUMP_TO(label_");
-                b.append(dflt.toString());
+                b.append(LabelInstruction.labelName(dflt));
                 b.append(", ");
                 b.append(LabelInstruction.getLabelCatchDepth(dflt, instructions));
                 b.append(");\n");
             } else {
                 b.append("        default: goto label_");
-                b.append(dflt.toString());
+                b.append(LabelInstruction.labelName(dflt));
                 b.append(";\n");
             }
         }

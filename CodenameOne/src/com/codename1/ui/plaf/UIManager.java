@@ -666,6 +666,45 @@ public class UIManager {
         return getComponentStyleImpl(id, false, type + "#");
     }
 
+    /// True when the theme actually declares at least one entry for the given custom style
+    /// type on this UIID -- `Button.hover#bgColor`, `Button.hover#derive` and so on.
+    ///
+    /// This exists because {@link #getComponentCustomStyle(String, String)} *never returns
+    /// null*: asked for a type the theme says nothing about, it falls through to a copy of
+    /// the blank default style, whose background is white and whose foreground is black. For
+    /// `press` and `dis` that is harmless, because the shipped themes declare them wherever a
+    /// component consults them. For a state a component may consult on any UIID -- hover is
+    /// the first -- it is not: a theme written before that state existed would repaint every
+    /// hovered component in the blank default, which reads as a rendering bug and has no
+    /// obvious cause. So a caller that can tolerate "no such style" asks here first and skips
+    /// the state entirely.
+    ///
+    /// The dark spelling is checked as well, because a theme is free to declare a state only
+    /// inside `@media (prefers-color-scheme: dark)`, which the CSS compiler emits as
+    /// `$Dark&lt;UIID&gt;`.
+    ///
+    /// The answer is memoised for a whole theme generation by the same style-definition index
+    /// that backs dark-style resolution, so the linear scan behind it happens once per UIID
+    /// and type, not once per query.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose custom style we are asking about
+    ///
+    /// - `type`: the style type, e.g. `hover`
+    ///
+    /// #### Returns
+    ///
+    /// true when the theme declares that custom style for this UIID
+    public boolean hasComponentCustomStyle(String id, String type) {
+        if (type == null || type.length() == 0) {
+            return false;
+        }
+        String dotted = (id == null || id.length() == 0) ? "" : dottedId(id);
+        String suffix = dotted + type + "#";
+        return hasStyleDefinition(suffix) || hasStyleDefinition("$Dark" + suffix);
+    }
+
     /// Returns the selected style of the component with the given baseStyle or a **new instance** of the default
     /// style, but overrides styles based on the directives in the styleStrings.
     ///

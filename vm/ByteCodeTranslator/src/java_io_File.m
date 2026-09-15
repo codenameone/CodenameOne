@@ -133,9 +133,17 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
        type check, and it hands the collector String metadata for an array payload.
        cn1MainArgs has always used the array class; these three did not. Fixed on
        all of them, including the two that predate the Windows arm. */
-    JAVA_OBJECT arr = allocArray(threadStateData, [files count], &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    /* [files count] is NSUInteger -- 64-bit -- while allocArray's length and the
+       element setter's index are JAVA_INT. Narrow ONCE and explicitly, and loop on
+       the narrowed value so the bound and the index have the same type. The
+       implicit conversion this replaces is what the native warning census caught,
+       and it only became visible when this file started being compiled at all: the
+       translated java_io_File.c used to overwrite it on the Apple targets, which is
+       the collision fixed earlier on this branch. */
+    JAVA_INT fileCount = (JAVA_INT)[files count];
+    JAVA_OBJECT arr = allocArray(threadStateData, fileCount, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
 
-    for (int i=0; i<[files count]; i++) {
+    for (JAVA_INT i = 0; i < fileCount; i++) {
         NSString* f = [files objectAtIndex:i];
         JAVA_OBJECT s = fromNSString(CN1_THREAD_STATE_PASS_ARG f);
         CN1_SET_ARRAY_ELEMENT_OBJECT(arr, i, s);

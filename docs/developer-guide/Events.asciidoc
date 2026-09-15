@@ -126,11 +126,11 @@ These seem similar but they have one important distinction. The latter code is i
 
 Bridging to native code often means passing messages between Codename One Java and platform specific code. The cross-platform message bus provides a high-level abstraction for that by letting you post messages to the native layer and subscribe for messages that originate there. Use https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#postMessage(com.codename1.ui.events.MessageEvent)[Display.postMessage()] to send an https://www.codenameone.com/javadoc/com/codename1/ui/events/MessageEvent.html[MessageEvent] to the platform, and https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#addMessageListener(com.codename1.ui.events.ActionListener)[Display.addMessageListener()] to receive events that arrive from native code, JavaScript bridges, or background services. Message events include helpers like `isPromptForAudioRecorder()`, `isPromptForAudioPlayer()`, and `getPromptPromise()` that allow you to hook into permission prompts emitted by the JavaScript port so custom UI can respond to platform requests while keeping the event dispatch on the EDT. This API complements `NetworkEvent` by covering native-to-Java messaging without requiring direct low-level callbacks.
 
-==== DataChangeListener
+==== DataChangedListener
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/events/DataChangedListener.html[DataChangedListener] is used in several places to show that the underlying model data has changed:
 
-* https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] - the text field provides an action listener but that "fires" when the data input is complete. `DataChangeListener`
+* https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] - the text field provides an action listener but that "fires" when the data input is complete. `DataChangedListener`
 fires with every key entered and thus allows functionality such as "auto complete" and is indeed used internally
 in the Codename One AutoCompleteTextField.
 
@@ -260,7 +260,7 @@ Each of those has advantages and disadvantages, specifically:
 
 There are two basic types of low-level events: Key and Pointer.
 
-IMPORTANT: Key events are relevant to physical keys and won't trigger on virtual keyboard keys, to track those use a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] with a `DataChangeListener` as mentioned above.
+IMPORTANT: Key events are relevant to physical keys and won't trigger on virtual keyboard keys, to track those use a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] with a `DataChangedListener` as mentioned above.
 
 The pointer events (touch events) can be intercepted by overriding one or more of these methods in `Component` or `Form`. Notice that unless you want to block functionality you should probably invoke `super` when overriding:
 [source,text]

@@ -395,7 +395,7 @@ This is intentional and due to the `PeerComponent` functionality mentioned below
 
 <3> Notice that there is no constructor and the class is public. It's crucial that the system will be able to assign the class without obstruction. You can use a constructor but it can't have any arguments and you shouldn't rely on semantics of construction.
 
-<4> You implemented the native method and that you set `isSupported` to true.
+<4> The native method is implemented, and `isSupported` answers true.
 
 IMPORTANT: The IDE won't provide completion suggestions and will claim that there are errors in the code! +
 Codename One doesn't include the native platforms in its bundle for example: the full Android SDK or the full Xcode Objective-C runtime. For example, since the native code is compiled on the servers (where these runtimes are present) this shouldn't be a problem
@@ -778,7 +778,7 @@ include::../demos/android/src/main/java/com/codenameone/developerguide/advancedt
 include::../demos/ios/src/main/objectivec/PeerComponentExamples.m[tag=iosAllTypesSignature,indent=0]
 ----
 
-NOTE: You had to break lines for the print version, the JavaScript version is a long method name that broke the book!
+NOTE: The lines are broken for the print version -- the JavaScript name is one long method name that ran off the page.
 
 .JavaScript Version
 [source,JavaScript]
@@ -1458,8 +1458,8 @@ https://www.codenameone.com/javadoc/com/codename1/ui/SideMenuBar.html[SideMenuBa
 it. What's left for the platform to color is the chrome around your app: the status bar, and the card the
 task switcher shows for it.
 
-Define a `colors.xml` file under `android/src/main/resources` for that. Every `<color>` in it becomes an
-`android:` item in the generated theme, so each name has to be an Android theme attribute:
+Define a `colors.xml` file under `android/src/main/resources` for that. Every `<color>` whose name is an
+Android theme attribute becomes an `android:` item in the generated theme:
 
 [source,xml]
 ----
@@ -1468,6 +1468,13 @@ include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under
 
 NOTE: The colors reach the Material variant of the generated theme, so a device old enough to fall back to
 the Holo variant ignores them.
+
+NOTE: A color whose name isn't an Android theme attribute stays an ordinary `@color/` resource and never
+reaches the theme, and the build log names it. Android Studio puts ordinary app colors such as
+`ic_launcher_background` in this same file, so an imported `colors.xml` keeps working -- but a misspelled
+attribute produces no theming, and that log line is where it says so. The names the build accepts are read
+from the installed platform, so any `android:` theme attribute works, not a fixed list.
+
 
 === Intercepting URLs on iOS & Android
 

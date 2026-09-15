@@ -456,7 +456,7 @@ public class Font extends CN {
         return new CustomFont(bitmap, cutOffsets, charWidth, charsets);
     }
 
-    /// Creates a system native font in a similar way to common MIDP fonts
+    /// Creates a system native font
     ///
     /// #### Parameters
     ///

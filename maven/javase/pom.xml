@@ -381,6 +381,9 @@
                                     <fileset dir="${project.basedir}/../../Themes">
                                         <include name="iOSModernTheme.res"/>
                                         <include name="AndroidMaterialTheme.res"/>
+                                        <include name="GnomeAdwaitaTheme.res"/>
+                                        <include name="WindowsFluentTheme.res"/>
+                                        <include name="MacOSAquaTheme.res"/>
                                         <include name="iPhoneTheme.res"/>
                                         <include name="iOS7Theme.res"/>
                                         <include name="androidTheme.res"/>

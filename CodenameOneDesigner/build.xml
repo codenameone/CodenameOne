@@ -74,7 +74,6 @@
     <target name="-pre-compile">
         <!-- copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="src/GeneratedProject" / -->
         <copy file="../Themes/androidTheme.res" todir="src" />
-        <copy file="../Themes/blackberry_theme.res" todir="src" />
         <copy file="../Themes/winTheme.res" todir="src" />
         <copy file="../Themes/iPhoneTheme.res" todir="src" />
         <copy file="../Themes/iOS7Theme.res" todir="src" />

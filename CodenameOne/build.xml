@@ -243,15 +243,6 @@
         
         <ant inheritall="false" antfile="../Ports/Android/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/Android/build.xml" target="jar" />
-        <ant inheritall="false" antfile="../Ports/BlackBerryOS_4_2/build.xml" target="clean" />
-        <ant inheritall="false" antfile="../Ports/BlackBerryOS_4_2/build.xml" target="jar" />
-        <ant inheritall="false" antfile="../Ports/BlackBerryOS_5/build.xml" target="clean" />
-        <ant inheritall="false" antfile="../Ports/BlackBerryOS_5/build.xml" target="jar" />
-        
-        <!-- fucking J2ME doesn't work on new Mac OS/NetBeans 8 build -->
-        <!-- ant inheritall="false" antfile="../Ports/J2ME/build.xml" target="clean" />
-        <ant inheritall="false" antfile="../Ports/J2ME/build.xml" target="jar" / -->
-        
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="jar" />
         <ant inheritall="false" antfile="../Ports/CLDC11/build.xml" target="clean" />

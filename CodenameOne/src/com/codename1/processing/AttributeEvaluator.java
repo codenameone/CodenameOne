@@ -64,12 +64,42 @@ class AttributeEvaluator extends AbstractEvaluator {
      */
     @Override
     protected Object evaluateSingle(StructuredContent element, String expr) {
-        if (element.getAttribute(expr) != null) {
+        // The '@' has to come off first. Every other method here strips it
+        // before the lookup and this one did not, so it asked the element for
+        // an attribute literally named "@rank" -- which no document has, so
+        // "[@rank]", the documented way to select the elements that carry an
+        // attribute, matched nothing at all and said nothing about it.
+        String name = expr.startsWith("@") ? expr.substring(1) : expr;
+        if (!MapContent.attributeOrFields(element, name).isEmpty()) {
             return element;
         }
         return super.evaluateSingle(element, expr);
     }
 
+
+    /// The text of a value that can be compared, or null when there is none.
+    ///
+    /// A JSON field can hold an object, and getText() answers a map with its
+    /// first KEY -- so "[@profile='name']" matched {"profile":{"name":"A"}},
+    /// and which key it matched depended on the map's iteration order. An
+    /// object is not a scalar and has nothing to compare against; the step
+    /// that READS a field still hands back the object itself.
+    ///
+    /// An array is not the same case: its values arrive here one at a time,
+    /// each in its own node.
+    ///
+    /// - `value`: one value of the named field
+    ///
+    /// #### Returns
+    ///
+    /// the text, or null when the value is structured or has none
+    private static String scalarText(StructuredContent value) {
+        Object root = value.getNativeRoot();
+        if (root instanceof java.util.Map || root instanceof java.util.List) {
+            return null;
+        }
+        return value.getText();
+    }
 
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(com.codename1.path.impl.StructuredContent, java.lang.String, java.lang.String)
@@ -78,21 +108,24 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = element.getAttribute(lvalue);
-        if (attr == null) {
-            return null;
-        }
-        if (isNumeric(rvalue) && isNumeric(attr)) {
-            int l = Integer.parseInt(attr);
-            int r = Integer.parseInt(rvalue);
-            if (l < r) {
+        java.util.List values = MapContent.attributeOrFields(element, lvalue);
+        rvalue = stripQuotes(rvalue);
+        // Every value, because a JSON field can be an array and a match on any
+        // of them is a match -- the same rule child evaluation has always used.
+        for (Object value : values) {
+            String attr = scalarText((StructuredContent) value);
+            if (attr == null) {
+                continue;
+            }
+            if (isNumeric(rvalue) && isNumeric(attr)) {
+                if (compareNumbers(attr, rvalue) < 0) {
+                    return element;
+                }
+                continue;
+            }
+            if (attr.compareTo(rvalue) < 0) {
                 return element;
             }
-            return null;
-        }
-        rvalue = stripQuotes(rvalue);
-        if (attr.compareTo(rvalue) > 0) {
-            return element;
         }
         return null;
     }
@@ -104,21 +137,24 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = element.getAttribute(lvalue);
-        if (attr == null) {
-            return null;
-        }
-        if (isNumeric(rvalue) && isNumeric(attr)) {
-            int l = Integer.parseInt(attr);
-            int r = Integer.parseInt(rvalue);
-            if (l > r) {
+        java.util.List values = MapContent.attributeOrFields(element, lvalue);
+        rvalue = stripQuotes(rvalue);
+        // Every value, because a JSON field can be an array and a match on any
+        // of them is a match -- the same rule child evaluation has always used.
+        for (Object value : values) {
+            String attr = scalarText((StructuredContent) value);
+            if (attr == null) {
+                continue;
+            }
+            if (isNumeric(rvalue) && isNumeric(attr)) {
+                if (compareNumbers(attr, rvalue) > 0) {
+                    return element;
+                }
+                continue;
+            }
+            if (attr.compareTo(rvalue) > 0) {
                 return element;
             }
-            return null;
-        }
-        rvalue = stripQuotes(rvalue);
-        if (attr.compareTo(rvalue) < 0) {
-            return element;
         }
         return null;
     }
@@ -130,21 +166,32 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = element.getAttribute(lvalue);
-        if (attr == null) {
-            return null;
-        }
-        if (isNumeric(rvalue) && isNumeric(attr)) {
-            int l = Integer.parseInt(attr);
-            int r = Integer.parseInt(rvalue);
-            if (l == r) {
-                return element;
-            }
-            return null;
+        java.util.List values = MapContent.attributeOrFields(element, lvalue);
+        // "[@attr=null]" is the documented way to ask for the elements that do
+        // NOT carry an attribute, and it is the one predicate whose answer is
+        // yes precisely when there is no value. The null check used to return
+        // before the rvalue was read, so it could never match one.
+        //
+        // Unquoted, because 'null' in quotes is a string the value might
+        // really be.
+        if ("null".equals(rvalue)) {
+            return values.isEmpty() ? element : null;
         }
         rvalue = stripQuotes(rvalue);
-        if (attr.compareTo(rvalue) == 0) {
-            return element;
+        for (Object value : values) {
+            String attr = scalarText((StructuredContent) value);
+            if (attr == null) {
+                continue;
+            }
+            if (isNumeric(rvalue) && isNumeric(attr)) {
+                if (compareNumbers(attr, rvalue) == 0) {
+                    return element;
+                }
+                continue;
+            }
+            if (attr.compareTo(rvalue) == 0) {
+                return element;
+            }
         }
         return null;
     }

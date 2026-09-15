@@ -1,0 +1,618 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+/*
+ * macOS (AppKit) native theme for Codename One.
+ *
+ * PALETTE follows the AppKit system colours, which are semantic rather than fixed: macOS
+ * resolves controlAccentColor, selectedContentBackgroundColor and the rest against the
+ * user's appearance and accent choice. The values below are the DEFAULTS -- what the
+ * reference runner reported, accent #007AFF and highlight #0064E1 -- and the accent is
+ * bound so a port reading NSColor.controlAccentColor can replace it at runtime.
+ *
+ * macOS is the one platform where the user's HIGHLIGHT colour is separate from the accent
+ * and separately settable, so it gets its own variable rather than being derived.
+ *
+ * DIMENSIONS are converted from AppKit's documented control metrics at 1x (1pt = 0.3528mm)
+ * and written in MILLIMETRES so they scale on the 2x displays every real Mac has. The
+ * reference runner reports a 1.0 backing scale, which no real Mac has, which is why the
+ * capture forces 2x rather than inheriting it.
+ *
+ * VIBRANCY is not expressed here. NSVisualEffectView is a view the window hosts, not a fill
+ * a control owns, so it belongs to port code rather than a stylesheet. The reference runner
+ * ships with Reduce Transparency ON by default, which flattens every material -- the capture
+ * turns it off and asserts it, because a reference taken under it would encode a look no
+ * user sees.
+ */
+
+#Constants {
+    --accent-color: #007aff;            /* NSColor.controlAccentColor, default blue */
+    --accent-color-dark: #007aff;
+    --accent-fg-color: #ffffff;
+    --accent-fg-color-dark: #ffffff;
+    --selection-color: #0064e1;         /* selectedContentBackgroundColor, set separately */
+    --selection-color-dark: #0064e1;
+    --window-bg-color: #ececec;         /* windowBackgroundColor */
+    --window-bg-color-dark: #323232;
+    --control-bg-color: #ffffff;        /* controlBackgroundColor */
+    --control-bg-color-dark: #1e1e1e;
+    --text-color: #000000;              /* labelColor */
+    --text-color-dark: #ffffff;
+    --text-secondary-color: #7f7f7f;    /* secondaryLabelColor */
+    --text-secondary-color-dark: #98989d;
+    --separator-color: #dcdcdc;         /* separatorColor */
+    --separator-color-dark: #48484a;
+    --accent-pressed-color: #0060df;    /* controlAccentColor darkened on press */
+    --accent-pressed-color-dark: #0060df;
+    --view-bg-color: #ffffff;           /* textBackgroundColor */
+    --view-bg-color-dark: #1e1e1e;
+    --stroke-color: #c6c6c8;            /* the control outline, distinct from separatorColor */
+    --stroke-color-dark: #545456;
+    --headerbar-bg-color: #ececec;      /* the macOS title bar matches windowBackgroundColor */
+    --headerbar-bg-color-dark: #323232;
+    --destructive-color: #ff3b30;       /* systemRed */
+    --success-color: #34c759;           /* systemGreen */
+
+    includeNativeBool: false;
+    darkModeBool: true;
+
+    /* macOS keeps its own title bar with the traffic lights; the app does not draw it. */
+    desktopTitleBarMode: native;
+
+    commandBehavior: Native;
+    paintsTitleBarBool: false;
+    tabPlacementInt: 0;
+    tabsFillRowsBool: true;
+    tabsGridBool: true;
+    tabsEqualWidthBool: true;
+
+    /* AppKit's check and radio are 14pt: 4.94mm. Noticeably smaller than Fluent's 20px and
+       Adwaita's 18px, which is one of the clearest metric differences between the three. */
+    checkBoxIconSizeMM: "4.94";
+    radioIconSizeMM: "4.94";
+
+    /* NSSlider: a 3pt trough. */
+    sliderTrackThicknessMM: "1.06";
+}
+
+/* --- Window and text ------------------------------------------------------------------- */
+
+Form {
+    background-color: var(--window-bg-color, #ececec);
+    color: var(--text-color, #000000);
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+Label {
+    color: var(--text-color, #000000);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+/* --- Button ---------------------------------------------------------------------------- */
+/*
+ * The Aqua push button is white with a 5pt radius and a hairline, and it is SMALLER than its
+ * Fluent and Adwaita counterparts: about 21pt tall against 32px and 34px. It darkens
+ * slightly on hover and noticeably when pressed.
+ */
+
+Button {
+    color: var(--text-color, #000000);
+    background-color: #ffffff;
+    border: 0.26mm solid #c9c9c9;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+Button.hover {
+    color: var(--text-color, #000000);
+    background-color: #f7f7f7;
+    border: 0.26mm solid #c9c9c9;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+Button.pressed {
+    color: var(--text-color, #000000);
+    background-color: #e0e0e0;
+    border: 0.26mm solid #c0c0c0;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+Button.disabled {
+    color: #b4b4b4;
+    background-color: #fafafa;
+    border: 0.26mm solid #dedede;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+/* The default button: accent filled, and on macOS it is the one the Return key triggers. */
+RaisedButton {
+    color: var(--accent-fg-color, #ffffff);
+    background-color: var(--accent-color, #007aff);
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+RaisedButton.hover {
+    color: var(--accent-fg-color, #ffffff);
+    background-color: #1a88ff;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+RaisedButton.pressed {
+    color: var(--accent-fg-color, #ffffff);
+    background-color: #0060cc;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+RaisedButton.disabled {
+    color: #b4b4b4;
+    background-color: #e8e8e8;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+FlatButton {
+    color: var(--accent-color, #007aff);
+    background-color: transparent;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+FlatButton.hover {
+    color: var(--accent-color, #007aff);
+    background-color: #e8e8e8;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+FlatButton.pressed {
+    color: #0060cc;
+    background-color: #dcdcdc;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+/* --- Text entry ------------------------------------------------------------------------ */
+
+TextField {
+    color: var(--text-color, #000000);
+    background-color: var(--control-bg-color, #ffffff);
+    border: 0.26mm solid #c0c0c0;
+    border-radius: 1.06mm;
+    padding: 0.9mm 2.1mm 0.9mm 2.1mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+TextField.hover {
+    color: var(--text-color, #000000);
+    background-color: var(--control-bg-color, #ffffff);
+    border: 0.26mm solid #a8a8a8;
+    border-radius: 1.06mm;
+    padding: 0.9mm 2.1mm 0.9mm 2.1mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+/* Focused: the Aqua focus ring, drawn as an accent border here. */
+TextField.selected {
+    color: var(--text-color, #000000);
+    background-color: var(--control-bg-color, #ffffff);
+    border: 0.53mm solid var(--accent-color, #007aff);
+    border-radius: 1.06mm;
+    padding: 0.9mm 2.1mm 0.9mm 2.1mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+TextField.disabled {
+    color: #b4b4b4;
+    background-color: #f5f5f5;
+    border: 0.26mm solid #dedede;
+    border-radius: 1.06mm;
+    padding: 0.9mm 2.1mm 0.9mm 2.1mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+TextArea { cn1-derive: TextField; }
+
+/* --- Check, radio, switch -------------------------------------------------------------- */
+
+CheckBox {
+    color: var(--text-color, #000000);
+    background-color: transparent;
+    padding: 0.7mm;
+    margin: 0.4mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+CheckBox.selected { color: var(--accent-color, #007aff); background-color: transparent; }
+CheckBox.hover { color: var(--text-color, #000000); background-color: #e4e4e4; }
+CheckBox.disabled { color: #b4b4b4; background-color: transparent; }
+
+RadioButton {
+    color: var(--text-color, #000000);
+    background-color: transparent;
+    padding: 0.7mm;
+    margin: 0.4mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+RadioButton.selected { color: var(--accent-color, #007aff); background-color: transparent; }
+RadioButton.hover { color: var(--text-color, #000000); background-color: #e4e4e4; }
+RadioButton.disabled { color: #b4b4b4; background-color: transparent; }
+
+/* NSSwitch: a 38x22pt pill. */
+Switch {
+    color: #ffffff;
+    background-color: #e0e0e0;
+    cn1-background-type: cn1-pill-border;
+    padding: 0.4mm;
+    margin: 0.4mm;
+}
+
+Switch.selected {
+    color: #ffffff;
+    background-color: var(--accent-color, #007aff);
+    cn1-background-type: cn1-pill-border;
+    padding: 0.4mm;
+    margin: 0.4mm;
+}
+
+Switch.hover {
+    color: #ffffff;
+    background-color: #d4d4d4;
+    cn1-background-type: cn1-pill-border;
+    padding: 0.4mm;
+    margin: 0.4mm;
+}
+
+Switch.disabled {
+    color: #ffffff;
+    background-color: #f0f0f0;
+    cn1-background-type: cn1-pill-border;
+    padding: 0.4mm;
+    margin: 0.4mm;
+}
+
+/* --- Slider and progress --------------------------------------------------------------- */
+
+Slider {
+    color: var(--accent-color, #007aff);
+    background-color: #d4d4d4;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.7mm;
+}
+
+SliderFull {
+    color: var(--accent-color, #007aff);
+    background-color: var(--accent-color, #007aff);
+    cn1-background-type: cn1-pill-border;
+    margin: 0.7mm;
+}
+
+ProgressBar {
+    background-color: #d4d4d4;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.7mm;
+}
+
+/* The FILLED portion. Without this UIID the fill falls back to UIManager's blank default,
+   which paints the completed part of the bar white -- the track styled and the progress
+   not. Slider has the same split (SliderFull), and it is easy to declare one and forget
+   the other. */
+ProgressBarFull {
+    background-color: #007aff;
+    color: #007aff;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.7mm;
+}
+
+/* --- ComboBox ------------------------------------------------------------------------- */
+/*
+ * Declared because the fidelity matrix asks for it and nothing was styling it: the tile
+ * rendered from UIManager's blank defaults and was pixel-identical in normal and hover,
+ * which is what an unstyled control looks like when you only glance at it. A native
+ * NSPopUpButton / GtkDropDown / WinUI ComboBox reads as a button with a label, which is what
+ * the Codename One side has to offer against it.
+ */
+
+ComboBox {
+    color: #000000;
+    background-color: #ffffff;
+    border: 0.26mm solid #c9c9c9;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+ComboBox.hover {
+    color: #000000;
+    background-color: #f7f7f7;
+    border: 0.26mm solid #c9c9c9;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+ComboBox.disabled {
+    color: #b4b4b4;
+    background-color: #fafafa;
+    border: 0.26mm solid #c9c9c9;
+    border-radius: 1.76mm;
+    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
+    margin: 0.7mm;
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+
+/* A native slider highlights its track under the pointer. Without this the hover tile was
+   byte-identical to the normal one. */
+Slider.hover {
+    color: #007aff;
+    background-color: #c4c4c4;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.7mm;
+}
+
+Slider.disabled {
+    color: #b4b4b4;
+    background-color: #fafafa;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.7mm;
+}
+
+/* --- Title bar and toolbar ------------------------------------------------------------- */
+
+TitleArea {
+    background-color: var(--window-bg-color, #ececec);
+    border-bottom: 0.26mm solid var(--separator-color, #dcdcdc);
+    padding: 1.4mm 1.4mm 1.4mm 1.4mm;
+    margin: 0;
+}
+
+Title {
+    color: var(--text-color, #000000);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+Toolbar {
+    background-color: var(--window-bg-color, #ececec);
+    border-bottom: 0.26mm solid var(--separator-color, #dcdcdc);
+    padding: 0;
+    margin: 0;
+}
+
+/* --- Dialog --------------------------------------------------------------------------- */
+
+Dialog {
+    background-color: #f2f2f2;
+    border-radius: 3.53mm;
+    padding: 5.6mm;
+    margin: 2.1mm;
+}
+
+DialogTitle {
+    color: var(--text-color, #000000);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+}
+
+DialogBody {
+    color: var(--text-color, #000000);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3.0mm;
+    text-align: center;
+}
+
+/* --- Lists and scrollbars -------------------------------------------------------------- */
+/*
+ * ListRendererFocus in particular: IOSImplementation.injectListFocusStyle leaves this alone
+ * only when the theme has an opinion about it, and the macOS port inherits that injector.
+ * A theme that omits it gets the hardcoded blue bar that injector falls back to.
+ */
+
+Scroll { background-color: transparent; }
+ScrollThumb { background-color: #c1c1c1; cn1-background-type: cn1-pill-border; }
+ScrollThumb.hover { background-color: #a8a8a8; cn1-background-type: cn1-pill-border; }
+ScrollThumb.pressed { background-color: #8e8e8e; cn1-background-type: cn1-pill-border; }
+HorizontalScroll { background-color: transparent; }
+HorizontalScrollThumb { cn1-derive: ScrollThumb; }
+DesktopScroll { background-color: transparent; }
+DesktopScrollThumb { cn1-derive: ScrollThumb; }
+DesktopHorizontalScroll { background-color: transparent; }
+DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
+
+/* The sidebar capsule: macOS rounds the whole selected row. */
+ListRenderer {
+    color: var(--text-color, #000000);
+    background-color: transparent;
+    border-radius: 1.41mm;
+    padding: 1.1mm 2.5mm 1.1mm 2.5mm;
+}
+
+ListRenderer.selected {
+    color: #ffffff;
+    background-color: var(--selection-color, #0064e1);
+    border-radius: 1.41mm;
+    padding: 1.1mm 2.5mm 1.1mm 2.5mm;
+}
+
+ListRenderer.hover {
+    color: var(--text-color, #000000);
+    background-color: #e4e4e4;
+    border-radius: 1.41mm;
+    padding: 1.1mm 2.5mm 1.1mm 2.5mm;
+}
+
+ListRendererFocus {
+    background-color: transparent;
+    border: 0.53mm solid var(--accent-color, #007aff);
+    border-radius: 1.41mm;
+}
+
+/* --- Dark ------------------------------------------------------------------------------ */
+
+@media (prefers-color-scheme: dark) {
+    Form { background-color: #323232; color: #ffffff; }
+    Label { color: #ffffff; }
+
+    Button { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    Button.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    Button.pressed { color: #ffffff; background-color: #4a4a4a; border: 0.26mm solid #5c5c5c; border-radius: 1.76mm; }
+    Button.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #4a4a4a; border-radius: 1.76mm; }
+
+    RaisedButton { color: #ffffff; background-color: #007aff; }
+    RaisedButton.hover { color: #ffffff; background-color: #1a88ff; }
+    RaisedButton.pressed { color: #ffffff; background-color: #0060cc; }
+    RaisedButton.disabled { color: #6e6e6e; background-color: #3c3c3c; }
+
+    FlatButton { color: #4da3ff; background-color: transparent; }
+    FlatButton.hover { color: #4da3ff; background-color: #3c3c3c; }
+    FlatButton.pressed { color: #007aff; background-color: #4a4a4a; }
+
+    TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #48484a; border-radius: 1.06mm; }
+    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #5c5c5e; border-radius: 1.06mm; }
+    TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #007aff; border-radius: 1.06mm; }
+    TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; border-radius: 1.06mm; }
+
+    CheckBox { color: #ffffff; }
+    CheckBox.selected { color: #007aff; }
+    CheckBox.hover { color: #ffffff; background-color: #3c3c3c; }
+    CheckBox.disabled { color: #6e6e6e; }
+
+    RadioButton { color: #ffffff; }
+    RadioButton.selected { color: #007aff; }
+    RadioButton.hover { color: #ffffff; background-color: #3c3c3c; }
+    RadioButton.disabled { color: #6e6e6e; }
+
+    Switch { background-color: #5a5a5a; }
+    Switch.selected { background-color: #007aff; }
+    Switch.hover { background-color: #666666; }
+    Switch.disabled { background-color: #3c3c3c; }
+
+    Slider { background-color: #5a5a5a; }
+    SliderFull { background-color: #007aff; color: #007aff; }
+    ProgressBar { background-color: #5a5a5a; }
+    ProgressBarFull { background-color: #007aff; color: #007aff; }
+
+    TitleArea { background-color: #323232; border-bottom: 0.26mm solid #48484a; }
+    Title { color: #ffffff; }
+    Toolbar { background-color: #323232; border-bottom: 0.26mm solid #48484a; }
+
+    Dialog { background-color: #3a3a3a; }
+    DialogTitle { color: #ffffff; }
+    DialogBody { color: #ffffff; }
+
+    ComboBox { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    ComboBox.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    ComboBox.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
+    Slider.hover { background-color: #666666; color: #007aff; }
+    Slider.disabled { background-color: #3c3c3c; color: #6e6e6e; }
+    ScrollThumb { background-color: #5a5a5a; }
+    ScrollThumb.hover { background-color: #6e6e6e; }
+    ScrollThumb.pressed { background-color: #8e8e8e; }
+
+    ListRenderer { color: #ffffff; background-color: transparent; }
+    ListRenderer.selected { color: #ffffff; background-color: #0064e1; }
+    ListRenderer.hover { color: #ffffff; background-color: #3c3c3c; }
+    ListRendererFocus { border: 0.53mm solid #007aff; border-radius: 1.41mm; }
+
+    /* cn1-derive is flattened against the LIGHT parent at compile time, so a UIID
+       that derives in the light block gets a concrete COPY of the light colours and
+       no $Dark entry at all. Without repeating the derive here, a dark-mode TextArea
+       keeps TextField's near-white background on a dark form. Repeat every derive. */
+    TextArea { cn1-derive: TextField; }
+    HorizontalScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopScrollThumb { cn1-derive: ScrollThumb; }
+    DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
+}

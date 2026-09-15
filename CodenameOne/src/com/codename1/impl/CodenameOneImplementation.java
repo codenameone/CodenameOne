@@ -573,7 +573,7 @@ public abstract class CodenameOneImplementation {
     }
 
     /// Encapsulates the editing code which is specific to the platform, some platforms
-    /// would allow "in place editing" MIDP does not.
+    /// allow "in place editing" and some do not.
     ///
     /// #### Parameters
     ///
@@ -634,7 +634,7 @@ public abstract class CodenameOneImplementation {
     }
 
     /// Encapsulates the editing code which is specific to the platform, some platforms
-    /// would allow "in place editing" MIDP does not.
+    /// allow "in place editing" and some do not.
     ///
     /// #### Parameters
     ///
@@ -2650,7 +2650,7 @@ public abstract class CodenameOneImplementation {
         fillPolygon(graphics, new int[]{x1, x2, x3}, new int[]{y1, y2, y3}, 3);
     }
 
-    /// Draws the RGB values based on the MIDP API of a similar name. Renders a
+    /// Draws the RGB values from a packed ARGB array. Renders a
     /// series of device-independent RGB+transparency values in a specified
     /// region. The values are stored in rgbData in a format with 24 bits of
     /// RGB and an eight-bit alpha value (0xAARRGGBB), with the first value
@@ -6507,9 +6507,7 @@ public abstract class CodenameOneImplementation {
     }
 
     /// Allows exposing the given object to JavaScript code so the JavaScript code can invoke methods
-    /// and access fields on the given object. Notice that on RIM devices which don't support reflection
-    /// this object must implement the propriatery Scriptable interface
-    /// http://www.blackberry.com/developers/docs/5.0.0api/net/rim/device/api/script/Scriptable.html
+    /// and access fields on the given object.
     ///
     /// #### Parameters
     ///
@@ -7460,7 +7458,7 @@ public abstract class CodenameOneImplementation {
 
     /// The storage data is used by some storage implementations (e.g. CDC) to place the
     /// storage object in a "proper" location matching the application name. This needs to
-    /// be set by the user, the name might be ignored in platforms (such as MIDP) where storage
+    /// be set by the user, the name might be ignored on platforms where storage
     /// is mapped to a native application specific storage.
     ///
     /// #### Returns
@@ -7472,7 +7470,7 @@ public abstract class CodenameOneImplementation {
 
     /// The storage data is used by some storage implementations (e.g. CDC) to place the
     /// storage object in a "proper" location matching the application name. This needs to
-    /// be set by the user, the name might be ignored in platforms (such as MIDP) where storage
+    /// be set by the user, the name might be ignored on platforms where storage
     /// is mapped to a native application specific storage.
     ///
     /// #### Parameters
@@ -8541,7 +8539,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// #### Returns
     ///
-    /// the name of the platform e.g. ios, rim, win, and, me
+    /// the name of the platform e.g. ios, and, win, mac, linux, HTML5
     public abstract String getPlatformName();
 
     /// Returns the suffixes for ovr files that should be used when loading a layered resource file on this platform
@@ -8553,7 +8551,7 @@ public abstract class CodenameOneImplementation {
         return new String[0];
     }
 
-    /// This callback allows highly broken devices like the blackberry to automatically detect the network
+    /// This callback allows a platform to automatically detect the network
     /// type
     public boolean shouldAutoDetectAccessPoint() {
         return false;

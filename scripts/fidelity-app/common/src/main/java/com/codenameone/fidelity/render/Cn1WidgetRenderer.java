@@ -39,6 +39,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.Slider;
 import com.codename1.ui.Tabs;
+import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.plaf.Border;
@@ -55,6 +56,29 @@ public final class Cn1WidgetRenderer {
     private Cn1WidgetRenderer() {
     }
 
+    /// Maps a desktop row id onto the component kind that builds it.
+    ///
+    /// A desktop Button is still a Button; what makes the row different is its UIID, its tile
+    /// geometry and the states it is asked for, none of which live here. Mapping at the top
+    /// of the dispatch means every existing branch is reached unchanged, rather than being
+    /// duplicated with a "Desktop" prefix.
+    private static String desktopToMobileId(String id) {
+        if (id == null || !id.startsWith("Desktop")) {
+            return id;
+        }
+        String rest = id.substring("Desktop".length());
+        if ("AccentButton".equals(rest)) {
+            return "RaisedButton";
+        }
+        if ("ComboBox".equals(rest)) {
+            // No dedicated ComboBox branch; a popup button reads as a Button with a label,
+            // which is what the CN1 side has to offer against a native NSPopUpButton /
+            // GtkDropDown / WinUI ComboBox. Tracked as an approximation rather than hidden.
+            return "Button";
+        }
+        return rest;
+    }
+
     /** Returns true when this renderer knows how to build the given component id. */
     public static boolean isSupported(String id) {
         return "Button".equals(id) || "RaisedButton".equals(id) || "FlatButton".equals(id)
@@ -67,7 +91,17 @@ public final class Cn1WidgetRenderer {
                 || "SwitchMorph".equals(id)                    // animation-frame validation: frozen droplet slide
                 || "TabOne".equals(id)                         // minimal: one tab with a transparent icon slot
                 || "GlassText".equals(id) || "GlassIcon".equals(id) // ladder rungs: glass + one element
-                || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
+                || (id != null && id.startsWith("GlassPanel")) // glass-blend isolation panels
+                // The desktop rows. They build the same components as the mobile ones -- a
+                // Button is a Button -- and differ in their UIID, their tile geometry and the
+                // states they are asked for. Named separately rather than reusing the mobile
+                // ids because one screenshot name has to identify one row, and a desktop
+                // Button and a mobile Button are different references.
+                || "DesktopButton".equals(id) || "DesktopAccentButton".equals(id)
+                || "DesktopTextField".equals(id) || "DesktopCheckBox".equals(id)
+                || "DesktopRadioButton".equals(id) || "DesktopSwitch".equals(id)
+                || "DesktopSlider".equals(id) || "DesktopProgressBar".equals(id)
+                || "DesktopComboBox".equals(id);
     }
 
     /**
@@ -79,7 +113,19 @@ public final class Cn1WidgetRenderer {
     }
 
     public static Component build(ComponentSpec spec, String state, String appearance) {
-        String id = spec.getId();
+        Component built = buildImpl(spec, state, appearance);
+        // Applied here rather than inside each branch. Every widget grew its own state
+        // handling, so adding hover to the Button path left CheckBox, RadioButton, Switch and
+        // Slider silently ignoring it -- the tiles rendered, looked plausible, and were
+        // pixel-identical to their normal state. One place means one behaviour.
+        if (built != null) {
+            applyDesktopState(built, state);
+        }
+        return built;
+    }
+
+    private static Component buildImpl(ComponentSpec spec, String state, String appearance) {
+        String id = desktopToMobileId(spec.getId());
         String uiid = spec.getCn1Uiid();
         boolean dark = "dark".equals(appearance);
         String text = spec.getText() != null ? spec.getText() : "";
@@ -456,6 +502,25 @@ public final class Cn1WidgetRenderer {
         } else if ("pressed".equals(state)) {
             // Force the pressed visual state so the pressed style is painted.
             b.pressed();
+        }
+    }
+
+    /// Applies the two states that only exist on the desktop.
+    ///
+    /// Both are set on the MODEL rather than synthesised as input, which is how every other
+    /// state here is driven: the runner never moves a pointer or presses a key, because a
+    /// capture that depends on input timing is a capture that differs between runs. Hover is
+    /// the state Codename One gained for these themes; focus is the existing selected style,
+    /// which is what a focused component renders with.
+    private static void applyDesktopState(Component c, String state) {
+        if ("hover".equals(state)) {
+            c.setHovered(true);
+        } else if ("focus".equals(state)) {
+            c.setFocusable(true);
+            Form f = c.getComponentForm();
+            if (f != null) {
+                f.setFocused(c);
+            }
         }
     }
 }

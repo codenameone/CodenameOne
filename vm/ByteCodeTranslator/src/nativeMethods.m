@@ -1030,6 +1030,33 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
      * heap corruption on the arm64 clean target). memmove is the correct,
      * overlap-safe primitive. */
     memmove( (*dstArr).data + (dstOffset * byteSize), (*srcArr).data  + (srcOffset * byteSize), length * byteSize);
+#ifdef CN1_NURSERY
+    // THE NURSERY BARRIER, which the bulk copy above bypasses exactly as it bypasses the
+    // two SATB halves -- and for the same reason: no per-element setter runs, so
+    // CN1_WRITE_BARRIER never fires. The nursery's whole safety argument is that a heap
+    // object can never reference a nursery object, because any store that would create
+    // such a reference promotes the value first. A bulk copy of references into a heap
+    // array breaks that invariant silently.
+    //
+    // It is not a theoretical hole: ArrayList.grow copies its backing array through here,
+    // and with it unpatched a self-hosted translation faults inside ArrayList's iterator
+    // after ~8 minor collections -- i.e. as soon as the arena has wrapped once and the
+    // block holding the unpromoted element has been handed out again. Before the first
+    // wrap the dangling reference still points at intact memory and nothing is observed,
+    // which is why this survives any short run.
+    //
+    // Only when the DESTINATION is outside the nursery: a nursery-to-nursery copy keeps
+    // both ends in the young generation, which is the case promotion exists to avoid.
+    if(!cls->primitiveType && !cn1IsYoungObject(dst)) {
+        JAVA_ARRAY_OBJECT* cn1__d = ((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset;
+        int cn1__i;
+        for(cn1__i = 0 ; cn1__i < length ; cn1__i++) {
+            if(cn1__d[cn1__i] != JAVA_NULL) {
+                cn1NurseryWriteBarrier(dst, (JAVA_OBJECT)cn1__d[cn1__i]);
+            }
+        }
+    }
+#endif
     if(cn1__satbReg) {
         cn1SatbBulkEnd();
     }
@@ -1454,16 +1481,6 @@ JAVA_DOUBLE java_lang_Double_longBitsToDouble___long_R_double(CODENAME_ONE_THREA
 }
 
 JAVA_LONG java_lang_Double_doubleToLongBits___double_R_long(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE n1) {
-    union {
-        JAVA_DOUBLE d;
-        JAVA_LONG   l;
-    } u;
-    
-    u.d = n1;
-    return u.l;
-}
-
-JAVA_LONG java_lang_Double_doubleToRawLongBits___double_R_long(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE n1) {
     union {
         JAVA_DOUBLE d;
         JAVA_LONG   l;
@@ -1973,6 +1990,7 @@ JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STA
     return newStringFromCString(threadStateData, clz->clsName);
 }
 
+
 JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
     struct clazz* clz = (struct clazz*)cls;
     return clz->isArray;
@@ -1988,6 +2006,12 @@ JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA
 JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT cls2) {
     struct clazz* clz1 = (struct clazz*)cls;
     struct clazz* clz2 = (struct clazz*)cls2;
+    // A primitive class carries CN1_PRIMITIVE_CLASS_ID, which indexes no row of
+    // the instanceof tables, so it must never reach instanceofFunction. The JDK
+    // rule is also simply identity: int is assignable only from int.
+    if(clz1->primitiveType || clz2->primitiveType) {
+        return clz1 == clz2 ? JAVA_TRUE : JAVA_FALSE;
+    }
     // A.isAssignableFrom(B): target is A, the class under test is B.
     return instanceofFunction(clz1->classId, clz2->classId);
 }
@@ -1995,6 +2019,9 @@ JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENA
 JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT obj) {
     if(obj == JAVA_NULL) { return JAVA_FALSE; }
     struct clazz* clz1 = (struct clazz*)cls;
+    // No object is ever an instance of a primitive class, and its sentinel
+    // classId indexes no instanceof table row -- see isAssignableFrom above.
+    if(((struct clazz*)cls)->primitiveType) { return JAVA_FALSE; }
     struct clazz* clz2 = (struct clazz*)CN1_CLASS_OF(obj); // tag-aware: a tagged Integer has no header
     // A.isInstance(o): target is A, the class under test is o's class. These were
     // reversed, so isInstance searched the TARGET's supertype table for the
@@ -2537,6 +2564,31 @@ double cn1GcProbeMarkMs = 0, cn1GcProbeSweepMs = 0;
 int cn1GcProbeThrew = 0;
 #endif
 JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
+    // FREEZE: refuse to start a cycle at all once the exit census has claimed the
+    // heap. Clearing System.gcShouldLoop is not sufficient on its own -- the GC
+    // thread may already have evaluated `while(gcShouldLoop)` and be on its way
+    // here, and System's start-up path re-raises that flag after its initial wait.
+    // Either way the census would see gcCurrentlyRunning false, start walking, and
+    // have the pending cycle resume and sweep underneath it. Checked here because
+    // this is the one door every cycle comes through.
+    // CLAIM the cycle, do not merely check a flag. Loading a freeze flag and then
+    // setting gcCurrentlyRunning is two steps, and the collector can be preempted
+    // between them: the census would raise the freeze, see gcCurrentlyRunning still
+    // false, and start walking a heap this thread is about to sweep. The claim below
+    // is a single compare-exchange, so a cycle is either started or refused with
+    // nothing observable in between.
+    {
+        int cn1Expected = CN1_GC_CYCLE_IDLE;
+        if(!atomic_compare_exchange_strong_explicit(&cn1GcCycleState, &cn1Expected,
+                CN1_GC_CYCLE_RUNNING, memory_order_acq_rel, memory_order_acquire)) {
+            // In practice only the FROZEN case can be taken: System's GC thread is
+            // the sole caller (System.java's `while(gcShouldLoop)` loop), so no second
+            // entrant can observe RUNNING. Refusing on RUNNING too is defence rather
+            // than policy -- two concurrent cycles would be worse than a skipped one --
+            // and it means this is not a behaviour change for any existing caller.
+            return;
+        }
+    }
     gcCurrentlyRunning = JAVA_TRUE;
     if(firstTimeGcThread) {
         firstTimeGcThread = JAVA_FALSE;
@@ -2662,6 +2714,14 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     // of malloc entirely for exactly this reason.
     lowMemoryMode = JAVA_FALSE;
     gcCurrentlyRunning = JAVA_FALSE;
+    // Release the claim. Only ever RUNNING -> IDLE: a census that froze while this
+    // cycle ran holds the state at FROZEN and this must not clobber it, which is why
+    // the transition is a compare-exchange rather than a store.
+    {
+        int cn1Running = CN1_GC_CYCLE_RUNNING;
+        atomic_compare_exchange_strong_explicit(&cn1GcCycleState, &cn1Running,
+                CN1_GC_CYCLE_IDLE, memory_order_acq_rel, memory_order_relaxed);
+    }
 }
 
 JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {

@@ -62,6 +62,24 @@ public @interface DesktopBuild {
     /// desktop build is resizable
     Toggle resizable() default Toggle.DEFAULT;
 
+    /// Which native theme a desktop build installs, and the one hint that decides
+    /// whether a desktop application looks like the platform it is running on.
+    ///
+    /// `auto` and `native` both mean "whatever this machine is" -- Fluent on
+    /// Windows, Aqua on macOS, Adwaita on GNOME -- which is the only sensible
+    /// reading on desktop, where one binary runs on all three. A theme can also be
+    /// named outright with `fluent`, `aqua` or `adwaita`, which is what a build
+    /// that wants one look everywhere asks for. `legacy` keeps what desktop
+    /// applications have always had, and `custom` installs nothing so the
+    /// application's own theme is the only one.
+    ///
+    /// Read by the JavaSE port at runtime rather than by a builder, so unlike most
+    /// hints here it changes what the running application does rather than what is
+    /// produced for it.
+    @Hint(name = "desktop.themeMode",
+          valuePattern = "auto|native|fluent|aqua|adwaita|legacy|custom")
+    String themeMode() default "";
+
     /// How the desktop window is framed: native for the OS title bar and menu bar,
     /// custom for an undecorated window with a Codename One drawn title bar, or
     /// toolbar for the legacy in-app Toolbar. An unrecognized value falls back to

@@ -121,7 +121,18 @@ class SubContent implements StructuredContent {
      */
     @Override
     public String getAttribute(String name) {
+        // A node set has no single attribute value, so this cannot answer for
+        // one. Result reads attributes per node instead -- see nodes().
         return null;
+    }
+
+    /// INTERNAL - the nodes this set holds.
+    ///
+    /// A caller that has to answer per node rather than for the set as a whole
+    /// -- reading an attribute, which has no meaning across several elements
+    /// -- needs them individually.
+    List<StructuredContent> nodes() {
+        return root;
     }
 
     /*
