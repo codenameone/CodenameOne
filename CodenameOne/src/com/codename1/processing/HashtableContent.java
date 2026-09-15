@@ -196,8 +196,14 @@ class MapContent implements StructuredContent {
             return new Vector();
         }
         // on arrays, auto select first element that contains 'name'.
+        //
+        // Past the guard above, root is a Map or a List and cannot be null, so
+        // the two null checks this method used to make on it are gone: one
+        // decided oldList and the other guarded the cast below. The cast is
+        // safe for the same reason -- a List only gets here through an entry
+        // the loop kept, and it keeps one only when it is a Map.
         Object node = root;
-        boolean oldList = node == null || (node instanceof Vector);
+        boolean oldList = node instanceof Vector;
         if (node instanceof List) {
             Object tmp = null;
             for (Object entry : (List) node) {
@@ -217,13 +223,6 @@ class MapContent implements StructuredContent {
                 }
             }
             node = tmp;
-        }
-        if (node == null) {
-            if (oldList) {
-                return new Vector();
-            } else {
-                return new ArrayList();
-            }
         }
         node = ((Map) node).get(name);
         if (node == null) {
