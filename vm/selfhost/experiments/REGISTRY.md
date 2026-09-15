@@ -2128,3 +2128,44 @@ excluding anything on this corpus, so widening it would buy nothing.
 The census is `-D` gated, defaults off, and changes no emitted output: gates on the tree
 carrying it are GC-VERIFY GREEN (three self-tests still non-vacuous), gauntlet GREEN,
 Gate D PASS, Gate A PASS (798 files byte-identical), negative control PASS.
+
+## Round 17: a PRE-EXISTING intermittent SIGSEGV under memory pressure
+
+Found while measuring, not while looking for it: the self-hosted translator crashes
+roughly **1 run in 16** when another memory-hungry process runs alongside it. It produced
+11 or 748 of 798 files and exited 139 (SIGSEGV) or 138 (SIGBUS).
+
+**It is not caused by anything on this branch, and that was settled by A/B rather than
+by argument.** A worktree at 389a7e9341 -- before the frameless split, the for-each
+lowering, the accessor fold and the aging-slack default -- was built and run under the
+same load:
+
+| binary | runs | crashes |
+|---|---:|---:|
+| pre-change (389a7e9341) | 16 | **1** |
+| this branch, `CN1_GC_AGING_SLACK=1` | 16 | **1** |
+| this branch, compiled default (slack=0) | 28 | **0** |
+
+Same rate before and after; the new default has if anything shown fewer, though 0/28
+against 1/16 is not a significant difference and should not be read as one.
+
+The crash reports say what it is. The pre-change one is `KERN_INVALID_ADDRESS at
+0x0000000000000000` inside `Parser.writeOutput` -- **a null dereference**, which on the
+clean target is a hard SIGSEGV rather than a NullPointerException, because that target
+installs no signal handler (only the iOS port does). The branch one is
+`0xffffffff0000016c` inside `updateInlinableFieldDependencies`, one frame deeper in the
+same `writeOutput -> eliminateUnusedMethods -> cullClasses -> updateAllDependencies`
+path.
+
+Both appear only under memory pressure, which points at an allocation returning
+JAVA_NULL and the generated code dereferencing it: `codenameOneGcMalloc` has a
+retry-after-collection loop, but `CN1_FAST_NEW`'s inlined BiBOP bump path does not go
+through it. **A VM that segfaults instead of throwing OutOfMemoryError is a robustness
+bug, not a tuning one**, and on a device it is the difference between a caught error and
+a crash report.
+
+This is recorded rather than fixed here: it predates every optimization on this branch,
+it needs its own reproducer (the load generator above is one), and the fix is in the
+allocation-failure path rather than anywhere this branch has touched. It is also why the
+gauntlet and the GC verifier did not catch it -- neither runs under external memory
+pressure.
