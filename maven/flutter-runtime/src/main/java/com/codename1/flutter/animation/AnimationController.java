@@ -217,16 +217,48 @@ public class AnimationController extends Animation<Double> {
 
     public void animateTo(double target, Duration duration, Curve curve) {
         repeating = false;
-        long d = duration != null ? duration.inMilliseconds() : durationMs;
-        AnimationStatus dir = target >= currentValue ? AnimationStatus.forward : AnimationStatus.reverse;
-        beginRun(clamp(target), d, dir, curve);
+        AnimationStatus dir = target >= currentValue
+                ? AnimationStatus.forward : AnimationStatus.reverse;
+        beginRun(clamp(target), simulationMillis(target, duration, dir), dir, curve);
+    }
+
+    /**
+     * How long an {@code animateTo}/{@code animateBack} run lasts.
+     *
+     * <p>A duration given explicitly is that duration. Without one, the controller's
+     * duration describes crossing the WHOLE range, and the run gets the fraction of it
+     * this move actually covers -- Flutter's {@code _animateToInternal}:
+     * {@code directionDuration * remainingFraction}.</p>
+     *
+     * <p>Not a detail. Reply opens its mailbox drawer with {@code animateTo(0.4)} on a
+     * 300ms controller, which is a 120ms animation; running the full 300 made the drawer
+     * take two and a half times as long to arrive as the reference, and the same error
+     * slowed the drop arrow beside it and the search page behind it. Measured against the
+     * reference frame by frame, ours had barely moved at the point the reference was
+     * finished.</p>
+     */
+    /// Seam for AnimateToDurationTest: the arithmetic, without needing a frame clock.
+    long simulationMillisForTest(double target, Duration explicit, AnimationStatus dir) {
+        return simulationMillis(target, explicit, dir);
+    }
+
+    private long simulationMillis(double target, Duration explicit, AnimationStatus dir) {
+        if (explicit != null) {
+            // Flutter does not animate at all when asked to go where it already is.
+            return target == currentValue ? 0 : explicit.inMilliseconds();
+        }
+        double range = upperBound - lowerBound;
+        double remaining = range > 0 ? Math.abs(target - currentValue) / range : 1.0;
+        long base = dir == AnimationStatus.reverse && reverseDurationMs >= 0
+                ? reverseDurationMs : durationMs;
+        return Math.round(base * remaining);
     }
 
     public void animateBack(double target, Duration duration, Curve curve) {
         repeating = false;
-        long d = duration != null ? duration.inMilliseconds()
-                : (reverseDurationMs >= 0 ? reverseDurationMs : durationMs);
-        beginRun(clamp(target), d, AnimationStatus.reverse, curve);
+        beginRun(clamp(target),
+                simulationMillis(target, duration, AnimationStatus.reverse),
+                AnimationStatus.reverse, curve);
     }
 
     public void repeat(Double min, Double max, Boolean reverse, Duration period) {
