@@ -1030,33 +1030,6 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
      * heap corruption on the arm64 clean target). memmove is the correct,
      * overlap-safe primitive. */
     memmove( (*dstArr).data + (dstOffset * byteSize), (*srcArr).data  + (srcOffset * byteSize), length * byteSize);
-#ifdef CN1_NURSERY
-    // THE NURSERY BARRIER, which the bulk copy above bypasses exactly as it bypasses the
-    // two SATB halves -- and for the same reason: no per-element setter runs, so
-    // CN1_WRITE_BARRIER never fires. The nursery's whole safety argument is that a heap
-    // object can never reference a nursery object, because any store that would create
-    // such a reference promotes the value first. A bulk copy of references into a heap
-    // array breaks that invariant silently.
-    //
-    // It is not a theoretical hole: ArrayList.grow copies its backing array through here,
-    // and with it unpatched a self-hosted translation faults inside ArrayList's iterator
-    // after ~8 minor collections -- i.e. as soon as the arena has wrapped once and the
-    // block holding the unpromoted element has been handed out again. Before the first
-    // wrap the dangling reference still points at intact memory and nothing is observed,
-    // which is why this survives any short run.
-    //
-    // Only when the DESTINATION is outside the nursery: a nursery-to-nursery copy keeps
-    // both ends in the young generation, which is the case promotion exists to avoid.
-    if(!cls->primitiveType && !cn1IsYoungObject(dst)) {
-        JAVA_ARRAY_OBJECT* cn1__d = ((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset;
-        int cn1__i;
-        for(cn1__i = 0 ; cn1__i < length ; cn1__i++) {
-            if(cn1__d[cn1__i] != JAVA_NULL) {
-                cn1NurseryWriteBarrier(dst, (JAVA_OBJECT)cn1__d[cn1__i]);
-            }
-        }
-    }
-#endif
     if(cn1__satbReg) {
         cn1SatbBulkEnd();
     }

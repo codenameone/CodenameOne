@@ -1004,8 +1004,8 @@ public class ByteCodeClass {
                     b.append(bf.getClsName());
                     if (bf.isObjectType()) {
                         b.append("(threadStateData);\n    ");
-                        // A static field is a GC root outside any nursery -> a nursery
-                        // value stored here always escapes and must be promoted.
+                        // SATB insertion barrier: record the reference being stored, so
+                        // a static that takes a child mid-mark keeps it alive.
                         b.append("CN1_WRITE_BARRIER(JAVA_NULL, __cn1StaticVal);\n    ");
                         // SATB deletion barrier: preserve the overwritten static reference.
                         b.append("CN1_SATB_DELETE(&STATIC_FIELD_").append(bf.getClsName())
@@ -1120,9 +1120,10 @@ public class ByteCodeClass {
             b.append(fld.getCDefinition());
             if(fld.isObjectType()) {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   ");
-                // Nursery write barrier: a reference is being stored into a heap object's
-                // field, so a nursery value escapes and must be promoted. No-op unless
-                // -DCN1_NURSERY.
+                // SATB insertion barrier: record the reference being stored, so an object
+                // linked into the graph mid-mark is kept alive even when the container it
+                // is stored into is a fresh grace object the mark has not reached. Off-mark
+                // this is one predicted-not-taken flag load.
                 b.append("CN1_WRITE_BARRIER(__cn1T, __cn1Val); ");
                 // SATB deletion barrier: preserve the reference being overwritten for the
                 // current mark cycle. No-op (single flag load) outside GC.
@@ -1408,28 +1409,25 @@ public class ByteCodeClass {
                     if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CLEAN) {
                         b.append("    cn1AbortOnUncaughtException = 1;\n");
                     }
-                    // With the nursery, the main thread allocates and must cooperate with
-                    // the concurrent GC's stop-the-world pause (so the GC never scans its
-                    // nursery while a minor collection runs). Lightweight threads are the
-                    // ones the GC pauses; mark the main thread lightweight too.
-                    // NOT on the macOS target, where this thread goes on to
-                    // become AppKit's event loop rather than the thread that
-                    // runs Java. "Lightweight" is a promise to the collector
-                    // that the thread parks: cn1_globals.m waits for
-                    // threadActive to drop and then migrates
-                    // pendingHeapAllocations WITHOUT taking threadHeapMutex,
-                    // which is the mutex it does take for a native thread. The
-                    // unlocked append in cn1AddPending is safe only under that
-                    // pause -- its own comment says so -- so a thread that
-                    // never parks and still claims to be lightweight lets a
-                    // grow inside cn1AddPending free the array while the
-                    // collector is reading it. The event loop reaches Java only
-                    // through AppKit callbacks and brackets nothing, so it must
-                    // stay native; the flag is set below on the dispatched
-                    // thread that actually runs the application.
-                    if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_MACOS) {
-                        b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
-                    }
+                    // MAIN IS NOT REGISTERED AS A LIGHTWEIGHT THREAD, and that is the
+                    // behaviour every shipping build has always had. A block here used to
+                    // set lightweightThread on it, but it sat inside #ifdef CN1_NURSERY,
+                    // which nothing ever defined, so it was dead text in the emitted C;
+                    // it went with the nursery rather than being switched on, because
+                    // turning it on would change what every generated application does.
+                    //
+                    // Keep the hazard it documented, because it still applies to anything
+                    // that flips that flag here. "Lightweight" is a promise to the
+                    // collector that the thread parks: cn1_globals.m waits for
+                    // threadActive to drop and then migrates pendingHeapAllocations
+                    // WITHOUT taking threadHeapMutex, which is the mutex it does take for
+                    // a native thread. The unlocked append in cn1AddPending is safe only
+                    // under that pause -- its own comment says so -- so a thread that
+                    // never parks and still claims to be lightweight lets a grow inside
+                    // cn1AddPending free the array while the collector is reading it. On
+                    // macOS in particular this thread goes on to become AppKit's event
+                    // loop, which reaches Java only through callbacks and brackets
+                    // nothing, so it must stay native.
                     // On the native macOS target the application's main method
                     // runs on a background thread and AppKit owns the main one.
                     // That is not a preference: the main thread has to be free to
@@ -1445,25 +1443,24 @@ public class ByteCodeClass {
                         b.append("    CN1MacInstallMainMenu();\n");
                         b.append("    CN1MacInstallAppDelegate();\n");
                         b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
-                        // The dispatched block runs on a DIFFERENT thread from
-                        // the one flagged above, with its own thread-local state
-                        // whose flags all default to false, and the application's
-                        // main allocates from the nursery on it. So it is a Java
-                        // thread and has to be registered as one, which means
-                        // BOTH flags and not just the first: the collector reads
-                        // a lightweight thread that is not active as parked, and
-                        // a parked thread is precisely the one it may scan and
-                        // migrate the nursery and pendingHeapAllocations of
-                        // without taking the heap mutex. Setting lightweight
-                        // alone was therefore worse than setting neither -- it
-                        // invited the collector into the arena this thread was
-                        // still filling. threadRunner sets the same pair, and
-                        // retires with markDeadThread, for every thread it
-                        // starts; this block is that sequence written by hand.
-                        b.append("#ifdef CN1_NURSERY\n"
-                                + "        getThreadLocalData()->lightweightThread = JAVA_TRUE;\n"
-                                + "        getThreadLocalData()->threadActive = JAVA_TRUE;\n"
-                                + "#endif\n");
+                        // OPEN QUESTION, INHERITED AND DELIBERATELY NOT ANSWERED HERE.
+                        // This dispatched block runs the application's main on a thread
+                        // the runtime knows nothing about: its thread-local flags all
+                        // default to false, so the collector treats it as native and
+                        // takes threadHeapMutex for it, which is the conservative side.
+                        // A nursery-only block used to register it as lightweight+active
+                        // and retire it with markDeadThread, the way threadRunner does
+                        // for every thread it starts -- but it was inside
+                        // #ifdef CN1_NURSERY and no build ever compiled it, so that
+                        // registration has never actually happened on any shipped macOS
+                        // binary. It went with the nursery instead of being switched on,
+                        // because enabling it is a behaviour change to a live target and
+                        // wants its own change and its own gate. If it is ever revisited:
+                        // BOTH flags or neither. The collector reads a lightweight thread
+                        // that is not active as PARKED, and a parked thread is precisely
+                        // the one whose pendingHeapAllocations it may migrate without the
+                        // heap mutex -- so setting lightweight alone is worse than
+                        // setting nothing.
                         // Hand main() the real command line. This used to pass
                         // JAVA_NULL, so a translated program could not read its own
                         // arguments at all and every knob had to come in through the
@@ -1479,12 +1476,6 @@ public class ByteCodeClass {
                         // exists. markDeadThread is declared inline because it
                         // is defined in nativeMethods.m and appears in no
                         // header; without that it is an implicit declaration.
-                        b.append("#ifdef CN1_NURSERY\n"
-                                + "        {\n"
-                                + "            extern void markDeadThread(struct ThreadLocalData *d);\n"
-                                + "            markDeadThread(getThreadLocalData());\n"
-                                + "        }\n"
-                                + "#endif\n");
                         b.append("    });\n");
                         b.append("    [NSApp run];\n}\n\n");
                     } else {

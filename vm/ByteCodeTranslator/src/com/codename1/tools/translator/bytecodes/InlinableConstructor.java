@@ -60,8 +60,8 @@ import org.objectweb.asm.Opcodes;
  *
  * GC: at the new-site the object is already a GC root (it sits on the operand stack),
  * and the bump/calloc zeroed its reference fields, so storing into them via the
- * existing {@code set_field_*} accessors (which carry the VM's write barrier, a no-op
- * unless the nursery is enabled) is exactly what the out-of-line ctor would do. The
+ * existing {@code set_field_*} accessors (which carry the VM's write barrier, i.e. the
+ * SATB insertion half) is exactly what the out-of-line ctor would do. The
  * straight-line field stores contain no safepoint, so no GC can interleave the
  * partially-constructed object.
  */
@@ -115,7 +115,9 @@ public final class InlinableConstructor {
             // build cannot inline -- the very call Lever B exists to remove). The
             // struct type obj__<owner> is already complete in this TU (the new-site
             // references it). Object stores carry CN1_WRITE_BARRIER, exactly as the
-            // accessor does (a no-op unless the nursery is enabled).
+            // accessor does. That barrier is the SATB insertion half and is NOT
+            // optional: omitting it on a field store is a live mark-completeness hole,
+            // which is what FusedFieldInit was fixed for.
             String lhs = "((struct obj__" + s.cOwner + "*)(" + objExpr + "))->" + s.cOwner + "_" + s.fieldName;
             b.append("    ");
             if (s.fieldCat == 'o') {

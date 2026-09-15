@@ -1778,14 +1778,6 @@ static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE);
 static void cn1GcBuildVirtualThreadSnapshot(void);
 static void cn1GcScanParkedVirtualThreads(CODENAME_ONE_THREAD_STATE);
 static int cn1GcParkedVirtualThreadsScanned;
-#ifdef CN1_NURSERY
-// The young generation is a ROOT SOURCE for the major mark (see
-// cn1NurseryMarkYoungRoots). It is scanned ONCE PER PAUSED THREAD, over that thread's
-// OWN young blocks -- not once per cycle over all of them. A nursery is thread-local
-// and only its owner mutates it, so the owner being paused is exactly what makes the
-// walk safe; see the call site.
-void cn1NurseryMarkYoungRoots(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* owner);
-#endif
 static void cn1GcSignalStopThreads(struct ThreadLocalData* self);
 static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
 #ifdef CN1_GC_CAN_FORCE_STOP
@@ -2153,7 +2145,7 @@ void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count) {
         }
         // Same filters as cn1SatbEnqueue, applied WITHOUT the lock -- they only read the
         // object's own mark word.
-#if !defined(CN1_SATB_LOG_FRESH) && !defined(CN1_NURSERY)
+#ifndef CN1_SATB_LOG_FRESH
         if(__atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
             continue;
         }
@@ -2183,7 +2175,7 @@ void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count) {
 }
 
 void cn1SatbEnqueue(JAVA_OBJECT old) {
-#if !defined(CN1_SATB_LOG_FRESH) && !defined(CN1_NURSERY)
+#ifndef CN1_SATB_LOG_FRESH
     // FRESH-REFERENCE FILTER (issue 5537).
     //
     // A mark == -1 object was allocated after this cycle's snapshot was taken, so it is
@@ -2195,15 +2187,13 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
     // lost -- which is the hazard the insertion half was added for.
     //
     // THAT LAST STEP IS THE WHOLE ARGUMENT, AND IT HAS A PRECONDITION: the INSERTION half
-    // has to exist. Under CN1_NURSERY it does not -- CN1_WRITE_BARRIER is the nursery
-    // remembered-set update there and enqueues nothing (cn1_globals.h) -- so a fresh
-    // container that takes an older child after the grace pass has that child recorded
-    // nowhere, and dropping the deletion entry for the container would let the sweep
-    // reclaim a child the graced container still references. The filter is an
-    // optimisation, not a correctness requirement, so a build without the insertion half
-    // simply does not get it. CN1_NURSERY is not defined anywhere in-tree today, which is
-    // why this is a latent hole rather than a live one, but the flag is documented and
-    // reachable.
+    // has to exist. CN1_WRITE_BARRIER is that half in every configuration this tree
+    // builds, and -DCN1_DISABLE_SATB compiles out the deletion half with it, so the two
+    // cannot come apart. Do not reintroduce a configuration where the write barrier means
+    // something other than SATB insertion without revisiting this filter: a fresh
+    // container that takes an older child after the grace pass would then have that child
+    // recorded nowhere, and dropping the deletion entry for the container would let the
+    // sweep reclaim a child the graced container still references.
     //
     // Without the filter the log is a positive feedback loop rather than a cost. Measured
     // on the game-tree shape at 4 threads: essentially the ENTIRE log was fresh
@@ -2988,23 +2978,6 @@ void cn1GcDiscoverReference(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ref, JAVA_BOO
        || __atomic_load_n(referentField, __ATOMIC_RELAXED) == JAVA_NULL) {
         return;                                    // already cleared: nothing to decide
     }
-#ifdef CN1_NURSERY
-    // A NURSERY PROMOTION IS NOT A WEAK-REFERENCE DECISION. cn1PromoteDrain runs the
-    // generated mark functions with nurseryPromoting raised, and gcMarkObject's promotion
-    // branch is what moves a referenced object out of the block being recycled. Routing the
-    // referent here instead skips that branch entirely: a surviving WeakReference whose
-    // referent sits in a different nursery block would be promoted alone, the minor
-    // collector would recycle the referent's block, and the field -- never cleared, because
-    // this is not a collection cycle -- would be left pointing into it.
-    //
-    // During promotion the referent is therefore treated exactly like any other field. No
-    // clearing happens on this path in any case, so making the edge strong here costs a
-    // promotion and nothing else.
-    if(threadStateData != 0 && threadStateData->nurseryPromoting) {
-        gcMarkObject(threadStateData, __atomic_load_n(referentField, __ATOMIC_RELAXED), force);
-        return;
-    }
-#endif
 #ifdef CN1_GC_VERIFY
     // THE VERIFIER HAS TO SEE THE REFERENT, and it could not.
     //
@@ -3705,11 +3678,6 @@ void codenameOneGCMark() {
                 // barrier is (see CN1_GC_CAN_FORCE_STOP): without the barrier the only way
                 // to keep it would be to hold the freeze across exactly those two.
                 //
-                // And a thread inside its own nursery minor collection is never frozen at
-                // all: cn1MarkForceStopUncooperative declines it, because the root scans
-                // mark through the TARGET's thread state and nurseryPromoting makes
-                // gcMarkObject return without marking anything.
-                //
                 // The stack-bounds entry is the one to learn from: cn1GcStackBase is two
                 // plain accessors on Apple and pthread_getattr_np on Linux, and only the
                 // Linux spelling allocates. Checking the Apple one and calling the
@@ -4072,27 +4040,6 @@ void codenameOneGCMark() {
                     cn1GcParkedVirtualThreadsScanned = 1;
                     cn1GcScanParkedVirtualThreads(d);
                 }
-#ifdef CN1_NURSERY
-                // The young generation, as a root source. Without this the collector
-                // cannot see a live nursery object at all and frees the heap objects it
-                // references; see cn1NurseryMarkYoungRoots for why the promotion barrier
-                // does not already cover this direction.
-                //
-                // SCANS ONLY `t`, THE THREAD THIS ITERATION HAS PAUSED. An earlier version
-                // ran once per cycle over EVERY thread's young blocks and claimed the
-                // stopped-thread region made that safe. It does not: this loop pauses
-                // threads ONE AT A TIME and releases each before the next is scanned, so a
-                // global walk here races every other mutator -- which can bump-allocate,
-                // run its own minor collection, clear start bits and recycle blocks while
-                // the walk reads them. That is a missed root or a dereference of a
-                // recycled header, and the comment asserting otherwise was the worse half
-                // of the bug.
-                //
-                // A nursery is thread-local and only its owner touches it, so scanning
-                // each thread's own blocks while that thread is paused is both safe and
-                // complete: every thread is paused in some iteration.
-                cn1NurseryMarkYoungRoots(d, t);
-#endif
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
                 cn1GcSelfCheckThreadStack(t, stackSize);
 #endif
@@ -7918,8 +7865,8 @@ void cn1GcRegisterClazz(struct clazz* c) {
  * Prints allocation volume by class, biggest first.
  *
  * Deliberately a census of what was ALLOCATED rather than of what is live: churn
- * is what costs, and a live-object walk cannot see the BiBOP or nursery objects
- * at all (they never enter allObjectsInHeap), which is exactly where the small
+ * is what costs, and a live-object walk cannot see the BiBOP objects at all
+ * (they never enter allObjectsInHeap), which is exactly where the small
  * high-turnover objects sit. Counters are read without synchronisation; a
  * diagnostic wants the shape, not the last digit.
  */
@@ -11028,25 +10975,6 @@ static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
         // (250ms) retry loop above keeps signalling until the thread answers.
         return JAVA_FALSE;
     }
-#ifdef CN1_NURSERY
-    // DECLINE a thread caught inside its own minor collection. cn1NurseryWriteBarrier
-    // raises nurseryPromoting and deliberately leaves threadActive TRUE for the duration,
-    // so it is a prime candidate for this escalation -- and the root scans below call
-    // gcMarkObject(t, ...) with the TARGET's thread state, whose first act under that flag
-    // is to promote-or-return WITHOUT marking. Freezing here would therefore hand the
-    // sweep a thread whose roots were all silently skipped, and mature objects live only
-    // from this thread would be reclaimed under it.
-    //
-    // Checked AFTER the stop, not before: read while the thread is running, the flag can
-    // be raised in the window between the read and the signal landing. A frozen thread's
-    // flag cannot change, so this is exact. Released and reported as a failure so the
-    // caller's retry simply tries again after the next interval, by which time the minor
-    // collection is normally over -- and the cooperative wait is still in force meanwhile.
-    if(t->nurseryPromoting) {
-        cn1GcSignalReleaseOne(t);   // before any bookkeeping, so there is none to unwind
-        return JAVA_FALSE;
-    }
-#endif
     atomic_fetch_add_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
     t->gcMarkForcedStop = JAVA_TRUE;
     return JAVA_TRUE;
@@ -11089,8 +11017,6 @@ static int cn1GcParkedVirtualThreadsScanned = 0;
 
 static void cn1GcBuildVirtualThreadSnapshot(void) {
     cn1GcParkedVirtualThreadsScanned = 0;
-#ifdef CN1_NURSERY
-#endif
     int n = cn1VirtualThreadSnapshot(cn1GcVtSnapshot, CN1_VT_SNAPSHOT_MAX);
     if(n > CN1_VT_SNAPSHOT_MAX) {
         // Scanning a subset is not a degraded mode, it is a use-after-free waiting
@@ -11341,25 +11267,6 @@ cn1GcMallocRetry:
     CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef CN1_GC_INSTRUMENT
     extern long long cn1_instr_allocCount; cn1_instr_allocCount++;
-#endif
-#ifdef CN1_NURSERY
-    // Small objects go to the thread-local young generation and bypass the global
-    // heap table entirely. Returns 0 (arena exhausted) -> fall through to the heap.
-    // CN1_NURSERY_NO_ARRAYS localises the remaining defect by OBJECT KIND. Arrays are
-    // the one nursery population with a distinct layout (header + inline data, so every
-    // `arr->data` a caller holds is an INTERIOR pointer) and they dominate the young set
-    // by bytes. Splitting them out answers whether the bug is array-specific in one
-    // build, which no amount of reading the promotion walk has managed to.
-    if(size <= CN1_NURSERY_MAX_OBJECT && constantPoolObjects != 0
-#ifdef CN1_NURSERY_NO_ARRAYS
-       && (parent == 0 || !parent->isArray)
-#endif
-       && !threadStateData->nativeAllocationMode) {
-        JAVA_OBJECT nurseryObj = cn1NurseryAlloc(threadStateData, size, parent);
-        if(nurseryObj != JAVA_NULL) {
-            return nurseryObj;
-        }
-    }
 #endif
 #if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
     // Small objects AND small arrays: serve from the per-thread BiBOP page heap,
@@ -11856,15 +11763,6 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             free(md);
         }
     }
-#ifdef CN1_NURSERY
-    // A promoted nursery object lives inside an arena block; never free() it -- just
-    // drop the block's live count and recycle the whole block once it hits zero.
-    if(cn1InNursery(obj)) {
-        extern void cn1NurseryObjectFreed(JAVA_OBJECT o);
-        cn1NurseryObjectFreed(obj);
-        return;
-    }
-#endif
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
     int* ptr = (int*)obj;
     ptr--;
@@ -12121,7 +12019,7 @@ volatile JAVA_OBJECT gcMarkCurrentDrainObj = JAVA_NULL;
 // gcMarkLocalBuf points here (on that worker's stack); gcMarkWorklistPush appends to it
 // and flushes to the shared worklist in batches. When NULL the thread is on the serial
 // path and pushes straight to the shared worklist with no locking (single-threaded by
-// construction: root snapshot, the serial drain, the nursery promote drain). Being a
+// construction: the root snapshot and the serial drain). Being a
 // thread-local pointer it also doubles as the per-thread "am I a parallel worker?" flag
 // that gcMarkObject uses to choose the atomic mark-claim path.
 struct gcMarkLocalBuffer {
@@ -12205,9 +12103,6 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     gcMarkWorklistTop++;
 }
 
-#ifdef CN1_NURSERY
-extern void cn1NurseryPromote(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
-#endif
 
 #if CN1_TAGGED_ACTIVE
 // Object-shaped proxies indexed by tag code; see cn1ClassOf in cn1_globals.h. They let a
@@ -12303,41 +12198,6 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     if(obj == JAVA_NULL || CN1_IS_TAGGED(obj)) {
         return;
     }
-#ifdef CN1_NURSERY
-    // THE NURSERY DECISION MUST COME FIRST -- AHEAD OF EVERY OTHER GUARD IN THIS
-    // FUNCTION, AND PARTICULARLY AHEAD OF THE CONSERVATIVE-RESOLVE REJECTION BELOW.
-    //
-    // That rejection drops any object cn1ConservativeResolve() cannot map back to
-    // itself, which is how a reference into a freed slot is refused. A NURSERY object
-    // never resolves: it lives in neither a BiBOP page nor allObjectsInHeap, and the
-    // resolver knows about nothing else. So with the nursery branch placed after it,
-    // every promotion request routed through gcMarkObject was silently discarded --
-    // cn1PromoteDrain walked a promoted object, called gcMarkObject on each of its
-    // fields, and every one of them returned before reaching the promotion.
-    //
-    // The symptom was a promoted container pointing at a dead young object: measured as
-    // a promoted java.util.ArrayList (heapPos=-2, mark function present) whose `array`
-    // field at +32 of 48 bytes referenced an Object[] the collection had just declared
-    // dead. Roots were not at fault (stack/bibop/legacy hits all zero), the worklist was
-    // not at fault (pushed == drained, nothing lost) -- the promotion simply never
-    // happened. CN1_NURSERY_PROMOTE_ALL masked it precisely because it promotes without
-    // going through gcMarkObject at all.
-    if(threadStateData != 0 && threadStateData->nurseryPromoting) {
-        if(cn1InNursery(obj) && obj->__heapPosition == -1) {
-            cn1NurseryPromote(threadStateData, obj);
-        }
-        return;
-    }
-    // THE MAJOR COLLECTOR NEVER TOUCHES THE YOUNG GENERATION. A still-young object
-    // belongs to its owning thread's minor collector, which may reclaim it at any time:
-    // marking it would stamp a header about to be recycled, and pushing it would put
-    // reclaimable memory on the mark worklist for a later drain to dereference. Skipping
-    // costs nothing, because cn1NurseryMarkYoungRoots walks the young generation in full
-    // as a root source, which is all the major collector needs from it.
-    if(cn1IsYoungObject(obj)) {
-        return;
-    }
-#endif
 #ifdef CN1_GC_VERIFY
     // QA verifier mode: cn1GcVerifyHeap drives the SAME generated mark functions
     // the collector uses, so every reference field of every surviving object
@@ -12461,30 +12321,6 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     if(__cls == 0 || __cls == (&class__java_lang_Class)) {
         return;
     }
-#ifdef CN1_NURSERY
-    // During THIS thread's minor collection we reuse the per-class mark functions to
-    // walk the object graph, but PROMOTE nursery objects instead of marking (and stop
-    // at heap objects -- the write barrier guarantees they don't point into the
-    // nursery). The flag is per-thread so the concurrent GC thread is unaffected.
-#ifdef CN1_NURSERY_VERIFY
-    if(threadStateData->nurseryVerifying) {
-        if(cn1IsYoungObject(obj)) {
-            JAVA_OBJECT __h = threadStateData->nurseryVerifyHolder;
-            fprintf(stderr, "[NURSERY-VERIFY] INVARIANT VIOLATION: holder=%s (heapPos=%d) "
-                            "-> young referent=%s\n",
-                    (__h != JAVA_NULL && __h->__codenameOneParentClsReference != 0
-                        && __h->__codenameOneParentClsReference->clsName != 0)
-                            ? __h->__codenameOneParentClsReference->clsName : "?",
-                    __h != JAVA_NULL ? __h->__heapPosition : -999,
-                    (obj->__codenameOneParentClsReference != 0
-                        && obj->__codenameOneParentClsReference->clsName != 0)
-                            ? obj->__codenameOneParentClsReference->clsName : "?");
-            fflush(stderr);
-        }
-        return;
-    }
-#endif
-#endif
 
     int markVal = currentGcMarkValue;
 
@@ -12656,892 +12492,11 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     }
 }
 
-#ifdef CN1_NURSERY
-// ===================== Thread-local young generation (nursery) =====================
-char* cn1NurseryArenaStart = 0;
-char* cn1NurseryArenaEnd = 0;
-static int cn1NurseryBlockCount = 0;
-// young: the block is in some thread's young set (being bump-allocated). A young block
-// is reclaimed ONLY by that thread's minor collection. cn1NurseryObjectFreed (sweep
-// thread) must never push a young block to the free stack, or it races the minor
-// collection's release and double-pushes -> free-stack overflow -> SIGABRT.
-typedef struct { int liveCount; JAVA_BOOLEAN tenured; JAVA_BOOLEAN young; } CN1NurseryBlockMeta;
-static CN1NurseryBlockMeta* cn1NurseryBlocks = 0;
-// OBJECT-START BITMAP, one bit per 16-byte granule of the arena. It exists so a
-// CONSERVATIVELY found word -- which may point into the MIDDLE of an object -- can be
-// resolved back to that object's base. Without it the minor collection can only
-// recognise a base pointer, and generated C at -O3 is free to keep an interior pointer
-// (an array's data, a strength-reduced field address) while the base dies in a register,
-// so a still-live object would go unpromoted and its block be recycled underneath it.
-// 16 bytes is the allocator's own alignment below, so one bit per granule is exact.
-// Cost is 1/128th of the arena (512KB for the default 64MB) and one OR per allocation.
-static unsigned char* cn1NurseryStartBits = 0;
-#define CN1_NURSERY_GRANULE 16
-#define CN1_NURSERY_BITS_PER_BLOCK (CN1_NURSERY_BLOCK_SIZE / CN1_NURSERY_GRANULE)
-static int* cn1NurseryFreeStack = 0;
-static int cn1NurseryFreeTop = 0;
-static pthread_mutex_t cn1NurseryMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_once_t cn1NurseryOnce = PTHREAD_ONCE_INIT;
-
-static void cn1NurseryDoInit() {
-    cn1NurseryArenaStart = (char*)malloc(CN1_NURSERY_ARENA_SIZE);
-    cn1NurseryArenaEnd = cn1NurseryArenaStart + CN1_NURSERY_ARENA_SIZE;
-    cn1NurseryBlockCount = CN1_NURSERY_ARENA_SIZE / CN1_NURSERY_BLOCK_SIZE;
-    cn1NurseryBlocks = (CN1NurseryBlockMeta*)calloc(cn1NurseryBlockCount, sizeof(CN1NurseryBlockMeta));
-    cn1NurseryStartBits = (unsigned char*)calloc(
-            (size_t)CN1_NURSERY_ARENA_SIZE / CN1_NURSERY_GRANULE / 8, 1);
-    cn1NurseryFreeStack = (int*)malloc(sizeof(int) * cn1NurseryBlockCount);
-    for(int i = 0 ; i < cn1NurseryBlockCount ; i++) {
-        cn1NurseryFreeStack[i] = cn1NurseryBlockCount - 1 - i;
-    }
-    cn1NurseryFreeTop = cn1NurseryBlockCount;
-}
-
-static inline int cn1NurseryBlockIndex(void* p) {
-    return (int)(((char*)p - cn1NurseryArenaStart) / CN1_NURSERY_BLOCK_SIZE);
-}
-
-static int cn1NurseryGrabBlock() {
-    int idx = -1;
-    pthread_mutex_lock(&cn1NurseryMutex);
-    if(cn1NurseryFreeTop > 0) {
-        idx = cn1NurseryFreeStack[--cn1NurseryFreeTop];
-        // Reset under the mutex so the sweep thread can't observe a half-initialized
-        // block (it reads liveCount/tenured/young in cn1NurseryObjectFreed).
-        cn1NurseryBlocks[idx].liveCount = 0;
-        cn1NurseryBlocks[idx].tenured = JAVA_FALSE;
-        cn1NurseryBlocks[idx].young = JAVA_TRUE;
-        // A RECYCLED block still carries the previous occupants' start bits. Left
-        // behind, they would let the conservative resolver hand back a "base" that
-        // belongs to a dead layout -- a plausible-looking object whose boundaries have
-        // since moved, which is the same recycled-slot hazard the BiBOP verifier
-        // poisons its slots for.
-        memset(cn1NurseryStartBits + ((size_t)idx * CN1_NURSERY_BITS_PER_BLOCK / 8),
-               0, CN1_NURSERY_BITS_PER_BLOCK / 8);
-    }
-    pthread_mutex_unlock(&cn1NurseryMutex);
-    return idx;
-}
-
-// Called by the global sweep when it frees a promoted (tenured-block) object. The
-// object stays in place; we just drop the block's live count and recycle the whole
-// block once every survivor in it has died -- but ONLY if the block has been retired
-// from its thread's young set. A still-young block is reclaimed by the minor
-// collection instead; freeing it here too would double-push and overflow the stack.
-void cn1NurseryObjectFreed(JAVA_OBJECT o) {
-    int idx = cn1NurseryBlockIndex(o);
-    pthread_mutex_lock(&cn1NurseryMutex);
-    int lc = --cn1NurseryBlocks[idx].liveCount;
-#ifdef CN1_NURSERY_NO_RECLAIM
-    // The ablation has to cover BOTH recycle paths or it does not ablate anything: the
-    // minor collection returns empty blocks, and this returns a block whose last promoted
-    // survivor has died. Gating only the first still recycles memory through here, which
-    // is how a "no reclaim" arm kept reproducing a use-after-free.
-    (void)lc;
-    pthread_mutex_unlock(&cn1NurseryMutex);
-    return;
-#endif
-    if(lc <= 0 && cn1NurseryBlocks[idx].tenured && !cn1NurseryBlocks[idx].young) {
-        cn1NurseryBlocks[idx].tenured = JAVA_FALSE;
-        cn1NurseryFreeStack[cn1NurseryFreeTop++] = idx;
-    }
-    pthread_mutex_unlock(&cn1NurseryMutex);
-}
-
-#ifdef CN1_NURSERY_DEBUG
-// PUSHED vs DRAINED. Every promoted object is pushed onto the worklist and must be
-// walked exactly once, because walking it is what promotes its children. If these two
-// diverge, promotions are being DISCARDED -- which is indistinguishable, from the heap's
-// point of view, from the drain never having run.
-static long long cn1NurseryPushed = 0, cn1NurseryDrained = 0, cn1NurseryTopResets = 0;
-#endif
-static void cn1PromotePush(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
-    if(threadStateData->nurseryPromoteTop >= threadStateData->nurseryPromoteCap) {
-        threadStateData->nurseryPromoteCap = threadStateData->nurseryPromoteCap ? threadStateData->nurseryPromoteCap * 2 : 8192;
-        threadStateData->nurseryPromoteWorklist = (JAVA_OBJECT*)realloc(threadStateData->nurseryPromoteWorklist, sizeof(JAVA_OBJECT) * threadStateData->nurseryPromoteCap);
-    }
-    threadStateData->nurseryPromoteWorklist[threadStateData->nurseryPromoteTop++] = o;
-#ifdef CN1_NURSERY_DEBUG
-    cn1NurseryPushed++;
-#endif
-}
-
-// Add an object to this thread's pending-allocation buffer, exactly like a normal
-// heap allocation. The mark phase migrates pending -> allObjectsInHeap while the
-// thread is paused, so registration never races the concurrent sweep/mark.
-static void cn1AddPending(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
-    if(threadStateData->heapAllocationSize >= threadStateData->threadHeapTotalSize) {
-        // Same use-after-free as codenameOneGcMalloc: lock unconditionally (lightweight
-        // threads included) so the GC's cn1GcBuildRootSnapshots never reads this array
-        // mid-free. Held only across the grow; no park/signal-stop inside -> no deadlock.
-        lockThreadHeapMutex();
-        void** tmp = malloc(threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
-        memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
-        memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
-        threadStateData->threadHeapTotalSize *= 2;
-        free(threadStateData->pendingHeapAllocations);
-        threadStateData->pendingHeapAllocations = tmp;
-        unlockThreadHeapMutex();
-    }
-    threadStateData->pendingHeapAllocations[threadStateData->heapAllocationSize++] = o;
-}
-
-// Promote one nursery object IN PLACE (address unchanged): tenure its block and hand
-// it to the normal pending-allocation path so the next paused mark registers it in
-// allObjectsInHeap. __heapPosition: -1 = un-promoted nursery, -2 = promoted/pending,
-// >=0 = migrated into the global table.
-void cn1NurseryPromote(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
-    pthread_mutex_lock(&cn1NurseryMutex);
-    int idx = cn1NurseryBlockIndex(o);
-    cn1NurseryBlocks[idx].tenured = JAVA_TRUE;
-    cn1NurseryBlocks[idx].liveCount++;
-    pthread_mutex_unlock(&cn1NurseryMutex);
-    o->__heapPosition = -2;
-    threadStateData->nurseryPromotedSinceMinor++;
-    cn1AddPending(threadStateData, o);
-    cn1PromotePush(threadStateData, o);
-}
-
-static void cn1PromoteDrain(CODENAME_ONE_THREAD_STATE) {
-    while(threadStateData->nurseryPromoteTop > 0) {
-        JAVA_OBJECT o = threadStateData->nurseryPromoteWorklist[--threadStateData->nurseryPromoteTop];
-#ifdef CN1_NURSERY_DEBUG
-        cn1NurseryDrained++;
-#endif
-        gcMarkFunctionPointer fp = o->__codenameOneParentClsReference->markFunction;
-        if(fp != 0) {
-            fp(threadStateData, o, JAVA_FALSE);
-        }
-    }
-}
-
-// Resolve a CONSERVATIVELY found word to the base of the nursery object that contains
-// it, or JAVA_NULL. Interior pointers are the whole reason this exists -- see the
-// bitmap declaration. The backward scan is bounded by CN1_NURSERY_MAX_OBJECT, which is
-// the largest object the nursery will ever hold, so this is O(32) and not O(block).
-//
-// A word pointing into a block's unallocated tail resolves to the last object before
-// it, which is a FALSE POSITIVE: it promotes an object that may be dead. That is the
-// correct direction for a conservative collector -- retaining garbage costs a block,
-// mistaking a live object for garbage costs the process.
-static JAVA_OBJECT cn1NurseryResolveInterior(void* w) {
-    if(!cn1InNursery(w)) {
-        return JAVA_NULL;
-    }
-    size_t off = (size_t)((char*)w - cn1NurseryArenaStart);
-    size_t g = off / CN1_NURSERY_GRANULE;
-    size_t blockFirstG = (off / CN1_NURSERY_BLOCK_SIZE) * CN1_NURSERY_BITS_PER_BLOCK;
-    size_t back = (CN1_NURSERY_MAX_OBJECT / CN1_NURSERY_GRANULE) + 1;
-    // Lowest granule this scan may look at, computed by SUBTRACTING FROM g rather than
-    // testing `g - i >= blockFirstG` in the loop condition: these are size_t, so once i
-    // passes g that difference underflows to a huge value and the test is always true --
-    // an unsigned-underflow walk off the front of the bitmap.
-    size_t stopG = blockFirstG;
-    size_t gg;
-    if(g - blockFirstG > back) {
-        stopG = g - back;
-    }
-    for(gg = g ; ; gg--) {
-        if(cn1NurseryStartBits[gg >> 3] & (unsigned char)(1u << (gg & 7))) {
-            JAVA_OBJECT o = (JAVA_OBJECT)(cn1NurseryArenaStart + gg * CN1_NURSERY_GRANULE);
-            // -1 is "still in the nursery". Anything else has already been promoted and
-            // is owned by the global collector, which needs no help from us.
-            if(o->__heapPosition == -1 && o->__codenameOneParentClsReference != 0) {
-                return o;
-            }
-            return JAVA_NULL;
-        }
-        if(gg == stopG) {
-            break;
-        }
-    }
-    return JAVA_NULL;
-}
-
-// THE ROOT SET THIS COLLECTOR WAS MISSING.
-//
-// The minor collection below scans threadObjectStack, which is the PRECISE root set.
-// That was complete when the nursery was written and has not been since: frameless
-// object/instance codegen is default-on (cn1_globals.h, PHASE 3b), and it exists
-// precisely so a reference does NOT have to be pushed onto threadObjectStack -- the
-// concurrent collector finds it by scanning the C stack conservatively instead. So on a
-// default build the precise stack is largely EMPTY, the minor collection promotes almost
-// nothing, and it then recycles blocks holding objects the mutator still has in hand.
-//
-// Measured, because this is the kind of claim that should not be argued: translating the
-// self-hosting corpus SIGSEGVs after ONE minor collection with frameless codegen on, and
-// runs to a clean Java-level result with it off
-// (CN1_SELFHOST_JAVA_OPTS=-Dcn1.frameless.objects=false -Dcn1.frameless.instance=false).
-//
-// Scanning our own stack needs no signal and no stop: this runs ON the mutator thread,
-// from inside its own allocation path, so [current frame, stack base) is exactly the
-// region that can hold its live references. setjmp flushes the callee-saved registers
-// into a buffer ON that frame, so scanning from the buffer upward covers registers and
-// stack in one range -- the same trick cn1GcScanThreadNativeStack uses for other threads.
-#ifdef CN1_NURSERY_DEBUG
-// SELF-COUNT. Both early returns in this function are silent, and a scan that bails on a
-// stack bound it could not resolve looks exactly like a scan that found nothing -- which
-// would make the root fix it implements untestable. Reported per minor collection.
-static long long cn1NurseryScanWords = 0, cn1NurseryScanFound = 0;
-#endif
-__attribute__((no_sanitize("address")))
-static void cn1NurseryScanNativeStack(CODENAME_ONE_THREAD_STATE) {
-    jmp_buf regs;
-    size_t ssz = 0;
-    char* hi;
-    char* lo;
-    char* p;
-    // The return value is irrelevant; setjmp is called for its register flush alone.
-    (void)CN1_TRY_SETJMP(regs);
-    hi = cn1GcStackBase(pthread_self(), &ssz);
-    if(hi == 0) {
-        return;
-    }
-    lo = (char*)&regs;
-    if(lo >= hi) {
-        // A stack that does not contain our own frame is one we cannot reason about
-        // (an alternate signal stack, a platform whose introspection lied). Scanning a
-        // wrong range would resolve arbitrary memory as objects, so scan nothing: the
-        // precise walk below still runs and the arena simply retains more.
-        return;
-    }
-    p = (char*)(((uintptr_t)lo + (sizeof(void*) - 1)) & ~((uintptr_t)(sizeof(void*) - 1)));
-    for(; p + sizeof(void*) <= hi ; p += sizeof(void*)) {
-        JAVA_OBJECT o = cn1NurseryResolveInterior(*(void**)p);
-#ifdef CN1_NURSERY_DEBUG
-        cn1NurseryScanWords++;
-#endif
-        if(o != JAVA_NULL) {
-#ifdef CN1_NURSERY_DEBUG
-            cn1NurseryScanFound++;
-#endif
-            cn1NurseryPromote(threadStateData, o);
-        }
-    }
-}
-
-#ifdef CN1_NURSERY_POISON
-// Stable small id per clazz, assigned on first sight and announced on stderr, so a
-// poisoned-pointer fault address decodes back to a class name after the fact.
-static struct clazz* cn1NurseryPoisonLegend[4096];
-static int cn1NurseryPoisonLegendCount = 0;
-static int cn1NurseryPoisonId(struct clazz* c) {
-    int i;
-    for(i = 0 ; i < cn1NurseryPoisonLegendCount ; i++) {
-        if(cn1NurseryPoisonLegend[i] == c) {
-            return i;
-        }
-    }
-    if(cn1NurseryPoisonLegendCount >= 4096) {
-        return 4095;
-    }
-    i = cn1NurseryPoisonLegendCount++;
-    cn1NurseryPoisonLegend[i] = c;
-    fprintf(stderr, "[NURSERY-POISON] idx=%d class=%s\n", i,
-            (c != 0 && c->clsName != 0) ? c->clsName : "?");
-    fflush(stderr);
-    return i;
-}
-#endif
-
-#ifdef CN1_NURSERY_FINDREF
-// THE INVERSE OF THE INVARIANT VERIFIER, and the tool that actually answers the question.
-//
-// The verifier asks "does any OLD object reference a young one?" and has answered no,
-// repeatedly, while the heap was demonstrably being corrupted. That only rules out one
-// holder. This asks the question the other way round: promotion has finished, so every
-// remaining unpromoted object in a retiring block is DEAD -- now scan every place a
-// pointer can live and report anything still pointing at one.
-//
-// Each region is reported separately because the region IS the diagnosis:
-//   STACK   -> the conservative root scan has a gap
-//   BIBOP / LEGACY -> a store took no write barrier (and the verifier missed it)
-//   NURSERY -> the promotion walk failed to follow a field
-static void cn1NurseryFindRefs(CODENAME_ONE_THREAD_STATE) {
-    long stackHits = 0, bibopHits = 0, legacyHits = 0, nurseryHits = 0;
-    struct clazz* firstHolder = 0; struct clazz* firstTarget = 0; const char* firstRegion = "?";
-    // The three facts that separate "the drain skipped this field" from "the scanner is
-    // reading padding": where in the holder the word sits, how big the holder is, and
-    // whether the holder even HAS a mark function for the drain to have called.
-    int firstHolderPos = -999, firstHolderHasMark = -1, firstOffset = -1, firstSpan = -1;
-    // --- this thread's C stack + registers ---
-    {
-        jmp_buf regs; size_t ssz = 0; char* hi; char* lo; char* q;
-        (void)CN1_TRY_SETJMP(regs);
-        hi = cn1GcStackBase(pthread_self(), &ssz);
-        lo = (char*)&regs;
-        if(hi != 0 && lo < hi) {
-            q = (char*)(((uintptr_t)lo + 7) & ~(uintptr_t)7);
-            for(; q + sizeof(void*) <= hi ; q += sizeof(void*)) {
-                JAVA_OBJECT o = cn1NurseryResolveInterior(*(void**)q);
-                if(o != JAVA_NULL) {
-                    stackHits++;
-                    if(firstTarget == 0) { firstTarget = o->__codenameOneParentClsReference;
-                                           firstRegion = "STACK"; }
-                }
-            }
-        }
-    }
-    // --- every BiBOP slot and every legacy object, field by field, via a scan of their
-    //     raw words. Raw words rather than mark functions on purpose: a field that took
-    //     no write barrier is exactly the case a mark function might also not describe.
-    {
-        CN1BibopPage* pg = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
-        while(pg != 0) {
-            int n = atomic_load_explicit(&pg->bumpIndex, memory_order_acquire);
-            int i;
-            for(i = 0 ; i < n ; i++) {
-                JAVA_OBJECT o = cn1BibopSlot(pg, i);
-                char* q = (char*)o; char* e = q + pg->slotSize;
-                if(__atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE) == CN1_BIBOP_FREE_MARK) continue;
-                for(; q + sizeof(void*) <= e ; q += sizeof(void*)) {
-                    JAVA_OBJECT t = cn1NurseryResolveInterior(*(void**)q);
-                    if(t != JAVA_NULL) {
-                        bibopHits++;
-                        if(firstTarget == 0) { firstHolder = o->__codenameOneParentClsReference;
-                                               firstTarget = t->__codenameOneParentClsReference;
-                                               firstRegion = "BIBOP"; }
-                    }
-                }
-            }
-            pg = atomic_load_explicit(&pg->nextAll, memory_order_acquire);
-        }
-    }
-    {
-        int t2 = currentSizeOfAllObjectsInHeap, i;
-        for(i = 0 ; i < t2 ; i++) {
-            JAVA_OBJECT o = allObjectsInHeap[i];
-            size_t sz;
-            if(o == JAVA_NULL || o->__heapPosition == CN1_BIBOP_ADOPTED) continue;
-            sz = malloc_size((void*)o);
-            if(sz == 0 || sz > (size_t)(64*1024)) continue;
-            {
-                char* q = (char*)o; char* e = q + sz;
-                for(; q + sizeof(void*) <= e ; q += sizeof(void*)) {
-                    JAVA_OBJECT t = cn1NurseryResolveInterior(*(void**)q);
-                    if(t != JAVA_NULL) {
-                        legacyHits++;
-                        if(firstTarget == 0) { firstHolder = o->__codenameOneParentClsReference;
-                                               firstTarget = t->__codenameOneParentClsReference;
-                                               firstRegion = "LEGACY"; }
-                    }
-                }
-            }
-        }
-    }
-    // --- PROMOTED nursery objects (they are in no other index until the next mark) ---
-    {
-        int b;
-        for(b = 0 ; b < cn1NurseryBlockCount ; b++) {
-            size_t g0, g1, g;
-            if(!cn1NurseryBlocks[b].tenured && !cn1NurseryBlocks[b].young) continue;
-            g0 = (size_t)b * CN1_NURSERY_BITS_PER_BLOCK; g1 = g0 + CN1_NURSERY_BITS_PER_BLOCK;
-            for(g = g0 ; g < g1 ; g++) {
-                JAVA_OBJECT o;
-                if(!(cn1NurseryStartBits[g >> 3] & (unsigned char)(1u << (g & 7)))) continue;
-                o = (JAVA_OBJECT)(cn1NurseryArenaStart + g * CN1_NURSERY_GRANULE);
-                if(o->__heapPosition == -1) continue;   // dead itself; not a holder
-                {
-                    // BOUND BY THE NEXT OBJECT START, not by CN1_NURSERY_MAX_OBJECT.
-                    // Objects are packed, so a fixed 512-byte window runs off the end of
-                    // a small object and reads its NEIGHBOURS -- which are quite likely
-                    // the dead ones. That inflates the count and can attribute a
-                    // reference to an object that never held it. The next set start bit
-                    // is the exact end of this object.
-                    size_t gEnd = g + 1;
-                    char* q; char* e;
-                    while(gEnd < g1 &&
-                          !(cn1NurseryStartBits[gEnd >> 3] & (unsigned char)(1u << (gEnd & 7)))) {
-                        gEnd++;
-                    }
-                    q = (char*)o;
-                    e = cn1NurseryArenaStart + gEnd * CN1_NURSERY_GRANULE;
-                    for(; q + sizeof(void*) <= e ; q += sizeof(void*)) {
-                        JAVA_OBJECT t = cn1NurseryResolveInterior(*(void**)q);
-                        if(t != JAVA_NULL) {
-                            nurseryHits++;
-                            if(firstTarget == 0) { firstHolder = o->__codenameOneParentClsReference;
-                                                   firstTarget = t->__codenameOneParentClsReference;
-                                                   firstRegion = "NURSERY";
-                                                   firstHolderPos = o->__heapPosition;
-                                                   firstHolderHasMark =
-                                                       (o->__codenameOneParentClsReference != 0
-                                                        && o->__codenameOneParentClsReference->markFunction != 0);
-                                                   firstOffset = (int)(q - (char*)o);
-                                                   firstSpan = (int)(e - (char*)o); }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if(stackHits | bibopHits | legacyHits | nurseryHits) {
-        fprintf(stderr, "[NURSERY-FINDREF] DANGLING refs to dead young objects: "
-                        "stack=%ld bibop=%ld legacy=%ld nursery=%ld | first in %s: holder=%s "
-                        "(heapPos=%d markFn=%d) +%d of %d -> %s\n",
-                stackHits, bibopHits, legacyHits, nurseryHits, firstRegion,
-                (firstHolder && firstHolder->clsName) ? firstHolder->clsName : "(root)",
-                firstHolderPos, firstHolderHasMark, firstOffset, firstSpan,
-                (firstTarget && firstTarget->clsName) ? firstTarget->clsName : "?");
-        fflush(stderr);
-    }
-}
-#endif
-
-static int cn1NurseryStaticScanDisabled(void) {
-    static int cached = -1;
-    if(cached < 0) {
-        const char* v = getenv("CN1_NURSERY_NO_STATIC_SCAN");
-        cached = (v != 0 && v[0] != '0') ? 1 : 0;
-    }
-    return cached;
-}
-void cn1NurseryMinorCollect(CODENAME_ONE_THREAD_STATE) {
-    threadStateData->nurseryPromoting = JAVA_TRUE;
-#ifdef CN1_NURSERY_DEBUG
-    if(threadStateData->nurseryPromoteTop != 0) { cn1NurseryTopResets++; }
-#endif
-    threadStateData->nurseryPromoteTop = 0;
-    // BEFORE the precise walk. Both feed the same promote worklist and promotion is
-    // idempotent (cn1NurseryPromote flips heapPosition off -1), so the order only
-    // decides which pass claims a given object first.
-    cn1NurseryScanNativeStack(threadStateData);
-    int top = threadStateData->threadObjectStackOffset;
-    struct elementStruct* stack = threadStateData->threadObjectStack;
-    for(int i = 0 ; i < top ; i++) {
-        if(stack[i].type == CN1_TYPE_OBJECT) {
-            JAVA_OBJECT o = stack[i].data.o;
-            if(o != JAVA_NULL && cn1InNursery(o) && o->__heapPosition == -1) {
-                cn1NurseryPromote(threadStateData, o);
-            }
-        }
-    }
-    JAVA_OBJECT ct = threadStateData->currentThreadObject;
-    if(ct != JAVA_NULL && cn1InNursery(ct) && ct->__heapPosition == -1) cn1NurseryPromote(threadStateData, ct);
-    JAVA_OBJECT ex = threadStateData->exception;
-    if(ex != JAVA_NULL && cn1InNursery(ex) && ex->__heapPosition == -1) cn1NurseryPromote(threadStateData, ex);
-    // Static fields are also roots. If the write barrier holds (statics never point
-    // into the nursery) this is cheap -- it just walks heap objects, which the
-    // promotion hook ignores -- but it also catches any store path that bypassed the
-    // barrier, so a still-live nursery object can never be left unpromoted (and then
-    // wrongly reclaimed). markStatics calls gcMarkObject, which promotes in this mode.
-    // markStatics IS A SAFETY NET, AND IT IS THE MOST EXPENSIVE THING IN A MINOR
-    // COLLECTION: it walks every static field in the program, every time, and minor
-    // collections are frequent by design.
-    //
-    // A static can no longer hold a young reference. A store into a static compiles to
-    // CN1_WRITE_BARRIER(JAVA_NULL, value); the barrier tests the TARGET with
-    // cn1IsYoungObject, JAVA_NULL is not young, so the value is promoted at the point of
-    // the store. The walk therefore finds nothing on the barrier-covered path and exists
-    // only to cover a store that bypassed the barrier entirely.
-    //
-    // Kept on by default -- it is a correctness backstop for exactly the class of bug
-    // this collector has been full of -- with CN1_NURSERY_NO_STATIC_SCAN to measure what
-    // it costs.
-    if(!cn1NurseryStaticScanDisabled()) {
-        extern void markStatics(CODENAME_ONE_THREAD_STATE);
-        markStatics(threadStateData);
-    }
-    cn1PromoteDrain(threadStateData);
-    threadStateData->nurseryPromoting = JAVA_FALSE;
-#ifdef CN1_NURSERY_VERIFY
-    // THE GENERATIONAL INVARIANT, CHECKED RATHER THAN ASSERTED IN A COMMENT.
-    //
-    // Promotion is complete at this point, so nothing outside the young generation may
-    // still reference something inside it. Walk every object the global collector knows
-    // about and re-run its mark function in reporting mode; any young referent names a
-    // store that failed to take the write barrier. Runs before the blocks retire, so the
-    // referent's class is still readable.
-    //
-    // O(registered objects) per minor collection: a QA build only, never shipped.
-    {
-        static long long __vPasses = 0, __vScanned = 0;
-        threadStateData->nurseryVerifying = JAVA_TRUE;
-        // BIBOP FIRST, and it is the half that matters: a BiBOP object is deliberately
-        // absent from allObjectsInHeap (that is the point of the page heap), so a walk
-        // of the legacy table alone reports every BiBOP holder clean. The first version
-        // of this verifier did exactly that and printed zero violations against a heap
-        // that was demonstrably corrupt.
-        {
-            CN1BibopPage* __p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
-            while(__p != 0) {
-                int __n = atomic_load_explicit(&__p->bumpIndex, memory_order_acquire);
-                int __i;
-                for(__i = 0 ; __i < __n ; __i++) {
-                    JAVA_OBJECT __o = cn1BibopSlot(__p, __i);
-                    int __m = __atomic_load_n(&__o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
-                    if(__m == CN1_BIBOP_FREE_MARK || __o->__codenameOneParentClsReference == 0) {
-                        continue;
-                    }
-                    gcMarkFunctionPointer __fp =
-                            __o->__codenameOneParentClsReference->markFunction;
-                    if(__fp != 0) {
-                        threadStateData->nurseryVerifyHolder = __o;
-                        __vScanned++;
-                        __fp(threadStateData, __o, JAVA_FALSE);
-                    }
-                }
-                __p = atomic_load_explicit(&__p->nextAll, memory_order_acquire);
-            }
-        }
-        int __t = currentSizeOfAllObjectsInHeap;
-        int __i;
-        for(__i = 0 ; __i < __t ; __i++) {
-            JAVA_OBJECT __o = allObjectsInHeap[__i];
-            if(__o == JAVA_NULL || __o->__codenameOneParentClsReference == 0) {
-                continue;
-            }
-            gcMarkFunctionPointer __fp = __o->__codenameOneParentClsReference->markFunction;
-            if(__fp != 0) {
-                threadStateData->nurseryVerifyHolder = __o;
-                __vScanned++;
-                __fp(threadStateData, __o, JAVA_FALSE);
-            }
-        }
-        // PROMOTED-BUT-NOT-YET-REGISTERED objects. A promotion hands the object to
-        // cn1AddPending, and it only reaches allObjectsInHeap at the next paused mark --
-        // so everything promoted by the pass that just ran is in NEITHER of the two walks
-        // above. Those are precisely the objects most likely to hold a young referent,
-        // which made this omission the difference between a verifier that reports the
-        // violation and one that reports a confident zero. Reached through the
-        // object-start bitmap, because a pending object has no other index.
-        for(__i = 0 ; __i < cn1NurseryBlockCount ; __i++) {
-            if(!cn1NurseryBlocks[__i].tenured) {
-                continue;
-            }
-            size_t __b = (size_t)__i * CN1_NURSERY_BITS_PER_BLOCK;
-            size_t __e = __b + CN1_NURSERY_BITS_PER_BLOCK;
-            size_t __g;
-            for(__g = __b ; __g < __e ; __g++) {
-                if(cn1NurseryStartBits[__g >> 3] & (unsigned char)(1u << (__g & 7))) {
-                    JAVA_OBJECT __o = (JAVA_OBJECT)(cn1NurseryArenaStart
-                            + __g * CN1_NURSERY_GRANULE);
-                    if(__o->__heapPosition == -1
-                            || __o->__codenameOneParentClsReference == 0) {
-                        continue;
-                    }
-                    gcMarkFunctionPointer __fp =
-                            __o->__codenameOneParentClsReference->markFunction;
-                    if(__fp != 0) {
-                        threadStateData->nurseryVerifyHolder = __o;
-                        __vScanned++;
-                        __fp(threadStateData, __o, JAVA_FALSE);
-                    }
-                }
-            }
-        }
-        threadStateData->nurseryVerifyHolder = JAVA_NULL;
-        threadStateData->nurseryVerifying = JAVA_FALSE;
-        // SELF-COUNT, because "0 violations" is exactly what a verifier that never ran
-        // also prints. This line is the difference between a clean result and a vacuous
-        // one, and it is printed every pass so a run that ends early still says how much
-        // was actually checked.
-        __vPasses++;
-        fprintf(stderr, "[NURSERY-VERIFY] pass=%lld holdersScanned=%lld\n",
-                __vPasses, __vScanned);
-        fflush(stderr);
-    }
-#endif
-    // Retire every young block from the young set (under the mutex, so the sweep thread
-    // sees a consistent young flag). A block with no live promoted survivors (liveCount
-    // <= 0: never tenured, or every survivor it held already died) is reclaimed now;
-    // one that still has survivors stays tenured and is freed later by
-    // cn1NurseryObjectFreed when its last survivor dies. Clearing `young` first hands
-    // that responsibility cleanly to the sweep with no double-push window.
-#ifdef CN1_NURSERY_FINDREF
-    cn1NurseryFindRefs(threadStateData);
-#endif
-#ifdef CN1_NURSERY_PROMOTE_ALL
-    // ABLATION, not a mode anyone should ship: promote EVERY object in every retiring
-    // block, reachable or not. It answers exactly one question -- is the remaining defect
-    // a REACHABILITY gap (some root the promotion walk never visits) or a defect in the
-    // promotion/registration machinery itself? With this on, no live object can possibly
-    // be left behind, so a surviving failure cannot be a missed root.
-    {
-        threadStateData->nurseryPromoting = JAVA_TRUE;
-        threadStateData->nurseryPromoteTop = 0;
-        for(int i = 0 ; i < threadStateData->nurseryYoungCount ; i++) {
-            size_t __b = (size_t)threadStateData->nurseryYoungBlocks[i]
-                    * CN1_NURSERY_BITS_PER_BLOCK;
-            size_t __e = __b + CN1_NURSERY_BITS_PER_BLOCK;
-            size_t __g;
-            for(__g = __b ; __g < __e ; __g++) {
-                if(cn1NurseryStartBits[__g >> 3] & (unsigned char)(1u << (__g & 7))) {
-                    JAVA_OBJECT __o = (JAVA_OBJECT)(cn1NurseryArenaStart
-                            + __g * CN1_NURSERY_GRANULE);
-                    if(__o->__heapPosition == -1) {
-                        cn1NurseryPromote(threadStateData, __o);
-                    }
-                }
-            }
-        }
-        cn1PromoteDrain(threadStateData);
-        threadStateData->nurseryPromoting = JAVA_FALSE;
-    }
-#endif
-    pthread_mutex_lock(&cn1NurseryMutex);
-    for(int i = 0 ; i < threadStateData->nurseryYoungCount ; i++) {
-        int idx = threadStateData->nurseryYoungBlocks[i];
-        cn1NurseryBlocks[idx].young = JAVA_FALSE;
-#ifdef CN1_NURSERY_POISON
-        // QA ONLY. Every object in a retiring block that was NOT promoted has just been
-        // declared dead by this collection. If any root was missed, one of them is still
-        // referenced -- and with the block merely retired (not yet recycled) that
-        // reference keeps working, so the defect stays invisible until a completely
-        // unrelated allocation reuses the memory much later. Poisoning the class pointer
-        // converts that into an immediate fault at a recognisable address, on the
-        // instruction that actually holds the stale reference, which is what names the
-        // missing root. Walk order comes from the object-start bitmap, so it needs no
-        // per-object size.
-        {
-            size_t __b = (size_t)idx * CN1_NURSERY_BITS_PER_BLOCK;
-            size_t __e = __b + CN1_NURSERY_BITS_PER_BLOCK;
-            size_t __g;
-            for(__g = __b ; __g < __e ; __g++) {
-                if(cn1NurseryStartBits[__g >> 3] & (unsigned char)(1u << (__g & 7))) {
-                    JAVA_OBJECT __o = (JAVA_OBJECT)(cn1NurseryArenaStart
-                            + __g * CN1_NURSERY_GRANULE);
-                    if(__o->__heapPosition == -1) {
-                        // ENCODE THE CLASS INTO THE POISON. A flat 0xDEADBEEF proves a
-                        // stale reference exists but says nothing about WHAT was missed,
-                        // and the class is the whole diagnosis -- it names the field or
-                        // container the promotion walk failed to follow. The legend is
-                        // printed once per class as it is assigned, and the faulting
-                        // address then reads back as 0xDEAD<idx><offset>.
-                        __o->__codenameOneParentClsReference =
-                                (struct clazz*)(uintptr_t)(0x0000DEAD00000000ULL
-                                        | ((unsigned long long)cn1NurseryPoisonId(
-                                                __o->__codenameOneParentClsReference) << 16));
-                    }
-                }
-            }
-        }
-#endif
-#ifndef CN1_NURSERY_NO_RECLAIM
-        if(cn1NurseryBlocks[idx].liveCount <= 0) {
-            cn1NurseryBlocks[idx].tenured = JAVA_FALSE;
-            cn1NurseryFreeStack[cn1NurseryFreeTop++] = idx;
-        }
-#endif
-    }
-    pthread_mutex_unlock(&cn1NurseryMutex);
-    threadStateData->nurseryYoungCount = 0;
-    threadStateData->nurseryCurrentBlock = -1;
-    threadStateData->nurseryBump = 0;
-    threadStateData->nurseryEnd = 0;
-    threadStateData->nurseryBytesSinceMinor = 0;
-    // Adaptive bypass decision. If most of what we allocated since the last minor
-    // survived, the nursery (bump + write barrier + promote-to-pending) was strictly
-    // more work than allocating into the heap directly would have been. Bypass it for
-    // a while, then re-probe. A churny phase reclaims whole blocks here and keeps the
-    // nursery on; an escaping phase trips this and stops paying the overhead.
-    int allocated = threadStateData->nurseryAllocSinceMinor;
-    int promoted = threadStateData->nurseryPromotedSinceMinor;
-    if(allocated >= CN1_NURSERY_BYPASS_MIN_SAMPLE &&
-       promoted * 100 >= allocated * CN1_NURSERY_BYPASS_SURVIVAL_PCT) {
-        threadStateData->nurseryBypass = JAVA_TRUE;
-        threadStateData->nurseryBypassCountdown = CN1_NURSERY_BYPASS_ALLOCS;
-    }
-#ifdef CN1_NURSERY_DEBUG
-    fprintf(stderr, "[NURSERY] worklist pushed=%lld drained=%lld lost=%lld discardingResets=%lld\n",
-            cn1NurseryPushed, cn1NurseryDrained, cn1NurseryPushed - cn1NurseryDrained,
-            cn1NurseryTopResets);
-    fprintf(stderr, "[NURSERY] stackScan words=%lld found=%lld\n",
-            cn1NurseryScanWords, cn1NurseryScanFound);
-    fprintf(stderr, "[NURSERY] minor: alloc=%d promoted=%d survival=%d%% reprobe=%d -> bypass=%d\n",
-            allocated, promoted, allocated ? (promoted*100/allocated) : 0,
-            threadStateData->nurseryReprobing, threadStateData->nurseryBypass);
-#endif
-    threadStateData->nurseryReprobing = JAVA_FALSE;
-    threadStateData->nurseryAllocSinceMinor = 0;
-    threadStateData->nurseryPromotedSinceMinor = 0;
-}
-
-JAVA_OBJECT cn1NurseryAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
-    pthread_once(&cn1NurseryOnce, cn1NurseryDoInit);
-    // GC safepoint. The concurrent GC pauses lightweight threads (threadBlockedByGC +
-    // wait on threadActive) before scanning their stacks/nursery objects. The normal
-    // allocation path yields here too (~line 1141); the nursery fast path must as
-    // well, otherwise the GC either scans this thread's nursery while a minor
-    // collection mutates it (corruption) or waits forever. A minor collection itself
-    // keeps threadActive true throughout, so the GC never scans mid-collection.
-    if(threadStateData->threadBlockedByGC && !threadStateData->nativeAllocationMode) {
-        CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
-        threadStateData->threadActive = JAVA_FALSE;
-        while(threadStateData->threadBlockedByGC) {
-            usleep(1000);
-        }
-        threadStateData->threadActive = JAVA_TRUE;
-    }
-    // Adaptive bypass: a recent minor collection saw high survival, so skip the
-    // nursery and let the caller allocate into the global heap. Decrement toward a
-    // re-probe; when it elapses, allocate in the nursery again to re-measure survival.
-    if(threadStateData->nurseryBypass) {
-        if(--threadStateData->nurseryBypassCountdown > 0) {
-            return JAVA_NULL;
-        }
-        threadStateData->nurseryBypass = JAVA_FALSE;
-        threadStateData->nurseryReprobing = JAVA_TRUE;
-    }
-    if(threadStateData->nurseryYoungBlocks == 0) {
-        threadStateData->nurseryYoungCapacity = 256;
-        threadStateData->nurseryYoungBlocks = (int*)malloc(sizeof(int) * threadStateData->nurseryYoungCapacity);
-        threadStateData->nurseryYoungCount = 0;
-        threadStateData->nurseryCurrentBlock = -1;
-    }
-    int asize = (size + 15) & ~15;
-    if(threadStateData->nurseryBump == 0 || threadStateData->nurseryBump + asize > threadStateData->nurseryEnd) {
-        long minorTrigger = threadStateData->nurseryReprobing ? CN1_NURSERY_REPROBE_BYTES : CN1_NURSERY_MINOR_TRIGGER;
-        if(threadStateData->nurseryBytesSinceMinor >= minorTrigger) {
-            cn1NurseryMinorCollect(threadStateData);
-        }
-        int idx = cn1NurseryGrabBlock();
-        if(idx < 0) {
-            return JAVA_NULL; // arena exhausted -> use the global heap
-        }
-        if(threadStateData->nurseryYoungCount >= threadStateData->nurseryYoungCapacity) {
-            threadStateData->nurseryYoungCapacity *= 2;
-            threadStateData->nurseryYoungBlocks = (int*)realloc(threadStateData->nurseryYoungBlocks, sizeof(int) * threadStateData->nurseryYoungCapacity);
-        }
-        threadStateData->nurseryYoungBlocks[threadStateData->nurseryYoungCount++] = idx;
-        threadStateData->nurseryCurrentBlock = idx;
-        threadStateData->nurseryBump = cn1NurseryArenaStart + (long)idx * CN1_NURSERY_BLOCK_SIZE;
-        threadStateData->nurseryEnd = threadStateData->nurseryBump + CN1_NURSERY_BLOCK_SIZE;
-    }
-    JAVA_OBJECT o = (JAVA_OBJECT)threadStateData->nurseryBump;
-    threadStateData->nurseryBump += asize;
-    threadStateData->nurseryBytesSinceMinor += asize;
-    threadStateData->nurseryAllocSinceMinor++;
-    memset(o, 0, size);
-    o->__codenameOneParentClsReference = parent;
-    // PLAIN, unlike the collector-side writes below: this is header initialisation of an
-    // object no other thread can reach yet. The SATB barrier only ever reads the mark of
-    // an object the mutator holds a reference to, i.e. one already published, and the
-    // publishing store is what orders this write against any reader.
-    o->__codenameOneGcMark = -1;
-    o->__heapPosition = -1;
-    // START BIT LAST, AND RELEASE-ORDERED. The bitmap is what lets another walker find
-    // this object -- the major collection's young-root pass reads it while this thread
-    // may still be allocating -- so publishing the bit before the header is initialised
-    // would hand that walker an object whose class pointer is still the previous
-    // occupant's garbage. Setting it last makes "bit set" mean "header complete".
-    {
-        size_t __g = (size_t)(((char*)o - cn1NurseryArenaStart) / CN1_NURSERY_GRANULE);
-        __atomic_fetch_or(&cn1NurseryStartBits[__g >> 3],
-                          (unsigned char)(1u << (__g & 7)), __ATOMIC_RELEASE);
-    }
-    return o;
-}
-
-// THE MISSING HALF OF THE GENERATIONAL DESIGN.
-//
-// Eager promotion on escape guarantees that no OLD object references a YOUNG one, which
-// is what lets a minor collection ignore the rest of the heap. The converse direction has
-// no mechanism: a live young object routinely references heap objects, and the major
-// collector cannot see it to find them. A nursery object is in no BiBOP page and no
-// allObjectsInHeap slot, and cn1ConservativeResolve -- which resolves every other root --
-// knows nothing about the arena, so it resolves a stack word pointing at a young object
-// to JAVA_NULL. The heap objects that young object holds are then reachable from nothing
-// the collector can see, and the sweep frees them underneath it.
-//
-// So the young generation has to be a ROOT SOURCE for the major mark. Every object in a
-// block that is still young has its mark function run in the ordinary (non-promoting)
-// mode, which marks its heap children without marking the young object itself -- the
-// young object needs no mark, because no sweep looks at it.
-//
-// CONSERVATIVE BY CONSTRUCTION: it walks every object in the young blocks, not just the
-// reachable ones, because reachability within the young generation is what a MINOR
-// collection determines and this runs without one. The cost is retaining heap objects
-// held by young garbage until the next minor collection, which is one trigger's worth.
-void cn1NurseryMarkYoungRoots(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* owner) {
-    int i;
-#ifdef CN1_NURSERY_DEBUG
-    static long long __yrPasses = 0, __yrBlocks = 0, __yrObjects = 0;
-    __yrPasses++;
-#endif
-    if(cn1NurseryStartBits == 0 || owner == 0 || owner->nurseryYoungBlocks == 0) {
-        return;
-    }
-    // OWNER'S BLOCKS ONLY, and the caller must have this thread PAUSED. nurseryYoungBlocks
-    // is the owner's own list, mutated only by the owner (cn1NurseryAlloc appends,
-    // cn1NurseryMinorCollect clears it), so reading it while the owner runs would race
-    // both the list and the blocks it names.
-    for(i = 0 ; i < owner->nurseryYoungCount ; i++) {
-        int blk = owner->nurseryYoungBlocks[i];
-        size_t b, e, g;
-        if(blk < 0 || blk >= cn1NurseryBlockCount) {
-            continue;
-        }
-        b = (size_t)blk * CN1_NURSERY_BITS_PER_BLOCK;
-        e = b + CN1_NURSERY_BITS_PER_BLOCK;
-        for(g = b ; g < e ; g++) {
-            JAVA_OBJECT o;
-            gcMarkFunctionPointer fp;
-            if(!(__atomic_load_n(&cn1NurseryStartBits[g >> 3], __ATOMIC_ACQUIRE)
-                    & (unsigned char)(1u << (g & 7)))) {
-                continue;
-            }
-            o = (JAVA_OBJECT)(cn1NurseryArenaStart + g * CN1_NURSERY_GRANULE);
-            if(o->__heapPosition != -1 || o->__codenameOneParentClsReference == 0) {
-                continue;   // promoted objects are registered and marked the normal way
-            }
-            fp = o->__codenameOneParentClsReference->markFunction;
-#ifdef CN1_NURSERY_DEBUG
-            __yrObjects++;
-#endif
-            if(fp != 0) {
-                fp(threadStateData, o, JAVA_FALSE);
-            }
-        }
-#ifdef CN1_NURSERY_DEBUG
-        __yrBlocks++;
-#endif
-    }
-#ifdef CN1_NURSERY_DEBUG
-    fprintf(stderr, "[NURSERY] youngRoots pass=%lld blocks=%lld objects=%lld\n",
-            __yrPasses, __yrBlocks, __yrObjects);
-    fflush(stderr);
-#endif
-}
-
-// Write barrier: an object reference is being stored into a non-nursery location, so
-// the value escapes the thread-local nursery and must be promoted to the global heap.
-void cn1NurseryWriteBarrier(JAVA_OBJECT target, JAVA_OBJECT value) {
-    // cn1IsYoungObject on the TARGET, never cn1InNursery: a promoted container is still
-    // physically inside the arena, and treating that as "young" skips the promotion the
-    // value needs. See cn1IsYoungObject in cn1_globals.h.
-    if(value != JAVA_NULL && cn1IsYoungObject(value) && !cn1IsYoungObject(target)) {
-        struct ThreadLocalData* threadStateData = getThreadLocalData();
-        // Re-entrancy guard: promotion walks markFunctions which can store refs and
-        // re-enter the barrier; the outermost call owns the worklist drain.
-        if(threadStateData->nurseryPromoting) {
-            cn1NurseryPromote(threadStateData, value);
-            return;
-        }
-        threadStateData->nurseryPromoting = JAVA_TRUE;
-#ifdef CN1_NURSERY_DEBUG
-        if(threadStateData->nurseryPromoteTop != 0) { cn1NurseryTopResets++; }
-#endif
-        threadStateData->nurseryPromoteTop = 0;
-        cn1NurseryPromote(threadStateData, value);
-        cn1PromoteDrain(threadStateData);
-        threadStateData->nurseryPromoting = JAVA_FALSE;
-    }
-}
-#endif
 
 void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL) {
         return;
     }
-#ifdef CN1_NURSERY
-    // The minor collection reuses array mark functions to walk arrays for promotion;
-    // there the array's mark bit is NOT claimed through gcMarkObject, so set it as the
-    // pre-existing code did.
-    if(threadStateData->nurseryPromoting) {
-        __atomic_store_n(&obj->__codenameOneGcMark, currentGcMarkValue, __ATOMIC_RELAXED);
-    }
-#endif
     // In the concurrent GC drain (serial or parallel) this array's mark bit was already
     // claimed atomically by the gcMarkObject that enqueued it. We must NOT rewrite it
     // here: a redundant non-atomic store would race with other workers reading the bit
@@ -13732,13 +12687,11 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
         // worklist to empty IS the fixed point, and the table walk can only re-find
         // objects whose mark functions have already run.
         //
-        // gcMarkObject is the ONLY writer of the current epoch during a mark. The two
-        // other stores of currentGcMarkValue in this file are not counter-examples: the
-        // one in codenameOneGCSweep is the grace rule promoting a mark==-1 survivor, and
-        // it runs AFTER the mark, when nothing drains again; the one in gcMarkArrayObject
-        // is under CN1_NURSERY (not built here) and its own comment says the concurrent
-        // drain must not take that path. If a third writer is ever added, this gate and
-        // the belt below both depend on it pushing too.
+        // gcMarkObject is the ONLY writer of the current epoch during a mark. The one
+        // other store of currentGcMarkValue in this file is not a counter-example: it is
+        // in codenameOneGCSweep, the grace rule promoting a mark==-1 survivor, and it runs
+        // AFTER the mark, when nothing drains again. If a third writer is ever added, this
+        // gate and the belt below both depend on it pushing too.
         //
         // Unconditionally it was the dominant cost of a mark and bought nothing. Measured
         // on the churn workload: 8.9 passes per cycle over a 1.9M-slot table, 16.5 MILLION
@@ -13894,23 +12847,28 @@ static int gcMarkResolveThreadCount() {
     // elsewhere in the branch GC changes (nursery / tagged-int / BiBOP sweep).
     int n = 1;
 #elif defined(_WIN32)
-    // WINDOWS STAYS SERIAL BY DEFAULT, and this is not caution for its own sake -- it is
-    // the one configuration where making marking parallel was MEASURED to break.
+    // WINDOWS STAYS SERIAL BY DEFAULT, because the parallel marker has never executed on
+    // its threading layer.
     //
-    // `ParparVM Java Tests (Windows)` / screenshot-capture (arm64) went from green to
-    // red on the commit that made marking CPU-derived: the translated app reported
-    // pass=113 fail=24 not-run=54 and emitted 132 of 166 screenshots, i.e. it stopped
-    // part-way through the suite, while the same job is green on master and was green on
-    // this branch immediately before. Every arm that validates parallel marking --
-    // the GC suite at 1 and 4 markers on arm64 and x64, and every measurement behind the
-    // defaults above -- runs on POSIX threads. Windows does not: it goes through the
-    // Win32 pthread SHIM, which the parallel marker had never run on, because this
-    // branch was hardcoded to one marker.
+    // Every arm that validates parallel marking runs on POSIX threads: the GC suite at 1
+    // and 4 markers on native arm64 Linux and on x64, and every measurement behind the
+    // defaults above. Windows does not -- it goes through the Win32 pthread SHIM, and
+    // this branch was hardcoded to one marker, so the shim has never run a marker pool
+    // at all. Unvalidated is reason enough to keep the behaviour Windows already shipped.
     //
-    // So the shim is unvalidated for this, not proven broken, and the honest default is
-    // the behaviour Windows already shipped. -DCN1_GC_MARK_THREADS=N turns it on there
-    // for whoever debugs the shim; re-enabling it by default needs that Windows job
-    // green, not a local measurement on another platform.
+    // WHAT IS NOT ESTABLISHED, and an earlier version of this comment claimed it was:
+    // `ParparVM Java Tests (Windows)` / screenshot-capture (arm64) did go from green to
+    // red across this work -- the translated app reported pass=113 fail=24 not-run=54,
+    // emitting 132 of 166 screenshots, i.e. stopping part-way through the suite, while
+    // the same job stayed green on master. But TWO things changed in that range: this
+    // branch became CPU-derived, AND the mark worklist grew to 1048576 entries (17MB of
+    // static zerofill). Either could be responsible, and the run that would have
+    // isolated the marker count was cancelled by a later push before its Windows jobs
+    // ran. Attributing the failure to the marker count alone would be a guess wearing a
+    // measurement's clothes.
+    //
+    // -DCN1_GC_MARK_THREADS=N turns it on for whoever picks up the shim; re-enabling it
+    // by default needs that Windows job green, not a measurement from another platform.
     (void)CN1_GC_MARK_THREAD_CAP;
     int n = 1;
 #else
@@ -16277,25 +15235,6 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     }
 #endif
     memcpy( (*arr).data, (*src).data, arr->length * byteSize);
-#ifdef CN1_NURSERY
-    // THE NURSERY BARRIER, bypassed here for the same reason as the SATB halves above:
-    // the memcpy publishes references with no per-element setter, so CN1_WRITE_BARRIER
-    // never runs. See the matching block in java_lang_System_arraycopy for why an
-    // unpromoted nursery reference inside a heap array is a use-after-free that only
-    // shows up once the arena has wrapped.
-    //
-    // allocArray can answer from the nursery too, so the destination is tested rather
-    // than assumed: a nursery-to-nursery clone keeps both ends young and needs nothing.
-    if(!cls->primitiveType && !cn1IsYoungObject((void*)arr)) {
-        JAVA_ARRAY_OBJECT* cn1__d = (JAVA_ARRAY_OBJECT*)(*arr).data;
-        int cn1__i;
-        for(cn1__i = 0 ; cn1__i < arr->length ; cn1__i++) {
-            if(cn1__d[cn1__i] != JAVA_NULL) {
-                cn1NurseryWriteBarrier((JAVA_OBJECT)arr, (JAVA_OBJECT)cn1__d[cn1__i]);
-            }
-        }
-    }
-#endif
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
     if(cn1__satbReg) {
         cn1SatbBulkEnd();
