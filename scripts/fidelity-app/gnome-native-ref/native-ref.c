@@ -204,6 +204,30 @@ static void write_manifest(GtkWindow *win, GtkWidget *probe_widget) {
 }
 
 
+/* Pumps the main loop until the widget has a real allocation, or gives up.
+ *
+ * A fixed number of g_main_context_iteration(NULL, FALSE) calls is NOT enough and that is
+ * how the first capture run failed: non-blocking iteration returns immediately when
+ * nothing is pending, GTK allocates on a frame-clock tick that has not been scheduled yet,
+ * and every tile after the first was read back at 0x0 and reported "was never laid out".
+ * The first tile survived only because the initial present had laid it out.
+ *
+ * So wait on the CONDITION rather than on a count. The sleep is what lets the frame clock
+ * actually fire; 2ms x 400 is 800ms of headroom per tile, and in practice it takes a
+ * handful of turns. */
+static int wait_for_allocation(GtkWidget *w) {
+    for (int i = 0; i < 400; i++) {
+        while (g_main_context_iteration(NULL, FALSE)) {
+            /* drain whatever is pending */
+        }
+        if (gtk_widget_get_width(w) > 0 && gtk_widget_get_height(w) > 0) {
+            return 1;
+        }
+        g_usleep(2000);
+    }
+    return 0;
+}
+
 /* Renders a widget through the window's OWN GskRenderer -- the same renderer that painted
  * it on screen -- rather than grabbing X11 pixels. The widget is realized, allocated and
  * state-flagged inside a real mapped window, so measurement and CSS state resolution are
@@ -372,8 +396,13 @@ static void capture_appearance(GtkWindow *win, const char *appearance) {
     adw_style_manager_set_color_scheme(sm,
             strcmp(appearance, "dark") == 0 ? ADW_COLOR_SCHEME_FORCE_DARK
                                             : ADW_COLOR_SCHEME_FORCE_LIGHT);
-    for (int i = 0; i < 40; i++) {
-        g_main_context_iteration(NULL, FALSE);
+    /* Let the style change propagate. Adwaita restyles every widget from the colour
+     * scheme, and a tile captured mid-transition carries the previous palette. */
+    for (int i = 0; i < 50; i++) {
+        while (g_main_context_iteration(NULL, FALSE)) {
+            /* drain */
+        }
+        g_usleep(2000);
     }
 
     for (int s = 0; s < SPEC_COUNT; s++) {
@@ -387,8 +416,9 @@ static void capture_appearance(GtkWindow *win, const char *appearance) {
                 continue;
             }
             gtk_window_set_child(win, tile);
-            for (int i = 0; i < 20; i++) {
-                g_main_context_iteration(NULL, FALSE);
+            if (!wait_for_allocation(tile)) {
+                blocker("%s was never allocated; GTK did not lay the tile out", name);
+                continue;
             }
             capture_widget(win, tile, name);
         }
@@ -425,8 +455,8 @@ static gboolean on_ready(gpointer data) {
         GtkWidget *tile = build_tile(&SPECS[0], "normal");
         if (tile) {
             gtk_window_set_child(win, tile);
-            for (int i = 0; i < 20; i++) {
-                g_main_context_iteration(NULL, FALSE);
+            if (!wait_for_allocation(tile)) {
+                blocker("the probe tile was never allocated");
             }
             capture_widget(win, tile, "probe_DesktopButton_normal_light");
         } else {

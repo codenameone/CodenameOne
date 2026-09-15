@@ -441,10 +441,15 @@ public partial class App : Application
     {
         foreach (var appearance in new[] { "light", "dark" })
         {
-            if (_window.Content is FrameworkElement rootEl)
+            bool dark = appearance == "dark";
+            await OnUiAsync(() =>
             {
-                rootEl.RequestedTheme = appearance == "dark" ? ElementTheme.Dark : ElementTheme.Light;
-            }
+                if (_window.Content is FrameworkElement rootEl)
+                {
+                    rootEl.RequestedTheme = dark ? ElementTheme.Dark : ElementTheme.Light;
+                }
+                return true;
+            });
             await WaitForFramesAsync(3);
 
             foreach (var spec in Specs)
@@ -452,39 +457,49 @@ public partial class App : Application
                 foreach (var state in spec.States)
                 {
                     var name = $"{spec.Id}_{state}_{appearance}";
-                    var widget = MakeWidget(spec.Kind);
+                    var widget = await OnUiAsync<FrameworkElement>(() =>
+                    {
+                        var w = MakeWidget(spec.Kind);
+                        if (w is null)
+                        {
+                            return null;
+                        }
+                        w.HorizontalAlignment = IsFullWidth(spec.Kind)
+                            ? HorizontalAlignment.Stretch
+                            : HorizontalAlignment.Left;
+                        w.VerticalAlignment = VerticalAlignment.Top;
+                        w.Margin = new Thickness(0);
+
+                        var host = new Grid
+                        {
+                            Width = TileW,
+                            Height = TileH,
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            VerticalAlignment = VerticalAlignment.Top,
+                            // The tile surface. Left transparent the Mica backdrop shows
+                            // through, which is a different surface from the one the CN1
+                            // tiles are painted on and would be compared against the wrong
+                            // thing.
+                            Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
+                            RequestedTheme = dark ? ElementTheme.Dark : ElementTheme.Light,
+                        };
+                        host.Children.Add(w);
+                        _tileHost.Children.Clear();
+                        _tileHost.Children.Add(host);
+                        return w;
+                    });
                     if (widget is null)
                     {
                         _blockers.Add($"{name}: unknown native_win kind '{spec.Kind}'");
                         continue;
                     }
-                    widget.HorizontalAlignment = IsFullWidth(spec.Kind)
-                        ? HorizontalAlignment.Stretch
-                        : HorizontalAlignment.Left;
-                    widget.VerticalAlignment = VerticalAlignment.Top;
-                    widget.Margin = new Thickness(0);
-
-                    var host = new Grid
-                    {
-                        Width = TileW,
-                        Height = TileH,
-                        HorizontalAlignment = HorizontalAlignment.Left,
-                        VerticalAlignment = VerticalAlignment.Top,
-                        // The tile surface. Left transparent the Mica backdrop shows through,
-                        // which is a different surface from the one the CN1 tiles are painted
-                        // on and would be compared against the wrong thing.
-                        Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
-                        RequestedTheme = appearance == "dark" ? ElementTheme.Dark : ElementTheme.Light,
-                    };
-                    host.Children.Add(widget);
-                    _tileHost.Children.Clear();
-                    _tileHost.Children.Add(host);
 
                     // After the tree is live: a visual state cannot be applied to a control
                     // that has not had its template expanded yet, and GoToState returns false
                     // if it is tried too early.
                     await WaitForFramesAsync(2);
-                    if (!ApplyState(widget, state, spec.Kind, name))
+                    bool applied = await OnUiAsync(() => ApplyState(widget, state, spec.Kind, name));
+                    if (!applied)
                     {
                         continue;
                     }
@@ -507,9 +522,36 @@ public partial class App : Application
         }
     }
 
+    /// Runs a piece of XAML work on the UI thread and returns its result.
+    ///
+    /// Every XAML touch in the capture loop goes through this, and that is not defensive
+    /// style: the first capture run crashed with RPC_E_WRONGTHREAD (0x8001010E) reading
+    /// _window.Content, because an await earlier in the run had resumed the continuation
+    /// on a ThreadPool thread and XAML objects have hard thread affinity. Win32 is thread
+    /// agnostic and deliberately stays outside this -- GetClientRect and BitBlt do not care
+    /// which thread calls them.
+    private Task<T> OnUiAsync<T>(Func<T> work)
+    {
+        var tcs = new TaskCompletionSource<T>();
+        var queue = _window.DispatcherQueue;
+        if (queue is null || !queue.TryEnqueue(() =>
+            {
+                try { tcs.TrySetResult(work()); }
+                catch (Exception ex) { tcs.TrySetException(ex); }
+            }))
+        {
+            tcs.TrySetException(new InvalidOperationException(
+                "the UI dispatcher queue refused the work; the window is gone"));
+        }
+        return tcs.Task;
+    }
+
     /// Waits for n genuinely composed frames. Not Task.Delay: on a loaded runner a fixed
     /// sleep is either wasteful or too short, and too short here means capturing the
     /// previous tile.
+    ///
+    /// The subscription itself is made on the UI thread -- CompositionTarget.Rendering is
+    /// XAML and has the same affinity as everything else here.
     private async Task WaitForFramesAsync(int n)
     {
         var drawn = new TaskCompletionSource<bool>();
@@ -523,9 +565,9 @@ public partial class App : Application
                 drawn.TrySetResult(true);
             }
         };
-        CompositionTarget.Rendering += onFrame;
+        await OnUiAsync(() => { CompositionTarget.Rendering += onFrame; return true; });
         await Task.WhenAny(drawn.Task, Task.Delay(3000));
-        CompositionTarget.Rendering -= onFrame;
+        await OnUiAsync(() => { CompositionTarget.Rendering -= onFrame; return true; });
     }
 
     /// BitBlts the client area, which is held at exactly one tile, and writes it.
