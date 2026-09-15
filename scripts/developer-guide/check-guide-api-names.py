@@ -81,7 +81,7 @@ WORD = re.compile(
     r'\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b'
     # As a link label that is exactly the name: Image.html[Iamge]. A label
     # with more words in it is read by JAVADOC_LABEL below.
-    r'|\[([A-Z][A-Za-z0-9]{4,})\]'
+    r'|\[([A-Z][A-Za-z0-9]{3,})\]'
     # Reading a member off it: Iamge.createImage().
     r'|\b([A-Z][a-z]{4,})\s*\.\s*[a-z][A-Za-z0-9]*\s*\(')
 # A code span is read whole rather than from its first word, because the name
@@ -96,7 +96,10 @@ WORD = re.compile(
 JAVADOC_LABEL = re.compile(
     r'codenameone\.com/javadoc/[A-Za-z0-9/.]+\.html\[([^\]\n]{1,200})\]')
 CODE_SPAN = re.compile(r'`([^`\n]{1,400})`')
-SPAN_NAME = re.compile(r'(?<![-/\w])([A-Z][A-Za-z0-9]{4,})\b')
+# Four characters, not five: a five-character class that loses one is four
+# long, and `new Imag()` was never even extracted. The candidate still has to
+# be five, so this only widens what is looked AT, not what it is compared to.
+SPAN_NAME = re.compile(r'(?<![-/\w])([A-Z][A-Za-z0-9]{3,})\b')
 # Used where only a class can go: after `new`, or with a member read off it.
 # That is the difference between `new Buttons()`, which is a class that does
 # not exist, and `Worlds` or `Get All Subscription Statuses`, which are a
@@ -540,6 +543,12 @@ def main():
             if near is None:
                 continue
             tied, distance = near
+            if len(word) < SHORTEST_DISTINGUISHING_NAME and distance > 1:
+                # A short word is read so that a five-character class losing a
+                # character -- Imag for Image -- is looked at, but two edits
+                # from something that short is no longer a resemblance: Matt,
+                # a name in the credits, is two from the class Mat22.
+                continue
             # The first alphabetically is what the message names, and every
             # tied class decides the rule: if any of them is a rearrangement
             # the word is treated as one, so the answer cannot depend on which
