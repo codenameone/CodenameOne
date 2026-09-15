@@ -112,6 +112,72 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void rejectsAFlavourValueItDoesNotUnderstand() throws Exception {
+        // "true".equalsIgnoreCase(v) reads EVERY other spelling as false, so a
+        // typo silently selected the client flavour and skipped the
+        // both-runtimes guard -- a green build and a packaged server with none
+        // of its backend registrations.
+        String previous = System.getProperty("cn1.backendOrm");
+        System.setProperty("cn1.backendOrm", "ture");
+        try {
+            File classes = tmp.newFolder("classes");
+            JavaSourceCompiler.compile(
+                    JavaSourceCompiler.singleSource("com.example.Typo",
+                            "package com.example;\n"
+                                    + "import com.codename1.annotations.*;\n"
+                                    + "@Entity public class Typo {\n"
+                                    + "    @Id public long id;\n"
+                                    + "    public Typo() {}\n"
+                                    + "}\n"),
+                    classes, Arrays.asList(testClassesDir()));
+            ProcessorContext ctx = runProcessor(classes);
+            assertTrue("a flavour value that is neither true nor false must be refused",
+                    ctx.hasErrors());
+        } finally {
+            if (previous == null) {
+                System.clearProperty("cn1.backendOrm");
+            } else {
+                System.setProperty("cn1.backendOrm", previous);
+            }
+        }
+    }
+
+    @Test
+    public void acceptsBothSpellingsOfTheFlavour() throws Exception {
+        // THE CONTROL: the refusal above must not be "anything set is refused".
+        String previous = System.getProperty("cn1.backendOrm");
+        try {
+            String[] values = new String[] {"true", "false", "TRUE", "False"};
+            for (int iter = 0; iter < values.length; iter++) {
+                String value = values[iter];
+                System.setProperty("cn1.backendOrm", value);
+                // Numbered, not named after the value: "true" and "TRUE" are the
+                // same folder on a case-insensitive filesystem, which is most of
+                // the machines this runs on.
+                File classes = tmp.newFolder("classes-" + iter);
+                JavaSourceCompiler.compile(
+                        JavaSourceCompiler.singleSource("com.example.Fine",
+                                "package com.example;\n"
+                                        + "import com.codename1.annotations.*;\n"
+                                        + "@Entity public class Fine {\n"
+                                        + "    @Id public long id;\n"
+                                        + "    public Fine() {}\n"
+                                        + "}\n"),
+                        classes, Arrays.asList(testClassesDir()));
+                ProcessorContext ctx = runProcessor(classes);
+                assertFalse("-Dcn1.backendOrm=" + value + " is a value this accepts",
+                        ctx.hasErrors());
+            }
+        } finally {
+            if (previous == null) {
+                System.clearProperty("cn1.backendOrm");
+            } else {
+                System.setProperty("cn1.backendOrm", previous);
+            }
+        }
+    }
+
+    @Test
     public void rejectsANestedEntity() throws Exception {
         // A public static member class can have a public no-arg constructor, so
         // this used to be ACCEPTED and then generated a dao naming the entity by
