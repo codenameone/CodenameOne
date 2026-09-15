@@ -1962,3 +1962,55 @@ elements are not boxed.
 only about the VM if the arm being measured is the arm that ships. Two figures in one
 session were quoted from a configuration nobody runs -- an -O1 gate binary would have been
 a third. `ForEachBench`'s javadoc now carries the LTO requirement and the scaling check.
+
+## Round 14: the whole-program ratio did NOT move, and that is the useful result
+
+Full self-hosting workload, shipping shape (`build-selfhost.sh -O3`, which implies
+`-flto=thin`), subject `parpar-O3`, 5 interleaved rounds, time = min, memory = MAX
+phys_footprint. **834 files identical across all three arms**, so the ratios are also a
+correctness result.
+
+Two runs, three minutes apart:
+
+| | run 1 (load 8.5) | run 2 (load 14.0) | recorded FINAL baseline |
+|---|---|---|---|
+| parpar time | 1.22s | 1.36s | 0.88s |
+| jdk25 time | 0.93s | 0.94s | 0.65s |
+| jdk8 time | 1.18s | 1.18s | 0.91s |
+| **vs jdk25 time** | **1.31x** | **1.45x** | 1.35x |
+| parpar peak | 1262 MB | 1562 MB | 835 MB |
+| jdk25 peak | 709 MB | - | 525 MB |
+| **vs jdk25 memory** | **1.78x** | **2.22x** | 1.59x |
+
+**Neither run is trustworthy in absolute terms and the two do not agree**, so the honest
+statement is a range: time 1.31-1.45x JDK 25, memory 1.78-2.22x. The machine had Spotlight
+indexing, a CN1 simulator and another checkout's `core-unittests verify` running; this file
+already records that this host cannot resolve 5%.
+
+Worth noting even so: **the parpar arm is far more load-sensitive than the JVM's.** Its
+samples spread 1.36-1.83s in run 2 while JDK 25 stayed 0.94-1.05s, and its peak footprint
+moved 1050-1262 MB inside a single quiet-ish run. A concurrent collector with CPU-derived
+marker threads loses more to contention than a JVM does, which is itself a finding: any
+whole-program ratio from this harness on a busy machine is biased AGAINST parpar.
+
+### The for-each work is worth ~3% here, and that was predictable
+
+Round 13 made a pure-iteration loop **3x faster than JDK 25**. The whole-program ratio is
+unchanged against the 1.35x baseline. That is not a contradiction and not a measurement
+failure -- it is the difference between a microbenchmark and a workload:
+
+- earlier profiling put ITERATION at **19.3%** of main-thread time;
+- the rewrite fires on **71 of ~295** for-each sites, i.e. ~24%;
+- so the reachable whole-program gain is roughly `0.193 * 0.24 * (2/3)` = **~3%**,
+
+which is below this host's resolution and consistent with seeing nothing. **The
+microbenchmark was never evidence about transpilation throughput**, and quoting it as
+such would have been the third configuration error in one session.
+
+So: the remaining 1.3-1.45x is not iterator dispatch, and it is not frame overhead. What
+is left to attack is what the profile says is left -- and the next measurement worth
+taking is a fresh `-DCN1_GC_CONFORM` attribution on a QUIET machine, not more loop work.
+Memory is now the larger gap of the two (1.78x+ against 1.31x), and D1/D2 in the plan --
+taking BiBOP pages from mmap so the 92.9 MB of malloc-retained free space is returnable,
+and sizing the reference-field share of the live heap -- are still untouched and are where
+the 700 MB delta actually lives.
