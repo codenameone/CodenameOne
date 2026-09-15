@@ -530,7 +530,19 @@ def main():
             # and each would be reported. So a name that is a real identifier
             # in this repository is accepted wherever it appears; what the
             # position changes is the plural rule above.
-            vouched = code if distance == 1 else anywhere
+            # One edit away, or the same letters in a different order, and a
+            # comment cannot vouch for it: those are what a typo looks like,
+            # and a typo copied into a comment was vouching for itself --
+            # which is how `ConectionRequest` survived in both the io chapter
+            # and the javadoc of com.codename1.io.
+            #
+            # Two edits that are NOT a rearrangement are how a foreign name
+            # looks: SFSpeechRecognizer beside SpeechRecognizer, IPsec beside
+            # Inset, Overridden beside Override. Requiring code for those
+            # reports all seven of them, so there a comment is evidence
+            # enough.
+            rearranged = sorted(word.lower()) == sorted(candidate.lower())
+            vouched = code if distance == 1 or rearranged else anywhere
             if word not in vouched:
                 typos.append((name, word, candidate))
 
