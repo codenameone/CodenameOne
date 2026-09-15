@@ -272,6 +272,32 @@ public abstract class Dialect {
     }
 
     /**
+     * One ORDER BY term, with NULLs placed the same way on every engine.
+     *
+     * <p>The engines disagree by default, measured over one null and two values:
+     *
+     * <pre>
+     *                   ASC       DESC
+     *   sqlite          null,a,b  b,a,null
+     *   postgresql      a,b,null  null,b,a
+     *   mysql           null,a,b  b,a,null
+     * </pre>
+     *
+     * <p>So {@code orderBy("name", true).first()} answered the null row on two
+     * engines and a real one on the third. NULL sorts LOWEST here -- first
+     * ascending, last descending -- which is what SQLite and MySQL already do,
+     * and PostgreSQL is brought to match rather than the other way round
+     * because two of three and the usual reading of NULL agree on it.
+     *
+     * <p>MySQL cannot say NULLS FIRST at all: it answers a syntax error, so the
+     * order is expressed there as a leading {@code (col IS NULL)} term, which is
+     * the documented way to get the same effect.
+     */
+    public String orderBy(String quotedColumn, boolean ascending) {
+        return quotedColumn + (ascending ? " ASC NULLS FIRST" : " DESC NULLS LAST");
+    }
+
+    /**
      * Whether anything follows the first statement in {@code sql}.
      *
      * <p>What {@link com.codename1.backend.Database} refuses before dispatching,
@@ -638,6 +664,15 @@ public abstract class Dialect {
          * than letting the same entity work on two and fail on the third. See
          * Table.MAX_ASSIGNED_TEXT_KEY.
          */
+        public String orderBy(String quotedColumn, boolean ascending) {
+            // NULLS FIRST is a syntax error here, so the same placement is spelled
+            // with the boolean term MySQL's own documentation gives for it:
+            // (col IS NULL) is 1 for a null and 0 otherwise, so ordering that
+            // DESC puts the nulls first and ASC puts them last.
+            return "(" + quotedColumn + " IS NULL) " + (ascending ? "DESC" : "ASC")
+                    + ", " + quotedColumn + (ascending ? " ASC" : " DESC");
+        }
+
         public String assignedKeyColumn(int kind) {
             if(kind == TEXT) {
                 // BINARY COLLATION, because MySQL's default one is case AND

@@ -409,4 +409,22 @@ class DialectTest {
         assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL PRIMARY KEY",
                 Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
     }
+
+    @Test
+    @DisplayName("a null sorts lowest on every engine, however the engine spells it")
+    void ordersNullsTheSameWay() {
+        // Measured over one null and two values, the defaults disagreed: SQLite
+        // and MySQL put the null first ascending, PostgreSQL put it last. So
+        // orderBy(field, true).first() answered a different row after a move to
+        // production. NULL sorts LOWEST now, which is what two of the three
+        // already did.
+        assertEquals("\"v\" ASC NULLS FIRST", Dialect.SQLITE.orderBy("\"v\"", true));
+        assertEquals("\"v\" DESC NULLS LAST", Dialect.SQLITE.orderBy("\"v\"", false));
+        assertEquals("\"v\" ASC NULLS FIRST", Dialect.POSTGRES.orderBy("\"v\"", true));
+        assertEquals("\"v\" DESC NULLS LAST", Dialect.POSTGRES.orderBy("\"v\"", false));
+        // MySQL answers a syntax error to NULLS FIRST, so the same placement is
+        // spelled with the boolean term its own documentation gives.
+        assertEquals("(`v` IS NULL) DESC, `v` ASC", Dialect.MYSQL.orderBy("`v`", true));
+        assertEquals("(`v` IS NULL) ASC, `v` DESC", Dialect.MYSQL.orderBy("`v`", false));
+    }
 }

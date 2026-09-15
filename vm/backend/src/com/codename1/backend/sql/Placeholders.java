@@ -496,6 +496,7 @@ final class Placeholders {
                                         boolean executableComments) throws IOException {
         int at = 0;
         int blocks = 0;
+        int cases = 0;
         int length = sql.length();
         while(at < length) {
             int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
@@ -542,8 +543,22 @@ final class Placeholders {
                 at += 5;
                 continue;
             }
+            if(isWord(sql, at, "case")) {
+                // A CASE EXPRESSION ENDS WITH "END" TOO, and counting that END
+                // against the trigger body closed the body early: the semicolon
+                // after it then read as a statement boundary and
+                // "CREATE TRIGGER ... BEGIN UPDATE t SET v = CASE ... END; END"
+                // -- one statement -- was refused as two.
+                cases++;
+                at += 4;
+                continue;
+            }
             if(isWord(sql, at, "end")) {
-                if(blocks > 0) {
+                // Innermost first: an END closes the CASE it belongs to before
+                // it can close the block around it.
+                if(cases > 0) {
+                    cases--;
+                } else if(blocks > 0) {
                     blocks--;
                 }
                 at += 3;

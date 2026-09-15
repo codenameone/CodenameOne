@@ -307,6 +307,27 @@ public class OrmCheck {
                 String.valueOf(notes.query().in("title",
                         new Object[] {"low", "LOW"}).count()));
 
+        // WHERE A NULL SORTS. Measured over one null and two values, the
+        // engines disagreed by default: SQLite and MySQL put the null first
+        // ascending, PostgreSQL put it last -- so orderBy(..., true).first()
+        // answered the null row on two engines and a real one on the third.
+        // NULL sorts LOWEST now on all three, which is what two of them already
+        // did. `body` is null on every row this method inserted except none, so
+        // the ordering is done on a column that really has one.
+        notes.query().delete();
+        notes.insert(note("first", 1, false, 1000L));
+        Note withBody = note("second", 2, false, 2000L);
+        withBody.body = "text";
+        notes.insert(withBody);
+        check("a null sorts first ascending", "null",
+                String.valueOf(notes.query().orderBy("body", true).first().body));
+        check("and last descending", "text",
+                String.valueOf(notes.query().orderBy("body", false).first().body));
+        notes.query().delete();
+        notes.insert(note("low", 1, false, 1000L));
+        notes.insert(note("high", 10, true, 2000L));
+        notes.insert(note("mid", 5, false, 3000L));
+
         // LIKE IS NOT, AND THAT IS A KNOWN GAP. SQLite folds ASCII case in LIKE
         // by default while PostgreSQL does not, so "lo%" matches "LOW" on SQLite
         // alone. Pinned per engine rather than left silent: this is the one
