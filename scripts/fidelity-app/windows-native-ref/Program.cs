@@ -114,6 +114,10 @@ public partial class App : Application
     private readonly Dictionary<string, string> _normalHashes = new();
     private readonly List<string> _identicalToNormal = new();
 
+    /// Backdrop colour sampled from each appearance's tiles, and the check that the two
+    /// are not the same. See AssertAppearancesDiffer().
+    private readonly Dictionary<string, string> _backdropByAppearance = new();
+
     /// One row of the desktop matrix. Kind is the native_win key in fidelity-tests.yaml,
     /// and the ids and states are that file's too: the two lists must agree or the
     /// comparator pairs a CN1 render against nothing.
@@ -490,15 +494,17 @@ public partial class App : Application
                             // through, which is a different surface from the one the CN1
                             // tiles are painted on and would be compared against the wrong
                             // thing.
-                            Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
+                            // The backdrop comes from a Style carrying a {ThemeResource}
+                            // (App.xaml, TileHostStyle) rather than from a brush read out of
+                            // Application.Current.Resources here. That read resolves against
+                            // the application dictionary once and does no element-theme
+                            // resolution, so the dark half of the set was captured as dark
+                            // controls on the LIGHT #F3F3F3 surface -- a backdrop no Windows
+                            // 11 application ever shows, and one the CN1 side could never
+                            // have matched.
+                            Style = (Style)Application.Current.Resources["TileHostStyle"],
                             // NOT RequestedTheme here. The root already carries it and the
-                            // tile inherits, and setting it a second time on a child that is
-                            // about to be added re-runs template application AFTER the visual
-                            // state has been set -- which silently resets PointerOver to
-                            // Normal. Measured: with it, the dark hover tiles for Button,
-                            // TextBox and ComboBox came out byte-identical to their normal
-                            // tiles while the light ones differed, which is not a difference
-                            // any platform actually has.
+                            // tile inherits it.
                         };
                         host.Children.Add(w);
                         _tileHost.Children.Clear();
@@ -537,6 +543,8 @@ public partial class App : Application
             }
         }
 
+        AssertAppearancesDiffer();
+
         int expected = 0;
         foreach (var spec in Specs)
         {
@@ -572,6 +580,37 @@ public partial class App : Application
                 "the UI dispatcher queue refused the work; the window is gone"));
         }
         return tcs.Task;
+    }
+
+    /// Fails the run when the light and dark passes were captured on the same backdrop.
+    ///
+    /// This is here because it happened. The tile background was read as
+    /// Application.Current.Resources["SolidBackgroundFillColorBaseBrush"], which resolves
+    /// against the application dictionary once and does no element-theme resolution, so the
+    /// controls went dark and the surface behind them stayed light #F3F3F3. Sixty tiles,
+    /// zero blockers, a manifest that said "capture", and half the set on a backdrop no
+    /// Windows 11 application ever shows.
+    ///
+    /// Nothing downstream would have caught it either: the CN1 side renders its dark tiles
+    /// on the real dark surface, so the pair would simply have scored badly and read as a
+    /// theme that needed work.
+    private void AssertAppearancesDiffer()
+    {
+        if (_backdropByAppearance.Count < 2)
+        {
+            return;
+        }
+        var distinct = new HashSet<string>(_backdropByAppearance.Values);
+        if (distinct.Count == 1)
+        {
+            _blockers.Add("the light and dark passes were both captured on backdrop "
+                + distinct.First() + ": the appearance did not actually change, so half the "
+                + "set is mislabelled");
+        }
+        foreach (var kv in _backdropByAppearance)
+        {
+            Console.WriteLine($"NATIVEREF:INFO {kv.Key} backdrop {kv.Value}");
+        }
     }
 
     /// Records whether a state tile is byte-identical to its own normal tile.
@@ -666,6 +705,11 @@ public partial class App : Application
             _tilesWritten++;
             Console.WriteLine($"NATIVEREF:wrote {name} {w}x{h}");
             NoteIfIdenticalToNormal(name, path);
+            // Bottom-right corner: every widget in the matrix anchors top-left and none is
+            // as tall as the tile, so this pixel is always backdrop.
+            var corner = image.GetPixel(image.Width - 1, image.Height - 1);
+            var appearanceKey = name.Substring(name.LastIndexOf('_') + 1);
+            _backdropByAppearance[appearanceKey] = $"#{corner.R:X2}{corner.G:X2}{corner.B:X2}";
         }
         finally
         {
@@ -1113,6 +1157,9 @@ public partial class App : Application
         sb.AppendLine($"    \"segoe_ui_variable_installed\": {Json(segoeVariable)}");
         sb.AppendLine("  },");
         sb.AppendLine($"  \"tiles_written\": {_tilesWritten},");
+        sb.Append("  \"backdrop_by_appearance\": {");
+        sb.Append(string.Join(", ", _backdropByAppearance.Select(kv => $"\"{Escape(kv.Key)}\": \"{Escape(kv.Value)}\"")));
+        sb.AppendLine("},");
         sb.Append("  \"states_identical_to_normal\": [");
         sb.Append(string.Join(", ", _identicalToNormal.Select(n => $"\"{Escape(n)}\"")));
         sb.AppendLine("],");

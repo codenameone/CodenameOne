@@ -66,6 +66,11 @@ static int normal_count = 0;
 static char identical[CN1_MAX_IDENTICAL][128];
 static int identical_count = 0;
 
+/* Backdrop colour sampled from each appearance's tiles. See assert_appearances_differ. */
+static char backdrop_light[16] = "";
+static char backdrop_dark[16] = "";
+
+
 static void note_if_identical_to_normal(const char *name, const char *path) {
     char id[96], state[32], appearance[32];
     const char *u2 = strrchr(name, '_');
@@ -178,6 +183,26 @@ static void blocker(const char *fmt, ...) {
     exit_code = 20;
 }
 
+/* Fails the run when the light and dark passes were captured on the same backdrop.
+ *
+ * This is here because it happened on the Windows reference: the tile background was read
+ * from a dictionary that does no element-theme resolution, so the controls went dark and
+ * the surface behind them stayed light. Sixty tiles, zero blockers, and half the set on a
+ * backdrop the platform never shows. Nothing downstream catches it either -- the CN1 side
+ * renders its dark tiles on the real dark surface, so the pair simply scores badly and
+ * reads as a theme that needs work. */
+static void assert_appearances_differ(void) {
+    if (backdrop_light[0] && backdrop_dark[0]) {
+        printf("NATIVEREF:INFO light backdrop %s, dark backdrop %s\n",
+               backdrop_light, backdrop_dark);
+        if (strcmp(backdrop_light, backdrop_dark) == 0) {
+            blocker("the light and dark passes were both captured on backdrop %s: the "
+                    "appearance did not actually change, so half the set is mislabelled",
+                    backdrop_light);
+        }
+    }
+}
+
 static char *json_escape(const char *s) {
     GString *o = g_string_new("");
     for (; s && *s; s++) {
@@ -274,6 +299,8 @@ static void write_manifest(GtkWindow *win, GtkWidget *probe_widget) {
      * variable-length arrays, and the manifest previously carried NO blockers field at
      * all -- so a consumer reading it could not tell "no blockers" from "this manifest
      * does not report them", which the Windows one does report. */
+    fprintf(f, "  \"backdrop_by_appearance\": {\"light\": \"%s\", \"dark\": \"%s\"},\n",
+            backdrop_light, backdrop_dark);
     fprintf(f, "  \"states_identical_to_normal\": [");
     for (int i = 0; i < identical_count; i++) {
         fprintf(f, "%s\"%s\"", i ? ", " : "", identical[i]);
@@ -349,6 +376,27 @@ static void capture_widget(GtkWindow *win, GtkWidget *w, const char *name) {
         tiles_written++;
         printf("NATIVEREF:wrote %s %dx%d\n", name, width, height);
         note_if_identical_to_normal(name, path);
+        /* Bottom-right corner: every widget in the matrix anchors top-left and none is as
+         * tall as the tile, so this pixel is always backdrop. */
+        GdkTexture *t2 = gdk_texture_new_from_filename(path, NULL);
+        if (t2) {
+            GBytes *bytes = NULL;
+            int tw = gdk_texture_get_width(t2), th = gdk_texture_get_height(t2);
+            guchar *data = g_malloc((gsize) tw * th * 4);
+            gdk_texture_download(t2, data, (gsize) tw * 4);
+            guchar *px = data + ((gsize) (th - 1) * tw * 4) + (gsize) (tw - 1) * 4;
+            char hex[16];
+            /* gdk_texture_download writes BGRA. */
+            snprintf(hex, sizeof(hex), "#%02X%02X%02X", px[2], px[1], px[0]);
+            if (strstr(name, "_light")) {
+                g_strlcpy(backdrop_light, hex, sizeof(backdrop_light));
+            } else if (strstr(name, "_dark")) {
+                g_strlcpy(backdrop_dark, hex, sizeof(backdrop_dark));
+            }
+            g_free(data);
+            (void) bytes;
+            g_object_unref(t2);
+        }
     }
     g_object_unref(tex);
     gsk_render_node_unref(node);
@@ -575,6 +623,7 @@ static gboolean on_ready(gpointer data) {
     } else {
         capture_appearance(win, "light");
         capture_appearance(win, "dark");
+        assert_appearances_differ();
         int expected = 0;
         for (int s = 0; s < SPEC_COUNT; s++) {
             for (int j = 0; SPECS[s].states[j]; j++) {

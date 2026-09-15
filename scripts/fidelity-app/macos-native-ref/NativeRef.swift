@@ -115,6 +115,8 @@ final class RefApp: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     var host: NSView!
     var written = 0
+    /// Backdrop colour sampled from each appearance's tiles. See assertAppearancesDiffer().
+    var backdropByAppearance: [String: String] = [:]
 
     func applicationDidFinishLaunching(_ note: Notification) {
         // .regular so the app can actually become frontmost. An NSWindow that is not key
@@ -348,6 +350,13 @@ final class RefApp: NSObject, NSApplicationDelegate {
             try png.write(to: URL(fileURLWithPath: path))
             written += 1
             print("NATIVEREF:wrote \(name) \(rep.pixelsWide)x\(rep.pixelsHigh)")
+            // Bottom-right corner: every widget in the matrix anchors top-left and none is
+            // as tall as the tile, so this pixel is always backdrop.
+            if let c = rep.colorAt(x: rep.pixelsWide - 1, y: rep.pixelsHigh - 1),
+               let appearance = name.split(separator: "_").last {
+                backdropByAppearance[String(appearance)] = String(format: "#%02X%02X%02X",
+                    Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255))
+            }
         } catch {
             blocker("\(name) could not be written: \(error)")
         }
@@ -377,6 +386,27 @@ final class RefApp: NSObject, NSApplicationDelegate {
                 }
                 write(img, name)
             }
+        }
+    }
+
+    /// Fails the run when the light and dark passes were captured on the same backdrop.
+    ///
+    /// This is here because it happened. On this file it was NSColor.windowBackgroundColor
+    /// read as `.cgColor`, which resolves against NSAppearance.current rather than the
+    /// appearance being set, so on a Mac in Dark Mode the whole light pass came out dark.
+    /// On the Windows reference it was the same shape of mistake in a different API. Both
+    /// produced a full tile count and zero blockers.
+    ///
+    /// Nothing downstream catches it: the CN1 side renders its tiles on the real surface
+    /// for each appearance, so the pair simply scores badly and reads as a theme that needs
+    /// work rather than as a reference that was captured wrong.
+    func assertAppearancesDiffer() {
+        for (appearance, colour) in backdropByAppearance.sorted(by: { $0.key < $1.key }) {
+            print("NATIVEREF:INFO \(appearance) backdrop \(colour)")
+        }
+        if Set(backdropByAppearance.values).count == 1, let only = backdropByAppearance.values.first {
+            blocker("the light and dark passes were both captured on backdrop \(only): the "
+                + "appearance did not actually change, so half the set is mislabelled")
         }
     }
 
@@ -415,6 +445,7 @@ final class RefApp: NSObject, NSApplicationDelegate {
         } else {
             captureAppearance("light")
             captureAppearance("dark")
+            assertAppearancesDiffer()
             let expected = SPECS.reduce(0) { $0 + $1.states.count } * 2
             if written != expected {
                 blocker("wrote \(written) tiles, expected \(expected): a partial set would be "
@@ -453,6 +484,7 @@ final class RefApp: NSObject, NSApplicationDelegate {
           "golden_set": "\(jsonEscape(goldenSet))",
           "mode": "\(isProbe ? "probe" : "capture")",
           "tiles_written": \(written),
+          "backdrop_by_appearance": {\(backdropByAppearance.sorted(by: { $0.key < $1.key }).map { "\"\($0.key)\": \"\($0.value)\"" }.joined(separator: ", "))},
           "os": {
             "version": "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
             "build": "\(jsonEscape(ProcessInfo.processInfo.operatingSystemVersionString))"

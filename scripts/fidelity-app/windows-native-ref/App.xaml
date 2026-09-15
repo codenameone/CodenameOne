@@ -27,6 +27,21 @@
             <ResourceDictionary.MergedDictionaries>
                 <controls:XamlControlsResources />
             </ResourceDictionary.MergedDictionaries>
+
+            <!--
+                The tile backdrop, and it has to be declared HERE rather than assigned in
+                code. Application.Current.Resources["SolidBackgroundFillColorBaseBrush"]
+                resolves against the application dictionary once, with no element-theme
+                resolution, so a tile whose RequestedTheme is Dark still got the LIGHT
+                brush: the dark half of the set was captured as dark controls on the light
+                #F3F3F3 surface, which is a backdrop no Windows 11 app ever shows.
+
+                A Setter with {ThemeResource} is resolved when the style is applied, against
+                the element's effective theme, which is the behaviour this needs.
+            -->
+            <Style x:Key="TileHostStyle" TargetType="Grid">
+                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
