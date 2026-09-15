@@ -677,6 +677,21 @@ class DatabaseUsageScanTest {
         assertTrue(usage.usesDatabaseCipher(), "unreadable means assume the cipher is needed");
     }
 
+    @Test
+    void anUnreadableClassLeavesTheVaultQuestionOpen() throws IOException {
+        // The vault answer cannot go the same way as the cipher's. Charging an unreadable class
+        // the cipher adds a dependency; charging it the vault links a private CommonCrypto SPI
+        // into a binary Apple scans. So it was recorded as NO -- which is the other silent wrong
+        // answer: an unreadable dependency that really does use Vault shipped with AES-GCM
+        // compiled out, and nothing asked the developer anything. Open is the honest state, and
+        // it is the one the budget-refusal path already reports.
+        writeUnreadableClass("com/example/App.class");
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesVault(), "an unreadable class is not proof that it DOES use one");
+        assertTrue(usage.isVaultUnknown(),
+                "nor is it proof that it does not; the builder has to ask");
+    }
+
     /**
      * Writes a real class that refers to the given internal names.
      *

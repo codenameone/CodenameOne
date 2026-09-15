@@ -1966,6 +1966,61 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aFreshReadSeesAWriteThisProcessDidNotMake() {
+        // Storage.readObject answers its process-local cache first and nothing another process
+        // writes can invalidate it, so "fresh" through that method was not fresh: every freshness
+        // check in this class compared against whatever this tab had already read. In a browser
+        // each tab is its own context over one IndexedDB, which is exactly the case the checks
+        // exist for -- another tab rotates the shared vault, this one agrees with itself and
+        // writes over the rotation.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        String entry = vaultRecordName(name);
+
+        // Warm this process's cache the way any read would.
+        Object cached = Storage.getInstance().readObject(entry);
+        assertTrue(cached instanceof String);
+
+        // Another context writes the shared entry. putStorageEntry goes straight to the backing
+        // store, which is what a second tab's write looks like from here: the bytes change and
+        // this process's cache does not.
+        String replacement = "cn1.vault.v1\nvault=deadbeef\nkey.id=dk\nkey.version=1\n"
+                + "counter=99\n";
+        TestCodenameOneImplementation.getInstance().putStorageEntry(entry,
+                encodeStorageString(replacement));
+
+        // The premise, asserted rather than assumed: through the ordinary read this process
+        // still sees its OWN cached copy and not the bytes now in storage. If that ever stops
+        // being true the cache no longer shadows a foreign write and this test is moot.
+        assertEquals(cached, Storage.getInstance().readObject(entry),
+                "the cache is supposed to shadow the foreign write; without that there is "
+                + "nothing here to fix");
+
+        // The vault must see the write, not its own cached predecessor.
+        // That it FAILS is the whole discriminator, and which error it picks is not: reading the
+        // cached predecessor would unlock this vault successfully, because that record is the one
+        // this password belongs to.
+        Vault reopened = Vault.named(name).configure(fast());
+        assertNotNull(errorOf(reopened.unlockWithPassword(pw("p"))),
+                "a fresh read must see the record that is actually stored, not the one this "
+                + "process cached before another context replaced it");
+    }
+
+    /// The bytes Storage writes for a String, so a test can put one in behind the cache.
+    private static byte[] encodeStorageString(String value) {
+        try {
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+            com.codename1.io.Util.writeObject(value, out);
+            out.close();
+            return bytes.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

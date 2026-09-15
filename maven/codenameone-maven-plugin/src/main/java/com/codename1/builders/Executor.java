@@ -1165,9 +1165,14 @@ public abstract class Executor {
             // that stops at Java 8, reads the constant pool directly instead for that reason.
             hit[0] = true;
             hit[1] = true;
-            // NOT hit[2]. Charging an unreadable class the cipher is conservative -- it adds a
-            // dependency. Charging it the vault links a private CommonCrypto SPI into a binary
-            // Apple scans, so the conservative answer there is the other one.
+            // The vault answer is neither yes nor no, and it used to be recorded as no. Charging
+            // an unreadable class the cipher is conservative, because it adds a dependency;
+            // charging it the vault links a private CommonCrypto SPI into a binary Apple scans,
+            // so neither guess is safe -- which is exactly the state the budget-refusal path
+            // already reports. An unreadable class whose bytecode does use Vault could otherwise
+            // ship with AES-GCM compiled out and a vault that cannot do its crypto, with nothing
+            // asked of the developer.
+            found[3] = true;
         }
         found[0] = found[0] || hit[0];
         found[1] = found[1] || hit[1];

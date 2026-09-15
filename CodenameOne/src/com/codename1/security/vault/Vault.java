@@ -2356,7 +2356,7 @@ public final class Vault {
     private VaultMetadata loadMetadataFresh() {
         Object stored;
         try {
-            stored = Storage.getInstance().readObject(metadataKey());
+            stored = readUncached(metadataKey());
         } catch (RuntimeException unreadable) {
             throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
                     "the vault record could not be read from storage", unreadable);
@@ -2683,6 +2683,40 @@ public final class Vault {
             }
         }
         return true;
+    }
+
+    /// One storage entry, read past the cache.
+    ///
+    /// Storage.readObject answers its process-local cache first and nothing another process
+    /// writes can invalidate it, so "fresh" through that method was not fresh at all -- every
+    /// freshness check in this class was comparing against whatever THIS tab had read before.
+    /// That is the whole mechanism those checks exist to catch: another tab rotates the shared
+    /// vault, this tab's commitMetadata compares its incoming record against a cached
+    /// predecessor, agrees with itself, and writes over the rotation.
+    ///
+    /// Composed from the public stream primitives rather than by clearing the cache, because
+    /// clearCache() is all-or-nothing: it would evict everything the APPLICATION has cached, on
+    /// every vault mutation, to answer a question about one entry.
+    private Object readUncached(String name) {
+        if (!Storage.getInstance().exists(name)) {
+            return null;
+        }
+        java.io.InputStream in = null;
+        try {
+            in = Storage.getInstance().createInputStream(name);
+            return com.codename1.io.Util.readObject(new java.io.DataInputStream(in));
+        } catch (java.io.IOException cannotRead) {
+            throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
+                    "the vault record could not be read from storage", cannotRead);
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (java.io.IOException ignored) {
+                    // Nothing left to do with it; the value was already read or the read failed.
+                }
+            }
+        }
     }
 
     private String metadataKey() {
