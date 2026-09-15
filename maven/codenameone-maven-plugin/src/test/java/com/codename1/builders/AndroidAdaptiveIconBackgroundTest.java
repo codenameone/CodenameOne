@@ -140,11 +140,9 @@ class AndroidAdaptiveIconBackgroundTest {
 
     @Test
     void theAttributeSetComesFromThePlatformJar(@TempDir File sdkDir) throws Exception {
-        File platform = new File(sdkDir, "platforms/android-99");
-        assertTrue(platform.mkdirs(), "test platform directory");
-        AndroidAttrJar.write(new File(platform, "android.jar"), "colorPrimary", "statusBarColor");
+        platform(sdkDir, "android-36", "colorPrimary", "statusBarColor");
 
-        Set<String> attributes = AndroidGradleBuilder.frameworkThemeAttributes(sdkDir);
+        Set<String> attributes = AndroidGradleBuilder.frameworkThemeAttributes(sdkDir, 36);
         assertTrue(attributes.contains("colorPrimary"), "read android.R$attr out of the platform jar");
         assertTrue(attributes.contains("statusBarColor"), "read android.R$attr out of the platform jar");
         assertFalse(attributes.contains("ic_launcher_background"),
@@ -153,8 +151,72 @@ class AndroidAdaptiveIconBackgroundTest {
 
     @Test
     void anSdkWithNoPlatformAnswersNull(@TempDir File sdkDir) {
-        assertEquals(null, AndroidGradleBuilder.frameworkThemeAttributes(sdkDir),
+        assertEquals(null, AndroidGradleBuilder.frameworkThemeAttributes(sdkDir, 1),
                 "no platform means no answer, which is what makes the caller pass names through unchecked");
+    }
+
+    @Test
+    void aPlatformOlderThanTheBuildTargetAnswersNull(@TempDir File sdkDir) throws Exception {
+        // The build links against a platform this process cannot see, so an
+        // attribute introduced after android-35 is absent from what we read
+        // and would be dropped although aapt2 resolves it. Refusing to answer
+        // is what makes the caller pass every name through unchecked.
+        platform(sdkDir, "android-35", "colorPrimary");
+
+        assertEquals(null, AndroidGradleBuilder.frameworkThemeAttributes(sdkDir, 37),
+                "evidence older than the compile platform cannot rule a name out");
+        assertTrue(AndroidGradleBuilder.frameworkThemeAttributes(sdkDir, 35).contains("colorPrimary"),
+                "evidence that reaches the target is conclusive");
+    }
+
+    @Test
+    void anSdkThisProcessCannotReadAnswersNull() {
+        // The build server runs gradle inside a container with its own SDK.
+        assertEquals(null, AndroidGradleBuilder.frameworkThemeAttributes(null, 1),
+                "no readable SDK means no answer");
+    }
+
+    @Test
+    void aMinorVersionedPlatformReducesToItsApiLevel(@TempDir File sdkDir) throws Exception {
+        // android-37.2 is API 37. Gathering the digits instead answers 372,
+        // which compares greater than every level there is.
+        assertEquals(37, AndroidGradleBuilder.platformApiLevel("android-37.2"));
+        assertEquals(35, AndroidGradleBuilder.platformApiLevel("android-35"));
+        assertEquals(-1, AndroidGradleBuilder.platformApiLevel("android-UpsideDownCake"));
+        assertEquals(-1, AndroidGradleBuilder.platformApiLevel("build-tools"));
+
+        platform(sdkDir, "android-37.2", "colorPrimary");
+        assertTrue(AndroidGradleBuilder.frameworkThemeAttributes(sdkDir, 37).contains("colorPrimary"),
+                "a minor-versioned platform counts as its API level");
+    }
+
+    @Test
+    void aColorDeclaredAsATypedItemCounts(@TempDir File valsDir) throws Exception {
+        // <item type="color" name="x"> is an equally valid color declaration.
+        // Missing it would put a second declaration of the same name in
+        // another file, which aapt2 rejects as a duplicate resource.
+        write(valsDir, "<item type=\"color\" name=\"ic_launcher_background\">#123456</item>");
+
+        assertTrue(AndroidGradleBuilder.declaresColor(new File(valsDir, "colors.xml"), "ic_launcher_background"),
+                "a color declared as a typed item is still a declaration of that color");
+
+        AndroidGradleBuilder.writeAdaptiveIconBackgroundColor(valsDir, "#000000");
+        assertFalse(new File(valsDir, "ic_launcher_background.xml").exists(),
+                "so ours must not be written beside it");
+    }
+
+    @Test
+    void anItemOfAnotherTypeIsNotAColor(@TempDir File valsDir) throws Exception {
+        write(valsDir, "<item type=\"dimen\" name=\"ic_launcher_background\">4dp</item>");
+
+        assertFalse(AndroidGradleBuilder.declaresColor(new File(valsDir, "colors.xml"), "ic_launcher_background"),
+                "only a color-typed item declares a color");
+    }
+
+    private static void platform(File sdkDir, String name, String... attributes) throws IOException {
+        File platform = new File(sdkDir, "platforms/" + name);
+        assertTrue(platform.mkdirs(), "test platform directory");
+        AndroidAttrJar.write(new File(platform, "android.jar"), attributes);
     }
 
     private static String items(File colorsFile) throws Exception {

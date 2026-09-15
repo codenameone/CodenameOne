@@ -5416,9 +5416,12 @@ public class AndroidGradleBuilder extends Executor {
         File colors = new File(valsDir, "colors.xml");
         String colorsStr = "";
         try {
-            Set<String> frameworkAttributes = frameworkThemeAttributes(androidSDKDir);
+            // Gradle runs against androidSDKDir here, so the platform that
+            // links these resources is one this process can read.
+            Set<String> frameworkAttributes =
+                    frameworkThemeAttributes(androidSDKDir, Integer.parseInt(targetNumber));
             if (frameworkAttributes == null && colors.exists()) {
-                log("Could not read android.R$attr from any installed platform, so every color in "
+                log("No installed Android platform reaches API " + targetNumber + ", so every color in "
                         + "colors.xml is passed to the theme unchecked");
             }
             ThemeColors themeColors = buildThemeColorItems(colors, frameworkAttributes);
@@ -10514,15 +10517,38 @@ public class AndroidGradleBuilder extends Executor {
         }
         try {
             Document dom = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(valuesFile);
-            NodeList nl = dom.getElementsByTagName("color");
-            for (int i = 0; i < nl.getLength(); i++) {
-                Node key = nl.item(i).getAttributes().getNamedItem("name");
-                if (key != null && name.equals(key.getNodeValue())) {
-                    return true;
-                }
-            }
+            return declares(dom.getElementsByTagName("color"), name, null)
+                    || declares(dom.getElementsByTagName("item"), name, "color");
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * Whether one of these elements declares {@code name}, optionally only
+     * when its {@code type} attribute says so. The second form is what makes
+     * {@code <item type="color" name="x">} count: it is an equally valid way
+     * to declare a color resource, and missing it would have us write a second
+     * declaration of the same name into another file, which aapt2 rejects as a
+     * duplicate.
+     */
+    private static boolean declares(NodeList elements, String name, String requiredType) {
+        for (int i = 0; i < elements.getLength(); i++) {
+            NamedNodeMap attributes = elements.item(i).getAttributes();
+            if (attributes == null) {
+                continue;
+            }
+            Node key = attributes.getNamedItem("name");
+            if (key == null || !name.equals(key.getNodeValue())) {
+                continue;
+            }
+            if (requiredType == null) {
+                return true;
+            }
+            Node type = attributes.getNamedItem("type");
+            if (type != null && requiredType.equals(type.getNodeValue())) {
+                return true;
+            }
         }
         return false;
     }
@@ -10602,30 +10628,71 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     /**
-     * Every {@code android.R.attr} name the installed platforms declare, which
-     * is exactly the set aapt2 can resolve an {@code android:<name>} theme item
-     * against. Answers {@code null} when no platform could be read, so a caller
-     * can fall back to passing names through unchecked rather than silently
-     * dropping a developer's theming.
+     * Every {@code android.R.attr} name the readable platforms declare, which
+     * is the set aapt2 can resolve an {@code android:<name>} theme item
+     * against.
      *
-     * <p>The union across installed platforms is deliberate: framework
-     * attributes are added and effectively never removed, so the union is the
-     * most permissive answer that is still derived from the platform rather
-     * than from a hand-maintained list.</p>
+     * <p>Answers {@code null} unless a platform at least as new as
+     * {@code minimumPlatformLevel} was read, and for a {@code null} SDK root.
+     * Both cases mean this process cannot see what will link the resources,
+     * and a caller that cannot see it must pass names through unchecked:
+     * dropping an attribute that a newer platform does define would quietly
+     * lose a developer's theming, which is worse than the link error the check
+     * exists to prevent.</p>
+     *
+     * <p>The union across platforms is deliberate: framework attributes are
+     * added and effectively never removed, so the union is the most permissive
+     * answer that is still derived from the platform rather than from a
+     * hand-maintained list.</p>
      */
-    static Set<String> frameworkThemeAttributes(File androidSDKDir) {
+    static Set<String> frameworkThemeAttributes(File androidSDKDir, int minimumPlatformLevel) {
+        if (androidSDKDir == null) {
+            return null;
+        }
         File[] platforms = new File(androidSDKDir, "platforms").listFiles();
         if (platforms == null) {
             return null;
         }
         Set<String> names = new HashSet<String>();
+        int newestRead = -1;
         for (File platform : platforms) {
             File jar = new File(platform, "android.jar");
-            if (jar.isFile()) {
-                names.addAll(attributeNames(jar));
+            if (!jar.isFile()) {
+                continue;
             }
+            Set<String> declared = attributeNames(jar);
+            if (declared.isEmpty()) {
+                continue;
+            }
+            names.addAll(declared);
+            newestRead = Math.max(newestRead, platformApiLevel(platform.getName()));
         }
-        return names.isEmpty() ? null : names;
+        if (names.isEmpty() || newestRead < minimumPlatformLevel) {
+            return null;
+        }
+        return names;
+    }
+
+    /**
+     * The API level a platform directory name carries, or -1 when it carries
+     * none. A minor-versioned platform reduces to its major: {@code
+     * android-37.2} is API 37, and gathering its digits instead would answer
+     * 372 and compare greater than every level there is.
+     */
+    static int platformApiLevel(String platformDirName) {
+        if (platformDirName == null || !platformDirName.startsWith("android-")) {
+            return -1;
+        }
+        String version = platformDirName.substring("android-".length());
+        int dot = version.indexOf('.');
+        if (dot >= 0) {
+            version = version.substring(0, dot);
+        }
+        try {
+            return Integer.parseInt(version);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     /**
