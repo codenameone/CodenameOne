@@ -1,0 +1,562 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+
+/*
+ * Windows 11 (Fluent / WinUI 3) native theme for Codename One.
+ *
+ * PALETTE comes from the WinUI common control resources, whose names are quoted beside each
+ * value so they can be checked against the platform rather than against memory.
+ *
+ * DIMENSIONS are converted from WinUI's documented metrics at 96dpi (1px = 0.2646mm) and
+ * written in MILLIMETRES. Fluent is specified in effective pixels, but authoring the theme
+ * in px would pin it to 96dpi -- the CSS compiler maps px to a non-scaling unit, so a 4px
+ * radius would stay 4 device pixels on a 200% display instead of becoming 8. Millimetres
+ * scale, which is what a theme needs; the fidelity TILES are sized in logical px for the
+ * opposite reason, since they describe the reference frame rather than the design.
+ *
+ * MICA is not expressed here. It is a window-level backdrop the compositor draws behind the
+ * window, not a fill any control owns, so it belongs to port code setting
+ * DWMWA_SYSTEMBACKDROP_TYPE rather than to a stylesheet. Surfaces below use the solid Fluent
+ * fills, which is what an app gets today and is honest about it; the measured
+ * client_background of #F3F3F3 on the reference runner is exactly that solid base.
+ *
+ * Verified against run 34960734710: the reference Button measured 69x32 logical px with
+ * corner #E9E9E9 and centre #FBFBFB, which is where the Button values below come from.
+ */
+
+#Constants {
+    /* WinUI resource names in brackets. The accent is the one thing a Windows user really
+       does personalise, so it is bound: a port reading UISettings.GetColorValue(Accent) can
+       push the real one in with a single addThemeProps call. #0078D4 is the system default
+       and is what the reference runner reported. */
+    --accent-color: #0078d4;            /* SystemAccentColor */
+    --accent-color-dark: #4cc2ff;       /* SystemAccentColorLight2 on dark */
+    --accent-fg-color: #ffffff;         /* TextOnAccentFillColorPrimary */
+    --accent-fg-color-dark: #000000;
+    --accent-pressed-color: #005a9e;    /* AccentFillColorTertiary */
+    --accent-pressed-color-dark: #2a8ad4;
+    --layer-bg-color: #fbfbfb;          /* CardBackgroundFillColorDefault */
+    --layer-bg-color-dark: #2c2c2c;
+    --page-bg-color: #f3f3f3;           /* SolidBackgroundFillColorBase */
+    --page-bg-color-dark: #202020;
+    --text-color: #1a1a1a;              /* TextFillColorPrimary */
+    --text-color-dark: #ffffff;
+    --text-secondary-color: #5d5d5d;    /* TextFillColorSecondary */
+    --text-secondary-color-dark: #cfcfcf;
+    --stroke-color: #e9e9e9;            /* ControlStrokeColorDefault */
+    --stroke-color-dark: #363636;
+
+    includeNativeBool: false;
+    darkModeBool: true;
+
+    /* Windows 11 keeps a system title bar above the app's content, so the window chrome is
+       the platform's rather than the app's. GNOME is the opposite and uses "custom". */
+    desktopTitleBarMode: native;
+
+    commandBehavior: Native;
+    paintsTitleBarBool: false;
+    tabPlacementInt: 0;
+    tabsFillRowsBool: true;
+    tabsGridBool: true;
+    tabsEqualWidthBool: true;
+
+    /* WinUI CheckBox and RadioButton glyphs are 20px boxes: 5.29mm at 96dpi. */
+    checkBoxIconSizeMM: "5.29";
+    radioIconSizeMM: "5.29";
+
+    /* Slider: a 4px trough under a 20px thumb. */
+    sliderTrackThicknessMM: "1.06";
+}
+
+/* --- Window and text ------------------------------------------------------------------- */
+
+Form {
+    background-color: var(--page-bg-color, #f3f3f3);
+    color: var(--text-color, #1a1a1a);
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+Label {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+/* --- Button ---------------------------------------------------------------------------- */
+/*
+ * The standard Fluent button: a near-white 4px-radius rect with a hairline stroke, which
+ * LIGHTENS on hover and goes flatter and greyer when pressed. That hover direction is the
+ * opposite of Adwaita's, which darkens, and is a good reason not to share one desktop theme
+ * across platforms.
+ */
+
+Button {
+    color: var(--text-color, #1a1a1a);
+    background-color: var(--layer-bg-color, #fbfbfb);
+    border: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+Button.hover {
+    color: var(--text-color, #1a1a1a);
+    background-color: #f6f6f6;
+    border: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+Button.pressed {
+    color: var(--text-secondary-color, #5d5d5d);
+    background-color: #f5f5f5;
+    border: 0.26mm solid #ededed;
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+Button.disabled {
+    color: #9d9d9d;
+    background-color: #f5f5f5;
+    border: 0.26mm solid #ededed;
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+/* AccentButtonStyle. */
+RaisedButton {
+    color: var(--accent-fg-color, #ffffff);
+    background-color: var(--accent-color, #0078d4);
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+RaisedButton.hover {
+    color: var(--accent-fg-color, #ffffff);
+    background-color: #1a86d9;
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+RaisedButton.pressed {
+    color: #cce3f5;
+    background-color: var(--accent-pressed-color, #005a9e);
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+RaisedButton.disabled {
+    color: #9d9d9d;
+    background-color: #e5e5e5;
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+/* Fluent's subtle/transparent button: no fill until hovered. */
+FlatButton {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+FlatButton.hover {
+    color: var(--text-color, #1a1a1a);
+    background-color: #ededed;
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+FlatButton.pressed {
+    color: var(--text-secondary-color, #5d5d5d);
+    background-color: #e5e5e5;
+    border-radius: 1.06mm;
+    padding: 1.3mm 3.1mm 1.3mm 3.1mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+/* --- Text entry ------------------------------------------------------------------------ */
+/*
+ * The Fluent TextBox has a thicker BOTTOM stroke than its other three sides, and when
+ * focused that bottom stroke turns accent-coloured and thicker still. Per-side border
+ * widths and colours compile to a CSSBorder, which carries each side natively -- this is
+ * the exact rule that the authoring notes used to say was impossible, and measuring the
+ * compiler rather than trusting the note is what made this theme expressible.
+ */
+
+TextField {
+    color: var(--text-color, #1a1a1a);
+    background-color: var(--layer-bg-color, #fbfbfb);
+    border-top: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-right: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-left: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-bottom: 0.4mm solid #8a8a8a;
+    border-radius: 1.06mm;
+    padding: 1.3mm 2.6mm 1.3mm 2.6mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+TextField.hover {
+    color: var(--text-color, #1a1a1a);
+    background-color: #f6f6f6;
+    border-top: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-right: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-left: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-bottom: 0.4mm solid #8a8a8a;
+    border-radius: 1.06mm;
+    padding: 1.3mm 2.6mm 1.3mm 2.6mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+/* Focused: white field, accent underline. */
+TextField.selected {
+    color: var(--text-color, #1a1a1a);
+    background-color: #ffffff;
+    border-top: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-right: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-left: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-bottom: 0.53mm solid var(--accent-color, #0078d4);
+    border-radius: 1.06mm;
+    padding: 1.3mm 2.6mm 1.3mm 2.6mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+TextField.disabled {
+    color: #9d9d9d;
+    background-color: #f5f5f5;
+    border: 0.26mm solid #ededed;
+    border-radius: 1.06mm;
+    padding: 1.3mm 2.6mm 1.3mm 2.6mm;
+    margin: 0.8mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+TextArea { cn1-derive: TextField; }
+
+/* --- Check, radio, switch -------------------------------------------------------------- */
+
+CheckBox {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    padding: 0.8mm;
+    margin: 0.5mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+CheckBox.selected { color: var(--accent-color, #0078d4); background-color: transparent; }
+CheckBox.hover { color: var(--text-color, #1a1a1a); background-color: #ededed; }
+CheckBox.disabled { color: #9d9d9d; background-color: transparent; }
+
+RadioButton {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    padding: 0.8mm;
+    margin: 0.5mm;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+RadioButton.selected { color: var(--accent-color, #0078d4); background-color: transparent; }
+RadioButton.hover { color: var(--text-color, #1a1a1a); background-color: #ededed; }
+RadioButton.disabled { color: #9d9d9d; background-color: transparent; }
+
+/* ToggleSwitch: a 40x20px pill. */
+Switch {
+    color: #ffffff;
+    background-color: #868686;
+    cn1-background-type: cn1-pill-border;
+    padding: 0.5mm;
+    margin: 0.5mm;
+}
+
+Switch.selected {
+    color: #ffffff;
+    background-color: var(--accent-color, #0078d4);
+    cn1-background-type: cn1-pill-border;
+    padding: 0.5mm;
+    margin: 0.5mm;
+}
+
+Switch.hover {
+    color: #ffffff;
+    background-color: #7a7a7a;
+    cn1-background-type: cn1-pill-border;
+    padding: 0.5mm;
+    margin: 0.5mm;
+}
+
+Switch.disabled {
+    color: #ffffff;
+    background-color: #c8c8c8;
+    cn1-background-type: cn1-pill-border;
+    padding: 0.5mm;
+    margin: 0.5mm;
+}
+
+/* --- Slider and progress --------------------------------------------------------------- */
+
+Slider {
+    color: var(--accent-color, #0078d4);
+    background-color: #868686;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
+SliderFull {
+    color: var(--accent-color, #0078d4);
+    background-color: var(--accent-color, #0078d4);
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
+ProgressBar {
+    background-color: #868686;
+    cn1-background-type: cn1-pill-border;
+    margin: 0.8mm;
+}
+
+/* --- Title and command bar ------------------------------------------------------------- */
+
+TitleArea {
+    background-color: var(--page-bg-color, #f3f3f3);
+    padding: 1.6mm 1.6mm 1.6mm 1.6mm;
+    margin: 0;
+}
+
+Title {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: left;
+}
+
+Toolbar {
+    background-color: var(--page-bg-color, #f3f3f3);
+    padding: 0;
+    margin: 0;
+}
+
+/* --- Dialog --------------------------------------------------------------------------- */
+/*
+ * ContentDialog sits on a layer fill with an 8px radius and a hairline stroke. Fluent gives
+ * it a drop shadow as well, which is now expressible since box-shadow compiles to
+ * RoundRectBorder's native shadow -- but a shadow combined with per-side borders is not, so
+ * this uses the uniform stroke and no shadow for now. A dialog shadow is a candidate once
+ * the fidelity suite can say whether it is worth the constraint.
+ */
+
+Dialog {
+    background-color: var(--layer-bg-color, #fbfbfb);
+    border: 0.26mm solid var(--stroke-color, #e9e9e9);
+    border-radius: 2.12mm;
+    padding: 6.3mm;
+    margin: 2.1mm;
+}
+
+DialogTitle {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 5.3mm;
+    text-align: left;
+}
+
+DialogBody {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+/* --- Lists and scrollbars -------------------------------------------------------------- */
+/*
+ * Declared explicitly because the look and feel asks for these UIIDs BY NAME, and a theme
+ * that omits them does not inherit something sensible -- it gets UIManager's blank defaults,
+ * which on a dark window is a white track with a black thumb.
+ */
+
+Scroll { background-color: transparent; }
+ScrollThumb { background-color: #8a8a8a; cn1-background-type: cn1-pill-border; }
+ScrollThumb.hover { background-color: #767676; cn1-background-type: cn1-pill-border; }
+ScrollThumb.pressed { background-color: #5d5d5d; cn1-background-type: cn1-pill-border; }
+HorizontalScroll { background-color: transparent; }
+HorizontalScrollThumb { cn1-derive: ScrollThumb; }
+DesktopScroll { background-color: transparent; }
+DesktopScrollThumb { cn1-derive: ScrollThumb; }
+DesktopHorizontalScroll { background-color: transparent; }
+DesktopHorizontalScrollThumb { cn1-derive: ScrollThumb; }
+
+/* NavigationView's selected row: a layer fill with an accent bar, approximated here by the
+   fill; the bar needs a per-side border and is tracked rather than faked. */
+ListRenderer {
+    color: var(--text-color, #1a1a1a);
+    background-color: transparent;
+    border-radius: 1.06mm;
+    padding: 1.6mm 2.6mm 1.6mm 2.6mm;
+}
+
+ListRenderer.selected {
+    color: var(--text-color, #1a1a1a);
+    background-color: var(--layer-bg-color, #fbfbfb);
+    border-radius: 1.06mm;
+    padding: 1.6mm 2.6mm 1.6mm 2.6mm;
+}
+
+ListRenderer.hover {
+    color: var(--text-color, #1a1a1a);
+    background-color: #ededed;
+    border-radius: 1.06mm;
+    padding: 1.6mm 2.6mm 1.6mm 2.6mm;
+}
+
+ListRendererFocus {
+    background-color: transparent;
+    border: 0.53mm solid var(--text-color, #1a1a1a);
+    border-radius: 1.06mm;
+}
+
+/* --- Dark ------------------------------------------------------------------------------ */
+
+@media (prefers-color-scheme: dark) {
+    Form { background-color: #202020; color: #ffffff; }
+    Label { color: #ffffff; }
+
+    Button { color: #ffffff; background-color: #2d2d2d; border: 0.26mm solid #363636; }
+    Button.hover { color: #ffffff; background-color: #323232; border: 0.26mm solid #363636; }
+    Button.pressed { color: #cfcfcf; background-color: #272727; border: 0.26mm solid #303030; }
+    Button.disabled { color: #787878; background-color: #272727; border: 0.26mm solid #303030; }
+
+    RaisedButton { color: #000000; background-color: #4cc2ff; }
+    RaisedButton.hover { color: #000000; background-color: #47b1e8; }
+    RaisedButton.pressed { color: #2b2b2b; background-color: #42a1d2; }
+    RaisedButton.disabled { color: #787878; background-color: #434343; }
+
+    FlatButton { color: #ffffff; background-color: transparent; }
+    FlatButton.hover { color: #ffffff; background-color: #2d2d2d; }
+    FlatButton.pressed { color: #cfcfcf; background-color: #272727; }
+
+    TextField {
+        color: #ffffff; background-color: #2d2d2d;
+        border-top: 0.26mm solid #363636; border-right: 0.26mm solid #363636;
+        border-left: 0.26mm solid #363636; border-bottom: 0.4mm solid #9a9a9a;
+    }
+    TextField.hover {
+        color: #ffffff; background-color: #323232;
+        border-top: 0.26mm solid #363636; border-right: 0.26mm solid #363636;
+        border-left: 0.26mm solid #363636; border-bottom: 0.4mm solid #9a9a9a;
+    }
+    TextField.selected {
+        color: #ffffff; background-color: #1f1f1f;
+        border-top: 0.26mm solid #363636; border-right: 0.26mm solid #363636;
+        border-left: 0.26mm solid #363636; border-bottom: 0.53mm solid #4cc2ff;
+    }
+    TextField.disabled { color: #787878; background-color: #272727; border: 0.26mm solid #303030; }
+
+    CheckBox { color: #ffffff; }
+    CheckBox.selected { color: #4cc2ff; }
+    CheckBox.hover { color: #ffffff; background-color: #2d2d2d; }
+    CheckBox.disabled { color: #787878; }
+
+    RadioButton { color: #ffffff; }
+    RadioButton.selected { color: #4cc2ff; }
+    RadioButton.hover { color: #ffffff; background-color: #2d2d2d; }
+    RadioButton.disabled { color: #787878; }
+
+    Switch { background-color: #9a9a9a; }
+    Switch.selected { background-color: #4cc2ff; }
+    Switch.hover { background-color: #aaaaaa; }
+    Switch.disabled { background-color: #434343; }
+
+    Slider { background-color: #9a9a9a; }
+    SliderFull { background-color: #4cc2ff; color: #4cc2ff; }
+    ProgressBar { background-color: #9a9a9a; }
+
+    TitleArea { background-color: #202020; }
+    Title { color: #ffffff; }
+    Toolbar { background-color: #202020; }
+
+    Dialog { background-color: #2c2c2c; border: 0.26mm solid #363636; }
+    DialogTitle { color: #ffffff; }
+    DialogBody { color: #ffffff; }
+
+    ScrollThumb { background-color: #9a9a9a; }
+    ScrollThumb.hover { background-color: #aaaaaa; }
+    ScrollThumb.pressed { background-color: #cfcfcf; }
+
+    ListRenderer { color: #ffffff; background-color: transparent; }
+    ListRenderer.selected { color: #ffffff; background-color: #2c2c2c; }
+    ListRenderer.hover { color: #ffffff; background-color: #2d2d2d; }
+    ListRendererFocus { border: 0.53mm solid #ffffff; }
+}
