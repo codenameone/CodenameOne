@@ -84,6 +84,12 @@ class TextEvaluator extends AbstractEvaluator {
         // a decimal.
         rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
+            if (v[i] == null) {
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(v[i])) {
                 if (compareNumbers(v[i], rvalue) < 0) {
                     return element;
@@ -119,6 +125,12 @@ class TextEvaluator extends AbstractEvaluator {
         int vlen = v.length;
         rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
+            if (v[i] == null) {
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(v[i])) {
                 if (compareNumbers(v[i], rvalue) > 0) {
                     return element;
@@ -153,6 +165,12 @@ class TextEvaluator extends AbstractEvaluator {
         int vlen = v.length;
         rvalue = stripQuotes(rvalue);
         for (int i = 0; i < vlen; i++) {
+            if (v[i] == null) {
+                // A node with no text of its own -- an empty nested array is
+                // one -- has nothing to compare, the same way the attribute
+                // evaluator treats a name it cannot resolve.
+                continue;
+            }
             if (isNumeric(rvalue) && isNumeric(v[i])) {
                 if (compareNumbers(v[i], rvalue) == 0) {
                     return element;

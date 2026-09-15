@@ -492,6 +492,10 @@ class ResultAttributePathTest {
         String[] values = r.getAsStringArray("/items/values");
         assertEquals(1, values.length, "the empty array should still be an entry");
         assertNull(values[0], "an empty array has no text");
+        // And a predicate over the same field has nothing to compare rather
+        // than a null to dereference.
+        assertEquals(0, r.getAsStringArray("/items[values=1]/values").length,
+                "comparing against a node with no text threw");
     }
 
     @Test
