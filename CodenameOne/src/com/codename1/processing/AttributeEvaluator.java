@@ -70,7 +70,7 @@ class AttributeEvaluator extends AbstractEvaluator {
         // "[@rank]", the documented way to select the elements that carry an
         // attribute, matched nothing at all and said nothing about it.
         String name = expr.startsWith("@") ? expr.substring(1) : expr;
-        if (MapContent.attributeOrField(element, name) != null) {
+        if (!MapContent.attributeOrFields(element, name).isEmpty()) {
             return element;
         }
         return super.evaluateSingle(element, expr);
@@ -84,27 +84,21 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = MapContent.attributeOrField(element, lvalue);
-        if (attr == null) {
-            return null;
-        }
-        // Quotes come off first: a quoted literal is still a literal, and
-        // leaving them on made every comparison against one fall through to
-        // comparing text. That went unnoticed while an attribute was always a
-        // bare XML string; a JSON field arrives as "1.0", so "[@rank='1']"
-        // compared "1.0" with "1" and matched nothing.
+        java.util.List values = MapContent.attributeOrFields(element, lvalue);
         rvalue = stripQuotes(rvalue);
-        if (isNumeric(rvalue) && isNumeric(attr)) {
-            if (compareNumbers(attr, rvalue) < 0) {
+        // Every value, because a JSON field can be an array and a match on any
+        // of them is a match -- the same rule child evaluation has always used.
+        for (Object value : values) {
+            String attr = (String) value;
+            if (isNumeric(rvalue) && isNumeric(attr)) {
+                if (compareNumbers(attr, rvalue) < 0) {
+                    return element;
+                }
+                continue;
+            }
+            if (attr.compareTo(rvalue) < 0) {
                 return element;
             }
-            return null;
-        }
-        // Backwards: this is the LESS-than method and it answered when the
-        // attribute sorted AFTER the value. Reachable whenever either side is
-        // not a number, which is most of the time for a text attribute.
-        if (attr.compareTo(rvalue) < 0) {
-            return element;
         }
         return null;
     }
@@ -116,20 +110,21 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = MapContent.attributeOrField(element, lvalue);
-        if (attr == null) {
-            return null;
-        }
+        java.util.List values = MapContent.attributeOrFields(element, lvalue);
         rvalue = stripQuotes(rvalue);
-        if (isNumeric(rvalue) && isNumeric(attr)) {
-            if (compareNumbers(attr, rvalue) > 0) {
+        // Every value, because a JSON field can be an array and a match on any
+        // of them is a match -- the same rule child evaluation has always used.
+        for (Object value : values) {
+            String attr = (String) value;
+            if (isNumeric(rvalue) && isNumeric(attr)) {
+                if (compareNumbers(attr, rvalue) > 0) {
+                    return element;
+                }
+                continue;
+            }
+            if (attr.compareTo(rvalue) > 0) {
                 return element;
             }
-            return null;
-        }
-        // Backwards, the same way the less-than method was.
-        if (attr.compareTo(rvalue) > 0) {
-            return element;
         }
         return null;
     }
@@ -141,35 +136,29 @@ class AttributeEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
         lvalue = lvalue.substring(1);
-        String attr = MapContent.attributeOrField(element, lvalue);
+        java.util.List values = MapContent.attributeOrFields(element, lvalue);
         // "[@attr=null]" is the documented way to ask for the elements that do
         // NOT carry an attribute, and it is the one predicate whose answer is
-        // yes precisely when the attribute is absent. The check below returned
-        // before the rvalue was ever looked at, so it could never match one.
+        // yes precisely when there is no value. The null check used to return
+        // before the rvalue was read, so it could never match one.
         //
-        // Unquoted, because 'null' in quotes is a string the attribute might
-        // really hold.
-        //
-        // A JSON document has no attributes: MapContent.getAttribute() answers
-        // null for every name, and the field an attribute expression names is
-        // a child there. Absence therefore has to mean no attribute AND no
-        // such field, or this predicate matched every object in a JSON
-        // document, including the ones that carry the field.
+        // Unquoted, because 'null' in quotes is a string the value might
+        // really be.
         if ("null".equals(rvalue)) {
-            return attr == null ? element : null;
-        }
-        if (attr == null) {
-            return null;
+            return values.isEmpty() ? element : null;
         }
         rvalue = stripQuotes(rvalue);
-        if (isNumeric(rvalue) && isNumeric(attr)) {
-            if (compareNumbers(attr, rvalue) == 0) {
+        for (Object value : values) {
+            String attr = (String) value;
+            if (isNumeric(rvalue) && isNumeric(attr)) {
+                if (compareNumbers(attr, rvalue) == 0) {
+                    return element;
+                }
+                continue;
+            }
+            if (attr.compareTo(rvalue) == 0) {
                 return element;
             }
-            return null;
-        }
-        if (attr.compareTo(rvalue) == 0) {
-            return element;
         }
         return null;
     }

@@ -343,12 +343,17 @@ class MapContent implements StructuredContent {
         return null;
     }
 
-    /// The value an `@name` expression asks for, whatever the format holds it.
+    /// The values an `@name` expression asks for, whatever the format holds.
     ///
-    /// XML keeps it in an attribute. JSON has no attributes at all -- the
+    /// XML keeps one in an attribute. JSON has no attributes at all -- the
     /// method above answers null for every name -- and the field the
     /// expression names is a child there, which is what the developer guide
     /// has always said an attribute expression does on a JSON document.
+    ///
+    /// A list rather than one value, because a JSON field can be an array:
+    /// `{"tags":["first","target"]}` has two, and answering with the first
+    /// hid the second from a predicate and dropped it from a path that read
+    /// the field. Child evaluation has always walked all of them.
     ///
     /// One place, because everything that reads an attribute has to agree:
     /// the predicates that compare one, the predicate that tests for one, and
@@ -363,24 +368,33 @@ class MapContent implements StructuredContent {
     ///
     /// #### Returns
     ///
-    /// the value, or null when this element has none
-    static String attributeOrField(StructuredContent element, String name) {
+    /// the values, empty when this element has none
+    static List attributeOrFields(StructuredContent element, String name) {
+        List values = new ArrayList();
         String attribute = element.getAttribute(name);
         if (attribute != null) {
-            return attribute;
+            values.add(attribute);
+            return values;
         }
         // XML draws the distinction the expression language draws: "[@rank]"
         // asks about an attribute and "[rank]" about a child element, so the
         // child is only the answer where there are no attributes to be had.
         if (!(element instanceof MapContent)) {
-            return null;
+            return values;
         }
         List children = element.getChildren(name);
-        if (children == null || children.isEmpty()) {
-            return null;
+        if (children == null) {
+            return values;
         }
-        StructuredContent first = (StructuredContent) children.get(0);
-        return first == null ? null : first.getText();
+        for (Object child : children) {
+            if (child instanceof StructuredContent) {
+                String text = ((StructuredContent) child).getText();
+                if (text != null) {
+                    values.add(text);
+                }
+            }
+        }
+        return values;
     }
 
     /*

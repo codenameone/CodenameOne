@@ -325,6 +325,45 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void aJsonArrayFieldOffersEveryValue() {
+        // An attribute expression names a child on JSON, and a child can be an
+        // array. Answering with the first value hid the rest from a predicate
+        // and dropped them from a path that read the field, while the child
+        // form of the same path returned all of them.
+        Result r = Result.fromContent(
+                "{\"items\":[{\"tags\":[\"first\",\"target\"],\"n\":\"A\"},"
+                + "{\"tags\":[\"other\"],\"n\":\"B\"}]}", Result.JSON);
+
+        String[] matched = r.getAsStringArray("/items[@tags='target']/n");
+        assertEquals(1, matched.length, "a value past the first never matched");
+        assertEquals("A", matched[0]);
+
+        assertEquals(3, r.getAsStringArray("/items/@tags").length,
+                "reading the field dropped the values past the first");
+        assertEquals(r.getAsStringArray("/items/tags").length,
+                r.getAsStringArray("/items/@tags").length,
+                "the attribute form and the child form disagree");
+    }
+
+    @Test
+    void twoDecimalsThatShareADoubleAreStillDifferent() {
+        // 0.1 and 0.10000000000000001 are one binary double, and the document
+        // keeps both spellings, so comparing through double made a predicate
+        // written for one select the other.
+        Result r = Result.fromContent(
+                "<t><p price='0.1' n='X'/></t>", Result.XML);
+        assertEquals(0,
+                r.getAsStringArray("/t/p[@price='0.10000000000000001']/@n").length,
+                "two distinct decimals compared equal");
+        assertEquals(1, r.getAsStringArray("/t/p[@price='0.1']/@n").length,
+                "the decimal stopped matching itself");
+        assertEquals(1, r.getAsStringArray("/t/p[@price='0.100']/@n").length,
+                "trailing zeros changed the value");
+        assertEquals(1, r.getAsStringArray("/t/p[@price < '0.2']/@n").length,
+                "decimal ordering is wrong");
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for

@@ -407,88 +407,111 @@ abstract class AbstractEvaluator implements Evaluator {
     protected int compareNumbers(String left, String right) {
         String l = left.trim();
         String r = right.trim();
-        if (isInteger(l) && isInteger(r)) {
-            return compareIntegers(l, r);
+        if (isFixedPoint(l) && isFixedPoint(r)) {
+            return compareFixedPoint(l, r);
         }
+        // Only an exponent reaches here, and a value written that way has
+        // already been through a double -- the JSON parser produced it -- so
+        // there is no exactness left to preserve.
         double dl = Double.parseDouble(l);
         double dr = Double.parseDouble(r);
         return dl < dr ? -1 : (dl > dr ? 1 : 0);
     }
 
-    /// Compares two whole numbers written as text, at any size.
+    /// Compares two numbers written without an exponent, digit by digit.
     ///
-    /// - `left`: an integer literal, possibly signed
+    /// - `left`: a number with no exponent
     ///
-    /// - `right`: an integer literal, possibly signed
+    /// - `right`: a number with no exponent
     ///
     /// #### Returns
     ///
     /// negative, zero or positive
-    private int compareIntegers(String left, String right) {
-        String leftDigits = significantDigits(left);
-        String rightDigits = significantDigits(right);
-        boolean leftNegative = left.charAt(0) == '-' && leftDigits.length() > 0;
+    private int compareFixedPoint(String left, String right) {
+        String leftWhole = wholePart(left);
+        String rightWhole = wholePart(right);
+        String leftFraction = fractionPart(left);
+        String rightFraction = fractionPart(right);
+        boolean leftNegative = left.charAt(0) == '-'
+                && !(leftWhole.length() == 0 && leftFraction.length() == 0);
         boolean rightNegative = right.charAt(0) == '-'
-                && rightDigits.length() > 0;
-        if (leftDigits.length() == 0 && rightDigits.length() == 0) {
-            // Both zero, however each was spelled: 0, -0, 000.
-            return 0;
-        }
-        if (leftDigits.length() == 0) {
-            return rightNegative ? 1 : -1;
-        }
-        if (rightDigits.length() == 0) {
-            return leftNegative ? -1 : 1;
-        }
+                && !(rightWhole.length() == 0 && rightFraction.length() == 0);
         if (leftNegative != rightNegative) {
             return leftNegative ? -1 : 1;
         }
-        int magnitude;
-        if (leftDigits.length() != rightDigits.length()) {
-            magnitude = leftDigits.length() < rightDigits.length() ? -1 : 1;
-        } else {
-            magnitude = leftDigits.compareTo(rightDigits);
-            magnitude = magnitude < 0 ? -1 : (magnitude > 0 ? 1 : 0);
+        int magnitude = compareDigits(leftWhole, rightWhole);
+        if (magnitude == 0) {
+            magnitude = compareFraction(leftFraction, rightFraction);
         }
         return leftNegative ? -magnitude : magnitude;
     }
 
-    /// The digits of an integer literal, without its sign or leading zeros.
-    ///
-    /// Empty when the value is zero, whichever way it was written.
-    ///
-    /// - `text`: a trimmed integer literal
-    ///
-    /// #### Returns
-    ///
-    /// the significant digits
-    private String significantDigits(String text) {
+    /// Compares two whole-number digit strings by value.
+    private int compareDigits(String left, String right) {
+        if (left.length() != right.length()) {
+            return left.length() < right.length() ? -1 : 1;
+        }
+        int order = left.compareTo(right);
+        return order < 0 ? -1 : (order > 0 ? 1 : 0);
+    }
+
+    /// Compares two fractional digit strings, padding the shorter with zeros.
+    private int compareFraction(String left, String right) {
+        int length = left.length() > right.length()
+                ? left.length() : right.length();
+        for (int i = 0; i < length; i++) {
+            char l = i < left.length() ? left.charAt(i) : '0';
+            char r = i < right.length() ? right.charAt(i) : '0';
+            if (l != r) {
+                return l < r ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+
+    /// The digits before the point, without sign or leading zeros.
+    private String wholePart(String text) {
         int at = 0;
         if (at < text.length()
                 && (text.charAt(at) == '-' || text.charAt(at) == '+')) {
             at++;
         }
-        while (at < text.length() && text.charAt(at) == '0') {
+        int point = text.indexOf('.');
+        int end = point < 0 ? text.length() : point;
+        while (at < end && text.charAt(at) == '0') {
             at++;
         }
-        return text.substring(at);
+        return text.substring(at, end);
     }
 
-    /// Whether this number is written as a whole number, with no point or
-    /// exponent, so it can be compared exactly.
+    /// The digits after the point, without trailing zeros.
+    private String fractionPart(String text) {
+        int point = text.indexOf('.');
+        if (point < 0) {
+            return "";
+        }
+        int end = text.length();
+        while (end > point + 1 && text.charAt(end - 1) == '0') {
+            end--;
+        }
+        return text.substring(point + 1, end);
+    }
+
+    /// Whether this number is written without an exponent, so it can be
+    /// compared exactly.
     ///
     /// - `text`: a value [#isNumeric] already accepted
     ///
     /// #### Returns
     ///
-    /// true when the value is an integer literal
-    private boolean isInteger(String text) {
+    /// true when the value has no exponent
+    private boolean isFixedPoint(String text) {
         if (text.length() == 0) {
             return false;
         }
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '.' || c == 'e' || c == 'E') {
+            if (c == 'e' || c == 'E') {
                 return false;
             }
         }
