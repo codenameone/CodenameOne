@@ -187,6 +187,17 @@ public class Form extends Container implements TopLevelContainer {
     /// restore puts back exactly what the theme gave, so the form is still
     /// following the theme, while a value the theme never handed out is one
     /// somebody meant.
+    ///
+    /// One case this cannot separate, and does not try to: an application that
+    /// sets the tint to precisely the colour the theme is handing out at that
+    /// moment. Such a form follows the next theme change rather than staying on
+    /// the value it named. Telling that apart from the framework putting the
+    /// same colour back needs to know which call site it came from, and two of
+    /// the four -- FloatingActionButton and GlassTutorial -- are outside this
+    /// package, so it would mean a public method about tint bookkeeping that
+    /// applications have no use for. The assignment it would protect changes
+    /// nothing at the moment it is made, and what it would preserve is a colour
+    /// identical to the theme's own.
     private int themeTintColor;
 
     private boolean themeTintColorKnown;
