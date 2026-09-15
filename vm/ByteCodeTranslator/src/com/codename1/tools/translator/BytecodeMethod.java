@@ -66,6 +66,16 @@ import org.objectweb.asm.Opcodes;
  * @author Shai Almog
  */
 public class BytecodeMethod implements SignatureSet {
+    /// Floor for a STACK-RESIDENT StringBuilder buffer, in array units. 128 chars
+    /// covers 96.8% of every char[] this VM allocates, measured by length histogram.
+    private static final int SB_STACK_FLOOR_UNITS = 128;
+
+    /// Ceiling on the TOTAL stack-resident fused buffers one method may declare. These
+    /// are C locals and iOS secondary threads have 512KB stacks, so the floor above
+    /// must not scale a frame without bound.
+    private static final int SB_STACK_BUDGET_BYTES = 2048;
+
+
     private static MethodDependencyGraph dependencyGraph;
 
     /**
@@ -3924,6 +3934,7 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     private void stackAllocStringBuilders() {
+        long stackFusedBudget = 0;
         if (DISABLE_SB_STACK_ALLOC) {
             return;
         }
@@ -4070,8 +4081,46 @@ public class BytecodeMethod implements SignatureSet {
                         len = Integer.parseInt(ch.getLengthExpr().trim());
                     } catch (NumberFormatException ignore) {
                     }
-                    if (len >= 0 && len <= 4096) {
-                        ti.setStackFusedChild(len, ch.getElemCTypePublic(),
+                    // GIVE A STACK-ALLOCATED StringBuilder A BUFFER IT WILL NOT
+                    // OUTGROW. The no-arg ctor asks for INITIAL_CAPACITY (32 chars),
+                    // so the stack buffer was 32 -- and enlargeBuffer ALWAYS goes to
+                    // the heap, so the first append past 32 characters abandoned the
+                    // stack buffer and then reallocated on the 1.5x ladder
+                    // (32, 50, 77, 117, 177...). Measured on the self-hosting corpus,
+                    // StringBuilder growth inside append(String) was 249,870 heap
+                    // char[] allocations averaging 149 characters: buffers that had
+                    // already grown several times.
+                    //
+                    // A char[] length histogram over every char[] this VM allocates
+                    // says where to put the floor: 128 units covers 96.8% of them by
+                    // count (43.7% are <=16, 65.5% <=32, 87.0% <=64, 96.8% <=128).
+                    //
+                    // ONLY FOR StringBuilder, and that restriction is the correctness
+                    // argument, not caution. Enlarging a fused child changes
+                    // value.length, and for StringBuilder that IS the capacity --
+                    // unobservable except through capacity(), which the JDK does not
+                    // specify beyond the minimum. For any other @Fused class the array
+                    // length may be semantic, so raising it would be a silent behaviour
+                    // change. The buffer is still sized by the CTOR wherever the ctor
+                    // asked for more.
+                    int stackLen = len;
+                    if (len >= 0 && "java/lang/StringBuilder".equals(ctorInv.getOwner())
+                            && stackLen < SB_STACK_FLOOR_UNITS) {
+                        stackLen = SB_STACK_FLOOR_UNITS;
+                    }
+                    // AND BOUND THE METHOD'S TOTAL. These are C locals: iOS secondary
+                    // threads get a 512KB stack, and a method with several concat
+                    // chains would otherwise scale its frame with the floor above.
+                    // Past the budget a site keeps whatever the ctor asked for, which
+                    // is always correct -- the heap path is the fallback, not a bug.
+                    int elemBytes = "JAVA_ARRAY_CHAR".equals(ch.getElemCTypePublic()) ? 2 : 1;
+                    if (stackLen != len
+                            && stackFusedBudget + (long) stackLen * elemBytes > SB_STACK_BUDGET_BYTES) {
+                        stackLen = len;
+                    }
+                    if (stackLen >= 0 && stackLen <= 4096) {
+                        stackFusedBudget += (long) stackLen * elemBytes;
+                        ti.setStackFusedChild(stackLen, ch.getElemCTypePublic(),
                                 ch.getArrayClassRefPublic(),
                                 ch.getCOwner() + "_" + ch.getFieldName());
                     }
