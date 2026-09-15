@@ -116,8 +116,12 @@ public abstract class Dialect {
     /**
      * The dialect for an engine name, or null when the name is not one of the
      * three. Accepts the spellings that appear in a URL scheme, ignoring case --
-     * "postgres" and "postgresql" are the same engine, and so are "mysql" and
-     * "mariadb".
+     * "postgres" and "postgresql" are the same engine. "mysql" and "mariadb" are
+     * the same PROTOCOL but not the same dialect: they have no case-sensitive
+     * NO PAD collation in common, so each name answers its own. A connection
+     * picks between them by the server's handshake banner instead, which is the
+     * better answer when there is a server to ask; this is for callers that
+     * have only a name.
      */
     public static Dialect forName(String engine) {
         if(engine == null) {
@@ -130,7 +134,14 @@ public abstract class Dialect {
                 || equalsIgnoreCaseAscii(engine, "postgresql")) {
             return POSTGRES;
         }
-        if(equalsIgnoreCaseAscii(engine, "mysql") || equalsIgnoreCaseAscii(engine, "mariadb")) {
+        if(equalsIgnoreCaseAscii(engine, "mariadb")) {
+            // The MariaDB name answers the MariaDB dialect. They differ only in
+            // the collation they can name, and MySQL's is unknown to MariaDB
+            // 10.11 -- so a schema generator that asked by name and got MYSQL
+            // emitted DDL that server refuses outright.
+            return MARIADB;
+        }
+        if(equalsIgnoreCaseAscii(engine, "mysql")) {
             return MYSQL;
         }
         return null;

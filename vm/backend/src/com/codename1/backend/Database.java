@@ -107,12 +107,22 @@ public final class Database {
     private final Dialect dialect;
 
     private Database(Db sqlite, Postgres postgres, MySql mysql, String describedAs,
-                     Dialect dialect) {
+                     Dialect dialect) throws IOException {
         this.sqlite = sqlite;
         this.postgres = postgres;
         this.mysql = mysql;
         this.describedAs = describedAs;
         this.dialect = dialect;
+        if(sqlite != null) {
+            // HERE, AND NOT IN A FACTORY. SQLite's LIKE folds ASCII case and the
+            // other two engines do not, so this decides what a query MEANS --
+            // and it had been set in DataSource.configure, then in open(), and
+            // each time some other way of getting a Database kept the old
+            // behaviour: of(Db) wraps a handle the caller opened and reaches
+            // neither. The constructor is the one thing every path runs, so it
+            // is the only place the answer cannot be missed.
+            sqlite.useCaseSensitiveLike();
+        }
     }
 
     /** A unit of work run inside {@link #transaction}. */
@@ -165,16 +175,7 @@ public final class Database {
                     session.isMariaDb() ? Dialect.MARIADB : Dialect.MYSQL);
         }
         refuseUnportableSqliteUri(url);
-        Db sqliteDb = Db.open(url);
-        // AT OPEN, not at pooling. LIKE folds ASCII case on SQLite and not on
-        // the other two, so it decides what a query MEANS -- and an earlier
-        // version set it in DataSource.configure, which EntityManager.open(db)
-        // and DataSource.of(db) never reach. Those paths then ran a
-        // case-insensitive LIKE against a schema the other engines compare
-        // case sensitively. The pragma is per connection, and this is the one
-        // place every SQLite connection comes from.
-        sqliteDb.useCaseSensitiveLike();
-        return new Database(sqliteDb, null, null, "sqlite:" + url, Dialect.SQLITE);
+        return new Database(Db.open(url), null, null, "sqlite:" + url, Dialect.SQLITE);
     }
 
     /**
@@ -241,7 +242,7 @@ public final class Database {
     }
 
     /** Wraps an already-open SQLite handle, for code that opened one directly. */
-    public static Database of(Db db) {
+    public static Database of(Db db) throws IOException {
         return new Database(db, null, null, "sqlite", Dialect.SQLITE);
     }
 

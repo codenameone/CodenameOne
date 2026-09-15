@@ -382,7 +382,10 @@ class DialectTest {
     void resolvesByName() {
         assertSame(Dialect.POSTGRES, Dialect.forName("postgres"));
         assertSame(Dialect.POSTGRES, Dialect.forName("PostgreSQL"));
-        assertSame(Dialect.MYSQL, Dialect.forName("mariadb"));
+        // MARIADB, not MYSQL: this expectation is superseded. The two have no
+        // case-sensitive NO PAD collation in common, so the name has to answer
+        // its own dialect. See namesMariaDbSeparately below.
+        assertSame(Dialect.MARIADB, Dialect.forName("mariadb"));
         assertSame(Dialect.SQLITE, Dialect.forName("SQLite"));
         assertEquals(null, Dialect.forName("oracle"));
     }
@@ -428,5 +431,25 @@ class DialectTest {
         // spelled with the boolean term its own documentation gives.
         assertEquals("(`v` IS NULL) DESC, `v` ASC", Dialect.MYSQL.orderBy("`v`", true));
         assertEquals("(`v` IS NULL) ASC, `v` DESC", Dialect.MYSQL.orderBy("`v`", false));
+    }
+
+    @Test
+    @DisplayName("the MariaDB name answers the MariaDB dialect")
+    void namesMariaDbSeparately() {
+        // Same wire protocol, not the same dialect: the two families have no
+        // case-sensitive NO PAD collation in common, so a caller that asked by
+        // name and got MYSQL emitted DDL MariaDB 10.11 refuses outright.
+        assertSame(Dialect.MARIADB, Dialect.forName("mariadb"));
+        assertSame(Dialect.MARIADB, Dialect.forName("MariaDB"));
+        assertSame(Dialect.MYSQL, Dialect.forName("mysql"));
+        // The engine NAME stays "mysql" for both, because everything that
+        // branches on it means the family and the SQL is the same.
+        assertEquals("mysql", Dialect.MARIADB.getName());
+        assertEquals("mysql", Dialect.MYSQL.getName());
+        // And the one difference is the collation.
+        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin",
+                Dialect.MARIADB.columnType(Dialect.TEXT));
+        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin",
+                Dialect.MYSQL.columnType(Dialect.TEXT));
     }
 }
