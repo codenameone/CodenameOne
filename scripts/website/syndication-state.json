@@ -2112,6 +2112,18 @@
         "url": "https://medium.com/@Codename_One/fill-an-sms-verification-code-without-reading-the-inbox-591ed26dbcb0?postPublishedType=initial",
         "syndicated_at": "2026-09-14T19:01:44+00:00"
       }
+    },
+    "platform-deprecation-watch": {
+      "hashnode": {
+        "url": "https://debugagent.com/we-stopped-waiting-for-platform-changes-to-find-us",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aa88a90821736758ae4c4c1",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-15T00:01:11+00:00"
+      }
     }
   }
 }
