@@ -193,7 +193,11 @@ class BibopPageFloorIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("bibop-page-floor-output");
         tempDirs.add(outputDir);
-        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "BibopPageFloorApp");
+        // "clean", NOT the 3-arg default -- see the matching note in
+        // GcOverflowSpiralIntegrationTest. The default appType "ios" emits the C runtime
+        // as Objective-C, which the CMake glob (*.c) silently drops, so the build fails at
+        // link on natives that have nothing to do with what this test measures.
+        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "BibopPageFloorApp", "clean");
 
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
