@@ -82,22 +82,22 @@ public final class Query<T> {
 
     /** field &gt; value. */
     public Query<T> gt(String field, Object value) {
-        return condition(field, " > ?", required(field, value));
+        return ordering(field, " > ?", required(field, value));
     }
 
     /** field &gt;= value. */
     public Query<T> gte(String field, Object value) {
-        return condition(field, " >= ?", required(field, value));
+        return ordering(field, " >= ?", required(field, value));
     }
 
     /** field &lt; value. */
     public Query<T> lt(String field, Object value) {
-        return condition(field, " < ?", required(field, value));
+        return ordering(field, " < ?", required(field, value));
     }
 
     /** field &lt;= value. */
     public Query<T> lte(String field, Object value) {
-        return condition(field, " <= ?", required(field, value));
+        return ordering(field, " <= ?", required(field, value));
     }
 
     /**
@@ -261,6 +261,23 @@ public final class Query<T> {
 
     private Object[] params() {
         return params.toArray();
+    }
+
+    /**
+     * An ORDERING comparison, whose left side carries the dialect's comparison
+     * collation.
+     *
+     * <p>Only the four range operators come here. Ordering differs between the
+     * engines where equality does not -- see Dialect.comparison, which measures
+     * it -- so collating eq/ne/in as well would put a COLLATE in most statements
+     * to change nothing.
+     */
+    private Query<T> ordering(String field, String operator, Object value) {
+        int index = table.definition.indexOfField(field);
+        String quoted = column(field);
+        boolean text = index >= 0 && table.columns[index].getKind() == Dialect.TEXT;
+        params.add(bound(value));
+        return raw(table.dialect.comparison(quoted, text) + operator);
     }
 
     private Query<T> condition(String field, String operator, Object value) {

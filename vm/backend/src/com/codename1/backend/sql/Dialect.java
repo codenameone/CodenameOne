@@ -390,6 +390,37 @@ public abstract class Dialect {
     }
 
     /**
+     * The left side of an ORDERING comparison -- &gt;, &gt;=, &lt;, &lt;= -- on a
+     * column of this kind.
+     *
+     * <p>The same reason {@link #orderBy(String, boolean, boolean)} exists, for
+     * the same columns, and leaving the two inconsistent is worse than leaving
+     * both alone: ordering was pinned to byte order while the comparisons that
+     * decide which rows come back were not, so a query could exclude a row that
+     * its own ORDER BY would have placed first.
+     *
+     * <p>MEASURED on a database created the way the standard image creates one,
+     * with lc_collate en_US.utf8, against rows holding 'Z' and 'a':
+     *
+     * <pre>
+     * WHERE v &gt; 'Z'    SQLite: a    MySQL: a    PostgreSQL: (none)
+     * </pre>
+     *
+     * <p>SQLite compares BINARY and the generated MySQL column carries a binary
+     * collation, so both answer in byte order; PostgreSQL follows the database's
+     * locale, where 'a' sorts before 'Z'. One entity, one query, two answers.
+     *
+     * <p>EQUALITY is deliberately NOT routed through here. PostgreSQL requires a
+     * deterministic collation by default, and under one, equality is byte
+     * equality whatever the sort order is -- so eq, ne and in already agree
+     * across the three, and collating them would be noise in every statement
+     * that uses them.
+     */
+    public String comparison(String quotedColumn, boolean text) {
+        return quotedColumn;
+    }
+
+    /**
      * Whether anything follows the first statement in {@code sql}.
      *
      * <p>What {@link com.codename1.backend.Database} refuses before dispatching,
@@ -637,6 +668,10 @@ public abstract class Dialect {
     }
 
     private static final class PostgresDialect extends Dialect {
+        public String comparison(String quotedColumn, boolean text) {
+            return text ? quotedColumn + " COLLATE \"C\"" : quotedColumn;
+        }
+
         public String orderBy(String quotedColumn, boolean ascending, boolean text) {
             // COLLATE "C" is byte order, which is what the other two already
             // give. Without it a locale-aware database ordered "a" before "Z"

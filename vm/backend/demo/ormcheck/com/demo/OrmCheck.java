@@ -281,6 +281,24 @@ public class OrmCheck {
         notes.insert(note("mid", 5, false, 3000L));
         check("count", "3", String.valueOf(notes.count()));
         check("gt", "1", String.valueOf(notes.query().gt("views", Integer.valueOf(5)).count()));
+        // A TEXT range comparison, which is where the three engines disagree by
+        // default. The three titles here -- low, high, mid -- are all lower case,
+        // so in BYTE order every one of them is above 'Z' (0x61.. against 0x5a).
+        // SQLite compares BINARY and the generated MySQL column carries a binary
+        // collation, so both answer 3. PostgreSQL follows the database locale, and
+        // on the en_US.utf8 a standard image creates, 'a' sorts BEFORE 'Z' --
+        // measured, this same query answered 3 on two engines and 0 on the third.
+        // The dialect's comparison collation is what makes it one number.
+        check("a text range comparison is byte order on every engine",
+                "above=3 below=0",
+                "above=" + notes.query().gt("title", "Z").count()
+                        + " below=" + notes.query().lt("title", "Z").count());
+        // And it agrees with the ORDER BY over the same column, which is the
+        // inconsistency this closes: ordering was already pinned to byte order
+        // while the comparison deciding which rows come back was not. Ascending by
+        // title, "high" is first, and it is one of the rows gt('Z') returns.
+        check("ordering and comparison agree on the same column", "high",
+                notes.query().orderBy("title", true).first().title);
         check("eq on a boolean", "1",
                 String.valueOf(notes.query().eq("pinned", Boolean.TRUE).count()));
         check("gte on a date and a mixed-case column", "2",

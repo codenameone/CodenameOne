@@ -22,33 +22,55 @@
  */
 package java.lang;
 
-import java.util.HashMap;
-
 /// @author shannah
 ///
-/// THE VALUES LIVE ON THE THREAD, not in a map owned by this object, and that is
-/// the whole of the design. What it replaces was a `Map<Thread,T>` plus a
-/// `Set<Thread>` held HERE and written by every thread that touched the variable,
-/// with no synchronization of any kind -- so two threads calling `set` at the same
-/// instant both wrote into one `java.util.HashMap`.
+/// THE VALUES LIVE ON THE THREAD, under a WEAK key, and both halves of that are
+/// load bearing.
 ///
-/// That map is open addressed with linear probing, and a torn insert leaves a table
-/// whose probe sequence has no terminator: every later lookup of an absent key walks
-/// the whole table and never stops. MEASURED on a Codename One backend server, which
-/// sets a ThreadLocal once per request: 14 threads spinning inside
-/// `java.util.HashMap.put` at 1450% CPU, the process answering nothing and never
-/// recovering. It needs no virtual threads and no collector involvement -- any two
-/// platform threads sharing a ThreadLocal can do it.
+/// What this replaces was a `Map<Thread,T>` plus a `Set<Thread>` held HERE and
+/// written by every thread that touched the variable, with no synchronization of
+/// any kind -- so two threads calling `set` at the same instant both wrote into one
+/// `java.util.HashMap`. That map is open addressed with linear probing, and a torn
+/// insert leaves a probe sequence with no terminator: every later lookup of an
+/// absent key walks the whole table and never stops. MEASURED on a Codename One
+/// backend server, which sets a ThreadLocal once per request: 14 threads spinning
+/// inside `java.util.HashMap.put` at 1450% CPU, the process answering nothing and
+/// never recovering. It needs no virtual threads and no collector involvement --
+/// any two platform threads sharing a ThreadLocal can do it.
 ///
-/// It also LEAKED. Nothing ever removed an entry for a thread that had died, so a
-/// server with a thread per connection accumulated one live entry per connection for
-/// the life of the process, and the ThreadLocal kept both the Thread and its value
-/// reachable. Keying off the Thread instead means the whole table dies with the
-/// thread that owns it.
+/// Keying off the thread fixes that, and there is no lock here because a thread
+/// only ever reads and writes its OWN table, which nothing else can reach.
 ///
-/// There is no lock here and none is needed: a thread only ever reads and writes its
-/// OWN map, which nothing else can reach.
+/// THE KEY IS WEAK because the obvious version of that trade leaks the other way.
+/// A long-lived worker thread that touches a short-lived ThreadLocal -- library or
+/// request code that creates them dynamically -- would pin the ThreadLocal AND its
+/// value until the thread died, however long ago the application dropped its last
+/// reference. The old layout at least let an unreachable ThreadLocal take its
+/// values with it. Holding the key weakly keeps that property and the new one:
+/// nothing here keeps a ThreadLocal alive, and an entry whose key has been
+/// collected is swept on the next access to this thread's table.
+///
+/// A LINEAR SCAN, not a hash table, and that is deliberate. A thread holds a
+/// handful of these in any real program, the scan is over an array of entries with
+/// no hashing and no probe sequence, and it is the sweep: every access already
+/// walks the whole table, so purging cleared keys costs nothing extra. It also
+/// cannot develop the pathology described above, which is what this class is
+/// recovering from.
 public class ThreadLocal<T> extends Object {
+
+    /// One binding. The KEY is the referent, held weakly; the value is strong,
+    /// because it is only reachable through an entry whose key is still alive.
+    /// Package private rather than private: java.lang.Thread declares the array
+    /// that holds these, and both classes live in java.lang.
+    static final class Entry extends java.lang.ref.WeakReference {
+        Object value;
+        boolean initialised;
+
+        Entry(ThreadLocal key, Object value) {
+            super(key);
+            this.value = value;
+        }
+    }
 
     public ThreadLocal() {
         super();
@@ -58,34 +80,93 @@ public class ThreadLocal<T> extends Object {
         return null;
     }
 
-    /// The calling thread's table, created on first use so a thread that never
-    /// touches a ThreadLocal pays nothing for one.
-    private static HashMap tableOfCurrentThread() {
+    /// This thread's entry for this ThreadLocal, sweeping entries whose key has
+    /// been collected on the way past. Returns null when there is no binding.
+    ///
+    /// `create` allocates the table and the entry rather than answering null, which
+    /// is what separates `set` from `get` on an unbound variable.
+    private Entry entryOfCurrentThread(boolean create) {
         Thread t = Thread.currentThread();
-        HashMap table = t.threadLocalValues;
+        Entry[] table = t.threadLocalValues;
         if(table == null) {
-            table = new HashMap();
+            if(!create) {
+                return null;
+            }
+            table = new Entry[8];
             t.threadLocalValues = table;
         }
-        return table;
+        Entry mine = null;
+        int free = -1;
+        for(int iter = 0 ; iter < table.length ; iter++) {
+            Entry e = table[iter];
+            if(e == null) {
+                if(free < 0) {
+                    free = iter;
+                }
+                continue;
+            }
+            Object key = e.get();
+            if(key == null) {
+                // Its ThreadLocal is gone, so the value it holds is unreachable to
+                // everyone. Dropping it here is the whole of the stale-entry sweep.
+                table[iter] = null;
+                if(free < 0) {
+                    free = iter;
+                }
+                continue;
+            }
+            if(key == this) {
+                mine = e;
+            }
+        }
+        if(mine != null || !create) {
+            return mine;
+        }
+        if(free < 0) {
+            // Grown rather than probed: there is no hash and no displacement, so a
+            // full table just needs more room.
+            Entry[] grown = new Entry[table.length * 2];
+            System.arraycopy(table, 0, grown, 0, table.length);
+            free = table.length;
+            table = grown;
+            t.threadLocalValues = grown;
+        }
+        mine = new Entry(this, null);
+        table[free] = mine;
+        return mine;
     }
 
     public T get() {
-        HashMap table = tableOfCurrentThread();
-        // containsKey rather than a null test, so a ThreadLocal deliberately set to
-        // null is not re-initialised on every read -- which is what the Set this
-        // replaces was for.
-        if(!table.containsKey(this)) {
-            table.put(this, initialValue());
+        Entry e = entryOfCurrentThread(true);
+        if(!e.initialised) {
+            // The initial value is computed ONCE and then remembered, including
+            // when it is null -- a ThreadLocal deliberately set to null must not be
+            // re-initialised on every read, which is what the Set this replaces was
+            // for.
+            e.initialised = true;
+            e.value = initialValue();
         }
-        return (T)table.get(this);
+        return (T)e.value;
     }
 
     public void set(T value) {
-        tableOfCurrentThread().put(this, value);
+        Entry e = entryOfCurrentThread(true);
+        e.initialised = true;
+        e.value = value;
     }
 
     public void remove() {
-        tableOfCurrentThread().remove(this);
+        Thread t = Thread.currentThread();
+        Entry[] table = t.threadLocalValues;
+        if(table == null) {
+            return;
+        }
+        for(int iter = 0 ; iter < table.length ; iter++) {
+            Entry e = table[iter];
+            if(e != null && e.get() == this) {
+                table[iter] = null;
+                return;
+            }
+        }
     }
 }
