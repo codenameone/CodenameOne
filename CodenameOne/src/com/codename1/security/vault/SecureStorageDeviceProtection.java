@@ -80,8 +80,12 @@ public class SecureStorageDeviceProtection extends DeviceProtection {
         // VaultCapabilities offer REMEMBER_DEVICE on a headless or keyring-less session where
         // every attempt to create the device key fails.
         boolean hasStore = store.entryState(account("cn1.probe")) != SecureStorage.ENTRY_UNKNOWN;
+        // YES, not "not NO". The report has three states and UNKNOWN is explicitly not a
+        // guarantee -- rounding it up here let VaultCapabilities accept a store that had never
+        // said it could keep anything, which is the same mistake as reading PERSISTENT off
+        // entryState, one step further in.
         boolean persists = hasStore
-                && store.protection().answer(Protection.PERSISTENT) != ProtectionReport.NO;
+                && store.protection().answer(Protection.PERSISTENT) == ProtectionReport.YES;
         b.set(Protection.PERSISTENT, persists);
         // Asked of the store, not inferred from the fact that one exists. "A store answered"
         // and "that store encrypts" are different questions, and two ports answer NO to the

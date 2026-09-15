@@ -944,7 +944,11 @@ public final class Vault {
                     // under the name -- so refusing without putting the old value back would
                     // discard a secret the caller still believes is there, on an operation that
                     // reported failure.
-                    Object previous = Storage.getInstance().readObject(entry);
+                    // Uncached, because this is what a rollback would put BACK. Storage's
+                    // process-local cache can answer with this tab's older copy, so restoring it
+                    // would overwrite whatever another tab stored most recently -- on an
+                    // operation that reports LOCKED and is supposed to have changed nothing.
+                    Object previous = readUncached(entry);
                     if (!Storage.getInstance().writeObject(entry, Bytes.toHex(sealed))) {
                         throw new VaultException(VaultError.QUOTA_EXCEEDED,
                                 "the secret could not be written to storage");
@@ -1050,7 +1054,8 @@ public final class Vault {
                     // because a lock can land inside the delete itself -- and reporting LOCKED
                     // over a secret that is irreversibly gone tells the caller nothing changed
                     // when everything did.
-                    Object previous = Storage.getInstance().readObject(entry);
+                    // Uncached, for the reason putSecret gives: a rollback restores this.
+                    Object previous = readUncached(entry);
                     Storage.getInstance().deleteStorageFile(entry);
                     if (generation != lockGeneration) {
                         if (previous instanceof String) {
@@ -1888,6 +1893,17 @@ public final class Vault {
                         // the import reported success while getPolicy() still answered the
                         // previous remembering policy and unlockRemembered still opened the vault
                         // without a password -- the opposite of what the caller configured.
+                        // Through the three-state read: deviceRecord() answers null both for
+                        // "there is none" and for "there is one and it could not be read", and
+                        // collapsing those let a transient failure skip the cleanup while the
+                        // import reported success. Once storage recovers the old record makes
+                        // getPolicy() report a remembering policy again, and at an unchanged key
+                        // version unlockRemembered reopens the vault without a password.
+                        if (deviceRecordState() == ProtectionReport.UNKNOWN) {
+                            throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
+                                    "a device record exists here and could not be read, so this "
+                                    + "import cannot make the vault session-only");
+                        }
                         DeviceRecord standing = deviceRecord();
                         if (standing != null) {
                             Storage.getInstance().deleteStorageFile(deviceRecordKey());
@@ -2545,7 +2561,12 @@ public final class Vault {
     }
 
     private DeviceRecord deviceRecord() {
-        Object stored = Storage.getInstance().readObject(deviceRecordKey());
+        // Uncached, like the metadata read. The device record is cross-context state -- another
+        // tab forgetting the device, or moving it to a different policy, writes this entry -- and
+        // Storage.readObject answers a copy this context took earlier, which nothing that tab
+        // does can invalidate. Found by a test whose deliberately unreadable record was invisible
+        // here, which is the same thing a real second tab would have been.
+        Object stored = readUncached(deviceRecordKey());
         if (!(stored instanceof String)) {
             return null;
         }
@@ -2560,7 +2581,7 @@ public final class Vault {
     /// protections such as ENCRYPTED_AT_REST=YES -- none of which was observed, because nothing
     /// managed to read the record that decides them.
     private int deviceRecordState() {
-        Object stored = Storage.getInstance().readObject(deviceRecordKey());
+        Object stored = readUncached(deviceRecordKey());
         if (stored instanceof String) {
             return DeviceRecord.parse((String) stored) == null
                     ? ProtectionReport.UNKNOWN : ProtectionReport.YES;

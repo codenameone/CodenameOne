@@ -790,9 +790,27 @@ public final class AndroidSecureStorage extends SecureStorage {
             lock = handle.getChannel().lock();
             handle.setLength(0);
             handle.getChannel().force(true);
+            boolean removed;
             synchronized (PLAIN_KEY_LOCK) {
-                return prefs.edit().remove(account).commit();
+                removed = prefs.edit().remove(account).commit();
             }
+            if (!removed) {
+                // The mark goes back. Clearing it first is right while the removal SUCCEEDS --
+                // a cleared mark beside a surviving value is read back by the next setIfAbsent
+                // and returned -- but a removal that failed leaves exactly the pair this gate
+                // exists to prevent: a value still in use and a gate saying nobody owns it, so a
+                // later process with a stale preferences cache generates a replacement key and
+                // overwrites it. Best effort, because the alternative to a failed rewrite is
+                // nothing at all.
+                try {
+                    handle.seek(0);
+                    handle.write(1);
+                    handle.getChannel().force(true);
+                } catch (java.io.IOException cannotRemark) {
+                    Log.e(cannotRemark);
+                }
+            }
+            return removed;
         } catch (java.io.IOException cannotRemove) {
             Log.e(cannotRemove);
             return false;

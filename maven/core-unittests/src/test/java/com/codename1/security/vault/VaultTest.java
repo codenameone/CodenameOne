@@ -2007,6 +2007,19 @@ class VaultTest extends UITestBase {
                 + "process cached before another context replaced it");
     }
 
+    /// The bytes Storage writes for any object, so a test can put one in behind the cache.
+    private static byte[] encodeStorageObject(Object value) {
+        try {
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+            com.codename1.io.Util.writeObject(value, out);
+            out.close();
+            return bytes.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /// The bytes Storage writes for a String, so a test can put one in behind the cache.
     private static byte[] encodeStorageString(String value) {
         try {
@@ -2229,6 +2242,34 @@ class VaultTest extends UITestBase {
         Vault reopened = Vault.named(name).configure(fast());
         assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
         assertArrayEquals(pw("abc123"), reopened.getSecret("token").get());
+    }
+
+    @Test
+    void aSessionOnlyImportRefusesWhenTheOldRecordCannotBeRead() {
+        // deviceRecord() answers null both for "there is none" and for "there is one and it could
+        // not be read". Collapsing those let a transient failure skip the cleanup while the
+        // import reported success -- and once storage recovers, the old record makes getPolicy()
+        // report a remembering policy again and unlockRemembered reopens the vault without a
+        // password.
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault origin = Vault.named(freshName()).configure(remember);
+        origin.enroll(pw("p"), remember).get();
+
+        String name = freshName();
+        Vault joined = Vault.named(name).configure(remember);
+        assertTrue(joined.importSyncState(origin.exportSyncState(), pw("p")).get().booleanValue());
+        String record = deviceRecordName(name);
+
+        // Present and unreadable, which is the state under test. A non-String value, because a
+        // String is what the record IS -- writing garbage text only produces a record that parses
+        // to something empty, which is a different (and already handled) case.
+        TestCodenameOneImplementation.getInstance().putStorageEntry(record,
+                encodeStorageObject(Integer.valueOf(7)));
+
+        Vault sessionOnly = Vault.named(name).configure(fast());
+        assertEquals(VaultError.TEMPORARILY_UNREADABLE,
+                errorOf(sessionOnly.importSyncState(origin.exportSyncState(), pw("p"))),
+                "an unreadable device record must not be treated as no device record");
     }
 
     @Test

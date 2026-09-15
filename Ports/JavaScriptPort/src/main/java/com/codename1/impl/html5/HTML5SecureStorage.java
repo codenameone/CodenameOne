@@ -97,8 +97,17 @@ public final class HTML5SecureStorage extends SecureStorage {
     /// that can reach one can reach them all.
     private static final String KEY_ID = "cn1.securestorage";
 
+    /// Where the PREVIOUS version of this port put a plaintext entry, which is the raw name.
+    ///
+    /// Not escaped, and that asymmetry is deliberate. Nothing here ever writes a legacy entry --
+    /// they are read and deleted only -- so this has to address what is already on disk, and what
+    /// is on disk was written by a version that passed the raw name to Storage. Escaping it made
+    /// every existing credential and managed database key invisible on the first launch after an
+    /// upgrade. Two historical accounts that normalization folded together still share one legacy
+    /// entry, which is what they have always done; the escape below stops that happening to
+    /// anything written from now on.
     private static String legacyKey(String account) {
-        return LEGACY_PREFIX + escaped(account);
+        return LEGACY_PREFIX + account;
     }
 
     private static String encryptedKey(String account) {
@@ -222,7 +231,13 @@ public final class HTML5SecureStorage extends SecureStorage {
                 return legacyValue(account);
             }
             // Proven readable, so the interrupted migration can be finished now and not sooner.
-            if (Storage.getInstance().exists(legacyKey(account))) {
+            // Only when it is the value this ciphertext holds. An older service worker or tab
+            // can write a NEWER plaintext entry after this version created the encrypted one, and
+            // deleting it here unconditionally threw that update away for good while get() went
+            // on answering the older ciphertext. Read past the cache for the same reason migrate
+            // does: the copy this tab took earlier is precisely what hides the other tab's write.
+            Object stale = readUncached(legacyKey(account));
+            if (stale instanceof String && plaintext.equals(stale)) {
                 Storage.getInstance().deleteStorageFile(legacyKey(account));
             }
             return plaintext;
