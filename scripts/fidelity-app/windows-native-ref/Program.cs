@@ -422,6 +422,16 @@ public partial class App : Application
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SystemParametersInfo(uint action, uint param, ref bool value, uint winIni);
 
+    /// Renders a window's own content into a DC, independent of what is on screen.
+    ///
+    /// PW_RENDERFULLCONTENT (2) is the flag that makes it work for a DirectComposition
+    /// surface, which is what WinUI 3 draws into; without it the call returns an empty
+    /// bitmap for exactly this kind of app.
+    [DllImport("user32.dll")]
+    private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint flags);
+
+    private const uint PW_RENDERFULLCONTENT = 0x00000002;
+
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
@@ -759,8 +769,6 @@ public partial class App : Application
     {
         DwmFlush();
         GetClientRect(_hwnd, out RECT clientRect);
-        var origin = new POINT { X = 0, Y = 0 };
-        ClientToScreen(_hwnd, ref origin);
         int w = clientRect.Right - clientRect.Left;
         int h = clientRect.Bottom - clientRect.Top;
         if (w <= 0 || h <= 0)
@@ -768,20 +776,57 @@ public partial class App : Application
             _blockers.Add($"{name}: the client area has no size ({w}x{h})");
             return null;
         }
+        // PrintWindow, NOT a screen BitBlt, and this is the difference between a
+        // reproducible set and a flaky one.
+        //
+        // A screen grab reads whatever is in front of those coordinates. The probe already
+        // reports that this window cannot take the foreground on a hosted runner -- the
+        // shell's own Search window holds it -- so the grab depends on nothing wandering
+        // over the region in the moment it runs. Two runs of the same commit differed on
+        // every tile, and one whole run came back #E0E0E0 in both appearances: not the
+        // window at all.
+        //
+        // PrintWindow renders the window's OWN content and does not care what is on top or
+        // whether it is foreground. It cannot see the Mica backdrop, which is drawn behind
+        // the window by the compositor -- but the tile paints an opaque
+        // SolidBackgroundFillColorBase over that region anyway, so the matrix never needed
+        // it. The probe capture still uses the screen BitBlt, because Mica is precisely
+        // what it is there to answer.
+        // PrintWindow renders the WHOLE window, title bar included, from the window's own
+        // origin -- so the bitmap has to be window sized and the client area cropped out of
+        // it afterwards. Rendering into a client-sized bitmap would have captured the title
+        // bar and called it a widget.
+        if (!GetWindowRect(_hwnd, out RECT wr))
+        {
+            _blockers.Add($"{name}: GetWindowRect failed");
+            return null;
+        }
+        int ww = wr.Right - wr.Left, wh = wr.Bottom - wr.Top;
+        var clientOrigin = new POINT { X = 0, Y = 0 };
+        ClientToScreen(_hwnd, ref clientOrigin);
+        int offX = clientOrigin.X - wr.Left, offY = clientOrigin.Y - wr.Top;
+
         IntPtr screen = GetDC(IntPtr.Zero);
         IntPtr mem = CreateCompatibleDC(screen);
-        IntPtr bmp = CreateCompatibleBitmap(screen, w, h);
+        IntPtr bmp = CreateCompatibleBitmap(screen, ww, wh);
         IntPtr old = SelectObject(mem, bmp);
-        bool ok = BitBlt(mem, 0, 0, w, h, screen, origin.X, origin.Y, SRCCOPY | CAPTUREBLT);
+        bool ok = PrintWindow(_hwnd, mem, PW_RENDERFULLCONTENT);
         SelectObject(mem, old);
         try
         {
             if (!ok)
             {
-                _blockers.Add($"{name}: BitBlt of the client area failed");
+                _blockers.Add($"{name}: PrintWindow of the client area failed");
                 return null;
             }
-            using var image = System.Drawing.Image.FromHbitmap(bmp);
+            using var whole = System.Drawing.Image.FromHbitmap(bmp);
+            if (offX < 0 || offY < 0 || offX + w > whole.Width || offY + h > whole.Height)
+            {
+                _blockers.Add($"{name}: the client area ({offX},{offY} {w}x{h}) does not lie "
+                    + $"inside the window bitmap ({whole.Width}x{whole.Height})");
+                return null;
+            }
+            using var image = whole.Clone(new System.Drawing.Rectangle(offX, offY, w, h), whole.PixelFormat);
             if (IsUniform(image, 0, 0, image.Width, image.Height))
             {
                 _blockers.Add($"{name}: captured a uniform image, so nothing was composited");
