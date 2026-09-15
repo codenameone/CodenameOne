@@ -114,9 +114,10 @@ class JavascriptSecureStorageNamespaceTest {
         int write = body.indexOf("writeObject(encryptedKey(account)");
         assertTrue(write > 0, "migrate no longer writes the encrypted entry: " + body);
         String beforeTheWrite = body.substring(0, write);
-        assertTrue(beforeTheWrite.indexOf("readObject(legacyKey(account))") > 0,
+        assertTrue(beforeTheWrite.indexOf("readUncached(legacyKey(account))") > 0,
                 "migrate must re-read the plaintext it is migrating before it overwrites the "
-                + "encrypted entry, or a stale tab wins over a newer write");
+                + "encrypted entry, and past Storage's cache -- readObject answers a copy this "
+                + "tab took earlier, which is exactly the stale value being guarded against");
         assertTrue(beforeTheWrite.indexOf("exists(encryptedKey(account))") > 0,
                 "migrate must check that no encrypted entry has appeared before writing one; "
                 + "get() only reaches migrate when there was none, so one now is newer");
@@ -124,9 +125,50 @@ class JavascriptSecureStorageNamespaceTest {
         // And the plaintext is only removed while it is still the value that was migrated.
         int delete = body.indexOf("deleteStorageFile(legacyKey(account))");
         assertTrue(delete > 0, "migrate no longer removes the plaintext: " + body);
-        assertTrue(body.lastIndexOf("readObject(legacyKey(account))", delete) > write,
-                "the plaintext must be re-read between the encrypted write and its deletion, or "
-                + "a value that arrived in between is deleted rather than kept");
+        assertTrue(body.lastIndexOf("readUncached(legacyKey(account))", delete) > write,
+                "the plaintext must be re-read between the encrypted write and its deletion, and "
+                + "past the cache, or a value that arrived in between is deleted rather than "
+                + "kept");
+    }
+
+    @Test
+    void accountNamesAreEscapedBeforeTheyBecomeStorageKeys() {
+        // Storage.fixFileName rewrites '/' and six other characters to '_' when normalizeNames is
+        // on, which is the default -- so `api/token` and `api_token` addressed ONE entry. The
+        // second set() overwrote the first account's ciphertext, and because the AAD still names
+        // the original account every later read of the first failed authentication.
+        //
+        // Structural, like the ordering check below, because this module cannot load the port's
+        // classes. What it holds is that neither key builder concatenates the account raw.
+        String source = readSource();
+        for (String signature : new String[]{
+                "private static String legacyKey(String account)",
+                "private static String encryptedKey(String account)"}) {
+            String body = methodBody(source, signature);
+            assertTrue(body.indexOf("escaped(account)") > 0,
+                    signature + " must escape the account before it becomes a storage key: "
+                    + body);
+        }
+        // And the escape has to be one fixFileName leaves alone -- '_' plus hex, never the
+        // characters it rewrites.
+        String escape = methodBody(source, "private static String escaped(String account)");
+        assertTrue(escape.indexOf("b.append('_')") > 0, escape);
+    }
+
+    @Test
+    void theEscapeCheckWouldHaveCaughtTheConcatenationItWasWrittenFor() {
+        // Guards that guard: the shipped draft returned PREFIX + account with nothing between.
+        String original = "{ return LEGACY_PREFIX + account; }";
+        assertFalse(original.indexOf("escaped(account)") > 0,
+                "the original really did concatenate the account raw");
+    }
+
+    private static String readSource() {
+        try {
+            return new String(Files.readAllBytes(SOURCE), StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Test

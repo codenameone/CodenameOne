@@ -98,11 +98,72 @@ public final class HTML5SecureStorage extends SecureStorage {
     private static final String KEY_ID = "cn1.securestorage";
 
     private static String legacyKey(String account) {
-        return LEGACY_PREFIX + account;
+        return LEGACY_PREFIX + escaped(account);
     }
 
     private static String encryptedKey(String account) {
-        return ENCRYPTED_PREFIX + account;
+        return ENCRYPTED_PREFIX + escaped(account);
+    }
+
+    /// An account name reduced to characters a storage key keeps.
+    ///
+    /// Storage.fixFileName rewrites '/', '\\', '%', '?', '*', ':' and '=' to '_' when
+    /// normalizeNames is on, which is the default -- so `api/token` and `api_token` addressed ONE
+    /// entry. The second set() overwrote the first account's ciphertext, and because the AAD
+    /// still names the original account every later read of the first failed authentication,
+    /// while remove() for either took out both. The vault escapes its own names for exactly this
+    /// and the scheme is the same: anything outside [A-Za-z0-9] and '.' becomes `_XXXX`, which
+    /// fixFileName leaves alone and which no two distinct names can collide on.
+    ///
+    /// Copied rather than shared: the vault's copy is private to a different module, and widening
+    /// something into public API to avoid ten lines here would be the worse trade.
+    private static String escaped(String account) {
+        StringBuilder b = new StringBuilder(account.length());
+        for (int iter = 0; iter < account.length(); iter++) {
+            char c = account.charAt(iter);
+            boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.';
+            if (safe) {
+                b.append(c);
+            } else {
+                b.append('_');
+                b.append(HEX.charAt((c >> 12) & 0x0f));
+                b.append(HEX.charAt((c >> 8) & 0x0f));
+                b.append(HEX.charAt((c >> 4) & 0x0f));
+                b.append(HEX.charAt(c & 0x0f));
+            }
+        }
+        return b.toString();
+    }
+
+    private static final String HEX = "0123456789abcdef";
+
+    /// One entry, read past Storage's process-local cache.
+    ///
+    /// readObject answers that cache before it looks at storage and nothing another context
+    /// writes can invalidate it -- so the re-reads this migration makes to decide whether the
+    /// plaintext is still the value it set out with were answering from the copy THIS tab had
+    /// already taken. Another tab replacing the value was invisible, and the deletion at the end
+    /// then removed the replacement, leaving only the encrypted copy of the value it superseded.
+    private static Object readUncached(String name) {
+        if (!Storage.getInstance().exists(name)) {
+            return null;
+        }
+        java.io.InputStream in = null;
+        try {
+            in = Storage.getInstance().createInputStream(name);
+            return com.codename1.io.Util.readObject(new java.io.DataInputStream(in));
+        } catch (java.io.IOException cannotRead) {
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (java.io.IOException ignored) {
+                    // Nothing left to do with it.
+                }
+            }
+        }
     }
 
     private HTML5DeviceProtection device() {
@@ -121,6 +182,15 @@ public final class HTML5SecureStorage extends SecureStorage {
             // The legacy entry goes only after the encrypted one is in place. A store that failed
             // the write above and had already lost the plaintext would have destroyed the value.
             Storage.getInstance().deleteStorageFile(legacyKey(account));
+            // Checked, because deleteStorageFile cannot report: it returns void, and this port's
+            // implementation catches the IndexedDB failure and returns. Answering true there told
+            // the caller its secret had been written securely while the OLD one was still sitting
+            // in browser storage as plaintext. remove() already checks this way.
+            if (Storage.getInstance().exists(legacyKey(account))) {
+                Log.p("SecureStorage: the plaintext entry this replaced could not be removed",
+                        Log.WARNING);
+                return false;
+            }
             return true;
         } catch (RuntimeException failed) {
             // Not logged with the value, the account or any part of the ciphertext -- this line
@@ -203,7 +273,7 @@ public final class HTML5SecureStorage extends SecureStorage {
             // construction. Neither is a compare-and-set: com.codename1.io.Storage has no such
             // primitive, so this narrows the window from the whole of seal() to the instructions
             // between the check and the write rather than closing it.
-            Object stillPlain = Storage.getInstance().readObject(legacyKey(account));
+            Object stillPlain = readUncached(legacyKey(account));
             if (!(stillPlain instanceof String) || !value.equals(stillPlain)) {
                 return;
             }
@@ -223,7 +293,7 @@ public final class HTML5SecureStorage extends SecureStorage {
             // Asked once more before the plaintext goes. It is the only copy of anything that
             // arrived after the check above, and deleting it there would lose that value
             // outright rather than merely deferring a migration.
-            Object beforeDelete = Storage.getInstance().readObject(legacyKey(account));
+            Object beforeDelete = readUncached(legacyKey(account));
             if (beforeDelete instanceof String && value.equals(beforeDelete)) {
                 Storage.getInstance().deleteStorageFile(legacyKey(account));
             }
