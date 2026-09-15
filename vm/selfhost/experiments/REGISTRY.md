@@ -2090,3 +2090,41 @@ its precondition now exists.** It is also the change with the largest blast radi
 VM -- every generated struct, every port native that reads a field out of one, and a
 second encoding for legacy-heap objects outside the window. It should be scoped and
 prototyped behind this census, not started on the strength of it.
+
+## Round 16: D6 REFUTED for the cost of one run, and it names its own replacement
+
+Plan item D6 -- "try/catch disables four optimizations at once ... this single exclusion
+is plausibly the largest codegen item left" -- said its first step was a measurement
+rather than code, and that if the number came back small "the whole line dies for the
+cost of one run". It came back small.
+
+`-Dcn1.framelessCensus=true`, self-hosting corpus:
+
+    methods=3350  frameless=2453 (73.2%)
+      excluded by try/catch ALONE:  12   (0.36%)
+      excluded for other reasons:  885
+
+**Twelve methods.** The exclusion is real, it does cost frameless codegen, bounds-check
+elimination and StringBuilder stack allocation together -- and it applies to 0.36% of
+methods on a program that is full of try/catch. D6 is dead; do not spend the setjmp
+risk on it.
+
+The same run names the replacement, which is why the instrument tallies reasons rather
+than just ruling try/catch out:
+
+    excludedOther: ctorOrClinit=557  synchronized=29  onDeviceDebug=0
+                   unhandledOpcode=0  empty=50   (rest: object args/returns/locals)
+
+**Constructors and static initializers are 557 methods, 16.6% of all of them, and 46x
+the try/catch item.** `isFramelessEligible` defers them deliberately -- "super-call /
+field-init / partially-constructed-receiver semantics need more care" -- and every
+allocation in the program runs one, so they are hot by construction. That is the
+frameless item worth scoping, and it was invisible while the plan was looking at
+try/catch.
+
+`unhandledOpcode=0` is worth noting too: the conservative whitelist of opcodes is not
+excluding anything on this corpus, so widening it would buy nothing.
+
+The census is `-D` gated, defaults off, and changes no emitted output: gates on the tree
+carrying it are GC-VERIFY GREEN (three self-tests still non-vacuous), gauntlet GREEN,
+Gate D PASS, Gate A PASS (798 files byte-identical), negative control PASS.

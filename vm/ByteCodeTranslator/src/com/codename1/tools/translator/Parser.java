@@ -226,6 +226,21 @@ public class Parser extends ClassVisitor {
     private int lambdaCounter;
     private int stringConcatCounter;
     public static void cleanup() {
+        if (BytecodeMethod.FRAMELESS_CENSUS) {
+            int t = BytecodeMethod.censusTotal;
+            System.out.println("[FRAMELESS] methods=" + t
+                + " frameless=" + BytecodeMethod.censusEligible
+                + " excludedByTryCatchALONE=" + BytecodeMethod.censusExcludedTryCatch
+                + " excludedOther=" + BytecodeMethod.censusExcludedOther
+                + (t > 0 ? "  (tryCatchAlone=" + (100 * BytecodeMethod.censusExcludedTryCatch / t)
+                    + "% of all methods)" : ""));
+            System.out.println("[FRAMELESS] excludedOther breakdown:"
+                + " ctorOrClinit=" + BytecodeMethod.censusNoConstructor
+                + " synchronized=" + BytecodeMethod.censusNoSync
+                + " onDeviceDebug=" + BytecodeMethod.censusNoDebug
+                + " unhandledOpcode=" + BytecodeMethod.censusNoOpcode
+                + " empty=" + BytecodeMethod.censusEmpty);
+        }
         nativeSources = null;
         classes.clear();
         // classes is cleared in place (same List reference), so the name index's

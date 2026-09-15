@@ -583,11 +583,53 @@ public class BytecodeMethod implements SignatureSet {
      * object-touching opcode makes it ineligible -- such a frame would carry a GC
      * root, which is exactly what frameless relies on being absent.
      */
+    /// FRAMELESS CENSUS (-Dcn1.framelessCensus=true). Plan item D6 says its first step
+    /// is a measurement rather than code: a method with any try/catch loses frameless
+    /// codegen, bounds-check elimination and StringBuilder stack allocation at once, and
+    /// the question is how many methods that exclusion ALONE is costing. Counted here
+    /// because this is the one place that already knows the answer.
+    static final boolean FRAMELESS_CENSUS =
+            "true".equalsIgnoreCase(Util.getProperty("cn1.framelessCensus", "false"));
+    static int censusEligible, censusExcludedTryCatch, censusExcludedOther, censusTotal;
+    /// Why the 'other' exclusions happened, so the census answers where the REMAINING
+    /// frameless opportunity is rather than only ruling try/catch out.
+    static int censusNoConstructor, censusNoSync, censusNoDebug, censusNoOpcode, censusEmpty;
+    static void censusReason(int which) {
+        switch (which) {
+            case 0: censusNoConstructor++; break;
+            case 1: censusNoSync++; break;
+            case 2: censusNoDebug++; break;
+            case 3: censusNoOpcode++; break;
+            default: censusEmpty++; break;
+        }
+    }
+
     private boolean isFramelessEligible() {
+        boolean r = isFramelessEligibleImpl(false);
+        if (FRAMELESS_CENSUS && !nativeMethod && !abstractMethod && !eliminated) {
+            censusTotal++;
+            if (r) {
+                censusEligible++;
+            } else if (isFramelessEligibleImpl(true)) {
+                // Would be eligible if try/catch alone were not disqualifying.
+                censusExcludedTryCatch++;
+            } else {
+                censusExcludedOther++;
+            }
+        }
+        return r;
+    }
+
+    /// @param ignoreTryCatch when true, a TryCatch range does not disqualify -- used
+    ///                       only by the census above to attribute the exclusion
+    private boolean isFramelessEligibleImpl(boolean ignoreTryCatch) {
         if (!FRAMELESS_ENABLED) {
             return false;
         }
         if (nativeMethod || abstractMethod || eliminated || synchronizedMethod || onDeviceDebug) {
+            if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+                censusReason(synchronizedMethod ? 1 : (onDeviceDebug ? 2 : 4));
+            }
             return false;
         }
         // PHASE 3b: object args/return/locals are allowed only when object-frameless is on
@@ -601,6 +643,9 @@ public class BytecodeMethod implements SignatureSet {
             // field-init / partially-constructed-receiver semantics need more care).
             if (!obj || !FRAMELESS_INSTANCE_ENABLED || constructor
                     || methodName.equals("__INIT__") || methodName.equals("__CLINIT__")) {
+                if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+                    censusReason(0);
+                }
                 return false;
             }
         }
@@ -620,7 +665,10 @@ public class BytecodeMethod implements SignatureSet {
         boolean hasRealInstruction = false;
         for (Instruction i : instructions) {
             if (i instanceof TryCatch) {
-                return false;
+                if (!ignoreTryCatch) {
+                    return false;
+                }
+                continue;
             }
             if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof LocalVariable) {
                 continue;
@@ -772,7 +820,13 @@ public class BytecodeMethod implements SignatureSet {
             // Any other instruction type (CustomInvoke/CustomJump/CustomIntruction/
             // ArithmeticExpression are produced only by optimize and must not appear
             // here; anything else is unrecognized) -> conservatively ineligible.
+            if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+                censusReason(3);
+            }
             return false;
+        }
+        if (FRAMELESS_CENSUS && !ignoreTryCatch && !hasRealInstruction) {
+            censusReason(4);
         }
         return hasRealInstruction;
     }
