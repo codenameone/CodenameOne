@@ -35,8 +35,31 @@ TRANSLATOR="$REPO/vm/ByteCodeTranslator/target/classes"
 # maven's own incremental check is not enough on its own: it answered "Nothing to
 # compile - all classes are up to date" for a source three hours newer than its
 # class.
+TR_MANIFEST="$REPO/vm/ByteCodeTranslator/target/selfhost-src.manifest"
+# The staging copy lives OUTSIDE target/, because `mvn clean` below deletes that whole
+# directory -- staging it inside meant the file was gone by the time it was compared and
+# moved into place, so the guard rebuilt on every single run and then failed on the
+# missing file. Caught by asking the gate to stay SILENT when nothing changed, which is
+# the half of a negative control that is easy to skip.
+TR_MANIFEST_NOW="$(mktemp -t cn1selfhostmanifest)"
+trap 'rm -f "$TR_MANIFEST_NOW"' EXIT
+find "$REPO/vm/ByteCodeTranslator/src" -type f | sort > "$TR_MANIFEST_NOW"
 needs_build=0
 if [ ! -f "$TRANSLATOR/com/codename1/tools/translator/ByteCodeTranslator.class" ]; then
+    needs_build=1
+elif [ ! -f "$TR_MANIFEST" ] || ! cmp -s "$TR_MANIFEST" "$TR_MANIFEST_NOW"; then
+    # A MANIFEST DIFF, because -newer cannot see a DELETION. Removing or renaming a
+    # source or a runtime resource makes no remaining file newer, so the timestamp test
+    # below is satisfied, maven is never re-run, and the deleted file survives in
+    # target/classes. The JVM translator then keeps embedding a runtime resource that no
+    # longer exists in the tree -- and because BOTH sides of the self-host comparison
+    # consume that same stale copy, Gate A still passes. A gate that cannot fail on a
+    # deleted file is not covering deletions.
+    #
+    # Same mechanism the JavaAPI block below already uses, and for the same reason;
+    # -type f rather than -name '*.java' because the C runtime ships as classpath
+    # resources (cn1_globals.m, nativeMethods.m, java_io_File.m, cn1_win_compat.c ...).
+    echo "translator source set changed (file added or removed) -- rebuilding"
     needs_build=1
 elif [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" -type f -newer "$TRANSLATOR" -print -quit 2>/dev/null)" ]; then
     # -type f, not -name '*.java'. The translator carries its C runtime as CLASSPATH
@@ -51,9 +74,18 @@ elif [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" -type f -newer "$TRANSLATOR"
 fi
 if [ "$needs_build" = 1 ]; then
     # `clean` because the incremental check cannot be trusted here; it also removes
-    # selfhost-asm-classpath.txt, which the next block regenerates.
+    # selfhost-asm-classpath.txt, which the next block regenerates. The clean is what
+    # actually evicts a deleted resource from target/classes, so the manifest test above
+    # is only useful paired with it.
     (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am clean package -DskipTests)
 fi
+# Record the manifest only after a build that succeeded -- `set -e` aborts above on
+# failure, so reaching here means target/classes matches this file list. Writing it
+# earlier would let one failed build convince every later run it was up to date. It has
+# to be written AFTER the maven run for the same reason the staging copy is kept out of
+# target/: the clean would otherwise remove it.
+mkdir -p "$(dirname "$TR_MANIFEST")"
+cp -f "$TR_MANIFEST_NOW" "$TR_MANIFEST"
 ASM_CP_FILE="$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt"
 if [ ! -f "$ASM_CP_FILE" ]; then
     (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator dependency:build-classpath \
