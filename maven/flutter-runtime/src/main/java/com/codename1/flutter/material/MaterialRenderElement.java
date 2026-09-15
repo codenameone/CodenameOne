@@ -133,6 +133,30 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
     /// as a soft edge, and more is not visible at these opacities.
     private static final int SHADOW_RINGS = 4;
 
+    /// Alpha of each shadow ring, innermost first, out of 255.
+    ///
+    /// The rings are FILLED shapes drawn outside-in, so each one darkens everything
+    /// inside it as well: with a single alpha for all four, the band against the surface
+    /// is hit four times and ends up far darker than Material's shadow, and the falloff
+    /// outward is linear where Material's is a blur that drops off fast.
+    ///
+    /// Calibrated against the reference, as darkening of white beside an elevation-6
+    /// circle -- the Reply study's compose button, which is the largest single elevated
+    /// surface in the gallery:
+    ///
+    /// ```text
+    ///   band   reference   one alpha for all   these alphas
+    ///      1       0.071               0.148          0.071
+    ///      2       0.035               0.077          0.035
+    ///      3       0.020               0.039          0.020
+    ///      4       0.008               0.039          0.008
+    /// ```
+    ///
+    /// The three opacities Material composes a shadow from do not change with elevation
+    /// -- only the blur and the offset do, and the ring extents already scale with it --
+    /// so these hold across elevations rather than fitting the one that was measured.
+    private static final int[] RING_ALPHA = {10, 4, 3, 2};
+
     /**
      * The elevation shadow where {@code fillShapeShadow} is unavailable (the iOS port among
      * them): a few progressively larger, fainter rounded rects under the card, drawn
@@ -150,7 +174,7 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         g.setColor(0x000000);
         for (int i = SHADOW_RINGS; i >= 1; i--) {
             int e = Math.max(1, spread * i / SHADOW_RINGS);
-            g.setAlpha(10);
+            g.setAlpha(RING_ALPHA[i - 1]);
             g.fillShape(clipShape(q[0] - e, q[1] - e + drop, q[2] + e * 2, q[3] + e * 2,
                     grown(q[4], e), grown(q[5], e), grown(q[6], e), grown(q[7], e)));
         }

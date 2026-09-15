@@ -66,20 +66,6 @@ public class ContainerTransformTransition extends Transition {
     private static final float CP2 = 0.2f;
     private static final float CP3 = 1.0f;
 
-    /// The same curve FLIPPED, which is what the close half of the transform runs on.
-    ///
-    /// Closing is not the opening played backwards: Material eases it on the mirror of
-    /// the opening curve, so the rectangle leaves slowly and arrives fast, the opposite
-    /// of how it opened. Reusing the opening curve for both -- which this did -- makes
-    /// the close start too quickly and then crawl into place.
-    ///
-    /// Mirroring a cubic bezier is exact rather than approximate: reflecting
-    /// {@code 1 - f(1 - t)} through the diagonal maps control points
-    /// {@code (x1,y1,x2,y2)} to {@code (1-x2, 1-y2, 1-x1, 1-y1)}.
-    private static final float RCP0 = 1 - CP2;
-    private static final float RCP1 = 1 - CP3;
-    private static final float RCP2 = 1 - CP0;
-    private static final float RCP3 = 1 - CP1;
 
     /// Material states this transform's colour and opacity changes in fifths of the run.
     private static final float FIFTH = 0.2f;
@@ -159,10 +145,11 @@ public class ContainerTransformTransition extends Transition {
         if (w <= 0 || h <= 0) {
             return;
         }
-        motion = closing
-                ? Motion.createCubicBezierMotion(0, SCALE, duration,
-                        RCP0, RCP1, RCP2, RCP3)
-                : Motion.createCubicBezierMotion(0, SCALE, duration, CP0, CP1, CP2, CP3);
+        // The SAME curve both ways. Closing is the open progress run backwards (see
+        // paint), and 1 - curve(elapsed) is already the mirrored easing -- selecting a
+        // mirrored curve here as well would mirror it twice and give
+        // curve(1 - elapsed), which is a different motion.
+        motion = Motion.createCubicBezierMotion(0, SCALE, duration, CP0, CP1, CP2, CP3);
         motion.start();
         progress = 0;
 
@@ -171,9 +158,16 @@ public class ContainerTransformTransition extends Transition {
         destBuffer = Image.createImage(w, h);
         destination.paintComponent(destBuffer.getGraphics(), true);
 
-        Form sourceForm = source.getComponentForm();
-        Component origin = sourceForm == null || componentName == null
-                ? null : findByName(sourceForm, componentName);
+        // The thing the surface grows out of lives on whichever page is NOT the one
+        // travelling. Opening, that is the page being left; CLOSING, it is the page being
+        // returned to -- so looking on the source form either way found nothing on the
+        // way back, and the transform fell through to its "no origin" guess and played
+        // the opening animation out of the middle of the screen. Going back looked
+        // nothing like the way in.
+        Component anchorOn = closing ? destination : source;
+        Form anchorForm = anchorOn.getComponentForm();
+        Component origin = anchorForm == null || componentName == null
+                ? null : findByName(anchorForm, componentName);
         if (origin == null) {
             // Nothing to grow from. The middle of the screen is a poor guess but it is a
             // transition rather than nothing at all, and the caller still gets the fade.
@@ -182,7 +176,7 @@ public class ContainerTransformTransition extends Transition {
             startX = (w - startW) / 2;
             startY = (h - startH) / 2;
             startRadius = startW / 2;
-            surfaceColor = destination.getStyle().getBgColor();
+            surfaceColor = openPage().getStyle().getBgColor();
             openColor = surfaceColor;
         } else {
             startX = origin.getAbsoluteX();
@@ -192,7 +186,7 @@ public class ContainerTransformTransition extends Transition {
             // A round thing stays round while it grows; anything else keeps its corners.
             startRadius = Math.min(startW, startH) / 2;
             surfaceColor = origin.getStyle().getBgColor();
-            openColor = destination.getStyle().getBgColor();
+            openColor = openPage().getStyle().getBgColor();
             // WITH its background. A button's colour usually comes from its border or a
             // painter rather than from bgColor, so a snapshot without the background is a
             // bare glyph and the style's colour is whatever the theme happened to set --
@@ -202,6 +196,22 @@ public class ContainerTransformTransition extends Transition {
             origin.paintComponent(originBuffer.getGraphics(), true);
             surfaceColor = centreColor(originBuffer, origin.getStyle().getBgColor());
         }
+    }
+
+    /// The page that TRAVELS: the one growing out of the origin, or shrinking back into
+    /// it. Opening it is the destination; closing it is the source.
+    private Component openPage() {
+        return closing ? getSource() : getDestination();
+    }
+
+    /// The snapshot of the page that travels.
+    private Image openBuffer() {
+        return closing ? sourceBuffer : destBuffer;
+    }
+
+    /// The snapshot of the page that stays put underneath.
+    private Image staticBuffer() {
+        return closing ? destBuffer : sourceBuffer;
     }
 
     @Override
@@ -215,7 +225,7 @@ public class ContainerTransformTransition extends Transition {
 
     @Override
     public void paint(Graphics g) {
-        if (motion == null || destBuffer == null) {
+        if (motion == null || openBuffer() == null) {
             return;
         }
         // Geometry follows the curve; everything else does not. Material drives the
@@ -223,17 +233,32 @@ public class ContainerTransformTransition extends Transition {
         // the RAW one, in fifths: the page behind dims over the first fifth, then the
         // surface colour and the incoming content cross over during the second, and the
         // rest of the run is the page settling into place.
+        //
+        // Both are OPEN progress -- 0 is folded into the origin, 1 is the full page --
+        // and closing runs them backwards. Everything below is written once, for the way
+        // in, and the way out is the same transform played in reverse: the rectangle
+        // shrinks back into what was tapped, the scrim lifts, and the contents cross
+        // over the other way. Without this the close ran the OPENING animation, so a
+        // page folded away by growing out of its button a second time.
         float t = ((float) progress) / SCALE;
         float linear = motion.getDuration() <= 0 ? 1f
                 : Math.min(1f, ((float) motion.getCurrentMotionTime()) / motion.getDuration());
+        // Only the GEOMETRY reverses. The fifths that govern the colours and the two
+        // contents are measured from the start of whichever run is playing, so closing
+        // crosses them over at the same point in its own run rather than at the mirrored
+        // point -- it just crosses them the other way round, which is the swap below.
+        if (closing) {
+            t = 1f - t;
+        }
+        float cross = crossover(linear);
         Component dest = getDestination();
         int fullW = dest.getWidth();
         int fullH = dest.getHeight();
 
         // What we came from, unchanged and underneath: the page being left does not move
         // in a container transform, it is covered.
-        if (sourceBuffer != null) {
-            g.drawImage(sourceBuffer, 0, 0);
+        if (staticBuffer() != null) {
+            g.drawImage(staticBuffer(), 0, 0);
         }
         // ...and dimmed. Without the scrim the whole background stays at full brightness
         // through the transition, which is most of the screen disagreeing with the
@@ -249,7 +274,15 @@ public class ContainerTransformTransition extends Transition {
         // Measured at the 50ms frame of a 300ms run, mean luma over the screen:
         // raw predicts 116.6 and we rendered 117.3; the curve predicts 163.4 and the
         // reference rendered 163.2.
-        int scrim = (int) (SCRIM_ALPHA * Math.min(1f, t / FIFTH));
+        // Opening, the scrim arrives over the first fifth and then stands. Closing, it
+        // does NOT mirror that: it lifts smoothly across the whole run, in proportion to
+        // how much of the transform is left. Mirroring the fifths instead held it at
+        // full black over the middle of the run and then dropped it in one step -- the
+        // page behind stayed dark almost until the surface had gone, where the reference
+        // has it brightening the whole way.
+        int scrim = closing
+                ? (int) (SCRIM_ALPHA * t)
+                : (int) (SCRIM_ALPHA * Math.min(1f, t / FIFTH));
         if (scrim > 0) {
             int old = g.getAlpha();
             g.setAlpha(scrim);
@@ -273,7 +306,9 @@ public class ContainerTransformTransition extends Transition {
 
         // The surface holds the tapped thing's colour for the first fifth, crosses to the
         // page's over the second, and is the page's thereafter.
-        g.setColor(blend(surfaceColor, openColor, crossover(linear)));
+        // Opening runs the tapped thing's colour to the page's; closing runs it back.
+        g.setColor(closing ? blend(openColor, surfaceColor, cross)
+                : blend(surfaceColor, openColor, cross));
         g.fillRect(x, y, w, h);
 
         // The tapped content stays fully opaque and is simply covered as the page arrives
@@ -283,14 +318,14 @@ public class ContainerTransformTransition extends Transition {
                     y + (h - originBuffer.getHeight()) / 2);
         }
 
-        float open = crossover(linear);
+        float open = closing ? 1f - cross : cross;
         if (open > 0) {
             int old = g.getAlpha();
             g.setAlpha((int) (255 * open));
             // Anchored to the surface, not to the screen: the page grows with the box out
             // of the corner it started in, which is what makes it read as the same object
             // rather than a page revealed through a window.
-            g.drawImage(destBuffer, x, y);
+            g.drawImage(openBuffer(), x, y);
             g.setAlpha(old);
         }
         g.setClip(clip[0], clip[1], clip[2], clip[3]);
