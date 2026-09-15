@@ -133,21 +133,19 @@ Label {
  * slightly on hover and noticeably when pressed.
  */
 
+/* NO .hover RULES for the controls below, and that is the platform rather than an
+   omission. AppKit draws no rollover state for a push button, text field, checkbox,
+   radio, switch, slider or popup button -- the captured reference says so itself, listing
+   all sixteen hover tiles in states_identical_to_normal, byte-identical to their normal
+   ones. A theme that styles hover here diverges from a reference that cannot move: those
+   rows were the six worst-scoring tiles in the set.
+
+   ScrollThumb and ListRenderer keep theirs. Neither is in the fidelity matrix, and AppKit
+   really does highlight a list row and a scroller under the pointer. */
+
 Button {
     color: var(--text-color, #000000);
     background-color: #ffffff;
-    border: 0.26mm solid #c9c9c9;
-    border-radius: 1.76mm;
-    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-    text-align: center;
-}
-
-Button.hover {
-    color: var(--text-color, #000000);
-    background-color: #f7f7f7;
     border: 0.26mm solid #c9c9c9;
     border-radius: 1.76mm;
     padding: 0.9mm 3.5mm 0.9mm 3.5mm;
@@ -193,17 +191,6 @@ RaisedButton {
     text-align: center;
 }
 
-RaisedButton.hover {
-    color: var(--accent-fg-color, #ffffff);
-    background-color: #1a88ff;
-    border-radius: 1.76mm;
-    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-    text-align: center;
-}
-
 RaisedButton.pressed {
     color: var(--accent-fg-color, #ffffff);
     background-color: #0060cc;
@@ -237,17 +224,6 @@ FlatButton {
     text-align: center;
 }
 
-FlatButton.hover {
-    color: var(--accent-color, #007aff);
-    background-color: #e8e8e8;
-    border-radius: 1.76mm;
-    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-    text-align: center;
-}
-
 FlatButton.pressed {
     color: #0060cc;
     background-color: #dcdcdc;
@@ -265,17 +241,6 @@ TextField {
     color: var(--text-color, #000000);
     background-color: var(--control-bg-color, #ffffff);
     border: 0.26mm solid #c0c0c0;
-    border-radius: 1.06mm;
-    padding: 0.9mm 2.1mm 0.9mm 2.1mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-}
-
-TextField.hover {
-    color: var(--text-color, #000000);
-    background-color: var(--control-bg-color, #ffffff);
-    border: 0.26mm solid #a8a8a8;
     border-radius: 1.06mm;
     padding: 0.9mm 2.1mm 0.9mm 2.1mm;
     margin: 0.7mm;
@@ -320,7 +285,6 @@ CheckBox {
 }
 
 CheckBox.selected { color: var(--accent-color, #007aff); background-color: transparent; }
-CheckBox.hover { color: var(--text-color, #000000); background-color: #e4e4e4; }
 CheckBox.disabled { color: #b4b4b4; background-color: transparent; }
 
 RadioButton {
@@ -333,7 +297,6 @@ RadioButton {
 }
 
 RadioButton.selected { color: var(--accent-color, #007aff); background-color: transparent; }
-RadioButton.hover { color: var(--text-color, #000000); background-color: #e4e4e4; }
 RadioButton.disabled { color: #b4b4b4; background-color: transparent; }
 
 /* NSSwitch: a 38x22pt pill. */
@@ -348,14 +311,6 @@ Switch {
 Switch.selected {
     color: #ffffff;
     background-color: var(--accent-color, #007aff);
-    cn1-background-type: cn1-pill-border;
-    padding: 0.4mm;
-    margin: 0.4mm;
-}
-
-Switch.hover {
-    color: #ffffff;
-    background-color: #d4d4d4;
     cn1-background-type: cn1-pill-border;
     padding: 0.4mm;
     margin: 0.4mm;
@@ -425,17 +380,6 @@ ComboBox {
     font-size: 3.4mm;
 }
 
-ComboBox.hover {
-    color: #000000;
-    background-color: #f7f7f7;
-    border: 0.26mm solid #c9c9c9;
-    border-radius: 1.76mm;
-    padding: 0.9mm 3.5mm 0.9mm 3.5mm;
-    margin: 0.7mm;
-    font-family: "native:MainRegular";
-    font-size: 3.4mm;
-}
-
 ComboBox.disabled {
     color: #b4b4b4;
     background-color: #fafafa;
@@ -449,13 +393,6 @@ ComboBox.disabled {
 
 /* A native slider highlights its track under the pointer. Without this the hover tile was
    byte-identical to the normal one. */
-Slider.hover {
-    color: #007aff;
-    background-color: #c4c4c4;
-    cn1-background-type: cn1-pill-border;
-    margin: 0.7mm;
-}
-
 Slider.disabled {
     color: #b4b4b4;
     background-color: #fafafa;
@@ -565,37 +502,30 @@ ListRendererFocus {
     Label { color: #ffffff; }
 
     Button { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
-    Button.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
     Button.pressed { color: #ffffff; background-color: #4a4a4a; border: 0.26mm solid #5c5c5c; border-radius: 1.76mm; }
     Button.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #4a4a4a; border-radius: 1.76mm; }
 
     RaisedButton { color: #ffffff; background-color: #007aff; }
-    RaisedButton.hover { color: #ffffff; background-color: #1a88ff; }
     RaisedButton.pressed { color: #ffffff; background-color: #0060cc; }
     RaisedButton.disabled { color: #6e6e6e; background-color: #3c3c3c; }
 
     FlatButton { color: #4da3ff; background-color: transparent; }
-    FlatButton.hover { color: #4da3ff; background-color: #3c3c3c; }
     FlatButton.pressed { color: #007aff; background-color: #4a4a4a; }
 
     TextField { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #48484a; border-radius: 1.06mm; }
-    TextField.hover { color: #ffffff; background-color: #1e1e1e; border: 0.26mm solid #5c5c5e; border-radius: 1.06mm; }
     TextField.selected { color: #ffffff; background-color: #1e1e1e; border: 0.53mm solid #007aff; border-radius: 1.06mm; }
     TextField.disabled { color: #6e6e6e; background-color: #2a2a2a; border: 0.26mm solid #3c3c3c; border-radius: 1.06mm; }
 
     CheckBox { color: #ffffff; }
     CheckBox.selected { color: #007aff; }
-    CheckBox.hover { color: #ffffff; background-color: #3c3c3c; }
     CheckBox.disabled { color: #6e6e6e; }
 
     RadioButton { color: #ffffff; }
     RadioButton.selected { color: #007aff; }
-    RadioButton.hover { color: #ffffff; background-color: #3c3c3c; }
     RadioButton.disabled { color: #6e6e6e; }
 
     Switch { background-color: #5a5a5a; }
     Switch.selected { background-color: #007aff; }
-    Switch.hover { background-color: #666666; }
     Switch.disabled { background-color: #3c3c3c; }
 
     Slider { background-color: #5a5a5a; }
@@ -612,9 +542,7 @@ ListRendererFocus {
     DialogBody { color: #ffffff; }
 
     ComboBox { color: #ffffff; background-color: #5a5a5a; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
-    ComboBox.hover { color: #ffffff; background-color: #666666; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
     ComboBox.disabled { color: #6e6e6e; background-color: #3c3c3c; border: 0.26mm solid #6b6b6b; border-radius: 1.76mm; }
-    Slider.hover { background-color: #666666; color: #007aff; }
     Slider.disabled { background-color: #3c3c3c; color: #6e6e6e; }
     ScrollThumb { background-color: #5a5a5a; }
     ScrollThumb.hover { background-color: #6e6e6e; }
