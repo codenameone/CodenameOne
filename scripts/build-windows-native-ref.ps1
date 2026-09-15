@@ -38,12 +38,15 @@ if (-not $msbuild) {
   throw "msbuild is not on PATH. The WindowsAppSDK packaging targets need Visual Studio's MSBuild; the .NET SDK's does not carry the AppxPackage tasks."
 }
 Write-Log "msbuild: $($msbuild.Source)"
-Write-Log "dotnet SDK in effect: $(& dotnet --version)"
 
 # Run from inside the project directory so the SDK pin in global.json applies: it resolves
 # from the current directory upward, not from the project path.
 Push-Location $Src
 try {
+  # Reported from INSIDE the project directory. Run from the repo root it reported 10.0.400
+  # while global.json pins 9.0.x, because SDK resolution reads global.json from the current
+  # directory upward -- a log line that was quietly answering a different question.
+  Write-Log "dotnet SDK here: $(& dotnet --version)"
   & msbuild -t:Restore -p:Configuration=Release -p:RuntimeIdentifier=$Rid -p:Platform=$MsbuildPlatform -v:minimal
   if ($LASTEXITCODE -ne 0) { throw "msbuild restore failed with $LASTEXITCODE" }
 
@@ -84,12 +87,32 @@ public static class Spi {
 # be -- and the app has no way to tell: it asks for a Button and gets one, just not a styled
 # one. Checked here because it is a property of the BUILD, and a build that quietly omits it
 # must not go on to photograph the result.
+#
+# Searched rather than assumed to be in one place: the PRI targets emit into the build
+# output, and `-t:Publish` does not necessarily carry it across for an unpackaged app. If it
+# exists at all, it is taken from wherever it landed.
 $pri = Join-Path $publishDir 'resources.pri'
 if (-not (Test-Path $pri)) {
-  Write-Log 'FAILED: resources.pri was not produced.'
+  $binDir = Join-Path $Src 'bin'
+  $found = @()
+  if (Test-Path $binDir) {
+    $found = @(Get-ChildItem -Path $binDir -Filter '*.pri' -Recurse -ErrorAction SilentlyContinue)
+  }
+  if ($found.Count -gt 0) {
+    $src = ($found | Sort-Object Length -Descending | Select-Object -First 1)
+    Write-Log "resources.pri was not in the publish output; taking $($src.FullName) ($($src.Length) bytes)"
+    Copy-Item $src.FullName $pri -Force
+  }
+}
+if (-not (Test-Path $pri)) {
+  Write-Log 'FAILED: no .pri was produced anywhere.'
   Write-Log 'WinUI theme resources live there; without it the controls render unstyled and'
   Write-Log 'the reference would encode fallback visuals rather than Fluent ones.'
-  Get-ChildItem $publishDir | Select-Object -First 25 -ExpandProperty Name | ForEach-Object { Write-Log "  $_" }
+  Write-Log "--- files in $publishDir ---"
+  Get-ChildItem $publishDir -File | Select-Object -First 30 -ExpandProperty Name | ForEach-Object { Write-Log "  $_" }
+  Write-Log "--- any .pri under $Src ---"
+  Get-ChildItem -Path $Src -Filter '*.pri' -Recurse -ErrorAction SilentlyContinue |
+    Select-Object -First 10 -ExpandProperty FullName | ForEach-Object { Write-Log "  $_" }
   exit 23
 }
 Write-Log "resources.pri present ($((Get-Item $pri).Length) bytes)"
