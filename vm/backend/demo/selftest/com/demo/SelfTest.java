@@ -1334,18 +1334,10 @@ public class SelfTest {
             // database -- the check would pass by testing nothing. Assembling it
             // at runtime is the only way the seven characters exist to be stored.
             String escapeText = new String(new char[]{'~', '~', 'u', '0', '0', '4', '1'});
-            // AN EMBEDDED NUL, built the same way and for the same reason. It is a
-            // legal character in a Java string -- JSON carries them -- and
-            // getBytes("UTF-8") encodes it as one zero byte, so binding the value
-            // by its C length stopped there and stored "a" while reporting success.
-            // The Java SE arm goes through JDBC and stored all three characters,
-            // which made it another divergence rather than a plain truncation.
-            String nulText = new String(new char[]{'a', '\0', 'b'});
             String[] values = new String[] {
                 "caf\u00e9",
                 "\ud83d\ude00 smile",
                 escapeText,
-                nulText,
                 "plain ascii",
             };
             for(int iter = 0 ; iter < values.length ; iter++) {
@@ -1360,6 +1352,32 @@ public class SelfTest {
                 check("stored text round trips: " + describeChars(values[iter]),
                         describeChars(values[iter]), describeChars(got));
             }
+            // AN EMBEDDED NUL USED TO BE ONE OF THE VALUES ABOVE, and is now
+            // refused before it reaches any engine. It is a legal character in a
+            // Java string -- JSON carries them -- and this check existed because
+            // getBytes("UTF-8") encodes it as one zero byte, so binding the
+            // value by its C length stopped there and stored "a" while
+            // reporting success, while the Java SE arm went through JDBC and
+            // stored all three. That divergence is gone the only way it could
+            // be: PostgreSQL cannot hold a zero byte in a text value at all, so
+            // no encoding makes the three agree and the bind is refused. The
+            // truncation it guarded is unreachable now rather than merely
+            // tested -- a value that cannot be bound cannot be cut short.
+            //
+            // A NUL inside a byte[] is untouched, which is where one belongs.
+            String nulText = new String(new char[]{'a', '\0', 'b'});
+            String refusedNul;
+            try {
+                db.execute("INSERT INTO texts (id, body) VALUES (?, ?)",
+                        new Object[]{Integer.valueOf(99), nulText});
+                refusedNul = "accepted";
+            } catch (Exception err) {
+                refusedNul = "refused";
+            }
+            check("a NUL in bound text is refused, not truncated", "refused", refusedNul);
+            check("and nothing was written", "0",
+                    String.valueOf(db.query("SELECT body FROM texts WHERE id = ?",
+                            new Object[]{Integer.valueOf(99)}).size()));
         } finally {
             db.close();
             new java.io.File(path).delete();
