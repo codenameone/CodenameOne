@@ -320,7 +320,7 @@ public class Tree extends Container {
         }
         c.putClientProperty(KEY_EXPANDED, "true");
         if (openFolder == null) {
-            setNodeMaterialIcon(FontImage.MATERIAL_FOLDER, c, 3);
+            setNodeMaterialIcon(FontImage.MATERIAL_FOLDER_OPEN, c, 3);
         } else {
             setNodeIcon(openFolder, c);
         }
@@ -360,45 +360,65 @@ public class Tree extends Container {
         return e != null && "true".equals(e);
     }
 
+    /// The node component of a branch row, or null when the row is not a branch.
+    ///
+    /// buildBranch() wraps a branch in a BorderLayout container and puts the
+    /// node component at NORTH, and every tree property -- KEY_OBJECT,
+    /// KEY_EXPANDED, KEY_DEPTH -- goes on that node component, never on the
+    /// wrapper. Reading one off the wrapper therefore always answers null,
+    /// which is what silently broke expandPath() and collapsePath() for every
+    /// branch: the object read back could not equal the path element being
+    /// looked for, and the expanded flag could not read true. Anything that
+    /// walks the rows has to come through here.
+    private Component branchNodeComponent(Component row) {
+        if (!(row instanceof Container)) {
+            return null;
+        }
+        Container rowContainer = (Container) row;
+        if (!(rowContainer.getLayout() instanceof BorderLayout)) {
+            return null;
+        }
+        return ((BorderLayout) rowContainer.getLayout()).getNorth();
+    }
+
     private Container expandPathNode(boolean animate, Container parent, Object node) {
         int cc = parent.getComponentCount();
         for (int iter = 0; iter < cc; iter++) {
-            Component current = parent.getComponentAt(iter);
-            Object o = current.getClientProperty(KEY_OBJECT);
-
-            if (!model.isLeaf(o)) {
-                //if(current instanceof Container) {
-                BorderLayout bl = (BorderLayout) ((Container) current).getLayout();
-
-                // the tree component is always at north expanded or otherwise
-                current = bl.getNorth();
-                if (Objects.equals(o, node)) {
-                    if (isExpanded(current)) {
-                        return (Container) bl.getCenter();
+            Component row = parent.getComponentAt(iter);
+            Component nodeComponent = branchNodeComponent(row);
+            if (nodeComponent == null) {
+                continue;
+            }
+            if (Objects.equals(nodeComponent.getClientProperty(KEY_OBJECT), node)) {
+                if (isExpanded(nodeComponent)) {
+                    Component children = ((BorderLayout) ((Container) row).getLayout()).getCenter();
+                    if (children instanceof Container) {
+                        return (Container) children;
                     }
-                    return expandNodeImpl(animate, current);
+                    return null;
                 }
+                return expandNodeImpl(animate, nodeComponent);
             }
         }
         return null;
     }
 
     private void collapsePathNode(Container parent, Object node) {
+        if (parent == null) {
+            return;
+        }
         int cc = parent.getComponentCount();
         for (int iter = 0; iter < cc; iter++) {
-            Component current = parent.getComponentAt(iter);
-            if (isExpanded(current)) {
-                BorderLayout bl = (BorderLayout) ((Container) current).getLayout();
-
-                // the tree component is always at north expanded or otherwise
-                current = bl.getNorth();
-                Object o = current.getClientProperty(KEY_OBJECT);
-                if (o != null && o.equals(node)) {
-                    if (isExpanded(current)) {
-                        collapseNode(current, null);
-                    }
-                    return;
+            Component nodeComponent = branchNodeComponent(parent.getComponentAt(iter));
+            if (nodeComponent == null) {
+                continue;
+            }
+            Object o = nodeComponent.getClientProperty(KEY_OBJECT);
+            if (o != null && o.equals(node)) {
+                if (isExpanded(nodeComponent)) {
+                    collapseNode(nodeComponent, null);
                 }
+                return;
             }
         }
     }
@@ -718,7 +738,11 @@ public class Tree extends Container {
     /// - `size`: The size in millimetres for the icon.
     ///
     protected void setNodeMaterialIcon(char c, Component node, float size) {
-        FontImage.setMaterialIcon(node, FontImage.MATERIAL_FOLDER, 3);
+        // Both arguments used to be discarded and MATERIAL_FOLDER at size 3
+        // was set instead, so the expanded state could not differ from the
+        // collapsed one: a tree with no treeFolderOpenImage in its theme --
+        // which is the default -- drew a closed folder beside an open branch.
+        FontImage.setMaterialIcon(node, c, size);
     }
 
     /// Creates a node within the tree, this method is protected allowing tree to be

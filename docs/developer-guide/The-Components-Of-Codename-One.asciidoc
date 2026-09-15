@@ -182,7 +182,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Custom modal Dialog in the south position
-image::img/components-dialog-modal-south.png[Custom Dialog in the south position,scaledwidth=20%]
+image::img/generated/components-dialog-modal-south.png[Custom Dialog in the south position,scaledwidth=20%]
 
 TIP: You can turn the code above to a modless `Dialog` by flipping the boolean `true` argument to `false`.
 
@@ -194,7 +194,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Custom Dialog positioned absolutely
-image::img/components-dialog-modal-bottom-half.png[Custom Dialog positioned,scaledwidth=20%]
+image::img/generated/components-dialog-modal-bottom-half.png[Custom Dialog positioned,scaledwidth=20%]
 
 NOTE: `hi` is the name of the parent `Form` in the sample above.
 
@@ -215,7 +215,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Dialog with tinted background
-image::img/components-dialog-tint.png[Dialog with tinted background,scaledwidth=20%]
+image::img/generated/components-dialog-tint.png[Dialog with tinted background,scaledwidth=20%]
 
 The tint color can be manipulated on the parent form, you can set it to any AARRGGBB value to set any color using the `setTintColor` method. Notice that this is invoked on the parent form and not on the `Dialog`!
 
@@ -229,7 +229,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Dialog with green tinted background
-image::img/components-dialog-green-tint.png[Dialog with green tinted background,scaledwidth=20%]
+image::img/generated/components-dialog-green-tint.png[Dialog with green tinted background,scaledwidth=20%]
 
 You can apply Gaussian blur to the background of a dialog to highlight the foreground further and produce an attractive effect. You can use the `setDefaultBlurBackgroundRadius` to apply this globally, you can use the theme constant `dialogBlurRadiusInt` to do the same or you can do this on a per `Dialog` basis using `setBlurBackgroundRadius`.
 
@@ -241,7 +241,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .The blur effect coupled with the OS default tint
-image::img/components-dialog-blur.png[The blur effect coupled with the OS default tint,scaledwidth=20%]
+image::img/generated/components-dialog-blur.png[The blur effect coupled with the OS default tint,scaledwidth=20%]
 
 It might be a bit hard to notice the blur effect with the tinting so here is the same code with tinting disabled:
 
@@ -251,7 +251,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .The blur effect is more pronounced when the tint is disabled
-image::img/components-dialog-blur-no-tint.png[The blur effect is more pronounced when the tint is disabled,scaledwidth=20%]
+image::img/generated/components-dialog-blur-no-tint.png[The blur effect is more pronounced when the tint is disabled,scaledwidth=20%]
 
 
 ==== Popup dialog
@@ -323,11 +323,11 @@ Using the interaction dialog is pretty trivial and like dialog:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava015Snippet.java[tag=the-components-of-codename-one-java-015,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsInteractionDialogFigure.java[tag=the-components-of-codename-one-java-015,indent=0]
 ----
 
 .Interaction Dialog
-image::img/components-interaction-dialog.png[Interaction Dialog,scaledwidth=20%]
+image::img/generated/components-interaction-dialog.png[Interaction Dialog,scaledwidth=20%]
 
 This will show the dialog on the right-hand side of the screen, which is pretty useful for a floating in place dialog.
 
@@ -1440,13 +1440,13 @@ The data of the `Tree` arrives from a model for example: this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava182Snippet.java[tag=the-components-of-codename-one-java-182,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeFigure.java[tag=the-components-of-codename-one-java-182,indent=0]
 ----
 
 Will result in this:
 
 .Tree
-image::img/tree.png[Tree,scaledwidth=20%]
+image::img/generated/tree.png[Tree,scaledwidth=40%]
 
 NOTE: Since `Tree` is hierarchy based you can't have a simple model like you've for the `Table` as deep hierarchy is harder to represent with arrays.
 
@@ -1454,19 +1454,19 @@ A more practical "real world" example would be working with XML data. You can us
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava183Snippet.java[tag=the-components-of-codename-one-java-183,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeXmlFigure.java[tag=the-components-of-codename-one-java-183,indent=0]
 ----
 
-NOTE: The `try(Stream)` syntax is a try with resources clogic that implicitly closes the stream.
+NOTE: The `try` with resources syntax closes the `Reader` for you however the block ends.
 
 .XML Tree
-image::img/components-tree-xml.png[XML Tree,scaledwidth=20%]
+image::img/generated/components-tree-xml.png[XML Tree,scaledwidth=40%]
 
 The model for the XML hierarchy is implemented as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava184Snippet.java[tag=the-components-of-codename-one-java-184,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeXmlFigure.java[tag=the-components-of-codename-one-java-184,indent=0]
 ----
 
 [[sharebutton-section]]

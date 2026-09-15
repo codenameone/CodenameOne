@@ -167,6 +167,48 @@ public class Form extends Container implements TopLevelContainer {
     private com.codename1.router.PopGuard popGuard;
     /// Default color for the screen tint when a dialog or a menu is shown
     private int tintColor;
+
+    /// The tint this form was last handed by a theme.
+    ///
+    /// show() runs initLaf() whenever the form has no transition animator, and
+    /// initLaf() used to assign the theme's tint unconditionally. A tint set
+    /// before showing -- the order every sample uses, because there is nothing
+    /// to set it on beforehand -- was therefore overwritten on the way to the
+    /// screen, and the dialog that followed dimmed in the wrong colour with
+    /// nothing to say why.
+    ///
+    /// What is remembered is the theme's own answer rather than a flag saying
+    /// the application chose, because the framework sets this tint too:
+    /// ComboBox, the toolbar overflow, the floating action button submenu and
+    /// GlassTutorial each save the current tint, force their own, and put the
+    /// old one back through this same setter. A flag would mark that restore as
+    /// an application's choice and a later theme change would then be ignored.
+    /// Comparing against the theme's last answer reads all of it correctly: a
+    /// restore puts back exactly what the theme gave, so the form is still
+    /// following the theme, while a value the theme never handed out is one
+    /// somebody meant.
+    ///
+    /// One case this cannot separate, and does not try to: an application that
+    /// sets the tint to precisely the colour the theme is handing out at that
+    /// moment. Such a form follows the next theme change rather than staying on
+    /// the value it named. Telling that apart from the framework putting the
+    /// same colour back needs to know which call site it came from, and two of
+    /// the four -- FloatingActionButton and GlassTutorial -- are outside this
+    /// package, so it would mean a public method about tint bookkeeping that
+    /// applications have no use for. The assignment it would protect changes
+    /// nothing at the moment it is made, and what it would preserve is a colour
+    /// identical to the theme's own.
+    ///
+    /// Nor does any of this change what happens when the theme changes while an
+    /// override is up and the override is then torn down: the form holds the
+    /// previous theme's tint until something shows it again. That is the four
+    /// call sites' own doing -- each captures a colour, and puts that captured
+    /// colour back however much time has passed -- and it predates this. Measured
+    /// on the unconditional assignment this replaced, from the same sequence:
+    /// both leave the form on the tint that was current when the override began.
+    private int themeTintColor;
+
+    private boolean themeTintColorKnown;
     /// Listeners for key release events
     private HashMap<Integer, ArrayList<ActionListener>> keyListeners;
     /// Listeners for game key release events
@@ -1607,7 +1649,19 @@ public class Form extends Container implements TopLevelContainer {
             menuBar.initMenuBar(this);
         }
 
-        tintColor = laf.getDefaultFormTintColor();
+        int themeTint = laf.getDefaultFormTintColor();
+        // The marker only moves when the theme's answer is actually taken. A
+        // theme refresh can land while one of those temporary overrides is up
+        // -- the system appearance changing under an open ComboBox is enough --
+        // and advancing it there would leave the marker on a colour this form
+        // never wore. The override's teardown then restores the previous theme
+        // default, which no longer matches the marker, and the form would read
+        // as having chosen that colour for the rest of its life.
+        if (!themeTintColorKnown || tintColor == themeTintColor) {
+            tintColor = themeTint;
+            themeTintColor = themeTint;
+            themeTintColorKnown = true;
+        }
         tactileTouchDuration = laf.getTactileTouchDuration();
     }
 
@@ -4565,7 +4619,10 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// Desktop only, because nothing else generates hover events.
     private void updateHoveredComponent(Component cmp) {
-        if (hoveredComponent == cmp) {
+        // Identity is the question being asked -- whether this is the same
+        // component instance the pointer was already over -- so equals() would
+        // be wrong here as well as slower.
+        if (hoveredComponent == cmp) { //NOPMD CompareObjectsWithEquals
             return;
         }
         if (hoveredComponent != null) {
