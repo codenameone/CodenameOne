@@ -170,6 +170,26 @@ public class OrmCheck {
         check("a null Float stays null", "null", String.valueOf(back.weightNarrow));
         check("@DbTransient is not stored", "null", String.valueOf(back.cached));
 
+        // A STRING PAST MySQL's TEXT LIMIT. TEXT holds 65,535 bytes there while
+        // SQLite and PostgreSQL leave a string column unbounded, so a document
+        // body this size stored on two engines and was rejected by a strict
+        // MySQL -- or truncated by a permissive one, which loses data and
+        // reports nothing. Checked by LENGTH rather than by equality so a
+        // truncation says how much survived.
+        StringBuilder big = new StringBuilder(70000);
+        while(big.length() < 70000) {
+            big.append("abcdefghij");
+        }
+        Note large = new Note();
+        large.title = "large";
+        large.body = big.toString();
+        notes.insert(large);
+        Note largeBack = notes.findById(Long.valueOf(large.id));
+        check("a string past MySQL's TEXT limit round trips", "70000",
+                String.valueOf(largeBack == null || largeBack.body == null
+                        ? -1 : largeBack.body.length()));
+        notes.delete(large);
+
         // And a value in the boxed column comes back as that value.
         back.revision = Long.valueOf(7);
         back.grade = Character.valueOf('A');

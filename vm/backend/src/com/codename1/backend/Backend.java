@@ -422,7 +422,22 @@ public final class Backend {
                         + "for them. Use 0 to stop immediately on purpose.");
             }
             Tls context = resolveTls();
-            HttpServer server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
+            // OURS ONLY WHEN WE MADE IT, the same rule the pool follows above: a
+            // context handed to .tls(Tls) belongs to the caller. On the packaged
+            // runtime Tls.create allocates a native SSL_CTX, and every path out
+            // of HttpServer.start below can fail -- an occupied port, a refused
+            // worker count, a reactor that will not set up -- so a supervisor
+            // that catches the error and retries leaked one context per attempt.
+            // Ownership passes to the server once start returns; until then it
+            // is this method's to release.
+            //
+            // Not covered by a JVM test, and cannot be: the Java SE arm's
+            // Tls.create always throws and its constructor is private, so no
+            // context exists to leak there. This is a packaged-runtime path.
+            boolean ownsContext = context != null && tls == null;
+            HttpServer server;
+            try {
+                server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
                         new HttpServer.Handler() {
                             public HttpServer.Response handle(HttpServer.Request request)
                                     throws Exception {
@@ -437,6 +452,12 @@ public final class Backend {
                                 return null;
                             }
                         }, context);
+            } catch (Exception err) {
+                if(ownsContext) {
+                    context.close();
+                }
+                throw err;
+            }
             Backend backend = new Backend(server, pool, manager, config, drain);
             if(!quiet) {
                 announce(backend, listenPort, context != null);

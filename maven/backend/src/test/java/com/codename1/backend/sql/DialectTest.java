@@ -194,7 +194,11 @@ class DialectTest {
     void namesColumnTypes() {
         assertEquals("TEXT", Dialect.SQLITE.columnType(Dialect.TEXT));
         assertEquals("TEXT", Dialect.POSTGRES.columnType(Dialect.TEXT));
-        assertEquals("TEXT", Dialect.MYSQL.columnType(Dialect.TEXT));
+        // LONGTEXT, not TEXT: this expectation is superseded. MySQL's TEXT
+        // holds 65,535 bytes while the other two are unbounded, so a long
+        // string stored on them and was refused or truncated here. See
+        // stringColumnsAreNotCappedOnMySql below.
+        assertEquals("LONGTEXT", Dialect.MYSQL.columnType(Dialect.TEXT));
         assertEquals("INTEGER", Dialect.SQLITE.columnType(Dialect.BIGINT));
         assertEquals("BIGINT", Dialect.POSTGRES.columnType(Dialect.BIGINT));
         assertEquals("BIGINT", Dialect.MYSQL.columnType(Dialect.BIGINT));
@@ -379,5 +383,24 @@ class DialectTest {
         assertSame(Dialect.MYSQL, Dialect.forName("mariadb"));
         assertSame(Dialect.SQLITE, Dialect.forName("SQLite"));
         assertEquals(null, Dialect.forName("oracle"));
+    }
+
+    @Test
+    @DisplayName("a string column is unbounded on every engine, MySQL included")
+    void stringColumnsAreNotCappedOnMySql() {
+        // MySQL's TEXT holds 65,535 BYTES while the other two leave a string
+        // column unbounded, so a document body past that limit stored on two
+        // engines and was rejected -- or silently truncated -- by the third.
+        // The blob branch of this very switch already took LONGBLOB for the
+        // same reason; the string branch had been left on TEXT.
+        assertEquals("LONGTEXT", Dialect.MYSQL.columnType(Dialect.TEXT));
+        assertEquals("LONGBLOB", Dialect.MYSQL.columnType(Dialect.BLOB));
+        assertEquals("TEXT", Dialect.SQLITE.columnType(Dialect.TEXT));
+        assertEquals("TEXT", Dialect.POSTGRES.columnType(Dialect.TEXT));
+
+        // A KEY is the exception and stays bounded, because MySQL cannot index
+        // an unbounded column at all. See Table.MAX_ASSIGNED_TEXT_KEY.
+        assertEquals("VARCHAR(255) NOT NULL PRIMARY KEY",
+                Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
     }
 }

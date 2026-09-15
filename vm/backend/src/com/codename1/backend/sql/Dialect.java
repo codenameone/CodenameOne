@@ -553,7 +553,20 @@ public abstract class Dialect {
                 case BLOB:
                     return "LONGBLOB";
                 default:
-                    return "TEXT";
+                    // LONGTEXT, for the reason the LONGBLOB above it already
+                    // takes: MySQL's TEXT holds 65,535 BYTES, while SQLite and
+                    // PostgreSQL leave a string column unbounded. A document
+                    // body past that limit stored fine on two engines and was
+                    // rejected by a strict MySQL or silently TRUNCATED by a
+                    // permissive one -- and nothing in a generated write could
+                    // have caught it, because the limit is the column's, not the
+                    // field's. The blob branch got this right and the string one
+                    // did not, in the same switch.
+                    //
+                    // A KEY is unaffected: assignedKeyColumn overrides this with
+                    // VARCHAR(255), because MySQL cannot index an unbounded
+                    // column at all. See Table.MAX_ASSIGNED_TEXT_KEY.
+                    return "LONGTEXT";
             }
         }
 
