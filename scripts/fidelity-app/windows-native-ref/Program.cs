@@ -568,7 +568,7 @@ public partial class App : Application
                     await WaitForFramesAsync(3);
                     await OnUiAsync(() => ApplyState(widget, state, spec.Kind, name));
                     await WaitForFramesAsync(5);
-                    await CaptureTileAsync(name);
+                    await CaptureSettledTileAsync(name);
                 }
             }
         }
@@ -696,11 +696,50 @@ public partial class App : Application
         await OnUiAsync(() => { CompositionTarget.Rendering -= onFrame; return true; });
     }
 
+    /// Captures a tile only once two consecutive captures agree, so the frame written is
+    /// provably settled rather than assumed to be.
+    ///
+    /// Turning system animations off was not enough, and the measurement is why this exists
+    /// rather than a longer sleep. SPI_SETCLIENTAREAANIMATION governs theme TRANSITIONS;
+    /// the check-box check, the switch knob, the slider thumb and the progress bar animate
+    /// through storyboards in their own control templates, which it does not reach. Two runs
+    /// of the same commit still differed on exactly those eight tiles -- by 1 to 58 pixels
+    /// out of 13440, the moving edge of each one.
+    ///
+    /// A fixed delay would be a guess at how long each storyboard takes, wrong on a loaded
+    /// runner, and silently wrong in the direction that looks fine. Comparing consecutive
+    /// captures asks the question directly and answers it per tile, and a tile that never
+    /// settles is a blocker rather than a coin flip written into a golden set.
+    private async Task CaptureSettledTileAsync(string name)
+    {
+        const int MaxAttempts = 8;
+        byte[] previous = null;
+        for (int attempt = 0; attempt < MaxAttempts; attempt++)
+        {
+            byte[] current = GrabClientArea(name);
+            if (current is null)
+            {
+                return;
+            }
+            if (previous != null && previous.AsSpan().SequenceEqual(current))
+            {
+                WriteTile(name, current);
+                return;
+            }
+            previous = current;
+            await Task.Delay(120);
+        }
+        _blockers.Add($"{name}: never produced two identical consecutive captures in "
+            + $"{MaxAttempts} attempts, so whatever is still moving would be frozen at a "
+            + "random point in a golden set");
+    }
+
     /// BitBlts the client area, which is held at exactly one tile, and writes it.
-    private async Task CaptureTileAsync(string name)
+    /// One BitBlt of the client area, returned as raw pixels. No file is written: the
+    /// caller compares consecutive grabs and only writes when they agree.
+    private byte[] GrabClientArea(string name)
     {
         DwmFlush();
-        await Task.Delay(60);
         GetClientRect(_hwnd, out RECT clientRect);
         var origin = new POINT { X = 0, Y = 0 };
         ClientToScreen(_hwnd, ref origin);
@@ -709,7 +748,7 @@ public partial class App : Application
         if (w <= 0 || h <= 0)
         {
             _blockers.Add($"{name}: the client area has no size ({w}x{h})");
-            return;
+            return null;
         }
         IntPtr screen = GetDC(IntPtr.Zero);
         IntPtr mem = CreateCompatibleDC(screen);
@@ -722,24 +761,17 @@ public partial class App : Application
             if (!ok)
             {
                 _blockers.Add($"{name}: BitBlt of the client area failed");
-                return;
+                return null;
             }
             using var image = System.Drawing.Image.FromHbitmap(bmp);
             if (IsUniform(image, 0, 0, image.Width, image.Height))
             {
                 _blockers.Add($"{name}: captured a uniform image, so nothing was composited");
-                return;
+                return null;
             }
-            var path = Path.Combine(_outDir, name + ".png");
-            image.Save(path, System.Drawing.Imaging.ImageFormat.Png);
-            _tilesWritten++;
-            Console.WriteLine($"NATIVEREF:wrote {name} {w}x{h}");
-            NoteIfIdenticalToNormal(name, path);
-            // Bottom-right corner: every widget in the matrix anchors top-left and none is
-            // as tall as the tile, so this pixel is always backdrop.
-            var corner = image.GetPixel(image.Width - 1, image.Height - 1);
-            var appearanceKey = name.Substring(name.LastIndexOf('_') + 1);
-            _backdropByAppearance[appearanceKey] = $"#{corner.R:X2}{corner.G:X2}{corner.B:X2}";
+            using var ms = new MemoryStream();
+            image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            return ms.ToArray();
         }
         finally
         {
@@ -747,6 +779,23 @@ public partial class App : Application
             DeleteDC(mem);
             ReleaseDC(IntPtr.Zero, screen);
         }
+    }
+
+    /// Writes a settled grab and records the two things the manifest reports about it.
+    private void WriteTile(string name, byte[] png)
+    {
+        var path = Path.Combine(_outDir, name + ".png");
+        File.WriteAllBytes(path, png);
+        _tilesWritten++;
+        using var ms = new MemoryStream(png);
+        using var image = new System.Drawing.Bitmap(ms);
+        Console.WriteLine($"NATIVEREF:wrote {name} {image.Width}x{image.Height}");
+        NoteIfIdenticalToNormal(name, path);
+        // Bottom-right corner: every widget in the matrix anchors top-left and none is
+        // as tall as the tile, so this pixel is always backdrop.
+        var corner = image.GetPixel(image.Width - 1, image.Height - 1);
+        var appearanceKey = name.Substring(name.LastIndexOf('_') + 1);
+        _backdropByAppearance[appearanceKey] = $"#{corner.R:X2}{corner.G:X2}{corner.B:X2}";
     }
 
     /// Grabs what DWM actually put on the screen, which is the only way the Mica backdrop
