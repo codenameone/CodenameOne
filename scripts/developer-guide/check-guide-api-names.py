@@ -479,6 +479,42 @@ def is_plural_of_a_class(word, simple):
            (word.endswith('es') and word[:-2] in simple)
 
 
+def without_asciidoc_comments(text):
+    """Drops what Asciidoctor will not render.
+
+    A line beginning with ``//`` is a comment, and ``////`` opens a block of
+    them. A maintainer commenting out an obsolete link should not be failed
+    over an API no reader can see.
+
+    Only outside a delimited block, because inside one those characters are
+    content: a listing's own language may well use ``//`` for its comments,
+    and dropping those lines would change the code the guide shows.
+    """
+    out = []
+    in_listing = False
+    in_comment_block = False
+    for line in text.split('\n'):
+        stripped = line.rstrip()
+        if not in_comment_block and (stripped.startswith('----')
+                                     or stripped.startswith('....')
+                                     or stripped.startswith('++++')):
+            in_listing = not in_listing
+            out.append(line)
+            continue
+        if not in_listing and stripped.startswith('////'):
+            in_comment_block = not in_comment_block
+            out.append('')
+            continue
+        if in_comment_block:
+            out.append('')
+            continue
+        if not in_listing and stripped.startswith('//'):
+            out.append('')
+            continue
+        out.append(line)
+    return '\n'.join(out)
+
+
 def class_positions():
     """Every word the guide uses where only a type can go.
 
@@ -490,7 +526,7 @@ def class_positions():
         if not name.endswith(('.asciidoc', '.adoc')):
             continue
         with open(os.path.join(GUIDE, name), encoding='utf-8') as handle:
-            text = handle.read()
+            text = without_asciidoc_comments(handle.read())
         for span in CODE_SPAN.finditer(text):
             body = span.group(1)
             for match in CLASS_POSITION.finditer(body):
@@ -519,7 +555,7 @@ def main():
         if not name.endswith(('.asciidoc', '.adoc')):
             continue
         with open(os.path.join(GUIDE, name), encoding='utf-8') as handle:
-            text = handle.read()
+            text = without_asciidoc_comments(handle.read())
         for match in JAVADOC.finditer(text):
             target = match.group(1).replace('/', '.')
             if target not in qualified:
