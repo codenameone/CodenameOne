@@ -77,15 +77,19 @@ JAVADOC = re.compile(
 # skipped those, so "URLIamge" went unread. Backticks are code, so four
 # characters is enough there and "Iamge" is caught.
 WORD = re.compile(
-    # In a code span, whether or not the name is the whole of it:
-    # `Iamge`, `Iamge.createImage()`.
-    r'`([A-Z][A-Za-z0-9]{4,})[`.(]'
     # Spelled like a class in prose, by internal capitals or a leading acronym.
-    r'|\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b'
+    r'\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b'
     # As a link label: Image.html[Iamge].
     r'|\[([A-Z][A-Za-z0-9]{4,})\]'
     # Reading a member off it: Iamge.createImage().
     r'|\b([A-Z][a-z]{4,})\s*\.\s*[a-z][A-Za-z0-9]*\s*\(')
+# A code span is read whole rather than from its first word, because the name
+# is rarely the whole of it: `new Iamge()`, `com.codename1.ui.Iamge`.
+# Not after '/' or '-': those are a URL path segment and a command-line flag,
+# neither of which is a class. CocoaPods/Specs and -Dtarget are both in the
+# guide and both read as near misses without this.
+CODE_SPAN = re.compile(r'`([^`\n]{1,400})`')
+SPAN_NAME = re.compile(r'(?<![-/\w])([A-Z][A-Za-z0-9]{4,})\b')
 # Every one of those carries a signal that the token is code -- backticks, a
 # link target, a member call. A bare capitalised word in prose carries none,
 # and asking for it is not a near miss away from a class name, it IS one:
@@ -395,8 +399,12 @@ def main():
             target = match.group(1).replace('/', '.')
             if target not in qualified:
                 dead_links.append('%s: %s' % (name, target))
-        for match in WORD.finditer(text):
-            word = next(group for group in match.groups() if group)
+        words = [match.group(1)
+                 for span in CODE_SPAN.finditer(text)
+                 for match in SPAN_NAME.finditer(span.group(1))]
+        words += [next(group for group in match.groups() if group)
+                  for match in WORD.finditer(text)]
+        for word in words:
             if word in simple or word in seen:
                 continue
             seen.add(word)
