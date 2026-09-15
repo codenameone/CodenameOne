@@ -66,6 +66,21 @@ public class ContainerTransformTransition extends Transition {
     private static final float CP2 = 0.2f;
     private static final float CP3 = 1.0f;
 
+    /// The same curve FLIPPED, which is what the close half of the transform runs on.
+    ///
+    /// Closing is not the opening played backwards: Material eases it on the mirror of
+    /// the opening curve, so the rectangle leaves slowly and arrives fast, the opposite
+    /// of how it opened. Reusing the opening curve for both -- which this did -- makes
+    /// the close start too quickly and then crawl into place.
+    ///
+    /// Mirroring a cubic bezier is exact rather than approximate: reflecting
+    /// {@code 1 - f(1 - t)} through the diagonal maps control points
+    /// {@code (x1,y1,x2,y2)} to {@code (1-x2, 1-y2, 1-x1, 1-y1)}.
+    private static final float RCP0 = 1 - CP2;
+    private static final float RCP1 = 1 - CP3;
+    private static final float RCP2 = 1 - CP0;
+    private static final float RCP3 = 1 - CP1;
+
     /// Material states this transform's colour and opacity changes in fifths of the run.
     private static final float FIFTH = 0.2f;
 
@@ -91,6 +106,9 @@ public class ContainerTransformTransition extends Transition {
     private int surfaceColor;
     private int openColor;
     private GeneralPath path;
+
+    /// Whether this instance is the CLOSE half, which runs on the mirrored curve.
+    private boolean closing;
 
     private ContainerTransformTransition(String componentName, int duration) {
         this.componentName = componentName;
@@ -141,7 +159,10 @@ public class ContainerTransformTransition extends Transition {
         if (w <= 0 || h <= 0) {
             return;
         }
-        motion = Motion.createCubicBezierMotion(0, SCALE, duration, CP0, CP1, CP2, CP3);
+        motion = closing
+                ? Motion.createCubicBezierMotion(0, SCALE, duration,
+                        RCP0, RCP1, RCP2, RCP3)
+                : Motion.createCubicBezierMotion(0, SCALE, duration, CP0, CP1, CP2, CP3);
         motion.start();
         progress = 0;
 
@@ -217,7 +238,18 @@ public class ContainerTransformTransition extends Transition {
         // ...and dimmed. Without the scrim the whole background stays at full brightness
         // through the transition, which is most of the screen disagreeing with the
         // reference for most of the run -- far more pixels than the surface itself.
-        int scrim = (int) (SCRIM_ALPHA * Math.min(1f, linear / FIFTH));
+        // Off the CURVED progress, not the raw clock -- unlike the opacities and the
+        // surface colour below, which Material does drive off the raw one. Getting this
+        // one wrong is not a subtle shading difference: the scrim covers the whole
+        // screen, so while it is ramping, every pixel is at the wrong brightness. It
+        // cost a single frame 83% wrong pixels against the reference, between two
+        // neighbours at 5% and 13%, because the raw clock reaches full dim more than
+        // twice as fast as the curve does.
+        //
+        // Measured at the 50ms frame of a 300ms run, mean luma over the screen:
+        // raw predicts 116.6 and we rendered 117.3; the curve predicts 163.4 and the
+        // reference rendered 163.2.
+        int scrim = (int) (SCRIM_ALPHA * Math.min(1f, t / FIFTH));
         if (scrim > 0) {
             int old = g.getAlpha();
             g.setAlpha(scrim);
@@ -330,6 +362,9 @@ public class ContainerTransformTransition extends Transition {
 
     @Override
     public Transition copy(boolean reverse) {
-        return new ContainerTransformTransition(componentName, duration);
+        ContainerTransformTransition t =
+                new ContainerTransformTransition(componentName, duration);
+        t.closing = reverse;
+        return t;
     }
 }
