@@ -1,0 +1,3 @@
+# Scanner output. These are built on demand (see README.md) and must never be
+# committed -- a .class in git is stale the moment the .java beside it changes.
+*.class

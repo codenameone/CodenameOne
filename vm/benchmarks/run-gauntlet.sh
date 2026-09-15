@@ -23,7 +23,13 @@ J8="${JDK_8_HOME:?set JDK_8_HOME}"
 # fall OUTSIDE the taggable range so the heap fallback is exercised rather than
 # assumed. It catches the failure this scheme makes easy -- a wrong class or a wrong
 # hash, returned silently with nothing thrown.
-TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge"
+#
+# ConcatCorrupt is heap integrity ACROSS the fused string-concat natives, which take
+# raw interior pointers into their source strings' byte[] and then ALLOCATE. Read its
+# javadoc before trusting it: under conservative roots the sources are rooted by the
+# native stack scan, so it is a REGRESSION GUARD on that property and not a proof that
+# the natives root anything themselves.
+TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
