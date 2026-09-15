@@ -45,15 +45,27 @@ name: Desktop theme fidelity
         options: [all, windows, macos, gnome]
   push:
     branches: [master]
+    # Narrow ON PURPOSE: the theme sources, their compiled output, and the harness that is
+    # specific to this suite. Nothing else.
+    #
+    # The list used to include scripts/lib/cn1ss.sh and scripts/common/java/**, which are
+    # shared with the iOS and Android fidelity suites and with every screenshot runner in
+    # the tree. Those ARE inputs to this score, so including them looks right -- and it
+    # means a change to the shared comparator drags a three-platform, quarter-hour desktop
+    # job behind it. That cost lands on whoever touched the shared file, which is not their
+    # concern, and the same regression is caught by the next push that does touch a theme.
+    #
+    # A gate is worth what it catches minus what it costs everyone else.
     paths:
       - '.github/workflows/scripts-fidelity-desktop.yml'
       - 'scripts/run-desktop-fidelity-tests.sh'
-      - 'scripts/fidelity-app/common/**'
       - 'scripts/fidelity-app/desktop-runner/**'
-      - 'scripts/fidelity-app/goldens/**'
-      - 'scripts/fidelity-app/baseline/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/common/java/**'
+      - 'scripts/fidelity-app/goldens/windows-11-fluent/**'
+      - 'scripts/fidelity-app/goldens/gnome-adwaita/**'
+      - 'scripts/fidelity-app/goldens/macos-aqua/**'
+      - 'scripts/fidelity-app/baseline/windows-11-fluent-*.json'
+      - 'scripts/fidelity-app/baseline/gnome-adwaita-*.json'
+      - 'scripts/fidelity-app/baseline/macos-aqua-*.json'
       - 'native-themes/windows-fluent/**'
       - 'native-themes/gnome-adwaita/**'
       - 'native-themes/macos-aqua/**'
