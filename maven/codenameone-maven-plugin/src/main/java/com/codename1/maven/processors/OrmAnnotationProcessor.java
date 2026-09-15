@@ -124,7 +124,47 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
         accepted.clear();
-        backend = forcedFlavour != null ? forcedFlavour.booleanValue() : isBackendModule(ctx);
+        if (forcedFlavour != null) {
+            backend = forcedFlavour.booleanValue();
+            return;
+        }
+        // BOTH RUNTIMES ON ONE CLASSPATH IS REFUSED, not guessed at.
+        //
+        // The classpath answers this question by which Database is on it, and
+        // when both are it answers nothing -- so the old fallback quietly chose
+        // the CLIENT flavour. For a backend module that pulls the core in
+        // through a shared library that is the wrong half: the pass emits
+        // Cn1Dao and DaoBootstrap instead of backend entity definitions, and a
+        // generated backend entry point then references a BackendDaoBootstrap
+        // nothing wrote, or starts with no entities registered at all. It also
+        // made the two passes disagree, because backend-package forces the
+        // backend flavour and the ordinary process-annotations pass did not.
+        //
+        // Refusing is the honest answer to an ambiguous classpath, and it is
+        // one property away from being unambiguous. The shared-contract module
+        // in this repository already sets it, which is what showed that the
+        // classpath cannot decide this on its own.
+        //
+        // AFTER the property, not before it: -Dcn1.backendOrm is exactly the
+        // answer this refusal asks for, so checking the classpath first refuses
+        // the very builds that had already supplied it. That is not theoretical
+        // -- it failed this repository's own contract build, which passes the
+        // property on the command line.
+        String settled = System.getProperty("cn1.backendOrm");
+        if (settled != null && settled.length() > 0) {
+            backend = "true".equalsIgnoreCase(settled);
+            return;
+        }
+        if (onCompileClasspath(ctx, BACKEND_DATABASE)
+                && onCompileClasspath(ctx, CLIENT_DATABASE)) {
+            ctx.error("this module has both the Codename One core and the "
+                    + "server-side backend on its compile classpath, so which ORM "
+                    + "its @Entity classes are stored through cannot be read from "
+                    + "the classpath. Set -Dcn1.backendOrm=true for a server module "
+                    + "or -Dcn1.backendOrm=false for a client one.");
+            return;
+        }
+        backend = isBackendModule(ctx);
     }
 
     /// Generates server-side daos whatever the classpath looks like. See
@@ -132,6 +172,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     public void setBackendFlavour(boolean serverSide) {
         this.forcedFlavour = Boolean.valueOf(serverSide);
     }
+
+    /// The two classes whose presence tells the runtimes apart.
+    private static final String BACKEND_DATABASE = "com/codename1/backend/Database.class";
+    private static final String CLIENT_DATABASE = "com/codename1/db/Database.class";
 
     /// Which runtime this module's entities are stored through.
     ///
@@ -143,14 +187,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Otherwise: the backend flavour when the backend's `Database` is on the
     /// compile classpath and the core's is not. A client module has the core
     /// and not the backend, so it takes the other branch and nothing about
-    /// existing projects changes.
+    /// existing projects changes. A module with BOTH never reaches here --
+    /// [#start] refuses it rather than letting this pick a half.
     private static boolean isBackendModule(ProcessorContext ctx) {
         String forced = System.getProperty("cn1.backendOrm");
         if (forced != null && forced.length() > 0) {
             return "true".equalsIgnoreCase(forced);
         }
-        return onCompileClasspath(ctx, "com/codename1/backend/Database.class")
-                && !onCompileClasspath(ctx, "com/codename1/db/Database.class");
+        return onCompileClasspath(ctx, BACKEND_DATABASE)
+                && !onCompileClasspath(ctx, CLIENT_DATABASE);
     }
 
     /// Whether a class file is on the compile classpath, as a directory entry or
