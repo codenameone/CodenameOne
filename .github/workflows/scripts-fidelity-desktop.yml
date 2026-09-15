@@ -94,8 +94,18 @@ jobs:
           cd maven
           mvn -B -q -DskipTests -pl core install
           mvn -B -q -DskipTests -Plocal-dev-javase -pl javase install
+          # codenameone-maven-plugin is what the fidelity app's own build runs, and
+          # nothing above installs it, so the app build cannot resolve it on a clean
+          # runner. -am brings javase with it, which needs the same profile.
+          mvn -B -q -DskipTests -Plocal-dev-javase -pl codenameone-maven-plugin -am install
           cd ../scripts/fidelity-app
-          ./mvnw -B -q -pl common -DskipTests install
+          ./mvnw -B -q -pl common,desktop-runner -DskipTests install
+
+      # The simulator needs a display; the hosted Windows and macOS images have a
+      # session, Linux does not.
+      - name: Install xvfb
+        if: matrix.platform == 'gnome'
+        run: bash scripts/ci/apt-get-install.sh xvfb
 
       - name: Score the theme against the native reference
         shell: bash

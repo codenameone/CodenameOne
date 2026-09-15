@@ -256,6 +256,13 @@ public final class DesktopTileRunner {
         }
     }
 
+    /// Writes one tile with javax.imageio, straight out of the JavaSE port's own
+    /// BufferedImage peer.
+    ///
+    /// Host APIs are correct here and are the reason this class is not in `common`:
+    /// that module is compiled as Codename One application code under a
+    /// bytecode-compliance gate, and CN1's FileSystemStorage does not address a host
+    /// directory the comparator can read anyway.
     private static void writePng(Image img, File dest) throws Exception {
         Object peer = img.getImage();
         if (peer instanceof java.awt.image.RenderedImage) {

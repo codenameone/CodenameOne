@@ -93,9 +93,12 @@ rf_log "Rendering Codename One tiles for $PLATFORM using $THEME_RES"
 # for the design generation rather than for the machine.
 SIM_JAR="$(ls maven/javase/target/codenameone-javase-*-jar-with-dependencies.jar 2>/dev/null | head -n1 || true)"
 CLASSES_DIR="$APP_DIR/common/target/classes"
-if [ ! -f "$CLASSES_DIR/com/codenameone/fidelity/DesktopTileRunner.class" ]; then
-  rf_log "FAILED: the fidelity app is not built ($CLASSES_DIR)."
-  rf_log "Build it with: (cd $APP_DIR && ./mvnw -q -pl common install)"
+# The tile renderer is in its own module: it is host code (java.awt, java.io) and
+# `common` is compiled as CN1 application code under a bytecode-compliance gate.
+RUNNER_CLASSES="$APP_DIR/desktop-runner/target/classes"
+if [ ! -f "$RUNNER_CLASSES/com/codenameone/fidelity/DesktopTileRunner.class" ]; then
+  rf_log "FAILED: the fidelity app is not built ($RUNNER_CLASSES)."
+  rf_log "Build it with: (cd $APP_DIR && ./mvnw -q -pl common,desktop-runner install)"
   exit 27
 fi
 if [ ! -f "$CLASSES_DIR/fidelity-tests.yaml" ]; then
@@ -111,10 +114,27 @@ if [ -z "$SIM_JAR" ]; then
 fi
 
 set +e
-"$JAVA_BIN" -Djava.awt.headless=true \
+# NOT -Djava.awt.headless=true. The JavaSE port creates a real AWT window during
+# Display.init and throws HeadlessException when it cannot, so the simulator needs a
+# display rather than the absence of one -- which is why every other simulator runner
+# here (run-javase-device-tests.sh, archetype-smoke.yml) reaches for xvfb-run on Linux
+# instead. macOS and Windows runners have a session already.
+#
+# useAppFrame=false keeps the simulator's inspector/AppFrame chrome out of the run: it
+# is stored as a per-user preference, so without pinning it the tiles depend on what
+# the last person to open this app in the simulator happened to click.
+DISPLAY_WRAPPER=()
+if [ "$(uname -s)" = "Linux" ]; then
+  if ! command -v xvfb-run >/dev/null 2>&1; then
+    rf_log "FAILED: xvfb-run is required on Linux (apt-get install xvfb)."
+    exit 25
+  fi
+  DISPLAY_WRAPPER=(xvfb-run -a)
+fi
+${DISPLAY_WRAPPER[@]+"${DISPLAY_WRAPPER[@]}"} "$JAVA_BIN" -Dcn1.simulator.useAppFrame=false \
     -Dcn1ss.fidelity.platform="$PLATFORM" \
     -Dcn1ss.fidelity.themeResource="/$THEME_RES.res" \
-    -cp "$REPO_ROOT/$SIM_JAR:$REPO_ROOT/$APP_DIR/common/target/classes" \
+    -cp "$REPO_ROOT/$SIM_JAR:$REPO_ROOT/$CLASSES_DIR:$REPO_ROOT/$RUNNER_CLASSES" \
     com.codenameone.fidelity.DesktopTileRunner "$PLATFORM" "$THEME_RES" "$TILE_DIR"
 rc=$?
 set -e
