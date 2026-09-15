@@ -58,6 +58,13 @@ AWKWARD = "Project O'Brien with spaces"
 # and cost several times a normal build -- and a blocklist would have to be
 # updated every time another one is added. These are the cheap, non-Apple
 # targets a canary has any reason to ask for.
+# The job timeout in starter-canary.yml must exceed LAUNCH_TIMEOUT + POLL_TIMEOUT
+# plus checkout/python/JDK setup. If the runner kills the job first, the canary
+# never writes its report and the alert job reports an outage that did not
+# happen -- so these two numbers and that one are a single decision.
+LAUNCH_TIMEOUT = 1800   # 30 min: mvnw downloads Maven and the toolchain
+POLL_TIMEOUT = 1200     # 20 min: waiting for the cloud build to finish
+
 CHEAP_TARGETS = ("javascript", "windows_device", "windows_desktop",
                  "linux_device", "android")
 
@@ -107,9 +114,15 @@ def login(opener, base, email, password):
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     if status not in (200, 302) or "error" in urllib.parse.urlparse(final).query:
+        # Never name the account. This message is written to canary.json, and
+        # the alert job copies it verbatim into a tracking issue -- Actions log
+        # masking does not reach artifacts or issue bodies, so putting the
+        # address here would publish a configured credential the first time
+        # sign-in broke, which is precisely when this runs.
         raise CanaryFailure(
-            f"form login as {email} failed (HTTP {status}, landed on {final}). "
-            "Either the canary credentials are wrong or the sign-in path is broken."
+            f"the canary account could not sign in (HTTP {status}, landed on "
+            f"{urllib.parse.urlparse(final).path}). Either the configured "
+            "credentials are wrong or the sign-in path is broken."
         )
     return final
 
@@ -254,18 +267,22 @@ def seed_token(project, mvn, email, token, plugin_version):
          f"-Dtoken={token}", f"-Duser={email}"],
         cwd=project,
         what="cn1:set-user-token",
-        secret=token,
+        secrets=(token, email),
     )
     log("seeded build-client token")
 
 
-def run(command, cwd, what, timeout=3600, secret=None, check=True):
+def run(command, cwd, what, timeout=3600, secrets=(), check=True):
     result = subprocess.run(
         command, cwd=str(cwd), capture_output=True, text=True, timeout=timeout
     )
     output = (result.stdout or "") + (result.stderr or "")
-    if secret:
-        output = output.replace(secret, "***")
+    # Redact before this can reach a report, and so an issue body. The account
+    # address is passed to the goal as an argument, so a tool that echoes its
+    # arguments back in an error would otherwise carry it straight out.
+    for value in secrets:
+        if value:
+            output = output.replace(value, "***")
     if check and result.returncode != 0:
         raise CanaryFailure(
             f"{what} failed with exit {result.returncode}:\n{tail(output)}"
@@ -290,7 +307,7 @@ def launch(project, target):
     env_note = f"{'build.bat' if WINDOWS else './build.sh'} {target}"
     log(f"running {env_note} (this downloads Maven and the CN1 toolchain; several minutes)")
     code, output = run(
-        command, cwd=project, what=env_note, timeout=3600, check=False
+        command, cwd=project, what=env_note, timeout=LAUNCH_TIMEOUT, check=False
     )
     return code, output
 
@@ -317,7 +334,7 @@ TERMINAL = {"success", "failed", "cancelled"}
 
 
 def await_cloud_build(opener, base, known_ids, target, launcher_code, output,
-                      timeout=1800, interval=20):
+                      timeout=POLL_TIMEOUT, interval=20):
     """Wait for a build this run submitted to reach a terminal state."""
     deadline = time.time() + timeout
     seen = None
@@ -459,7 +476,7 @@ def main():
     started = time.time()
     opener, _ = build_opener()
 
-    log(f"signing in to {base} as {email}")
+    log(f"signing in to {base}")  # the account is never named in output
     login(opener, base, email, password)
 
     with tempfile.TemporaryDirectory(prefix="cn1-canary-") as tmp:

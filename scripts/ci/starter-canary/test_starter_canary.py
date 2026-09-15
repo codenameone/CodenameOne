@@ -160,6 +160,56 @@ class StarterAssertions(unittest.TestCase):
             self.unpack(buffer)
 
 
+class Redaction(unittest.TestCase):
+    """Failure text reaches a public tracking issue, so it must name no account."""
+
+    def test_login_failure_does_not_name_the_account(self):
+        class Response:
+            """Spring bounces a rejected sign-in back to /login?error."""
+
+            def __init__(self, url):
+                self.status, self.headers, self.url = 200, {}, url
+
+            def read(self):
+                return b'<input name="_csrf" value="t">'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        class Opener:
+            def __init__(self):
+                self.calls = 0
+
+            def open(self, request, timeout=0):
+                self.calls += 1
+                return Response("https://x/login" if self.calls == 1
+                                else "https://x/login?error")
+
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.login(Opener(), "https://x", "secret-account@example.com", "pw")
+        message = str(caught.exception)
+        self.assertNotIn("secret-account@example.com", message)
+        self.assertIn("could not sign in", message)
+
+    def test_run_redacts_every_supplied_credential(self):
+        code, output = canary.run(
+            [sys.executable, "-c", "print('tok-abc123 user@example.com ok')"],
+            cwd=".", what="probe", secrets=("tok-abc123", "user@example.com"))
+        self.assertNotIn("tok-abc123", output)
+        self.assertNotIn("user@example.com", output)
+        self.assertIn("***", output)
+
+
+class Budgets(unittest.TestCase):
+    def test_internal_budgets_fit_the_documented_job_timeout(self):
+        """The workflow allows 70 minutes; the canary must finish inside it."""
+        total_minutes = (canary.LAUNCH_TIMEOUT + canary.POLL_TIMEOUT) / 60
+        self.assertLess(total_minutes, 70, "job timeout-minutes must exceed this")
+
+
 class PomProperties(unittest.TestCase):
     """The plugin version is its own property and must not be assumed equal."""
 

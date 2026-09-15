@@ -72,7 +72,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # Must exceed the canary's own budgets (LAUNCH_TIMEOUT 30m + POLL_TIMEOUT
+    # 20m in starter_canary.py) plus checkout/python/JDK setup. Cut it below
+    # their sum and the runner kills the job before the canary can write its
+    # report, turning a slow-but-healthy build into a reported outage.
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v6
 
@@ -97,19 +101,27 @@ jobs:
           CN1_CANARY_PASSWORD: ${{ secrets.CN1_CANARY_PASSWORD }}
           CN1_CANARY_TOKEN: ${{ secrets.CN1_CANARY_TOKEN }}
           CANARY_REPORT: ${{ runner.temp }}/canary.json
-        # Explicitly bash: on windows-latest the default shell is PowerShell,
-        # where a trailing backslash does not continue a line, so python would
-        # get a stray argument and the --target/--report lines would be run as
-        # separate commands.
+          # Through `env`, never interpolated into the script body. A dispatch
+          # input expanded straight into `run:` is evaluated by the shell before
+          # python ever sees it, so a value like $(...) would execute with all
+          # three credentials in the environment. The allowlist runs far too
+          # late to help with that.
+          CANARY_TARGET: ${{ github.event.inputs.target || 'javascript' }}
+          CANARY_SKIP_BUILD: ${{ github.event.inputs.skip_build || 'false' }}
         # `python`, not `python3`: this runs under Git Bash on the Windows
         # runner, which provides no python3 shim, while setup-python puts
         # `python` on PATH for every platform.
         shell: bash
         run: |
+          set -u
+          skip=""
+          if [ "$CANARY_SKIP_BUILD" = "true" ]; then
+            skip="--skip-build"
+          fi
           python scripts/ci/starter-canary/starter_canary.py \
-            --target "${{ github.event.inputs.target || 'javascript' }}" \
-            ${{ github.event.inputs.skip_build == 'true' && '--skip-build' || '' }} \
-            --report "${{ runner.temp }}/canary.json"
+            --target "$CANARY_TARGET" \
+            $skip \
+            --report "$CANARY_REPORT"
 
       - name: Ensure a report exists
         if: always()
