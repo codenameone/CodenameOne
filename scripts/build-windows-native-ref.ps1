@@ -31,16 +31,15 @@ Write-Log "Publishing for $Rid (msbuild platform $MsbuildPlatform)"
 
 $publishDir = Join-Path $env:TEMP "cn1-win-ref-$(Get-Random)"
 
-# Visual Studio's MSBuild, not `dotnet publish` -- see the comment in NativeRef.csproj for
-# why. The workflow puts it on PATH with microsoft/setup-msbuild.
-$msbuild = (Get-Command msbuild -ErrorAction SilentlyContinue)
-if (-not $msbuild) {
-  throw "msbuild is not on PATH. The WindowsAppSDK packaging targets need Visual Studio's MSBuild; the .NET SDK's does not carry the AppxPackage tasks."
-}
-Write-Log "msbuild: $($msbuild.Source)"
-
-# Run from inside the project directory so the SDK pin in global.json applies: it resolves
-# from the current directory upward, not from the project path.
+# Built, not published, and run straight out of the build output.
+#
+# `-t:Publish` dropped the PRI files: neither the app's resources.pri nor WinUI's
+# Microsoft.UI.Xaml.Controls.pri reached the publish directory, so every control rendered
+# unstyled. The build output has them, and for a self-contained RID build it is already a
+# complete, runnable folder -- publishing bought nothing and lost the theme resources.
+#
+# OutDir is pinned rather than discovered so the path does not have to be reconstructed from
+# the platform, RID and target framework, which is four things that can each drift.
 Push-Location $Src
 try {
   # Reported from INSIDE the project directory. Run from the repo root it reported 10.0.400
@@ -50,72 +49,35 @@ try {
   & msbuild -t:Restore -p:Configuration=Release -p:RuntimeIdentifier=$Rid -p:Platform=$MsbuildPlatform -v:minimal
   if ($LASTEXITCODE -ne 0) { throw "msbuild restore failed with $LASTEXITCODE" }
 
-  & msbuild -t:Publish `
+  & msbuild -t:Build `
       -p:Configuration=Release `
       -p:RuntimeIdentifier=$Rid `
       -p:Platform=$MsbuildPlatform `
       -p:SelfContained=true `
-      -p:PublishDir=$publishDir `
+      -p:OutDir="$publishDir\" `
       -v:minimal
-  if ($LASTEXITCODE -ne 0) { throw "msbuild publish failed with $LASTEXITCODE" }
+  if ($LASTEXITCODE -ne 0) { throw "msbuild build failed with $LASTEXITCODE" }
 } finally {
   Pop-Location
 }
 
-# Pin what the reference must not drift on. Animations off so nothing is captured
-# mid-transition; grayscale font smoothing rather than ClearType, because ClearType's
-# colour fringes against Codename One's grayscale AA would be a permanent, unclosable
-# text residual. Both are recorded in the manifest so the CN1 side can be matched to them.
-Write-Log 'Pinning animation and font-smoothing state'
-try {
-  Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public static class Spi {
-  [DllImport("user32.dll", SetLastError = true)]
-  public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
-}
-'@ -ErrorAction Stop
-  # SPI_SETCLIENTAREAANIMATION = 0x1043, SPI_SETFONTSMOOTHINGTYPE = 0x200B
-  [void][Spi]::SystemParametersInfo(0x1043, 0, [IntPtr]::Zero, 0)
-} catch {
-  Write-Log "WARNING: could not pin system parameters: $_"
-}
-
-# WinUI's theme dictionary ships inside resources.pri. Without it every control silently
-# falls back to an unstyled default -- a square grey rectangle where a Fluent Button should
-# be -- and the app has no way to tell: it asks for a Button and gets one, just not a styled
-# one. Checked here because it is a property of the BUILD, and a build that quietly omits it
-# must not go on to photograph the result.
+# WinUI's theme dictionary ships inside a .pri. Without one every control silently falls back
+# to an unstyled default -- a square grey rectangle where a Fluent Button should be -- and the
+# app has no way to tell: it asks for a Button and gets one, just not a styled one.
 #
-# Searched rather than assumed to be in one place: the PRI targets emit into the build
-# output, and `-t:Publish` does not necessarily carry it across for an unpackaged app. If it
-# exists at all, it is taken from wherever it landed.
-$pri = Join-Path $publishDir 'resources.pri'
-if (-not (Test-Path $pri)) {
-  $binDir = Join-Path $Src 'bin'
-  $found = @()
-  if (Test-Path $binDir) {
-    $found = @(Get-ChildItem -Path $binDir -Filter '*.pri' -Recurse -ErrorAction SilentlyContinue)
-  }
-  if ($found.Count -gt 0) {
-    $src = ($found | Sort-Object Length -Descending | Select-Object -First 1)
-    Write-Log "resources.pri was not in the publish output; taking $($src.FullName) ($($src.Length) bytes)"
-    Copy-Item $src.FullName $pri -Force
-  }
-}
-if (-not (Test-Path $pri)) {
-  Write-Log 'FAILED: no .pri was produced anywhere.'
-  Write-Log 'WinUI theme resources live there; without it the controls render unstyled and'
+# Checked, not repaired. An earlier version of this copied the largest .pri it could find to
+# resources.pri, which made the check pass while the controls stayed unstyled: it had grabbed
+# WinUI's framework PRI and renamed it, which is not the same file and does not do the same
+# job. A check that papers over what it finds is worse than no check.
+$priFiles = @(Get-ChildItem -Path $publishDir -Filter '*.pri' -ErrorAction SilentlyContinue)
+if ($priFiles.Count -eq 0) {
+  Write-Log 'FAILED: no .pri in the build output.'
+  Write-Log 'WinUI theme resources live there; without one the controls render unstyled and'
   Write-Log 'the reference would encode fallback visuals rather than Fluent ones.'
-  Write-Log "--- files in $publishDir ---"
   Get-ChildItem $publishDir -File | Select-Object -First 30 -ExpandProperty Name | ForEach-Object { Write-Log "  $_" }
-  Write-Log "--- any .pri under $Src ---"
-  Get-ChildItem -Path $Src -Filter '*.pri' -Recurse -ErrorAction SilentlyContinue |
-    Select-Object -First 10 -ExpandProperty FullName | ForEach-Object { Write-Log "  $_" }
   exit 23
 }
-Write-Log "resources.pri present ($((Get-Item $pri).Length) bytes)"
+foreach ($f in $priFiles) { Write-Log "pri: $($f.Name) ($($f.Length) bytes)" }
 
 $env:NATIVEREF_OUT = $OutDir
 if (-not $env:NATIVEREF_MODE) { $env:NATIVEREF_MODE = 'probe' }
