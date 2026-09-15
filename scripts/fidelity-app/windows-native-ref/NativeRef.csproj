@@ -43,6 +43,9 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- App.xaml would otherwise generate its own entry point, which clashes with the
+         explicit STAThread Main in Program.cs. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250228001" />

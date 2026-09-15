@@ -59,6 +59,15 @@ public static class Program
 
 public partial class App : Application
 {
+    public App()
+    {
+        // Generated from App.xaml, which is where the style dictionary is merged. Doing that
+        // merge from C# instead -- in this constructor, and then in OnLaunched -- crashed the
+        // process with 0xC000027B both times, because without a XAML file the project
+        // produces no app resources.pri and XamlControlsResources cannot load its dictionary.
+        InitializeComponent();
+    }
+
     /// Merged in OnLaunched, not in the constructor.
     ///
     /// Merges WinUI's default style dictionary.
@@ -89,8 +98,6 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        Resources.MergedDictionaries.Add(new XamlControlsResources());
-
         _outDir = Environment.GetEnvironmentVariable("NATIVEREF_OUT")
                   ?? throw new InvalidOperationException("NATIVEREF_OUT is not set");
         Directory.CreateDirectory(_outDir);
