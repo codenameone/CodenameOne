@@ -35,7 +35,7 @@ import com.codename1.ui.Font;
  * one the app bundled; either way the text is painted in the family the design
  * asks for. This runtime used to discard {@code fontFamily} entirely and paint
  * every string in the platform default, which is the single largest visual
- * difference on any screen with a designed typeface — a study whose whole look
+ * difference on any screen with a designed typeface -- a study whose whole look
  * is Work Sans or Libre Franklin renders in Helvetica and every glyph is the
  * wrong shape, the wrong width and on the wrong baseline.</p>
  *
@@ -86,7 +86,7 @@ public final class FontResolver {
      * The face for {@code family} at {@code weight}, or null when the app
      * bundles no such file (in which case the caller keeps the platform font).
      *
-     * <p>Cached including the misses — a family with no bundled face is asked
+     * <p>Cached including the misses -- a family with no bundled face is asked
      * for on every build of every Text that names it, and probing the asset
      * folders each time is a filesystem walk per string.</p>
      */
@@ -273,12 +273,26 @@ public final class FontResolver {
         return v > 0x7fff ? v - 0x10000 : v;
     }
 
-    /// (usWinAscent + |sTypoDescender|) / unitsPerEm, or 0 when the tables are absent.
+    /// The face's own line height as a multiple of the em, or 0 when the tables
+    /// are absent.
+    ///
+    /// This is the rule the reference stack uses, and it is NOT a free choice of
+    /// metrics: a font carries two competing pairs, and bit 7 of the OS/2
+    /// `fsSelection` field (`USE_TYPO_METRICS`) is the face author stating which
+    /// one is authoritative. Set, the typographic pair wins, line gap included;
+    /// clear, the `hhea` pair does.
+    ///
+    /// Mixing the two -- pairing `usWinAscent` with `sTypoDescender`, as this
+    /// once did -- produces a box taller than either pair describes, because
+    /// `usWinAscent` is the ink bound of the tallest glyph rather than an
+    /// ascent. The error only shows on text whose style states no height, so it
+    /// stayed invisible while the type scale supplied one for nearly every role.
     private static double metrics(byte[] d) {
         try {
             int tables = u16(d, 4);
             int head = -1;
             int os2 = -1;
+            int hhea = -1;
             for (int i = 0; i < tables; i++) {
                 int rec = 12 + 16 * i;
                 String tag = new String(d, rec, 4, "ISO-8859-1");
@@ -287,21 +301,38 @@ public final class FontResolver {
                     head = off;
                 } else if ("OS/2".equals(tag)) {
                     os2 = off;
+                } else if ("hhea".equals(tag)) {
+                    hhea = off;
                 }
             }
-            if (head < 0 || os2 < 0) {
+            if (head < 0) {
                 return 0;
             }
             int upem = u16(d, head + 18);
             if (upem <= 0) {
                 return 0;
             }
-            int typoDescender = s16(d, os2 + 70);
-            int winAscent = u16(d, os2 + 74);
-            if (winAscent <= 0) {
-                return 0;
+            // fsSelection bit 7 is USE_TYPO_METRICS.
+            boolean useTypo = os2 >= 0 && (u16(d, os2 + 62) & 0x80) != 0;
+            if (useTypo) {
+                int ascender = s16(d, os2 + 68);
+                int descender = s16(d, os2 + 70);
+                int lineGap = s16(d, os2 + 72);
+                int height = ascender - descender + lineGap;
+                if (height > 0) {
+                    return height / (double) upem;
+                }
             }
-            return (winAscent + Math.abs(typoDescender)) / (double) upem;
+            if (hhea >= 0) {
+                int ascender = s16(d, hhea + 4);
+                int descender = s16(d, hhea + 6);
+                int lineGap = s16(d, hhea + 8);
+                int height = ascender - descender + lineGap;
+                if (height > 0) {
+                    return height / (double) upem;
+                }
+            }
+            return 0;
         } catch (Throwable t) {
             return 0;
         }
