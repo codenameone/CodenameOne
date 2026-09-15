@@ -272,6 +272,23 @@ public abstract class Dialect {
     }
 
     /**
+     * Whether anything follows the first statement in {@code sql}.
+     *
+     * <p>What {@link com.codename1.backend.Database} refuses before dispatching,
+     * because SQLite would run the first statement and drop the rest in silence.
+     * See {@link Placeholders#hasTrailingStatement}.
+     */
+    public boolean hasTrailingStatement(String sql) throws IOException {
+        if(sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.hasTrailingStatement(sql, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /**
      * Whether {@code sql} updates an existing row when it conflicts.
      *
      * <p>What {@link com.codename1.backend.Database#insert} needs before it

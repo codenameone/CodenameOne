@@ -743,6 +743,20 @@ public class OrmCheck {
                 refusedNan = "refused";
             }
             check("NaN is refused on every engine", "refused", refusedNan);
+            // A SECOND STATEMENT, which SQLite runs the first half of and
+            // reports success for while the other two refuse it. Measured: the
+            // DELETE never ran and nothing said so.
+            String refusedTail;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?); DELETE FROM cn1_rawnul",
+                        new Object[] {"tail"});
+                refusedTail = "accepted";
+            } catch (Exception err) {
+                refusedTail = "refused";
+            }
+            check("a second statement is refused on every engine", "refused", refusedTail);
+            // A TERMINATOR IS NOT A SECOND STATEMENT, and that already worked.
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?);", new Object[] {"terminated"});
             // THE CONTROLS, counted together so neither refusal can pass by
             // refusing everything: the same statement without a NUL writes, and
             // an ordinary double binds. Two rows, and the count is taken after
@@ -751,7 +765,7 @@ public class OrmCheck {
             pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)", new Object[] {"ab"});
             pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
                     new Object[] {Double.valueOf(1.5)});
-            check("and the same statements without one still write", "2",
+            check("and the same statements without one still write", "3",
                     String.valueOf(pool.query("SELECT v FROM cn1_rawnul", null).size()));
             // And a byte[] carrying a NUL is fine, because a blob is where one
             // belongs on every engine.

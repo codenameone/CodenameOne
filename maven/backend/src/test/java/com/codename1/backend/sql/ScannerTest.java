@@ -112,6 +112,41 @@ class ScannerTest {
     }
 
     @Test
+    @DisplayName("a second statement is seen, and a trigger body is not one")
+    void trailingStatementsAreRecognised() throws Exception {
+        // SQLite compiles the FIRST statement and drops the rest without a word
+        // -- sqlite3_prepare_v2 with a null tail pointer -- while PostgreSQL and
+        // MySQL refuse the same string. Measured on all three. Database refuses
+        // it everywhere, so the two answers become one.
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "INSERT INTO t (v) VALUES (?); DELETE FROM u"));
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "INSERT INTO t (v) VALUES (?);DELETE FROM u"));
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "INSERT INTO t (v) VALUES (?); /* c */ DELETE FROM u"));
+
+        // What already worked and has to keep working: a terminator, a comment
+        // after it, a run of empty statements, and a semicolon inside a literal.
+        assertFalse(Dialect.SQLITE.hasTrailingStatement("INSERT INTO t (v) VALUES (?)"));
+        assertFalse(Dialect.SQLITE.hasTrailingStatement("INSERT INTO t (v) VALUES (?);"));
+        assertFalse(Dialect.SQLITE.hasTrailingStatement("INSERT INTO t (v) VALUES (?); "));
+        assertFalse(Dialect.SQLITE.hasTrailingStatement(
+                "INSERT INTO t (v) VALUES (?); -- done"));
+        assertFalse(Dialect.SQLITE.hasTrailingStatement("INSERT INTO t (v) VALUES (?);;"));
+        assertFalse(Dialect.SQLITE.hasTrailingStatement("INSERT INTO t (v) VALUES ('a;b')"));
+
+        // A TRIGGER BODY IS ONE STATEMENT. Its semicolons belong to the CREATE
+        // that contains them and SQLite compiles the whole of it, so counting
+        // BEGIN and END is what keeps a naive check from refusing valid DDL.
+        assertFalse(Dialect.SQLITE.hasTrailingStatement(
+                "CREATE TRIGGER x AFTER INSERT ON t BEGIN UPDATE u SET v = 1; END"));
+        // And a real second statement after the block is still one.
+        assertTrue(Dialect.SQLITE.hasTrailingStatement(
+                "CREATE TRIGGER x AFTER INSERT ON t BEGIN UPDATE u SET v = 1; END; "
+                        + "DROP TABLE u"));
+    }
+
+    @Test
     @DisplayName("an upsert is recognised as SQL, not found as text")
     void upsertsAreRecognised() throws Exception {
         // Database refuses one of these on the engines that read the generated

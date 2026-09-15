@@ -464,6 +464,72 @@ final class Placeholders {
     }
 
     /**
+     * Whether anything follows the first statement.
+     *
+     * <p>SQLite compiles ONE statement and drops the rest: the native arm calls
+     * sqlite3_prepare_v2 with a null tail pointer, so
+     * "INSERT INTO audit(v) VALUES (?); DELETE FROM jobs" inserts the row,
+     * reports success, and never runs the DELETE. PostgreSQL and MySQL refuse
+     * the same string outright -- "cannot insert multiple commands into a
+     * prepared statement" and a syntax error. Measured on all three. A silent
+     * partial execution is the worst of the three answers, so the statement is
+     * refused everywhere instead.
+     *
+     * <p>A trailing terminator is not a second statement, nor is a comment after
+     * it, nor a run of empty ones -- those already worked and must keep working.
+     *
+     * <p>BEGIN ... END is counted, because the semicolons inside a trigger body
+     * belong to the one statement that contains them and SQLite compiles the
+     * whole of it. A bare BEGIN that opens a transaction leaves the count
+     * raised and makes this answer false, which errs toward allowing rather
+     * than toward refusing something valid.
+     */
+    static boolean hasTrailingStatement(String sql, boolean nestedComments,
+                                        boolean backslashEscapes, boolean hashComments,
+                                        boolean dollarQuotedStrings,
+                                        boolean dashCommentNeedsSpace,
+                                        boolean bracketIdentifiers,
+                                        boolean executableComments) throws IOException {
+        int at = 0;
+        int blocks = 0;
+        int length = sql.length();
+        while(at < length) {
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            if(next > at) {
+                at = next;
+                continue;
+            }
+            char c = sql.charAt(at);
+            if(c == ';' && blocks == 0) {
+                int after = skipBlanks(sql, at + 1, nestedComments, backslashEscapes,
+                        hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                        bracketIdentifiers, executableComments);
+                while(after < length && sql.charAt(after) == ';') {
+                    after = skipBlanks(sql, after + 1, nestedComments, backslashEscapes,
+                            hashComments, dollarQuotedStrings, dashCommentNeedsSpace,
+                            bracketIdentifiers, executableComments);
+                }
+                return after < length;
+            }
+            if(isWord(sql, at, "begin")) {
+                blocks++;
+                at += 5;
+                continue;
+            }
+            if(isWord(sql, at, "end")) {
+                if(blocks > 0) {
+                    blocks--;
+                }
+                at += 3;
+                continue;
+            }
+            at++;
+        }
+        return false;
+    }
+
+    /**
      * Whether the statement updates an existing row when it conflicts --
      * "ON CONFLICT ... DO UPDATE" or MySQL's "ON DUPLICATE KEY UPDATE".
      *
