@@ -162,12 +162,16 @@ class MapContent implements StructuredContent {
         }
 
         for (Object o : array) {
-            // There is a bug that needs to be addressed, should always have
-            // Maps.
-            // for now prevent the critical cast exception.
-            if (o instanceof Map) {
-                children.add(new MapContent(o, this));
-            } else if (o instanceof String) {
+            // Maps and strings were the only shapes kept, so an array of
+            // numbers or booleans -- "scores":[1,2] -- came back EMPTY, from
+            // the child form of a path as well as the attribute form. The
+            // JSON parser hands those back as Double, Long and Boolean, and a
+            // value is a value whatever its type; MapContent reads it through
+            // getText() either way.
+            //
+            // null is still dropped: there is no value to read from it, and
+            // the absence tests are what ask about that.
+            if (o != null) {
                 children.add(new MapContent(o, this));
             }
         }
@@ -252,6 +256,12 @@ class MapContent implements StructuredContent {
     public StructuredContent getChild(int index) {
         if (root instanceof List) {
             return new MapContent(((List) root).get(index), this);
+        }
+        if (!(root instanceof Map)) {
+            // A scalar has no children. The cast below used to be reached for
+            // one and throw -- and ParparVM does not throw for a failed cast,
+            // so on a device it would have read a Double as a Map instead.
+            return null;
         }
         Map h = (Map) root;
         if (index < 0 || index >= h.size()) {
@@ -429,6 +439,12 @@ class MapContent implements StructuredContent {
     public String getText() {
         if (root instanceof String) {
             return (String) root;
+        }
+        // A scalar is its own text. The parser hands numbers back as Double
+        // or Long and booleans as Boolean, and every one of those is a value
+        // a path can read or a predicate can compare.
+        if (root != null && !(root instanceof Map) && !(root instanceof List)) {
+            return root.toString();
         }
         StructuredContent sc = getChild(0);
         if (sc == null) {

@@ -405,17 +405,81 @@ abstract class AbstractEvaluator implements Evaluator {
     ///
     /// negative, zero or positive, as `compareTo` does
     protected int compareNumbers(String left, String right) {
-        String l = left.trim();
-        String r = right.trim();
-        if (isFixedPoint(l) && isFixedPoint(r)) {
-            return compareFixedPoint(l, r);
+        // Exponents are written out first rather than parsed. A document can
+        // carry one -- an XML attribute holds whatever text it likes -- and
+        // through a double, 9007199254740992e0 and 9007199254740993e0 are one
+        // value while 1e309 and 2e309 are both infinity.
+        return compareFixedPoint(withoutExponent(left.trim()),
+                                 withoutExponent(right.trim()));
+    }
+
+    /// Rewrites a number in exponent form as plain digits.
+    ///
+    /// - `text`: a value [#isNumeric] already accepted
+    ///
+    /// #### Returns
+    ///
+    /// the same value with the point moved and the exponent gone
+    private String withoutExponent(String text) {
+        int marker = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == 'e' || c == 'E') {
+                marker = i;
+                break;
+            }
         }
-        // Only an exponent reaches here, and a value written that way has
-        // already been through a double -- the JSON parser produced it -- so
-        // there is no exactness left to preserve.
-        double dl = Double.parseDouble(l);
-        double dr = Double.parseDouble(r);
-        return dl < dr ? -1 : (dl > dr ? 1 : 0);
+        if (marker < 0) {
+            return text;
+        }
+        int exponent = parseExponent(text.substring(marker + 1));
+        String mantissa = text.substring(0, marker);
+        String sign = "";
+        if (mantissa.length() > 0
+                && (mantissa.charAt(0) == '-' || mantissa.charAt(0) == '+')) {
+            sign = mantissa.charAt(0) == '-' ? "-" : "";
+            mantissa = mantissa.substring(1);
+        }
+        int point = mantissa.indexOf('.');
+        String digits = point < 0 ? mantissa
+                : mantissa.substring(0, point) + mantissa.substring(point + 1);
+        int pointAt = (point < 0 ? mantissa.length() : point) + exponent;
+        StringBuilder out = new StringBuilder();
+        if (pointAt <= 0) {
+            out.append("0.");
+            for (int i = 0; i < -pointAt; i++) {
+                out.append('0');
+            }
+            out.append(digits);
+        } else if (pointAt >= digits.length()) {
+            out.append(digits);
+            for (int i = digits.length(); i < pointAt; i++) {
+                out.append('0');
+            }
+        } else {
+            out.append(digits.substring(0, pointAt));
+            out.append('.');
+            out.append(digits.substring(pointAt));
+        }
+        return sign + out.toString();
+    }
+
+    /// Reads the exponent's digits, which [#isNumeric] has already checked.
+    private int parseExponent(String text) {
+        boolean negative = text.length() > 0 && text.charAt(0) == '-';
+        int at = negative || (text.length() > 0 && text.charAt(0) == '+')
+                ? 1 : 0;
+        int value = 0;
+        for (int i = at; i < text.length(); i++) {
+            // Bounded rather than wrapped: an exponent past this writes more
+            // digits than any document holds, and the comparison only needs
+            // the two to stay ordered.
+            if (value > 100000) {
+                break;
+            }
+            value = value * 10 + (text.charAt(i) - '0');
+        }
+        return negative ? -value : value;
     }
 
     /// Compares two numbers written without an exponent, digit by digit.
@@ -495,27 +559,6 @@ abstract class AbstractEvaluator implements Evaluator {
             end--;
         }
         return text.substring(point + 1, end);
-    }
-
-    /// Whether this number is written without an exponent, so it can be
-    /// compared exactly.
-    ///
-    /// - `text`: a value [#isNumeric] already accepted
-    ///
-    /// #### Returns
-    ///
-    /// true when the value has no exponent
-    private boolean isFixedPoint(String text) {
-        if (text.length() == 0) {
-            return false;
-        }
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == 'e' || c == 'E') {
-                return false;
-            }
-        }
-        return true;
     }
 
     /// Utility method for subclasses to determine strip single/double quotes

@@ -364,6 +364,49 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void aJsonArrayOfNumbersIsReadable() {
+        // The array conversion kept maps and strings only, so an array of
+        // numbers came back empty from BOTH forms of the path -- the parser
+        // returns those as Double and Long. Reading one then walked into a
+        // cast to Map, which throws here and on a device would have read the
+        // Double as a Map instead.
+        Result r = Result.fromContent(
+                "{\"items\":[{\"scores\":[1,2],\"n\":\"A\"},"
+                + "{\"scores\":[9],\"n\":\"B\"}]}", Result.JSON);
+
+        String[] matched = r.getAsStringArray("/items[@scores=2]/n");
+        assertEquals(1, matched.length, "a numeric array value never matched");
+        assertEquals("A", matched[0]);
+        assertEquals(3, r.getAsStringArray("/items/scores").length,
+                "the child form dropped the numbers");
+        assertEquals(3, r.getAsStringArray("/items/@scores").length,
+                "the attribute form dropped the numbers");
+    }
+
+    @Test
+    void anExponentIsComparedByItsDigits() {
+        // An XML attribute holds whatever text it likes, including exponent
+        // form. Through a double, 9007199254740992e0 and 9007199254740993e0
+        // are one value, and 1e309 and 2e309 are both infinity.
+        Result r = Result.fromContent(
+                "<t><p v='9007199254740992e0' n='X'/>"
+                + "<p v='9007199254740993e0' n='Y'/>"
+                + "<p v='1e309' n='P'/><p v='2e309' n='Q'/></t>", Result.XML);
+
+        String[] big = r.getAsStringArray("/t/p[@v='9007199254740993e0']/@n");
+        assertEquals(1, big.length, "two exponent values compared equal");
+        assertEquals("Y", big[0]);
+
+        String[] huge = r.getAsStringArray("/t/p[@v='2e309']/@n");
+        assertEquals(1, huge.length, "two values past the double range compared equal");
+        assertEquals("Q", huge[0]);
+
+        // And the same number written two ways is still one number.
+        assertEquals(1, r.getAsStringArray("/t/p[@v='1000e306']/@n").length,
+                "1e309 and 1000e306 are the same value");
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for
