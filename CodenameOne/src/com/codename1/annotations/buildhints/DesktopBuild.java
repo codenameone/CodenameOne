@@ -77,7 +77,7 @@ public @interface DesktopBuild {
     /// hints here it changes what the running application does rather than what's
     /// produced for it.
     @Hint(name = "desktop.themeMode",
-          valuePattern = "auto|native|fluent|aqua|adwaita|legacy|custom")
+            valuePattern = "auto|native|fluent|aqua|adwaita|legacy|custom")
     String themeMode() default "";
 
     /// How the desktop window is framed: native for the OS title bar and menu bar,
