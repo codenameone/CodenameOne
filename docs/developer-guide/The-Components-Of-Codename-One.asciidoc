@@ -417,8 +417,13 @@ The following sample shows off simple text field usage:
 
 [[text-component-sample-code]]
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTextComponentFigure.java[tag=the-components-of-codename-one-text-component,indent=0]
+----
+
 .Simple text component sample
-image::img/components-text-component.png[Simple text component sample,scaledwidth=20%]
+image::img/generated/components-text-component.png[Simple text component sample,scaledwidth=40%]
 
 TIP: The <<Advanced-search-code,Toolbar section>> contains an elaborate `TextField` search sample with `DataChangedListener` and rather unique styling.
 
@@ -1812,7 +1817,7 @@ image::img/generated/components-toolbar.png[The Toolbar,scaledwidth=25%]
 
 
 .The default sidemenu of the Toolbar
-image::img/components-toolbar-sidemenu.png[The default sidemenu of the Toolbar,scaledwidth=30%]
+image::img/generated/components-toolbar-sidemenu.png[The default sidemenu of the Toolbar,scaledwidth=30%]
 
 .The overflow menu of the Toolbar
 image::img/components-toolbar-overflow-menu.png[The overflow menu of the Toolbar,scaledwidth=25%]
