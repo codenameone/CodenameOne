@@ -62,6 +62,7 @@ public partial class App : Application
     private Window _window;
     private readonly List<string> _blockers = new();
     private string _outDir;
+    private bool _occluded;
     private bool _isProbe;
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -171,6 +172,13 @@ public partial class App : Application
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr pid);
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint attach, uint attachTo, bool fAttach);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(POINT p);
+    [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X, Y; }
+
+    private const uint GA_ROOT = 2;
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder s, int max);
@@ -224,12 +232,17 @@ public partial class App : Application
                 }
                 Thread.Sleep(150);
             }
-            if (GetForegroundWindow() != hwnd)
-            {
-                _blockers.Add("this window never became foreground, so a screen capture "
-                    + $"would be of whatever is on top of it ({DescribeForegroundWindow()})");
-                return;
-            }
+            // Foreground is NOT the question a screen capture cares about; occlusion is.
+            // The runner desktop keeps a "Microsoft account" out-of-box window that will not
+            // yield foreground even with the input-thread attach, but the presenter is set
+            // always-on-top, so this window can still be the one on screen. Asserting
+            // foreground therefore refused runs that would have captured perfectly good
+            // pixels.
+            //
+            // So the real check is asked directly: what window does the OS say is at the
+            // centre of our rectangle? If that resolves to us, nothing is covering the
+            // thing being photographed, whoever happens to own the keyboard.
+            bool isForeground = GetForegroundWindow() == hwnd;
 
             if (!GetWindowRect(hwnd, out RECT r))
             {
@@ -247,6 +260,19 @@ public partial class App : Application
             // grab races the first present and returns the desktop.
             DwmFlush();
             Thread.Sleep(400);
+
+            var centre = new POINT { X = r.Left + w / 2, Y = r.Top + h / 2 };
+            IntPtr atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
+            _occluded = atCentre != hwnd;
+            if (_occluded)
+            {
+                _blockers.Add("something is covering this window, so the capture would be of "
+                    + $"it and not of us ({DescribeForegroundWindow()}, "
+                    + $"at centre 0x{atCentre.ToInt64():X}). Screen capture reads whatever is "
+                    + "on top, and a picture of the wrong window still looks like a picture.");
+                return;
+            }
+            Console.WriteLine($"NATIVEREF:INFO unoccluded at centre; foreground={isForeground}");
 
             var pos = new { X = r.Left, Y = r.Top };
             IntPtr screen = GetDC(IntPtr.Zero);
@@ -363,6 +389,10 @@ public partial class App : Application
         sb.AppendLine($"    \"transparency_effects\": {Json(transparency)},");
         sb.AppendLine($"    \"animations_enabled\": {Json(animations)},");
         sb.AppendLine($"    \"accent_color\": \"#{accent.R:X2}{accent.G:X2}{accent.B:X2}\"");
+        sb.AppendLine("  },");
+        sb.AppendLine("  \"capture\": {");
+        sb.AppendLine($"    \"occluded\": {Json(_occluded)},");
+        sb.AppendLine($"    \"was_foreground\": {Json(GetForegroundWindow() == WinRT.Interop.WindowNative.GetWindowHandle(_window))}");
         sb.AppendLine("  },");
         sb.AppendLine("  \"fonts\": {");
         sb.AppendLine($"    \"control_family\": \"{Escape(fontFamily)}\",");
