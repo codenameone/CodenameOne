@@ -3407,6 +3407,16 @@ public class IPhoneBuilder extends Executor {
                     + "does -- the vault needs AES-GCM -- or false if it does not, which keeps "
                     + "the GCM symbols out of the binary.");
         }
+        // Vault use IS crypto use, and the two answers came from scans of different trees. The
+        // database scan merges buildinRes, so a submitted LIBRARY that uses Vault is detected
+        // there; the permission scan that sets usesCryptoAPI walks classesDir only, so it saw
+        // nothing and left the flag false. The conjunction below then disabled the base crypto
+        // implementation as well as GCM, and the library reached the iOS stubs with a vault that
+        // could neither encrypt nor unlock. The vault cannot function without the crypto API, so
+        // detecting one is detecting the other.
+        if (usesVault) {
+            usesCryptoAPI = true;
+        }
         usesCryptoGcm = usesCryptoAPI
                 && (usesVault || "true".equals(gcmHint)
                     || (vaultUnknown && !"false".equals(gcmHint)));

@@ -2273,6 +2273,35 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aSessionOnlyImportThatCannotRemoveTheRecordIsRefused() {
+        // deleteStorageFile returns void and both real ports can fail one silently, so this
+        // proceeded to delete the underlying key and report success while the record survived --
+        // after which getPolicy() answers the old remembering policy and unlockRemembered follows
+        // that record to a key that is gone. setPolicy already makes this check.
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault origin = Vault.named(freshName()).configure(remember);
+        origin.enroll(pw("p"), remember).get();
+
+        String name = freshName();
+        Vault joined = Vault.named(name).configure(remember);
+        assertTrue(joined.importSyncState(origin.exportSyncState(), pw("p")).get().booleanValue());
+        String record = deviceRecordName(name);
+
+        Vault sessionOnly = Vault.named(name).configure(fast());
+        TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(record);
+        try {
+            assertEquals(VaultError.STORAGE_UNAVAILABLE,
+                    errorOf(sessionOnly.importSyncState(origin.exportSyncState(), pw("p"))),
+                    "a record that would not go must not be reported as gone");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+        }
+        // And the key it names is still there, so the vault is coherent rather than half-cleared.
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE,
+                Vault.named(name).configure(fast()).getPolicy());
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

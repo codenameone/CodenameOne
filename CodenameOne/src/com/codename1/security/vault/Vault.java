@@ -1907,6 +1907,17 @@ public final class Vault {
                         DeviceRecord standing = deviceRecord();
                         if (standing != null) {
                             Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                            // Before the key goes, and before this reports success -- the check
+                            // setPolicy already makes on the same transition. deleteStorageFile
+                            // returns void and both real ports can fail one silently, and a
+                            // record that survived leaves getPolicy() answering the old
+                            // remembering policy while unlockRemembered follows it to a key that
+                            // has since been deleted.
+                            if (Storage.getInstance().exists(deviceRecordKey())) {
+                                throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                        "the device record could not be removed, so this import "
+                                        + "cannot make the vault session-only");
+                            }
                             requireKeyDeleted(deviceProtection(standing.policy),
                                     "the previous device key could not be deleted");
                         }
