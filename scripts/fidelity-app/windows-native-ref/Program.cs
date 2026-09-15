@@ -207,10 +207,14 @@ public partial class App : Application
     private static extern bool SystemParametersInfo(uint action, uint param, IntPtr pv, uint winIni);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
 
     private const uint SPI_SETFOREGROUNDLOCKTIMEOUT = 0x2001;
     private const uint SPIF_SENDCHANGE = 0x02;
     private const uint WM_CLOSE = 0x0010;
+    private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
+    private const uint MOUSEEVENTF_LEFTUP = 0x0004;
     [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(POINT p);
     [DllImport("user32.dll")] private static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
 
@@ -440,6 +444,33 @@ public partial class App : Application
                 if (attached) AttachThreadInput(fgThread, thisThread, false);
             }
             await Task.Delay(150);
+        }
+        if (GetForegroundWindow() == hwnd)
+        {
+            return true;
+        }
+
+        // Last resort: activate the way a person would, by clicking on it. The shell's
+        // "Search" window holds the foreground on this image and does not respond to
+        // WM_CLOSE the way an ordinary app window does, and SetForegroundWindow keeps losing
+        // to it. A real click travels the normal input path, which Windows always honours --
+        // there is no policy that refuses to activate the window the user just clicked.
+        //
+        // The point is inside our client area but far from the widgets, so the click lands
+        // on empty background: activating the window must not also press the control being
+        // photographed.
+        if (GetWindowRect(hwnd, out RECT wr))
+        {
+            int cx = wr.Left + (wr.Right - wr.Left) * 4 / 5;
+            int cy = wr.Top + (wr.Bottom - wr.Top) * 4 / 5;
+            Console.WriteLine($"NATIVEREF:INFO clicking empty background at {cx},{cy} to activate "
+                + $"(foreground was {DescribeForegroundWindow()})");
+            SetCursorPos(cx, cy);
+            await Task.Delay(120);
+            mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
+            await Task.Delay(60);
+            mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+            await Task.Delay(500);
         }
         return GetForegroundWindow() == hwnd;
     }
