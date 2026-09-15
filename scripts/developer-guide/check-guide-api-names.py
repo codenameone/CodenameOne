@@ -79,7 +79,8 @@ JAVADOC = re.compile(
 WORD = re.compile(
     # Spelled like a class in prose, by internal capitals or a leading acronym.
     r'\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b'
-    # As a link label: Image.html[Iamge].
+    # As a link label that is exactly the name: Image.html[Iamge]. A label
+    # with more words in it is read by JAVADOC_LABEL below.
     r'|\[([A-Z][A-Za-z0-9]{4,})\]'
     # Reading a member off it: Iamge.createImage().
     r'|\b([A-Z][a-z]{4,})\s*\.\s*[a-z][A-Za-z0-9]*\s*\(')
@@ -88,6 +89,12 @@ WORD = re.compile(
 # Not after '/' or '-': those are a URL path segment and a command-line flag,
 # neither of which is a class. CocoaPods/Specs and -Dtarget are both in the
 # guide and both read as near misses without this.
+# The visible text of a javadoc link, which names an API however many words
+# it takes: Image.html[Iamge class] and Image.html[an Iamge] both name one.
+# Only javadoc labels, because an ordinary AsciiDoc bracket holds alt text and
+# attributes -- prose, where a capitalised word is not a class.
+JAVADOC_LABEL = re.compile(
+    r'codenameone\.com/javadoc/[A-Za-z0-9/.]+\.html\[([^\]\n]{1,200})\]')
 CODE_SPAN = re.compile(r'`([^`\n]{1,400})`')
 SPAN_NAME = re.compile(r'(?<![-/\w])([A-Z][A-Za-z0-9]{4,})\b')
 # Used where only a class can go: after `new`, or with a member read off it.
@@ -481,6 +488,9 @@ def main():
         words = []
         for span in CODE_SPAN.finditer(text):
             for match in SPAN_NAME.finditer(span.group(1)):
+                words.append(match.group(1))
+        for label in JAVADOC_LABEL.finditer(text):
+            for match in SPAN_NAME.finditer(label.group(1)):
                 words.append(match.group(1))
         for match in WORD.finditer(text):
             words.append(next(group for group in match.groups() if group))
