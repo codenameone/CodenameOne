@@ -400,8 +400,19 @@ SHORTEST_DISTINGUISHING_NAME = 5
 
 
 def near_miss_of(word, candidates):
-    """The closest candidate within EDIT_LIMIT edits as (name, distance)."""
+    """The closest classes within EDIT_LIMIT edits, as (names, distance).
+
+    Every candidate at the minimum distance, sorted, rather than whichever the
+    set happened to yield first. A word can sit the same distance from several
+    classes -- RAModel is two edits from both ARModel and Model -- and the set
+    iterates in hash order, which changes with the interpreter's seed. That
+    was cosmetic while the answer only named a class in the message; it stopped
+    being cosmetic when the rule about rearrangements started reading it, since
+    RAModel rearranges ARModel and does not rearrange Model, so the same input
+    passed or failed depending on the seed.
+    """
     best = None
+    names = []
     for candidate in candidates:
         if len(candidate) < SHORTEST_DISTINGUISHING_NAME:
             continue
@@ -419,9 +430,15 @@ def near_miss_of(word, candidates):
                 break
         else:
             distance = previous[-1]
-            if 0 < distance <= EDIT_LIMIT and (best is None or distance < best[1]):
-                best = (candidate, distance)
-    return best
+            if not 0 < distance <= EDIT_LIMIT:
+                continue
+            if best is None or distance < best:
+                best, names = distance, [candidate]
+            elif distance == best:
+                names.append(candidate)
+    if best is None:
+        return None
+    return sorted(names), best
 
 
 def is_invented_name(word, simple, anywhere):
@@ -522,7 +539,12 @@ def main():
             near = near_miss_of(word, simple)
             if near is None:
                 continue
-            candidate, distance = near
+            tied, distance = near
+            # The first alphabetically is what the message names, and every
+            # tied class decides the rule: if any of them is a rearrangement
+            # the word is treated as one, so the answer cannot depend on which
+            # candidate was picked.
+            candidate = tied[0]
             # Vouching still applies in a class position. Requiring a real
             # Codename One class there sounds stricter and is wrong: the guide
             # calls members off platform classes it does not ship --
@@ -541,7 +563,8 @@ def main():
             # Inset, Overridden beside Override. Requiring code for those
             # reports all seven of them, so there a comment is evidence
             # enough.
-            rearranged = sorted(word.lower()) == sorted(candidate.lower())
+            rearranged = any(sorted(word.lower()) == sorted(other.lower())
+                             for other in tied)
             vouched = code if distance == 1 or rearranged else anywhere
             if word not in vouched:
                 typos.append((name, word, candidate))
