@@ -62,12 +62,26 @@ JAVADOC = re.compile(
 # URLImage, GZIPInputStream, JSONParser -- and the CamelCase alternative alone
 # skipped those, so "URLIamge" went unread. Backticks are code, so four
 # characters is enough there and "Iamge" is caught.
-WORD = re.compile(r'`([A-Z][A-Za-z0-9]{3,})`'
-                  r'|\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}'
-                  r'|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b')
+WORD = re.compile(
+    # In a code span, whether or not the name is the whole of it:
+    # `Iamge`, `Iamge.createImage()`.
+    r'`([A-Z][A-Za-z0-9]{4,})[`.(]'
+    # Spelled like a class in prose, by internal capitals or a leading acronym.
+    r'|\b([A-Z][a-z]+[A-Z][A-Za-z0-9]{3,}|[A-Z]{2,}[a-z][A-Za-z0-9]{2,})\b'
+    # As a link label: Image.html[Iamge].
+    r'|\[([A-Z][A-Za-z0-9]{4,})\]'
+    # Reading a member off it: Iamge.createImage().
+    r'|\b([A-Z][a-z]{4,})\s*\.\s*[a-z][A-Za-z0-9]*\s*\(')
+# Every one of those carries a signal that the token is code -- backticks, a
+# link target, a member call. A bare capitalised word in prose carries none,
+# and asking for it is not a near miss away from a class name, it IS one:
+# measured over this guide, that alternative reported Threat for Thread,
+# Imagine for Image, Managing for Ranging and 41 more, all ordinary English.
+# A one-word class named in running prose is out of reach here, and a wrong
+# name in a code span, a link or a call is not.
 IDENTIFIER = re.compile(r'\b[A-Z][A-Za-z0-9]{2,}\b')
 # Comments are prose, and prose carries the same typos the guide does.
-def strip_comments(text):
+def strip_comments(text, mask_literals=False):
     """Removes comments, which are prose and carry the same typos.
 
     The whole point of reading the tree is to tell a real identifier from a
@@ -81,6 +95,9 @@ def strip_comments(text):
     pair no lookbehind sees, and cutting the line there removed an opening
     brace, unbalancing the nesting scan and losing every type declared after
     it in that file.
+
+    `mask_literals` blanks their contents as well, which the declaration scan
+    needs and the identifier scan must not have; see the note below.
     """
     out = []
     at = 0
@@ -97,7 +114,16 @@ def strip_comments(text):
                     end += 1
                     break
                 end += 1
-            out.append(text[at:end])
+            # Blanked for the declaration scan, where a literal's contents are
+            # data: a brace inside one -- String x = "}" -- was counted as
+            # structure, which closed a type early and made everything nested
+            # after it look top-level. JSONSanitizer and RECompiler both hold
+            # such literals.
+            #
+            # Kept when the caller is collecting identifiers, because a name
+            # written in a literal is still a name this code uses: OAuth2 and
+            # Slide appear that way and are not misspellings of anything.
+            out.append(' ' * (end - at) if mask_literals else text[at:end])
             at = end
         elif text.startswith('//', at):
             newline = text.find('\n', at)
@@ -242,7 +268,7 @@ def class_index():
                 # in a javadoc example is not a type anyone can link to -- but
                 # they also carry @hidden, which has to be read first.
                 hidden = hidden_types(raw)
-                source = strip_comments(raw)
+                source = strip_comments(raw, mask_literals=True)
                 for trail, published in declared_types(source):
                     if any(step in hidden for step in trail):
                         continue
@@ -356,7 +382,7 @@ def main():
             if target not in qualified:
                 dead_links.append('%s: %s' % (name, target))
         for match in WORD.finditer(text):
-            word = match.group(1) or match.group(2)
+            word = next(group for group in match.groups() if group)
             if word in simple or word in seen:
                 continue
             seen.add(word)
