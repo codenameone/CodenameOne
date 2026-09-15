@@ -64,6 +64,7 @@ public partial class App : Application
     private string _outDir;
     private bool _occluded;
     private string _stage = "(not started)";
+    private string _clientBackground = "(not sampled)";
     private IntPtr _hwnd;
     private bool _isProbe;
 
@@ -245,39 +246,6 @@ public partial class App : Application
             _stage = "show";
             ShowWindow(hwnd, SW_RESTORE);
             ShowWindow(hwnd, SW_SHOW);
-            for (int i = 0; i < 20 && GetForegroundWindow() != hwnd; i++)
-            {
-                // Win32 refuses SetForegroundWindow from a process that is not already
-                // foreground -- which is every app on a CI desktop that has the out-of-box
-                // privacy dialog in front. Attaching to the foreground window's input
-                // thread lifts that restriction for the duration.
-                IntPtr fg = GetForegroundWindow();
-                uint fgThread = GetWindowThreadProcessId(fg, IntPtr.Zero);
-                uint thisThread = GetCurrentThreadId();
-                bool attached = fgThread != 0 && fgThread != thisThread
-                                && AttachThreadInput(fgThread, thisThread, true);
-                try
-                {
-                    BringWindowToTop(hwnd);
-                    SetForegroundWindow(hwnd);
-                }
-                finally
-                {
-                    if (attached) AttachThreadInput(fgThread, thisThread, false);
-                }
-                await Task.Delay(150);
-            }
-            // Foreground is NOT the question a screen capture cares about; occlusion is.
-            // The runner desktop keeps a "Microsoft account" out-of-box window that will not
-            // yield foreground even with the input-thread attach, but the presenter is set
-            // always-on-top, so this window can still be the one on screen. Asserting
-            // foreground therefore refused runs that would have captured perfectly good
-            // pixels.
-            //
-            // So the real check is asked directly: what window does the OS say is at the
-            // centre of our rectangle? If that resolves to us, nothing is covering the
-            // thing being photographed, whoever happens to own the keyboard.
-            bool isForeground = GetForegroundWindow() == hwnd;
 
             _stage = "window-rect";
             if (!GetWindowRect(hwnd, out RECT r))
@@ -326,7 +294,37 @@ public partial class App : Application
                     + "on top, and a picture of the wrong window still looks like a picture.");
                 return;
             }
-            Console.WriteLine($"NATIVEREF:INFO unoccluded at centre; foreground={isForeground}");
+            // Only NOW is it worth asking for the foreground. The earlier attempt ran before
+            // the occluders were minimised and could never have succeeded: Win32 refuses
+            // SetForegroundWindow to a process that is not already foreground, and the
+            // out-of-box window held it. Nothing retried once the obstacle was gone, so the
+            // window ended up unoccluded but inactive -- visible, and rendered in the
+            // inactive style.
+            //
+            // Activation is not cosmetic for a reference set. An inactive window renders its
+            // title bar differently and does not get the Mica backdrop, so capturing one
+            // would encode a look no user sees, which is the same class of error as
+            // capturing with Reduce Transparency on under macOS.
+            _stage = "activate";
+            bool isForeground = await TryTakeForegroundAsync(hwnd);
+            if (!isForeground)
+            {
+                _blockers.Add("the window is unoccluded but never became active "
+                    + $"({DescribeForegroundWindow()}), so its title bar and backdrop would "
+                    + "be captured in the inactive style");
+                return;
+            }
+            // Activating can re-order windows, so confirm nothing slid back over us.
+            atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
+            if (atCentre != hwnd)
+            {
+                _occluded = true;
+                _blockers.Add($"activating let 0x{atCentre.ToInt64():X} "
+                    + $"({DescribeWindow(atCentre)}) back over the window");
+                return;
+            }
+            await Task.Delay(300);
+            Console.WriteLine("NATIVEREF:INFO active and unoccluded");
 
             var pos = new { X = r.Left, Y = r.Top };
             _stage = "bitblt";
@@ -353,11 +351,22 @@ public partial class App : Application
                 // utterly empty window -- which is exactly what it did: a captured
                 // cn1-native-ref frame with a correct Windows 11 title bar and nothing at
                 // all beneath it.
+                // Sample the client background well away from the button and record it.
+                // Whether the Mica backdrop is actually reaching the window is otherwise an
+                // eyeball judgement on a PNG: a flat theme fill and a Mica surface over a
+                // pale desktop look similar at a glance, and "mica_supported: true" only
+                // says the OS could draw it, not that this window got it.
                 GetClientRect(hwnd, out RECT cr);
                 var origin = new POINT { X = 0, Y = 0 };
                 ClientToScreen(hwnd, ref origin);
                 int cx = origin.X - r.Left, cy = origin.Y - r.Top;
                 int cw = cr.Right - cr.Left, ch = cr.Bottom - cr.Top;
+                if (cw > 0 && ch > 0 && cx >= 0 && cy >= 0 && cx + cw <= w && cy + ch <= h)
+                {
+                    var bg = image.GetPixel(cx + cw * 3 / 4, cy + ch * 3 / 4);
+                    _clientBackground = $"#{bg.R:X2}{bg.G:X2}{bg.B:X2}";
+                    Console.WriteLine($"NATIVEREF:INFO client background sample {_clientBackground}");
+                }
                 if (cw > 0 && ch > 0 && cx >= 0 && cy >= 0 && cx + cw <= w && cy + ch <= h
                     && IsUniform(image, cx, cy, cw, ch))
                 {
@@ -380,6 +389,33 @@ public partial class App : Application
                 + $"'{_stage}': {(string.IsNullOrWhiteSpace(e.Message) ? "(no message)" : e.Message)}");
             Console.Error.WriteLine($"NATIVEREF:EXCEPTION stage={_stage} {e}");
         }
+    }
+
+
+    /// Takes the foreground, working around the Win32 rule that a process which is not
+    /// already foreground may not call SetForegroundWindow. Attaching to the current
+    /// foreground window's input thread lifts that restriction for the duration.
+    private static async Task<bool> TryTakeForegroundAsync(IntPtr hwnd)
+    {
+        for (int i = 0; i < 20 && GetForegroundWindow() != hwnd; i++)
+        {
+            IntPtr fg = GetForegroundWindow();
+            uint fgThread = GetWindowThreadProcessId(fg, IntPtr.Zero);
+            uint thisThread = GetCurrentThreadId();
+            bool attached = fgThread != 0 && fgThread != thisThread
+                            && AttachThreadInput(fgThread, thisThread, true);
+            try
+            {
+                BringWindowToTop(hwnd);
+                SetForegroundWindow(hwnd);
+            }
+            finally
+            {
+                if (attached) AttachThreadInput(fgThread, thisThread, false);
+            }
+            await Task.Delay(150);
+        }
+        return GetForegroundWindow() == hwnd;
     }
 
     /// Names whatever is actually in front, so a capture failure says which window stole
@@ -468,7 +504,8 @@ public partial class App : Application
         sb.AppendLine("  },");
         sb.AppendLine("  \"capture\": {");
         sb.AppendLine($"    \"occluded\": {Json(_occluded)},");
-        sb.AppendLine($"    \"was_foreground\": {Json(GetForegroundWindow() == _hwnd)}");
+        sb.AppendLine($"    \"was_foreground\": {Json(GetForegroundWindow() == _hwnd)},");
+        sb.AppendLine($"    \"client_background\": \"{Escape(_clientBackground)}\"");
         sb.AppendLine("  },");
         sb.AppendLine("  \"fonts\": {");
         sb.AppendLine($"    \"control_family\": \"{Escape(fontFamily)}\",");
