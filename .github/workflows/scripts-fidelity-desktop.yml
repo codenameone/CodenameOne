@@ -13,8 +13,16 @@ name: Desktop theme fidelity
 # Each theme is scored on ITS OWN runner. A Fluent theme measured on a Mac would be measured
 # in the wrong system font, and text metrics are most of a fidelity score.
 #
-# A PULL-REQUEST GATE for the two platforms whose goldens are committed, and dispatch only
-# for the one whose are not. That split is the point: a leg with no golden set exits 24 on
+# Runs on master and on dispatch. NOT on pull_request, deliberately.
+#
+# It had a pull_request trigger for about an hour and that was a mistake: it put a
+# three-platform, quarter-hour job onto every PR that happened to touch scripts/lib,
+# scripts/common/java or a theme, none of which is those authors' concern. If this ever
+# becomes a PR gate it should be after the themes have stopped moving and with the paths
+# narrowed to the theme sources alone.
+#
+# Gating on master still catches a regression the same day it lands, which is what the
+# ratchet is for. That split is the point: a leg with no golden set exits 24 on
 # every run, and wiring it to a trigger would mean either a permanently red workflow, which
 # teaches people to ignore it, or an unseeded run reported as a pass, which is a check
 # satisfied by nothing having happened.
@@ -35,25 +43,6 @@ name: Desktop theme fidelity
         type: choice
         default: all
         options: [all, windows, macos, gnome]
-  # The two path lists are written out twice rather than shared with a YAML anchor.
-  # The anchor is valid YAML and GitHub Actions does not support it: the workflow
-  # parses locally, and every run fails with "a workflow file issue" and no log.
-  pull_request:
-    paths:
-      - '.github/workflows/scripts-fidelity-desktop.yml'
-      - 'scripts/run-desktop-fidelity-tests.sh'
-      - 'scripts/fidelity-app/common/**'
-      - 'scripts/fidelity-app/desktop-runner/**'
-      - 'scripts/fidelity-app/goldens/**'
-      - 'scripts/fidelity-app/baseline/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/common/java/**'
-      - 'native-themes/windows-fluent/**'
-      - 'native-themes/gnome-adwaita/**'
-      - 'native-themes/macos-aqua/**'
-      - 'Themes/WindowsFluentTheme.res'
-      - 'Themes/GnomeAdwaitaTheme.res'
-      - 'Themes/MacOSAquaTheme.res'
   push:
     branches: [master]
     paths:
