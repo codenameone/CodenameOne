@@ -1383,6 +1383,23 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
     }
     return (char*)p >= cn1NurseryArenaStart && (char*)p < cn1NurseryArenaEnd;
 }
+// "Is this object STILL IN the young generation?" -- which is NOT the same question as
+// cn1InNursery(), and conflating the two is a use-after-free.
+//
+// Promotion does not MOVE anything: cn1NurseryPromote flips __heapPosition from -1 to -2
+// and registers the object with the global collector, but the bytes stay at the same
+// address inside the arena. So cn1InNursery() -- a pure address-range test -- keeps
+// answering TRUE for an object that has belonged to the old generation for a long time.
+//
+// Every barrier that asks "is the TARGET young?" must therefore ask this instead. Asking
+// cn1InNursery() alone makes a store into a promoted container look like a young->young
+// store, which needs no promotion, so the VALUE is never promoted -- and the value's
+// block is then recycled while the promoted container still points at it. Observed as a
+// fault inside ASM's MethodNode.getLabelNodes reading an Object[] element whose class
+// pointer had been poisoned by the retiring collection.
+static inline JAVA_BOOLEAN cn1IsYoungObject(void* p) {
+    return (JAVA_BOOLEAN)(cn1InNursery(p) && ((JAVA_OBJECT)p)->__heapPosition == -1);
+}
 // Emitted by the translator before an object-reference store into a heap location.
 // Fast path is INLINE: only a value that actually lives in the nursery can escape, so
 // the overwhelmingly common heap->heap / null store collapses to a two-compare range
@@ -1392,10 +1409,31 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // Tagged immediates are excluded by cn1InNursery itself -- see the note there; this used
 // to carry its own CN1_IS_TAGGED test, which fixed the barrier and left the five other
 // call sites that dereference straight after it still exposed.
+//
+// IT ALSO HAS TO CARRY THE SATB INSERTION HALF. This macro is the only barrier the
+// translator emits at an object store, so in the no-nursery build it doubles as SATB
+// insertion (see the #else). Defining CN1_NURSERY used to REPLACE that rather than
+// compose with it, which silently dropped insertion from the concurrent collector --
+// the half whose absence lets a fresh container that takes an older child mid-mark have
+// that child recorded nowhere, so the sweep reclaims it while the container still points
+// at it. cn1_globals.m's deletion-filter argument names this build as its one exception,
+// and the exception only existed because nothing compiled it. The two halves are
+// independent (nursery escape-promotion vs. mark liveness) and both must run.
+// ORDER MATTERS AND THE YOUNG TEST COMES SECOND. The nursery barrier runs first and
+// PROMOTES an escaping value, so by the time the SATB test runs the value is young only
+// if it is staying in the young generation -- a young->young store. Those must NOT enter
+// the SATB log: the log is drained by the collector, which would then mark and trace an
+// object whose lifetime belongs to the minor collector, and a minor collection is free to
+// reclaim it in between. That is a use-after-free with the collector holding the stale
+// reference, which is the worst possible owner of one.
 #define CN1_WRITE_BARRIER(target, value) \
     do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(value); \
-         if(cn1__bv != JAVA_NULL && cn1InNursery(cn1__bv)) { \
-             cn1NurseryWriteBarrier((JAVA_OBJECT)(target), cn1__bv); } } while(0)
+         if(cn1__bv != JAVA_NULL) { \
+             if(cn1InNursery(cn1__bv)) { \
+                 cn1NurseryWriteBarrier((JAVA_OBJECT)(target), cn1__bv); } \
+             if(__builtin_expect(gcSatbActive, 0) && !CN1_IS_TAGGED(cn1__bv) \
+                && !cn1IsYoungObject(cn1__bv)) { \
+                 cn1SatbEnqueue(cn1__bv); } } } while(0)
 #else
 // No nursery: repurpose the (already-emitted-at-every-object-store) write barrier as the
 // SATB INSERTION half. During the mark, enqueue the NEW reference being stored so an
@@ -1452,11 +1490,23 @@ extern void cn1SatbBulkQuiesce(void);
 // barrier compiles out entirely, so there is zero footprint on the store hot path.
 #define CN1_SATB_DELETE(fieldAddr) do { } while(0)
 #else
+#ifdef CN1_NURSERY
+// The young exclusion applies to the DELETION half for the same reason as the insertion
+// half: the overwritten value can be a young object, and handing one to the collector's
+// log lets it trace memory the minor collector owns and may already have reclaimed.
+#define CN1_SATB_DELETE(fieldAddr) \
+    do { if(__builtin_expect(gcSatbActive, 0)) { \
+             JAVA_OBJECT cn1__old = *(JAVA_OBJECT volatile*)(fieldAddr); \
+             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old) \
+                && !cn1IsYoungObject(cn1__old)) cn1SatbEnqueue(cn1__old); \
+         } } while(0)
+#else
 #define CN1_SATB_DELETE(fieldAddr) \
     do { if(__builtin_expect(gcSatbActive, 0)) { \
              JAVA_OBJECT cn1__old = *(JAVA_OBJECT volatile*)(fieldAddr); \
              if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old)) cn1SatbEnqueue(cn1__old); \
          } } while(0)
+#endif
 #endif
 
 // ---- java.lang.ref support -------------------------------------------------
@@ -1546,6 +1596,13 @@ struct ThreadLocalData {
     // gcMarkObject at the same time a mutator promotes, and a shared flag would make
     // the GC thread promote-instead-of-mark and corrupt the heap.
     JAVA_BOOLEAN nurseryPromoting;
+#ifdef CN1_NURSERY_VERIFY
+    // QA: while set, gcMarkObject REPORTS young referents instead of promoting them, so
+    // the generational invariant can be checked rather than assumed. Holder is whatever
+    // object's mark function is currently running, which is what names the guilty field.
+    JAVA_BOOLEAN nurseryVerifying;
+    JAVA_OBJECT  nurseryVerifyHolder;
+#endif
     JAVA_OBJECT* nurseryPromoteWorklist;
     int   nurseryPromoteTop;
     int   nurseryPromoteCap;
