@@ -286,7 +286,11 @@ class VaultSourceInvariantsTest extends UITestBase {
             String after = body.substring(firstWrite);
             boolean rechecks = after.indexOf("generation != lockGeneration") > 0
                     || after.indexOf("requireSameGeneration(generation)") > 0
-                    || after.indexOf("requireDeviceRecordStillWanted(generation)") > 0
+                    // Matched on the open paren rather than the whole call: this one grew a
+                    // second argument -- the record to put back when the write REPLACED one --
+                    // and the literal spelling then matched nothing, so the ratchet reported
+                    // both of its callers as unchecked.
+                    || after.indexOf("requireDeviceRecordStillWanted(generation,") > 0
                     || after.indexOf("publishKey(generation") > 0;
             if (!rechecks && !exempt(name)) {
                 missing.add(name);

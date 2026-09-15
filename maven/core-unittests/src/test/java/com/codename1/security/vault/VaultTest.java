@@ -1209,6 +1209,118 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRedundantRememberThatRacesALockKeepsTheEnrolmentItAlreadyHad() throws Exception {
+        // rememberDevice is not always a CREATE. A device already remembered under this policy is
+        // rewrapped here anyway, and the lock-race rollback deleted the record unconditionally --
+        // so a redundant "remember me" that raced a lock() reported LOCKED and ALSO silently threw
+        // away the working enrolment the user already had. The device key is untouched by the
+        // rewrap, so the old record still opens the vault and putting it back is what "nothing
+        // changed" has to mean for a call that reports failure.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        // Proven to work BEFORE the race, or the assertion afterwards proves nothing.
+        assertTrue(Vault.named(name).configure(remember).unlockRemembered().get().booleanValue());
+
+        VaultError outcome = whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        return errorOf(vault.rememberDevice());
+                    }
+                },
+                new Runnable() {
+                    public void run() {
+                        vault.lock();
+                    }
+                });
+
+        assertEquals(VaultError.LOCKED, outcome, "the redundant remember must still be refused");
+        Vault reopened = Vault.named(name).configure(remember);
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, reopened.getPolicy(),
+                "the enrolment this call did not create must survive it");
+        assertTrue(reopened.unlockRemembered().get().booleanValue(),
+                "and it must still actually open the vault");
+    }
+
+    @Test
+    void forgettingADeviceWhoseRecordWillNotGoLeavesTheKeyAlone() throws Exception {
+        // deleteStorageFile returns void on every port and both real ones can drop one silently
+        // -- JavaSE discards File.delete()'s boolean, the browser catches the IndexedDB error --
+        // so forgetDevice went on to destroy the device key under a record that had survived and
+        // reported TRUE. That end state is worse than either alternative: getPolicy() still says
+        // REMEMBER_DEVICE, the record names a key that no longer exists, and unlockRemembered is
+        // broken on a call whose whole contract is that it cleaned up. Refusing leaves the
+        // remembered unlock WORKING, which is a state the caller can retry from.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+
+        TestCodenameOneImplementation.getInstance()
+                .setStorageDeleteIgnored(deviceRecordName(name));
+        try {
+            assertEquals(VaultError.STORAGE_UNAVAILABLE, errorOf(vault.forgetDevice()),
+                    "a record that would not go must not be reported as forgotten");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+        }
+
+        // The key was NOT deleted, so the surviving record still works rather than pointing at
+        // nothing. This is the assertion that distinguishes the fix from merely reporting an
+        // error after the damage.
+        Vault reopened = Vault.named(name).configure(remember);
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, reopened.getPolicy());
+        assertTrue(reopened.unlockRemembered().get().booleanValue(),
+                "refusing must leave the remembered unlock intact, not half-removed");
+    }
+
+    @Test
+    void aLockRaceWhoseRollbackCannotDeleteDestroysTheKeyInstead() throws Exception {
+        // The rollback's own message promised "nothing that can reopen it without a password was
+        // left behind" while nothing had checked that the delete happened. A record surviving
+        // here is a FRESH passwordless unlock for a vault the application has just closed, which
+        // is the exact outcome the generation check exists to prevent -- so the mechanism behind
+        // it goes instead, and the refusal says so rather than claiming the record is gone.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        // Read while the record exists, because the helper finds it by enumerating storage.
+        String record = deviceRecordName(name);
+        // Forgotten first, so the rollback takes the CREATE branch -- the one that deletes -- and
+        // not the restore branch added above.
+        assertTrue(vault.forgetDevice().get().booleanValue());
+
+        TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(record);
+        VaultError outcome;
+        try {
+            outcome = whileTheDeviceStoreIsPrompting(
+                    new java.util.concurrent.Callable<VaultError>() {
+                        public VaultError call() {
+                            return errorOf(vault.rememberDevice());
+                        }
+                    },
+                    new Runnable() {
+                        public void run() {
+                            vault.lock();
+                        }
+                    });
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+        }
+
+        assertEquals(VaultError.STORAGE_UNAVAILABLE, outcome,
+                "a rollback that could not delete must not report LOCKED and claim it did");
+        // And the surviving record cannot open anything, because its key is gone.
+        Vault reopened = Vault.named(name).configure(remember);
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()),
+                "the record may survive, but it must not be able to reopen the vault");
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue(),
+                "and the password must still work");
+    }
+
+    @Test
     void aVaultLockedWhileSetPolicyRunsRemembersNothing() throws Exception {
         // The same hole, in the other method that establishes one. Codex reported rememberDevice;
         // setPolicy reaches the identical write through rememberNow and had no generation either.

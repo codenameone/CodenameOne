@@ -706,8 +706,17 @@ public final class Vault {
                                 + "policy first",
                                 Protection.PERSISTENT, null);
                     }
+                    // Snapshotted before the rewrite, because this call is not always a
+                    // CREATE. A device already remembered under this same policy is rewrapped
+                    // here anyway, and the rollback below then deleted a remembered unlock this
+                    // call did not create -- so a redundant "remember me" that raced a lock()
+                    // reported LOCKED and also silently forgot the working enrolment the user
+                    // already had. Read past Storage's cache, because another tab can have
+                    // replaced it since this one last looked.
+                    Object restore = readUncached(deviceRecordKey());
                     rememberNow(options.getPolicy());
-                    requireDeviceRecordStillWanted(generation);
+                    requireDeviceRecordStillWanted(generation,
+                            restore instanceof String ? (String) restore : null);
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -789,7 +798,22 @@ public final class Vault {
             @Override
             public void run() {
                 try {
-                    Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                    Storage storage = Storage.getInstance();
+                    storage.deleteStorageFile(deviceRecordKey());
+                    // Proven gone BEFORE the mechanism behind it is destroyed, and the order is
+                    // the whole point. deleteStorageFile returns void on every port and both real
+                    // ones can fail it silently -- JavaSE discards File.delete()'s boolean, the
+                    // browser catches the IndexedDB error -- so this used to go on and delete the
+                    // device key under a record that had survived. What that leaves is worse than
+                    // either end state: getPolicy() still reports a remembering policy, the record
+                    // still names a key that no longer exists, unlockRemembered() is broken, and
+                    // forgetDevice() reported TRUE. Refusing leaves the remembered unlock WORKING,
+                    // which is the state the caller can retry from.
+                    if (storage.exists(deviceRecordKey())) {
+                        throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                "this device's remembered-unlock record could not be removed, so "
+                                + "the key it names has been left in place rather than orphaned");
+                    }
                     forgetEveryMechanism();
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -2161,7 +2185,10 @@ public final class Vault {
                                     "the previous device key could not be deleted");
                             outgoingKeyGone[0] = true;
                         }
-                        requireDeviceRecordStillWanted(generation);
+                        // null: setPolicy has already deleted the OUTGOING device key by this
+                        // point, so the record it replaced names a key that no longer exists and
+                        // putting it back would restore a remembered unlock that cannot work.
+                        requireDeviceRecordStillWanted(generation, null);
                     }
                     settled = true;
                     out.complete(Boolean.TRUE);
@@ -2848,18 +2875,47 @@ public final class Vault {
     /// did not, so a vault the application had asked to close was left with a fresh passwordless
     /// unlock on disk, and the call reported success.
     ///
-    /// Deleting is the rollback, because there was nothing here to put back: this branch runs only
-    /// when the record is new or its policy is changing, and the change-of-policy case saves and
-    /// restores the previous record on its own failure path already.
+    /// `restore` is the record this call overwrote, serialized, or null when it created one.
+    /// Deleting is the right rollback only in the second case. The first version of this took no
+    /// such argument and always deleted, on the claim that "there was nothing here to put back" --
+    /// true of setPolicy, whose outgoing key has already been deleted by the time it gets here, and
+    /// false of rememberDevice, which rewraps an existing enrolment under the same device key.
+    /// That key is untouched, so the old record still works and putting it back is what "nothing
+    /// changed" means for a call that reports failure.
     ///
     /// Not every path needs this. `forgetDevice` and `destroyLocalData` only ever remove, so a lock
     /// landing inside one leaves less behind rather than more, and `changePassword` is documented
     /// to work on a locked instance and publishes no key at all.
-    private void requireDeviceRecordStillWanted(int generation) {
+    private void requireDeviceRecordStillWanted(int generation, String restore) {
         if (generation == lockGeneration) {
             return;
         }
-        Storage.getInstance().deleteStorageFile(deviceRecordKey());
+        Storage storage = Storage.getInstance();
+        if (restore != null) {
+            storage.writeObject(deviceRecordKey(), restore);
+            throw new VaultException(VaultError.LOCKED,
+                    "the vault was locked while this device was being remembered; the remembered "
+                    + "unlock that was already here has been put back unchanged");
+        }
+        storage.deleteStorageFile(deviceRecordKey());
+        if (storage.exists(deviceRecordKey())) {
+            // The delete is void-returning and both real ports can drop one silently, so this
+            // message -- "nothing that can reopen it without a password was left behind" -- was a
+            // claim nothing had checked. A record that survives here is a fresh passwordless
+            // unlock for a vault the application has just closed, which is the exact outcome the
+            // generation check exists to prevent, so the mechanism behind it goes instead: a
+            // record whose device key is gone cannot open anything.
+            try {
+                forgetEveryMechanism();
+            } catch (RuntimeException alsoFailed) {
+                // Reporting this would name the wrong failure. The refusal below is the answer
+                // either way, and it does not promise the record is gone.
+            }
+            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                    "the vault was locked while this device was being remembered, and the record "
+                    + "written for it could not be removed; its device key has been destroyed so "
+                    + "that it cannot reopen the vault, but the record itself is still here");
+        }
         throw new VaultException(VaultError.LOCKED,
                 "the vault was locked while this device was being remembered; nothing that can "
                 + "reopen it without a password was left behind");
