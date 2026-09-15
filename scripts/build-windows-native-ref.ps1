@@ -105,11 +105,21 @@ foreach ($f in @($outLog, $errLog)) {
 }
 Write-Log "app exited $rc"
 
-if ($rc -ne 0) {
-  Write-Log "FAILED: the reference app exited $rc; see the BLOCKER lines above."
+if ($rc -eq 20) {
+  Write-Log 'FAILED: the app refused to vouch for the capture; see the BLOCKER lines above.'
   Write-Log 'A blocker means the capture would have been quietly wrong, not that it crashed.'
-  Write-Log 'On windows-latest (Windows Server) a Mica/transparency blocker is expected --'
-  Write-Log 're-dispatch with windows_runner: windows-11-arm for a real Windows 11 client.'
+  exit $rc
+}
+elseif ($rc -ne 0) {
+  # Distinguished from a blocker because the two need completely different responses, and
+  # the previous message asserted "not that it crashed" underneath an app that had in fact
+  # crashed with 0xC000027B.
+  $hex = '0x{0:X8}' -f ($rc -band 0xFFFFFFFF)
+  Write-Log "FAILED: the app CRASHED with exit $rc ($hex)."
+  if ($hex -eq '0xC000027B') {
+    Write-Log 'That is STATUS_STOWED_EXCEPTION: an unhandled WinRT/XAML exception. The'
+    Write-Log 'usual cause is touching XAML state before it is ready, or off the UI thread.'
+  }
   exit $rc
 }
 Write-Log "Wrote $((Get-ChildItem $OutDir | Measure-Object).Count) file(s) to $OutDir"

@@ -59,6 +59,8 @@ public static class Program
 
 public partial class App : Application
 {
+    /// Merged in OnLaunched, not in the constructor.
+    ///
     /// Merges WinUI's default style dictionary.
     ///
     /// The template projects do this in App.xaml, which this app does not have -- it is pure
@@ -70,11 +72,9 @@ public partial class App : Application
     /// resource index was missing too, so the missing PRI looked like the explanation; it
     /// was not, and the build output carrying both framework PRIs while the button stayed
     /// (194,194,194) is what finally ruled it out.
-    public App()
-    {
-        Resources ??= new ResourceDictionary();
-        Resources.MergedDictionaries.Add(new XamlControlsResources());
-    }
+    ///
+    /// Doing this in the App constructor crashed the process outright with 0xC000027B, a
+    /// stowed WinRT exception: Application.Resources is not ready to be touched that early.
 
     private Window _window;
     private readonly List<string> _blockers = new();
@@ -89,6 +89,8 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        Resources.MergedDictionaries.Add(new XamlControlsResources());
+
         _outDir = Environment.GetEnvironmentVariable("NATIVEREF_OUT")
                   ?? throw new InvalidOperationException("NATIVEREF_OUT is not set");
         Directory.CreateDirectory(_outDir);
