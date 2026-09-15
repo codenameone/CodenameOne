@@ -885,14 +885,17 @@
       var id = CN1_SECURE_STORE_PREFIX + String(entry);
       return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
         return store.add({ id: id, sealed: String(sealed), created: 0 });
-      }).then(function(added) {
+      }).then(function() {
         return cn1VaultCommit(tx).then(function() {
-          if (added !== undefined) {
-            return String(sealed);
-          }
-          // Refused, so somebody else is already there. Read what won, in its own transaction:
-          // the one above has committed and the answer has to be the settled record rather than
-          // what this tab tried to write.
+          // Re-read ALWAYS, not only when the add was refused. A successful add says this tab
+          // won the create; it does not say the record still holds what this tab wrote, because
+          // cn1SecureStoreSet puts into the same id and an ordinary set() from another tab can
+          // land between the add and this answer. Returning ``sealed`` there sent the caller
+          // back its own superseded ciphertext, which it then mirrored into ordinary storage
+          // over the newer value -- a lost update that the atomic create was supposed to rule
+          // out. Whatever the store actually holds is the only answer that cannot be stale.
+          // The add's own result is therefore not read at all, and the refusal path costs
+          // nothing extra: it always needed this read.
           return cn1VaultOpenDb().then(function(again) {
             var read = again.transaction(CN1_VAULT_STORE, 'readonly');
             return cn1VaultRequest(read.objectStore(CN1_VAULT_STORE), function(store) {
@@ -901,12 +904,37 @@
               if (found && typeof found.sealed === 'string') {
                 return found.sealed;
               }
-              // Gone between the refusal and the read -- another tab removed it. Nothing is
+              // Gone between the write and the read -- another tab removed it. Nothing is
               // stored, and reporting this tab's own value would be a lie about what persisted.
               throw new Error('NotFoundError');
             });
           });
         });
+      });
+    });
+  }
+
+  /// Writes one secure-storage record, replacing whatever was there.
+  ///
+  /// ``put`` and not ``add``, because this is set(): last write wins is what it means. What it
+  /// is FOR is that an ordinary set() has to settle in the same place a create does. It used to
+  /// write ordinary Storage only, so a tab paused inside setIfAbsent -- past its "nothing here"
+  /// check -- could create the gate afterwards and mirror its own candidate over the value this
+  /// call had already stored. With both writers going through this store, the create's re-read
+  /// sees the newer record and adopts it, and the one window left is two concurrent set() calls,
+  /// where last-write-wins is the contract rather than a lost update.
+  function cn1SecureStoreSet(entry, sealed) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.put({
+          id: CN1_SECURE_STORE_PREFIX + String(entry),
+          sealed: String(sealed),
+          created: 0
+        });
+      }).then(function() {
+        // Durable before it is called done, for the reason on cn1VaultCommit.
+        return cn1VaultCommit(tx);
       });
     });
   }
@@ -1220,6 +1248,13 @@
       }
       if (op === 'secureStoreForget') {
         return cn1SecureStoreForget(request.entry).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreSet') {
+        return cn1SecureStoreSet(request.entry, request.sealed).then(function() {
           return cn1VaultReply(CN1V_OK, null);
         }, function(error) {
           return cn1VaultReply(cn1VaultStatusOf(error), null);

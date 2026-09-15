@@ -290,6 +290,36 @@ try {
 
   await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: syncing.authenticatorId });
 
+  // ------------------------------------------------------- the secure-store gate
+  // An ordinary account's record has to settle in ONE place. It used to settle in two: the
+  // atomic create wrote this store and a plain set() wrote ordinary Storage, so a create
+  // paused past its "nothing here" check could mirror its own candidate over a value set()
+  // had already stored. Both writers go through this store now, and the create answers with
+  // what the store holds rather than with what it tried to write.
+  const ENTRY = 'account.token';
+  const asText = (reply) => String.fromCharCode.apply(null, payload(reply));
+
+  const gateCreate = await call({ op: 'secureStoreSetIfAbsent', entry: ENTRY, sealed: 'first' });
+  check('an absent account is created', status(gateCreate), 0);
+  check('and the create answers its own record', asText(gateCreate), 'first');
+
+  const gateReCreate = await call({ op: 'secureStoreSetIfAbsent', entry: ENTRY, sealed: 'second' });
+  check('a second create is refused and answers the settled record', asText(gateReCreate), 'first');
+
+  check('an ordinary set replaces it',
+    status(await call({ op: 'secureStoreSet', entry: ENTRY, sealed: 'third' })), 0);
+  // The check the re-read exists for: the create must report what the store holds now, not
+  // the record that originally won the gate.
+  const gateAfterSet = await call({ op: 'secureStoreSetIfAbsent', entry: ENTRY, sealed: 'fourth' });
+  check('and a later create adopts the value the set stored', asText(gateAfterSet), 'third');
+
+  check('forgetting the entry succeeds',
+    status(await call({ op: 'secureStoreForget', entry: ENTRY })), 0);
+  const gateReopened = await call({ op: 'secureStoreSetIfAbsent', entry: ENTRY, sealed: 'fifth' });
+  check('and the gate is free again', asText(gateReopened), 'fifth');
+  check('releasing a gate that was never taken is not an error',
+    status(await call({ op: 'secureStoreForget', entry: 'account.never' })), 0);
+
   check('forgetting the passkey succeeds', status(await call({ op: 'prfForget', keyId: KEY })), 0);
   check('and the state reports none', await call({ op: 'prfState', keyId: KEY }), [0, 0, 0]);
   check('and the vault then has no passkey', status(await call({ op: 'prfDerive', keyId: KEY })), 1);

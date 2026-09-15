@@ -100,9 +100,7 @@ styles a component while the pointer is over it:
 
 [source,css]
 ----
-Button.hover {
-    background-color: #f6f6f6;
-}
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-themes-css-005,indent=0]
 ----
 
 It compiles to `hover#` entries the same way `.pressed` compiles to

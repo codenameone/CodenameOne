@@ -687,6 +687,53 @@ public abstract class Executor {
     /// database ones are.
     private static final String VAULT_PACKAGE = "com/codename1/security/vault";
 
+    /// The vault types whose use actually reaches AES-GCM.
+    ///
+    /// Not the package. Protection and ProtectionReport live in it and are the parameter and the
+    /// return type of the SecureStorage policy overloads, so an application that only asks what a
+    /// store already provides -- and never creates a Vault or seals an envelope -- named the
+    /// package and was classified as a vault user. On iOS that enables CN1_INCLUDE_CRYPTO_GCM and
+    /// links the private CommonCrypto GCM SPI symbols into a binary Apple scans, which is the one
+    /// outcome this gating exists to prevent. These four are the entry points that reach the GCM
+    /// implementation; the rest of the package describes a policy rather than performing crypto.
+    private static final String[] VAULT_GCM_CLASSES = {
+        VAULT_PACKAGE + "/Vault",
+        VAULT_PACKAGE + "/SecureEnvelope",
+        VAULT_PACKAGE + "/KeyHandle",
+        VAULT_PACKAGE + "/VaultKeyHandle",
+        // Public, and it seals and opens envelopes itself, so an application can reach GCM
+        // through it without ever naming Vault.
+        VAULT_PACKAGE + "/SecureStorageDeviceProtection",
+    };
+
+    /// Whether a referenced name -- an internal name, a descriptor or a signature -- mentions a
+    /// vault type that needs AES-GCM.
+    ///
+    /// Substring, because the caller cannot say which of the three it holds, but the character
+    /// after the match is checked: "Vault" must not match VaultMetadata, VaultException,
+    /// VaultError or VaultPolicy, all of which an application can name without any crypto. An
+    /// inner class ("Vault$1") does count, so '$' is accepted along with the ';' and '<' that
+    /// end a name inside a descriptor or a signature.
+    private static boolean isVaultGcmClass(String name) {
+        for (int iter = 0; iter < VAULT_GCM_CLASSES.length; iter++) {
+            String one = VAULT_GCM_CLASSES[iter];
+            int at = name.indexOf(one);
+            while (at >= 0) {
+                int after = at + one.length();
+                if (after >= name.length()) {
+                    return true;
+                }
+                char c = name.charAt(after);
+                if (c == '$' || (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z')
+                        && !(c >= '0' && c <= '9') && c != '_')) {
+                    return true;
+                }
+                at = name.indexOf(one, at + 1);
+            }
+        }
+        return false;
+    }
+
     /// Framework classes whose reference to the database package is their own.
     ///
     /// Named one by one rather than by package, because a package is not a reliable statement
@@ -1061,7 +1108,7 @@ public abstract class Executor {
             if (name == null) {
                 return;
             }
-            if (name.indexOf(VAULT_PACKAGE + "/") >= 0) {
+            if (isVaultGcmClass(name)) {
                 hit[2] = true;
             }
             if (name.indexOf(DATABASE_PACKAGE + "/") >= 0) {

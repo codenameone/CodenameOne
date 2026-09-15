@@ -102,6 +102,12 @@ DangerButton.pressed {
 }
 /* end::native-themes-css-004[] */
 
+/* tag::native-themes-css-005[] */
+Button.hover {
+    background-color: #f6f6f6;
+}
+/* end::native-themes-css-005[] */
+
 /* tag::the-components-of-codename-one-css-001[] */
 #Constants {
     tabsAnimatedIndicatorBool: true;

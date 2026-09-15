@@ -1338,6 +1338,19 @@ bindNative([
   }));
 });
 
+// An ordinary set(), settled in the same store the create gate uses. Without it a tab paused
+// inside setIfAbsent could create the gate after this write and mirror its own candidate over
+// the value set() had already stored.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeSet_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreSet",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
 // Releases the create gate, so remove() leaves nothing behind that a later setIfAbsent could
 // answer with.
 bindNative([

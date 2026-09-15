@@ -147,6 +147,48 @@ class VaultSourceInvariantsTest extends UITestBase {
     }
 
     @Test
+    void theRotationNoticesAKeyReplacementThatLandedInsideIt() {
+        // rotateDataKey snapshots the OUTGOING key and seals it into the retired chain. adoptKey
+        // zeroes that array in place, so a redundant unlockWithPassword completing between the
+        // snapshot and the seal left the rotation writing an envelope full of ZEROES as the
+        // retired key -- and reporting success. Every secret written under the old key version is
+        // then permanently unreadable, with nothing to tell the application it happened.
+        //
+        // seal, putSecret, databaseKey and operationalKey were all given this guard when the
+        // in-flight writer races were fixed. The rotation -- the one operation whose whole job is
+        // to MOVE the key, and therefore the one that holds the outgoing array longest -- was
+        // not.
+        //
+        // A shape check for the same reason as the handle stamp above: the window is inside the
+        // KDF and the seal, and the one deterministic hook these tests have does not open it
+        // reliably, so a behavioural test here would pass whether or not the guard is present.
+        String body = methodBody(readVaultSource(),
+                "public AsyncResource<Boolean> rotateDataKey(final char[] password)");
+        assertTrue(body.indexOf("requireSameKey(") > 0,
+                "the rotation must recheck the key generation it captured");
+        int adopt = body.indexOf("adoptKey(");
+        assertTrue(adopt > 0, "the rotation must adopt the fresh key");
+        assertTrue(body.lastIndexOf("requireSameKey(", adopt) > 0,
+                "the recheck must come BEFORE the swap, or it guards nothing: " + body);
+    }
+
+    @Test
+    void theRotationCapturesTheKeyGenerationBeforeItDoesAnyWork() {
+        // And it must capture it OUTSIDE the asynchronous body. Reading keyGeneration where the
+        // seal runs reads it after any replacement that already landed, so the guard above
+        // compares the field with itself and passes over the exact race it exists to catch.
+        String source = readVaultSource();
+        int at = source.indexOf(
+                "public AsyncResource<Boolean> rotateDataKey(final char[] password)");
+        assertTrue(at > 0, "rotateDataKey not found");
+        int async = source.indexOf("background(new Runnable()", at);
+        assertTrue(async > at, "rotateDataKey must hand its work to a background turn");
+        String prologue = source.substring(at, async);
+        assertTrue(prologue.indexOf("keyGeneration") > 0,
+                "the generation must be captured in the caller's turn: " + prologue);
+    }
+
+    @Test
     void theIdleTimeoutIsMeasuredOnAClockNobodyCanSet() {
         // currentTimeMillis is the wall clock and it moves: a user correcting the date, or an NTP
         // step, sends it backwards, and the idle subtraction then goes negative -- so the vault

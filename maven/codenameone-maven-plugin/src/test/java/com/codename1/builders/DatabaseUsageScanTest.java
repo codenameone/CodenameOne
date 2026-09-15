@@ -894,6 +894,77 @@ class DatabaseUsageScanTest {
     }
 
     @Test
+    void namingOnlyThePolicyTypesIsNotUsingTheVault() throws IOException {
+        // Protection and ProtectionReport are the parameter and the return type of the
+        // SecureStorage policy overloads, so an application that only asks what a store already
+        // provides -- and never creates a Vault or seals an envelope -- named the package. That
+        // was classified as vault use, which on iOS enables CN1_INCLUDE_CRYPTO_GCM and links the
+        // private CommonCrypto GCM SPI symbols into a binary Apple scans: the exact outcome this
+        // gating exists to prevent, reached by an application that does no vault crypto at all.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class",
+                "com/codename1/security/vault/Protection",
+                "com/codename1/security/vault/ProtectionReport",
+                "com/codename1/security/vault/VaultException",
+                "com/codename1/security/vault/UnlockPolicy",
+                "com/codename1/security/vault/VaultCapabilities");
+
+        assertFalse(executor.scanForDatabaseUsage(root).usesVault(),
+                "asking a store what it provides does not need AES-GCM");
+    }
+
+    @Test
+    void everyVaultTypeThatReachesGcmIsStillDetected() throws IOException {
+        // The narrowing above must not drop an entry point. These four are the public types whose
+        // use reaches the GCM implementation, and each on its own has to answer yes -- including
+        // SecureStorageDeviceProtection, which seals and opens envelopes itself and can therefore
+        // be reached without ever naming Vault.
+        String[] reachesGcm = {
+            "com/codename1/security/vault/Vault",
+            "com/codename1/security/vault/SecureEnvelope",
+            "com/codename1/security/vault/KeyHandle",
+            "com/codename1/security/vault/SecureStorageDeviceProtection"
+        };
+        for (int iter = 0; iter < reachesGcm.length; iter++) {
+            delete(root);
+            setUpRoot();
+            writeFramework();
+            writeVaultFramework();
+            writeClass("com/example/MyApp.class", reachesGcm[iter]);
+            assertTrue(executor.scanForDatabaseUsage(root).usesVault(),
+                    reachesGcm[iter] + " reaches AES-GCM and must be detected");
+        }
+    }
+
+    @Test
+    void aTypeWhoseNameMerelyStartsWithAGcmTypesNameIsNotOne() throws IOException {
+        // The match is a substring, because the caller holds an internal name, a descriptor or a
+        // signature and cannot say which. VaultMetadata, VaultException, VaultError and
+        // VaultOptions all begin with "Vault" and none of them is it.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class",
+                "com/codename1/security/vault/VaultError",
+                "com/codename1/security/vault/VaultOptions");
+
+        assertFalse(executor.scanForDatabaseUsage(root).usesVault(),
+                "VaultError is not Vault");
+    }
+
+    @Test
+    void anInnerClassOfAGcmTypeCounts() throws IOException {
+        // '$' has to be accepted where a letter is not, or a lambda or anonymous class compiled
+        // into Vault would be missed.
+        writeFramework();
+        writeVaultFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/security/vault/Vault$Opened");
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesVault(),
+                "an inner class of Vault is Vault");
+    }
+
+    @Test
     void anApplicationClassInsideTheVaultPackageIsStillScanned() throws IOException {
         // Excluded by name, never as a directory. The package is the framework's by convention
         // and not by ownership, so a helper an application or a library puts there has to be

@@ -214,7 +214,10 @@ public final class HTML5SecureStorage extends SecureStorage {
             // could never delete it, and remove() reported success while the entry lived on.
             //
             // Both tabs write the same settled bytes, so this is idempotent however the race
-            // went: the loser is writing the winner's record, not its own.
+            // went: the loser is writing the winner's record, not its own. A set() landing
+            // after the re-read above still wins in the gate store and loses here, which is
+            // two concurrent writes resolving last-write-wins rather than a create discarding
+            // a value it was told about -- that one is closed by set() settling in the gate.
             if (!Storage.getInstance().writeObject(encryptedKey(account), settled)) {
                 return null;
             }
@@ -243,11 +246,30 @@ public final class HTML5SecureStorage extends SecureStorage {
     /// to refuse and the Java side has to tell them apart.
     static native byte[] nativeSetIfAbsent(String entry, String sealed);
 
+    /// Writes one record into the same store the create gate uses, replacing what was there.
+    ///
+    /// An ordinary set() used to write ordinary Storage only. A tab paused inside setIfAbsent --
+    /// past its "nothing here" check -- could then create the gate afterwards and mirror its own
+    /// candidate over the value this call had already stored, which is the lost update the
+    /// atomic create exists to rule out. With both writers settling in one store the create's
+    /// re-read sees the newer record and adopts it.
+    static native byte[] nativeSet(String entry, String sealed);
+
     /// Releases the gate for one entry, so a later create can win it again.
     ///
     /// Without this, remove() would clear the value while the gate still held the old ciphertext,
     /// and the next setIfAbsent would answer with a credential the caller had forgotten.
     static native byte[] nativeForget(String entry);
+
+    /// Whether a gate native reported success.
+    ///
+    /// Distinct from "it threw": a build whose bridge predates these natives has no gate store
+    /// at all, so there is nothing for a caller to keep consistent and the ordinary Storage
+    /// write stands on its own. A bridge that answered and refused is the opposite case -- the
+    /// store is there and now disagrees with Storage -- and every caller treats that as failure.
+    private static boolean gateAccepted(byte[] answer) {
+        return answer != null && answer.length > 0 && answer[0] == STATUS_OK;
+    }
 
     /// The status byte a native prefixes its payload with when it succeeded.
     private static final byte STATUS_OK = 0;
@@ -262,6 +284,23 @@ public final class HTML5SecureStorage extends SecureStorage {
         }
         try {
             String sealed = seal(account, value);
+            // The gate store first, so a setIfAbsent running concurrently in another tab sees
+            // this value when it re-reads the settled record and adopts it instead of mirroring
+            // its own candidate over it. Ordinary Storage is the mirror; this is where the two
+            // writers meet.
+            try {
+                if (!gateAccepted(nativeSet(encryptedKey(account), sealed))) {
+                    // The bridge is there and refused, so the gate now holds the superseded
+                    // ciphertext. Writing only the mirror would leave the next setIfAbsent able
+                    // to resurrect it.
+                    Log.p("SecureStorage: the create gate refused this write", Log.WARNING);
+                    return false;
+                }
+            } catch (RuntimeException noBridge) {
+                // No gate store in this build, so nothing can diverge from one. See gateAccepted.
+                Log.p("SecureStorage could not settle the create gate: " + reasonOf(noBridge),
+                        Log.WARNING);
+            }
             if (!Storage.getInstance().writeObject(encryptedKey(account), sealed)) {
                 return false;
             }
@@ -404,10 +443,21 @@ public final class HTML5SecureStorage extends SecureStorage {
         // The gate as well, or the value is gone while the record that settled it remains -- and
         // the next setIfAbsent would hand back a credential this call was told to forget.
         try {
-            nativeForget(encryptedKey(account));
+            // Checked. The bridge answers a refused delete with a status byte rather than
+            // throwing, so ignoring it let remove() report success over a gate that still held
+            // the old ciphertext -- and the next setIfAbsent would read that record back and
+            // write the forgotten credential or managed database key into ordinary storage
+            // again. Reporting failure is what makes the caller try again rather than believe
+            // the secret is gone.
+            if (!gateAccepted(nativeForget(encryptedKey(account)))) {
+                Log.p("SecureStorage: the create gate for this entry could not be released",
+                        Log.WARNING);
+                return false;
+            }
         } catch (RuntimeException noBridge) {
-            // A build whose bridge predates this native. The entry is still removed from the
-            // namespace every read uses, which is what this method promises.
+            // A build whose bridge predates this native, which therefore has no gate store and
+            // never created one. The entry is still removed from the namespace every read uses,
+            // which is what this method promises. See gateAccepted.
             Log.p("SecureStorage could not release the create gate: " + reasonOf(noBridge),
                     Log.WARNING);
         }

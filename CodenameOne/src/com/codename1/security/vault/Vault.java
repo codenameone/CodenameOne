@@ -1593,6 +1593,13 @@ public final class Vault {
     /// find out when they need it.
     public AsyncResource<Boolean> rotateDataKey(final char[] password) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // The key generation as well as the lock generation. The rotation snapshots the OUTGOING
+        // key and seals it into the retired chain, and adoptKey zeroes that array in place -- so a
+        // redundant unlockWithPassword completing in between left this sealing an envelope full
+        // of zeroes as the retired key, reporting success, and making every secret from the old
+        // version permanently unreadable. seal, putSecret, databaseKey and operationalKey were
+        // given this guard; the rotation, which is the operation that MOVES the key, was not.
+        final int keyAt = keyGeneration;
         // Rotation derives from the password twice -- once to prove it, once to wrap the new key
         // -- so at the default profile it holds the vault open for well over a second. A lock that
         // lands in there must not be undone by the publish at the end.
@@ -1628,6 +1635,9 @@ public final class Vault {
                         throw new VaultException(VaultError.AUTHENTICATION_FAILED,
                                 "the password does not match this vault");
                     }
+                    // Asked before the outgoing key is sealed into the chain, because everything
+                    // after this point depends on currentKey still being this vault's.
+                    requireSameKey(keyAt);
                     fresh = SecureRandom.bytes(32);
                     int newVersion = meta.dataKeyVersion + 1;
                     // Built on a copy, and swapped in only once it is safely written. Advancing
@@ -1700,6 +1710,9 @@ public final class Vault {
                                 "the vault was locked while the key was being rotated; the "
                                 + "rotation is stored and the vault is closed");
                     }
+                    // And once more before the swap: the seal above takes real time, and a
+                    // replacement landing inside it would have retired zeroes.
+                    requireSameKey(keyAt);
                     adoptKey(fresh);
                     fresh = null;
                     metadata = next;
