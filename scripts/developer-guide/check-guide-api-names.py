@@ -125,6 +125,10 @@ CLASS_POSITION = re.compile(
     # does: `@Routes` is not the plural of anything, it is a type that does
     # not exist.
     r'|@([A-Z][A-Za-z0-9]{4,})\b')
+# What a class extends or implements. Read as a whole clause rather than as an
+# alternative above, because an implements list holds several names and a
+# pattern that matched the first consumed it, leaving the rest unseen.
+INHERITS = re.compile(r'\b(?:extends|implements)\s+([^{;`\n]{1,200})')
 # Every one of those carries a signal that the token is code -- backticks, a
 # link target, a member call. A bare capitalised word in prose carries none,
 # and asking for it is not a near miss away from a class name, it IS one:
@@ -454,8 +458,12 @@ def class_positions():
         with open(os.path.join(GUIDE, name), encoding='utf-8') as handle:
             text = handle.read()
         for span in CODE_SPAN.finditer(text):
-            for match in CLASS_POSITION.finditer(span.group(1)):
+            body = span.group(1)
+            for match in CLASS_POSITION.finditer(body):
                 found.add(next(g for g in match.groups() if g))
+            for clause in INHERITS.finditer(body):
+                for match in SPAN_NAME.finditer(clause.group(1)):
+                    found.add(match.group(1))
         for match in WORD.finditer(text):
             if match.lastindex == 3:
                 found.add(match.group(3))
