@@ -25,17 +25,36 @@ $OutDir   = Join-Path $RepoRoot 'artifacts/desktop-native-ref/windows'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $Rid = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'win-arm64' } else { 'win-x64' }
-Write-Log "Publishing for $Rid"
+# MSBuild wants the platform in its own spelling, which is not the RID's.
+$MsbuildPlatform = if ($Rid -eq 'win-arm64') { 'ARM64' } else { 'x64' }
+Write-Log "Publishing for $Rid (msbuild platform $MsbuildPlatform)"
 
 $publishDir = Join-Path $env:TEMP "cn1-win-ref-$(Get-Random)"
-# Published from INSIDE the project directory on purpose: the SDK pin in global.json is
-# resolved from the current directory upward, not from the project path, so invoking this
-# from the repo root would silently select the runner's newest SDK instead.
+
+# Visual Studio's MSBuild, not `dotnet publish` -- see the comment in NativeRef.csproj for
+# why. The workflow puts it on PATH with microsoft/setup-msbuild.
+$msbuild = (Get-Command msbuild -ErrorAction SilentlyContinue)
+if (-not $msbuild) {
+  throw "msbuild is not on PATH. The WindowsAppSDK packaging targets need Visual Studio's MSBuild; the .NET SDK's does not carry the AppxPackage tasks."
+}
+Write-Log "msbuild: $($msbuild.Source)"
+Write-Log "dotnet SDK in effect: $(& dotnet --version)"
+
+# Run from inside the project directory so the SDK pin in global.json applies: it resolves
+# from the current directory upward, not from the project path.
 Push-Location $Src
 try {
-  Write-Log "dotnet SDK in effect: $(& dotnet --version)"
-  & dotnet publish -c Release -r $Rid --self-contained true -o $publishDir
-  if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with $LASTEXITCODE" }
+  & msbuild -t:Restore -p:Configuration=Release -p:RuntimeIdentifier=$Rid -p:Platform=$MsbuildPlatform -v:minimal
+  if ($LASTEXITCODE -ne 0) { throw "msbuild restore failed with $LASTEXITCODE" }
+
+  & msbuild -t:Publish `
+      -p:Configuration=Release `
+      -p:RuntimeIdentifier=$Rid `
+      -p:Platform=$MsbuildPlatform `
+      -p:SelfContained=true `
+      -p:PublishDir=$publishDir `
+      -v:minimal
+  if ($LASTEXITCODE -ne 0) { throw "msbuild publish failed with $LASTEXITCODE" }
 } finally {
   Pop-Location
 }

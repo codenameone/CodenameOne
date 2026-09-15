@@ -103,6 +103,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+      # The WindowsAppSDK packaging targets resolve eight MSBuild tasks out of Visual
+      # Studio's AppxPackage assembly, which the .NET SDK has never carried. `dotnet build`
+      # therefore cannot build a WinUI 3 app at all, whichever SDK version is selected.
+      - name: Put Visual Studio's MSBuild on PATH
+        uses: microsoft/setup-msbuild@v2
       - name: Capture
         shell: pwsh
         run: ./scripts/build-windows-native-ref.ps1

@@ -18,29 +18,20 @@
     <SelfContained>true</SelfContained>
     <EnableMsixTooling>false</EnableMsixTooling>
     <!--
-      Turns off MrtCore's PRI payload expansion, which cannot run under `dotnet build` at
-      all. Read out of the package's own MrtCore.PriGen.targets rather than guessed at:
+      Built with Visual Studio's MSBuild, not `dotnet build`. MrtCore.PriGen.targets
+      resolves its tasks from
+      $(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\AppxPackage\,
+      and eight distinct tasks live in that Visual Studio assembly: ValidateConfiguration,
+      GetPackageArchitecture, GetDefaultResourceLanguage, GetSdkFileFullPath,
+      GetSdkPropertyValue, ExpandPayloadDirectories, RemovePayloadDuplicates and
+      RemoveRedundantXamlFilesFromSdkPayload. Under `dotnet` that path is the .NET SDK
+      directory, where the AppxPackage tooling has never shipped at any version.
 
-        line  50 : AppxMSBuildToolsPath defaults to
-                   $(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\AppxPackage\
-        line  87 : AppxGeneratePriEnabled defaults to true ONLY when unset, so a value set
-                   here wins
-        line 908 : AddPriPayloadFilesToCopyToOutputDirectoryItems is gated on
-                   '$(AppxGeneratePriEnabled)' != 'false'
-
-      Under `dotnet`, MSBuildExtensionsPath is the .NET SDK directory, and the AppxPackage
-      tooling belongs to VISUAL STUDIO; it has never shipped there. So the task assembly is
-      missing under whichever SDK is selected, which is why pinning 10.0.400 down to 9.0.318
-      changed the path in the error message and nothing else. This property is a first-class
-      opt-out, not a workaround for a version skew.
-
-      Safe here because the app is code only: no .xaml files, no images, no localized
-      strings, so it indexes no resources of its own. It does mean WinUI's own .pri files
-      are not expanded into the output, which would surface as unstyled or missing controls,
-      so the probe captures a real tile and inspects it rather than treating a green build
-      as a rendered one.
+      Disabling them one property at a time was tried and abandoned: each property that
+      silenced one task simply revealed the next, and getting a build out that way would
+      have meant switching off most of the resource pipeline and then wondering why the
+      controls rendered unstyled.
     -->
-    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
     <PublishReadyToRun>false</PublishReadyToRun>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
