@@ -182,7 +182,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 .Custom modal Dialog in the south position
-image::img/components-dialog-modal-south.png[Custom Dialog in the south position,scaledwidth=20%]
+image::img/generated/components-dialog-modal-south.png[Custom Dialog in the south position,scaledwidth=20%]
 
 TIP: You can turn the code above to a modless `Dialog` by flipping the boolean `true` argument to `false`.
 
@@ -1440,13 +1440,13 @@ The data of the `Tree` arrives from a model for example: this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava182Snippet.java[tag=the-components-of-codename-one-java-182,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeFigure.java[tag=the-components-of-codename-one-java-182,indent=0]
 ----
 
 Will result in this:
 
 .Tree
-image::img/tree.png[Tree,scaledwidth=20%]
+image::img/generated/tree.png[Tree,scaledwidth=40%]
 
 NOTE: Since `Tree` is hierarchy based you can't have a simple model like you've for the `Table` as deep hierarchy is harder to represent with arrays.
 
@@ -1454,19 +1454,19 @@ A more practical "real world" example would be working with XML data. You can us
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava183Snippet.java[tag=the-components-of-codename-one-java-183,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeXmlFigure.java[tag=the-components-of-codename-one-java-183,indent=0]
 ----
 
-NOTE: The `try(Stream)` syntax is a try with resources clogic that implicitly closes the stream.
+NOTE: The `try` with resources syntax closes the `Reader` for you however the block ends.
 
 .XML Tree
-image::img/components-tree-xml.png[XML Tree,scaledwidth=20%]
+image::img/generated/components-tree-xml.png[XML Tree,scaledwidth=40%]
 
 The model for the XML hierarchy is implemented as such:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava184Snippet.java[tag=the-components-of-codename-one-java-184,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsTreeXmlFigure.java[tag=the-components-of-codename-one-java-184,indent=0]
 ----
 
 [[sharebutton-section]]
