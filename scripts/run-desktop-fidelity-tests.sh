@@ -48,6 +48,24 @@ CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 cn1ss_log() { rf_log "$1"; }
 
+# Compile the shared Java helpers (ProcessScreenshots, FidelityGate, the report
+# renderers) and point the library at the JVM that runs them. Without this every
+# cn1ss_* helper refuses with "CN1SS_JAVA_BIN is not configured" -- which reads as
+# an unset variable rather than as a missing setup call, so it is worth naming.
+#
+# The SAME JVM renders the tiles and runs the helpers: the helpers need 17+ for
+# switch expressions and the simulator needs 11+, while tools/env.sh puts JDK 8 on
+# PATH for the framework build. CN1SS_DESKTOP_JAVA is how CI passes the newer one.
+JAVA_BIN="${CN1SS_DESKTOP_JAVA:-$(command -v java || true)}"
+if [ -z "$JAVA_BIN" ] || [ ! -x "$JAVA_BIN" ]; then
+  rf_log "FAILED: no java on PATH; set CN1SS_DESKTOP_JAVA to a JDK 17+ java binary."
+  exit 25
+fi
+if ! cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"; then
+  rf_log "FAILED: could not prepare the Java helpers with $JAVA_BIN"
+  exit 25
+fi
+
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts/${PLATFORM}-fidelity}"
 mkdir -p "$ARTIFACTS_DIR"
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
@@ -73,7 +91,6 @@ rf_log "Rendering Codename One tiles for $PLATFORM using $THEME_RES"
 # "mac" or "linux" from the HOST, which is right for an application and wrong here: the same
 # host must be able to render whichever theme it is asked for, and the golden set is named
 # for the design generation rather than for the machine.
-JAVA_BIN="${CN1SS_DESKTOP_JAVA:-java}"
 SIM_JAR="$(ls maven/javase/target/codenameone-javase-*-jar-with-dependencies.jar 2>/dev/null | head -n1 || true)"
 CLASSES_DIR="$APP_DIR/common/target/classes"
 if [ ! -f "$CLASSES_DIR/com/codenameone/fidelity/DesktopTileRunner.class" ]; then
@@ -116,6 +133,24 @@ fi
 export CN1SS_FIDELITY_SPEC="$SPEC_FILE"
 export CN1SS_FIDELITY_PLATFORM="$PLATFORM"
 
+# One --actual entry per TILE, "<test name>=<png>". The comparator takes files, not
+# a directory, and handing it a directory is not a usage error it reports -- it is
+# an entry whose path does not exist, so the run dies inside the helper with nothing
+# to say. The glob also leaves tile-backgrounds.properties behind, which is read
+# from the tile directory rather than passed in.
+shopt -s nullglob
+declare -a COMPARE_ENTRIES=()
+for png in "$TILE_DIR"/*_cn1.png; do
+  base="$(basename "$png" .png)"
+  COMPARE_ENTRIES+=("${base%_cn1}=${png}")
+done
+shopt -u nullglob
+if [ "${#COMPARE_ENTRIES[@]}" -eq 0 ]; then
+  rf_log "FAILED: $TILE_DIR holds no *_cn1.png tiles to score."
+  exit 26
+fi
+rf_log "Scoring ${#COMPARE_ENTRIES[@]} tile(s) against $GOLDEN_SET"
+
 cn1ss_process_fidelity \
   "Desktop fidelity ($PLATFORM, $GOLDEN_SET)" \
   "$WORK_DIR/compare.json" \
@@ -125,4 +160,4 @@ cn1ss_process_fidelity \
   "$PREVIEW_DIR" \
   "$ARTIFACTS_DIR" \
   "$BASELINE_FILE" \
-  "$PLATFORM=$TILE_DIR"
+  "${COMPARE_ENTRIES[@]}"
