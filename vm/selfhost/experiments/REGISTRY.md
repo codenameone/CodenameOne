@@ -2014,3 +2014,79 @@ Memory is now the larger gap of the two (1.78x+ against 1.31x), and D1/D2 in the
 taking BiBOP pages from mmap so the 92.9 MB of malloc-retained free space is returnable,
 and sizing the reference-field share of the live heap -- are still untouched and are where
 the 700 MB delta actually lives.
+
+## Round 15: the memory census, and the aging slack finally ruled on
+
+Memory is the larger gap, so this is the census the plan made a precondition for any
+representation work. Built `-DCN1_ALLOC_CENSUS -O3` and read `[JHEAP]`/`[LIVE]`, which
+already existed and had never been pointed at this question.
+
+Process footprint 957MB at the final sweep. Where it is:
+
+| | MB |
+|---|---:|
+| live Java objects | 502.9 |
+| BiBOP slack (reserved 463.4 - live 372.3) | 91.1 |
+| legacy heap, 358,717 objects | 130.6 |
+| malloc idle (allocated 943.7 - inUse 883.5) | 60.2 |
+| object table, 897,369 / 960,000 slots | 7.3 |
+
+And the composition of the 488MB live set, which is the number that matters, POST-SWEEP
+rather than at exit (the two agreed, so this is steady state and not a batch program
+dying between collections):
+
+| bucket | MB | share |
+|---|---:|---:|
+| traced (reachable) | 364.3 | 74.6% |
+| fresh (grace) | 0.3 | 0.1% |
+| aging (marked last cycle, not this one) | 65.7 | 13.5% |
+| dead (older, unswept page) | 57.6 | 11.8% |
+
+**A quarter of the heap is unreachable memory being held.** Split by shape: 289.8MB in
+1,334,696 arrays and 198.2MB in 2,373,354 objects, which is **40.7MB of 32-byte array
+headers and 36.2MB of 16-byte object headers -- 76.9MB, 15.8% of the live set, in headers
+alone.** HotSpot's equivalent (16-byte array header, 12-byte compressed object header)
+would be 47.6MB, so ~29MB of that is excess rather than inherent.
+
+### Refuted in one build: smaller BiBOP pages
+
+91MB of slack across 7,297 non-empty pages is ~11.5KB unused per 64KB page, which reads
+like page-tail waste. `-DCN1_BIBOP_PAGE_SIZE=16384` should then have cut it ~4x. It made
+the peak **worse -- 889MB against 854MB** -- so the slack is not tail waste, it is freed
+slots inside pages that are still in use, and recovering it needs compaction, which this
+VM deliberately does not do. One build, one answer, no further page-size tuning.
+
+### The aging slack: 12%, and 8 of 8 rounds
+
+`cn1GcAgingSlack` was written as a knob with the default left at 1 and a note asking for
+the gates to rule on it rather than a census. They have. 8 interleaved rounds, peak
+phys_footprint:
+
+    slack=1   872 907 891 789 946 953 842 978 MB
+    slack=0   840 749 834 772 870 852 702 695 MB
+
+**Lower in 8 of 8** -- sign test p ~= 0.004, which is what makes the direction certain on
+a host that cannot resolve 5% -- mean reduction ~12%, range 2-29%. Wall clock did not
+move (0.77-0.82s either way): the slack buys memory, not time.
+
+What ruled on the risk, premature reclamation of an object a live field still points at:
+`run-gc-verify.sh` GREEN at slack=0 with all ten drivers clean AND all three self-tests
+still detecting their injected faults (grace-pass, early-free, dangling referent), so it
+did not pass vacuously; `run-gauntlet.sh` GREEN, 15 tortures byte-identical; and the
+self-hosted translator's whole output tree byte-identical to the JVM reference over 797
+files. A reference freed a cycle early does not emit identical C.
+
+Default is now 0. The knob stays for diagnosis and is the ablation the GC gates use.
+
+### Where that leaves the gap, honestly
+
+Peak ~800MB against JDK 25's 468MB on the same metric, so ~1.7x, down from 1.79x. The
+remaining ~330MB is NOT in reach of another knob, and the census says where it is:
+~105MB of reference-field bytes in `java.lang.Object[]` alone (124MB total, 577,239
+arrays), ~29MB of header excess, 91MB of uncompactable slack, 60MB of malloc idle.
+
+**The single biggest item is 32-bit references (plan D2), and the census that plan made
+its precondition now exists.** It is also the change with the largest blast radius in the
+VM -- every generated struct, every port native that reads a field out of one, and a
+second encoding for legacy-heap objects outside the window. It should be scoped and
+prototyped behind this census, not started on the strength of it.

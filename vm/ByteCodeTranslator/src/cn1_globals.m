@@ -672,18 +672,47 @@ static JAVA_BOOLEAN cn1GcPageIndexStale = JAVA_FALSE;
 // for one more cycle by this rule alone. The churn classes are the ones paying for it:
 // Object[] 41% aging, char[] 30%, boolean[] 82%, asm Subroutine 82%.
 //
-// It defaults to 1, which is the historical behaviour, and is NOT lowered here. The
-// slack is what covers a mark that was incomplete rather than a heap that was empty --
-// a page-index miss, a conservative-scan gap -- and on ParparVM a dangling read is a
-// native crash no Java catch can see. Lowering it is a real memory win and a real risk,
-// so it is exposed as a measurable knob for the GC gates to rule on rather than flipped
-// on the strength of a good-looking census.
+// IT NOW DEFAULTS TO 0, AND THE GATES RULED ON IT RATHER THAN A CENSUS.
+//
+// The note above asked for exactly that and left the default at 1 until it existed.
+// Measured on the self-hosting corpus, 8 interleaved rounds, peak phys_footprint:
+//
+//   slack=1   872 907 891 789 946 953 842 978 MB
+//   slack=0   840 749 834 772 870 852 702 695 MB
+//
+// LOWER IN 8 OF 8 ROUNDS -- a sign test puts that at p ~= 0.004, which is what makes
+// the direction certain on a host that cannot resolve 5% -- for a mean reduction of
+// about 12% (range 2-29%). Wall clock did not move (0.77-0.82s either way): the slack
+// buys memory, not time, in both directions.
+//
+// What ruled on the risk, which is premature reclamation of an object a live field
+// still points at:
+//
+//   - run-gc-verify.sh GREEN at slack=0: all ten drivers clean (GraceAudit 239 verify
+//     passes, LegacyGrace 120, BulkCopyBarrier 27, plus GcStress/MtStress/MapTorture/
+//     SbTorture/FusedTest/ThreadChurn/LargeArrayLoad), and ALL THREE self-tests still
+//     detected their injected faults -- the grace-pass fault, the early-free fault and
+//     the dangling referent -- so the gate was not passing vacuously.
+//   - run-gauntlet.sh GREEN at slack=0: 15 tortures byte-identical to JDK 25.
+//   - The self-hosted translator's whole output tree stayed BYTE-IDENTICAL to the JVM
+//     reference over 797 files, on a 37.6k-line program that hammers collections,
+//     strings, exceptions and file I/O. A reference freed one cycle early would not
+//     produce identical C; it would produce a native crash or wrong bytes.
+//
+// The residual risk is unchanged in KIND and is worth stating plainly: the slack
+// covered a mark that was incomplete rather than a heap that was empty -- a page-index
+// miss, a conservative-scan gap -- and on ParparVM a dangling read is a native crash no
+// Java catch can see. What changed is that the mechanisms which used to need that cover
+// are now individually gated (the page-index staleness flag, the SATB re-arm fixpoint,
+// the bulk-copy handshake), so the slack was paying a second time for insurance already
+// bought. Raise it with CN1_GC_AGING_SLACK if a target ever shows otherwise; the knob
+// stays for diagnosis, and it is the ablation the GC gates use.
 static int cn1GcAgingSlack(void) {
     static int cached = -1;
     if(cached < 0) {
         const char* v = getenv("CN1_GC_AGING_SLACK");
-        int n = v != 0 ? atoi(v) : 1;
-        cached = (n >= 0 && n <= 8) ? n : 1;
+        int n = v != 0 ? atoi(v) : 0;
+        cached = (n >= 0 && n <= 8) ? n : 0;
     }
     return cached;
 }
