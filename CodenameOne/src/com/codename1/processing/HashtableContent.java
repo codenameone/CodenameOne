@@ -261,7 +261,14 @@ class MapContent implements StructuredContent {
     @Override
     public StructuredContent getChild(int index) {
         if (root instanceof List) {
-            return new MapContent(((List) root).get(index), this);
+            List entries = (List) root;
+            if (index < 0 || index >= entries.size()) {
+                // An empty list has no first child, and getText() asks for
+                // one: a nested [[]] threw from there rather than reading as
+                // the nothing it is.
+                return null;
+            }
+            return new MapContent(entries.get(index), this);
         }
         if (!(root instanceof Map)) {
             // A scalar has no children. The cast below used to be reached for

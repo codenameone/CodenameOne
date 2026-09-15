@@ -520,14 +520,20 @@ abstract class AbstractEvaluator implements Evaluator {
         // Signed arithmetic, one step at a time: the magnitudes are what the
         // digits hold, and delta is small enough that stepping is exact and
         // bounded by the mantissa's length.
+        //
+        // The direction is decided per step, not once. A value walking down
+        // through zero changes sign, and from there the same delta moves it
+        // AWAY from zero rather than towards it -- decided once, the steps
+        // after the crossing went back the way they came, so 1e-10001 and the
+        // same number written out in full did not compare equal.
         int steps = delta < 0 ? -delta : delta;
-        boolean up = (delta > 0) != negative;
+        boolean adding = delta > 0;
         for (int i = 0; i < steps; i++) {
-            if (up) {
-                value = incrementDigits(value);
-            } else if (isZeroDigits(value)) {
-                negative = !negative;
+            if (isZeroDigits(value)) {
+                negative = !adding;
                 value = "1";
+            } else if (adding != negative) {
+                value = incrementDigits(value);
             } else {
                 value = decrementDigits(value);
             }

@@ -484,6 +484,36 @@ class ResultAttributePathTest {
     }
 
     @Test
+    void anEmptyNestedArrayReadsAsNothing() {
+        // Keeping every value in an array means a nested one is kept too, and
+        // reading its text asked for a first child it does not have.
+        Result r = Result.fromContent(
+                "{\"items\":[{\"values\":[[]]}]}", Result.JSON);
+        String[] values = r.getAsStringArray("/items/values");
+        assertEquals(1, values.length, "the empty array should still be an entry");
+        assertNull(values[0], "an empty array has no text");
+    }
+
+    @Test
+    void aValueSteppedDownThroughZeroKeepsGoing() {
+        // The order of a value is its exponent stepped by the places the
+        // mantissa shifts the point, and that walk can cross zero. Deciding
+        // the direction once meant the steps after the crossing went back the
+        // way they came, so these two spellings of the same number -- one in
+        // exponent form, one written out -- did not compare equal.
+        StringBuilder written = new StringBuilder("0.");
+        for (int i = 0; i < 10000; i++) {
+            written.append('0');
+        }
+        written.append('1');
+        Result r = Result.fromContent(
+                "<t><p v='1e-10001' n='exp'/><p v='" + written + "' n='plain'/></t>",
+                Result.XML);
+        assertEquals(2, r.getAsStringArray("/t/p[@v='1e-10001']/@n").length,
+                "the same number written two ways did not compare equal");
+    }
+
+    @Test
     void anUnclosedPredicateIsReportedRatherThanSpun() {
         // getPredicate() ran off the end with the bracket still open, left the
         // position where it was, and tokenize() called it again from there for
