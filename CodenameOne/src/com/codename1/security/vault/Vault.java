@@ -440,6 +440,12 @@ public final class Vault {
             if (options.getPolicy() != UnlockPolicy.SESSION_ONLY) {
                 try {
                     rememberNow(options.getPolicy());
+                    // The enrolment above is committed -- the metadata is written and the key is
+                    // published -- so a lock landing inside the prompt does not undo it; it
+                    // invalidates only the wrap, which is withdrawn rather than left describing
+                    // zeroes. requireSameGeneration ran before rememberNow and could not see a
+                    // lock that arrived after it.
+                    withdrawDeviceRecordIfLocked(generation);
                 } catch (RuntimeException rememberFailed) {
                     // RuntimeException and not just VaultException: a port can throw rather than
                     // complete with an error, and that left the vault published exactly the same
@@ -1464,6 +1470,15 @@ public final class Vault {
         final AsyncResource<char[]> out = new AsyncResource<char[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration;
+        // The key generation as well. adoptKey zeroes the dataKey array IN PLACE, so an unlock of
+        // an already-unlocked vault or a key import running beside this leaves the seal below
+        // wrapping zeroes while stampMac -- which read the field a second time, after the
+        // replacement -- stamps authentic metadata over it. The result is a recovery code the
+        // vault accepts as well-formed and that can never open it, handed to the user as their
+        // one way back in. seal, putSecret, databaseKey, operationalKey and rotateDataKey all
+        // carry this guard; this path read the field twice and carried neither the snapshot nor
+        // the check.
+        final int keyAt = keyGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -1494,16 +1509,23 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while a recovery code was being created");
                     }
+                    // Snapshotted once and used for BOTH the wrap and the MAC, so the two
+                    // cannot disagree about which key this record belongs to.
+                    byte[] sealing = dataKey;
+                    requireSameKey(keyAt);
                     byte[] derived = recoveryKey(code);
                     VaultMetadata next = current.copy();
                     next.recoveryWrap = SecureEnvelope.seal(derived, next.dataKeyId,
                             next.dataKeyVersion,
-                            wrapBinding(next, PURPOSE_RECOVERY), dataKey);
+                            wrapBinding(next, PURPOSE_RECOVERY), sealing);
                     Bytes.zero(derived);
                     next.counter = current.counter + 1;
                     // Checked before the write: a recovery code refused after persisting its
                     // wrap would be a code the vault accepts and the caller never received.
-                    stampMac(next, current, dataKey);
+                    stampMac(next, current, sealing);
+                    // And after the seal, which is where a replacement lands: the KDF above runs
+                    // for as long as the profile asks.
+                    requireSameKey(keyAt);
                     requireSameGeneration(generation);
                     VaultMetadata previous = current;
                     commitMetadata(previous, next);
@@ -1780,9 +1802,7 @@ public final class Vault {
                             // The record goes, on the same reasoning as the catch below: the
                             // rotation is committed and stays reported as done, and what is
                             // discarded is a wrap that cannot open anything.
-                            if (generation != lockGeneration) {
-                                Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                            }
+                            withdrawDeviceRecordIfLocked(generation);
                         } catch (RuntimeException rewrapFailed) {
                             Storage.getInstance().deleteStorageFile(deviceRecordKey());
                         }
@@ -2000,6 +2020,10 @@ public final class Vault {
                     } else {
                         try {
                             rememberNow(options.getPolicy());
+                            // Same reason as enrolment's: publishKey already checked this
+                            // generation, and a lock arriving during the prompt after it leaves a
+                            // record wrapping zeroes. The import is committed; only the wrap goes.
+                            withdrawDeviceRecordIfLocked(generation);
                         } catch (RuntimeException rememberFailed) {
                             // Rolled back to whatever was here BEFORE, which is not always
                             // nothing. The first version of this deleted the record outright, on
@@ -2886,6 +2910,30 @@ public final class Vault {
     /// Not every path needs this. `forgetDevice` and `destroyLocalData` only ever remove, so a lock
     /// landing inside one leaves less behind rather than more, and `changePassword` is documented
     /// to work on a locked instance and publishes no key at all.
+    /// Withdraws a device record written while a lock was landing, WITHOUT failing the call.
+    ///
+    /// The other half of `requireDeviceRecordStillWanted`, for the three paths that commit
+    /// something else first. rememberNow snapshots the data key it is handed and `lock()` zeroes
+    /// that same array in place, so a store that prompts -- a passkey, a keystore with user
+    /// verification -- can come back to find it wrapping zeroes. It then unwraps zeroes for its
+    /// own read-back check, agrees with itself, and writes a device record of the right key
+    /// VERSION holding nothing: `getPolicy()` reports the device is remembered and every later
+    /// `unlockRemembered()` fails metadata authentication with nothing to say why.
+    ///
+    /// Withdrawing rather than throwing, because the rotation or the import beside it is already
+    /// committed and stays reported as done; what is discarded is a wrap that cannot open
+    /// anything. The degradation is observable -- the record is gone, so `getPolicy()` answers
+    /// SESSION_ONLY, which is the state the device is really in.
+    ///
+    /// Named rather than written out at each site, because it was written out at ONE of the three
+    /// and the other two were reported separately.
+    private void withdrawDeviceRecordIfLocked(int generation) {
+        if (generation == lockGeneration) {
+            return;
+        }
+        Storage.getInstance().deleteStorageFile(deviceRecordKey());
+    }
+
     private void requireDeviceRecordStillWanted(int generation, String restore) {
         if (generation == lockGeneration) {
             return;

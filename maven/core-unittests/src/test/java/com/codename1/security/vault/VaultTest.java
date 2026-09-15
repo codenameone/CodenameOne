@@ -1209,6 +1209,77 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void anEnrolmentLockedInsideItsPromptLeavesNoUnusableDeviceRecord() throws Exception {
+        // enroll publishes the key and then establishes the remembered unlock through a store
+        // that can PROMPT. requireSameGeneration ran before that prompt and could not see a lock
+        // arriving during it -- and rememberNow snapshots the data key that lock() zeroes in
+        // place, so it wrapped zeroes, unwrapped zeroes for its own read-back, agreed with
+        // itself, and wrote a device record of the right key VERSION holding nothing. enroll()
+        // reported success, getPolicy() reported REMEMBER_DEVICE, and every later
+        // unlockRemembered() died on metadata authentication with nothing to say why.
+        String name = freshName();
+        final VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+
+        whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        errorOf(vault.enroll(pw("p"), remember));
+                        return null;
+                    }
+                },
+                new Runnable() {
+                    public void run() {
+                        vault.lock();
+                    }
+                });
+
+        // Whatever enrol reported, what must NOT be on disk is a record that claims a remembered
+        // unlock and cannot deliver one.
+        Vault reopened = Vault.named(name).configure(remember);
+        if (reopened.getPolicy() == UnlockPolicy.REMEMBER_DEVICE) {
+            assertTrue(reopened.unlockRemembered().get().booleanValue(),
+                    "a device record left behind must actually open the vault");
+        }
+    }
+
+    @Test
+    void anImportLockedInsideItsPromptLeavesNoUnusableDeviceRecord() throws Exception {
+        // The third rememberNow site, and the one no review round reported. Same shape as
+        // enrolment: publishKey checked the generation before the prompt, nothing checked it
+        // after, and the import stays committed while the wrap describes zeroes.
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault origin = Vault.named(freshName()).configure(remember);
+        origin.enroll(pw("p"), remember).get();
+
+        String name = freshName();
+        final Vault joined = Vault.named(name).configure(remember);
+        final byte[] state = origin.exportSyncState();
+
+        whileTheDeviceStoreIsPrompting(
+                new java.util.concurrent.Callable<VaultError>() {
+                    public VaultError call() {
+                        errorOf(joined.importSyncState(state, pw("p")));
+                        return null;
+                    }
+                },
+                new Runnable() {
+                    public void run() {
+                        joined.lock();
+                    }
+                });
+
+        Vault reopened = Vault.named(name).configure(remember);
+        if (reopened.getPolicy() == UnlockPolicy.REMEMBER_DEVICE) {
+            assertTrue(reopened.unlockRemembered().get().booleanValue(),
+                    "a device record left behind must actually open the vault");
+        }
+        // And the password must work either way, because the import itself is committed.
+        assertTrue(Vault.named(name).configure(fast())
+                .unlockWithPassword(pw("p")).get().booleanValue());
+    }
+
+    @Test
     void aRedundantRememberThatRacesALockKeepsTheEnrolmentItAlreadyHad() throws Exception {
         // rememberDevice is not always a CREATE. A device already remembered under this policy is
         // rewrapped here anyway, and the lock-race rollback deleted the record unconditionally --

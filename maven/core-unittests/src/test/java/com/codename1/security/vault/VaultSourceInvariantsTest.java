@@ -189,6 +189,60 @@ class VaultSourceInvariantsTest extends UITestBase {
     }
 
     @Test
+    void everyRememberNowCallAsksWhetherALockLandedInThePrompt() {
+        // rememberNow snapshots the data key it is handed and lock() zeroes that same array in
+        // place, so a store that PROMPTS -- a passkey, a keystore with user verification -- can
+        // return to find it wrapping zeroes. It unwraps zeroes for its own read-back, agrees with
+        // itself, and writes a device record of the right key VERSION holding nothing. Nothing
+        // fails; getPolicy() reports the device is remembered and every later unlockRemembered()
+        // dies on metadata authentication with nothing to say why.
+        //
+        // There are five call sites and they were fixed one review round at a time -- rotateDataKey
+        // first, then rememberDevice and setPolicy, then enroll, with importSyncState never
+        // reported at all. This asks the question of ALL of them, so the sixth cannot be written
+        // without one.
+        String source = readVaultSource();
+        java.util.List<String> missing = new java.util.ArrayList<String>();
+        int at = 0;
+        int seen = 0;
+        while (true) {
+            int call = source.indexOf("rememberNow(", at);
+            if (call < 0) {
+                break;
+            }
+            at = call + 1;
+            // Its own declaration, not a call.
+            if (source.lastIndexOf("private void ", call) > source.lastIndexOf('\n', call) - 20
+                    && source.startsWith("private void rememberNow(",
+                            source.lastIndexOf("private void ", call))) {
+                continue;
+            }
+            seen++;
+            // The answer has to be near the call, so a window rather than the whole file -- but
+            // bounded by the NEXT rememberNow rather than by a character count, because setPolicy
+            // carries 2,200 characters of comment between its call and its guard and a fixed
+            // window reported it as unguarded. Ending at the next site is exact: a guard can then
+            // only answer for the call it follows.
+            int next = source.indexOf("rememberNow(", call + 1);
+            String after = source.substring(call, next < 0 ? source.length() : next);
+            boolean asks = after.indexOf("withdrawDeviceRecordIfLocked(generation)") > 0
+                    || after.indexOf("requireDeviceRecordStillWanted(generation,") > 0;
+            if (!asks) {
+                missing.add("the rememberNow at offset " + call);
+            }
+        }
+        assertTrue(seen >= 5, "only " + seen + " rememberNow calls found, so this scanned almost "
+                + "nothing; the sites are enroll, rememberDevice, setPolicy, rotateDataKey and "
+                + "importSyncState");
+        assertTrue(missing.isEmpty(),
+                "these establish a remembered unlock and never ask whether a lock landed in the "
+                + "prompt that wrote it: " + missing + ". Follow the call with "
+                + "withdrawDeviceRecordIfLocked(generation) when the operation beside it is "
+                + "already committed, or requireDeviceRecordStillWanted(generation, ...) when it "
+                + "is not.");
+    }
+
+    @Test
     void theIdleTimeoutIsMeasuredOnAClockNobodyCanSet() {
         // currentTimeMillis is the wall clock and it moves: a user correcting the date, or an NTP
         // step, sends it backwards, and the idle subtraction then goes negative -- so the vault

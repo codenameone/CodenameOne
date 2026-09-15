@@ -219,6 +219,21 @@ public final class HTML5SecureStorage extends SecureStorage {
             // two concurrent writes resolving last-write-wins rather than a create discarding
             // a value it was told about -- that one is closed by set() settling in the gate.
             if (!Storage.getInstance().writeObject(encryptedKey(account), settled)) {
+                // The gate goes with it. The add succeeded, so the ciphertext is settled in the
+                // gate store; leaving it there while reporting failure means the entry is absent
+                // from every namespace a read uses AND present in the one a create consults, so
+                // the NEXT setIfAbsent loses its own add, reads this record back, and makes the
+                // value from a call that reported failure visible as though it had been stored.
+                // Released only when this tab is the one that won -- the loser is looking at
+                // somebody else's live record and must not delete it.
+                if (sealed.equals(settled)) {
+                    try {
+                        nativeForget(encryptedKey(account));
+                    } catch (RuntimeException noBridge) {
+                        Log.p("SecureStorage could not release the create gate it had just "
+                                + "taken: " + reasonOf(noBridge), Log.WARNING);
+                    }
+                }
                 return null;
             }
             String plain = open(account, settled);
