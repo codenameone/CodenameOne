@@ -298,6 +298,23 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * parent's allocation block. Preserve the parent's compact representation
      * while copying the requested logical window.
      */
+    /**
+     * Slice into a FUSED String -- one allocation for the object and its characters,
+     * instead of the object plus a separate backing array.
+     *
+     * substring is the busiest String producer in this VM: 290,581 calls on the
+     * self-hosting corpus, averaging twelve characters, and 866 call sites in the
+     * framework core alone. At that length the separate array is mostly HEADER -- 32
+     * bytes of array header for 12 bytes of payload -- so fusing removes both an
+     * allocation and the header, and keeps the parent's coder so a compact string
+     * stays compact.
+     *
+     * Returns null when a fused block is unavailable (the slice is too large for the
+     * page heap, or BiBOP is off), and the caller takes the two-object path below,
+     * which is correct for any length.
+     */
+    private native String cn1SubstringFused(int off, int n);
+
     private String(String parent, int newOffset, int newCount) {
         Object parentValue = parent.value;
         if (parentValue instanceof byte[]) {
@@ -918,7 +935,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return this;
         }
         if (start >= 0 && start <= count) {
-            return new String(this, offset + start, count - start);
+            String fused = cn1SubstringFused(offset + start, count - start);
+            return fused != null ? fused : new String(this, offset + start, count - start);
         }
         throw new ArrayIndexOutOfBoundsException(start);
     }
@@ -935,7 +953,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         // NOTE last character not copied!
         // Fast range check.
         if (start >= 0 && start <= end && end <= count) {
-            return new String(this, offset + start, end - start);
+            String fused = cn1SubstringFused(offset + start, end - start);
+            return fused != null ? fused : new String(this, offset + start, end - start);
         }
         throw new ArrayIndexOutOfBoundsException(start);
     }

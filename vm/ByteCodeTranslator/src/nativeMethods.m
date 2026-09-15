@@ -4298,6 +4298,74 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
 // filled with a single memcpy -- no Java ctor chain, no System.arraycopy, no
 // separate array allocation. Falls back to the pure-Java twin when the fused
 // allocator declines (oversize for BiBOP).
+/*
+ * SUBSTRING AS ONE ALLOCATION.
+ *
+ * The Java slice constructor allocates twice -- a backing array, then the String that
+ * points at it -- and substring is the busiest String producer in this VM: 290,581 calls
+ * on the self-hosting corpus averaging TWELVE characters, with 866 call sites in the
+ * framework core alone. At that length the separate array is mostly header: 32 bytes of
+ * array header carrying 12 bytes of payload. Fusing the characters into the String's own
+ * block removes the second allocation and that header outright.
+ *
+ * The parent's coder is preserved rather than re-derived. A slice of a Latin-1 string is
+ * Latin-1 by construction -- every unit is one the parent already held -- so there is
+ * nothing to scan for, unlike StringBuilder.toString which is converting from char[].
+ *
+ * Returns JAVA_NULL when a fused block is unavailable (over CN1_BIBOP_MAX_OBJECT, or
+ * BiBOP disabled); String.substring then takes the ordinary two-object path, which is
+ * correct for any length. That keeps this native free of bounds checking and exception
+ * construction -- substring has already done both before calling.
+ */
+JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT off, JAVA_INT n) {
+    struct obj__java_lang_String* me = (struct obj__java_lang_String*)__cn1ThisObject;
+    JAVA_ARRAY src = (JAVA_ARRAY)me->java_lang_String_value;
+    if(src == JAVA_NULL || n < 0) {
+        return JAVA_NULL;
+    }
+    JAVA_BOOLEAN latin1 = (src->__codenameOneParentClsReference == &class_array1__JAVA_BYTE);
+    struct clazz* acls = latin1 ? &class_array1__JAVA_BYTE : &class_array1__JAVA_CHAR;
+    int esz = latin1 ? (int)sizeof(JAVA_ARRAY_BYTE) : (int)sizeof(JAVA_ARRAY_CHAR);
+
+    enteringNativeAllocations();
+    int fieldsEnd = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
+    int total = fieldsEnd + CN1_FUSED_ARR_BYTES(n, esz);
+    JAVA_OBJECT so = cn1AllocFused(threadStateData, total, &class__java_lang_String);
+    if(so == JAVA_NULL) {
+        finishedNativeAllocations();
+        return JAVA_NULL;   // caller falls back to the two-object path
+    }
+    JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, fieldsEnd, acls, esz, n);
+    // DELIBERATELY NOT RE-ATTRIBUTED TO THE ARRAY CLASS. cn1AllocFused charges the
+    // whole block to java.lang.String, which is the truth: a fused substring is ONE
+    // allocation, and the characters are inside it. An earlier version of this split
+    // the bytes and added a second COUNT for the array class so the census would read
+    // like the two-object path -- which silently cancelled the very saving this native
+    // exists for, and made the object total look unchanged. The census reports what
+    // happened; it is not the place to preserve an old shape.
+    struct obj__java_lang_String* rs = (struct obj__java_lang_String*)so;
+    rs->java_lang_String_value = arr;
+    rs->java_lang_String_offset = 0;
+    rs->java_lang_String_count = n;
+    rs->java_lang_String_hashCode = 0;
+    rs->java_lang_String_nsString = 0;
+    if(n > 0) {
+        // Re-read the parent's array AFTER the allocation: cn1AllocFused can run a GC
+        // handshake. The heap does not move, but re-loading the field is free and keeps
+        // this correct against a future where it does.
+        src = (JAVA_ARRAY)me->java_lang_String_value;
+        if(latin1) {
+            memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data,
+                   ((JAVA_ARRAY_BYTE*)src->data) + off, (size_t)n);
+        } else {
+            memcpy((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data,
+                   ((JAVA_ARRAY_CHAR*)src->data) + off, (size_t)n * sizeof(JAVA_ARRAY_CHAR));
+        }
+    }
+    finishedNativeAllocations();
+    return so;
+}
+
 JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
     if(__builtin_expect(!class__java_lang_String.initialized, 0)) __STATIC_INITIALIZER_java_lang_String(threadStateData);
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;

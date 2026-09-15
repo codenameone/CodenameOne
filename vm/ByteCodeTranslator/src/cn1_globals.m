@@ -13008,6 +13008,21 @@ JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz
 #ifdef CN1_GC_CONFORM
         if(fused != JAVA_NULL) { cn1RecordAllocation(cls, totalSize); }
 #endif
+        // AND THE [ALLOC] CENSUS, WHICH IS A SEPARATE INSTRUMENT AND HAD A HOLE HERE.
+        // cn1RecordAllocation above is CN1_GC_CONFORM; the [ALLOC] table is
+        // CN1_ALLOC_CENSUS, a different macro over different storage, and it was hooked
+        // at only three entry points -- cn1BibopFastAlloc, cn1BibopFastAllocNoZero and
+        // codenameOneGcMalloc. This function calls cn1BibopAlloc directly, which is
+        // hooked by neither, so EVERY FUSED OBJECT WAS INVISIBLE to it: String.cn1ConcatN,
+        // StringBuilder.toString, and anything else built as one block.
+        //
+        // It understated total allocation on the self-hosting corpus by ~50MB of 856MB,
+        // and worse, it made any change that MOVES allocations onto the fused path look
+        // like a reduction. A fused substring first measured as "-6% objects and -3.6%
+        // bytes" on the strength of this hole alone; the honest figure once both arms
+        // are counted is -2.8% allocations and no byte change. vm/CLAUDE.md's claim that
+        // "CN1_ALLOC_CENSUS counts at every entry point" was false, and is true now.
+        if(fused != JAVA_NULL) { CN1_ALLOC_CENSUS_COUNT(cls, totalSize); }
         return fused;
     }
 #endif
@@ -13452,6 +13467,11 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
                 // that dominates the block for long strings.
                 cn1RecordAllocation(&class__java_lang_String, off);
                 cn1RecordAllocation(&class_array1__JAVA_BYTE, total - off);
+#endif
+#ifdef CN1_ALLOC_CENSUS
+                // The other instrument, same hole -- see cn1AllocFused. Charged whole to
+                // String: one block is one allocation.
+                CN1_ALLOC_CENSUS_COUNT(&class__java_lang_String, total);
 #endif
                 return so;
             }
