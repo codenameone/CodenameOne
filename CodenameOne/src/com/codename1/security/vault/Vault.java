@@ -51,8 +51,14 @@ import com.codename1.util.AsyncResource;
 /// Vault vault = Vault.named("notes");
 /// if (!vault.isEnrolled()) {
 ///     vault.enroll(password, new VaultOptions().policy(UnlockPolicy.REMEMBER_DEVICE)).get();
-/// } else if (!vault.unlockRemembered().isDone()) {
-///     vault.unlockWithPassword(password).get();
+/// } else {
+///     try {
+///         // Not isDone(): that answers whether the operation has FINISHED, and it is true
+///         // for the ordinary KEY_MISSING this returns on a device that was never remembered.
+///         vault.unlockRemembered().get();
+///     } catch (RuntimeException notRemembered) {
+///         vault.unlockWithPassword(password).get();
+///     }
 /// }
 /// vault.putSecret("api.token", token).get();
 /// ```
@@ -1939,6 +1945,9 @@ public final class Vault {
                 UnlockPolicy configuredBefore = options.getPolicy();
                 Object savedRecord = Storage.getInstance().readObject(deviceRecordKey());
                 boolean settled = false;
+                // An array because the finally below reads it and this is a Java 5 source level;
+                // what it records is the one step of this transition that cannot be undone.
+                final boolean[] outgoingKeyGone = {false};
                 try {
                     requirePolicySupported(policy);
                     // Judged against the policy being moved TO, and before options is mutated or
@@ -2002,6 +2011,7 @@ public final class Vault {
                         if (outgoing != deviceProtection(policy)) {
                             requireKeyDeleted(outgoing,
                                     "the previous device key could not be deleted");
+                            outgoingKeyGone[0] = true;
                         }
                         requireDeviceRecordStillWanted(generation);
                     }
@@ -2025,9 +2035,15 @@ public final class Vault {
                         // and that is deliberate redundancy: it is the one place that can put the
                         // record back before the OUTGOING key is deleted, and this runs after.
                         options.policy(configuredBefore);
-                        if (savedRecord instanceof String) {
+                        if (savedRecord instanceof String && !outgoingKeyGone[0]) {
                             Storage.getInstance().writeObject(deviceRecordKey(), savedRecord);
                         } else {
+                            // Not restored once the OUTGOING key has been deleted: on a port
+                            // where the two policies are different mechanisms -- a stored key and
+                            // a passkey in the browser -- that key is gone for good, and putting
+                            // its record back leaves a remembered unlock that names a key nothing
+                            // holds. It would fail at the next launch rather than here. Session
+                            // only is the honest state, and the password still opens the vault.
                             Storage.getInstance().deleteStorageFile(deviceRecordKey());
                         }
                     }

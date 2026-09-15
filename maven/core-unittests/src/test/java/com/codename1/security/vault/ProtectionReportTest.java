@@ -97,4 +97,23 @@ class ProtectionReportTest extends UITestBase {
         assertTrue(ProtectionReport.none().satisfies(null));
         assertNull(ProtectionReport.none().firstUnmet(null));
     }
+
+    @Test
+    void aNullRequirementIsNotReportedAsEverythingMet() {
+        // null is this method's success sentinel -- it means every requirement is provided -- and
+        // provides(null) is false, so a null ELEMENT returned that sentinel for an array nobody
+        // had finished checking. {null, ENCRYPTED_AT_REST} therefore reported all requirements
+        // met, and SecureStorage wrote into a store with no encryption at all.
+        ProtectionReport report = ProtectionReport.builder()
+                .set(Protection.PERSISTENT, true)
+                .set(Protection.ENCRYPTED_AT_REST, false)
+                .build();
+
+        assertEquals(Protection.ENCRYPTED_AT_REST,
+                report.firstUnmet(new Protection[]{null, Protection.ENCRYPTED_AT_REST}),
+                "a null must not stop the scan before a real requirement");
+        assertNull(report.firstUnmet(new Protection[]{null, Protection.PERSISTENT}),
+                "and a null alongside a met requirement is still met");
+        assertNull(report.firstUnmet(new Protection[]{null}));
+    }
 }

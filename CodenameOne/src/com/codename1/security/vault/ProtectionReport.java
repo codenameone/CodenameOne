@@ -137,6 +137,14 @@ public final class ProtectionReport {
             return null;
         }
         for (Protection protection : required) {
+            if (protection == null) {
+                // A null is not an unmet requirement, and it must not become one: provides(null)
+                // is false, so returning it here handed the caller this method's success sentinel
+                // -- null means "everything is provided" -- for an array that had not been
+                // checked past that point. {null, ENCRYPTED_AT_REST} therefore reported every
+                // requirement met, and SecureStorage wrote into a store with no encryption at all.
+                continue;
+            }
             if (!provides(protection)) {
                 return protection;
             }
