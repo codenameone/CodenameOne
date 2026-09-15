@@ -24,6 +24,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.plaf.UIManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -51,5 +52,53 @@ class FormTintColorTest extends UITestBase {
         untouched.show();
 
         assertEquals(fromTheme, untouched.getTintColor(), "the theme default should still apply");
+    }
+
+    private static void setThemeTint(int color) {
+        UIManager.getInstance().getLookAndFeel().setDefaultFormTintColor(color);
+    }
+
+    /// ComboBox, the toolbar overflow, the floating action button submenu and
+    /// GlassTutorial all save the form's tint, force their own, and put the old
+    /// one back through the same setter an application uses. A form that went
+    /// through that has not chosen anything and must still follow the theme.
+    @FormTest
+    void aFrameworkOverrideThatPutsTheTintBackIsNotAChoice() {
+        int original = UIManager.getInstance().getLookAndFeel().getDefaultFormTintColor();
+        try {
+            setThemeTint(0x66112233);
+            Form hi = new Form("Default");
+            hi.show();
+
+            int saved = hi.getTintColor();
+            hi.setTintColor(0);
+            hi.setTintColor(saved);
+
+            setThemeTint(0x66445566);
+            hi.show();
+
+            assertEquals(0x66445566, hi.getTintColor(),
+                    "a form nobody chose a tint for stopped following the theme");
+        } finally {
+            setThemeTint(original);
+        }
+    }
+
+    @FormTest
+    void anExplicitTintOutlastsAThemeChange() {
+        int original = UIManager.getInstance().getLookAndFeel().getDefaultFormTintColor();
+        try {
+            setThemeTint(0x66112233);
+            Form hi = new Form("Chosen");
+            hi.setTintColor(GREEN);
+            hi.show();
+
+            setThemeTint(0x66445566);
+            hi.show();
+
+            assertEquals(GREEN, hi.getTintColor(), "the theme took back a tint the application chose");
+        } finally {
+            setThemeTint(original);
+        }
     }
 }

@@ -168,14 +168,28 @@ public class Form extends Container implements TopLevelContainer {
     /// Default color for the screen tint when a dialog or a menu is shown
     private int tintColor;
 
-    /// Whether the application picked the tint colour itself, in which case the
-    /// theme must not take it back. show() runs initLaf() whenever the form has
-    /// no transition animator, so a tint set before showing -- the order every
-    /// sample uses, because there is nothing to set it on beforehand otherwise
-    /// -- was overwritten with the theme default on the way to the screen, and
-    /// the dialog that followed dimmed in the wrong colour with nothing to say
-    /// why.
-    private boolean tintColorSet;
+    /// The tint this form was last handed by a theme.
+    ///
+    /// show() runs initLaf() whenever the form has no transition animator, and
+    /// initLaf() used to assign the theme's tint unconditionally. A tint set
+    /// before showing -- the order every sample uses, because there is nothing
+    /// to set it on beforehand -- was therefore overwritten on the way to the
+    /// screen, and the dialog that followed dimmed in the wrong colour with
+    /// nothing to say why.
+    ///
+    /// What is remembered is the theme's own answer rather than a flag saying
+    /// the application chose, because the framework sets this tint too:
+    /// ComboBox, the toolbar overflow, the floating action button submenu and
+    /// GlassTutorial each save the current tint, force their own, and put the
+    /// old one back through this same setter. A flag would mark that restore as
+    /// an application's choice and a later theme change would then be ignored.
+    /// Comparing against the theme's last answer reads all of it correctly: a
+    /// restore puts back exactly what the theme gave, so the form is still
+    /// following the theme, while a value the theme never handed out is one
+    /// somebody meant.
+    private int themeTintColor;
+
+    private boolean themeTintColorKnown;
     /// Listeners for key release events
     private HashMap<Integer, ArrayList<ActionListener>> keyListeners;
     /// Listeners for game key release events
@@ -1616,9 +1630,12 @@ public class Form extends Container implements TopLevelContainer {
             menuBar.initMenuBar(this);
         }
 
-        if (!tintColorSet) {
-            tintColor = laf.getDefaultFormTintColor();
+        int themeTint = laf.getDefaultFormTintColor();
+        if (!themeTintColorKnown || tintColor == themeTintColor) {
+            tintColor = themeTint;
         }
+        themeTintColor = themeTint;
+        themeTintColorKnown = true;
         tactileTouchDuration = laf.getTactileTouchDuration();
     }
 
@@ -5373,7 +5390,6 @@ public class Form extends Container implements TopLevelContainer {
     @Override
     public void setTintColor(int tintColor) {
         this.tintColor = tintColor;
-        tintColorSet = true;
     }
 
     /// Sets the menu transitions for showing/hiding the menu, can be null...
