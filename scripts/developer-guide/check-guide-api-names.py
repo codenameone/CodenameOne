@@ -90,6 +90,13 @@ WORD = re.compile(
 # guide and both read as near misses without this.
 CODE_SPAN = re.compile(r'`([^`\n]{1,400})`')
 SPAN_NAME = re.compile(r'(?<![-/\w])([A-Z][A-Za-z0-9]{4,})\b')
+# Used where only a class can go: after `new`, or with a member read off it.
+# That is the difference between `new Buttons()`, which is a class that does
+# not exist, and `Worlds` or `Get All Subscription Statuses`, which are a
+# product and an Apple endpoint the guide names in code spans.
+CLASS_POSITION = re.compile(
+    r'\bnew\s+([A-Z][A-Za-z0-9]{4,})\b'
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\.\s*[a-z][A-Za-z0-9]*\s*\(')
 # Every one of those carries a signal that the token is code -- backticks, a
 # link target, a member call. A bare capitalised word in prose carries none,
 # and asking for it is not a near miss away from a class name, it IS one:
@@ -381,6 +388,15 @@ def is_invented_name(word, simple, anywhere):
 
 
 def is_plural_of_a_class(word, simple):
+    """Whether this is a class name with a plural ending, as prose writes it.
+
+    Not asked where only a class can go -- after `new`, or with a member read
+    off it -- because there the same shape is a name that does not exist:
+    `new Buttons()` and `Images.createImage()` were waved through as plurals
+    of Button and Image. Everywhere else it holds: the guide names a product
+    called `Worlds` and an Apple endpoint called `Get All Subscription
+    Statuses`, both in code spans.
+    """
     return (word.endswith('s') and word[:-1] in simple) or \
            (word.endswith('es') and word[:-2] in simple)
 
@@ -399,22 +415,42 @@ def main():
             target = match.group(1).replace('/', '.')
             if target not in qualified:
                 dead_links.append('%s: %s' % (name, target))
-        words = [match.group(1)
-                 for span in CODE_SPAN.finditer(text)
-                 for match in SPAN_NAME.finditer(span.group(1))]
-        words += [next(group for group in match.groups() if group)
-                  for match in WORD.finditer(text)]
+        # Each word with whether it was written as code, because the plural
+        # rule depends on it: "Buttons" in prose is the plural of a class, and
+        # `new Buttons()` is a class that does not exist.
+        in_class_position = set()
+        words = []
+        for span in CODE_SPAN.finditer(text):
+            body = span.group(1)
+            for match in CLASS_POSITION.finditer(body):
+                in_class_position.add(match.group(1) or match.group(2))
+            for match in SPAN_NAME.finditer(body):
+                words.append(match.group(1))
+        for match in WORD.finditer(text):
+            word = next(group for group in match.groups() if group)
+            if match.lastindex == 3:
+                in_class_position.add(word)
+            words.append(word)
         for word in words:
             if word in simple or word in seen:
                 continue
             seen.add(word)
-            if is_plural_of_a_class(word, simple) or \
-                    is_invented_name(word, simple, anywhere):
+            if is_invented_name(word, simple, anywhere):
+                continue
+            if word not in in_class_position \
+                    and is_plural_of_a_class(word, simple):
                 continue
             near = near_miss_of(word, simple)
             if near is None:
                 continue
             candidate, distance = near
+            # Vouching still applies in a class position. Requiring a real
+            # Codename One class there sounds stricter and is wrong: the guide
+            # calls members off platform classes it does not ship --
+            # `Context.openFileInput()` is Android's, two edits from Contact --
+            # and each would be reported. So a name that is a real identifier
+            # in this repository is accepted wherever it appears; what the
+            # position changes is the plural rule above.
             vouched = code if distance == 1 else anywhere
             if word not in vouched:
                 typos.append((name, word, candidate))
