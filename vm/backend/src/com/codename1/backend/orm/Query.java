@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.orm;
 
+import com.codename1.backend.sql.Dialect;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -150,7 +152,11 @@ public final class Query<T> {
         // The DIALECT renders the term, because where a null sorts is not the
         // same on the three by default and MySQL cannot even spell the standard
         // way of saying it. See Dialect.orderBy.
-        order = order + table.dialect.orderBy(quoted, ascending);
+        // THE KIND TRAVELS WITH IT: a text column needs its collation pinned
+        // and COLLATE is a type error on anything else. See Dialect.orderBy.
+        int index = table.definition.indexOfField(field);
+        boolean text = index >= 0 && table.columns[index].getKind() == Dialect.TEXT;
+        order = order + table.dialect.orderBy(quoted, ascending, text);
         return this;
     }
 

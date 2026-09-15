@@ -213,6 +213,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 : ec.packageName + "." + ec.daoSimpleName;
         String table = entityAnn.getString("table");
         ec.tableName = (table == null || table.length() == 0) ? ec.simpleName : table;
+        if (backend && tooLongForAnEngine(ec.tableName)) {
+            ctx.error(cls, "@Entity " + ec.binaryName + " is stored in a table named '"
+                    + ec.tableName + "', which is " + utf8Length(ec.tableName) + " bytes. "
+                    + "MySQL refuses an identifier over 64 and PostgreSQL silently "
+                    + "TRUNCATES past 63, so the name has to fit in "
+                    + MAX_IDENTIFIER_BYTES + ".");
+            return;
+        }
 
         for (FieldInfo f : cls.getFields()) {
             if (f.isStatic()) continue;
@@ -314,6 +322,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                         + "column, so a text type here would be written a number. Drop the "
                         + "type, or declare the field as a String to store one-character "
                         + "text.");
+                continue;
+            }
+
+            if (backend && tooLongForAnEngine(pf.columnName)) {
+                ctx.error(cls, "@Entity field " + ec.binaryName + "." + f.getName()
+                        + " maps to a column named '" + pf.columnName + "', which is "
+                        + utf8Length(pf.columnName) + " bytes. MySQL refuses an identifier "
+                        + "over 64 and PostgreSQL silently TRUNCATES past 63, so the name "
+                        + "has to fit in " + MAX_IDENTIFIER_BYTES + ".");
                 continue;
             }
 
@@ -867,6 +884,46 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// Whether a field can hold null, which is what separates `int` from
     /// `Integer` and decides both halves of the generated access.
+    /// The longest identifier every engine stores whole.
+    ///
+    /// SQLite has no limit worth naming, MySQL refuses one over 64 characters,
+    /// and PostgreSQL TRUNCATES past 63 bytes rather than refusing -- which is
+    /// the worse of the two, because two long names that differ only past the
+    /// cut become one table and nothing says so. Measured: a 70-character table
+    /// name is accepted by SQLite, accepted-and-truncated by PostgreSQL, and
+    /// refused by MySQL with "Identifier name ... is too long".
+    ///
+    /// So the tightest limit is the limit, checked in BYTES because
+    /// PostgreSQL's is a byte count and a non-ASCII name spends more than one
+    /// per character.
+    static final int MAX_IDENTIFIER_BYTES = 63;
+
+    private static boolean tooLongForAnEngine(String identifier) {
+        return identifier != null && utf8Length(identifier) > MAX_IDENTIFIER_BYTES;
+    }
+
+    /// UTF-8 length without encoding the string, so no charset has to be named.
+    private static int utf8Length(String identifier) {
+        int total = 0;
+        for (int iter = 0; iter < identifier.length(); iter++) {
+            char c = identifier.charAt(iter);
+            if (c < 0x80) {
+                total += 1;
+            } else if (c < 0x800) {
+                total += 2;
+            } else if (c >= 0xd800 && c <= 0xdbff) {
+                // A surrogate PAIR is one code point in four bytes, counted at
+                // the high half so the low half adds nothing.
+                total += 4;
+            } else if (c >= 0xdc00 && c <= 0xdfff) {
+                total += 0;
+            } else {
+                total += 3;
+            }
+        }
+        return total;
+    }
+
     /// Whether the field is a Java PRIMITIVE, which is the set that cannot hold
     /// null and therefore the set whose columns are declared NOT NULL.
     ///

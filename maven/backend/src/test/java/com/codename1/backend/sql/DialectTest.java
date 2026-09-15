@@ -463,8 +463,23 @@ class DialectTest {
         // 'abc' by default and refuses it with the pragma on. GLOB is case
         // sensitive and scoped to the one comparison.
         assertEquals(" GLOB ?", Dialect.SQLITE.likeOperator());
-        assertEquals(" LIKE ?", Dialect.POSTGRES.likeOperator());
-        assertEquals(" LIKE ?", Dialect.MYSQL.likeOperator());
+        // ESCAPE '' on the other two, and this expectation is superseded by it:
+        // they give LIKE a default escape of backslash and SQLite gives it
+        // none, so "100\\%" matched the literal "100%" on two engines and a
+        // "100\\" prefix on the third. An empty escape brings them to SQLite's
+        // reading. SQLite cannot spell it -- "ESCAPE expression must be a
+        // single character" -- which is one more reason its branch renders
+        // something else entirely.
+        assertEquals(" LIKE ? ESCAPE ''", Dialect.POSTGRES.likeOperator());
+        assertEquals(" LIKE ? ESCAPE ''", Dialect.MYSQL.likeOperator());
+        // A backslash is an ordinary character in the translated pattern too,
+        // so all three agree that it is literal: "100\\%" asks for a "100\\"
+        // prefix everywhere rather than for the literal "100%" on two engines.
+        assertEquals("100\\*", Dialect.SQLITE.likePattern("100\\%"));
+        // And a LIKE pattern that really does contain GLOB's metacharacters has
+        // every one of them escaped, brackets included -- "100[*]" is three
+        // literal characters to LIKE and must stay three to GLOB.
+        assertEquals("100[[][*]]", Dialect.SQLITE.likePattern("100[*]"));
 
         // The wildcards are spelled differently, so the pattern travels with the
         // operator.

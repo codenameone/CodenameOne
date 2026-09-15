@@ -322,7 +322,18 @@ public abstract class Dialect {
      * translated to match: see {@link #likePattern}.
      */
     public String likeOperator() {
-        return " LIKE ?";
+        // ESCAPE '' DISABLES THE ESCAPE. PostgreSQL and MySQL give LIKE a
+        // default escape of backslash and SQLite gives it none, so
+        // like("name", "100\\%") looked for the literal "100%" on two engines
+        // and for a "100\\" prefix on the third. Measured, matching 1, 1 and 0
+        // rows. An empty ESCAPE makes both of them agree with SQLite, where a
+        // backslash is an ordinary character -- and with the GLOB rendering
+        // below, whose translation leaves a backslash alone for the same reason.
+        //
+        // SQLite cannot say ESCAPE '' at all ("ESCAPE expression must be a
+        // single character"), which is another reason the SQLite branch renders
+        // something else entirely rather than sharing this string.
+        return " LIKE ? ESCAPE ''";
     }
 
     /**
@@ -356,6 +367,25 @@ public abstract class Dialect {
      * the documented way to get the same effect.
      */
     public String orderBy(String quotedColumn, boolean ascending) {
+        return orderBy(quotedColumn, ascending, false);
+    }
+
+    /**
+     * {@link #orderBy(String, boolean)} for a column whose kind is known.
+     *
+     * <p>A TEXT column needs its collation pinned as well as its nulls placed.
+     * Measured over "Z" and "a": SQLite orders them Z then a, because its
+     * default collation is byte order, while a PostgreSQL database initialised
+     * with a locale-aware collation orders a then Z -- so
+     * {@code orderBy("name", true).first()} answered a different entity
+     * depending on the database. Byte order is the one all three can agree on:
+     * SQLite is already there, MySQL's text columns carry a binary collation
+     * for the case-sensitivity reason, and PostgreSQL says it as COLLATE "C".
+     *
+     * <p>The kind has to be passed because COLLATE is only valid on text. An
+     * integer column with one is a type error, not a no-op.
+     */
+    public String orderBy(String quotedColumn, boolean ascending, boolean text) {
         return quotedColumn + (ascending ? " ASC NULLS FIRST" : " DESC NULLS LAST");
     }
 
@@ -607,6 +637,14 @@ public abstract class Dialect {
     }
 
     private static final class PostgresDialect extends Dialect {
+        public String orderBy(String quotedColumn, boolean ascending, boolean text) {
+            // COLLATE "C" is byte order, which is what the other two already
+            // give. Without it a locale-aware database ordered "a" before "Z"
+            // and the other two ordered "Z" first.
+            return (text ? quotedColumn + " COLLATE \"C\"" : quotedColumn)
+                    + (ascending ? " ASC NULLS FIRST" : " DESC NULLS LAST");
+        }
+
         public String getName() {
             return "postgresql";
         }
@@ -777,11 +815,16 @@ public abstract class Dialect {
          * than letting the same entity work on two and fail on the third. See
          * Table.MAX_ASSIGNED_TEXT_KEY.
          */
-        public String orderBy(String quotedColumn, boolean ascending) {
+        public String orderBy(String quotedColumn, boolean ascending, boolean text) {
             // NULLS FIRST is a syntax error here, so the same placement is spelled
             // with the boolean term MySQL's own documentation gives for it:
             // (col IS NULL) is 1 for a null and 0 otherwise, so ordering that
             // DESC puts the nulls first and ASC puts them last.
+            //
+            // The THREE-argument form is the one to override. Overriding only
+            // the two-argument one left Query calling the base version, which
+            // emitted NULLS FIRST and was refused outright -- text needs no
+            // COLLATE here, because these columns already carry a binary one.
             return "(" + quotedColumn + " IS NULL) " + (ascending ? "DESC" : "ASC")
                     + ", " + quotedColumn + (ascending ? " ASC" : " DESC");
         }
