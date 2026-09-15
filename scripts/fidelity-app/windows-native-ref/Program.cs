@@ -415,7 +415,8 @@ public partial class App : Application
     /// protocol in goldens/README.md is that nondeterminism is fixed in the app or by
     /// pinning an environment knob, never with a tolerance file, and this is the knob.
     private const uint SPI_SETCLIENTAREAANIMATION = 0x1043;
-    private const uint SPIF_SENDCHANGE = 0x02;
+    // SPIF_SENDCHANGE is already declared below, beside the foreground-lock call that
+    // also uses it.
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SystemParametersInfo(uint action, uint param, ref bool value, uint winIni);
