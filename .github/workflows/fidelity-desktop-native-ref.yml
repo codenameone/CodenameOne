@@ -45,7 +45,12 @@ name: Desktop native reference capture
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # NOT cancel-in-progress, unlike every PR-gating workflow here. Those cancel because a
+  # superseded commit's result is worthless. A capture run is the opposite: it exists to
+  # produce evidence, the macOS leg can sit queued for the better part of an hour, and a
+  # second dispatch -- to iterate on the Windows leg, say -- would destroy the very answer
+  # the first one was dispatched for. Queue behind instead.
+  cancel-in-progress: false
 
 permissions:
   contents: read

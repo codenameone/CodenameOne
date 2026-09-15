@@ -16,6 +16,12 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
+    <!-- If MrtCore PRI generation still fails after the SDK pin in global.json, the next
+         thing to try is EnableMsixTooling=true: the official unpackaged WinUI 3 template
+         sets it true even though the app is unpackaged, because the MRT tooling is used
+         regardless. Left false for now because the observed error named the .NET SDK 10
+         layout specifically, and changing one thing at a time is what makes the next run
+         interpretable. -->
     <EnableMsixTooling>false</EnableMsixTooling>
     <PublishReadyToRun>false</PublishReadyToRun>
     <Nullable>disable</Nullable>

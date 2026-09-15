@@ -47,6 +47,9 @@ sleep 1
 # software and deterministic, which is the same property scripts/linux/screenshots relies
 # on for the Linux port baselines. Recorded in the manifest either way, because if a soft
 # shadow ever looks wrong this is the first thing to question.
+# GTK warns loudly on every run that it cannot reach the accessibility bus and tells you to
+# set this; there is no a11y bus on a bare Xvfb and the reference does not need one.
+export GTK_A11Y=none
 export GSK_RENDERER="${GSK_RENDERER:-cairo}"
 export LIBGL_ALWAYS_SOFTWARE=1
 export GDK_SCALE=1

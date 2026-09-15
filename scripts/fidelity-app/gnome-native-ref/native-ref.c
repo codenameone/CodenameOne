@@ -261,6 +261,11 @@ int main(int argc, char **argv) {
 
     GtkSettings *settings = gtk_settings_get_default();
     g_object_set(settings,
+                 /* Set explicitly, not inherited. There is no GNOME settings daemon on a
+                  * bare Xvfb, so GTK falls back to "Sans 10" and fontconfig resolves DejaVu
+                  * -- installing fonts-cantarell is necessary but not sufficient, which is
+                  * exactly what the first probe run reported. */
+                 "gtk-font-name", "Cantarell 11",
                  "gtk-enable-animations", FALSE,
                  "gtk-cursor-blink", FALSE,
                  /* Grayscale, not subpixel. The runner default produces coloured fringes

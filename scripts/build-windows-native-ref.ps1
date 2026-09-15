@@ -28,8 +28,17 @@ $Rid = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -
 Write-Log "Publishing for $Rid"
 
 $publishDir = Join-Path $env:TEMP "cn1-win-ref-$(Get-Random)"
-& dotnet publish $Src -c Release -r $Rid --self-contained true -o $publishDir
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with $LASTEXITCODE" }
+# Published from INSIDE the project directory on purpose: the SDK pin in global.json is
+# resolved from the current directory upward, not from the project path, so invoking this
+# from the repo root would silently select the runner's newest SDK instead.
+Push-Location $Src
+try {
+  Write-Log "dotnet SDK in effect: $(& dotnet --version)"
+  & dotnet publish -c Release -r $Rid --self-contained true -o $publishDir
+  if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with $LASTEXITCODE" }
+} finally {
+  Pop-Location
+}
 
 # Pin what the reference must not drift on. Animations off so nothing is captured
 # mid-transition; grayscale font smoothing rather than ClearType, because ClearType's
