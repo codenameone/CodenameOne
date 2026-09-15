@@ -63,6 +63,23 @@ change into a green build.
    Nondeterminism is fixed in the reference app or by pinning an environment knob,
    never with a tolerance file. There are no tolerance sidecars here and there
    will not be.
+
+   What that took on Windows, since the same trail is likely to be walked again:
+   a screen `BitBlt` reads whatever is in front of those coordinates, and the app
+   cannot take the foreground on a hosted runner, so two runs differed on *every*
+   tile and one came back `#E0E0E0` in both appearances -- not the window at all.
+   `PrintWindow` with `PW_RENDERFULLCONTENT` renders the window's own content
+   instead and took it to 3 tiles. Control-template storyboards are not covered by
+   `SPI_SETCLIENTAREAANIMATION`, so the app grabs repeatedly and writes only when
+   two consecutive grabs agree.
+
+   **The measured residual, recorded rather than tolerated:** the Windows set
+   reproduces byte-for-byte except for 2-3 pixels on the slider thumb's
+   anti-aliased edge in dark mode, which differ by +/-1 in a channel between runs.
+   That is GPU rasterizer rounding; nothing in the app or the environment pins it.
+   It is far below the comparator's content threshold and does not move a score.
+   It is written down here so the next person does not spend a run discovering it,
+   and it is NOT a licence to accept a larger one.
 5. **Record the first baseline separately**, with `FIDELITY_UPDATE_BASELINE=1`, so
    the commit that defines the goldens and the commit that defines the ratchet are
    two reviewable changes rather than one.
