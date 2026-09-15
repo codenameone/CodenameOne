@@ -34,7 +34,12 @@ J8="${JDK_8_HOME:?set JDK_8_HOME}"
 # ToCharT gates the toCharArray() elision pass: three shapes it must rewrite and four it
 # must REFUSE (mutation, two escapes, a computed index). Rewriting a refused shape is a
 # wrong answer rather than a crash, which is precisely what a checksum catches.
-TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT"
+#
+# ForEachT is the semantics gate for for-each loop specialization: the shapes a loop
+# duplicator gets wrong (break, continue, early return, nesting, a try/catch inside the
+# body) crossed with receivers that must and must NOT take an ArrayList fast path. It
+# prints per receiver rather than only a checksum, so a failure names the shape.
+TORTURES="MapTorture IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
