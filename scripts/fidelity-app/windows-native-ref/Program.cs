@@ -95,6 +95,7 @@ public partial class App : Application
     private FrameworkElement _probeControl;
     private Grid _tileHost;
     private bool _animationsDisabled;
+    private byte[] _lastWrittenTile;
     private Windows.Foundation.Rect _probeBounds;
     private bool _isProbe;
 
@@ -713,6 +714,12 @@ public partial class App : Application
     private async Task CaptureSettledTileAsync(string name)
     {
         const int MaxAttempts = 8;
+        // Before the FIRST grab, not only between grabs. Splitting the old capture into
+        // grab-and-compare dropped this delay, and two fast grabs then both landed before
+        // the new tile had been composited -- which the loop accepted, because an unpainted
+        // window is trivially stable. It wrote #E0E0E0 for both appearances and the
+        // backdrop assertion caught it, which is the whole reason that assertion exists.
+        await Task.Delay(120);
         byte[] previous = null;
         for (int attempt = 0; attempt < MaxAttempts; attempt++)
         {
@@ -723,7 +730,18 @@ public partial class App : Application
             }
             if (previous != null && previous.AsSpan().SequenceEqual(current))
             {
+                if (_lastWrittenTile != null && _lastWrittenTile.AsSpan().SequenceEqual(current))
+                {
+                    // Stable AND identical to the tile before it: the window is showing the
+                    // previous tile, not this one. Two different widgets cannot render the
+                    // same bytes, so this is a swap that has not landed rather than a
+                    // coincidence, and waiting is the right response.
+                    previous = null;
+                    await Task.Delay(200);
+                    continue;
+                }
                 WriteTile(name, current);
+                _lastWrittenTile = current;
                 return;
             }
             previous = current;
