@@ -194,11 +194,13 @@ class DialectTest {
     void namesColumnTypes() {
         assertEquals("TEXT", Dialect.SQLITE.columnType(Dialect.TEXT));
         assertEquals("TEXT", Dialect.POSTGRES.columnType(Dialect.TEXT));
-        // LONGTEXT, not TEXT: this expectation is superseded. MySQL's TEXT
-        // holds 65,535 bytes while the other two are unbounded, so a long
-        // string stored on them and was refused or truncated here. See
-        // stringColumnsAreNotCappedOnMySql below.
-        assertEquals("LONGTEXT", Dialect.MYSQL.columnType(Dialect.TEXT));
+        // LONGTEXT, not TEXT, and with a binary collation: both halves of this
+        // expectation were superseded. MySQL's TEXT holds 65,535 bytes while
+        // the other two are unbounded, and its default collation is case and
+        // accent insensitive, so eq() matched a different row here than there.
+        // See stringColumnsAreNotCappedOnMySql below.
+        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+                Dialect.MYSQL.columnType(Dialect.TEXT));
         assertEquals("INTEGER", Dialect.SQLITE.columnType(Dialect.BIGINT));
         assertEquals("BIGINT", Dialect.POSTGRES.columnType(Dialect.BIGINT));
         assertEquals("BIGINT", Dialect.MYSQL.columnType(Dialect.BIGINT));
@@ -393,7 +395,8 @@ class DialectTest {
         // engines and was rejected -- or silently truncated -- by the third.
         // The blob branch of this very switch already took LONGBLOB for the
         // same reason; the string branch had been left on TEXT.
-        assertEquals("LONGTEXT", Dialect.MYSQL.columnType(Dialect.TEXT));
+        assertEquals("LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+                Dialect.MYSQL.columnType(Dialect.TEXT));
         assertEquals("LONGBLOB", Dialect.MYSQL.columnType(Dialect.BLOB));
         assertEquals("TEXT", Dialect.SQLITE.columnType(Dialect.TEXT));
         assertEquals("TEXT", Dialect.POSTGRES.columnType(Dialect.TEXT));
