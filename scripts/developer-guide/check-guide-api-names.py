@@ -133,11 +133,15 @@ CLASS_POSITION = re.compile(
     # not exist.
     r'|@([A-Z][A-Za-z0-9]{4,})\b'
     # A method reference names its receiver type: Images::createImage.
-    r'|\b([A-Z][A-Za-z0-9]{4,})\s*::')
-# What a class extends or implements. Read as a whole clause rather than as an
-# alternative above, because an implements list holds several names and a
-# pattern that matched the first consumed it, leaving the rest unseen.
-INHERITS = re.compile(r'\b(?:extends|implements)\s+([^{;`\n]{1,200})')
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*::'
+    # Tested against, thrown, or taken as a varargs parameter -- each names a
+    # type and nothing else can go there.
+    r'|\binstanceof\s+([A-Z][A-Za-z0-9]{4,})\b'
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\.\.\.')
+# What a class extends or implements, and what a method throws. Read as whole
+# clauses rather than as alternatives above, because each holds several names
+# and a pattern that matched the first consumed it, leaving the rest unseen.
+INHERITS = re.compile(r'\b(?:extends|implements|throws)\s+([^{;`\n]{1,200})')
 # Every one of those carries a signal that the token is code -- backticks, a
 # link target, a member call. A bare capitalised word in prose carries none,
 # and asking for it is not a near miss away from a class name, it IS one:
