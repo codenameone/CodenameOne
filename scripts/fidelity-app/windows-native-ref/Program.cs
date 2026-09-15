@@ -63,6 +63,8 @@ public partial class App : Application
     private readonly List<string> _blockers = new();
     private string _outDir;
     private bool _occluded;
+    private string _stage = "(not started)";
+    private IntPtr _hwnd;
     private bool _isProbe;
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -86,8 +88,8 @@ public partial class App : Application
         // BitBlt, and without this a dialog appearing in between could still slide over the
         // window in the gap -- which is a race that would show up as an occasional wrong
         // capture rather than a consistent one, and those are far worse to diagnose.
-        var hwndEarly = WinRT.Interop.WindowNative.GetWindowHandle(_window);
-        var idEarly = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwndEarly);
+        _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        var idEarly = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
         if (AppWindow.GetFromWindowId(idEarly).Presenter is OverlappedPresenter op)
         {
             op.IsAlwaysOnTop = true;
@@ -204,13 +206,15 @@ public partial class App : Application
     {
         try
         {
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+            _stage = "hwnd";
+            var hwnd = _hwnd;
 
             // Reading the SCREEN means reading whatever is on top of it. The first run that
             // got this far captured the Windows out-of-box privacy dialog sitting over this
             // app, reported zero blockers, and looked entirely plausible -- a 768x519 image
             // full of real controls. So the window is forced to the front and the result is
             // verified, rather than assumed from the fact that we asked for it.
+            _stage = "show";
             ShowWindow(hwnd, SW_RESTORE);
             ShowWindow(hwnd, SW_SHOW);
             for (int i = 0; i < 20 && GetForegroundWindow() != hwnd; i++)
@@ -247,6 +251,7 @@ public partial class App : Application
             // thing being photographed, whoever happens to own the keyboard.
             bool isForeground = GetForegroundWindow() == hwnd;
 
+            _stage = "window-rect";
             if (!GetWindowRect(hwnd, out RECT r))
             {
                 _blockers.Add("GetWindowRect failed; the window region is unknown");
@@ -262,6 +267,7 @@ public partial class App : Application
             // Wait for real presented frames, not for wall-clock time. CompositionTarget.Rendering
             // ticks once per composed frame, so counting them proves XAML actually drew
             // rather than merely that time passed.
+            _stage = "await-frames";
             var drawn = new TaskCompletionSource<bool>();
             int frames = 0;
             EventHandler<object> onFrame = null;
@@ -275,7 +281,11 @@ public partial class App : Application
             };
             CompositionTarget.Rendering += onFrame;
             await Task.WhenAny(drawn.Task, Task.Delay(5000));
-            CompositionTarget.Rendering -= onFrame;
+            // Deliberately no unsubscribe here. The handler removes itself on the UI thread
+            // once it has counted enough frames, and doing it again from whichever thread
+            // this continuation landed on is a XAML call off the UI thread -- which is the
+            // shape of an empty-message COMException. If the timeout won instead, the
+            // handler simply outlives a process that is about to exit.
             Console.WriteLine($"NATIVEREF:INFO composed frames observed: {frames}");
             if (frames == 0)
             {
@@ -288,6 +298,7 @@ public partial class App : Application
             DwmFlush();
             await Task.Delay(400);
 
+            _stage = "minimise-occluders";
             var centre = new POINT { X = r.Left + w / 2, Y = r.Top + h / 2 };
             IntPtr atCentre = GetAncestor(WindowFromPoint(centre), GA_ROOT);
 
@@ -318,6 +329,7 @@ public partial class App : Application
             Console.WriteLine($"NATIVEREF:INFO unoccluded at centre; foreground={isForeground}");
 
             var pos = new { X = r.Left, Y = r.Top };
+            _stage = "bitblt";
             IntPtr screen = GetDC(IntPtr.Zero);
             IntPtr mem = CreateCompatibleDC(screen);
             IntPtr bmp = CreateCompatibleBitmap(screen, w, h);
@@ -360,7 +372,13 @@ public partial class App : Application
         }
         catch (Exception e)
         {
-            _blockers.Add($"capture threw {e.GetType().Name}: {e.Message}");
+            // COMException's Message is routinely empty, and "capture threw COMException:"
+            // is worth nothing to whoever reads it next. Record where it got to, the
+            // HRESULT, and the frame it came from -- a probe whose failures are not
+            // self-describing just converts one unknown into another.
+            _blockers.Add($"capture threw {e.GetType().Name} (0x{e.HResult:X8}) at stage "
+                + $"'{_stage}': {(string.IsNullOrWhiteSpace(e.Message) ? "(no message)" : e.Message)}");
+            Console.Error.WriteLine($"NATIVEREF:EXCEPTION stage={_stage} {e}");
         }
     }
 
@@ -450,7 +468,7 @@ public partial class App : Application
         sb.AppendLine("  },");
         sb.AppendLine("  \"capture\": {");
         sb.AppendLine($"    \"occluded\": {Json(_occluded)},");
-        sb.AppendLine($"    \"was_foreground\": {Json(GetForegroundWindow() == WinRT.Interop.WindowNative.GetWindowHandle(_window))}");
+        sb.AppendLine($"    \"was_foreground\": {Json(GetForegroundWindow() == _hwnd)}");
         sb.AppendLine("  },");
         sb.AppendLine("  \"fonts\": {");
         sb.AppendLine($"    \"control_family\": \"{Escape(fontFamily)}\",");
