@@ -288,6 +288,35 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 pf.nullable = false;
             }
 
+            if (backend && pf.kind.kind == PropertyTypeKind.Kind.CHAR
+                    && pf.explicitSqlType != null) {
+                // A char is stored as its UTF-16 CODE UNIT, in an integer
+                // column, so the value bound for 'x' is 120. Declared onto a
+                // text column -- @Column(type = "CHAR(1)") is the natural way to
+                // meet an existing schema -- PostgreSQL then refuses 120 as too
+                // long for CHAR(1) and MySQL truncates or refuses it. The write
+                // and the declaration would disagree.
+                //
+                // Refused rather than guessed at: deciding whether an arbitrary
+                // type string is textual means parsing CHAR(1), VARCHAR(4),
+                // TEXT, citext and whatever else three dialects accept, and
+                // being wrong there writes the wrong shape into a column that
+                // takes it. The same reasoning refuses @Column(type) on a
+                // generated key above.
+                //
+                // Values.asCodeUnitObject still READS text, which is not
+                // inconsistent: a table this ORM did not create can have a
+                // CHAR(1) where the entity has a char, and reading it is the one
+                // direction that can be done unambiguously.
+                ctx.error(cls, "@Entity field " + ec.binaryName + "." + f.getName()
+                        + " is a char and declares @Column(type=\"" + pf.explicitSqlType
+                        + "\"). A char is stored as its UTF-16 code unit in an integer "
+                        + "column, so a text type here would be written a number. Drop the "
+                        + "type, or declare the field as a String to store one-character "
+                        + "text.");
+                continue;
+            }
+
             AnnotationValues idAnn = f.getAnnotation(ID_DESC);
             if (idAnn != null) {
                 pf.isId = true;

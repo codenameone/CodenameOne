@@ -289,6 +289,48 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void refusesAnExplicitTypeOnACharField() throws Exception {
+        // A char is stored as its UTF-16 code unit in an integer column, so 'x'
+        // binds as 120. Declared onto CHAR(1) -- the natural way to meet an
+        // existing schema -- PostgreSQL refuses 120 as too long and MySQL
+        // truncates it: the write and the declaration disagree. Refused rather
+        // than guessed at, because deciding whether an arbitrary type string is
+        // textual means parsing whatever three dialects accept.
+        File classes = compileFixture(
+                "com.example.Grade",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Grade {\n"
+                        + "    @Id public long id;\n"
+                        + "    @Column(type=\"CHAR(1)\") public char letter;\n"
+                        + "    public Grade() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertTrue("a text type on a char field should be refused", ctx.hasErrors());
+        assertTrue("the message should name the type: " + ctx.getErrors(),
+                ctx.getErrors().toString().indexOf("CHAR(1)") >= 0);
+    }
+
+    @Test
+    public void keepsACharFieldWithNoDeclaredType() throws Exception {
+        // The other side: without a declared type the dialect chooses an integer
+        // column and the code-unit mapping fits, so this must keep building.
+        File classes = compileFixture(
+                "com.example.Mark",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Entity public class Mark {\n"
+                        + "    @Id public long id;\n"
+                        + "    public char letter;\n"
+                        + "    public Character optional;\n"
+                        + "    public Mark() {}\n"
+                        + "}\n");
+        ProcessorContext ctx = runProcessor(classes, backendClasspath());
+        assertFalse("a char with no declared type is fine: " + ctx.getErrors(),
+                ctx.hasErrors());
+    }
+
+    @Test
     public void refusesAnExplicitTypeOnAGeneratedKey() throws Exception {
         // A generated key's declaration is one indivisible form per engine --
         // SQLite's AUTOINCREMENT is legal only after the exact words INTEGER
