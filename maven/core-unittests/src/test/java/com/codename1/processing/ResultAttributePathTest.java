@@ -496,6 +496,14 @@ class ResultAttributePathTest {
         // than a null to dereference.
         assertEquals(0, r.getAsStringArray("/items[values=1]/values").length,
                 "comparing against a node with no text threw");
+
+        // A nested array holding a null is wrapped like any other value, and
+        // asking it for its text dereferenced it.
+        Result nested = Result.fromContent(
+                "{\"items\":[{\"values\":[[null]]}]}", Result.JSON);
+        String[] nulls = nested.getAsStringArray("/items/values");
+        assertEquals(1, nulls.length);
+        assertNull(nulls[0], "a null inside a nested array has no text");
     }
 
     @Test

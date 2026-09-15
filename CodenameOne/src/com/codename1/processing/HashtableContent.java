@@ -121,6 +121,12 @@ class MapContent implements StructuredContent {
             }
         } else if (root instanceof List) {
             return PrettyPrinter.print((List) root);
+        } else if (root == null) {
+            // A null entry of an array is wrapped like any other, and this
+            // used to dereference it: [[null]] threw from here. Empty rather
+            // than null, because toString must not answer null -- getText is
+            // where "there is no text" is said.
+            return "";
         } else {
             return root.toString();
         }
@@ -468,6 +474,11 @@ class MapContent implements StructuredContent {
         }
         if (sc.getNativeRoot() instanceof String) {
             return (String) sc.getNativeRoot();
+        }
+        if (sc.getNativeRoot() == null) {
+            // A null entry has no text, which is not the same as the empty
+            // string toString has to answer with.
+            return null;
         }
         return sc.toString();
     }
