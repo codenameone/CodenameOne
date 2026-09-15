@@ -649,6 +649,39 @@
     return value instanceof Uint8Array ? value : new Uint8Array(value);
   }
 
+  /// A string as the UTF-8 bytes a Java native expects after the status byte.
+  ///
+  /// TextEncoder where it exists, which is every browser this port supports; the manual encoder
+  /// is there because the bridge also runs under the test harness, where it may not.
+  function cn1VaultUtf8Bytes(text) {
+    var value = String(text == null ? '' : text);
+    if (typeof TextEncoder === 'function') {
+      return new TextEncoder().encode(value);
+    }
+    var out = [];
+    for (var i = 0; i < value.length; i++) {
+      var cp = value.charCodeAt(i);
+      if (cp >= 0xd800 && cp <= 0xdbff && i + 1 < value.length) {
+        var next = value.charCodeAt(i + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          cp = 0x10000 + ((cp - 0xd800) << 10) + (next - 0xdc00);
+          i++;
+        }
+      }
+      if (cp < 0x80) {
+        out.push(cp);
+      } else if (cp < 0x800) {
+        out.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
+      } else if (cp < 0x10000) {
+        out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      } else {
+        out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f),
+                 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      }
+    }
+    return new Uint8Array(out);
+  }
+
   function cn1VaultReply(status, payload) {
     var body = payload == null ? new Uint8Array(0) : cn1VaultBytes(payload);
     var out = new Array(body.length + 1);
@@ -838,6 +871,50 @@
   /// the race to a tab that did not would otherwise report success and then derive under the
   /// syncable credential the winner stored. The caller has to see what won in order to judge it,
   /// so the settled record is what comes back.
+  /// Adds one secure-storage record if its id is free, and answers whichever record settled.
+  ///
+  /// ``add`` and not ``put``, for the reason the device key gives: two tabs opening the same
+  /// managed database both find nothing, both generate a value, and the store must accept
+  /// exactly one. The loser's add fails with a ConstraintError -- which cn1VaultRequest turns
+  /// into ``undefined`` -- and it then re-reads and adopts the winner's record. With ``put`` the
+  /// loser would overwrite the winner, and the database the winner had already created under its
+  /// value would not open again.
+  function cn1SecureStoreSetIfAbsent(entry, sealed) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      var id = CN1_SECURE_STORE_PREFIX + String(entry);
+      return cn1VaultRequest(tx.objectStore(CN1_VAULT_STORE), function(store) {
+        return store.add({ id: id, sealed: String(sealed), created: 0 });
+      }).then(function(added) {
+        return cn1VaultCommit(tx).then(function() {
+          if (added !== undefined) {
+            return String(sealed);
+          }
+          // Refused, so somebody else is already there. Read what won, in its own transaction:
+          // the one above has committed and the answer has to be the settled record rather than
+          // what this tab tried to write.
+          return cn1VaultOpenDb().then(function(again) {
+            var read = again.transaction(CN1_VAULT_STORE, 'readonly');
+            return cn1VaultRequest(read.objectStore(CN1_VAULT_STORE), function(store) {
+              return store.get(id);
+            }).then(function(found) {
+              if (found && typeof found.sealed === 'string') {
+                return found.sealed;
+              }
+              // Gone between the refusal and the read -- another tab removed it. Nothing is
+              // stored, and reporting this tab's own value would be a lie about what persisted.
+              throw new Error('NotFoundError');
+            });
+          });
+        });
+      });
+    });
+  }
+
+  /// Keeps secure-storage records from colliding with the device key and the passkey records,
+  /// which share this object store.
+  var CN1_SECURE_STORE_PREFIX = 'cn1ss.';
+
   function cn1VaultStorePrfRecord(keyId, record) {
     return cn1VaultOpenDb().then(function(db) {
       var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
@@ -1120,6 +1197,13 @@
           // store that answered "nothing here" lead to opposite decisions on
           // the Java side, and collapsing them is how a device key that was
           // there all along gets replaced.
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreSetIfAbsent') {
+        return cn1SecureStoreSetIfAbsent(request.entry, request.sealed).then(function(settled) {
+          return cn1VaultReply(CN1V_OK, cn1VaultUtf8Bytes(settled));
+        }, function(error) {
           return cn1VaultReply(cn1VaultStatusOf(error), null);
         });
       }

@@ -1325,6 +1325,19 @@ bindNative([
   }));
 });
 
+// The atomic create for an ordinary secure-storage account. Two tabs opening the same managed
+// database both find nothing and both generate a value; IndexedDB's ``add`` accepts exactly one
+// and this hands the loser back the record that won, so both proceed under the same value.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeSetIfAbsent_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreSetIfAbsent",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5DeviceProtection_nativeEnsureKey_java_lang_String_R_byte_1ARRAY"
 ], function*(keyId) {

@@ -141,14 +141,16 @@ class JavascriptSecureStorageNamespaceTest {
         // Structural, like the ordering check below, because this module cannot load the port's
         // classes. What it holds is that neither key builder concatenates the account raw.
         String source = readSource();
-        for (String signature : new String[]{
-                "private static String legacyKey(String account)",
-                "private static String encryptedKey(String account)"}) {
-            String body = methodBody(source, signature);
-            assertTrue(body.indexOf("escaped(account)") > 0,
-                    signature + " must escape the account before it becomes a storage key: "
-                    + body);
-        }
+        assertTrue(methodBody(source, "private static String encryptedKey(String account)")
+                        .indexOf("escaped(account)") > 0,
+                "the encrypted key must escape the account before it becomes a storage key");
+        // legacyKey deliberately does NOT. It addresses what a PREVIOUS version already wrote,
+        // which used the raw name, and escaping it made every existing credential invisible on
+        // the first launch after an upgrade. Asserted so the asymmetry cannot be "tidied up".
+        assertTrue(methodBody(source, "private static String legacyKey(String account)")
+                        .indexOf("escaped(account)") < 0,
+                "the legacy key must stay raw, or entries written by the previous version of "
+                + "this port can no longer be found");
         // And the escape has to be one fixFileName leaves alone -- '_' plus hex, never the
         // characters it rewrites.
         String escape = methodBody(source, "private static String escaped(String account)");
@@ -166,6 +168,40 @@ class JavascriptSecureStorageNamespaceTest {
     private static String readSource() {
         try {
             return new String(Files.readAllBytes(SOURCE), StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    void theAtomicCreateNativeIsBoundUnderTheNameTheTranslatorWillEmit() {
+        // A native whose binding name is wrong does not fail: it compiles, it links, and the
+        // feature is simply inert on the device -- which for THIS native means setIfAbsent
+        // answering null and two tabs going back to overwriting each other's keys. So the name is
+        // derived from the translator rather than read back from the file that declares it.
+        // methodIdentifier already carries the cn1_ prefix; adding another is what the first
+        // version of this test did, and it reported the binding missing when it was correct.
+        String expected = JavascriptNameUtil.methodIdentifier(
+                "com/codename1/impl/html5/HTML5SecureStorage",
+                "nativeSetIfAbsent",
+                "(Ljava/lang/String;Ljava/lang/String;)[B");
+        String portJs = read(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main",
+                "webapp", "port.js").toAbsolutePath().normalize());
+        assertTrue(portJs.indexOf(expected) > 0,
+                "port.js must bind the name the translator emits, which is:\n  " + expected);
+
+        // And the Java side must still declare it, or the binding is for nothing.
+        String source = readSource();
+        assertTrue(source.indexOf("static native byte[] nativeSetIfAbsent(") > 0,
+                "HTML5SecureStorage must declare the native the binding names");
+        assertTrue(source.indexOf("public String setIfAbsent(") > 0,
+                "and override setIfAbsent to use it, or the inherited check-then-write stands");
+    }
+
+    private static String read(Path path) {
+        assertTrue(Files.exists(path), "not found: " + path);
+        try {
+            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
         } catch (java.io.IOException e) {
             throw new IllegalStateException(e);
         }

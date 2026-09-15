@@ -173,6 +173,68 @@ public final class HTML5SecureStorage extends SecureStorage {
         }
     }
 
+    /// Creates an entry only if the account has none, atomically across tabs.
+    ///
+    /// The inherited implementation checks and then writes, which two tabs can both pass -- and
+    /// in a browser that is not a narrow window: opening the same managed database in two tabs
+    /// does it. Each tab then generates a key, both write, and Storage hands each tab back its
+    /// OWN cached ciphertext, so each proceeds under a key only one of them persisted. The
+    /// database the loser created cannot be opened after a reload.
+    ///
+    /// IndexedDB's `add` is the primitive that settles it: the store accepts exactly one record
+    /// for an id and refuses the rest with a ConstraintError, so the loser re-reads and adopts
+    /// the winner's value. The device key and the passkey record already converge this way; this
+    /// is the same move for an ordinary account.
+    ///
+    /// Answers null when the entry could not be created and could not be read either, which is
+    /// the inherited contract.
+    @Override
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        String existing = get(account);
+        if (existing != null) {
+            return existing;
+        }
+        try {
+            // Sealed first: what the store settles on has to be the ciphertext, or two tabs
+            // would converge on one record and disagree about what it decrypts to.
+            String sealed = seal(account, value);
+            byte[] answer = nativeSetIfAbsent(encryptedKey(account), sealed);
+            if (answer == null || answer.length == 0 || answer[0] != STATUS_OK) {
+                return null;
+            }
+            // The SETTLED record comes back, which is this tab's ciphertext only if it won.
+            String settled = new String(answer, 1, answer.length - 1, "UTF-8");
+            String plain = open(account, settled);
+            if (plain != null) {
+                // The plaintext entry a previous version may have left goes only once the
+                // encrypted one is settled and readable, and only when it is the same value.
+                Object stale = readUncached(legacyKey(account));
+                if (stale instanceof String && plain.equals(stale)) {
+                    Storage.getInstance().deleteStorageFile(legacyKey(account));
+                }
+            }
+            return plain;
+        } catch (RuntimeException failed) {
+            Log.p("SecureStorage create refused: " + reasonOf(failed), Log.WARNING);
+            return null;
+        } catch (java.io.UnsupportedEncodingException noUtf8) {
+            return null;
+        }
+    }
+
+    /// Adds one record if its id is free, and answers the record that is there either way.
+    ///
+    /// Status byte first, then the settled ciphertext as UTF-8 -- the same shape every native in
+    /// HTML5DeviceProtection uses, and for the same reason: a browser has several distinct ways
+    /// to refuse and the Java side has to tell them apart.
+    static native byte[] nativeSetIfAbsent(String entry, String sealed);
+
+    /// The status byte a native prefixes its payload with when it succeeded.
+    private static final byte STATUS_OK = 0;
+
     private HTML5DeviceProtection device() {
         return HTML5DeviceProtection.getInstance();
     }
