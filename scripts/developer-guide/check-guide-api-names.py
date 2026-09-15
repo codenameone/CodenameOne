@@ -94,7 +94,11 @@ WORD = re.compile(
 # Only javadoc labels, because an ordinary AsciiDoc bracket holds alt text and
 # attributes -- prose, where a capitalised word is not a class.
 JAVADOC_LABEL = re.compile(
-    r'codenameone\.com/javadoc/[A-Za-z0-9/.]+\.html\[([^\]\n]{1,200})\]')
+    r'codenameone\.com/javadoc/[A-Za-z0-9/.]+\.html'
+    # A link to a member carries a fragment, and its label is the signature --
+    # createFromImage(Image, boolean) names a type in the guide today.
+    r'(?:#[^\[\]\n]{0,200})?'
+    r'\[([^\]\n]{1,200})\]')
 CODE_SPAN = re.compile(r'`([^`\n]{1,400})`')
 # Four characters, not five: a five-character class that loses one is four
 # long, and `new Imag()` was never even extracted. The candidate still has to
