@@ -490,6 +490,19 @@ public final class Database {
      * written for one engine working.
      */
     private String bind(String sql, Object[] params) throws IOException {
+        if(dialect.hasTrailingStatement(sql)) {
+            // SQLITE RUNS THE FIRST ONE AND DROPS THE REST, reporting success:
+            // sqlite3_prepare_v2 is called with a null tail pointer, so
+            // "INSERT INTO audit(v) VALUES (?); DELETE FROM jobs" inserts the
+            // row and never deletes anything. PostgreSQL and MySQL refuse the
+            // same string. Measured on all three -- and of the two answers, a
+            // silent partial execution is the one nobody can debug, so this
+            // makes SQLite agree with the engines that refuse.
+            throw new IOException("This is more than one statement, and the three engines "
+                    + "disagree about it: SQLite runs the FIRST and silently ignores the "
+                    + "rest, while PostgreSQL and MySQL refuse it. Send them one at a time, "
+                    + "or use inTransaction() to group them: [" + sql + "]");
+        }
         refuseNulInTextParameters(params);
         return dialect.bind(sql, params == null ? 0 : params.length);
     }
