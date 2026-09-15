@@ -1117,3 +1117,196 @@ nothing under `backend/`, `demo/` or `maven/` -- verified by listing every chang
 against master -- and CI's build-test (17) and (21) pass. The test SKIPS on a fresh
 worktree and runs on a populated one, so a worktree A/B is confounded by build state
 rather than by code; scope is the honest discriminator here, not the worktree.
+
+---
+
+# Round 8: two corrections to this branch's own work
+
+## The 1M worklist was a 17MB reservation in every application
+
+The array is STATIC, so its size ships with every generated binary -- iOS and Android
+included, not just a desktop translation. 1M entries is 17MB of `__bss` against 65536's
+1.26MB, and the knee had never been measured between those two points. Re-measured:
+
+| worklist | wall          | peak         | __bss   |
+|----------|---------------|--------------|---------|
+| 65536    | 1.55 / 1.86s  | 1063-1189MB  |  1.26MB |
+| 262144   | 1.24 / 1.28s  |  760-786MB   |  4.41MB |
+| 1048576  | 1.31 / 1.44s  |  812-858MB   | 16.99MB |
+
+**262144 is the knee**: as good as 1M on both axes for a quarter of the table. Default
+corrected from 1048576 to 262144.
+
+The reservation is ZEROFILL, which is why a table this size is affordable at all -- all
+three binaries are byte-identical on disk at 4,529,096 bytes, and pages commit only when
+touched. That is a reason the cost is bounded, not a reason to be careless: the pages a
+large heap DOES touch are real, and they are what the peak-memory column above measures.
+
+A second trap this created: the file carries TWO `#ifndef CN1_GC_MARK_WORKLIST_SIZE`
+blocks by design (the hoisted one the grace pass needs, and a fallback that keeps a -D
+override authoritative in both places). Both were 65536, so they could not disagree.
+Changing only one left them at 262144 and 65536 -- whichever the preprocessor reaches
+first silently wins, so reordering or deleting the hoisted block would drop the default
+back with no warning. Both literals are now synced, and say so.
+
+## The young-root scan raced every thread but the one it had paused
+
+`cn1NurseryMarkYoungRoots` walked EVERY thread's young blocks from a loop that pauses
+threads ONE AT A TIME and releases each before the next is scanned. The other mutators
+keep running: bump-allocating, running their own minor collections, clearing start-bit
+ranges and recycling blocks while the walk reads them. Missed root, or a dereference of
+a recycled header.
+
+The comment was the worse half:
+
+    // Inside the stopped-thread region on purpose, so a mutator cannot be
+    // bump-allocating into a block while it is walked.
+
+False, and it answers exactly the question a reader would have asked -- so it would have
+stopped the next person checking. Now scans only the thread that iteration paused, over
+that thread's own `nurseryYoungBlocks`. A nursery is thread-local and only its owner
+mutates it, so this is safe AND complete: every thread is paused in some iteration.
+
+## A CAUSAL CLAIM THAT DID NOT HOLD, and how it was caught
+
+The Windows commit said the screenshot job "went from green to red on the commit that
+made marking CPU-derived". Checking the actual range between the green head (1c784ef8)
+and the failing one (9831ac4e), TWO things changed: the Windows marker branch became
+CPU-derived (a branch that had never executed at all), AND the mark worklist grew to
+17MB of static zerofill. Either could be responsible on a constrained runner.
+
+The comment has been corrected to separate what is established -- the Win32 pthread shim
+has never run a marker pool, which alone justifies keeping Windows serial -- from what is
+not, which is WHICH of the two changes broke it.
+
+### And the isolation run was destroyed by pushing over it
+
+5e8c6430 was deliberately a single-variable change so the next Windows run would answer
+that question. It was then pushed over before its Windows jobs started, and
+`cancel-in-progress` cancelled them:
+
+    5e8c6430 -> cancelled   (clean-target arm64 ran; both screenshot jobs cancelled)
+    9831ac4e -> failure
+    1c784ef8 -> success
+
+So the experiment cost a full CI cycle and produced nothing. On a PR whose CI runs for
+~40 minutes, an in-flight run IS the experiment; pushing during one is discarding it.
+
+---
+
+# Round 9: deleting what nothing builds, and a gate so it cannot happen again
+
+Round 8 ended with a correction to this branch's own work. This round is the same
+exercise widened: the nursery was not the only configuration nobody compiled, and the
+interesting result is how the obvious test turns out to be the wrong one.
+
+## The nursery is gone
+
+The case is closed and was already in this file: `CN1_NURSERY` had no `#define` anywhere,
+no workflow/script/pom/test passed `-DCN1_NURSERY`, and `git log -S"CN1_NURSERY" --
+.github/` has never had a commit. When it was finally repaired and measured (Round 5) it
+lost on both axes -- 6.62s against 1.00s, 1321MB against 1093MB -- and the 14-23%
+survival that motivated it was an artefact of dropped promotions, with the true figure
+51-57%. Half of all small objects survive, and promotion moves them from BiBOP (page
+based, O(1) all-dead-page reclaim) into the legacy heap (table based, per-object
+malloc/free). BiBOP already IS the fast young-object path.
+
+1,244 lines of C. **The only codegen change is three lines of dead preprocessor text**,
+and that is measured rather than argued: `verify-output-neutral.sh vs-master` over a
+corpus app reports exactly one generated file differing, and the whole diff is the
+`#ifdef CN1_NURSERY` block `ByteCodeClass` emitted into every `main()`.
+
+## "IS IT BUILT BY A GATE" IS THE WRONG TEST ON ITS OWN
+
+The rule that deletes the nursery is "an arm nothing builds is dead code". Applied
+literally to the whole runtime it would have deleted **37 healthy arms**, including
+`CN1_ALLOC_CENSUS` -- the instrument every heap conclusion in this file rests on -- and
+every A/B arm the earlier rounds were measured with. Ungated is not the same as dead.
+
+The sharp question is whether the arm still **compiles**. Sweeping all 41:
+
+| result | count |
+|---|---|
+| builds and runs | 37 |
+| rotted | 4 |
+
+| rotted arm | failure |
+|---|---|
+| `CN1_NURSERY` | 3 implicit declarations; deleted |
+| `CN1_DISABLE_CONSERVATIVE_GC_ROOTS` | 4 errors -- `gcPthreadValid` declared inside the conservative-roots `#ifdef`, read unconditionally by `CN1_RESUME_THREAD` |
+| `CN1_DISABLE_BIBOP` | undefined `_cn1GcCycleState` at LINK time |
+| `DEBUG_GC_OBJECTS_IN_HEAP` | 9 errors, then a bus error; deleted as superseded |
+
+Two of those are worse than they look. **`CN1_DISABLE_CONSERVATIVE_GC_ROOTS` is the only
+arm in the tree that can falsify a GC rooting claim**, so while it was broken an entire
+class of evidence was unavailable. And **`CN1_DISABLE_BIBOP` is what
+`run-bibop-adaptive.sh` builds as its comparison baseline**, so that script could not have
+run either -- it is pre-existing on master, confirmed by checking the enclosing
+conditionals at HEAD before blaming this branch.
+
+`cn1GcCycleState` deserves its own line. It sat inside the BiBOP guard under a comment
+reading *"Defined UNCONDITIONALLY ... so a build without CN1_ALLOC_CENSUS must still
+link"* -- false for the one configuration that tests it -- ten lines below `bibopGcEpoch`,
+which had been hoisted out of that same guard for that same reason, with a comment saying
+so. The same bug twice, and the second copy was wearing a comment asserting it could not
+happen.
+
+## The gate, and its derivation
+
+`vm/benchmarks/check-ablation-arms.sh`, a job on every PR touching `vm/**`. It compiles
+and links every arm; what an arm DOES is its own gate's business.
+
+**The arm list is derived from the source.** Anything the preprocessor tests that the tree
+never self-defaults is a pure `-D` opt-in. A hand-written list would rot exactly the way
+the arms did -- someone adds an arm, forgets the list, and it is uncovered from birth. Two
+corrections were needed to get the derivation right, both worth knowing:
+
+- A `#define` only counts as a DEFAULT when it is the body of its own `#ifndef`.
+  `CN1_NO_WEAK_REFS` is defined only inside `#if defined(CN1_DISABLE_SATB) && ...`, so
+  treating any define as a default silently dropped a real arm out of the sweep.
+- The `#ifndef`/`#define` pair is routinely separated by several lines of rationale, so
+  the adjacency test has to survive comments. Without that, four value tunables vanished.
+
+**Proven non-vacuous** by re-injecting the `CN1_DISABLE_BIBOP` defect exactly -- putting
+`cn1GcCycleState` back inside the guard. The gate fails on that arm alone, passes the
+others, and goes green when it is restored.
+
+## A claim of mine that the repaired arm immediately falsified
+
+`ConcatCorrupt` was added as a torture for the fused concat natives, which take raw
+interior pointers into their sources' `byte[]` and then allocate. Its first javadoc said
+`-DCN1_DISABLE_CONSERVATIVE_GC_ROOTS` would make it bite. **It does not**: `corrupt=0` in
+that arm too, because with precise roots the source Strings are still in the caller's
+operand-stack slots. The hazard exists in NO configuration this VM builds -- which is
+consistent with the fused-concat GC bracket that was added earlier on this branch and then
+withdrawn as "the premise was wrong", and is now the measurement behind that withdrawal
+rather than the argument.
+
+So the driver stays, and its javadoc says its non-vacuity is UNPROVEN. It earns its place
+as a heap-integrity torture -- 256 `int[]` held live and fully re-verified across 400,000
+concatenations -- not as evidence about rooting. A self-test that cannot fail is worse than
+none; the fix is to state the scope, not to claim more.
+
+## The performance step could not have passed a single run
+
+The ratchet added at the end of Round 8 had three independent defects, none of them a
+performance regression:
+
+- **No JDK 25 in that job.** `parparvm-selfhost.yml` sets up JDK 8 only, so both reference
+  arms resolved to it, the labeller de-duplicated them to `jdk8` and `jdk8#2`, and the
+  `vs jdk25:` line the guard greps for was never printed. The step then exits 1 on "no
+  ratio line" -- which `perf-guard.sh` reports as a CORRECTNESS failure, so the first run
+  would have read as the arms emitting different C.
+- **The peak-memory probe was Darwin-only.** `/usr/bin/time -l` and "peak memory
+  footprint" are BSD/Darwin; GNU time has neither, so on the runner every arm produced an
+  empty string and the ratio line divided by nothing. It is per-platform now -- phys_footprint
+  on Darwin, `VmHWM` elsewhere -- and every line NAMES the metric, because the two are not
+  the same quantity and a Darwin figure must never be compared to a Linux one.
+- **It measured the -O1 diff-gate binary.** The gates are built -O1 on purpose; a ratio
+  from that binary is not the ratio anything ships. The perf arm is its own -O3 build now.
+
+And the ceilings are back to unreachable. `CN1_PERF_MAX_MEM=99` next to a 3.00x time
+ceiling was a disabled gate beside a number guessed from Mac measurements for a Linux
+runner nobody has data from. Both are 99, the step is called "Performance report", and
+setting them from the runner's own spread is the follow-up. **A threshold chosen without
+data from the machine that will enforce it is not a ratchet, it is a future flake.**

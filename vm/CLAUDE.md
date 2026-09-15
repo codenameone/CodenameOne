@@ -165,30 +165,44 @@ pom for one test is not worth it. Its generator also hardcoded `ICONST_1`, so a 
 Framework and JavaAPI code is not scanned by that mojo at all; there is no `synchronized` on
 a boxed value anywhere in `CodenameOne/src`, `vm/JavaAPI/src` or `Ports` today.
 
-### The nursery guard belongs in cn1InNursery, and -DCN1_NURSERY did not compile
+### Generational collection: measured here, and it loses on both axes
 
-Every caller of `cn1InNursery` dereferences the header the instant it answers true --
-`cn1InNursery(o) && o->__heapPosition == -1` is the shape at all six sites, in the minor
-collection's stack-root scan, its `currentThreadObject` and `exception` roots, the promote
-path and the write barrier. A tagged `Double` carries a raw IEEE pattern and a tagged `Long`
-a shifted payload, either of which can land inside the arena range by coincidence, and the
-read that follows is an unaligned load off a word with no header. The guard therefore lives
-in `cn1InNursery` itself; guarding only the write barrier -- which is what the first version
-of this work did -- left the other five exposed.
+A complete thread-local young generation lived under `CN1_NURSERY` -- bump-allocated 64KB
+blocks in an arena, minor collection, promote-on-escape (so no card table and no remembered
+set), an adaptive survival-based bypass. **It is gone**, and this note exists so it is not
+re-proposed on the strength of the number that motivated it.
 
-**Reachable by construction, not observed.** Instrumenting the range check to count tagged
-values that fall inside the arena gives **0** on `BoxEdge`, `GcStress` and `MtStress`: a
-tagged Long is `v << 3` and a tagged Double's bit pattern is astronomically larger than a
-heap address, so the overlap needs an unusual value. Real, narrow, and cheap to exclude.
+Nothing ever built it. There was no `#define CN1_NURSERY` anywhere, and no workflow, script,
+pom or test passed `-DCN1_NURSERY`. It was repaired over several rounds -- dropped promotions
+(the conservative-resolve guard in `gcMarkObject` rejected every nursery object before the
+promotion branch), a missing tag guard, a young-root scan that raced -- and then measured.
+Against a 1.00s / 1093MB default on the self-hosting corpus:
 
-**`-DCN1_NURSERY` had not compiled for as long as the bulk SATB barrier has existed.** The
-`cn1SatbBulkBegin` / `cn1SatbEnqueueRangeLocked` / `cn1SatbBulkEnd` declarations sat inside
-the no-nursery `#else` while `nativeMethods.m` calls all three unconditionally from
-`java_lang_System_arraycopy`, so the build died on three implicit declarations. The functions
-were always defined; only the declarations were misplaced. That silently retired an ablation
-arm this file documents, and it is the reason the missing tag guard could not be caught by
-building the configuration it affects. Hoisted above the split, and the configuration now
-builds and runs `BoxEdge` byte-identically plus `GcStress`/`MtStress` clean.
+| arm | wall | peak |
+|---|---|---|
+| nursery, 8MB trigger / 64MB arena | 6.62s | 1321MB |
+| nursery, 64MB trigger / 256MB arena | 6.62-8.56s | 1464-1600MB |
+| nursery, static scan skipped | 5.97-8.56s | 1464-1474MB |
+
+**The survival figure that justified it was an artefact.** 14-23% was measured while
+promotions were being silently dropped; true minor-collection survival is **51-57%**. That
+inverts the argument: roughly half of all small objects survive, and promotion moves them out
+of BiBOP -- page-based, with O(1) reclaim of an all-dead page -- into the LEGACY heap, which
+is table-based with a per-object malloc/free. **BiBOP already is the fast young-object path.**
+What this VM needed was not a fourth heap but a collector that keeps up with the one it has,
+which is what parallel marking and the mark worklist delivered. The same conclusion from the
+other side: with the nursery on, `hashMapChurn` went 32x to 43x, because a young generation
+pays for survivors and a map that holds its entries makes everything survive.
+
+Two lessons that outlive the code. **An unbuilt configuration rots silently**: `-DCN1_NURSERY`
+had not compiled for as long as the bulk SATB barrier had existed (three
+`cn1SatbBulkBegin`/`cn1SatbEnqueueRangeLocked`/`cn1SatbBulkEnd` declarations sat inside the
+no-nursery `#else` while `nativeMethods.m` called all three unconditionally), which retired the
+one arm that could have caught the missing tag guard. And **a nursery pointer test must not
+dereference**: every caller of `cn1InNursery` read the header the instant it answered true, so
+a tagged `Double` -- a raw IEEE pattern -- landing inside the arena range by coincidence was an
+unaligned load off a word with no header. If a young generation is ever attempted again, the
+range test owns that guard, not its callers.
 
 ### The gate has to be in CI, and it has to know which arm it ran
 
@@ -980,13 +994,10 @@ sound; holding the freeze through the drain instead drags `markStatics` (force-m
 which mallocs through the force-visited table) and `gcMarkDrainParallel` (lazy
 `pthread_create`) inside it, which is a wedge in the middle of the fix for a wedge.
 
-A thread inside its own **nursery minor collection** is never frozen either.
-`cn1NurseryWriteBarrier` raises `nurseryPromoting` and leaves `threadActive` TRUE for the
-duration, so it is a prime escalation candidate -- and the root scans mark through the
-TARGET's thread state, where that flag makes `gcMarkObject` promote-or-return without
-marking anything. Freezing one would hand the sweep a thread whose roots were all silently
-skipped. The check runs AFTER the stop, because a flag read while the thread is still
-running can be raised in the window before the signal lands.
+A carve-out that used to sit here went with the nursery, and the rule behind it is worth
+keeping: **a thread that is mid-way through a collection of its own must not be frozen**, and
+the check has to run AFTER the stop rather than before, because a flag read while the thread
+is still running can be raised in the window before the signal lands.
 The proper long-term answer is a back-edge poll in the translator; it costs throughput in
 every loop the VM ever runs, and this makes the pathological case survivable without paying
 that everywhere.
