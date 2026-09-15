@@ -79,6 +79,21 @@ public static class Spi {
   Write-Log "WARNING: could not pin system parameters: $_"
 }
 
+# WinUI's theme dictionary ships inside resources.pri. Without it every control silently
+# falls back to an unstyled default -- a square grey rectangle where a Fluent Button should
+# be -- and the app has no way to tell: it asks for a Button and gets one, just not a styled
+# one. Checked here because it is a property of the BUILD, and a build that quietly omits it
+# must not go on to photograph the result.
+$pri = Join-Path $publishDir 'resources.pri'
+if (-not (Test-Path $pri)) {
+  Write-Log 'FAILED: resources.pri was not produced.'
+  Write-Log 'WinUI theme resources live there; without it the controls render unstyled and'
+  Write-Log 'the reference would encode fallback visuals rather than Fluent ones.'
+  Get-ChildItem $publishDir | Select-Object -First 25 -ExpandProperty Name | ForEach-Object { Write-Log "  $_" }
+  exit 23
+}
+Write-Log "resources.pri present ($((Get-Item $pri).Length) bytes)"
+
 $env:NATIVEREF_OUT = $OutDir
 if (-not $env:NATIVEREF_MODE) { $env:NATIVEREF_MODE = 'probe' }
 
