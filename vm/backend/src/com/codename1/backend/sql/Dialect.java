@@ -179,6 +179,10 @@ public abstract class Dialect {
      * MySQL wants AUTO_INCREMENT on the type it was given, and PostgreSQL has
      * neither and uses an identity column.
      */
+    public String generatedKeyColumn(int kind, String quotedColumn) {
+        return generatedKeyColumn(kind);
+    }
+
     public abstract String generatedKeyColumn(int kind);
 
     /**
@@ -659,6 +663,32 @@ public abstract class Dialect {
          * are the same column here, and a String one cannot be generated at all.
          */
         public String generatedKeyColumn(int kind) {
+            return generatedKeyColumn(kind, null);
+        }
+
+        /**
+         * A generated key declared as {@code int} is BOUNDED to the Java int range
+         * here, which the other two get from their column type for nothing.
+         *
+         * <p>PostgreSQL declares INTEGER and MySQL declares INT for that kind, so
+         * both refuse a key past 2147483647 at the database. SQLite has one
+         * generated-key form -- AUTOINCREMENT is legal only after the exact words
+         * INTEGER PRIMARY KEY -- and that column is 64 bit whatever the entity
+         * said. So SQLite alone would hand back a key that does not fit the field
+         * it has to be written into: the row COMMITS, and then Values.asInt throws
+         * while narrowing it. The caller sees a failed insert over a row that
+         * exists and an entity with no usable id, and retrying duplicates it.
+         *
+         * <p>A CHECK is the only way to say it here, since the type cannot change.
+         * It costs nothing until the counter actually reaches the bound, and at
+         * that point it turns a committed row with an unusable key into a refused
+         * insert -- which is what the other two already do.
+         */
+        public String generatedKeyColumn(int kind, String quotedColumn) {
+            if(kind == INTEGER && quotedColumn != null) {
+                return "INTEGER PRIMARY KEY AUTOINCREMENT CHECK(" + quotedColumn
+                        + " BETWEEN -2147483648 AND 2147483647)";
+            }
             return "INTEGER PRIMARY KEY AUTOINCREMENT";
         }
 
