@@ -13,26 +13,19 @@ name: Desktop theme fidelity
 # Each theme is scored on ITS OWN runner. A Fluent theme measured on a Mac would be measured
 # in the wrong system font, and text metrics are most of a fidelity score.
 #
-# DISPATCH ONLY, and that is deliberate rather than an oversight. The golden sets are not
-# seeded: scripts/fidelity-app/goldens/{windows-11-fluent,macos-aqua,gnome-adwaita} stay empty
-# until someone dispatches fidelity-desktop-native-ref.yml in capture mode, reviews the frames
-# and commits them. Until then every run exits 24, "no native references" -- the correct
-# answer, and a useless gate. An automatic trigger now would mean one of two bad things: a
-# workflow that is permanently red, which teaches people to ignore it, or an unseeded run
-# reported as a pass, which is a check satisfied by nothing having happened.
+# A PULL-REQUEST GATE for the two platforms whose goldens are committed, and dispatch only
+# for the one whose are not. That split is the point: a leg with no golden set exits 24 on
+# every run, and wiring it to a trigger would mean either a permanently red workflow, which
+# teaches people to ignore it, or an unseeded run reported as a pass, which is a check
+# satisfied by nothing having happened.
 #
-# So the triggers arrive WITH the goldens, in the same commit. That commit adds:
+#   windows-11-fluent  seeded from run 34998745240, baselined, gating
+#   gnome-adwaita      seeded from run 34990802562, baselined, gating
+#   macos-aqua         NOT SEEDED -- the macOS runner queue has not yielded a slot; the
+#                      capture app is verified and the set is one dispatch away
 #
-#   pull_request:
-#     paths: [ 'native-themes/windows-fluent/**', 'native-themes/macos-aqua/**',
-#              'native-themes/gnome-adwaita/**', 'scripts/fidelity-app/**',
-#              'scripts/run-desktop-fidelity-tests.sh', 'scripts/common/java/**' ]
-#   push:
-#     branches: [master]
-#     paths: [ ...the same... ]
-#
-# Everything below that line is already written against a seeded set, so seeding is the only
-# work left. Dispatch it by hand meanwhile -- it scores whatever is committed.
+# Seeding macos-aqua is what promotes it: drop the platform out of the `if` below in the
+# same commit that adds the goldens, and it gates like the other two.
 
 'on':
   workflow_dispatch:
@@ -42,6 +35,25 @@ name: Desktop theme fidelity
         type: choice
         default: all
         options: [all, windows, macos, gnome]
+  pull_request:
+    paths: &gate_paths
+      - '.github/workflows/scripts-fidelity-desktop.yml'
+      - 'scripts/run-desktop-fidelity-tests.sh'
+      - 'scripts/fidelity-app/common/**'
+      - 'scripts/fidelity-app/desktop-runner/**'
+      - 'scripts/fidelity-app/goldens/**'
+      - 'scripts/fidelity-app/baseline/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'native-themes/windows-fluent/**'
+      - 'native-themes/gnome-adwaita/**'
+      - 'native-themes/macos-aqua/**'
+      - 'Themes/WindowsFluentTheme.res'
+      - 'Themes/GnomeAdwaitaTheme.res'
+      - 'Themes/MacOSAquaTheme.res'
+  push:
+    branches: [master]
+    paths: *gate_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -53,9 +65,14 @@ permissions:
 jobs:
   fidelity-desktop:
     name: ${{ matrix.platform }}
+    # On a dispatch, whatever was asked for. On a trigger, only the platforms whose
+    # golden sets are committed -- macos is absent from that list until its set lands.
     if: >-
-      github.event.inputs.targets == 'all'
-      || github.event.inputs.targets == matrix.platform
+      (github.event_name == 'workflow_dispatch'
+        && (github.event.inputs.targets == 'all'
+            || github.event.inputs.targets == matrix.platform))
+      || (github.event_name != 'workflow_dispatch'
+          && contains(fromJSON('["windows", "gnome"]'), matrix.platform))
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
