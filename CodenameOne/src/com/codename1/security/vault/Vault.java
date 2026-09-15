@@ -215,7 +215,19 @@ public final class Vault {
         int enrolled = stored == STATE_UNKNOWN ? ProtectionReport.UNKNOWN
                 : (stored != NOT_ENROLLED ? ProtectionReport.YES : ProtectionReport.NO);
         b.set(Protection.PERSISTENT, enrolled);
-        if (deviceRecord() == null) {
+        int recordState = deviceRecordState();
+        if (recordState == ProtectionReport.UNKNOWN) {
+            // A record is there and could not be read, so which mechanism protects this vault is
+            // not known -- and neither branch below can be taken without claiming it is.
+            b.set(Protection.ENCRYPTED_AT_REST, ProtectionReport.UNKNOWN);
+            b.set(Protection.NON_EXTRACTABLE_KEY, ProtectionReport.UNKNOWN);
+            b.set(Protection.OS_PROTECTED, ProtectionReport.UNKNOWN);
+            b.set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN);
+            b.set(Protection.USER_VERIFICATION, ProtectionReport.UNKNOWN);
+            b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);
+            return b.build();
+        }
+        if (recordState == ProtectionReport.NO) {
             // No stored key, so the only thing at rest is ciphertext under a password-derived key.
             b.set(Protection.ENCRYPTED_AT_REST, enrolled);
             // No device wrap, so the only thing that can reopen this vault is the password. None
@@ -1901,6 +1913,17 @@ public final class Vault {
         background(new Runnable() {
             @Override
             public void run() {
+                // Everything this call may disturb, captured before it disturbs any of it: the
+                // configured policy and the device record as found. A transition that fails part
+                // way used to leave both half-applied -- options already moved to the target the
+                // transition never reached, so the vault reported one policy and every later
+                // rememberDevice or import used the other, and a shared VaultOptions carried that
+                // into whatever else was configured with it; and on a failure AFTER rememberNow
+                // the new record stood, so a retry saw current.policy == policy, skipped the
+                // cleanup for good, and reported success.
+                UnlockPolicy configuredBefore = options.getPolicy();
+                Object savedRecord = Storage.getInstance().readObject(deviceRecordKey());
+                boolean settled = false;
                 try {
                     requirePolicySupported(policy);
                     // Judged against the policy being moved TO, and before options is mutated or
@@ -1917,6 +1940,16 @@ public final class Vault {
                             ? UnlockPolicy.SESSION_ONLY : current.policy;
                     if (policy == UnlockPolicy.SESSION_ONLY) {
                         Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                        // Checked, because deleteStorageFile reports nothing: it returns void,
+                        // and both real ports can fail one silently. A record that survived
+                        // leaves getPolicy() answering the old remembering policy, and a later
+                        // move BACK to it then finds current.policy == policy and skips the
+                        // enrolment -- a remembered unlock permanently without its key.
+                        if (Storage.getInstance().exists(deviceRecordKey())) {
+                            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                    "the device record could not be removed, so this vault is "
+                                    + "not session-only");
+                        }
                         requireKeyDeleted(deviceProtection(previous),
                                 "the device key could not be deleted");
                     } else if (current == null || current.policy != policy) {
@@ -1957,6 +1990,7 @@ public final class Vault {
                         }
                         requireDeviceRecordStillWanted(generation);
                     }
+                    settled = true;
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -1968,6 +2002,20 @@ public final class Vault {
                     // cannot diagnose. Reached most easily by locking mid-operation, which nulls
                     // metadata under a worker that already passed requireUnlocked.
                     out.error(asVaultException(broke, "this vault operation could not complete"));
+                } finally {
+                    if (!settled) {
+                        // Back to exactly what was found, by every route out that is not success
+                        // -- which is what "nothing changed" has to mean for a call that reports
+                        // failure. The inner handler around rememberNow restores the record too
+                        // and that is deliberate redundancy: it is the one place that can put the
+                        // record back before the OUTGOING key is deleted, and this runs after.
+                        options.policy(configuredBefore);
+                        if (savedRecord instanceof String) {
+                            Storage.getInstance().writeObject(deviceRecordKey(), savedRecord);
+                        } else {
+                            Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                        }
+                    }
                 }
             }
         });
@@ -2218,17 +2266,20 @@ public final class Vault {
             "the sync state does not descend from the vault already on this device; importing it "
             + "would discard the key this device is using and everything sealed under it";
 
+    /// The tag over one record, computed without touching it.
+    ///
+    /// It used to null `meta.mac` for the duration and put it back in a finally, which was both
+    /// unnecessary and unsafe: serializeForMac already excludes the tag -- that is the whole
+    /// reason it exists beside serialize -- and `meta` is frequently the shared `metadata`
+    /// object, so the window exposed a record with no tag to any other worker. createRecoveryCode
+    /// reading base.mac == null in that window stamps an update with no parent fingerprint, which
+    /// later makes an ordinary sync import look like a fork; two verifications overlapping can
+    /// also fail authentication against each other for no reason.
     private byte[] recordMac(VaultMetadata meta, byte[] key) {
-        byte[] saved = meta.mac;
-        meta.mac = null;
-        try {
-            Hmac mac = Hmac.create(Hash.SHA256, key);
-            mac.update(Bytes.utf8("cn1.vault.record.v1"));
-            mac.update(Bytes.utf8(meta.serializeForMac()));
-            return mac.doFinal();
-        } finally {
-            meta.mac = saved;
-        }
+        Hmac mac = Hmac.create(Hash.SHA256, key);
+        mac.update(Bytes.utf8("cn1.vault.record.v1"));
+        mac.update(Bytes.utf8(meta.serializeForMac()));
+        return mac.doFinal();
     }
 
     /// The one subkey derivation, so the live handle and a recovered older one cannot drift.
@@ -2417,6 +2468,23 @@ public final class Vault {
             return null;
         }
         return DeviceRecord.parse((String) stored);
+    }
+
+    /// Whether a device record is here, absent, or present and unreadable.
+    ///
+    /// deviceRecord() answers null for the last two alike, which is right for a caller asking
+    /// "can I unlock with it" and wrong for one asking what protects this vault: a transient
+    /// read failure then reported SESSION_ONLY and, through protection(), password-only
+    /// protections such as ENCRYPTED_AT_REST=YES -- none of which was observed, because nothing
+    /// managed to read the record that decides them.
+    private int deviceRecordState() {
+        Object stored = Storage.getInstance().readObject(deviceRecordKey());
+        if (stored instanceof String) {
+            return DeviceRecord.parse((String) stored) == null
+                    ? ProtectionReport.UNKNOWN : ProtectionReport.YES;
+        }
+        return Storage.getInstance().exists(deviceRecordKey())
+                ? ProtectionReport.UNKNOWN : ProtectionReport.NO;
     }
 
     private void writeDeviceRecord(DeviceRecord record) {

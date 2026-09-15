@@ -2021,6 +2021,65 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aFailedPolicyTransitionLeavesTheConfiguredPolicyAlone() {
+        // options.policy(policy) was applied before the transition and never put back. A vault
+        // whose transition failed then reported its old persisted policy while every later
+        // rememberDevice or import used the target it never reached -- and a VaultOptions shared
+        // with another vault carried that change into it.
+        String name = freshName();
+        VaultOptions options = fast();
+        Vault vault = Vault.named(name).configure(options);
+        vault.enroll(pw("p"), options).get();
+        assertEquals(UnlockPolicy.SESSION_ONLY, options.getPolicy());
+
+        device.refuseEnsure = true;
+        try {
+            assertNotNull(errorOf(vault.setPolicy(UnlockPolicy.REMEMBER_DEVICE)),
+                    "the store refuses, so the transition cannot succeed");
+        } finally {
+            device.refuseEnsure = false;
+        }
+        assertEquals(UnlockPolicy.SESSION_ONLY, options.getPolicy(),
+                "a transition that failed must not have moved the configured policy");
+        assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+    }
+
+    @Test
+    void aSessionOnlyMoveThatCannotRemoveTheRecordIsRefused() {
+        // deleteStorageFile reports nothing, and a record that survived leaves getPolicy()
+        // answering the old remembering policy -- after which a move BACK to that policy finds
+        // current.policy == policy and skips the enrolment, leaving a remembered unlock
+        // permanently without its key.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+
+        TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(
+                deviceRecordName(name));
+        try {
+            assertEquals(VaultError.STORAGE_UNAVAILABLE,
+                    errorOf(vault.setPolicy(UnlockPolicy.SESSION_ONLY)),
+                    "a record that would not go must not be reported as gone");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+        }
+        // And the vault is what it was, not half-moved.
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+    }
+
+    /// The storage entry the device record lands in.
+    private static String deviceRecordName(String vaultName) {
+        for (String entry : Storage.getInstance().listEntries()) {
+            if (entry.indexOf(vaultName) > 0 && entry.endsWith(".device")) {
+                return entry;
+            }
+        }
+        throw new IllegalStateException("no device record for " + vaultName);
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:
