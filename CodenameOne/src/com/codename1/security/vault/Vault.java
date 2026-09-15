@@ -2052,7 +2052,20 @@ public final class Vault {
                 // the new record stood, so a retry saw current.policy == policy, skipped the
                 // cleanup for good, and reported success.
                 UnlockPolicy configuredBefore = options.getPolicy();
-                Object savedRecord = Storage.getInstance().readObject(deviceRecordKey());
+                // Snapshotted through the three-state reader, and refused outright when it cannot
+                // be taken. The cached read collapsed "there is no record" and "there is one and
+                // it could not be read" into the same null -- and the rollback below deletes the
+                // record whenever the snapshot is not a String, so a transient failure turned a
+                // setPolicy REJECTED before it changed anything into one that removed the user's
+                // remembered unlock. Nothing this method can do afterwards is safe if it does not
+                // know what it is rolling back to.
+                if (deviceRecordState() == ProtectionReport.UNKNOWN) {
+                    out.error(new VaultException(VaultError.TEMPORARILY_UNREADABLE,
+                            "a device record exists here and could not be read, so this policy "
+                            + "change cannot be undone if it fails; nothing was changed"));
+                    return;
+                }
+                Object savedRecord = readUncached(deviceRecordKey());
                 boolean settled = false;
                 // An array because the finally below reads it and this is a Java 5 source level;
                 // what it records is the one step of this transition that cannot be undone.

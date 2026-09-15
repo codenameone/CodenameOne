@@ -2302,6 +2302,36 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aPolicyChangeRefusesRatherThanRollBackToARecordItCannotRead() {
+        // The rollback deletes the device record whenever its snapshot is not a String, and the
+        // cached read collapsed "no record" and "a record that could not be read" into the same
+        // null -- so a setPolicy REJECTED before it changed anything removed the user's
+        // remembered unlock on the way out.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        String record = deviceRecordName(name);
+
+        TestCodenameOneImplementation.getInstance().putStorageEntry(record,
+                encodeStorageObject(Integer.valueOf(7)));
+        // A cold cache, which is what a fresh launch has. With a warm one the rollback restores
+        // the copy this process happens to be holding and the deletion never shows -- so without
+        // this the test observes the refusal and not the damage behind it.
+        Storage.getInstance().clearCache();
+
+        Vault reopened = Vault.named(name).configure(fast());
+        VaultError refused = errorOf(reopened.setPolicy(UnlockPolicy.REQUIRE_USER_VERIFICATION));
+
+        // The damage first, because that is the finding: a call that changed nothing must not
+        // have deleted the record on its way out.
+        assertTrue(Storage.getInstance().exists(record),
+                "a refused policy change must not have removed the remembered unlock");
+        assertEquals(VaultError.TEMPORARILY_UNREADABLE, refused,
+                "and it must say why it refused, rather than failing later for another reason");
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:
