@@ -689,6 +689,16 @@ class DatabaseUsageScanTest {
     private void writeClass(String path, String... references) throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        OutputStream out = new FileOutputStream(f);
+        try {
+            out.write(classBytes(path, references));
+        } finally {
+            out.close();
+        }
+    }
+
+    /// The same class, as bytes, for the archive tests that never put one on disk.
+    private byte[] classBytes(String path, String... references) {
         String internalName = path.substring(0, path.length() - ".class".length());
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
         w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
@@ -708,12 +718,7 @@ class DatabaseUsageScanTest {
         m.visitMaxs(2, 1);
         m.visitEnd();
         w.visitEnd();
-        OutputStream out = new FileOutputStream(f);
-        try {
-            out.write(w.toByteArray());
-        } finally {
-            out.close();
-        }
+        return w.toByteArray();
     }
 
     /** Display declares openOrCreate(String, DatabaseConfig), so it names both. */
@@ -750,6 +755,50 @@ class DatabaseUsageScanTest {
                 "com/codename1/security/vault/ProtectionReport");
         writeClass("com/codename1/security/SecureStorage.class",
                 "com/codename1/security/vault/ProtectionReport");
+    }
+
+    @Test
+    void aNestedArchiveIsScannedForTheVaultAfterTheDatabaseIsAlreadyKnown() throws IOException {
+        // The nested loop stopped on the first two answers. It was written when there were two
+        // questions and was not revisited when the vault became the third, so a classes.jar whose
+        // EARLY class used an encrypted database answered both and ended the scan before a later
+        // class in the same jar that uses the vault. usesVault came back false, IPhoneBuilder left
+        // AES-GCM out of the binary, and the vault failed on the device in an application whose
+        // dependency demonstrably uses it.
+        //
+        // Entry order is the whole point of this test: a ZipInputStream reads in write order, so
+        // the database class has to go in first for the loop to be able to stop early.
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Secure.class"));
+            innerZip.write(classCalling("rawKey"));
+            innerZip.closeEntry();
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Vaulted.class"));
+            innerZip.write(classBytes("com/vendor/Vaulted.class",
+                    "com/codename1/security/vault/Vault"));
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "secure.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "the early class uses the database");
+        assertTrue(usage.usesDatabaseCipher(), "and encrypts it");
+        assertTrue(usage.usesVault(),
+                "the later class in the same nested jar uses the vault, and the scan must not "
+                + "have stopped once the first two questions were answered");
     }
 
     @Test

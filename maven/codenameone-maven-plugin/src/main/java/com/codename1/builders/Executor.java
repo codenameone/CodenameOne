@@ -1070,7 +1070,13 @@ public abstract class Executor {
         java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(
                 new BoundedInputStream(nested, budget));
         java.util.zip.ZipEntry entry = in.getNextEntry();
-        while (entry != null && !(found[0] && found[1])) {
+        // All THREE, like every other loop in this scan. This one was written when there were two
+        // questions and was not revisited when the vault became the third, so a nested classes.jar
+        // whose early class used an encrypted database answered both of them and stopped -- before
+        // reaching a later class in the same jar that uses the vault. usesVault then came back
+        // false, IPhoneBuilder left AES-GCM out of the binary, and the vault failed on the device
+        // in an application whose dependency demonstrably uses it.
+        while (entry != null && !(found[0] && found[1] && found[2])) {
             String name = entry.getName();
             // Charged before ANY test of what the entry is, directories
             // included. A directory carries no payload, so neither byte budget
