@@ -35,13 +35,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 GUIDE = os.path.join(ROOT, 'docs', 'developer-guide')
 
 # Everything an application's own code can reference.
-# Every source the published javadoc is built from. The java.* compatibility
-# classes are part of it -- the guide links to java/util/List.html -- so a
-# typo there has to be caught the same way one in com.codename1 is.
+# Exactly what the published javadoc is built from, which
+# .github/scripts/build_javadocs.sh spells out: CodenameOne/src and the
+# java.* compatibility classes in Ports/CLDC11/src. The guide links to
+# java/util/List.html, so a typo there has to be caught the same way one in
+# com.codename1 is -- and vm/JavaAPI/src is deliberately absent, because
+# javadoc never sees it and a link to a class only IT has is dead.
 APP_ROOTS = [
     os.path.join(ROOT, 'CodenameOne', 'src'),
     os.path.join(ROOT, 'Ports', 'CLDC11', 'src'),
-    os.path.join(ROOT, 'vm', 'JavaAPI', 'src'),
 ]
 # Every source the repository holds, which is where the foreign names live.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)

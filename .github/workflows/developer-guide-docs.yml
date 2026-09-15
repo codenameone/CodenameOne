@@ -7,6 +7,12 @@ on:
       - 'docs/developer-guide/**'
       - 'docs/demos/**'
       - 'scripts/developer-guide/**'
+      # The API-name check derives the published pages from the javadoc's own
+      # sources, and the guide links into the java.* compatibility classes --
+      # java/util/List.html among them. A change that renames or deletes one
+      # of those without touching docs/ would otherwise skip this job and
+      # leave a dead link behind.
+      - 'Ports/CLDC11/**'
       - '.github/workflows/developer-guide-docs.yml'
       # The build hint table is rendered rather than committed, so a change to
       # anything it is rendered FROM changes what this guide contains without
