@@ -128,6 +128,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_System_currentTimeMillis_R_long",
             "cn1_java_lang_System_exit_int",
             "cn1_java_lang_System_gcLight",
+            "cn1_java_lang_System_getenvImpl_java_lang_String_R_java_lang_String",
             "cn1_java_lang_System_gcMarkSweep",
             "cn1_java_lang_System_identityHashCode_java_lang_Object_R_int",
             "cn1_java_lang_Integer_cn1Value_R_int",

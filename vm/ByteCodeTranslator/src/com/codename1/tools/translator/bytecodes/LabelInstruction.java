@@ -25,6 +25,7 @@ package com.codename1.tools.translator.bytecodes;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,55 @@ public class LabelInstruction extends Instruction {
     // a lot of strings.
     private static Map<Label,Label> usedLabels = new Hashtable<Label,Label>();
     
+    /**
+     * Stable names for the C labels generated from ASM labels.
+     *
+     * These used to be {@code Label.toString()}, which ASM defines as
+     * {@code "L" + System.identityHashCode(this)}. That made the emitted C depend on
+     * identity hash codes, with two consequences. It is not reproducible -- nothing
+     * promises an identity hash is stable. And it is not even VALID on a runtime
+     * whose identity hash can be negative: ParparVM's is the object pointer narrowed
+     * to int, so a self-hosted translator emitted {@code label_L-180306432001}, which
+     * C reads as a subtraction, and every method with a try/catch failed to compile.
+     *
+     * Numbering is per method and assigned in bytecode order as the labels are
+     * visited, so a method's C depends only on that method. A global counter would
+     * work too, but it would make every method downstream of any change renumber,
+     * which turns one real difference into thousands when two outputs are compared.
+     *
+     * C labels are function-scoped, so the same name in two methods is not a clash.
+     *
+     * An IdentityHashMap because Label overrides neither equals nor hashCode, and two
+     * distinct labels must never share a name.
+     */
+    private static final Map<Label, String> labelNames = new IdentityHashMap<Label, String>();
+
+    /**
+     * Names {@code l} as the {@code index}th label of its method. Called from
+     * BytecodeMethod.addLabel while the method is being parsed.
+     */
+    public static void assignLabelName(Label l, int index) {
+        if (!labelNames.containsKey(l)) {
+            labelNames.put(l, "L" + index);
+        }
+    }
+
+    /**
+     * The C label name for {@code l}.
+     *
+     * Every label reaching emission has been through addLabel, so the fallback is
+     * unreachable; it is spelled with a distinct prefix so that if it ever does fire
+     * it cannot collide with a real per-method name.
+     */
+    public static String labelName(Label l) {
+        String name = labelNames.get(l);
+        if (name == null) {
+            name = "Lx" + labelNames.size();
+            labelNames.put(l, name);
+        }
+        return name;
+    }
+
     // cleanup between passes, free the garbage!
     public static void cleanup()
     {
@@ -63,6 +113,7 @@ public class LabelInstruction extends Instruction {
     	tryEndLabels.clear();
     	labelCatchDepth.clear();
     	usedLabels.clear();
+    	labelNames.clear();
     }
     public LabelInstruction(org.objectweb.asm.Label parent) {
         super(-1);
@@ -160,7 +211,7 @@ public class LabelInstruction extends Instruction {
             return;
         }
         b.append("\nlabel_"); 
-        b.append(parent); 
+        b.append(labelName(parent)); 
         b.append(":\n");
         Integer tryCount = tryEndLabels.get(parent);
         if(tryCount != null) {
@@ -181,19 +232,19 @@ public class LabelInstruction extends Instruction {
                 for(int iter = strs.size() - 1;  iter >= 0 ; iter--) {
                     Pair s = strs.get(iter);
                     b.append(" tryBlockOffset");
-                    b.append(parent);
+                    b.append(labelName(parent));
                     b.append(s.cls);
                     b.append(s.counter);
                     b.append(" = threadStateData->tryBlockOffset;\n");
                     b.append("    BEGIN_TRY(");
                     b.append(s.cls);
                     b.append(", catch_");
-                    b.append(parent);
+                    b.append(labelName(parent));
                     b.append(s.cls);
                     b.append(s.counter);
                     //b.append("); NSLog(@\"Begin try on:  %s %d off: %i\\n\", __FILE__, __LINE__, getThreadLocalData()->tryBlockOffset);");
                     b.append(");\n    restoreTo");
-                    b.append(parent);
+                    b.append(labelName(parent));
                     b.append(s.cls);
                     b.append(s.counter);
                     b.append(" = threadStateData->threadObjectStackOffset;\n");

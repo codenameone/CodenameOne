@@ -23,6 +23,8 @@
 
 package com.codename1.tools.translator.bytecodes;
 
+import com.codename1.tools.translator.Util;
+
 import com.codename1.tools.translator.ByteCodeClass;
 import com.codename1.tools.translator.Parser;
 import java.util.List;
@@ -57,7 +59,7 @@ public class Ldc extends Instruction implements AssignableExpression {
             int sort = ((Type) cst).getSort();
             Type tp = (Type) cst;
             if (sort == Type.OBJECT) {
-                String t = tp.getInternalName().replace('/', '_').replace('$', '_');
+                String t = Util.mangle(tp.getInternalName());
                 if(!dependencyList.contains(t)) {
                     dependencyList.add(t);
                 }
@@ -75,7 +77,7 @@ public class Ldc extends Instruction implements AssignableExpression {
                         case Type.SHORT:
                             return;
                     }
-                    String t = ttt.getInternalName().replace('/', '_').replace('$', '_');
+                    String t = Util.mangle(ttt.getInternalName());
                     ByteCodeClass.addArrayType(t, tp.getDimensions());
                     if(!dependencyList.contains(t)) {
                         dependencyList.add(t);
@@ -159,15 +161,15 @@ public class Ldc extends Instruction implements AssignableExpression {
             Type tp = (Type) cst;
             if (sort == Type.OBJECT) {
                 //b.append("/* LDC: '");
-                //b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                //b.append(Util.mangle(tp.getInternalName()));
                 //b.append("'*/\n    PUSH_POINTER((JAVA_OBJECT)&class__");
-                //b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                //b.append(Util.mangle(tp.getInternalName()));
                 //b.append(");\n");
                 b.append("(JAVA_OBJECT)&class__");
-                b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(tp.getInternalName()));
             } else if (sort == Type.ARRAY) {
                 //b.append("/* LDC Array: '");
-                //b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                //b.append(Util.mangle(tp.getInternalName()));
                 //b.append("'*/\n    PUSH_POINTER((JAVA_OBJECT)&class_array");
                 b.append("(JAVA_OBJECT)&class_array");
                 b.append(tp.getDimensions());
@@ -199,7 +201,7 @@ public class Ldc extends Instruction implements AssignableExpression {
                         b.append("JAVA_SHORT");
                         break;
                     default:
-                        b.append(ttt.getInternalName().replace('/', '_').replace('$', '_'));
+                        b.append(Util.mangle(ttt.getInternalName()));
                         break;
                 }
                 //b.append(");\n");
@@ -283,13 +285,13 @@ public class Ldc extends Instruction implements AssignableExpression {
             Type tp = (Type) cst;
             if (sort == Type.OBJECT) {
                 b.append("/* LDC: '");
-                b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(tp.getInternalName()));
                 b.append("'*/\n    PUSH_POINTER((JAVA_OBJECT)&class__");
-                b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(tp.getInternalName()));
                 b.append(");\n");
             } else if (sort == Type.ARRAY) {
                 b.append("/* LDC Array: '");
-                b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                b.append(Util.mangle(tp.getInternalName()));
                 b.append("'*/\n    PUSH_POINTER((JAVA_OBJECT)&class_array");
                 b.append(tp.getDimensions());
                 b.append("__");
@@ -320,7 +322,7 @@ public class Ldc extends Instruction implements AssignableExpression {
                         b.append("JAVA_SHORT");
                         break;
                     default:
-                        b.append(ttt.getInternalName().replace('/', '_').replace('$', '_'));
+                        b.append(Util.mangle(ttt.getInternalName()));
                         break;
                 }
                 b.append(");\n");

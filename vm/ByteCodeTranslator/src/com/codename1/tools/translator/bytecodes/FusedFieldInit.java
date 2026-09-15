@@ -56,9 +56,27 @@ public class FusedFieldInit extends Instruction {
         String field = owner + "_" + child.getFieldName();
         String lhs = "((struct obj__" + owner + "*)__cn1ThisObject)->" + field;
         b.append("    if(").append(lhs).append(" == JAVA_NULL) { /* fused field: not pre-installed */\n");
-        b.append("        ").append(lhs).append(" = allocArray(threadStateData, ")
+        // Through a TEMPORARY, so the barrier can see the value before the field does.
+        //
+        // This path publishes an INDEPENDENT array into a field of an already-existing
+        // object, and a raw C assignment takes neither half of the store barrier that the
+        // ordinary PUTFIELD path emits. That is not cosmetic. CN1_WRITE_BARRIER is the
+        // SATB insertion half, so without it an array allocated and installed during a
+        // concurrent mark is recorded nowhere and can be swept while the field still
+        // points at it -- the same hazard cloneArray and System.arraycopy each carry an
+        // explicit bulk barrier for. Under a generational build it is also the promotion
+        // hook: the array is freshly allocated and therefore young, the owner is not, and
+        // a verifier over the self-hosting corpus reported exactly this shape 1552 times
+        // (BiBOP owner -> young Object[]/Label[]/Frame[]) before this line existed.
+        //
+        // FusedConstructor's own children need no barrier and get none: those arrays are
+        // carved out of the OWNER'S block by cn1FusedInstallPrimArray and have no
+        // independent GC identity. This one calls allocArray, so it does.
+        b.append("        JAVA_OBJECT __cn1ffi = allocArray(threadStateData, ")
          .append(child.ctorLengthExpr()).append(", ").append(child.arrayClassRef())
          .append(", sizeof(").append(child.elemCType()).append("), 1);\n");
+        b.append("        CN1_WRITE_BARRIER(__cn1ThisObject, __cn1ffi);\n");
+        b.append("        ").append(lhs).append(" = __cn1ffi;\n");
         b.append("    }\n");
     }
 }

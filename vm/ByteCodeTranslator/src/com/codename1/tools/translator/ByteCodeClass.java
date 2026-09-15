@@ -656,14 +656,30 @@ public class ByteCodeClass {
 
 
 
+    // One reusable emit buffer for the whole output pass, reset per class rather
+    // than reallocated. Parser.writeOutput -> writeFile -> generateCCode is a
+    // single sequential loop with no executor and one call site, so there is no
+    // concurrent or re-entrant use to guard against.
+    //
+    // This is not micro-tuning. A fresh StringBuilder starts at capacity 16 and
+    // JavaAPI grows by 1.5x ((len>>1)+len+2), so building N chars allocates about
+    // 3N chars = 6N bytes in abandoned intermediate arrays. Across 5897 emitted
+    // files totalling 245MB that is roughly 1.4GB of pure churn, and MEASURED on
+    // ParparVM the emit phase allocated 2518MB in a single GC cycle against a
+    // 24MB trigger. Keeping the capacity across classes means the growth series
+    // runs only until the buffer reaches the largest class, then never again.
+    private static final StringBuilder EMIT_BUFFER = new StringBuilder(1 << 20);
+
     public String generateCCode(List<ByteCodeClass> allClasses) {
 
-        StringBuilder b = new StringBuilder();
+        StringBuilder b = EMIT_BUFFER;
+        b.setLength(0);
         b.append("#include \"");
         b.append(clsName);
         
         b.append(".h\"\n");
         
+
         for(String s : dependsClassesInterfaces) {
             if (exportsClassesInterfaces.contains(s)) {
                 continue;
@@ -952,6 +968,12 @@ public class ByteCodeClass {
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
+                    // Inline-guard rather than call: the initialiser's own first
+                    // line already returns when the flag is set, so the call was a
+                    // no-op after the first time -- but a CALL, on a path that runs
+                    // per static-field access. MEASURED: __STATIC_INITIALIZER_* was
+                    // 7.2% of mutator self-time, java.util.Iterator's alone 6.26%.
+                    // Safe as an ACQUIRE load now that the flag is release-stored.
                     b.append("() {\n    __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
                     if (bf.isVolatile()) {
@@ -1027,7 +1049,7 @@ public class ByteCodeClass {
         buildInstanceFieldList(fullFieldList);
         
         String nullCheck = "";
-        if (System.getProperty("fieldNullChecks", "false").equals("true")) {
+        if (Util.getProperty("fieldNullChecks", "false").equals("true")) {
             nullCheck = "if(__cn1T == JAVA_NULL){throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));}\n";
         }
         for(ByteCodeField fld : fullFieldList) {
@@ -1204,6 +1226,36 @@ public class ByteCodeClass {
                     b.append(", &objInstance->").append(REFERENCE_CLASS).append("_cn1AgedCycle");
                     b.append(", objInstance->").append(REFERENCE_CLASS).append("_cn1Strength);\n");
                     continue;
+                }
+                // TYPE-IDENTITY CHECK, verifier builds only.
+                //
+                // CN1_GC_VERIFY already proves every traced reference RESOLVES, which
+                // is why a reclaimed-and-recycled slot slips past it: the slot holds a
+                // perfectly valid object, just not the one the field was pointing at.
+                // A Linux suite core caught the consequence -- ArrayList.add running on
+                // an object whose class word said charts.compat.Canvas, reading the
+                // list's backing-array slot out of two of Canvas's int fields.
+                //
+                // The field's DECLARED type is known here and thrown away, so the
+                // collector has no way to notice. Passing it lets the verifier ask
+                // whether what the field holds is assignable to what it was declared
+                // as, which is exactly the question a recycled slot answers wrongly --
+                // and it names the field, instead of leaving a SIGSEGV in an unrelated
+                // method a whole cycle later.
+                //
+                // Arrays are skipped for now: their id mapping is dimensional and the
+                // failure this was written for was a plain object field.
+                // getRuntimeDescriptor() is the mangled type for a plain object field
+                // and carries "[]" for an array, which is how arrays are excluded.
+                String fldType = fld.getRuntimeDescriptor();
+                if (fldType != null && fldType.indexOf('[') < 0
+                        && Parser.getClassObject(fldType) != null) {
+                    b.append("#ifdef CN1_GC_VERIFY\n");
+                    b.append("    cn1GcVerifyFieldType(threadStateData, objToMark, objInstance->");
+                    b.append(fld.getClsName()).append("_").append(fld.getFieldName());
+                    b.append(", cn1_class_id_").append(fldType);
+                    b.append(", \"").append(clsName).append(".").append(fld.getFieldName()).append("\");\n");
+                    b.append("#endif\n");
                 }
                 b.append("    gcMarkObject(threadStateData, ");
                 if (fld.isVolatile()) {
@@ -1527,10 +1579,33 @@ public class ByteCodeClass {
         }
         
         // insert static initializer
+        // NOT static: the inline guards emitted at allocation and static-access
+        // sites live in OTHER translation units and have to test COMPLETION. They
+        // used to test class__X.initialized instead, which is the wrong flag --
+        // that one is the JLS recursion guard and is deliberately set BEFORE
+        // __CLINIT__ runs, so a thread observing it could skip the initialiser
+        // while another thread was still inside the class initialiser, and then
+        // read statics that had not been written yet. Releasing on "started"
+        // cannot publish writes that happen after it.
         b.append("static int __").append(clsName).append("_LOADED__=0;\n");
         b.append("void __STATIC_INITIALIZER_");
         b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__").append(clsName).append("_LOADED__) return;\n\n    ");
+        // ACQUIRE, not a plain load. This is the fast path of a double-checked
+        // initialisation: the completing store below is a RELEASE, and the two
+        // together are what make the writes this function performed -- the
+        // vtable, and every classToInterfaceMap_<iface>[classId] row -- visible
+        // to a thread that observes the flag set.
+        //
+        // With plain accesses on arm64 a second thread could see LOADED==1 while
+        // those table stores were still invisible, then index a row that read as
+        // NULL. OBSERVED: three identical SIGSEGVs at
+        // classToInterfaceMap_java_util_NavigableMap[classId] + 0x8, reached from
+        // TreeSet.clear -> the interface dispatch for NavigableMap.clear, in a
+        // translator that is single-threaded in its own code but shares the
+        // process with the GC thread, which also runs Java and so also runs
+        // class initialisers.
+        b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__atomic_load_n(&__")
+         .append(clsName).append("_LOADED__, __ATOMIC_ACQUIRE)) return;\n\n    ");
 
         
         // Block-registered enter/exit (the synchronized-method pattern): if the
@@ -1579,7 +1654,10 @@ public class ByteCodeClass {
             b.append(".vtable = initVtableForInterface();\n");
             b.append("    classToInterfaceMap_");
             b.append(clsName);
-            b.append(" = malloc(sizeof(int*) * cn1_array_start_offset);\n");
+            // calloc, not malloc: rows are filled only for classes that implement
+            // this interface, so an id that does not read as a registered row must
+            // read as NULL rather than as whatever the allocator last left there.
+            b.append(" = calloc(cn1_array_start_offset, sizeof(int*));\n");
             for(ByteCodeClass cls : allClasses) {
                 if(!cls.isInterface) {
                     if(cls.doesImplement(this)) {
@@ -1616,9 +1694,21 @@ public class ByteCodeClass {
             b.append(".vtable);\n");
 
         }
-        b.append("    class__");
+        b.append("    __atomic_store_n(&class__");
         b.append(clsName);
-        b.append(".initialized = JAVA_TRUE;\n");
+        // This flag means STARTED, not completed: the JLS requires a class whose
+        // initialiser re-enters itself to proceed rather than deadlock, so it has
+        // to be set before __CLINIT__ runs, and the check above the monitor is
+        // that recursion guard. Nothing outside this function may treat it as
+        // "safe to use the class" in the JLS sense -- a class under initialization
+        // is not finished. The release is what the INLINE GUARDS acquire against:
+        // they test this flag, and it is what publishes the vtable and the
+        // classToInterfaceMap rows written just above. Guarding them on
+        // __X_LOADED__ instead would also be correct about the vtable and would
+        // additionally hold other threads until __CLINIT__ returned -- a strictly
+        // later gate than master opens, which moved layout on four native ports
+        // and is not what the visibility defect required.
+        b.append(".initialized, JAVA_TRUE, __ATOMIC_RELEASE);\n");
         // init static fields and invoke the static initializer code block
         if(clInitMethod != null) {
             b.append("    ");
@@ -1629,7 +1719,10 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(");\n");
 
-        b.append("__").append(clsName).append("_LOADED__=1;\n");
+        // RELEASE: pairs with the acquire on the fast path above, so everything
+        // this initialiser wrote happens-before another thread's early return.
+        b.append("__atomic_store_n(&__").append(clsName)
+         .append("_LOADED__, 1, __ATOMIC_RELEASE);\n");
 
         b.append("}\n\n");
 
@@ -2000,7 +2093,6 @@ public class ByteCodeClass {
         b.append("extern void __STATIC_INITIALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE);\n");
-        
         b.append("extern void __FINALIZER_");
         b.append(clsName);
         b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToDelete);\n");

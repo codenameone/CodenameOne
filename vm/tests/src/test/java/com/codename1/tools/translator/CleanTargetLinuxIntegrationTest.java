@@ -287,6 +287,16 @@ class CleanTargetLinuxIntegrationTest {
         if (Boolean.parseBoolean(System.getenv("CN1_LINUX_FULL_DEBUG"))) {
             configure.add("-DCN1_DEBUG_INFO_LEVEL=3");
         }
+        // Diagnostic defines, e.g. CN1_GC_VERIFY for the collector's heap-integrity
+        // checker. Unset it and the build is exactly what it was.
+        String extraDefines = System.getenv("CN1_LINUX_EXTRA_DEFINES");
+        if (extraDefines != null && !extraDefines.trim().isEmpty()) {
+            configure.add("-DCN1_EXTRA_DEFINES=" + extraDefines.trim());
+        }
+        // Printed so a diagnostic build proves itself from the job log. A define
+        // that silently fails to reach the compiler leaves a clean-looking run that
+        // measured nothing, which is worse than no diagnostic at all.
+        System.out.println("CN1SS:HARNESS: cmake configure: " + String.join(" ", configure));
         CleanTargetIntegrationTest.runCommand(configure, cmakeRoot);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path elf = buildDir.resolve("LinuxHelloMain");

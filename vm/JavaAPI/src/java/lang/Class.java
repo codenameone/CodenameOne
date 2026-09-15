@@ -40,6 +40,11 @@ public final class Class<T> implements java.lang.reflect.Type {
     
     
     public ClassLoader getClassLoader() {
+        if (isPrimitive()) {
+            // A primitive class is bootstrap-defined and must report null, which is
+            // what reflection code tests to tell such a type from a loaded one.
+            return null;
+        }
         return ClassLoader.getSystemClassLoader();
     }
 
@@ -50,6 +55,40 @@ public final class Class<T> implements java.lang.reflect.Type {
      * following code fragment returns the runtime Class descriptor for the
      * class named java.lang.Thread: Classt= Class.forName("java.lang.Thread")
      */
+    /**
+     * Returns the Class object for {@code className}.
+     *
+     * ParparVM links the whole program ahead of time, so there is no second class
+     * loader to consult: both extra arguments are accepted and ignored, and the
+     * class is resolved exactly as the one-argument form resolves it. The overload
+     * exists because library bytecode calls it -- ASM's
+     * ClassWriter.getCommonSuperClass does -- and an absent overload is a link
+     * error in translated code, not a compile error here.
+     *
+     * &lt;p&gt;What {@code initialize == true} does NOT do here: it does not run the
+     * named class's static initializer. ParparVM runs one on first use -- the
+     * generated code calls the class's static initializer at every NEW, GETSTATIC
+     * and INVOKESTATIC -- so any code that goes on to TOUCH the class sees its
+     * statics initialized as normal. What does not work is using forName purely for
+     * a registration side effect and never referencing the class again, the
+     * JDBC-driver idiom. That pattern cannot work on this platform for a second
+     * reason anyway: obfuscation rewrites class names, so a name looked up as a
+     * string does not survive a release build.
+     *
+     * &lt;p&gt;WHY IT IS NOT IMPLEMENTED, rather than left as an oversight: forcing the
+     * initializer needs a way to reach it from a Class object, and {@code struct
+     * clazz} carries no static-initializer function pointer -- only newInstanceFp
+     * and enumValueOfFp. Adding one is a field on EVERY class in EVERY application,
+     * to serve a flag whose only in-tree caller is ASM, which passes
+     * {@code initialize = false}. The cost is paid by every app and the benefit is
+     * claimed by none, so this stays documented rather than built. If a real caller
+     * ever needs it, emit the pointer then.
+     */
+    public static java.lang.Class forName(java.lang.String className, boolean initialize,
+            ClassLoader loader) throws java.lang.ClassNotFoundException {
+        return forName(className);
+    }
+
     public static java.lang.Class forName(java.lang.String className) throws java.lang.ClassNotFoundException {
         className = className.replace('$', '.');
         Class c = forNameImpl(className);
@@ -136,7 +175,180 @@ public final class Class<T> implements java.lang.reflect.Type {
      * class upon which the getResourceAsStream method was called.
      */
     public java.io.InputStream getResourceAsStream(java.lang.String name){
-         return null; 
+        if (name == null) {
+            return null;
+        }
+        String absolute = name;
+        if (!absolute.startsWith("/")) {
+            // Relative names resolve against this class's package, as the javadoc
+            // above describes.
+            //
+            // KNOWN LIMITATION, for a NESTED class only. getName() cannot be told
+            // apart from a package here, because ParparVM builds the runtime class
+            // name as clsName.replace('_', '.') in ByteCodeClass -- it starts from
+            // the MANGLED name, so the '$' that separates a nested class from its
+            // outer one arrives as a '.', and so does any '_' in a class's own
+            // name. Outer$Inner therefore reports "a.b.Outer.Inner" where the JDK
+            // reports "a.b.Outer$Inner", and the package derived below is
+            // "a.b.Outer" rather than "a.b".
+            //
+            // The consequence is a MISS, not a wrong file: the derived path is a
+            // directory named after a class, which a resource tree does not have,
+            // so the lookup returns null exactly as it did before this method was
+            // implemented. It is deliberately not patched up by walking shorter
+            // prefixes -- a package really can be named like a class, and that
+            // would turn today's miss into a confidently wrong hit. The fix
+            // belongs in the name the VM reports, which is a change to getName()
+            // for every translated application and wants its own testing.
+            //
+            // PUSHBACK, so the next reader does not re-open this: fixing it HERE
+            // means guessing where the package ends, and every guess is wrong for
+            // some real input -- a package may legitimately be named like a class,
+            // and a class name may legitimately contain '_'. A guess would convert
+            // today's harmless miss into a confident wrong answer. The defect is
+            // that getName() is lossy; it is fixed there or not at all.
+            String className = getName();
+            int lastDot = className.lastIndexOf('.');
+            absolute = lastDot < 0 ? "/" + name
+                    : "/" + className.substring(0, lastDot).replace('.', '/') + "/" + name;
+        }
+        // Resources linked INTO the executable are deliberately not consulted here.
+        //
+        // CORRECTION, because the first version of this comment blamed the wrong
+        // thing: withdrawing this tier did NOT fix the ValidatorLightweightPicker
+        // screenshot difference, which persists without it. That is still an open
+        // question about this branch and the cause is elsewhere.
+        //
+        // The tier stays withdrawn on its own merits rather than that one. On
+        // master this method is `return null` on every ParparVM target, so no
+        // application has ever received anything from it and every caller has
+        // always taken its not-found path. Handing those callers a resource for the
+        // first time is a behaviour change for every shipping application, and it
+        // is a separate feature from self-hosting, which needs only the filesystem
+        // tier below. The javadoc this replaces claimed "nothing can regress, only
+        // start working" -- an assumption that every not-found path is strictly
+        // worse than the resource, which is not something this change established.
+        //
+        // The filesystem tier below stays, because it is OPT-IN: it answers only
+        // when CN1_RESOURCE_PATH names a search root, which no application sets and
+        // the self-hosted translator does. So an application sees exactly what it
+        // saw on master -- null -- and the translator can still find the C runtime
+        // it has to copy into its output.
+        //
+        // Letting applications read their own embedded resources is a good feature
+        // and wants its own change, where the screenshot baselines it moves can be
+        // reviewed as the point of the change rather than as fallout from one.
+        return cn1FileResource(absolute);
+    }
+
+
+    /**
+     * The filesystem half of {@link #getResourceAsStream}: looks the resource up
+     * under a search path, so a translated command-line program can read files that
+     * sit beside it rather than being linked into it.
+     *
+     * The path comes from CN1_RESOURCE_PATH, else a "cn1runtime" directory next to
+     * the executable. Entries are separated the way the platform separates path
+     * entries.
+     */
+    private static java.io.InputStream cn1FileResource(String absolute) {
+        String path = System.getenv("CN1_RESOURCE_PATH");
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        String relative = absolute.substring(1);
+        // A resource name is not a path expression. Refusing any ".." segment keeps
+        // a lookup inside the search root it was found under; without it a name
+        // like "../../etc/passwd" reads straight out of the filesystem, and the
+        // caller is usually passing a name that came from data.
+        if (relative.length() == 0 || cn1EscapesRoot(relative)) {
+            return null;
+        }
+        int from = 0;
+        while (from <= path.length()) {
+            int end = cn1PathEntryEnd(path, from);
+            String root = end < 0 ? path.substring(from) : path.substring(from, end);
+            if (root.length() > 0) {
+                java.io.File candidate = new java.io.File(root, relative);
+                // isFile(), not exists(): a DIRECTORY with the requested name exists
+                // and cannot be opened, and returning on that would abandon the
+                // search. Later roots still get their turn, which is the point of
+                // having a search path at all -- an earlier root holding an
+                // unusable candidate must not mask a usable one behind it.
+                if (candidate.isFile()) {
+                    try {
+                        return new java.io.FileInputStream(candidate);
+                    } catch (java.io.IOException err) {
+                        // Unreadable here does not mean absent everywhere: keep going.
+                        err = null;
+                    }
+                }
+            }
+            if (end < 0) {
+                break;
+            }
+            from = end + 1;
+        }
+        return null;
+    }
+
+    /**
+     * True when any segment of a resource-relative path is "..".
+     *
+     * A backslash counts as a separator as well as '/'. Resource names are
+     * '/'-separated by specification, but nothing stops a caller passing a Windows
+     * path, and there File("root", "..\\..\\x") escapes exactly as the '/' form
+     * does -- checking only '/' would leave the traversal open on the one platform
+     * whose separator it is.
+     */
+    private static boolean cn1EscapesRoot(String relative) {
+        int from = 0;
+        for (int i = 0; i <= relative.length(); i++) {
+            boolean atEnd = i == relative.length();
+            if (!atEnd && relative.charAt(i) != '/' && relative.charAt(i) != '\\') {
+                continue;
+            }
+            if (relative.substring(from, i).equals("..")) {
+                return true;
+            }
+            from = i + 1;
+        }
+        return false;
+    }
+
+    /**
+     * The index that ends the search-path entry starting at {@code from}, or -1 for
+     * the last one.
+     *
+     * This cannot use {@code File.pathSeparatorChar}, which is a hard-coded ':' in
+     * this class library rather than a platform value -- on a native Windows build
+     * that splits "C:\\res;D:\\res" after the drive letter and every entry is
+     * nonsense. Both separators are therefore accepted, and a ':' is not a
+     * separator when it sits directly after a single-letter entry and is followed
+     * by a slash, which is exactly a DOS drive prefix and never a POSIX path.
+     */
+    private static int cn1PathEntryEnd(String path, int from) {
+        for (int i = from; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == ';') {
+                return i;
+            }
+            if (c == ':') {
+                boolean driveLetter = i == from + 1
+                        && i + 1 < path.length()
+                        && (path.charAt(i + 1) == '\\' || path.charAt(i + 1) == '/')
+                        && cn1IsLetter(path.charAt(from));
+                if (!driveLetter) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /** ASCII letter test; Character.isLetter is locale-aware and not wanted here. */
+    private static boolean cn1IsLetter(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
     
     /**
@@ -193,6 +405,12 @@ public final class Class<T> implements java.lang.reflect.Type {
      * Creates a new instance of a class.
      */
     public java.lang.Object newInstance() throws java.lang.InstantiationException, java.lang.IllegalAccessException {
+        if (isPrimitive()) {
+            // A primitive descriptor has no constructor, and its newInstanceFp is
+            // zero -- the native calls that pointer unconditionally, so letting one
+            // through jumps to address zero instead of throwing.
+            throw new InstantiationException();
+        }
         Object o = newInstanceImpl();
         if(o == null) {
             throw new InstantiationException();
@@ -211,6 +429,11 @@ public final class Class<T> implements java.lang.reflect.Type {
      * returns "void".
      */
     public java.lang.String toString() {
+        if (isPrimitive()) {
+            // "int", not "int class" -- java.lang.Class documents the primitive form
+            // as the name alone.
+            return getName();
+        }
         return getName() + " class";
     }
 

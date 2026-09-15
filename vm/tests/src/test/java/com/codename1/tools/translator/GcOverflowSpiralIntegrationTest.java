@@ -232,7 +232,14 @@ class GcOverflowSpiralIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("gc-overflow-output");
         tempDirs.add(outputDir);
-        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "GcOverflowSpiralApp");
+        // "clean", NOT the 3-arg default. That default is appType "ios", which emits the C
+        // runtime as OBJECTIVE-C -- cn1_globals.m and nativeMethods.m -- while the CMake
+        // project this test then builds globs only *.c. The runtime is therefore excluded
+        // silently, and the link fails on whichever natives the app happens to retain
+        // (cn1Value for every boxed type, System.gcIdleWaitMillis, readImpl). It looks
+        // like a GC regression and is a target-type mismatch. Tests whose apps cull all
+        // of those link anyway, which is why this stayed hidden.
+        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "GcOverflowSpiralApp", "clean");
 
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
@@ -241,9 +248,25 @@ class GcOverflowSpiralIntegrationTest {
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
+        // PIN THE WORKLIST SIZE THIS TEST EXISTS TO STRESS.
+        //
+        // What is under test here is the OVERFLOW path: when the mark worklist cannot
+        // hold the frontier, the collector must fall back to the page rescan and still
+        // produce a sound mark. That mechanism is independent of how big the worklist
+        // happens to be by default.
+        //
+        // The product default was raised from 65536 to 1048576 entries (see
+        // CN1_GC_MARK_WORKLIST_SIZE -- the rescan was measured doing 10.1 million slot
+        // walks across 68 passes for zero useful work). At the larger size this test's
+        // fixed workload no longer comes near the limit, and the test correctly refused
+        // to pass: "the grace pass never drained mid-walk ... the assertion above proves
+        // nothing". Pinning the size keeps the test measuring the mechanism rather than
+        // the current default, and means raising or lowering that default again cannot
+        // silently turn this gate into a no-op.
         List<String> cmakeArgs = new ArrayList<>(Arrays.asList(
                 "cmake", "-S", distDir.toString(), "-B", buildDir.toString(),
-                "-DCMAKE_BUILD_TYPE=Release"));
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DCMAKE_C_FLAGS=-DCN1_GC_MARK_WORKLIST_SIZE=65536"));
         cmakeArgs.addAll(CompilerHelper.cmakeToolchainArgs());
         CleanTargetIntegrationTest.runCommand(cmakeArgs, distDir);
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
