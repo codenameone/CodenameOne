@@ -2428,7 +2428,27 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return true;
         }
         for (AnnotatedClass cls : ctx.getClassIndex().values()) {
-            if (cls.getClassAnnotation(OrmAnnotationProcessor.ENTITY_DESC) != null) {
+            if (cls.getClassAnnotation(OrmAnnotationProcessor.ENTITY_DESC) == null) {
+                continue;
+            }
+            // THE SAME BACKING-SOURCE QUESTION THE ORM PROCESSOR ASKS, because
+            // this is the other half of one decision and only half of it was
+            // fixed.
+            //
+            // Maven does not clean target/classes between incremental builds, so
+            // deleting the last entity source leaves its annotated .class behind.
+            // The ORM processor now ignores that class and DELETES the stale
+            // BackendDaoBootstrap -- and this loop went on answering true, so the
+            // generated BackendApplication referenced a bootstrap that had just
+            // been removed and the module would not compile until mvn clean.
+            //
+            // The index holds this project's own compiled output, so a class in
+            // it with no source under these roots is an orphan. Entities that
+            // live in a DEPENDENCY are unaffected: they have no source here by
+            // construction, and the bootstrap-on-disk branch above is what
+            // answers for them.
+            if (BuildHintAnnotationProcessor.hasBackingSource(cls,
+                    ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
                 return true;
             }
         }

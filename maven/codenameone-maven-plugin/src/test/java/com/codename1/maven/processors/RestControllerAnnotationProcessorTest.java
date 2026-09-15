@@ -261,6 +261,43 @@ public class RestControllerAnnotationProcessorTest {
                         .get(RestControllerAnnotationProcessor.MAIN_CLASS_RESOURCE));
     }
 
+    /// An @Entity named to match compileBoth's second file.
+    private static final String ORPHANED_ENTITY_SOURCE =
+            "package com.example;\n"
+            + "import com.codename1.annotations.*;\n"
+            + "@Entity public class Other {\n"
+            + "    @Id public long id;\n"
+            + "    public Other() {}\n"
+            + "}\n";
+
+    @Test
+    public void anOrphanedEntityDoesNotBreakTheGeneratedEntryPoint() throws Exception {
+        // THE OTHER HALF OF THE STALE-ENTITY FIX, and the assertion is the exact
+        // failure it produces rather than a proxy for it.
+        //
+        // Maven does not clean target/classes, so deleting the last entity source
+        // leaves its annotated .class behind. The ORM processor now ignores that
+        // class and DELETES the stale BackendDaoBootstrap -- and this processor
+        // went on seeing the orphan in the class index, so the generated
+        // BackendApplication still wrote `new ...BackendDaoBootstrap()` for a
+        // class that had just been removed. run() compiles what it generates, so
+        // that is a "cannot find symbol" here and "would not build until mvn
+        // clean" in a real module.
+        //
+        // The controller keeps ITS source, so the entry point really is
+        // generated: without one nothing is emitted at all and this would pass
+        // for any implementation, which is what a first version of it did.
+        File classes = compileBoth(CONTROLLER_SOURCE, ORPHANED_ENTITY_SOURCE);
+        File root = tmp.newFolder();
+        File pkg = new File(root, "com/example");
+        assertTrue(pkg.mkdirs());
+        writeUtf8(new File(pkg, "Notes.java"), CONTROLLER_SOURCE);
+        ProcessorContext ctx = run(classes,
+                Collections.singletonList(root.getAbsolutePath()));
+        assertFalse("an entity whose source is gone must not be an error",
+                ctx.hasErrors());
+    }
+
     @Test
     public void removesTheMainMarkerWhenNoControllerRemains() throws Exception {
         // Deleting the last controller used to leave the marker behind, naming a
