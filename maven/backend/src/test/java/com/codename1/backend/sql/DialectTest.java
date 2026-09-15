@@ -232,7 +232,7 @@ class DialectTest {
         // application-assigned string key is a VARCHAR there and TEXT elsewhere.
         // NOT NULL because SQLite would otherwise admit a null key; see
         // assignedKeysAreNotNull.
-        assertEquals("VARCHAR(255) NOT NULL PRIMARY KEY",
+        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL PRIMARY KEY",
                 Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
         assertEquals("TEXT NOT NULL PRIMARY KEY", Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT));
     }
@@ -359,7 +359,7 @@ class DialectTest {
         assertTrue(Dialect.POSTGRES.assignedKeyColumn(Dialect.TEXT).contains("NOT NULL"));
         assertTrue(Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT).contains("NOT NULL"));
         assertEquals("TEXT NOT NULL PRIMARY KEY", Dialect.SQLITE.assignedKeyColumn(Dialect.TEXT));
-        assertEquals("VARCHAR(255) NOT NULL PRIMARY KEY",
+        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL PRIMARY KEY",
                 Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
     }
 
@@ -399,8 +399,11 @@ class DialectTest {
         assertEquals("TEXT", Dialect.POSTGRES.columnType(Dialect.TEXT));
 
         // A KEY is the exception and stays bounded, because MySQL cannot index
-        // an unbounded column at all. See Table.MAX_ASSIGNED_TEXT_KEY.
-        assertEquals("VARCHAR(255) NOT NULL PRIMARY KEY",
+        // an unbounded column at all. See Table.MAX_ASSIGNED_TEXT_KEY. It also
+        // pins a BINARY collation: MySQL's default is case and accent
+        // insensitive, so "A" and "a" were the same primary key there while
+        // SQLite and PostgreSQL stored two rows.
+        assertEquals("VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL PRIMARY KEY",
                 Dialect.MYSQL.assignedKeyColumn(Dialect.TEXT));
     }
 }

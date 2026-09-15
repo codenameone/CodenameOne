@@ -614,7 +614,21 @@ public abstract class Dialect {
          */
         public String assignedKeyColumn(int kind) {
             if(kind == TEXT) {
-                return "VARCHAR(255) NOT NULL PRIMARY KEY";
+                // BINARY COLLATION, because MySQL's default one is case AND
+                // accent insensitive: with it, "A" and "a" are the same primary
+                // key. Measured against a live server -- inserting both gives
+                // "Duplicate entry 'a' for key 'PRIMARY'" here, while SQLite and
+                // PostgreSQL store two rows. An application that issued keys as
+                // mixed-case tokens lost rows on one engine only, and the loss
+                // is a duplicate-key error at best and a silent overwrite of
+                // meaning at worst.
+                //
+                // The charset is pinned with it: COLLATE alone conflicts when
+                // the table or database charset is not utf8mb4, and the other
+                // two engines are UTF-8 throughout, so naming it is what makes
+                // the three agree rather than depending on server defaults.
+                return "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin "
+                        + "NOT NULL PRIMARY KEY";
             }
             return columnType(kind) + " NOT NULL PRIMARY KEY";
         }
