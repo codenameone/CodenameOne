@@ -53,6 +53,14 @@ WINDOWS = os.name == "nt"
 # a build failure; keep reproducing that shape here.
 AWKWARD = "Project O'Brien with spaces"
 
+# An allowlist, not a blocklist. The launchers expose ios, ios_release,
+# ios_source, xcode, mac_native and mac_catalyst, all of which need a Mac host
+# and cost several times a normal build -- and a blocklist would have to be
+# updated every time another one is added. These are the cheap, non-Apple
+# targets a canary has any reason to ask for.
+CHEAP_TARGETS = ("javascript", "windows_device", "windows_desktop",
+                 "linux_device", "android", "android_source")
+
 
 class CanaryFailure(RuntimeError):
     """A user-visible breakage. The message becomes the GitHub issue body."""
@@ -341,6 +349,39 @@ def await_cloud_build(opener, base, known_ids, target, launcher_code, output,
     )
 
 
+def check_target_is_cloud(project, target):
+    """Confirm the served launcher maps this target to a cloud build.
+
+    Target names are not portable between launchers: the project archetype maps
+    `javascript` to `local-javascript` and keeps a separate `javascript_cloud`,
+    while the starter served by the console maps `javascript` straight to the
+    cloud target. Reading the launcher we were actually handed is the only way
+    to be sure -- and without this the canary would spend the full build poll
+    waiting for a build that was never going to be submitted, then report the
+    starter as broken when the real fault is the target name.
+    """
+    launcher = project / ("build.bat" if WINDOWS else "build.sh")
+    if not launcher.exists():
+        raise CanaryFailure(f"the served starter has no {launcher.name}")
+    text = launcher.read_text(encoding="utf-8", errors="replace")
+    marker = f":{target}" if WINDOWS else f"function {target}"
+    if marker not in text:
+        offered = re.findall(r"^:([a-z_0-9]+)" if WINDOWS else r"^function ([a-z_0-9]+)",
+                             text, re.MULTILINE)
+        raise CanaryFailure(
+            f"the served {launcher.name} has no '{target}' target. It offers: "
+            f"{', '.join(sorted(set(offered))) or 'nothing recognisable'}."
+        )
+    body = text.split(marker, 1)[1][:400]
+    if "local-" in body:
+        raise CanaryFailure(
+            f"'{target}' maps to a LOCAL build in the served {launcher.name} "
+            f"(buildTarget contains 'local-'), so it would never submit anything. "
+            "Point the canary at the launcher's cloud target instead."
+        )
+    log(f"'{target}' is a cloud target in the served {launcher.name}")
+
+
 def find_maven(project):
     """Prefer the shipped wrapper -- that is what a real user runs."""
     wrapper = project / ("mvnw.cmd" if WINDOWS else "mvnw")
@@ -371,10 +412,11 @@ def main():
         raise CanaryFailure(
             "CN1_CANARY_EMAIL and CN1_CANARY_PASSWORD are not set; the canary cannot sign in."
         )
-    if args.target.startswith("iphone") or args.target in ("macos",):
+    if args.target not in CHEAP_TARGETS:
         raise CanaryFailure(
-            f"refusing target '{args.target}': Apple targets cost 8 credits per build "
-            "and would exhaust the canary account's monthly allowance."
+            f"refusing target '{args.target}': the canary only submits cheap, non-Apple "
+            f"builds ({', '.join(CHEAP_TARGETS)}). Apple targets need a Mac host and cost "
+            "several times a normal build, which a nightly run would not survive."
         )
 
     base = args.base.rstrip("/")
@@ -392,6 +434,7 @@ def main():
 
         check_launcher_bits(project, modes)
         version = check_repositories(project)
+        check_target_is_cloud(project, args.target)
 
         if args.skip_build:
             log("--skip-build set; stopping after artefact checks")

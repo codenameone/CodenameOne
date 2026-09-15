@@ -46,7 +46,17 @@ python3 scripts/ci/starter-canary/starter_canary.py --skip-build
 python3 scripts/ci/starter-canary/starter_canary.py --target javascript
 ```
 
-Apple targets cost several times a normal build and the script refuses them.
+The canary only accepts cheap, non-Apple targets (`javascript`,
+`windows_device`, `windows_desktop`, `linux_device`, `android`,
+`android_source`) — an allowlist rather than a blocklist, so a new Apple target
+cannot slip through by being added later.
+
+Target names are also not portable between launchers: the project archetype maps
+`javascript` to a **local** build and keeps a separate `javascript_cloud`, while
+the starter served by the console maps `javascript` straight to the cloud
+target. The canary reads the launcher it was actually handed and fails
+immediately if the chosen target would build locally, rather than waiting out
+the full build poll for a submission that was never going to happen.
 
 ## The assertions
 

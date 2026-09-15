@@ -157,5 +157,40 @@ class StarterAssertions(unittest.TestCase):
             self.unpack(buffer)
 
 
+class TargetGuards(unittest.TestCase):
+    """Target names are not portable between launchers, so read the served one."""
+
+    CLOUD = 'function javascript {\n  "$MVNW" "package" "-Dcodename1.buildTarget=javascript"\n}\n'
+    LOCAL = 'function javascript {\n  "$MVNW" "package" "-Dcodename1.buildTarget=local-javascript"\n}\n'
+
+    def launcher(self, text):
+        directory = Path(tempfile.mkdtemp())
+        (directory / ("build.bat" if canary.WINDOWS else "build.sh")).write_text(text)
+        return directory
+
+    def test_cloud_target_accepted(self):
+        canary.check_target_is_cloud(self.launcher(self.CLOUD), "javascript")
+
+    def test_local_target_rejected_before_the_long_poll(self):
+        """The archetype maps `javascript` to local-javascript; catch it up front."""
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.check_target_is_cloud(self.launcher(self.LOCAL), "javascript")
+        self.assertIn("LOCAL build", str(caught.exception))
+
+    def test_unknown_target_lists_what_is_offered(self):
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.check_target_is_cloud(self.launcher(self.CLOUD), "javascript_cloud")
+        self.assertIn("javascript", str(caught.exception))
+
+    def test_apple_launcher_targets_are_not_in_the_allowlist(self):
+        for target in ("ios", "ios_release", "ios_source", "xcode",
+                       "mac_native", "mac_catalyst"):
+            self.assertNotIn(target, canary.CHEAP_TARGETS, target)
+
+    def test_allowlist_holds_only_cheap_targets(self):
+        for target in canary.CHEAP_TARGETS:
+            self.assertFalse(target.startswith(("ios", "mac", "xcode")), target)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

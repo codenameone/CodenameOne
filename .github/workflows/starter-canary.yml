@@ -62,6 +62,13 @@ jobs:
       # One runner must not mask the other: past breakages have been
       # unix-only (the execute bit) and Windows-only (the batch launcher).
       fail-fast: false
+      # The workflow-level concurrency group serialises separate RUNS, not the
+      # legs inside one run. These two share a single build account, which
+      # allows one build in flight, and each identifies its own build by
+      # diffing the account's build list -- so running them together risks a
+      # rejected submission and, worse, one leg adopting the other's build and
+      # masking a platform-specific launcher failure.
+      max-parallel: 1
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -90,6 +97,11 @@ jobs:
           CN1_CANARY_PASSWORD: ${{ secrets.CN1_CANARY_PASSWORD }}
           CN1_CANARY_TOKEN: ${{ secrets.CN1_CANARY_TOKEN }}
           CANARY_REPORT: ${{ runner.temp }}/canary.json
+        # Explicitly bash: on windows-latest the default shell is PowerShell,
+        # where a trailing backslash does not continue a line, so python would
+        # get a stray argument and the --target/--report lines would be run as
+        # separate commands.
+        shell: bash
         run: |
           python3 scripts/ci/starter-canary/starter_canary.py \
             --target "${{ github.event.inputs.target || 'javascript' }}" \
