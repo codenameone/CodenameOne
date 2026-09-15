@@ -121,8 +121,14 @@ def strip_comments(text):
 # it. Nested types are read from the source rather than guessed, so a link to
 # Outer.Inner is checked as exactly as one to a top-level class.
 DECLARATION = re.compile(
+    # Annotations may sit between the modifiers and the keyword, and Java
+    # allows them in any order: "public @Documented @Retention(...) @interface
+    # Inherited" is how the CLDC annotations are written. Stopping the group at
+    # the first '@' left those looking package-private, so their pages were
+    # called dead.
     r'(?P<modifiers>(?:\b(?:public|protected|private|static|final|abstract'
-    r'|strictfp|sealed|non-sealed)\s+)*)'
+    r'|strictfp|sealed|non-sealed)\s+'
+    r'|@(?!\s*interface\b)[A-Za-z][A-Za-z0-9.]*(?:\s*\([^)]*\))?\s*)*)'
     # The annotation form has to come first, and the plain "interface" must
     # refuse to match inside it: \b cannot match before '@', so
     # "public @interface Route" was matched from its inner token and lost the
