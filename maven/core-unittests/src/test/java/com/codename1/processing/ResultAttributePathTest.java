@@ -423,10 +423,20 @@ class ResultAttributePathTest {
         // came out as its first KEY. The child form of the same path returns
         // the object, and the two have to agree.
         Result r = Result.fromContent(
-                "{\"items\":[{\"profile\":{\"name\":\"A\"}}]}", Result.JSON);
+                "{\"items\":[{\"profile\":{\"name\":\"A\"},\"n\":\"X\"}]}",
+                Result.JSON);
         assertEquals(r.getAsArray("/items/profile").toString(),
                 r.getAsArray("/items/@profile").toString(),
                 "the attribute form and the child form disagree");
+
+        // Reading the object is one thing; comparing against it is another.
+        // getText() answers a map with its first KEY, so this matched -- and
+        // which key it matched depended on the map's iteration order.
+        assertEquals(0, r.getAsStringArray("/items[@profile='name']/n").length,
+                "a predicate compared against a key of the object");
+        // Asking whether the field is there still works.
+        assertEquals(1, r.getAsStringArray("/items[@profile]/n").length,
+                "the field stopped being found at all");
     }
 
     @Test

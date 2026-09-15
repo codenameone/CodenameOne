@@ -77,6 +77,30 @@ class AttributeEvaluator extends AbstractEvaluator {
     }
 
 
+    /// The text of a value that can be compared, or null when there is none.
+    ///
+    /// A JSON field can hold an object, and getText() answers a map with its
+    /// first KEY -- so "[@profile='name']" matched {"profile":{"name":"A"}},
+    /// and which key it matched depended on the map's iteration order. An
+    /// object is not a scalar and has nothing to compare against; the step
+    /// that READS a field still hands back the object itself.
+    ///
+    /// An array is not the same case: its values arrive here one at a time,
+    /// each in its own node.
+    ///
+    /// - `value`: one value of the named field
+    ///
+    /// #### Returns
+    ///
+    /// the text, or null when the value is structured or has none
+    private static String scalarText(StructuredContent value) {
+        Object root = value.getNativeRoot();
+        if (root instanceof java.util.Map || root instanceof java.util.List) {
+            return null;
+        }
+        return value.getText();
+    }
+
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(com.codename1.path.impl.StructuredContent, java.lang.String, java.lang.String)
      */
@@ -89,7 +113,7 @@ class AttributeEvaluator extends AbstractEvaluator {
         // Every value, because a JSON field can be an array and a match on any
         // of them is a match -- the same rule child evaluation has always used.
         for (Object value : values) {
-            String attr = ((StructuredContent) value).getText();
+            String attr = scalarText((StructuredContent) value);
             if (attr == null) {
                 continue;
             }
@@ -118,7 +142,7 @@ class AttributeEvaluator extends AbstractEvaluator {
         // Every value, because a JSON field can be an array and a match on any
         // of them is a match -- the same rule child evaluation has always used.
         for (Object value : values) {
-            String attr = ((StructuredContent) value).getText();
+            String attr = scalarText((StructuredContent) value);
             if (attr == null) {
                 continue;
             }
@@ -155,7 +179,7 @@ class AttributeEvaluator extends AbstractEvaluator {
         }
         rvalue = stripQuotes(rvalue);
         for (Object value : values) {
-            String attr = ((StructuredContent) value).getText();
+            String attr = scalarText((StructuredContent) value);
             if (attr == null) {
                 continue;
             }
