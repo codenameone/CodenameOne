@@ -763,7 +763,16 @@ final class Placeholders {
             if(c == '$') {
                 break;
             }
-            boolean letter = c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            // ANYTHING ABOVE ASCII IS A LETTER HERE, for the reason isWordChar
+            // gives: a dollar-quote tag follows PostgreSQL's unquoted-identifier
+            // rules, which admit the letters of the server encoding. isWordChar
+            // was widened for the boundary test and this one was left behind, so
+            // the OPENER was recognised and then the tag rejected -- and
+            // "SELECT $<e-acute>$?$<e-acute>$" counted the question mark inside
+            // the quoted body as a parameter and refused a zero-parameter call.
+            // The two tests are the same rule and have to move together.
+            boolean letter = c == '_' || c >= 0x80
+                    || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
             // A digit is a tag character everywhere except first, which is the
             // rule that leaves a hand-written $1 alone: it is a parameter that
             // PostgreSQL spells for itself, not the opening of a quoted body.
