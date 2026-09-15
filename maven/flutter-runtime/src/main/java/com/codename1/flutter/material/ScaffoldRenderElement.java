@@ -23,6 +23,8 @@
  */
 package com.codename1.flutter.material;
 
+import com.codename1.flutter.animation.AnimationController;
+
 import com.codename1.flutter.Element;
 import com.codename1.flutter.RenderElement;
 import com.codename1.flutter.rendering.BoxConstraints;
@@ -278,7 +280,67 @@ public class ScaffoldRenderElement extends RenderElement {
         // footer and the bottom navigation bar, so it floats over both; mounted
         // before them it is painted under them, and a DOCKED fab -- which
         // straddles the bar's top edge by design -- loses its whole bottom half.
-        fabChild = updateChild(fabChild, scaffold().getFloatingActionButton(), 2);
+        fabChild = updateChild(fabChild, fabWidget(), 2);
+    }
+
+    /// Scales the floating action button in and out, instead of it appearing and
+    /// vanishing between one frame and the next.
+    ///
+    /// Flutter's Scaffold runs every change of this slot through
+    /// {@code FloatingActionButtonAnimator.scaling} over
+    /// {@code kFloatingActionButtonSegue}. Dropping the widget outright is a visibly
+    /// different thing: Reply hides the button while its mailbox drawer opens, and the
+    /// reference still shows it 50ms in and has scaled it away by 100ms, where ours was
+    /// simply gone on the first frame of the gesture -- the button did not leave, it was
+    /// never there.
+    private static final int FAB_SEGUE_MS = 200;
+
+    private AnimationController fabScale;
+    private com.codename1.flutter.Widget lastFab;
+
+    private com.codename1.flutter.Widget fabWidget() {
+        com.codename1.flutter.Widget now = scaffold().getFloatingActionButton();
+        if (fabScale == null) {
+            if (now == null) {
+                return null;
+            }
+            fabScale = new AnimationController();
+            fabScale.duration(dart.core.Duration.of(0, 0, 0, 0, FAB_SEGUE_MS, 0));
+            // Present from the start: a scaffold that opens WITH a button did not
+            // animate one in, and scaling the first frame up would be an entrance
+            // nobody asked for.
+            fabScale.value(1.0);
+            fabScale.addListener(new dart.runtime.Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    markNeedsBuild();
+                }
+            });
+        }
+        if (now != null) {
+            lastFab = now;
+            if (fabScale.value().doubleValue() < 1.0) {
+                fabScale.forward(null);
+            }
+        } else if (lastFab != null) {
+            // Going: keep building the button that is leaving until it has finished
+            // leaving. Nothing else is holding it, so dropping it here is what made the
+            // exit instant.
+            if (fabScale.value().doubleValue() > 0.0) {
+                fabScale.reverse(null);
+                now = lastFab;
+            } else {
+                lastFab = null;
+            }
+        }
+        if (now == null) {
+            return null;
+        }
+        com.codename1.flutter.animation.ScaleTransition scaled =
+                new com.codename1.flutter.animation.ScaleTransition();
+        scaled.scale(fabScale);
+        scaled.child(now);
+        return scaled;
     }
 
     /**
