@@ -1315,6 +1315,37 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void twoVaultsConfiguredFromOneOptionsObjectDoNotShareItsPolicy() throws Exception {
+        // VaultOptions is mutable and this class mutates it: setPolicy writes the new policy
+        // through options.policy(...) and restores it in a finally. Retaining the caller's
+        // instance therefore tied together every vault configured from it -- changing one vault's
+        // policy silently changed what the other would enrol under next, so a vault could begin
+        // persisting a device key with nothing having called setPolicy on it.
+        VaultOptions shared = fast().policy(UnlockPolicy.SESSION_ONLY);
+        String first = freshName();
+        String second = freshName();
+        Vault one = Vault.named(first).configure(shared);
+        Vault two = Vault.named(second).configure(shared);
+        one.enroll(pw("p"), shared).get();
+        two.enroll(pw("p"), shared).get();
+
+        assertTrue(one.setPolicy(UnlockPolicy.REMEMBER_DEVICE).get().booleanValue());
+
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, one.getPolicy(),
+                "the vault that asked for it gets it");
+        assertEquals(UnlockPolicy.SESSION_ONLY, two.getPolicy(),
+                "and the one that did not must be untouched");
+        // The caller's own object is not rewritten under it either.
+        assertEquals(UnlockPolicy.SESSION_ONLY, shared.getPolicy(),
+                "the options the application still holds must say what it set");
+
+        // The consequence that makes this matter: a vault that never asked to be remembered must
+        // not have written a device key.
+        Vault reopened = Vault.named(second).configure(fast());
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()));
+    }
+
+    @Test
     void anAbsurdlyLargeSyncStateIsRefusedBeforeItIsDecoded() throws Exception {
         // Sync state comes from whatever the application syncs against, and everything INSIDE the
         // record is size-checked while the record itself was not -- so none of those limits

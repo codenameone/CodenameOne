@@ -50,6 +50,31 @@ public final class VaultOptions {
     /// [ProtectionReport#UNKNOWN] does not satisfy a requirement. A platform that cannot say
     /// whether a key is hardware backed has not provided hardware backing as far as a policy is
     /// concerned, and an application that needs the guarantee needs the refusal.
+    /// A private copy of these options.
+    ///
+    /// `Vault.configure` takes one, because this class is MUTABLE and the vault mutates it:
+    /// `setPolicy` writes the new policy through `options.policy(...)` and restores it in a
+    /// finally. Retaining the caller's instance meant one options object configuring two vaults
+    /// tied them together -- changing one vault's policy silently changed what the other would
+    /// enrol or import under next, so a vault could start persisting a device key without anyone
+    /// having called setPolicy on it.
+    ///
+    /// The Protection array is copied too, since an array is as shared as the object holding it.
+    /// The DeviceProtection is not: it is an SPI implementation, deliberately shared, and copying
+    /// it is neither possible nor wanted.
+    VaultOptions copy() {
+        VaultOptions out = new VaultOptions();
+        out.required = new Protection[required.length];
+        System.arraycopy(required, 0, out.required, 0, required.length);
+        out.kdf = kdf;
+        out.policy = policy;
+        out.autoLockMillis = autoLockMillis;
+        out.opaqueKeysOnly = opaqueKeysOnly;
+        out.deviceProtection = deviceProtection;
+        out.deviceBoundPasskeyRequired = deviceBoundPasskeyRequired;
+        return out;
+    }
+
     public VaultOptions require(Protection protection) {
         if (protection == null) {
             return this;

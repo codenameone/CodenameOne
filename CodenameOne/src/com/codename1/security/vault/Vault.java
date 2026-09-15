@@ -181,7 +181,13 @@ public final class Vault {
     /// does the work of removing wraps the new policy forbids.
     public Vault configure(VaultOptions newOptions) {
         if (newOptions != null) {
-            options = newOptions;
+            // Copied, not retained. VaultOptions is mutable and this class mutates it: setPolicy
+            // writes the new policy through options.policy(...) and restores it in a finally. So
+            // one options object configuring two vaults used to tie them together -- changing one
+            // vault's policy silently changed what the other would enrol or import under next,
+            // and a vault could begin persisting a device key with nothing having called
+            // setPolicy on it.
+            options = newOptions.copy();
         }
         return this;
     }
@@ -329,7 +335,10 @@ public final class Vault {
     /// protection is missing, or [VaultError#STORAGE_UNAVAILABLE] if nothing could be written
     public AsyncResource<Boolean> enroll(final char[] password, VaultOptions opts) {
         if (opts != null) {
-            options = opts;
+            // Copied, for the reason configure gives: this is the second way a caller's mutable
+            // options object gets retained, and the two vaults tied together by it do not care
+            // which door it came through.
+            options = opts.copy();
         }
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
@@ -987,11 +996,7 @@ public final class Vault {
                         // Asked again after the write, like createRecoveryCode. Completing here
                         // would let a screen that was already stale when the user touched it
                         // change what the vault holds after lock() had returned.
-                        if (previous instanceof String) {
-                            Storage.getInstance().writeObject(entry, previous);
-                        } else {
-                            Storage.getInstance().deleteStorageFile(entry);
-                        }
+                        requireSecretRestored(entry, previous);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this secret was being stored");
                     }
@@ -1103,9 +1108,7 @@ public final class Vault {
                     Object previous = readUncached(entry);
                     Storage.getInstance().deleteStorageFile(entry);
                     if (generation != lockGeneration) {
-                        if (previous instanceof String) {
-                            Storage.getInstance().writeObject(entry, previous);
-                        }
+                        requireSecretRestored(entry, previous);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this secret was being removed");
                     }
@@ -3142,6 +3145,31 @@ public final class Vault {
     /// characters each, so this still admits something like eighteen thousand rotations -- a
     /// daily rotation for fifty years. It is a bound on the absurd, not a quota.
     private static final int MAX_SYNC_STATE = 4 * 1024 * 1024;
+
+    /// Puts one secret entry back the way it was, and refuses to claim it did when it did not.
+    ///
+    /// Both lock-race rollbacks used to write or delete and then report LOCKED regardless.
+    /// writeObject returns a boolean nobody read and deleteStorageFile returns void, so a storage
+    /// failure during the rollback left the caller told "the vault was locked, nothing changed"
+    /// over a secret that had in fact been overwritten, created or deleted. LOCKED is a promise
+    /// that nothing changed; when it cannot be kept the answer is the storage failure, which is
+    /// the one the caller can do something about.
+    private static void requireSecretRestored(String entry, Object previous) {
+        if (previous instanceof String) {
+            if (!Storage.getInstance().writeObject(entry, previous)) {
+                throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                        "the vault was locked while this secret was being changed, and the value "
+                        + "that was there could not be put back");
+            }
+            return;
+        }
+        Storage.getInstance().deleteStorageFile(entry);
+        if (!definitelyGone(entry)) {
+            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                    "the vault was locked while this secret was being changed, and the entry "
+                    + "this call created could not be removed again");
+        }
+    }
 
     /// Refuses a sync state too large to be one, before anything decodes it.
     private static void requirePlausibleSyncState(byte[] state) {
