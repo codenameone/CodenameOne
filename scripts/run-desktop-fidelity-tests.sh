@@ -114,6 +114,14 @@ if [ -z "$SIM_JAR" ]; then
 fi
 
 set +e
+# The app classes come BEFORE the simulator jar on the class path, and that order is
+# load-bearing rather than tidy. The javase jar BUNDLES the native themes -- it ships
+# WindowsFluentTheme.res, GnomeAdwaitaTheme.res and MacOSAquaTheme.res -- so with the jar
+# first, every render used whatever theme was compiled into it at its last build instead of
+# the one in Themes/. A theme edit then scored identically to no edit at all, which reads
+# as "that CSS change did nothing" rather than as "the change was never loaded". Measured:
+# the jar's copy was missing three constants the source theme had.
+#
 # NOT -Djava.awt.headless=true. The JavaSE port creates a real AWT window during
 # Display.init and throws HeadlessException when it cannot, so the simulator needs a
 # display rather than the absence of one -- which is why every other simulator runner
@@ -134,7 +142,7 @@ fi
 ${DISPLAY_WRAPPER[@]+"${DISPLAY_WRAPPER[@]}"} "$JAVA_BIN" -Dcn1.simulator.useAppFrame=false \
     -Dcn1ss.fidelity.platform="$PLATFORM" \
     -Dcn1ss.fidelity.themeResource="/$THEME_RES.res" \
-    -cp "$REPO_ROOT/$SIM_JAR:$REPO_ROOT/$CLASSES_DIR:$REPO_ROOT/$RUNNER_CLASSES" \
+    -cp "$REPO_ROOT/$CLASSES_DIR:$REPO_ROOT/$RUNNER_CLASSES:$REPO_ROOT/$SIM_JAR" \
     com.codenameone.fidelity.DesktopTileRunner "$PLATFORM" "$THEME_RES" "$TILE_DIR"
 rc=$?
 set -e

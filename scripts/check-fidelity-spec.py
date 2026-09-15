@@ -18,6 +18,7 @@ import re
 import sys
 from pathlib import Path
 
+REPO = Path(__file__).resolve().parent.parent
 SPEC = Path(__file__).resolve().parent / "fidelity-app/common/src/main/resources/fidelity-tests.yaml"
 
 MOBILE_KEYS = {"native", "native_android"}
@@ -112,6 +113,8 @@ def main():
         if has_mobile and not has_desktop and "hover" in r.get("states", ""):
             yield_error(f"{where}: hover on a mobile row; a touch device has no hover to capture")
 
+    check_desktop_labels(rows)
+
     for e in ERRORS:
         print(f"check-fidelity-spec: {e}", file=sys.stderr)
     if ERRORS:
@@ -120,6 +123,56 @@ def main():
     print(f"check-fidelity-spec: {len(rows)} components ({mobile} mobile, {desktop} desktop), "
           f"{SPEC.name} is consistent")
     return 0
+
+
+# The three native reference apps HARDCODE the label each widget shows -- they are written
+# in C, Swift and C# and cannot read this YAML. The CN1 side reads it from here. When the
+# two disagree the comparison is between two different strings, which is a permanently
+# unreachable score rather than a visible failure: "Hello" against "Text" simply scores low
+# forever and reads as a theme that needs work.
+#
+# It had drifted on every one of the six desktop rows that carry text.
+NATIVE_REF_SOURCES = {
+    "windows": REPO / "scripts/fidelity-app/windows-native-ref/Program.cs",
+    "macos": REPO / "scripts/fidelity-app/macos-native-ref/NativeRef.swift",
+    "gnome": REPO / "scripts/fidelity-app/gnome-native-ref/native-ref.c",
+}
+
+# id -> the literal each reference app is expected to construct its widget with.
+DESKTOP_LABEL_LITERALS = {
+    "DesktopButton": "Button",
+    "DesktopAccentButton": "Button",
+    "DesktopTextField": "Text",
+    "DesktopCheckBox": "Check",
+    "DesktopRadioButton": "Radio",
+    "DesktopComboBox": "Option",
+}
+
+
+def check_desktop_labels(rows):
+    """The spec's `text` for each desktop row must be the literal the reference apps use."""
+    for r in rows:
+        rid = r.get("id")
+        if rid not in DESKTOP_LABEL_LITERALS:
+            continue
+        want = DESKTOP_LABEL_LITERALS[rid]
+        got = r.get("text")
+        if got != want:
+            yield_error(f"{rid}: text is '{got}' but the native reference apps render "
+                        f"'{want}'. The two sides would compare different strings, which "
+                        f"caps the score at something no theme change can reach")
+
+    # And the apps must really contain those literals, so this table cannot rot into a
+    # statement about a string nobody uses any more.
+    for platform, path in NATIVE_REF_SOURCES.items():
+        if not path.is_file():
+            yield_error(f"{path.name}: missing; cannot verify the {platform} labels")
+            continue
+        src = path.read_text(encoding="utf-8", errors="replace")
+        for rid, want in sorted(DESKTOP_LABEL_LITERALS.items()):
+            if f'"{want}"' not in src:
+                yield_error(f"{path.name}: does not contain the literal \"{want}\" that "
+                            f"{rid} is declared to render")
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -93,6 +93,21 @@
 
     /* NSSlider: a 3pt trough. */
     sliderTrackThicknessMM: "1.06";
+
+    /* Desktop sliders have a round KNOB on one continuous track. Without these the
+       painter draws Material's thumb instead: a thin vertical bar, with a gap either
+       side of it and a "stop indicator" dot near the far end, none of which any desktop
+       toolkit draws. Equal width and height is what makes the thumb a circle.
+       16px, the NSSlider knob. */
+    sliderThumbWidthMM: "3.21";
+    sliderThumbHeightMM: "3.21";
+    sliderContinuousTrackBool: true;
+
+    /* A desktop progress bar is much thinner than the slider beside it: 8px, measured from the macOS CI capture.
+       Its own constant for that reason -- one value for both would be wrong for one of
+       them. Without it a progress bar paints the legacy full-height fill, 19px against
+       this reference. */
+    progressTrackThicknessMM: "2.12";
 }
 
 /* --- Window and text ------------------------------------------------------------------- */
@@ -357,7 +372,10 @@ Switch.disabled {
 /* --- Slider and progress --------------------------------------------------------------- */
 
 Slider {
-    color: var(--accent-color, #007aff);
+    /* The KNOB colour, not the track's: paintNativeSlider takes the thumb from the
+       Slider style's foreground. White on every desktop, where the accent is the
+       filled part of the track behind it. */
+    color: #ffffff;
     background-color: #d4d4d4;
     cn1-background-type: cn1-pill-border;
     margin: 0.7mm;

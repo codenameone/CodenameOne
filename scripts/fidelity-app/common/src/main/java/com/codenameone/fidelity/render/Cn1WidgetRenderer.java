@@ -212,7 +212,11 @@ public final class Cn1WidgetRenderer {
             s.setEditable("Slider".equals(id));
             s.setMinValue(0);
             s.setMaxValue(100);
-            s.setProgress(50);
+            // The two widgets sit at DIFFERENT values in every native reference app, and
+            // they have to match here or the comparison is between two different states:
+            // a slider at 0.5 (knob centred) and a progress bar at 0.6. Setting both to 60
+            // put the CN1 knob 24px to the right of the reference's.
+            s.setProgress("Slider".equals(id) ? 50 : 60);
             if ("disabled".equals(state)) {
                 s.setEnabled(false);
             }
