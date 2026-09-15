@@ -66,7 +66,10 @@ class ListTileLayoutTest {
 
         ListTileRenderElement e = mountAndLayout(tile, BoxConstraints.loose(300, Double.POSITIVE_INFINITY));
 
-        assertEquals(new Size(300, 56), e.size(), "56lp minimum height, full width");
+        // 72lp, not 56: Material sizes a tile by its LINE COUNT, and this one has a
+        // subtitle, so it is a two-line tile. 56lp is the one-line height, asserted by
+        // titleOnlyTileOmitsMissingSections below.
+        assertEquals(new Size(300, 72), e.size(), "72lp two-line height, full width");
 
         List<RenderElement> children = e.renderChildren();
         assertEquals(5, children.size(), "leading, title, subtitle, trailing, overlay");
@@ -77,14 +80,14 @@ class ListTileLayoutTest {
         RenderElement overlay = children.get(4);
 
         assertEquals(16, leading.x(), "leading at the 16lp inset");
-        assertEquals(18, leading.y(), "leading vertically centered: (56-20)/2");
+        assertEquals(26, leading.y(), "leading vertically centered: (72-20)/2");
         assertEquals(52, title.x(), "title after leading + 16lp gap: 16+20+16");
-        assertEquals(10, title.y(), "text block centered: (56-36)/2");
+        assertEquals(18, title.y(), "text block centered: (72-36)/2");
         assertEquals(52, subtitle.x(), "subtitle aligned with title");
-        assertEquals(30, subtitle.y(), "subtitle right below the title: 10+20");
+        assertEquals(38, subtitle.y(), "subtitle right below the title: 18+20");
         assertEquals(260, trailing.x(), "trailing right-aligned: 300-16-24");
-        assertEquals(16, trailing.y(), "trailing vertically centered: (56-24)/2");
-        assertEquals(new Size(300, 56), overlay.size(), "the tap overlay covers the tile");
+        assertEquals(24, trailing.y(), "trailing vertically centered: (72-24)/2");
+        assertEquals(new Size(300, 72), overlay.size(), "the tap overlay covers the tile");
         assertEquals(0, overlay.x());
         assertEquals(0, overlay.y());
     }

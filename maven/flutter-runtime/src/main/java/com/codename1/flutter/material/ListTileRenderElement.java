@@ -50,8 +50,20 @@ import dart.runtime.Funcs;
  */
 public class ListTileRenderElement extends RenderElement {
 
-    /** Material list-tile minimum height in logical pixels. */
+    /** Material list-tile minimum height in logical pixels, for a tile with no subtitle. */
     public static final double MIN_HEIGHT_LP = 56;
+
+    /// Material's height for a tile that has a subtitle.
+    ///
+    /// A list tile's height comes from how many LINES it has, not from how big the
+    /// things inside it are, and in particular the leading widget never drives it -- it
+    /// is centred in the tile and is allowed to overflow. Letting it drive the height
+    /// made every tile as tall as its own avatar: Crane's destination list carries a
+    /// 60lp thumbnail, which with the vertical padding came to 76lp where Material's
+    /// two-line tile is 72lp, so each row ran 4lp long and the rows below it drifted
+    /// further out of register with every one that was added -- 43 device pixels by the
+    /// fourth row.
+    public static final double TWO_LINE_HEIGHT_LP = 72;
     /** Horizontal padding in logical pixels. */
     public static final double HPAD_LP = 16;
     /** Gap between sections in logical pixels. */
@@ -160,9 +172,12 @@ public class ListTileRenderElement extends RenderElement {
         double width = constraints.hasBoundedWidth()
                 ? constraints.maxWidth()
                 : sideWidth + textW;
-        double contentH = Math.max(textH, Math.max(leadingSize.height(), trailingSize.height()));
+        // The TEXT may push a tile past its nominal height; the leading and trailing may
+        // not. Material fixes the height by line count and centres the other two inside
+        // it, overflowing them if it must.
+        double nominal = Dp.px(subtitle != null ? TWO_LINE_HEIGHT_LP : MIN_HEIGHT_LP);
         double height = constraints.constrainHeight(
-                Math.max(Dp.px(MIN_HEIGHT_LP), contentH + vpad * 2));
+                Math.max(nominal, textH + vpad * 2));
 
         if (leading != null) {
             setChildOffset(leading, hpad, (height - leadingSize.height()) / 2);
