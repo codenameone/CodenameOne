@@ -1458,8 +1458,8 @@ https://www.codenameone.com/javadoc/com/codename1/ui/SideMenuBar.html[SideMenuBa
 it. What's left for the platform to color is the chrome around your app: the status bar, and the card the
 task switcher shows for it.
 
-Define a `colors.xml` file under `android/src/main/resources` for that. Every `<color>` in it becomes an
-`android:` item in the generated theme, so each name has to be an Android theme attribute:
+Define a `colors.xml` file under `android/src/main/resources` for that. Every `<color>` whose name is an
+Android theme attribute becomes an `android:` item in the generated theme:
 
 [source,xml]
 ----
@@ -1468,6 +1468,13 @@ include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under
 
 NOTE: The colors reach the Material variant of the generated theme, so a device old enough to fall back to
 the Holo variant ignores them.
+
+NOTE: A color whose name isn't an Android theme attribute stays an ordinary `@color/` resource and never
+reaches the theme, and the build log names it. Android Studio puts ordinary app colors such as
+`ic_launcher_background` in this same file, so an imported `colors.xml` keeps working -- but a misspelled
+attribute produces no theming, and that log line is where it says so. The names the build accepts are read
+from the installed platform, so any `android:` theme attribute works, not a fixed list.
+
 
 === Intercepting URLs on iOS & Android
 

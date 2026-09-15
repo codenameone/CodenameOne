@@ -41,6 +41,7 @@ import java.awt.image.ImageFilter;
 import java.awt.image.ImageProducer;
 import java.awt.image.RGBImageFilter;
 import java.io.*;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import java.net.MalformedURLException;
@@ -51,6 +52,7 @@ import java.nio.charset.StandardCharsets;
 
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -5282,14 +5284,8 @@ public class AndroidGradleBuilder extends Executor {
                     createIconFile(new File(mipmapXXXhdpiDir, "ic_launcher_background.png"), adaptiveBackground, 432, 432);
                     adaptiveIconBackgroundRef = "@mipmap/ic_launcher_background";
                 } else {
-                    String adaptiveIconBackground = request.getArg("android.adaptiveIconBackground", "#ffffff");
-                    String iconBackgroundColors = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                            + "<resources>\n"
-                            + "    <color name=\"ic_launcher_background\">" + adaptiveIconBackground + "</color>\n"
-                            + "</resources>\n";
-                    try (OutputStream output = Files.newOutputStream(new File(valsDir, "ic_launcher_background.xml").toPath())) {
-                        output.write(iconBackgroundColors.getBytes(StandardCharsets.UTF_8));
-                    }
+                    writeAdaptiveIconBackgroundColor(valsDir,
+                            request.getArg("android.adaptiveIconBackground", "#ffffff"));
                     adaptiveIconBackgroundRef = "@color/ic_launcher_background";
                 }
 
@@ -5419,24 +5415,31 @@ public class AndroidGradleBuilder extends Executor {
 
         File colors = new File(valsDir, "colors.xml");
         String colorsStr = "";
-        if (colors.exists()) {
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-
-            try {
-                //Using factory get an instance of document builder
-                DocumentBuilder db = dbf.newDocumentBuilder();
-                Document dom = db.parse(colors);
-                NodeList nl = dom.getElementsByTagName("color");
-                for (int i = 0; i < nl.getLength(); i++) {
-                    Node color = nl.item(i);
-                    NamedNodeMap attr = color.getAttributes();
-                    Node key = attr.getNamedItem("name");
-                    String k = key.getNodeValue();
-                    colorsStr += "<item name=\"android:" + k + "\">@color/" + k + "</item>\n";
-                }
-            } catch (Exception e) {
-                error("Failed to create DocumentBuilder", e);
+        try {
+            // The minimum is the compile SDK, not the target: gradle may
+            // select a platform newer than anything installed and let AGP
+            // download it, and an attribute introduced there would look
+            // unknown here and be dropped although aapt2 resolves it. Asking
+            // compileSdkInt rather than naming the floors keeps this correct
+            // when a new raise is added to it.
+            int effectiveCompileSdk = compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                    targetNumber, usesNearbyRanging,
+                    usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion, usesCallVoip,
+                    usesCustomTunnel);
+            Set<String> frameworkAttributes = frameworkThemeAttributes(androidSDKDir, effectiveCompileSdk);
+            if (frameworkAttributes == null && colors.exists()) {
+                log("No installed Android platform reaches the compile SDK (" + effectiveCompileSdk
+                        + "), so every color in colors.xml is passed to the theme unchecked");
             }
+            ThemeColors themeColors = buildThemeColorItems(colors, frameworkAttributes);
+            colorsStr = themeColors.items;
+            for (String skipped : themeColors.skipped) {
+                log("colors.xml declares '" + skipped + "', which is not an Android theme attribute, so it "
+                        + "stays an ordinary @color/" + skipped + " resource and does not reach the generated "
+                        + "theme. Only theme attribute names (colorPrimary, statusBarColor, ...) are applied.");
+            }
+        } catch (Exception e) {
+            error("Failed to create DocumentBuilder", e);
         }
 
         String themeName = "android:Theme.Black";
@@ -10471,6 +10474,264 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Writes the adaptive launcher icon background color into its own values
+     * file rather than into the shared {@code res/values/colors.xml}.
+     *
+     * <p>That separation is the whole point of this method. Every
+     * {@code <color>} declared in {@code colors.xml} is promoted by
+     * {@link #buildThemeColorItems(File)} into an {@code android:<name>} item
+     * of the generated theme, which means aapt2 resolves the name as
+     * {@code android:attr/<name>}. {@code ic_launcher_background} is not an
+     * Android theme attribute, so putting it in {@code colors.xml} fails
+     * resource linking with "style attribute
+     * 'android:attr/ic_launcher_background' not found" before an APK is ever
+     * produced -- the whole build dies over a launcher icon color (issue
+     * #5837). A separate file carries the same {@code @color/} reference and
+     * is never promoted.</p>
+     *
+     * <p>If the developer's own {@code colors.xml} already declares the name
+     * -- an Android Studio project template does exactly that -- theirs is
+     * left alone, because two files declaring one color name is a duplicate
+     * resource error.</p>
+     *
+     * @param valsDir the generated {@code res/values} directory
+     * @param color the color value for {@code android.adaptiveIconBackground}
+     */
+    static void writeAdaptiveIconBackgroundColor(File valsDir, String color) throws IOException {
+        if (declaresColor(new File(valsDir, "colors.xml"), ADAPTIVE_ICON_BACKGROUND_COLOR)) {
+            return;
+        }
+        String iconBackgroundColors = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                + "<resources>\n"
+                + "    <color name=\"ic_launcher_background\">" + color + "</color>\n"
+                + "</resources>\n";
+        try (OutputStream output = Files.newOutputStream(
+                new File(valsDir, "ic_launcher_background.xml").toPath())) {
+            output.write(iconBackgroundColors.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * Answers whether the given values file already declares a color of that
+     * name. A missing or unparsable file declares nothing.
+     */
+    static boolean declaresColor(File valuesFile, String name) {
+        if (!valuesFile.exists()) {
+            return false;
+        }
+        try {
+            Document dom = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(valuesFile);
+            return declares(dom.getElementsByTagName("color"), name, null)
+                    || declares(dom.getElementsByTagName("item"), name, "color");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether one of these elements declares {@code name}, optionally only
+     * when its {@code type} attribute says so. The second form is what makes
+     * {@code <item type="color" name="x">} count: it is an equally valid way
+     * to declare a color resource, and missing it would have us write a second
+     * declaration of the same name into another file, which aapt2 rejects as a
+     * duplicate.
+     */
+    private static boolean declares(NodeList elements, String name, String requiredType) {
+        for (int i = 0; i < elements.getLength(); i++) {
+            NamedNodeMap attributes = elements.item(i).getAttributes();
+            if (attributes == null) {
+                continue;
+            }
+            Node key = attributes.getNamedItem("name");
+            if (key == null || !name.equals(key.getNodeValue())) {
+                continue;
+            }
+            if (requiredType == null) {
+                return true;
+            }
+            Node type = attributes.getNamedItem("type");
+            if (type != null && requiredType.equals(type.getNodeValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The color resource the generated adaptive launcher icon names as its
+     * background. It is an icon resource by construction -- this builder emits
+     * the {@code @color/} reference to it from
+     * {@code mipmap-anydpi-v26/ic_launcher.xml} -- so it is never a theme
+     * attribute, whoever declared it.
+     */
+    static final String ADAPTIVE_ICON_BACKGROUND_COLOR = "ic_launcher_background";
+
+    /**
+     * What {@code res/values/colors.xml} contributed to the generated theme:
+     * the rendered {@code <item>} entries, and the color names that were left
+     * out because they are not Android theme attributes.
+     */
+    static final class ThemeColors {
+        final String items;
+        final List<String> skipped;
+
+        ThemeColors(String items, List<String> skipped) {
+            this.items = items;
+            this.skipped = Collections.unmodifiableList(new ArrayList<String>(skipped));
+        }
+    }
+
+    /**
+     * Renders the developer's {@code res/values/colors.xml} as {@code <item>}
+     * entries for the generated theme.
+     *
+     * <p>A color becomes an {@code android:<name>} item, which aapt2 resolves
+     * as {@code android:attr/<name>} -- so the name has to be an Android theme
+     * attribute, and one that is not fails resource linking with "style
+     * attribute 'android:attr/<name>' not found", killing the whole build over
+     * a color (issue #5837). Since {@code colors.xml} is also where Android
+     * itself expects ordinary app colors to live -- an Android Studio project
+     * template puts {@code ic_launcher_background} there -- a name that is not
+     * an attribute is left out of the theme and reported, rather than passed
+     * through to fail the link. It remains an ordinary {@code @color/} resource
+     * either way.</p>
+     *
+     * <p>A boolean theme attribute cannot arrive this way and is not handled:
+     * a {@code <color>} element holding {@code true} fails to compile at all
+     * ("error: invalid color"), so the file never reaches the theme
+     * generation. {@code android.windowLightStatusBar} is the build hint for
+     * the one such attribute this builder supports.</p>
+     *
+     * @param colorsFile the developer's colors.xml; a file that does not exist
+     *                   contributes nothing
+     * @param frameworkAttributes the framework attribute names to accept, or
+     *                            {@code null} to accept every name unchecked
+     *                            when the platform could not be read
+     */
+    static ThemeColors buildThemeColorItems(File colorsFile, Set<String> frameworkAttributes) throws Exception {
+        List<String> skipped = new ArrayList<String>();
+        if (!colorsFile.exists()) {
+            return new ThemeColors("", skipped);
+        }
+        StringBuilder colorsStr = new StringBuilder();
+        DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+        Document dom = db.parse(colorsFile);
+        NodeList nl = dom.getElementsByTagName("color");
+        for (int i = 0; i < nl.getLength(); i++) {
+            Node color = nl.item(i);
+            NamedNodeMap attr = color.getAttributes();
+            Node key = attr.getNamedItem("name");
+            if (key == null) {
+                continue;
+            }
+            String k = key.getNodeValue();
+            // Unconditional, and before the framework check, because this one
+            // does not depend on being able to read a platform: the adaptive
+            // icon this builder generates references the color, which is what
+            // makes it an icon resource rather than a theme attribute. Leaving
+            // it to the framework check would put it back in the theme on
+            // every build whose compile platform is unreadable from here --
+            // which is the build server -- and that is issue #5837 again.
+            if (ADAPTIVE_ICON_BACKGROUND_COLOR.equals(k)
+                    || (frameworkAttributes != null && !frameworkAttributes.contains(k))) {
+                skipped.add(k);
+                continue;
+            }
+            colorsStr.append("<item name=\"android:").append(k).append("\">@color/").append(k)
+                    .append("</item>\n");
+        }
+        return new ThemeColors(colorsStr.toString(), skipped);
+    }
+
+    /**
+     * Every {@code android.R.attr} name the readable platforms declare, which
+     * is the set aapt2 can resolve an {@code android:<name>} theme item
+     * against.
+     *
+     * <p>Answers {@code null} unless a platform at least as new as
+     * {@code minimumPlatformLevel} was read, and for a {@code null} SDK root.
+     * Both cases mean this process cannot see what will link the resources,
+     * and a caller that cannot see it must pass names through unchecked:
+     * dropping an attribute that a newer platform does define would quietly
+     * lose a developer's theming, which is worse than the link error the check
+     * exists to prevent.</p>
+     *
+     * <p>The union across platforms is deliberate: framework attributes are
+     * added and effectively never removed, so the union is the most permissive
+     * answer that is still derived from the platform rather than from a
+     * hand-maintained list.</p>
+     */
+    static Set<String> frameworkThemeAttributes(File androidSDKDir, int minimumPlatformLevel) {
+        if (androidSDKDir == null) {
+            return null;
+        }
+        File[] platforms = new File(androidSDKDir, "platforms").listFiles();
+        if (platforms == null) {
+            return null;
+        }
+        Set<String> names = new HashSet<String>();
+        int newestRead = -1;
+        for (File platform : platforms) {
+            File jar = new File(platform, "android.jar");
+            if (!jar.isFile()) {
+                continue;
+            }
+            Set<String> declared = attributeNames(jar);
+            if (declared.isEmpty()) {
+                continue;
+            }
+            names.addAll(declared);
+            newestRead = Math.max(newestRead, platformApiLevel(platform.getName()));
+        }
+        if (names.isEmpty() || newestRead < minimumPlatformLevel) {
+            return null;
+        }
+        return names;
+    }
+
+    /**
+     * The API level a platform directory name carries, or -1 when it carries
+     * none. A minor-versioned platform reduces to its major: {@code
+     * android-37.2} is API 37, and gathering its digits instead would answer
+     * 372 and compare greater than every level there is.
+     */
+    static int platformApiLevel(String platformDirName) {
+        if (platformDirName == null || !platformDirName.startsWith("android-")) {
+            return -1;
+        }
+        String version = platformDirName.substring("android-".length());
+        int dot = version.indexOf('.');
+        if (dot >= 0) {
+            version = version.substring(0, dot);
+        }
+        try {
+            return Integer.parseInt(version);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * The {@code android.R.attr} field names declared by one platform jar.
+     * Loaded with the bootstrap loader as parent so nothing on our own
+     * classpath can answer instead, and without initializing the class -- only
+     * the field names are wanted. A jar that cannot be read contributes
+     * nothing.
+     */
+    static Set<String> attributeNames(File androidJar) {
+        Set<String> names = new HashSet<String>();
+        try (URLClassLoader loader = new URLClassLoader(new URL[]{androidJar.toURI().toURL()}, null)) {
+            Class<?> attrs = Class.forName("android.R$attr", false, loader);
+            for (Field field : attrs.getFields()) {
+                names.add(field.getName());
+            }
+        } catch (Exception | LinkageError e) {
+            return names;
+        }
+        return names;
     }
 
     /**
