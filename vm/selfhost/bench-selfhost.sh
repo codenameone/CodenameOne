@@ -212,9 +212,14 @@ for round in $(seq 1 "$ROUNDS"); do
 for i in "${!ARMS[@]}"; do
     rm -rf "$W/run"; mkdir -p "$W/run"
     if [ "${ARMS[$i]}" = parpar ]; then
-        PEAKS[$i]=$(env CN1_RESOURCE_PATH="$REPO/vm/ByteCodeTranslator/src" \
-            cn1_time_peak "$W/mem.txt" "$PARPAR" \
+        # export/unset rather than an `env` prefix: cn1_time_peak is a shell FUNCTION and
+        # `env` can only exec a binary, so the prefix form died with "env: cn1_time_peak:
+        # No such file or directory" -- after the timing phase had already run, which is
+        # the worst place to fail.
+        export CN1_RESOURCE_PATH="$REPO/vm/ByteCodeTranslator/src"
+        PEAKS[$i]=$(cn1_time_peak "$W/mem.txt" "$PARPAR" \
             clean "$JAPI;$CLASSES" "$W/run" "$APP" "$PKG" "$APP" 1.0 clean none)
+        unset CN1_RESOURCE_PATH
     else
         PEAKS[$i]=$(cn1_time_peak "$W/mem.txt" "${ARMS[$i]}" -cp "$TR:$ASM" \
             com.codename1.tools.translator.ByteCodeTranslator \
