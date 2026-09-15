@@ -233,13 +233,17 @@ class VaultSourceInvariantsTest extends UITestBase {
             }
             at = error + 1;
             checked++;
-            // The undo must be the statement before it, not merely somewhere in the method: the
-            // finally still calls the same helper, and finding THAT one would pass over the
-            // ordering this exists to hold.
-            String before = body.substring(Math.max(0, error - 400), error);
-            assertTrue(before.indexOf("undoPolicyChange(") > 0,
-                    "every failure setPolicy publishes must be preceded by its rollback, or the "
-                    + "record is still half-changed when a callback sees it: " + before);
+            // Within the SAME catch block, not within some character window and not merely
+            // somewhere in the method: the finally calls the same helper, and finding that one
+            // would pass over the very ordering this exists to hold. A window was the first
+            // attempt and it broke the moment a rollback failure grew a multi-line message.
+            int block = body.lastIndexOf("catch (", error);
+            assertTrue(block >= 0, "an out.error outside any catch block: " + body);
+            String inBlock = body.substring(block, error);
+            assertTrue(inBlock.indexOf("undoPolicyChange(") > 0,
+                    "every failure setPolicy publishes must be preceded, in its own catch block, "
+                    + "by its rollback -- or the record is still half-changed when a callback "
+                    + "sees it: " + inBlock);
         }
         assertTrue(checked >= 2, "only " + checked + " out.error calls found in setPolicy, so "
                 + "this scanned almost nothing");

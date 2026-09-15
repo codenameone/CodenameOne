@@ -212,6 +212,28 @@ class VaultTest extends UITestBase {
         return s.toCharArray();
     }
 
+    /// The first VaultException an operation failed with, so a test can assert the REASON.
+    ///
+    /// The error code is not always enough: requireKeyDeleted and the rollback refusal both
+    /// report STORAGE_UNAVAILABLE, so a test that checks only the code passes whichever of them
+    /// was actually raised -- which is how the first version of the rollback test passed against
+    /// the code it was written to catch.
+    private static VaultException failureOf(AsyncResource<?> r) {
+        try {
+            r.get();
+            return null;
+        } catch (RuntimeException e) {
+            Throwable t = e;
+            while (t != null) {
+                if (t instanceof VaultException) {
+                    return (VaultException) t;
+                }
+                t = t.getCause();
+            }
+            return null;
+        }
+    }
+
     private static VaultError errorOf(AsyncResource<?> r) {
         try {
             r.get();
@@ -1312,6 +1334,62 @@ class VaultTest extends UITestBase {
                 "the enrolment this call did not create must survive it");
         assertTrue(reopened.unlockRemembered().get().booleanValue(),
                 "and it must still actually open the vault");
+    }
+
+    @Test
+    void aPolicyChangeWhoseRollbackCannotBeWrittenSaysSoRatherThanItsOriginalError()
+            throws Exception {
+        // The rollback used to only LOG a refused restore, on a reasoning that went stale when it
+        // moved ahead of out.error: the catches run it before publishing now, so a failed restore
+        // is something they can report. Leaving it at a log meant a call that reported its
+        // original error had also left the INCOMING record active while resetting options to the
+        // old policy -- the effective policy had changed, and a retry acted on the wrong
+        // remembered mechanism.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        final String record = deviceRecordName(name);
+        final TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+
+        // The transition has to fail where the OUTGOING key is still present, or the rollback
+        // takes its delete branch instead of its restore branch -- a version of this locked the
+        // vault mid-write and only ever exercised the delete. refuseDeletes makes
+        // requireKeyDeleted fail, which is after the incoming record is written and before
+        // outgoingKeyGone is set.
+        device.refuseDeletes = true;
+        // And the storage failure has to land on the ROLLBACK write, not the transition's own.
+        // The flag is read when a write CLOSES, so the first hook -- which fires on the incoming
+        // record's write -- only installs the second, and the second arms the failure at the
+        // start of the restore write that follows.
+        impl.setDuringStorageWrite(record, new Runnable() {
+            public void run() {
+                impl.setDuringStorageWrite(record, new Runnable() {
+                    public void run() {
+                        impl.setStorageWriteFailsOnClose(true);
+                    }
+                });
+            }
+        });
+        VaultException outcome;
+        try {
+            outcome = failureOf(vault.setPolicy(UnlockPolicy.REQUIRE_USER_VERIFICATION));
+        } finally {
+            impl.setStorageWriteFailsOnClose(false);
+            impl.setDuringStorageWrite(null, null);
+            device.refuseDeletes = false;
+        }
+
+        assertNotNull(outcome, "the policy change must fail");
+        assertEquals(VaultError.STORAGE_UNAVAILABLE, outcome.getError());
+        // The MESSAGE, because requireKeyDeleted -- the failure being cleaned up after here --
+        // reports STORAGE_UNAVAILABLE too, so the code alone cannot tell the two apart and a
+        // test asserting only the code passes against the unfixed code.
+        assertTrue(outcome.getMessage().indexOf("could not be put back") >= 0,
+                "a rollback that could not be written must be what the caller is told about, "
+                + "not the failure it was cleaning up after: " + outcome.getMessage());
+        // And the failure it replaced is still reachable, because the caller needs both.
+        assertNotNull(outcome.getCause(), "the original failure must go on as the cause");
     }
 
     @Test
