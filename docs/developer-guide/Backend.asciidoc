@@ -240,10 +240,13 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/D
 ----
 
 There is no JDBC driver involved. SQLite is linked into the binary, and the
-PostgreSQL and MySQL clients speak their wire protocols directly. MySQL 8.0 or
-newer: a string key needs a case-sensitive NO PAD collation, so `"A"` and `"a"`
-are two keys and `"token "` keeps its space, and such a collation arrived in
-8.0. Nothing else here depends on the version.
+PostgreSQL and MySQL clients speak their wire protocols directly, and a
+`mariadb://` URL is served by the same client. MySQL 8.0 and MariaDB 10.4 and
+newer are supported: a string key needs a case-sensitive NO PAD collation, so
+`"A"` and `"a"` are two keys and `"token "` keeps its space, and the two server
+families spell that collation differently. Which one is used comes from the
+server rather than from the URL scheme, so a `mysql://` URL pointed at MariaDB
+is still correct.
 
 Statements are written once, in one portable form: `?` for every parameter, and
 plain unquoted names. PostgreSQL binds `$1` rather than `?`, and that difference
