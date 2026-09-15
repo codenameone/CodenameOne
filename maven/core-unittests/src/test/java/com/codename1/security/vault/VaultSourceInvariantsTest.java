@@ -122,6 +122,30 @@ class VaultSourceInvariantsTest extends UITestBase {
         }
         throw new IllegalStateException("unterminated " + signature);
     }
+    @Test
+    void aHandleIsStampedWithTheKeyGenerationItWasDerivedUnder() {
+        // operationalKey snapshots the data key at the start and builds the handle at the end.
+        // Reading keyGeneration at the END stamps a handle derived from the SUPERSEDED key with
+        // the post-replacement number, so it considers itself live and emits MACs no handle
+        // obtained afterwards can verify -- the same defect the comment beside it records for the
+        // lock generation, in the counter that was added later.
+        //
+        // Checked as a shape rather than behaviourally: the derivation is HMAC, not the cipher,
+        // so the one deterministic hook these tests have does not fire inside it, and a test that
+        // cannot land the replacement in the window proves nothing. The behaviour that IS
+        // reachable -- a handle held across a completed rotation -- is covered by
+        // VaultTest.anOperationalKeyHeldAcrossARotationStopsWorking.
+        String body = methodBody(readVaultSource(),
+                "public AsyncResource<KeyHandle> operationalKey(final String purpose)");
+        int construct = body.indexOf("new VaultKeyHandle(");
+        assertTrue(construct > 0, "operationalKey must build a VaultKeyHandle");
+        String args = body.substring(construct, body.indexOf(';', construct));
+        assertTrue(args.indexOf("keyAt") > 0,
+                "the handle must be stamped with the captured generation: " + args);
+        assertTrue(args.indexOf("keyGeneration") < 0,
+                "reading the field here stamps the value AFTER any replacement: " + args);
+    }
+
     /// Methods that write and deliberately do not re-check the lock generation afterwards.
     ///
     /// Not an allow-list of what to scan -- the scan below is over every public asynchronous

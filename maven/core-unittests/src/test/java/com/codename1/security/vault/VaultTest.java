@@ -2148,6 +2148,35 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aKeyReplacedMidOperationIsNoticedEvenThoughTheVaultStaysOpen() {
+        // adoptKey zeroes the outgoing array in place and bumps keyGeneration, and lockGeneration
+        // does NOT move for a replacement -- a rotation leaves the vault open. So an operation
+        // that snapshotted dataKey and then waited on a cipher came back holding zeroes,
+        // encrypted under them, and reported success. What it produced is unreadable afterwards,
+        // and every check on that path was asking the other question.
+        String name = freshName();
+        final Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+
+        // Landed inside the crypto, which is the window between the snapshot and the result.
+        TestCodenameOneImplementation.getInstance().setDuringAes(new Runnable() {
+            public void run() {
+                vault.rotateDataKey(pw("p")).get();
+            }
+        });
+        try {
+            assertEquals(VaultError.CONFLICT, errorOf(vault.seal("note", "contents".getBytes())),
+                    "a seal whose key was replaced under it must not be handed back as good");
+        } finally {
+            TestCodenameOneImplementation.getInstance().setDuringAes(null);
+        }
+
+        // And the vault is fine: the rotation happened, and sealing now works under the new key.
+        byte[] sealed = vault.seal("note", "contents".getBytes()).get();
+        assertArrayEquals("contents".getBytes(), vault.open("note", sealed).get());
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

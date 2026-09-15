@@ -898,6 +898,7 @@ public final class Vault {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration;
+        final int keyAt = keyGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -924,6 +925,10 @@ public final class Vault {
                     // during the seal leaves ciphertext made with a key of zeroes. Refusing here
                     // means that is discarded rather than stored as if it were the secret.
                     requireSameGeneration(generation);
+                    // And that the key it sealed under is still this vault's. lockGeneration does
+                    // not move for a replacement, so without this the seal above could have run
+                    // against an array adoptKey had already zeroed.
+                    requireSameKey(keyAt);
                     String entry = secretKey(secretName);
                     // Kept so the write can be undone. The check above is before a storage write
                     // and a lock can land inside one, and this call REPLACES whatever was stored
@@ -1074,6 +1079,7 @@ public final class Vault {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration;
+        final int keyAt = keyGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -1096,6 +1102,9 @@ public final class Vault {
                     // produces ciphertext under zeroes. Handing that back would look like a
                     // sealed record and open as nothing.
                     requireSameGeneration(generation);
+                    // And under a key this vault still has: a replacement zeroes the array this
+                    // snapshotted, and lockGeneration does not move for one.
+                    requireSameKey(keyAt);
                     out.complete(sealed);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -1161,8 +1170,11 @@ public final class Vault {
     /// The handle stops working when the vault locks.
     public AsyncResource<KeyHandle> operationalKey(final String purpose) {
         final AsyncResource<KeyHandle> out = new AsyncResource<KeyHandle>();
-        // On the calling thread; see unlockWithPassword for why not in the worker.
+        // On the calling thread; see unlockWithPassword for why not in the worker. BOTH
+        // generations, because this derives from a snapshot of the data key and must not stamp
+        // the handle with a generation that moved after the snapshot was taken.
         final int generation = lockGeneration;
+        final int keyAt = keyGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -1176,9 +1188,10 @@ public final class Vault {
                                 "the vault was locked while this key was being derived");
                     }
                     byte[] derived = deriveSubkey(source, purpose);
-                    if (generation != lockGeneration) {
+                    if (generation != lockGeneration || keyAt != keyGeneration) {
                         Bytes.zero(derived);
                         requireSameGeneration(generation);
+                        requireSameKey(keyAt);
                     }
                     // extractedKeyProtection(), not the device report. The device key may
                     // well be non-extractable -- in the browser it is -- but what this handle
@@ -1190,8 +1203,12 @@ public final class Vault {
                     // lock landing between the check above and this line stamped the handle
                     // with the POST-lock value -- so the handle considered itself live and went
                     // on sealing and opening with key material the lock had invalidated.
-                    out.complete(new VaultKeyHandle(Vault.this, generation, keyGeneration,
-                            derived,
+                    // keyAt, not keyGeneration: reading the field here stamped the handle with
+                    // the value AFTER any replacement that had landed since `source` was taken,
+                    // so a handle derived from the superseded key considered itself live -- and
+                    // emitted MACs no handle obtained afterwards could verify. Exactly the defect
+                    // the note above records for the lock generation, in the counter added later.
+                    out.complete(new VaultKeyHandle(Vault.this, generation, keyAt, derived,
                             purpose, meta.dataKeyVersion, extractedKeyProtection()));
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -1245,6 +1262,7 @@ public final class Vault {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration;
+        final int keyAt = keyGeneration;
         background(new Runnable() {
             @Override
             public void run() {
@@ -1270,6 +1288,9 @@ public final class Vault {
                         Bytes.zero(key);
                         requireSameGeneration(generation);
                     }
+                    // A database key derived from an array that was replaced mid-derivation would
+                    // encrypt a database nothing can open afterwards.
+                    requireSameKey(keyAt);
                     out.complete(key);
                 } catch (VaultException failed) {
                     out.error(failed);
@@ -2702,6 +2723,24 @@ public final class Vault {
         throw new VaultException(VaultError.LOCKED,
                 "the vault was locked while this device was being remembered; nothing that can "
                 + "reopen it without a password was left behind");
+    }
+
+    /// Refuses when the DATA KEY has been replaced since `at`.
+    ///
+    /// Not the same question as the lock generation, and that is the whole of the defect this
+    /// answers: adoptKey zeroes the outgoing array in place and bumps this counter, while
+    /// lockGeneration does not move -- a rotation, or an unlock of an already-unlocked vault,
+    /// leaves the vault open. So a worker that snapshotted dataKey and then waited on a cipher or
+    /// a user-verification prompt came back holding a buffer of zeroes, encrypted under it, and
+    /// reported success. rememberNow's own read-back agreed, because unwrapping zeroes with
+    /// zeroes round-trips. What it wrote was a secret, a database key or a remembered record that
+    /// nothing can read afterwards.
+    private void requireSameKey(int at) {
+        if (at != keyGeneration) {
+            throw new VaultException(VaultError.CONFLICT,
+                    "this vault's data key was replaced while the operation was running, so what "
+                    + "it produced was not sealed under the key this vault now has");
+        }
     }
 
     private void requireSameGeneration(int generation) {

@@ -326,7 +326,11 @@ public class SecureStorage {
                 b.append(HEX_DIGITS.charAt(v & 0x0f));
             }
             return b.toString();
-        } catch (Exception noDigest) {
+        } catch (java.io.UnsupportedEncodingException noUtf8) {
+            return Integer.toHexString(account.hashCode());
+        } catch (RuntimeException noDigest) {
+            // A port with no SHA-256 at all. Naming the file is more important than naming it
+            // well, so this falls back on what it did before rather than failing to name it.
             return Integer.toHexString(account.hashCode());
         }
     }
