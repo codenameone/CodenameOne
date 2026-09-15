@@ -206,10 +206,13 @@ final class Table {
     }
 
     /** The values an insert binds, in the order {@link #getInsertSql} names them. */
-    Object[] insertParams(Object entity) {
+    Object[] insertParams(Object entity) throws IOException {
         Object[] out = new Object[insertColumns.length];
         for(int iter = 0 ; iter < insertColumns.length ; iter++) {
-            out[iter] = definition.get(entity, insertColumns[iter]);
+            Object value = definition.get(entity, insertColumns[iter]);
+            // The key is among these only when the application assigns it,
+            // which is exactly the case key() has something to say about.
+            out[iter] = insertColumns[iter] == idIndex ? key(value) : value;
         }
         return out;
     }
@@ -220,12 +223,12 @@ final class Table {
     }
 
     /** The values an update binds: every non-key column, then the key. */
-    Object[] updateParams(Object entity) {
+    Object[] updateParams(Object entity) throws IOException {
         Object[] out = new Object[updateColumns.length + 1];
         for(int iter = 0 ; iter < updateColumns.length ; iter++) {
             out[iter] = definition.get(entity, updateColumns[iter]);
         }
-        out[updateColumns.length] = definition.get(entity, idIndex);
+        out[updateColumns.length] = key(definition.get(entity, idIndex));
         return out;
     }
 
@@ -234,9 +237,45 @@ final class Table {
         definition.set(entity, idIndex, Long.valueOf(key));
     }
 
+    /**
+     * The longest an ASSIGNED text key may be, on every engine.
+     *
+     * <p>MySQL cannot index an unbounded TEXT column -- it needs a prefix length
+     * -- so a string key has to be declared VARCHAR(n) there, while SQLite and
+     * PostgreSQL leave it unbounded. Without a shared bound the same entity
+     * stores a 256-character key on two engines and fails on the third with
+     * "Data too long", which is the one thing this layer exists to prevent. So
+     * the tightest engine's limit is the limit everywhere, and it is enforced
+     * here rather than left to whichever server the deployment happens to use.
+     *
+     * <p>A column with an explicit {@code @Column(type)} is exempt: the
+     * developer named the type, it is written through unchanged on all three,
+     * and the bound is theirs to know.
+     */
+    static final int MAX_ASSIGNED_TEXT_KEY = 255;
+
+    /**
+     * {@code value} as a bound key, or a refusal when no engine pair could agree
+     * about it. See {@link #MAX_ASSIGNED_TEXT_KEY}.
+     */
+    Object key(Object value) throws IOException {
+        if(value instanceof String
+                && !columns[idIndex].isGenerated()
+                && columns[idIndex].getDeclaredType() == null
+                && ((String)value).length() > MAX_ASSIGNED_TEXT_KEY) {
+            throw new IOException("A key of " + ((String)value).length() + " characters is "
+                    + "longer than the " + MAX_ASSIGNED_TEXT_KEY + " this ORM stores on every "
+                    + "engine: MySQL cannot index an unbounded text column, so the key column "
+                    + "is VARCHAR(" + MAX_ASSIGNED_TEXT_KEY + ") there and the row would be "
+                    + "refused after working in development. Shorten the key, or declare the "
+                    + "column with @Column(type = \"...\") and size it yourself.");
+        }
+        return value;
+    }
+
     /** The key of {@code entity}, as a bound parameter. */
-    Object idOf(Object entity) {
-        return definition.get(entity, idIndex);
+    Object idOf(Object entity) throws IOException {
+        return key(definition.get(entity, idIndex));
     }
 
     /** One row as an entity. */

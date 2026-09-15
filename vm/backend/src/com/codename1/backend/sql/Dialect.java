@@ -585,9 +585,19 @@ public abstract class Dialect {
         /**
          * VARCHAR rather than the TEXT this engine uses for an ordinary string
          * column: MySQL indexes a TEXT column only by a prefix whose length it
-         * has to be given, so TEXT PRIMARY KEY is refused outright. 255 is the
-         * longest a utf8mb4 key can be under the 767-byte index limit older
-         * servers still have.
+         * has to be given, so TEXT PRIMARY KEY is refused outright.
+         *
+         * 255 is the conventional bound and it fits InnoDB's modern 3072-byte
+         * index limit with utf8mb4 to spare (255 * 4 = 1020). An earlier version
+         * of this comment justified it by the 767-byte limit of much older
+         * servers, which is arithmetic that does not work -- utf8mb4 would allow
+         * only 191 characters under that one. The number is right; the reason
+         * given for it was not.
+         *
+         * The other two engines leave a string key unbounded, so 255 is also the
+         * portable bound and Table refuses a longer one on every engine rather
+         * than letting the same entity work on two and fail on the third. See
+         * Table.MAX_ASSIGNED_TEXT_KEY.
          */
         public String assignedKeyColumn(int kind) {
             if(kind == TEXT) {

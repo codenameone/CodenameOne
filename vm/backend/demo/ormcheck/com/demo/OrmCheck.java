@@ -78,6 +78,7 @@ public class OrmCheck {
                 transactionsAreAtomic(em, notes);
                 createTableIsIdempotent(notes);
                 anEntityThatIsOnlyAKey(em);
+                aStringKeyTheApplicationAssigns(em);
                 aTerminatedStatementStillAnswersItsKey(pool);
                 anUpsertThatUpdatesStillAnswers(pool);
                 anIgnoredInsertAnswersNoKey(pool);
@@ -318,6 +319,72 @@ public class OrmCheck {
      * to write that: SQLite and PostgreSQL want DEFAULT VALUES and refuse the
      * empty lists, MySQL wants the empty lists and has no DEFAULT VALUES.
      */
+    /**
+     * A key the APPLICATION assigns, and a string one.
+     *
+     * <p>The column the three engines declare most differently: unbounded text
+     * on SQLite and PostgreSQL, and on MySQL a VARCHAR with a length, because it
+     * cannot index an unbounded column at all. So the portable key domain is the
+     * tightest of the three, and a key past it has to be refused everywhere
+     * rather than working on two engines and failing on the third with "Data too
+     * long" -- which is what happened until Table.MAX_ASSIGNED_TEXT_KEY existed.
+     */
+    private static void aStringKeyTheApplicationAssigns(EntityManager em) throws Exception {
+        Dao<Coupon> coupons = em.dao(Coupon.class);
+        coupons.dropTable();
+        coupons.createTable();
+        try {
+            Coupon ten = new Coupon();
+            ten.code = "SAVE-TEN";
+            ten.discount = 10;
+            coupons.insert(ten);
+            check("an assigned string key round trips", "10",
+                    String.valueOf(coupons.findById("SAVE-TEN").discount));
+            // Updated and deleted BY THAT KEY, which is the generated
+            // id = ? predicate doing its work against text rather than a number.
+            ten.discount = 15;
+            check("update finds the row by its string key", "true",
+                    String.valueOf(coupons.update(ten)));
+            check("and the update took", "15",
+                    String.valueOf(coupons.findById("SAVE-TEN").discount));
+
+            // THE BOUNDARY, which is where a VARCHAR(255) and an unbounded TEXT
+            // stop agreeing. 255 must store on every engine.
+            StringBuilder longest = new StringBuilder();
+            for(int iter = 0 ; iter < 255 ; iter++) {
+                longest.append('k');
+            }
+            Coupon edge = new Coupon();
+            edge.code = longest.toString();
+            edge.discount = 1;
+            coupons.insert(edge);
+            check("a key of exactly 255 characters stores", "1",
+                    String.valueOf(coupons.findById(longest.toString()).discount));
+
+            // And one past it is refused BEFORE the statement runs, on all three
+            // -- not accepted by two of them and rejected by the third.
+            Coupon tooLong = new Coupon();
+            tooLong.code = longest.toString() + "k";
+            tooLong.discount = 2;
+            String refused;
+            try {
+                coupons.insert(tooLong);
+                refused = "accepted";
+            } catch (Exception err) {
+                refused = "refused";
+            }
+            check("a key of 256 characters is refused on every engine", "refused", refused);
+            check("and nothing was written", "null",
+                    String.valueOf(coupons.findById(tooLong.code)));
+
+            check("delete by a string key reports the row", "true",
+                    String.valueOf(coupons.delete(ten)));
+            check("and it is gone", "null", String.valueOf(coupons.findById("SAVE-TEN")));
+        } finally {
+            coupons.dropTable();
+        }
+    }
+
     private static void anEntityThatIsOnlyAKey(EntityManager em) throws Exception {
         Dao<Ticket> tickets = em.dao(Ticket.class);
         tickets.dropTable();
