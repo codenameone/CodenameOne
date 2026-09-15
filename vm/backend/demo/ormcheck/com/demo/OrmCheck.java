@@ -818,6 +818,27 @@ public class OrmCheck {
                 refusedInf = "refused";
             }
             check("an infinity is refused on every engine", "refused", refusedInf);
+            // A RAW Boolean binds as 0/1 like the generated access does. The
+            // encoders disagreed: SQLite and MySQL sent 1 while PostgreSQL sent
+            // "t", which its own SMALLINT boolean column refuses with "invalid
+            // input syntax for type smallint". A caller writing its own SQL has
+            // the same claim on a portable answer as a dao.
+            pool.execute("DROP TABLE IF EXISTS cn1_rawbool", null);
+            pool.execute("CREATE TABLE cn1_rawbool (flag "
+                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BOOLEAN)
+                    + ")", null);
+            pool.execute("INSERT INTO cn1_rawbool (flag) VALUES (?)",
+                    new Object[] {Boolean.TRUE});
+            pool.execute("INSERT INTO cn1_rawbool (flag) VALUES (?)",
+                    new Object[] {Boolean.FALSE});
+            check("a raw Boolean binds as 1 and 0 on every engine", "1,0",
+                    String.valueOf(((java.util.Map)pool.query(
+                            "SELECT flag FROM cn1_rawbool ORDER BY flag DESC", null).get(0))
+                            .values().iterator().next())
+                            + "," + String.valueOf(((java.util.Map)pool.query(
+                            "SELECT flag FROM cn1_rawbool ORDER BY flag ASC", null).get(0))
+                            .values().iterator().next()));
+            pool.execute("DROP TABLE IF EXISTS cn1_rawbool", null);
             // A SECOND STATEMENT, which SQLite runs the first half of and
             // reports success for while the other two refuse it. Measured: the
             // DELETE never ran and nothing said so.
