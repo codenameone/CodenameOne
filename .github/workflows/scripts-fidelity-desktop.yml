@@ -153,12 +153,16 @@ jobs:
         run: |
           set -eo pipefail
           cd maven
-          mvn -B -q -DskipTests -pl core install
-          mvn -B -q -DskipTests -Plocal-dev-javase -pl javase install
-          # codenameone-maven-plugin is what the fidelity app's own build runs, and
-          # nothing above installs it, so the app build cannot resolve it on a clean
-          # runner. -am brings javase with it, which needs the same profile.
-          mvn -B -q -DskipTests -Plocal-dev-javase -pl codenameone-maven-plugin -am install
+          # ONE invocation with -am, not module builds in sequence. `-pl core` on its own
+          # cannot resolve codenameone-factory, which is a sibling module rather than a
+          # published artifact, so the first real run failed there before anything else
+          # ran. -am builds each module's dependencies, which pulls in factory and
+          # cn1-binaries.
+          #
+          # codenameone-maven-plugin is in the list because the fidelity app's own build
+          # runs it, and nothing else installs it on a clean runner.
+          mvn -B -q -DskipTests -Plocal-dev-javase \
+              -pl javase,codenameone-maven-plugin -am install
           cd ../scripts/fidelity-app
           ./mvnw -B -q -pl common,desktop-runner -DskipTests install
 
