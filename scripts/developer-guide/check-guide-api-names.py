@@ -192,7 +192,12 @@ DECLARATION = re.compile(
     # called dead.
     r'(?P<modifiers>(?:\b(?:public|protected|private|static|final|abstract'
     r'|strictfp|sealed|non-sealed)\s+'
-    r'|@(?!\s*interface\b)[A-Za-z][A-Za-z0-9.]*(?:\s*\([^)]*\))?\s*)*)'
+    # The argument list balances one level of nesting, because an annotation
+    # can take another as an argument: @Foo(value=@Bar(type=Baz.class)).
+    # Stopping at the first ')' left the match restarting at `class` without
+    # the `public` in front of it.
+    r'|@(?!\s*interface\b)[A-Za-z][A-Za-z0-9.]*'
+    r'(?:\s*\((?:[^()]|\([^()]*\))*\))?\s*)*)'
     # The annotation form has to come first, and the plain "interface" must
     # refuse to match inside it: \b cannot match before '@', so
     # "public @interface Route" was matched from its inner token and lost the
@@ -239,6 +244,13 @@ def declared_types(source):
 
     Publication follows javadoc's ``-protected``: a type has a page when it
     and every type enclosing it are public or protected.
+
+    ``@hidden`` is matched by simple name rather than by nesting path, so two
+    nested types in one file that share a name share the marker. No such pair
+    exists in the published sources -- checked over all of them -- and if one
+    were written the effect is a valid link reported as dead, which fails
+    loudly and in the file that caused it rather than letting anything
+    through.
     """
     out = []
     stack = []
