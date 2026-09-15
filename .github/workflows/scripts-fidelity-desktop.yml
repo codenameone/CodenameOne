@@ -1,0 +1,114 @@
+---
+name: Desktop theme fidelity
+
+# Scores the desktop native themes -- Windows Fluent, macOS Aqua, GNOME Adwaita -- against the
+# captured native references, the same way scripts-fidelity.yml does for iOS and Android.
+#
+# A SEPARATE workflow rather than three more jobs in scripts-fidelity.yml. That file's
+# pull_request paths trigger the WHOLE workflow, so adding these there would run the Android
+# emulator and the iOS simulator legs on every desktop CSS tweak, and would tie the desktop
+# gate's timing to theirs. They share the comparator and the golden-set machinery, which is
+# where sharing actually pays.
+#
+# Each theme is scored on ITS OWN runner. A Fluent theme measured on a Mac would be measured
+# in the wrong system font, and text metrics are most of a fidelity score.
+#
+# DISPATCH ONLY, and that is deliberate rather than an oversight. The golden sets are not
+# seeded: scripts/fidelity-app/goldens/{windows-11-fluent,macos-aqua,gnome-adwaita} stay empty
+# until someone dispatches fidelity-desktop-native-ref.yml in capture mode, reviews the frames
+# and commits them. Until then every run exits 24, "no native references" -- the correct
+# answer, and a useless gate. An automatic trigger now would mean one of two bad things: a
+# workflow that is permanently red, which teaches people to ignore it, or an unseeded run
+# reported as a pass, which is a check satisfied by nothing having happened.
+#
+# So the triggers arrive WITH the goldens, in the same commit. That commit adds:
+#
+#   pull_request:
+#     paths: [ 'native-themes/windows-fluent/**', 'native-themes/macos-aqua/**',
+#              'native-themes/gnome-adwaita/**', 'scripts/fidelity-app/**',
+#              'scripts/run-desktop-fidelity-tests.sh', 'scripts/common/java/**' ]
+#   push:
+#     branches: [master]
+#     paths: [ ...the same... ]
+#
+# Everything below that line is already written against a seeded set, so seeding is the only
+# work left. Dispatch it by hand meanwhile -- it scores whatever is committed.
+
+'on':
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Which themes to score'
+        type: choice
+        default: all
+        options: [all, windows, macos, gnome]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fidelity-desktop:
+    name: ${{ matrix.platform }}
+    if: >-
+      github.event.inputs.targets == 'all'
+      || github.event.inputs.targets == matrix.platform
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: gnome
+            runner: ubuntu-latest
+          - platform: windows
+            runner: windows-latest
+          - platform: macos
+            runner: macos-15
+    env:
+      CN1SS_FIDELITY_EPSILON: '2.0'
+    steps:
+      - uses: actions/checkout@v6
+
+      # JDK 8 builds the framework; the simulator needs 11 or newer to run. Both are needed,
+      # which is why two setup steps rather than one.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - id: jdk21
+        shell: bash
+        run: echo "path=$JAVA_HOME" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Build the core, the simulator and the fidelity app
+        shell: bash
+        run: |
+          set -eo pipefail
+          cd maven
+          mvn -B -q -DskipTests -pl core install
+          mvn -B -q -DskipTests -Plocal-dev-javase -pl javase install
+          cd ../scripts/fidelity-app
+          ./mvnw -B -q -pl common -DskipTests install
+
+      - name: Score the theme against the native reference
+        shell: bash
+        env:
+          # The simulator refuses to start on JDK 8, so the tiles are rendered with the 21
+          # that was installed first. The build above still runs on 8.
+          CN1SS_DESKTOP_JAVA: ${{ steps.jdk21.outputs.path }}/bin/java
+        run: scripts/run-desktop-fidelity-tests.sh "${{ matrix.platform }}"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: desktop-fidelity-${{ matrix.platform }}
+          path: artifacts/${{ matrix.platform }}-fidelity/**
+          if-no-files-found: warn
+          retention-days: 14
