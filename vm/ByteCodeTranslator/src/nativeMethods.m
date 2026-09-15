@@ -4519,11 +4519,46 @@ static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT m
     int count = s->java_lang_String_count;
     if(count == 0) return me;
     enteringNativeAllocations();
+    // PRESERVE THE SOURCE'S REPRESENTATION WHERE THE RESULT ALLOWS IT. This used to
+    // allocate a char[] unconditionally, so toUpperCase/toLowerCase silently turned a
+    // compact Latin-1 string into a UTF-16 one and every later reader paid for it.
+    //
+    // A cased Latin-1 string is USUALLY Latin-1 again but not always -- towupper(0xFF)
+    // is 0x178 and towupper(0xB5) is 0x39C -- so a compact source is converted
+    // OPTIMISTICALLY into a byte[] and abandons it for the char[] path the moment a
+    // converted unit does not fit. That keeps the common case at ONE allocation
+    // instead of converting into a char[] and compacting afterwards.
+    JAVA_BOOLEAN changed = JAVA_FALSE;
+    if(cn1StrIsLatin1(me)) {
+        JAVA_OBJECT barr = allocArray(threadStateData, count, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+        JAVA_ARRAY_BYTE* bd = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)barr)->data;
+        JAVA_BOOLEAN fits = JAVA_TRUE;
+        for(int i = 0 ; i < count ; i++) {
+            JAVA_ARRAY_CHAR c = cn1StrCharAtRaw(me, i);
+            JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)(toUpper ? towupper(c) : towlower(c));
+            if(m > 0xFF) { fits = JAVA_FALSE; break; }
+            if(m != c) changed = JAVA_TRUE;
+            bd[i] = (JAVA_ARRAY_BYTE)m;
+        }
+        if(fits) {
+            if(!changed) {
+                finishedNativeAllocations();
+                return me;   // barr becomes garbage; the GC reclaims it
+            }
+            JAVA_OBJECT bs = __NEW_INSTANCE_java_lang_String(threadStateData);
+            struct obj__java_lang_String* bo = (struct obj__java_lang_String*)bs;
+            bo->java_lang_String_value = barr;
+            bo->java_lang_String_offset = 0;
+            bo->java_lang_String_count = count;
+            finishedNativeAllocations();
+            return bs;
+        }
+        changed = JAVA_FALSE;   // the char[] pass below decides this again from scratch
+    }
     JAVA_OBJECT arr = allocArray(threadStateData, count, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
     // read the source AFTER the allocation (non-moving GC, `me` rooted by the
     // caller). Coder-aware: cn1StrCharAtRaw decodes Latin-1(byte[]) or UTF-16(char[]).
     JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data;
-    JAVA_BOOLEAN changed = JAVA_FALSE;
     for(int i = 0 ; i < count ; i++) {
         JAVA_ARRAY_CHAR c = cn1StrCharAtRaw(me, i);
         JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)(toUpper ? towupper(c) : towlower(c));

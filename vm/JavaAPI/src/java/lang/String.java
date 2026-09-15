@@ -321,9 +321,27 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         // COPY, do not share: the source may be a FUSED string whose value array
         // lives inside the source's own allocation block -- sharing it would let
         // this string outlive the block it points into.
+        //
+        // PRESERVE THE SOURCE'S REPRESENTATION, exactly as the slice constructor
+        // above does. This used to copy via toCharArray(), which was wrong twice
+        // over: it allocated a char[] the constructor then had to keep, and it
+        // DE-COMPACTED a Latin-1 source into UTF-16, so copying a compact string
+        // doubled its storage. Unlike compacting String(char[],int,int) -- measured
+        // and reverted, because it makes readers pay in toCharArray() -- this
+        // direction only ever matches what the source already is, so no reader can
+        // be pushed off a fast path it was on.
         this.offset = 0;
         this.count = value.count;
-        this.value = value.toCharArray();
+        Object src = value.value;
+        if (src instanceof byte[]) {
+            byte[] copy = new byte[count];
+            System.arraycopy((byte[]) src, value.offset, copy, 0, count);
+            this.value = copy;
+        } else {
+            char[] copy = new char[count];
+            System.arraycopy((char[]) src, value.offset, copy, 0, count);
+            this.value = copy;
+        }
     }
 
     /**
