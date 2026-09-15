@@ -170,7 +170,30 @@ JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODE
          * /etc/hosts/application.properties is a broken deployment, not an
          * optional file somebody chose not to write.
          */
-        return errno == ENOENT ? -1 : -2;
+        if(errno == ENOENT) {
+            /*
+             * A DANGLING SYMLINK IS NOT AN ABSENT FILE. open() follows the link
+             * and reports ENOENT for the missing TARGET, which is the same errno
+             * a path that names nothing gives -- so a deployment whose
+             * application.properties is a symlink into a volume that failed to
+             * mount read as "no configuration", every file-based setting fell
+             * back to an environment default, and a server naming its TLS
+             * certificate and key in that file came up in PLAINTEXT. That is the
+             * failure this whole split exists to prevent, arriving through the
+             * one errno the split treats as benign.
+             *
+             * lstat does not follow the link, so an entry that is there answers
+             * 0 while a path that names nothing answers -1. The link itself is
+             * present, so this is the "there is one and it could not be opened"
+             * case, which nobody may quietly ignore.
+             */
+            struct stat linkInfo;
+            if(lstat(p, &linkInfo) == 0) {
+                return -2;
+            }
+            return -1;
+        }
+        return -2;
     }
     return fd;
 #endif

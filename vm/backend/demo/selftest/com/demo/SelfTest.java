@@ -3955,6 +3955,29 @@ public class SelfTest {
         }
         check("while a file that is simply not there answers -1", "-1",
                 String.valueOf(absent));
+        // A DANGLING SYMLINK, which both arms used to collapse into "absent":
+        // open() follows the link and reports the missing TARGET, giving the same
+        // ENOENT a path that names nothing gives. A deployment whose
+        // application.properties is a symlink into a volume that failed to mount
+        // therefore read as "no configuration" -- every file-based setting fell
+        // back to an environment default, and a server naming its TLS certificate
+        // and key in that file came up in PLAINTEXT.
+        //
+        // The link is made by whoever runs this rather than here, because FileIo
+        // has no symlink call and adding a native for a test is a worse trade
+        // than skipping when it is absent. vm/backend/verify.sh makes it.
+        String dangling = "/tmp/cn1-selftest-dangling-link";
+        int danglingFd = FileIo.openRead(dangling);
+        if(danglingFd >= 0) {
+            FileIo.close(danglingFd);
+        }
+        if(danglingFd == -1) {
+            System.out.println("NOTE dangling-symlink check skipped: create "
+                    + dangling + " pointing at a missing target to run it");
+        } else {
+            check("a dangling symlink is told apart from an absent file", "-2",
+                    String.valueOf(danglingFd));
+        }
     }
 
     private static void aTruncatingPathOpensNothing() throws Exception {

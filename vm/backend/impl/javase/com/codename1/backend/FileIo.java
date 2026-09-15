@@ -229,6 +229,28 @@ public final class FileIo {
             }
             return Descriptors.add(opened);
         } catch (java.nio.file.NoSuchFileException absent) {
+            // A DANGLING SYMLINK IS NOT AN ABSENT FILE, and the open follows the
+            // link, so the exception names the missing TARGET and looks exactly
+            // like a path that names nothing. A deployment whose
+            // application.properties is a symlink into a volume that failed to
+            // mount then read as "no configuration": every file-based setting
+            // fell back to an environment default, and a server naming its TLS
+            // certificate and key in that file came up in PLAINTEXT. That is what
+            // this -1/-2 split exists to prevent, arriving through the one answer
+            // the split treats as benign.
+            //
+            // NOFOLLOW_LINKS asks about the entry rather than its target, so a
+            // link that is there answers true while a path that names nothing
+            // answers false. Matches the lstat the translated arm does.
+            try {
+                if(java.nio.file.Files.exists(java.nio.file.Paths.get(path),
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    return OPEN_FAILED;
+                }
+            } catch (Exception unnameable) {
+                // A path Paths.get refuses is not a path to anything; fall
+                // through to the absent answer the other catch below gives it.
+            }
             return -1;
         } catch (java.nio.file.InvalidPathException unnameable) {
             // ABSENT, NOT UNREADABLE, and the translated arm says so explicitly:
