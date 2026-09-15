@@ -1315,6 +1315,48 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aLockRaceWhoseRestoreCannotBeWrittenSaysSoInsteadOfClaimingLocked() throws Exception {
+        // The rollback puts the previous device record back and then reports LOCKED, whose whole
+        // meaning is "nothing changed" -- on the strength of a boolean nobody read. If that write
+        // is refused, what stays on disk is the record rememberNow just wrote, which on this path
+        // can be a wrap of the zeroed key, while the caller is told the remembered unlock it
+        // already had was put back unchanged. It was not, and it no longer works.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        final String record = deviceRecordName(name);
+        final TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+
+        // Two hooks, because the flag is read when a write CLOSES and arming it in one step would
+        // fail rememberNow's own write instead -- which reports STORAGE_UNAVAILABLE for a
+        // different reason and would make this pass against the unfixed code. The first fires at
+        // the start of rememberNow's write and only locks; the second, which it installs, arms
+        // the failure at the start of the restore write that follows.
+        impl.setDuringStorageWrite(record, new Runnable() {
+            public void run() {
+                vault.lock();
+                impl.setDuringStorageWrite(record, new Runnable() {
+                    public void run() {
+                        impl.setStorageWriteFailsOnClose(true);
+                    }
+                });
+            }
+        });
+        VaultError outcome;
+        try {
+            outcome = errorOf(vault.rememberDevice());
+        } finally {
+            impl.setStorageWriteFailsOnClose(false);
+            impl.setDuringStorageWrite(null, null);
+        }
+
+        assertEquals(VaultError.STORAGE_UNAVAILABLE, outcome,
+                "a restore that was refused must not be reported as LOCKED, which promises that "
+                + "nothing changed");
+    }
+
+    @Test
     void twoVaultsConfiguredFromOneOptionsObjectDoNotShareItsPolicy() throws Exception {
         // VaultOptions is mutable and this class mutates it: setPolicy writes the new policy
         // through options.policy(...) and restores it in a finally. Retaining the caller's

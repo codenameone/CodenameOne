@@ -22,6 +22,7 @@
  */
 package com.codename1.security.vault;
 
+import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.security.CryptoException;
 import com.codename1.security.Hash;
@@ -2203,7 +2204,8 @@ public final class Vault {
                             // leave it describing a mechanism that was never completed. Put back
                             // exactly what was there and report the failure: nothing changed.
                             if (saved instanceof String) {
-                                Storage.getInstance().writeObject(deviceRecordKey(), saved);
+                                requireDeviceRecordRestored(deviceRecordKey(), (String) saved,
+                                        establishFailed);
                             }
                             throw establishFailed;
                         }
@@ -2250,7 +2252,18 @@ public final class Vault {
                         // record back before the OUTGOING key is deleted, and this runs after.
                         options.policy(configuredBefore);
                         if (savedRecord instanceof String && !outgoingKeyGone[0]) {
-                            Storage.getInstance().writeObject(deviceRecordKey(), savedRecord);
+                            // Logged and not thrown, which is the one place that is right. This
+                            // is a finally, and the failure it is cleaning up after has ALREADY
+                            // been delivered through out.error above -- so an exception raised
+                            // here reaches nobody: it escapes into the worker past an
+                            // AsyncResource that is already complete. The handler around
+                            // rememberNow does the same restore before the outgoing key is
+                            // deleted and DOES report a refusal, which is the path that can.
+                            if (!Storage.getInstance()
+                                    .writeObject(deviceRecordKey(), savedRecord)) {
+                                Log.p("Vault: the device record could not be restored after a "
+                                        + "failed policy change", Log.WARNING);
+                            }
                         } else {
                             // Not restored once the OUTGOING key has been deleted: on a port
                             // where the two policies are different mechanisms -- a stored key and
@@ -2962,7 +2975,7 @@ public final class Vault {
         }
         Storage storage = Storage.getInstance();
         if (restore != null) {
-            storage.writeObject(deviceRecordKey(), restore);
+            requireDeviceRecordRestored(deviceRecordKey(), restore, null);
             throw new VaultException(VaultError.LOCKED,
                     "the vault was locked while this device was being remembered; the remembered "
                     + "unlock that was already here has been put back unchanged");
@@ -3168,6 +3181,26 @@ public final class Vault {
             throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
                     "the vault was locked while this secret was being changed, and the entry "
                     + "this call created could not be removed again");
+        }
+    }
+
+    /// Puts the device record back, and refuses to claim it did when it did not.
+    ///
+    /// The device-record twin of requireSecretRestored, and it exists for the same reason: every
+    /// one of these rollbacks wrote the old record and then reported a DIFFERENT error --
+    /// LOCKED, or whatever made the policy change fail -- on the strength of a boolean nobody
+    /// read. A storage refusal there leaves the record this call had just written, which on the
+    /// lock-race path can be a wrap of the zeroed key, while the caller is told the remembered
+    /// unlock it already had was put back unchanged. It was not, and it no longer works.
+    ///
+    /// The original failure goes on as the cause, because "the policy change failed" and "and it
+    /// could not be undone" are both things the caller needs, and only the second changes what
+    /// they can do next.
+    private static void requireDeviceRecordRestored(String key, String saved, Throwable because) {
+        if (!Storage.getInstance().writeObject(key, saved)) {
+            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                    "the device record this call replaced could not be put back, so this device's "
+                    + "remembered unlock is no longer the one it had", because);
         }
     }
 
