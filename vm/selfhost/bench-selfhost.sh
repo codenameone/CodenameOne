@@ -31,7 +31,13 @@ APP="${2:?}"; PKG="${3:?}"; ROUNDS="${4:-5}"
 T="$REPO/vm/selfhost/target"
 # -O3 -flto=thin is the documented release shape (vm/benchmarks/README.md);
 # CN1_SELFHOST_BIN overrides it for an A/B against the -O1 diff-gate build.
-PARPAR="${CN1_SELFHOST_BIN:-$T/parpar-O3}"
+# The binary the GATES verify, not a separate optimised build nobody refreshes.
+# It defaulted to $T/parpar-O3, which build-selfhost.sh does not produce and
+# nothing kept current: the bench spent four runs comparing a months-old binary
+# against a current JVM translator and correctly refusing to print a ratio, while
+# Gate A passed byte-identical on the same corpus. Benchmarking a binary the gates
+# have not verified cannot produce a meaningful number.
+PARPAR="${CN1_SELFHOST_BIN:-$T/parpar}"
 JAPI="$T/javaapi-classes"
 TR="$REPO/vm/ByteCodeTranslator/target/classes"
 ASM="$(cat "$REPO/vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt")"
@@ -96,6 +102,13 @@ for i in "${!ARMS[@]}"; do echo "arm    : ${NAMES[$i]} -> ${ARMS[$i]}"; done
 echo "corpus : $CLASSES"
 echo "arms   : ${NAMES[*]}    rounds: $ROUNDS"
 echo "memory : peak phys_footprint (/usr/bin/time -l)"
+# STALENESS: a benchmark of yesterday's binary is worse than no benchmark, because
+# the number looks like a measurement. Refuse rather than warn.
+if [ -n "$(find "$REPO/vm/ByteCodeTranslator/src" "$REPO/vm/JavaAPI/src" -type f -newer "$PARPAR" -print -quit 2>/dev/null)" ]; then
+    echo "REFUSING: $PARPAR is older than the translator/JavaAPI sources it was built from."
+    echo "  run vm/selfhost/build-selfhost.sh first."
+    exit 1
+fi
 
 # --- correctness precondition: every arm must emit the same C -------------------
 # Same absolute output path for all arms, sequentially, because the generated
@@ -104,6 +117,13 @@ OUT="$W/out"
 for i in "${!ARMS[@]}"; do
     mkdir -p "$OUT"
     invoke "${ARMS[$i]}" "$OUT" > "$W/${NAMES[$i]}.log" 2>&1 || { echo "${NAMES[$i]} FAILED"; tail -5 "$W/${NAMES[$i]}.log"; exit 1; }
+    # CLEAR the destination first. `mv` into an EXISTING directory nests the new
+    # tree inside it (tree-parpar/out/...) and leaves the previous run's dist/ in
+    # place, so the correctness check below compares a stale tree against a fresh
+    # one and reports a divergence that is pure harness. Observed: a tree-parpar
+    # left by an earlier session made every later run declare the VM divergent
+    # while Gate A passed byte-identical on the same corpus.
+    rm -rf "$W/tree-${NAMES[$i]}"
     mv "$OUT" "$W/tree-${NAMES[$i]}"
 done
 for i in "${!ARMS[@]}"; do

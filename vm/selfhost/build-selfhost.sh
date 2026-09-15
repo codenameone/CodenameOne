@@ -134,7 +134,13 @@ done
 #    set declare main, and ByteCodeClass.addMethod refuses to pick one otherwise.
 APP=com_codename1_tools_translator_ByteCodeTranslator
 rm -rf "$OUT/out"; mkdir -p "$OUT/out"
-"$J8/bin/java" -Xmx4g -cp "$TRANSLATOR:$ASM_CP" com.codename1.tools.translator.ByteCodeTranslator \
+# CN1_SELFHOST_JAVA_OPTS reaches the TRANSLATOR that emits the C, not the C compiler --
+# it is how a codegen-level ablation is run. The one that matters for GC work is
+# -Dcn1.frameless.objects=false -Dcn1.frameless.instance=false, which reverts to pushing
+# every object reference onto threadObjectStack; with frameless codegen on (the default)
+# a live reference can exist ONLY in a C local, so any collector that scans the precise
+# stack alone will miss it. Word-split on purpose: this is a list of options.
+"$J8/bin/java" -Xmx4g $CN1_SELFHOST_JAVA_OPTS -cp "$TRANSLATOR:$ASM_CP" com.codename1.tools.translator.ByteCodeTranslator \
     clean "$JAVAAPI;$OUT/asm-classes;$OUT/classes" "$OUT/out" \
     "$APP" com.codename1.tools.translator "$APP" 1.0 clean none \
     > "$OUT/translate.log" 2>&1 \
