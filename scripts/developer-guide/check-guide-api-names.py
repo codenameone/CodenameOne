@@ -95,8 +95,14 @@ SPAN_NAME = re.compile(r'(?<![-/\w])([A-Z][A-Za-z0-9]{4,})\b')
 # not exist, and `Worlds` or `Get All Subscription Statuses`, which are a
 # product and an Apple endpoint the guide names in code spans.
 CLASS_POSITION = re.compile(
+    # Constructed,
     r'\bnew\s+([A-Z][A-Za-z0-9]{4,})\b'
-    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\.\s*[a-z][A-Za-z0-9]*\s*\(')
+    # a member called on it,
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\.\s*[a-z][A-Za-z0-9]*\s*\('
+    # a constant read off it, or its class literal. Both say the token is a
+    # type as plainly as a constructor does: Images.DEFAULT and Images.class
+    # were read as the plural of Image.
+    r'|\b([A-Z][A-Za-z0-9]{4,})\s*\.\s*(?:[A-Z][A-Z0-9_]*\b|class\b)')
 # Every one of those carries a signal that the token is code -- backticks, a
 # link target, a member call. A bare capitalised word in prose carries none,
 # and asking for it is not a near miss away from a class name, it IS one:
@@ -401,10 +407,37 @@ def is_plural_of_a_class(word, simple):
            (word.endswith('es') and word[:-2] in simple)
 
 
+def class_positions():
+    """Every word the guide uses where only a type can go.
+
+    Read over the whole guide first, so a word judged in one chapter is
+    judged the same way in every other.
+    """
+    found = set()
+    for name in sorted(os.listdir(GUIDE)):
+        if not name.endswith(('.asciidoc', '.adoc')):
+            continue
+        with open(os.path.join(GUIDE, name), encoding='utf-8') as handle:
+            text = handle.read()
+        for span in CODE_SPAN.finditer(text):
+            for match in CLASS_POSITION.finditer(span.group(1)):
+                found.add(next(g for g in match.groups() if g))
+        for match in WORD.finditer(text):
+            if match.lastindex == 3:
+                found.add(match.group(3))
+    return found
+
+
 def main():
     simple, qualified = class_index()
     code, anywhere = tree_identifiers()
     dead_links, typos, seen = [], [], set()
+    # Every place in the guide where a token stands as a type, gathered before
+    # anything is judged. Collecting it per file made the answer depend on
+    # which file came first: a chapter writing "Buttons" as a plural put the
+    # word in `seen`, and a later chapter's `new Buttons()` was skipped as
+    # already-considered before its position was read.
+    in_class_position = class_positions()
 
     for name in sorted(os.listdir(GUIDE)):
         if not name.endswith(('.asciidoc', '.adoc')):
@@ -418,19 +451,12 @@ def main():
         # Each word with whether it was written as code, because the plural
         # rule depends on it: "Buttons" in prose is the plural of a class, and
         # `new Buttons()` is a class that does not exist.
-        in_class_position = set()
         words = []
         for span in CODE_SPAN.finditer(text):
-            body = span.group(1)
-            for match in CLASS_POSITION.finditer(body):
-                in_class_position.add(match.group(1) or match.group(2))
-            for match in SPAN_NAME.finditer(body):
+            for match in SPAN_NAME.finditer(span.group(1)):
                 words.append(match.group(1))
         for match in WORD.finditer(text):
-            word = next(group for group in match.groups() if group)
-            if match.lastindex == 3:
-                in_class_position.add(word)
-            words.append(word)
+            words.append(next(group for group in match.groups() if group))
         for word in words:
             if word in simple or word in seen:
                 continue
