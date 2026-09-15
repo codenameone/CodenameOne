@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Unpackaged, self-contained WinUI 3. MSIX is deliberately avoided: it needs a signing
+    certificate, a sideloading policy and Add-AppxPackage, and all three behave differently
+    on a Windows Server runner than on a Windows client one. That would make the reference
+    set depend on runner policy rather than on the design language, which is the opposite
+    of what this app is for. WindowsPackageType=None plus WindowsAppSDKSelfContained gives
+    a folder you cd into and run.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.22621.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>Cn1NativeRef</RootNamespace>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250228001" />
+  </ItemGroup>
+</Project>
