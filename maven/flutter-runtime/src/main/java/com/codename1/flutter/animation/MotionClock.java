@@ -27,31 +27,31 @@ package com.codename1.flutter.animation;
  * The clock every animation reads, and a way to take it off the wall.
  *
  * <p>Comparing motion between two stacks only means something if both are asked for the
- * SAME animation time. Against the wall clock they never are: a frame lands when it lands,
- * a slow build shifts every later frame, and two recordings of the same gesture are two
- * different samplings of it. Flutter's own widget tests solve this by owning the clock --
- * {@code tester.pump(d)} advances animations by exactly {@code d} -- and the reference
- * frames this port is measured against are captured that way.</p>
+ * SAME animation time. Against the wall clock they never are: a frame lands when it
+ * lands, and two recordings of one gesture are two different samplings of it. Flutter's
+ * own widget tests solve this by owning the clock -- {@code tester.pump(d)} advances
+ * animations by exactly {@code d} -- and the reference frames this port is measured
+ * against are captured that way.</p>
  *
- * <p>Frozen, this does the same here: the harness names an animation time, every running
- * controller is advanced to it, and the frame painted is the frame at that time. Nothing
- * else changes -- controllers still compute their own progress from it, so what is being
- * compared is still the runtime's real curve and duration arithmetic.</p>
+ * <p>This is a thin face over Codename One's own {@code AnimationTime}, the framework's
+ * pluggable animation clock, which exists for exactly this. Going through it rather than
+ * keeping a clock of our own is the point: a Flutter animation and the Codename One FORM
+ * TRANSITION carrying the page it lives on then advance together off one time source.
+ * With a separate clock, freezing it held the widgets still while the transition around
+ * them ran on regardless, so a captured frame was half of one moment and half of another
+ * -- and a page push, which is entirely a form transition, did not hold still at all.</p>
  *
  * <p>Released, which is how an application always runs, this is
  * {@code System.currentTimeMillis()} and costs one boolean test per tick.</p>
  */
 public final class MotionClock {
 
-    private static volatile boolean frozen;
-    private static volatile long nowMs;
-
     private MotionClock() {
     }
 
     /** The current animation time: the frozen one, or the wall clock. */
     public static long now() {
-        return frozen ? nowMs : System.currentTimeMillis();
+        return com.codename1.ui.animations.AnimationTime.now();
     }
 
     /**
@@ -62,35 +62,36 @@ public final class MotionClock {
      * see the clock jump backwards and measure a negative elapsed.</p>
      */
     public static void freeze() {
-        nowMs = System.currentTimeMillis();
-        frozen = true;
+        com.codename1.ui.animations.AnimationTime.setTime(System.currentTimeMillis());
     }
 
     /** Moves the frozen clock forward by {@code deltaMs}. Ignored when not frozen. */
     public static void advance(long deltaMs) {
-        if (frozen && deltaMs > 0) {
-            nowMs += deltaMs;
+        if (isFrozen() && deltaMs > 0) {
+            com.codename1.ui.animations.AnimationTime.setTime(now() + deltaMs);
         }
-    }
-
-    /** Hands the clock back to the wall. */
-    public static void release() {
-        frozen = false;
     }
 
     /**
      * Advances the frozen clock and runs one animation frame at the new time.
      *
      * <p>The single call a harness needs: FrameDriver is package private and staying that
-     * way, because an application has no business pumping the frame clock by hand.</p>
+     * way, because an application has no business pumping the frame clock by hand. A form
+     * transition needs no pumping here -- Codename One's own painting loop drives it, and
+     * that loop now reads the same clock.</p>
      */
     public static void advanceAndPump(long deltaMs) {
         advance(deltaMs);
         FrameDriver.pump();
     }
 
+    /** Hands the clock back to the wall. */
+    public static void release() {
+        com.codename1.ui.animations.AnimationTime.reset();
+    }
+
     /** Whether the clock is currently frozen. */
     public static boolean isFrozen() {
-        return frozen;
+        return com.codename1.ui.animations.AnimationTime.isOverridden();
     }
 }
