@@ -1275,10 +1275,18 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
     ExitProcess(3);
 }
 
-} /* extern "C" */
-
-#endif /* _WIN32 */
-
+/* INSIDE extern "C" AND INSIDE the _WIN32 guard, which is where every other
+ * native in this file lives. It was added below both: past the closing brace it
+ * compiles with C++ linkage, so the symbol is mangled and the translated C that
+ * calls it fails to link with
+ *
+ *     lld-link: error: undefined symbol:
+ *         com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_boolean
+ *
+ * which took out cross-compile, the suite exe and every screenshot leg that needs
+ * the exe. Past the #endif it would also be compiled on a non-Windows target,
+ * where RegGetValueW and HKEY_CURRENT_USER do not exist.
+ */
 /* ---------------------------------------------------------------- dark mode */
 
 /* True when the user has chosen the dark app theme.
@@ -1311,3 +1319,8 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_systemUsesDarkTheme___R_bo
     }
     return value == 0 ? JAVA_TRUE : JAVA_FALSE;
 }
+
+} /* extern "C" */
+
+#endif /* _WIN32 */
+
