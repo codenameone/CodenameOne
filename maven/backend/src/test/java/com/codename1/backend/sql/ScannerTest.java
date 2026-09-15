@@ -92,6 +92,20 @@ class ScannerTest {
         // rather than a letter -- which is the distinction being made.
         assertEquals("SELECT $tag$ ? $tag$, $1",
                 Dialect.POSTGRES.bind("SELECT $tag$ ? $tag$, ?", 1));
+
+        // AND ITS TAG MAY BE NON-ASCII TOO. A dollar-quote tag follows the same
+        // unquoted-identifier rules, so the boundary test and the tag test are
+        // one rule in two places -- widening only the first left this refusing
+        // "SELECT $\u00e9$?$\u00e9$" as having one parameter when the question
+        // mark is quoted text.
+        assertEquals("SELECT $\u00e9$?$\u00e9$",
+                Dialect.POSTGRES.bind("SELECT $\u00e9$?$\u00e9$", 0));
+        // A placeholder OUTSIDE a non-ASCII tagged body is still a placeholder.
+        assertEquals("SELECT $\u00e9$?$\u00e9$, $1",
+                Dialect.POSTGRES.bind("SELECT $\u00e9$?$\u00e9$, ?", 1));
+        // And the digit rule is untouched: $1 is PostgreSQL's own parameter, not
+        // the opening of a body, so it is left alone.
+        assertEquals("SELECT $1", Dialect.POSTGRES.bind("SELECT $1", 0));
         // And a keyword is not one when a non-ASCII letter runs into it.
         assertEquals(1, Dialect.POSTGRES.countInsertRows(
                 "INSERT INTO t (a) VALUES (?) /* caf\u00e9values (2) */"));
