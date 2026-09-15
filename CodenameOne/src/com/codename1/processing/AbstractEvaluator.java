@@ -571,7 +571,11 @@ abstract class AbstractEvaluator implements Evaluator {
         while (lead < out.length() - 1 && out.charAt(lead) == '0') {
             lead++;
         }
-        return out.substring(lead);
+        // Through the String: StringBuilder.substring is not in the class
+        // library Codename One compiles against -- CLDC11 has no such method
+        // and the VM's copy returns a StringBuilder -- so this is a compile
+        // error on the framework build even though it is fine on the JDK.
+        return out.toString().substring(lead);
     }
 
     /// Whether every character is a zero digit.
@@ -617,7 +621,7 @@ abstract class AbstractEvaluator implements Evaluator {
         while (end > 0 && Character.digit(digits.charAt(end - 1), 10) == 0) {
             end--;
         }
-        return digits.substring(0, end);
+        return digits.toString().substring(0, end);
     }
 
     /// Where the exponent begins, or -1.
