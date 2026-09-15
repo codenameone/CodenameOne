@@ -27,6 +27,7 @@ import com.codename1.flutter.TargetPlatform;
 import com.codename1.flutter.foundation.FoundationLib;
 import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
 
 /**
@@ -118,10 +119,38 @@ final class RouteTransitions {
             // forward is true, so the destination comes in from the leading edge, which is
             // the way BACK. A push brings the new page in from the trailing edge, and
             // showBack() plays this in reverse for the pop.
-            return CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, false,
-                    ms > 0 ? ms : CUPERTINO_PAGE_MS);
+            return eased(CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL,
+                    false, ms > 0 ? ms : CUPERTINO_PAGE_MS));
         }
         return CommonTransitions.createFade(ms > 0 ? ms : ZOOM_PAGE_MS);
+    }
+
+    /// Flutter's {@code Curves.linearToEaseOut}, which is the curve a Cupertino page
+    /// transition travels along.
+    private static final float[] LINEAR_TO_EASE_OUT = {0.35f, 0.91f, 0.33f, 0.97f};
+
+    /**
+     * Gives a transition Flutter's page curve instead of Codename One's default ease.
+     *
+     * <p>Both take the same 500ms, so the two agreed at the ends and disagreed all the
+     * way between: measured against the reference at the same animation times, ours ran
+     * ahead early and fell behind through the middle -- an ease-in-out against a curve
+     * that is nearly linear out of the gate and eases only at the finish. Same distance,
+     * same duration, visibly different travel.</p>
+     */
+    private static Transition eased(CommonTransitions t) {
+        t.setMotion(new com.codename1.util.LazyValue<Motion>() {
+            @Override
+            public Motion get(Object... args) {
+                int from = ((Integer) args[0]).intValue();
+                int to = ((Integer) args[1]).intValue();
+                int duration = ((Integer) args[2]).intValue();
+                return Motion.createCubicBezierMotion(from, to, duration,
+                        LINEAR_TO_EASE_OUT[0], LINEAR_TO_EASE_OUT[1],
+                        LINEAR_TO_EASE_OUT[2], LINEAR_TO_EASE_OUT[3]);
+            }
+        });
+        return t;
     }
 
     private static boolean usesCupertinoPageTransition(TargetPlatform p) {
