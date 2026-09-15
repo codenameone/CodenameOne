@@ -41,7 +41,10 @@ package java.lang;
 /// Keying off the thread fixes that, and there is no lock here because a thread
 /// only ever reads and writes its OWN table, which nothing else can reach.
 ///
-/// THE KEY IS WEAK because the obvious version of that trade leaks the other way.
+/// THE KEY IS WEAK IN THE OTHER COPY, because the obvious version of that trade
+/// leaks the other way. It is STRONG here, and Entry says why: this port's
+/// java.lang.ref.Reference is a stub that answers null, so a weak key would
+/// discard every live binding. The rest of the reasoning is the other copy's.
 /// A long-lived worker thread that touches a short-lived ThreadLocal -- library or
 /// request code that creates them dynamically -- would pin the ThreadLocal AND its
 /// value until the thread died, however long ago the application dropped its last
@@ -62,13 +65,33 @@ public class ThreadLocal<T> extends Object {
     /// because it is only reachable through an entry whose key is still alive.
     /// Package private rather than private: java.lang.Thread declares the array
     /// that holds these, and both classes live in java.lang.
-    static final class Entry extends java.lang.ref.WeakReference {
+    ///
+    /// THE KEY IS STRONG HERE, and only here. The twin of this class in
+    /// vm/JavaAPI holds it weakly, so a ThreadLocal the application has dropped
+    /// does not survive on a long-lived thread. That cannot be done on this port:
+    /// `java.lang.ref.Reference` in Ports/CLDC11 is a codavaj-generated stub whose
+    /// `get()` returns null unconditionally and whose `clear()` does nothing, so a
+    /// weak key reads as collected the instant it is stored. Every entry would be
+    /// swept as stale on the next access -- `set` followed by `get` would answer
+    /// `initialValue()`, and repeated `get` would recompute it every time.
+    ///
+    /// So the retention this port cannot avoid is the lesser fault, and it is the
+    /// behaviour this class has always had. Give CLDC11 a working Reference and
+    /// this should become the weak form the other copy uses.
+    static final class Entry {
+        final ThreadLocal key;
         Object value;
         boolean initialised;
 
         Entry(ThreadLocal key, Object value) {
-            super(key);
+            this.key = key;
             this.value = value;
+        }
+
+        /// Named for the WeakReference accessor the other copy inherits, so the two
+        /// implementations read the same way at every use.
+        ThreadLocal get() {
+            return key;
         }
     }
 
@@ -107,8 +130,10 @@ public class ThreadLocal<T> extends Object {
             }
             Object key = e.get();
             if(key == null) {
-                // Its ThreadLocal is gone, so the value it holds is unreachable to
-                // everyone. Dropping it here is the whole of the stale-entry sweep.
+                // UNREACHABLE while the key is strong -- see Entry -- and kept so
+                // the two copies of this class stay line for line comparable, and so
+                // that giving CLDC11 a real Reference is a one-line change here
+                // rather than a re-derivation.
                 table[iter] = null;
                 if(free < 0) {
                     free = iter;

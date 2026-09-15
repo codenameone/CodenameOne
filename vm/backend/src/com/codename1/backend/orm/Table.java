@@ -154,7 +154,8 @@ final class Table {
             if(iter > 0) {
                 create.append(", ");
             }
-            create.append(quotedColumns[iter]).append(' ').append(declaration(columns[iter]));
+            create.append(quotedColumns[iter]).append(' ')
+                    .append(declaration(columns[iter], quotedColumns[iter]));
         }
         create.append(")");
         this.createTableSql = create.toString();
@@ -354,7 +355,7 @@ final class Table {
     }
 
     /** Everything after the column name in CREATE TABLE. */
-    private String declaration(ColumnDefinition column) {
+    private String declaration(ColumnDefinition column, String quotedColumn) {
         if(column.isId()) {
             if(column.isGenerated()) {
                 // The DECLARED TYPE IS NOT CONSULTED, and that is not an
@@ -364,7 +365,9 @@ final class Table {
                 // put an arbitrary type. @Column(type) on an autoIncrement @Id
                 // is refused by the annotation processor rather than discarded
                 // here, so this branch is only ever reached without one.
-                return dialect.generatedKeyColumn(column.getKind());
+                // The QUOTED NAME travels with it so SQLite can bound an int key
+                // to the Java int range; see Dialect#generatedKeyColumn(int, String).
+                return dialect.generatedKeyColumn(column.getKind(), quotedColumn);
             }
             if(column.getDeclaredType() != null) {
                 // NOT NULL for the reason Dialect#assignedKeyColumn gives: SQLite
