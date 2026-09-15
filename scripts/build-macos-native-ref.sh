@@ -116,7 +116,9 @@ cat "$TEST_LOG"
 # `open -W` exits 0 whatever the app did, so the app reports its own verdict on the last
 # line and it is read back here. A missing verdict means the app died before finishing,
 # which must fail rather than pass quietly.
-rc=$(sed -n 's/^NATIVEREF:DONE exit=\([0-9][0-9]*\)$/\1/p' "$TEST_LOG" | tail -1)
+# Tolerant of extra fields before exit= (the capture run reports tiles= as well), but
+# still anchored to the whole line so a half-written log cannot satisfy it.
+rc=$(sed -n 's/^NATIVEREF:DONE .*exit=\([0-9][0-9]*\)$/\1/p' "$TEST_LOG" | tail -1)
 if [ -z "$rc" ]; then
   log "FAILED: the app never reported NATIVEREF:DONE -- it exited before finishing."
   exit 22

@@ -171,6 +171,13 @@ public final class DesktopTileRunner {
     /// identically -- but do not read a Fluent light width_ratio as a control width.
     /// Adwaita is tighter still at 5. Lowering the tolerance is not the fix; it would
     /// start counting anti-aliasing as content everywhere else.
+    /// Kept in sync BY HAND with FULL_WIDTH_KINDS in each native reference app. The two
+    /// sides must agree: if one stretches a control to the tile and the other does not, the
+    /// comparison is between two different geometries and the score means nothing.
+    private static final java.util.Set<String> FULL_WIDTH_IDS =
+            new java.util.HashSet<String>(java.util.Arrays.asList(
+                    "DesktopSlider", "DesktopProgressBar", "DesktopTextField"));
+
     private static int tileBackground() {
         return UIManager.getInstance().getComponentStyle("Form").getBgColor();
     }
@@ -216,7 +223,11 @@ public final class DesktopTileRunner {
         if (comp == null) {
             return false;
         }
-        if ("DesktopSlider".equals(c.getId()) || "DesktopProgressBar".equals(c.getId())) {
+        // Controls with no natural width: layout always assigns one, so the tile width is
+        // the honest answer and it is the rule the native reference apps apply too. Left to
+        // size itself a text field measures to its content, which is not a control anyone
+        // would recognise -- AppKit gives 39px for the string "Text".
+        if (FULL_WIDTH_IDS.contains(c.getId())) {
             comp.setPreferredW(w);
         }
         comp.getAllStyles().setMargin(0, 0, 0, 0);

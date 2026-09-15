@@ -93,8 +93,127 @@ public partial class App : Application
     private string _clientBackground = "(not sampled)";
     private IntPtr _hwnd;
     private FrameworkElement _probeControl;
+    private Grid _tileHost;
     private Windows.Foundation.Rect _probeBounds;
     private bool _isProbe;
+
+    /// The tile the widget is anchored top-left in. Mirrors tile_width_px / tile_height_px
+    /// in fidelity-tests.yaml; if those change, this must change with them.
+    private const int TileW = 240;
+    private const int TileH = 56;
+
+    private int _tilesWritten;
+
+    /// One row of the desktop matrix. Kind is the native_win key in fidelity-tests.yaml,
+    /// and the ids and states are that file's too: the two lists must agree or the
+    /// comparator pairs a CN1 render against nothing.
+    private sealed record Spec(string Id, string Kind, string[] States);
+
+    private static readonly Spec[] Specs =
+    {
+        new("DesktopButton",       "winui_button",        new[] { "normal", "hover", "pressed", "disabled" }),
+        new("DesktopAccentButton", "winui_button_accent", new[] { "normal", "hover", "pressed", "disabled" }),
+        new("DesktopTextField",    "winui_textbox",       new[] { "normal", "hover", "disabled" }),
+        new("DesktopCheckBox",     "winui_checkbox",      new[] { "normal", "selected", "hover", "disabled" }),
+        new("DesktopRadioButton",  "winui_radiobutton",   new[] { "normal", "selected", "hover", "disabled" }),
+        new("DesktopSwitch",       "winui_toggleswitch",  new[] { "normal", "selected", "hover", "disabled" }),
+        new("DesktopSlider",       "winui_slider",        new[] { "normal", "hover", "disabled" }),
+        new("DesktopProgressBar",  "winui_progressbar",   new[] { "normal" }),
+        new("DesktopComboBox",     "winui_combobox",      new[] { "normal", "hover", "disabled" }),
+    };
+
+    /// Controls with no natural width: layout always assigns one, so the tile width is the
+    /// honest answer. Kept in sync BY HAND with FULL_WIDTH_KINDS in the other reference apps
+    /// and FULL_WIDTH_IDS in DesktopTileRunner. If one side stretches a control and the
+    /// other does not, the comparison is between two geometries and the score means nothing.
+    private static bool IsFullWidth(string kind) =>
+        kind is "winui_slider" or "winui_progressbar" or "winui_textbox";
+
+    private static FrameworkElement MakeWidget(string kind) => kind switch
+    {
+        "winui_button" => new Button { Content = "Button" },
+        // The accent-filled button is a STYLE in WinUI, not a control: AccentButtonStyle is
+        // the documented resource key, and tinting a plain Button by hand produces a colour
+        // the system never draws.
+        "winui_button_accent" => new Button
+        {
+            Content = "Button",
+            Style = (Style)Application.Current.Resources["AccentButtonStyle"],
+        },
+        "winui_textbox" => new TextBox { Text = "Text" },
+        "winui_checkbox" => new CheckBox { Content = "Check" },
+        "winui_radiobutton" => new RadioButton { Content = "Radio" },
+        "winui_toggleswitch" => new ToggleSwitch(),
+        "winui_slider" => new Slider { Minimum = 0, Maximum = 1, Value = 0.5, StepFrequency = 0.01 },
+        "winui_progressbar" => new ProgressBar { Minimum = 0, Maximum = 1, Value = 0.6 },
+        "winui_combobox" => MakeComboBox(),
+        _ => null,
+    };
+
+    private static ComboBox MakeComboBox()
+    {
+        var c = new ComboBox();
+        c.Items.Add("Option");
+        c.SelectedIndex = 0;
+        return c;
+    }
+
+    /// Applies one state.
+    ///
+    /// Two different mechanisms on purpose. Enabled and checked are real PROPERTIES, so they
+    /// are set directly and WinUI resolves the visuals itself. Hover and pressed have no
+    /// property -- they exist only as visual states the input system would normally drive --
+    /// so they go through VisualStateManager.
+    ///
+    /// The state NAMES are per control and not guessable: a Button is "PointerOver", a
+    /// CheckBox is "UncheckedPointerOver" or "CheckedPointerOver" because its check and
+    /// interaction states are one combined group. So each is tried in turn and the result of
+    /// GoToState is CHECKED -- a name that does not exist returns false and silently leaves
+    /// the control in Normal, which would write a "hover" tile identical to normal and call
+    /// the theme faithful when it had never been tested.
+    private bool ApplyState(FrameworkElement widget, string state, string kind, string tileName)
+    {
+        switch (state)
+        {
+            case "normal":
+                return true;
+            case "selected":
+                if (widget is ToggleSwitch ts) { ts.IsOn = true; return true; }
+                if (widget is CheckBox cb) { cb.IsChecked = true; return true; }
+                if (widget is RadioButton rb) { rb.IsChecked = true; return true; }
+                _blockers.Add($"{tileName}: {kind} has no selected state");
+                return false;
+            case "disabled":
+                if (widget is Control dc) { dc.IsEnabled = false; return true; }
+                widget.IsHitTestVisible = false;
+                return true;
+            case "hover":
+            case "pressed":
+            {
+                if (widget is not Control control)
+                {
+                    _blockers.Add($"{tileName}: {kind} is not a Control, so it has no visual states");
+                    return false;
+                }
+                string[] candidates = state == "hover"
+                    ? new[] { "PointerOver", "UncheckedPointerOver", "CheckedPointerOver" }
+                    : new[] { "Pressed", "UncheckedPressed", "CheckedPressed" };
+                foreach (var name in candidates)
+                {
+                    if (VisualStateManager.GoToState(control, name, false))
+                    {
+                        return true;
+                    }
+                }
+                _blockers.Add($"{tileName}: none of [{string.Join(", ", candidates)}] is a "
+                    + $"visual state of {kind}, so the tile would be a copy of normal");
+                return false;
+            }
+            default:
+                _blockers.Add($"{tileName}: unknown state '{state}'");
+                return false;
+        }
+    }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -124,10 +243,26 @@ public partial class App : Application
             op.IsAlwaysOnTop = true;
         }
 
-        var root = new StackPanel { Orientation = Orientation.Vertical, Spacing = 12, Margin = new Thickness(24) };
-        var button = new Button { Content = "Default" };
-        root.Children.Add(button);
+        // The window content IS one tile: no padding, no spacing, nothing around it. That
+        // is what lets the capture take the client rect as the tile region rather than
+        // computing an offset into a larger window, and an offset computed wrong is a whole
+        // set shifted by a few pixels that still looks entirely plausible.
+        var root = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        _tileHost = root;
+        var button = new Button { Content = "Button" };
+        var probeHost = new Grid { Width = TileW, Height = TileH };
+        probeHost.Children.Add(button);
+        root.Children.Add(probeHost);
         _window.Content = root;
+
+        // Resize the CLIENT area to exactly one tile. AppWindow.ResizeClient sizes the
+        // client rather than the outer frame, so the title bar DWM always draws is excluded
+        // rather than subtracted afterwards.
+        AppWindow.GetFromWindowId(idEarly).ResizeClient(new Windows.Graphics.SizeInt32(TileW, TileH));
 
         _probeControl = button;
         root.Loaded += async (_, _) => await OnReadyAsync(root, button, micaSupported);
@@ -221,7 +356,15 @@ public partial class App : Application
         // are not expanded into the output, and if that mattered the controls would come
         // back unstyled or absent rather than failing loudly. A picture is the only thing
         // that distinguishes "built" from "drew a Fluent button".
+        // Probe verification ALWAYS runs, capture mode included: it is what distinguishes
+        // "built" from "drew a Fluent button", and a 60-tile set of unstyled controls would
+        // otherwise be committed as a reference.
         await CaptureWindowAsync();
+
+        if (!_isProbe)
+        {
+            await CaptureMatrixAsync();
+        }
 
         WriteManifest(micaSupported, transparency, animations, accent, rasterScale, fontFamily, segoeVariable);
 
@@ -229,7 +372,7 @@ public partial class App : Application
         {
             Console.Error.WriteLine($"NATIVEREF:BLOCKER {b}");
         }
-        Console.WriteLine($"NATIVEREF:DONE exit={(_blockers.Count > 0 ? 20 : 0)}");
+        Console.WriteLine($"NATIVEREF:DONE tiles={_tilesWritten} exit={(_blockers.Count > 0 ? 20 : 0)}");
         Console.Out.Flush();
         Environment.Exit(_blockers.Count > 0 ? 20 : 0);
     }
@@ -287,6 +430,150 @@ public partial class App : Application
 
     private const uint SRCCOPY = 0x00CC0020;
     private const uint CAPTUREBLT = 0x40000000;
+
+    /// Captures the whole matrix, both appearances.
+    ///
+    /// The window content is swapped per tile and the client area is held at exactly one
+    /// tile, so the BitBlt region never has to be reasoned about: what is composited IS the
+    /// tile. Each swap waits for real presented frames rather than a fixed sleep, because a
+    /// tile captured before its first present is a picture of the previous one.
+    private async Task CaptureMatrixAsync()
+    {
+        foreach (var appearance in new[] { "light", "dark" })
+        {
+            if (_window.Content is FrameworkElement rootEl)
+            {
+                rootEl.RequestedTheme = appearance == "dark" ? ElementTheme.Dark : ElementTheme.Light;
+            }
+            await WaitForFramesAsync(3);
+
+            foreach (var spec in Specs)
+            {
+                foreach (var state in spec.States)
+                {
+                    var name = $"{spec.Id}_{state}_{appearance}";
+                    var widget = MakeWidget(spec.Kind);
+                    if (widget is null)
+                    {
+                        _blockers.Add($"{name}: unknown native_win kind '{spec.Kind}'");
+                        continue;
+                    }
+                    widget.HorizontalAlignment = IsFullWidth(spec.Kind)
+                        ? HorizontalAlignment.Stretch
+                        : HorizontalAlignment.Left;
+                    widget.VerticalAlignment = VerticalAlignment.Top;
+                    widget.Margin = new Thickness(0);
+
+                    var host = new Grid
+                    {
+                        Width = TileW,
+                        Height = TileH,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        // The tile surface. Left transparent the Mica backdrop shows through,
+                        // which is a different surface from the one the CN1 tiles are painted
+                        // on and would be compared against the wrong thing.
+                        Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
+                        RequestedTheme = appearance == "dark" ? ElementTheme.Dark : ElementTheme.Light,
+                    };
+                    host.Children.Add(widget);
+                    _tileHost.Children.Clear();
+                    _tileHost.Children.Add(host);
+
+                    // After the tree is live: a visual state cannot be applied to a control
+                    // that has not had its template expanded yet, and GoToState returns false
+                    // if it is tried too early.
+                    await WaitForFramesAsync(2);
+                    if (!ApplyState(widget, state, spec.Kind, name))
+                    {
+                        continue;
+                    }
+                    await WaitForFramesAsync(2);
+                    await CaptureTileAsync(name);
+                }
+            }
+        }
+
+        int expected = 0;
+        foreach (var spec in Specs)
+        {
+            expected += spec.States.Length;
+        }
+        expected *= 2;
+        if (_tilesWritten != expected)
+        {
+            _blockers.Add($"wrote {_tilesWritten} tiles, expected {expected}: a partial set "
+                + "would be committed as if it were the whole matrix");
+        }
+    }
+
+    /// Waits for n genuinely composed frames. Not Task.Delay: on a loaded runner a fixed
+    /// sleep is either wasteful or too short, and too short here means capturing the
+    /// previous tile.
+    private async Task WaitForFramesAsync(int n)
+    {
+        var drawn = new TaskCompletionSource<bool>();
+        int frames = 0;
+        EventHandler<object> onFrame = null;
+        onFrame = (_, _) =>
+        {
+            if (++frames >= n)
+            {
+                CompositionTarget.Rendering -= onFrame;
+                drawn.TrySetResult(true);
+            }
+        };
+        CompositionTarget.Rendering += onFrame;
+        await Task.WhenAny(drawn.Task, Task.Delay(3000));
+        CompositionTarget.Rendering -= onFrame;
+    }
+
+    /// BitBlts the client area, which is held at exactly one tile, and writes it.
+    private async Task CaptureTileAsync(string name)
+    {
+        DwmFlush();
+        await Task.Delay(60);
+        GetClientRect(_hwnd, out RECT clientRect);
+        var origin = new POINT { X = 0, Y = 0 };
+        ClientToScreen(_hwnd, ref origin);
+        int w = clientRect.Right - clientRect.Left;
+        int h = clientRect.Bottom - clientRect.Top;
+        if (w <= 0 || h <= 0)
+        {
+            _blockers.Add($"{name}: the client area has no size ({w}x{h})");
+            return;
+        }
+        IntPtr screen = GetDC(IntPtr.Zero);
+        IntPtr mem = CreateCompatibleDC(screen);
+        IntPtr bmp = CreateCompatibleBitmap(screen, w, h);
+        IntPtr old = SelectObject(mem, bmp);
+        bool ok = BitBlt(mem, 0, 0, w, h, screen, origin.X, origin.Y, SRCCOPY | CAPTUREBLT);
+        SelectObject(mem, old);
+        try
+        {
+            if (!ok)
+            {
+                _blockers.Add($"{name}: BitBlt of the client area failed");
+                return;
+            }
+            using var image = System.Drawing.Image.FromHbitmap(bmp);
+            if (IsUniform(image, 0, 0, image.Width, image.Height))
+            {
+                _blockers.Add($"{name}: captured a uniform image, so nothing was composited");
+                return;
+            }
+            var path = Path.Combine(_outDir, name + ".png");
+            image.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            _tilesWritten++;
+            Console.WriteLine($"NATIVEREF:wrote {name} {w}x{h}");
+        }
+        finally
+        {
+            DeleteObject(bmp);
+            DeleteDC(mem);
+            ReleaseDC(IntPtr.Zero, screen);
+        }
+    }
 
     /// Grabs what DWM actually put on the screen, which is the only way the Mica backdrop
     /// appears at all: it is drawn behind the window by the compositor and is not part of
