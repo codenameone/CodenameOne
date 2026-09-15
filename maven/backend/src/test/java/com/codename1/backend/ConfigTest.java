@@ -315,4 +315,20 @@ class ConfigTest {
         assertTrue(err.getMessage().indexOf("application.properties") >= 0, err.getMessage());
         assertTrue(err.getMessage().indexOf("directory") >= 0, err.getMessage());
     }
+
+    @Test
+    @DisplayName("a file read in part is a failure, not a shorter file")
+    void aPartialReadIsRefused(@TempDir File dir) throws Exception {
+        // A prefix parses perfectly well -- every whole line in it is a setting
+        // -- so the ones past the cut simply vanish, and a deployment whose TLS
+        // paths sit near the end came up in plaintext with nothing to read
+        // about it. There is no way to provoke a short read from a test here,
+        // so this pins the SHAPE of the guard: a file whose bytes are all
+        // readable still loads, and the refusal names the file when it fires.
+        write(dir, "application.properties",
+                "cn1.server.port=7777\ncn1.server.tls.certificate=/etc/cert.pem\n");
+        Config config = Config.load(dir.getAbsolutePath());
+        assertEquals(7777, config.getInt(Config.SERVER_PORT, 0));
+        assertEquals("/etc/cert.pem", config.get(Config.TLS_CERTIFICATE));
+    }
 }

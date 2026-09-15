@@ -328,17 +328,17 @@ public class OrmCheck {
         notes.insert(note("high", 10, true, 2000L));
         notes.insert(note("mid", 5, false, 3000L));
 
-        // LIKE IS NOT, AND THAT IS A KNOWN GAP. SQLite folds ASCII case in LIKE
-        // by default while PostgreSQL does not, so "lo%" matches "LOW" on SQLite
-        // alone. Pinned per engine rather than left silent: this is the one
-        // query operation the three still disagree about, it predates this
-        // branch, and closing it means turning on PRAGMA case_sensitive_like,
-        // which changes the development loop's behaviour and is a decision of
-        // its own. If anyone changes it, this check says so.
+        // AND SO IS LIKE, NOW. SQLite folds ASCII case in LIKE by default while
+        // PostgreSQL does not, so "lo%" matched "LOW" on SQLite alone -- the
+        // same query answering different rows depending on the engine. Closed
+        // by setting PRAGMA case_sensitive_like on every pooled SQLite
+        // connection, which is why this expects one answer rather than one per
+        // engine as an earlier version of this check did.
         notes.insert(note("LOW", 2, false, 4000L));
-        check("LIKE folds case on SQLite and nowhere else",
-                "sqlite".equals(engine) ? "2" : "1",
+        check("LIKE is case sensitive on every engine", "1",
                 String.valueOf(notes.query().like("title", "lo%").count()));
+        check("and matches the other case on its own", "1",
+                String.valueOf(notes.query().like("title", "LO%").count()));
         notes.query().eq("title", "LOW").delete();
         // A CHARACTER AS A QUERY VALUE. The column holds the code unit, so a
         // query that bound one-character text compared 120 with "x" and matched
@@ -484,6 +484,26 @@ public class OrmCheck {
                     String.valueOf(coupons.findById("casekey").discount));
             coupons.delete(upper);
             coupons.delete(lower);
+
+            // A TRAILING SPACE IS PART OF THE KEY. MySQL's older binary
+            // collation is PAD SPACE, so "token" and "token " were the same
+            // primary key there -- measured, "Duplicate entry 'token '" --
+            // while SQLite and PostgreSQL kept them apart. The NO PAD
+            // collation makes the three agree.
+            Coupon padded = new Coupon();
+            padded.code = "PAD";
+            padded.discount = 6;
+            coupons.insert(padded);
+            Coupon spaced = new Coupon();
+            spaced.code = "PAD ";
+            spaced.discount = 7;
+            coupons.insert(spaced);
+            check("a trailing space makes a different key", "6",
+                    String.valueOf(coupons.findById("PAD").discount));
+            check("and the padded one is its own row", "7",
+                    String.valueOf(coupons.findById("PAD ").discount));
+            coupons.delete(padded);
+            coupons.delete(spaced);
 
             check("delete by a string key reports the row", "true",
                     String.valueOf(coupons.delete(ten)));
