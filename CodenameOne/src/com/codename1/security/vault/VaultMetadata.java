@@ -173,10 +173,37 @@ final class VaultMetadata {
         }
         // Ascending, so the record is stable and two clients that hold the same state serialize
         // to the same bytes -- which is what lets a sync layer compare them at all.
-        for (int version = 1; version < dataKeyVersion; version++) {
-            byte[] envelope = retired.get(Integer.valueOf(version));
+        //
+        // Over the entries that EXIST, not over the range the record claims. Counting up to
+        // dataKeyVersion made the cost of serializing a record a function of a number inside it,
+        // and importSyncState serializes an incoming record before it authenticates one -- the
+        // equal-counter fork check has to, because it is comparing bytes. So a sixty-byte record
+        // declaring `key.version=2147483647` and carrying nothing else span two billion lookups
+        // on the worker before anything rejected it, which on an off-EDT caller is its thread too.
+        int[] versions = new int[retired.size()];
+        int count = 0;
+        for (java.util.Enumeration<Integer> keys = retired.keys(); keys.hasMoreElements();) {
+            int version = keys.nextElement().intValue();
+            if (version >= 1 && version < dataKeyVersion) {
+                versions[count++] = version;
+            }
+        }
+        // Insertion sort: a retired chain is one entry per rotation this vault has ever done, so
+        // it is a handful, and this avoids depending on a Collections method the device class
+        // libraries would also have to define.
+        for (int iter = 1; iter < count; iter++) {
+            int value = versions[iter];
+            int at = iter - 1;
+            while (at >= 0 && versions[at] > value) {
+                versions[at + 1] = versions[at];
+                at--;
+            }
+            versions[at + 1] = value;
+        }
+        for (int iter = 0; iter < count; iter++) {
+            byte[] envelope = retired.get(Integer.valueOf(versions[iter]));
             if (envelope != null) {
-                b.append("retired.").append(version).append('=')
+                b.append("retired.").append(versions[iter]).append('=')
                         .append(Bytes.toHex(envelope)).append('\n');
             }
         }
@@ -231,7 +258,7 @@ final class VaultMetadata {
             } else if ("key.id".equals(key)) {
                 out.dataKeyId = value;
             } else if ("key.version".equals(key)) {
-                out.dataKeyVersion = parseInt(value);
+                out.dataKeyVersion = requireSaneVersion(parseInt(value));
             } else if ("mac".equals(key)) {
                 out.mac = Bytes.fromHex(value);
             } else if ("counter".equals(key)) {
@@ -266,6 +293,26 @@ final class VaultMetadata {
         }
         return out;
     }
+
+    /// A data key version a record could actually have reached.
+    ///
+    /// Every rotation retires the key it replaces into this record, so a genuine version N
+    /// carries N-1 envelopes and a record claiming a version it has no room for is malformed.
+    /// This does not try to enforce that exactly -- a future format that prunes old retired
+    /// entries would break it -- it just refuses the absurd, so that a number an attacker chose
+    /// cannot stand for an amount of work.
+    private static int requireSaneVersion(int version) {
+        if (version < 1 || version > MAX_KEY_VERSION) {
+            throw new VaultException(VaultError.CORRUPT,
+                    "vault record claims data key version " + version
+                    + ", which is not a version any vault could have reached");
+        }
+        return version;
+    }
+
+    /// Far past any rotation count a real vault reaches, and small enough that no loop over it
+    /// is a denial of service.
+    static final int MAX_KEY_VERSION = 1000000;
 
     private static byte[] hex(String value) {
         byte[] out = Bytes.fromHex(value);

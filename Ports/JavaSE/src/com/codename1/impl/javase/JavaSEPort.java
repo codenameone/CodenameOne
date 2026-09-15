@@ -22664,9 +22664,22 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 System.arraycopy(accumulated, 0, out, (index - 1) * hashLength, hashLength);
+                // Wiped as soon as it has been copied out. The portable implementation these
+                // mirror -- KdfProfile.pbkdf2Portable -- has always done this, and these two
+                // copies drifted from it: every one of these arrays holds the derived key, so
+                // SecureEnvelope wiping the array it is GIVEN cleared one copy of three.
+                //
+                // What cannot be wiped is each round's `u`: Mac.doFinal allocates a new array
+                // and the previous one is unreachable before there is anywhere to zero it from.
+                // That is inherent to the JCE shape rather than an omission here, and it is the
+                // same in the portable version.
+                java.util.Arrays.fill(accumulated, (byte) 0);
+                java.util.Arrays.fill(u, (byte) 0);
             }
             byte[] exact = new byte[length];
             System.arraycopy(out, 0, exact, 0, length);
+            java.util.Arrays.fill(out, (byte) 0);
+            java.util.Arrays.fill(block, (byte) 0);
             return exact;
         } catch (java.security.GeneralSecurityException e) {
             // Null, not an exception: the contract is "no native derivation here", and the caller

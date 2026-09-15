@@ -457,10 +457,28 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
+    /// The context the non-prompting tier resolves its files from.
+    ///
+    /// Never an Activity: this tier is the one a background service uses. The prompting tier
+    /// above genuinely needs an Activity and keeps asking for one.
+    private static Context context() {
+        Context ctx = AndroidNativeUtil.getContext();
+        if (ctx == null) {
+            throw new IllegalStateException("no Android context");
+        }
+        return ctx;
+    }
+
     /** The file whose creation decides which caller stores this account. */
     private java.io.File gateFile(String account) {
         try {
-            java.io.File dir = new java.io.File(AndroidNativeUtil.getActivity()
+            // getContext(), not getActivity(), for the reason plainPrefs() gives: a port
+            // initialized from a background service has no Activity and does have a context, and
+            // this tier exists precisely so a background caller can work. Through getActivity()
+            // this threw, the catch answered null, and setIfAbsent fell back to the inherited
+            // check-then-write -- losing the cross-process gate in exactly the configuration
+            // (a component with its own android:process) the gate was written for.
+            java.io.File dir = new java.io.File(context()
                     .getApplicationContext().getFilesDir(), "cn1securestorage");
             if (!dir.isDirectory() && !dir.mkdirs()) {
                 return null;
@@ -778,7 +796,12 @@ public final class AndroidSecureStorage extends SecureStorage {
 
     private void clearEveryGate() {
         try {
-            java.io.File dir = new java.io.File(AndroidNativeUtil.getActivity()
+            // getContext() here too: resetPlainKey runs when a keystore key has been
+            // invalidated, which a background service can hit before any Activity exists. Through
+            // getActivity() this threw after the preferences had already been cleared, the catch
+            // swallowed it, and every gate stayed marked with its entry gone -- so setIfAbsent
+            // answered null for every account from then on, including once an Activity started.
+            java.io.File dir = new java.io.File(context()
                     .getApplicationContext().getFilesDir(), "cn1securestorage");
             java.io.File[] gates = dir.listFiles();
             if (gates == null) {

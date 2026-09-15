@@ -1855,6 +1855,72 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRecordClaimingAnAbsurdKeyVersionIsRefusedRatherThanIterated() {
+        // Serializing a record cost one loop iteration per claimed key version, and
+        // importSyncState has to serialize an incoming record BEFORE it can authenticate one --
+        // the equal-counter fork check is a byte comparison. So a sixty-byte record declaring
+        // key.version=2147483647 span two billion lookups on the worker before anything rejected
+        // it, and on an off-EDT caller that is the caller's thread.
+        String name = freshName();
+        Vault first = Vault.named(name).configure(fast());
+        first.enroll(pw("p"), fast()).get();
+        byte[] state = first.exportSyncState();
+
+        // An EXISTING vault at the same counter, which is what reaches the check that serializes
+        // before it authenticates. A device with no vault takes the local == null path and never
+        // gets there -- the first version of this test did exactly that and measured nothing,
+        // which the A/B against the unfixed code showed by failing on the wrong error.
+        Vault other = Vault.named(freshName()).configure(fast());
+        assertTrue(other.importSyncState(state, pw("p")).get().booleanValue());
+
+        String forged = rewriteKeyVersion(
+                new String(state, java.nio.charset.StandardCharsets.UTF_8), Integer.MAX_VALUE);
+        long started = System.currentTimeMillis();
+        assertEquals(VaultError.CORRUPT,
+                errorOf(other.importSyncState(
+                        forged.getBytes(java.nio.charset.StandardCharsets.UTF_8), pw("p"))),
+                "a version no vault could have reached is a malformed record");
+        long took = System.currentTimeMillis() - started;
+        // The assertion above is the real one and it needs no clock. This is a backstop against a
+        // future change that makes the refusal expensive again, and the bound is set from
+        // measurement rather than taste: on this machine the whole test is 0.38s with the fix and
+        // the forged import alone took 7.95s without it, so five seconds fails the defect by a
+        // wide margin and leaves an order of magnitude for a slower runner.
+        assertTrue(took < 5000, "the refusal took " + took + "ms, which means it iterated");
+    }
+
+    @Test
+    void anOrdinaryRotatedRecordStillRoundTrips() {
+        // The bound must not refuse a real vault: a rotation is a legitimate version bump, and
+        // serializing over the entries that exist has to produce what the parser reads back.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue());
+        assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue());
+        byte[] sealed = vault.seal("note", "contents".getBytes()).get();
+        byte[] state = vault.exportSyncState();
+
+        Vault joined = Vault.named(freshName()).configure(fast());
+        assertTrue(joined.importSyncState(state, pw("p")).get().booleanValue());
+        assertArrayEquals("contents".getBytes(), joined.open("note", sealed).get());
+        assertEquals(3, keyVersionOf(state), "two rotations from version one");
+    }
+
+    /// Rewrites just the key version line, the way a server serving this record could.
+    private static String rewriteKeyVersion(String record, int version) {
+        StringBuilder out = new StringBuilder();
+        for (String line : com.codename1.util.StringUtil.tokenize(record, '\n')) {
+            if (line.startsWith("key.version=")) {
+                out.append("key.version=").append(version).append('\n');
+            } else {
+                out.append(line).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:
