@@ -566,7 +566,16 @@ public abstract class Dialect {
                     // A KEY is unaffected: assignedKeyColumn overrides this with
                     // VARCHAR(255), because MySQL cannot index an unbounded
                     // column at all. See Table.MAX_ASSIGNED_TEXT_KEY.
-                    return "LONGTEXT";
+                    //
+                    // The same BINARY COLLATION the key column pins, and for the
+                    // same reason: MySQL's default is case and accent
+                    // insensitive, so with the server's default collation
+                    // dao.query().eq("name", "A") matched a stored "a" here and
+                    // matched nothing on the other two. Measured -- eq returned
+                    // 2 rows on MySQL against 1 on SQLite and PostgreSQL. eq and
+                    // in() are the operations an application builds its
+                    // behaviour on, so they have to mean one thing.
+                    return "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin";
             }
         }
 

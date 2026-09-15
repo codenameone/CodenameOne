@@ -74,7 +74,7 @@ public class OrmCheck {
             try {
                 roundTripsEveryColumn(notes);
                 updatesAndDeletes(notes);
-                queriesByFieldName(notes);
+                queriesByFieldName(notes, pool.dialect().getName());
                 transactionsAreAtomic(em, notes);
                 createTableIsIdempotent(notes);
                 anEntityThatIsOnlyAKey(em);
@@ -270,7 +270,7 @@ public class OrmCheck {
      * unquoted name to lower case -- so these queries pass only because every
      * identifier the ORM writes is quoted.
      */
-    private static void queriesByFieldName(Dao<Note> notes) throws Exception {
+    private static void queriesByFieldName(Dao<Note> notes, String engine) throws Exception {
         // Cleared first, so what these count is what this method inserted rather
         // than what the checks before it left behind. A query with no conditions
         // deletes the table, which is the reading of the SQL it builds.
@@ -293,6 +293,32 @@ public class OrmCheck {
         check("in with nothing in it", "0",
                 String.valueOf(notes.query().in("title", new Object[0]).count()));
         check("isNull", "3", String.valueOf(notes.query().isNull("body").count()));
+
+        // EQUALITY IS CASE SENSITIVE ON ALL THREE. MySQL's default collation is
+        // case and accent insensitive, so without the binary collation the
+        // generated text column pins, eq("title", "LOW") matched the stored
+        // "low" there and matched nothing on the other two -- measured, 2 rows
+        // against 1. eq and in() are what an application builds behaviour on.
+        check("eq is case sensitive", "1",
+                String.valueOf(notes.query().eq("title", "low").count()));
+        check("and does not match another case", "0",
+                String.valueOf(notes.query().eq("title", "LOW").count()));
+        check("in() is case sensitive too", "1",
+                String.valueOf(notes.query().in("title",
+                        new Object[] {"low", "LOW"}).count()));
+
+        // LIKE IS NOT, AND THAT IS A KNOWN GAP. SQLite folds ASCII case in LIKE
+        // by default while PostgreSQL does not, so "lo%" matches "LOW" on SQLite
+        // alone. Pinned per engine rather than left silent: this is the one
+        // query operation the three still disagree about, it predates this
+        // branch, and closing it means turning on PRAGMA case_sensitive_like,
+        // which changes the development loop's behaviour and is a decision of
+        // its own. If anyone changes it, this check says so.
+        notes.insert(note("LOW", 2, false, 4000L));
+        check("LIKE folds case on SQLite and nowhere else",
+                "sqlite".equals(engine) ? "2" : "1",
+                String.valueOf(notes.query().like("title", "lo%").count()));
+        notes.query().eq("title", "LOW").delete();
         // A CHARACTER AS A QUERY VALUE. The column holds the code unit, so a
         // query that bound one-character text compared 120 with "x" and matched
         // nothing -- an empty result being an ordinary answer, silently.
@@ -704,10 +730,28 @@ public class OrmCheck {
             }
             check("a NUL bound through execute() is refused on every engine",
                     "refused", refused);
-            // THE CONTROL: the same statement without one still writes, so this
-            // cannot pass by refusing every parameter.
+            // NaN is the same shape of problem with three different answers:
+            // measured, SQLite writes NULL, PostgreSQL writes NaN and MySQL
+            // refuses the row outright. Nothing encodes to all three, so it is
+            // refused before any of them sees it.
+            String refusedNan;
+            try {
+                pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                        new Object[] {Double.valueOf(Double.NaN)});
+                refusedNan = "accepted";
+            } catch (Exception err) {
+                refusedNan = "refused";
+            }
+            check("NaN is refused on every engine", "refused", refusedNan);
+            // THE CONTROLS, counted together so neither refusal can pass by
+            // refusing everything: the same statement without a NUL writes, and
+            // an ordinary double binds. Two rows, and the count is taken after
+            // both rather than between them -- an earlier version inserted one
+            // of them first and then asserted a single row.
             pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)", new Object[] {"ab"});
-            check("and the same statement without one still writes", "1",
+            pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
+                    new Object[] {Double.valueOf(1.5)});
+            check("and the same statements without one still write", "2",
                     String.valueOf(pool.query("SELECT v FROM cn1_rawnul", null).size()));
             // And a byte[] carrying a NUL is fine, because a blob is where one
             // belongs on every engine.
