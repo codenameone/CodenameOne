@@ -70,7 +70,6 @@ public final class GuideFigures {
             new FigureVariant(new ComponentsTableWithSpanningFigure(), FigureDevice.ANDROID, false, "components-table-with-spanning.png"),
             new FigureVariant(new ComponentsTablePinstripeFigure(), FigureDevice.ANDROID, false, "components-table-pinstripe.png"),
             new FigureVariant(new ComponentsToolbarFigure(), FigureDevice.ANDROID, false, "components-toolbar.png"),
-            new FigureVariant(new ComponentsToggleButtonsGroupFigure(), FigureDevice.ANDROID, false, "components-toggle-buttons-component-group.png"),
             new FigureVariant(new ComponentsDialogModalSouthFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-south.png"),
             new FigureVariant(new ComponentsDialogBottomHalfFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-bottom-half.png"),
             new FigureVariant(new ComponentsDialogTintFigure(), FigureDevice.ANDROID, false, "components-dialog-tint.png"),

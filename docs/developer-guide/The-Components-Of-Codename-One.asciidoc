@@ -747,11 +747,11 @@ For example, to enclose the `CheckBox` components in a vertical `ComponentGroup`
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsToggleButtonsGroupFigure.java[tag=the-components-of-codename-one-java-157,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava157Snippet.java[tag=the-components-of-codename-one-java-157,indent=0]
 ----
 
 .Toggle button converted sample wrapped in ComponentGroup
-image::img/generated/components-toggle-buttons-component-group.png[Toggle button converted sample wrapped in ComponentGroup,scaledwidth=20%]
+image::img/components-toggle-buttons-component-group.png[Toggle button converted sample wrapped in ComponentGroup,scaledwidth=20%]
 
 === ComponentGroup
 

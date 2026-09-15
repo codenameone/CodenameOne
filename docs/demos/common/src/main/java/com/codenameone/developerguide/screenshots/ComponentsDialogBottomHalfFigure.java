@@ -49,6 +49,11 @@ class ComponentsDialogBottomHalfFigure implements GuideFigure {
     /// ComponentsDialogModalSouthFigure, which also explains why the listing in
     /// the chapter is repeated rather than included: this show has to be
     /// modeless or it never returns to the thread taking the photograph.
+    /// form.getHeight() is the render height, not a JavaSE window size: the
+    /// renderer sizes the form to the device profile before afterShow runs, which
+    /// is the reason afterShow exists at all. Measured on the committed figure --
+    /// the dialog's top edge sits at y=459 of 919, which is the half the chapter
+    /// describes.
     @Override
     public void afterShow(Form form) {
         Dialog d = new Dialog("Title");
