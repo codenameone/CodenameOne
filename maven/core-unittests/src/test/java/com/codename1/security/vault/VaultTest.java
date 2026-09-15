@@ -1646,6 +1646,103 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aRequirementIsJudgedAgainstTheStoredPolicyNotTheConfiguredOne() {
+        // What a requirement asks about is the protection this vault actually has, and that is a
+        // property of the mechanism it was enrolled with. Reading it from options got both
+        // directions wrong. This is the one that locks a user out: a vault enrolled
+        // REMEMBER_DEVICE, reopened by a caller that did not repeat the policy in its options, was
+        // judged against SESSION_ONLY -- whose report says OS protection is absent -- so a later
+        // require(OS_PROTECTED) refused a vault that genuinely had it.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        assertEquals(UnlockPolicy.REMEMBER_DEVICE, vault.getPolicy());
+        vault.lock();
+
+        // A later launch that asks for the protection but leaves the policy at its default.
+        VaultOptions requiring = fast().require(Protection.OS_PROTECTED);
+        assertEquals(UnlockPolicy.SESSION_ONLY, requiring.getPolicy(),
+                "the default is what makes this test the case it is about");
+        Vault reopened = Vault.named(name).configure(requiring);
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue(),
+                "the vault is stored under a policy that does provide OS protection");
+    }
+
+    @Test
+    void aRequirementTheStoredPolicyCannotMeetIsStillRefused() {
+        // The other direction, which is what stops the fix above from being a way to switch the
+        // check off: a vault that really is session-only has no OS protection, and a caller
+        // requiring it must still be refused -- including one that has configured a remembering
+        // policy it never established.
+        String name = freshName();
+        Vault vault = Vault.named(name).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+        vault.lock();
+
+        Vault reopened = Vault.named(name).configure(
+                fast().policy(UnlockPolicy.REMEMBER_DEVICE).require(Protection.OS_PROTECTED));
+        assertEquals(VaultError.POLICY_NOT_MET,
+                errorOf(reopened.unlockWithPassword(pw("p"))),
+                "a session-only vault does not acquire OS protection by being asked for it");
+    }
+
+    @Test
+    void anImportWhoseProtectionsAreUnmetCommitsNothingEvenUnderALock() throws Exception {
+        // BOTH import branches commit, and the protection check sat after the one that runs when
+        // a lock has landed. So a lock arriving during the key derivation took that branch: the
+        // record was written, this device was enrolled under a policy it was never going to get,
+        // and the only error the caller saw named the lock.
+        //
+        // Deterministic, not a race to win: the record being imported was sealed with a KDF slow
+        // enough that the import is certainly still deriving when the lock arrives, and the
+        // generation it compares against is captured when the call is made.
+        VaultOptions slow = new VaultOptions()
+                .kdf(KdfProfile.pbkdf2(2000000))
+                .deviceProtection(device);
+        Vault origin = Vault.named(freshName()).configure(slow);
+        origin.enroll(pw("p"), slow).get();
+        final byte[] state = origin.exportSyncState();
+
+        final String name = freshName();
+        device.encryptedAtRest = false;
+        final java.util.concurrent.atomic.AtomicReference<VaultError> reported =
+                new java.util.concurrent.atomic.AtomicReference<VaultError>();
+        try {
+            final Vault joining = Vault.named(name).configure(
+                    new VaultOptions().kdf(KdfProfile.pbkdf2(2000000))
+                            .deviceProtection(device)
+                            .policy(UnlockPolicy.REMEMBER_DEVICE)
+                            .require(Protection.ENCRYPTED_AT_REST));
+            final java.util.concurrent.CountDownLatch called =
+                    new java.util.concurrent.CountDownLatch(1);
+            Thread importing = new Thread(new Runnable() {
+                public void run() {
+                    called.countDown();
+                    reported.set(errorOf(joining.importSyncState(state, pw("p"))));
+                }
+            });
+            importing.start();
+            assertTrue(awaitQuietly(called));
+            // Two million iterations of software HMAC is seconds; a tenth of one lands inside the
+            // derivation every time rather than most of the time.
+            Thread.sleep(100);
+            joining.lock();
+            joinQuietly(importing);
+        } finally {
+            device.encryptedAtRest = true;
+        }
+
+        assertNotNull(reported.get(), "the import must fail");
+        // Whatever it reports, the thing that matters is that nothing was written: this device
+        // must not be enrolled by a call that could not meet what it was configured to require.
+        assertEquals(VaultError.KEY_MISSING,
+                errorOf(Vault.named(name).configure(fast()).unlockWithPassword(pw("p"))),
+                "an import that cannot meet its requirements must commit nothing, lock or no lock");
+    }
+
+    @Test
     void aForkThatNeverRotatedIsRefused() {
         // Key continuity is only half the question. A fork that never rotated keeps the same data
         // key on both sides, so it passes that check while its metadata changes are unrelated:

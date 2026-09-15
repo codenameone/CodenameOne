@@ -503,7 +503,17 @@ public final class Vault {
                     // requirements it was later configured with -- so require(...) governed the
                     // first launch and nothing afterwards, which is the opposite of what a
                     // requirement is for.
-                    requireProtections();
+                    //
+                    // Against the STORED policy, like unlockRemembered, not the configured one.
+                    // What the requirement asks about is the protection this vault actually has,
+                    // and that is a property of the mechanism it was enrolled with. Reading it
+                    // from options got both directions wrong: a vault enrolled REMEMBER_DEVICE
+                    // into the keychain was refused by a later require(OS_PROTECTED), because a
+                    // caller that had not repeated the policy in its options left it at
+                    // SESSION_ONLY, whose report says OS protection is absent -- and configuring
+                    // a remembered policy on a vault that is genuinely session-only passed the
+                    // same check without any such mechanism existing.
+                    requireProtections(getPolicy());
                     publishKey(generation, meta, key);
                     passwordNeedsRewrap = envelope.getKdf().needsUpgrade();
                     touch();
@@ -1419,7 +1429,10 @@ public final class Vault {
                                 "the vault was locked while it was being unlocked");
                     }
                     requireAuthenticRecord(meta, key);
-                    requireProtections();
+                    // The stored policy, for the reason unlockWithPassword gives: this is an
+                    // unlock, so the question is what the vault HAS, not what this caller
+                    // happened to configure.
+                    requireProtections(getPolicy());
                     publishKey(generation, meta, key);
                     touch();
                     out.complete(Boolean.TRUE);
@@ -1734,6 +1747,21 @@ public final class Vault {
                         Bytes.zero(key);
                         throw refused;
                     }
+                    // The configured policy governs this enrolment too. Importing sync state is
+                    // how a SECOND device joins a vault, so it is an enrolment entry point in
+                    // everything but name -- and it went from authentication straight to commit,
+                    // so a device configured REMEMBER_DEVICE or REQUIRE_USER_VERIFICATION, or
+                    // with unmet require(...), reported success and ended up session-only.
+                    //
+                    // Judged BEFORE the lock check, because both paths below commit. Sitting
+                    // after it meant a lock landing during the key derivation took the branch
+                    // that writes the record and reports LOCKED -- so an import asking for a
+                    // policy this device cannot support, or for a protection it does not have,
+                    // enrolled the device anyway and left it session-only, with the only error
+                    // the caller saw naming the lock. Both checks are pure: they read
+                    // capabilities and throw, so hoisting them changes nothing else.
+                    requirePolicySupported(options.getPolicy());
+                    requireProtections();
                     if (generation != lockGeneration) {
                         // The record is still written -- enrolling this device is the point of the
                         // call and it succeeded. What is refused is leaving the vault unlocked
@@ -1743,12 +1771,6 @@ public final class Vault {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the sync state was being imported");
                     }
-                    // The configured policy governs this enrolment too. Importing sync state is
-                    // how a SECOND device joins a vault, so it is an enrolment entry point in
-                    // everything but name -- and it went from authentication straight to commit,
-                    // so a device configured REMEMBER_DEVICE or REQUIRE_USER_VERIFICATION, or
-                    // with unmet require(...), reported success and ended up session-only.
-                    requireProtections();
                     // Committed against the record that was read above, so a tab that wrote
                     // between the comparison and here loses rather than being overwritten.
                     commitMetadata(local, incoming);

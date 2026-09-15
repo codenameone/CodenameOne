@@ -190,6 +190,30 @@ int cn1_crypto_aes_gcm(int encrypt, const uint8_t* key, int keyLen,
         memcpy(out + produced, tag, tagLen);
         produced += tagLen;
     } else {
+        /*
+         * CCCryptorGCMFinal COMPUTES the tag here, it does not verify one. That is the
+         * whole difference between the two finalizers in this SPI, and it is easy to
+         * read backwards:
+         *
+         *   CCCryptorGCMFinal(ref, void *tagOut, size_t *tagLen)   <- deprecated; OUT,
+         *                                                             both directions
+         *   CCCryptorGCMFinalize(ref, void *tag,  size_t  tagLen)  <- IN on decrypt,
+         *                                                             verifies itself
+         *
+         * This declares and calls the first (note the size_t POINTER), so the tag the
+         * input carries is never handed to CommonCrypto and the comparison below is
+         * what authenticates the message. A review round read this as the second form
+         * and concluded that decryption always fails before reaching the comparison,
+         * which would make the vault unusable on iOS.
+         *
+         * Measured rather than argued, because the SPI is undocumented: this exact
+         * function, compiled against the real CommonCrypto and run on the iOS 27
+         * simulator, encrypts 43 bytes to 59, decrypts them back to the same 43, and
+         * returns CN1_CRYPTO_E_AUTH_FAIL for both a flipped ciphertext byte and a
+         * wrong AAD. If this is ever changed to CCCryptorGCMFinalize, the comparison
+         * below must go with it -- comparing against a tag the finalizer has already
+         * consumed is where the failure the review described would really come from.
+         */
         if (CCCryptorGCMFinal(cryptor, tag, &tagLen) != kCCSuccess) {
             CCCryptorRelease(cryptor);
             return CN1_CRYPTO_E_GENERIC;
