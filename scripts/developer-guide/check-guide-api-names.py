@@ -285,7 +285,15 @@ def declared_types(source):
                 name, visible, kind = pending
                 # A member of an interface is implicitly public, so
                 # Mapper.Direct has a page although it carries no modifier.
-                if not visible and stack and stack[-1][1][2] == 'interface':
+                #
+                # Directly in its body, not anywhere inside it: a type declared
+                # in a default or static method is local to that method, and
+                # javadoc publishes no page for one. The enclosing interface is
+                # still on the stack there, so without the depth test a local
+                # class was read as a published member.
+                if not visible and stack \
+                        and stack[-1][1][2] == 'interface' \
+                        and depth == stack[-1][0] + 1:
                     visible = True
                 stack.append((depth, (name, visible, kind)))
                 trail = [n for _, (n, _, _) in stack]

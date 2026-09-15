@@ -13,6 +13,11 @@ on:
       # of those without touching docs/ would otherwise skip this job and
       # leave a dead link behind.
       - 'Ports/CLDC11/**'
+      # And the script that decides what javadoc publishes at all. The check
+      # mirrors its source roots, its excluded package and its -protected
+      # setting, so a change to any of those moves which links are alive
+      # without touching a page.
+      - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/developer-guide-docs.yml'
       # The build hint table is rendered rather than committed, so a change to
       # anything it is rendered FROM changes what this guide contains without
