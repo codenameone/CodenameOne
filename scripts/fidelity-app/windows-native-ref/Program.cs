@@ -42,6 +42,7 @@ using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Windows.UI.ViewManagement;
 
@@ -125,6 +126,13 @@ public partial class App : Application
             Console.WriteLine($"NATIVEREF:WARN rasterization scale is {rasterScale}, not 1.0");
         }
 
+        // Capture a real tile even in probe mode. A green build is not a rendered one:
+        // AppxGeneratePriEnabled is off (see NativeRef.csproj), so WinUI's own .pri files
+        // are not expanded into the output, and if that mattered the controls would come
+        // back unstyled or absent rather than failing loudly. A picture is the only thing
+        // that distinguishes "built" from "drew a Fluent button".
+        CaptureWindow(root);
+
         WriteManifest(micaSupported, transparency, animations, accent, rasterScale, fontFamily, segoeVariable);
 
         foreach (var b in _blockers)
@@ -134,6 +142,92 @@ public partial class App : Application
         Console.WriteLine($"NATIVEREF:DONE exit={(_blockers.Count > 0 ? 20 : 0)}");
         Console.Out.Flush();
         Environment.Exit(_blockers.Count > 0 ? 20 : 0);
+    }
+
+    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int w, int h);
+    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr h);
+    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
+    [DllImport("gdi32.dll")] private static extern bool BitBlt(IntPtr dst, int x, int y, int w, int h,
+        IntPtr src, int sx, int sy, uint rop);
+    [DllImport("dwmapi.dll")] private static extern int DwmFlush();
+
+    private const uint SRCCOPY = 0x00CC0020;
+    private const uint CAPTUREBLT = 0x40000000;
+
+    /// Grabs what DWM actually put on the screen, which is the only way the Mica backdrop
+    /// appears at all: it is drawn behind the window by the compositor and is not part of
+    /// the XAML visual tree, so RenderTargetBitmap would silently return the widget without
+    /// its material. This is the direct analogue of the iOS reference capturing a real
+    /// UIWindow rather than re-rendering a layer off-screen.
+    private void CaptureWindow(FrameworkElement root)
+    {
+        try
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+            var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            var appWindow = AppWindow.GetFromWindowId(id);
+            int w = appWindow.Size.Width, h = appWindow.Size.Height;
+            if (w <= 0 || h <= 0)
+            {
+                _blockers.Add($"the window has no size ({w}x{h}); nothing was composited");
+                return;
+            }
+
+            // Let the compositor finish the frame before reading the screen back, or the
+            // grab races the first present and returns the desktop.
+            DwmFlush();
+            Thread.Sleep(400);
+
+            var pos = appWindow.Position;
+            IntPtr screen = GetDC(IntPtr.Zero);
+            IntPtr mem = CreateCompatibleDC(screen);
+            IntPtr bmp = CreateCompatibleBitmap(screen, w, h);
+            IntPtr old = SelectObject(mem, bmp);
+            bool ok = BitBlt(mem, 0, 0, w, h, screen, pos.X, pos.Y, SRCCOPY | CAPTUREBLT);
+            SelectObject(mem, old);
+
+            if (!ok)
+            {
+                _blockers.Add("BitBlt of the window region failed");
+            }
+            else
+            {
+                using var image = System.Drawing.Image.FromHbitmap(bmp);
+                var name = _isProbe ? "probe_Button_normal_light" : "Button_normal_light";
+                var path = Path.Combine(_outDir, name + ".png");
+                image.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                Console.WriteLine($"NATIVEREF:wrote {name} {w}x{h}");
+                if (IsUniform(image))
+                {
+                    _blockers.Add($"{name} is a single flat colour: the window rendered "
+                        + "nothing, which is what a missing resource index looks like");
+                }
+            }
+
+            DeleteObject(bmp);
+            DeleteDC(mem);
+            ReleaseDC(IntPtr.Zero, screen);
+        }
+        catch (Exception e)
+        {
+            _blockers.Add($"capture threw {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    /// A uniformly coloured tile is the classic captured-before-present result, and it
+    /// scores as a perfect match against another blank tile rather than as a failure.
+    private static bool IsUniform(System.Drawing.Bitmap image)
+    {
+        var first = image.GetPixel(0, 0);
+        int stepX = Math.Max(1, image.Width / 32), stepY = Math.Max(1, image.Height / 32);
+        for (int y = 0; y < image.Height; y += stepY)
+            for (int x = 0; x < image.Width; x += stepX)
+                if (image.GetPixel(x, y) != first) return false;
+        return true;
     }
 
     private static bool FontIsInstalled(string family)

@@ -16,18 +16,39 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
-    <!-- If MrtCore PRI generation still fails after the SDK pin in global.json, the next
-         thing to try is EnableMsixTooling=true: the official unpackaged WinUI 3 template
-         sets it true even though the app is unpackaged, because the MRT tooling is used
-         regardless. Left false for now because the observed error named the .NET SDK 10
-         layout specifically, and changing one thing at a time is what makes the next run
-         interpretable. -->
     <EnableMsixTooling>false</EnableMsixTooling>
+    <!--
+      Turns off MrtCore's PRI payload expansion, which cannot run under `dotnet build` at
+      all. Read out of the package's own MrtCore.PriGen.targets rather than guessed at:
+
+        line  50 : AppxMSBuildToolsPath defaults to
+                   $(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\AppxPackage\
+        line  87 : AppxGeneratePriEnabled defaults to true ONLY when unset, so a value set
+                   here wins
+        line 908 : AddPriPayloadFilesToCopyToOutputDirectoryItems is gated on
+                   '$(AppxGeneratePriEnabled)' != 'false'
+
+      Under `dotnet`, MSBuildExtensionsPath is the .NET SDK directory, and the AppxPackage
+      tooling belongs to VISUAL STUDIO; it has never shipped there. So the task assembly is
+      missing under whichever SDK is selected, which is why pinning 10.0.400 down to 9.0.318
+      changed the path in the error message and nothing else. This property is a first-class
+      opt-out, not a workaround for a version skew.
+
+      Safe here because the app is code only: no .xaml files, no images, no localized
+      strings, so it indexes no resources of its own. It does mean WinUI's own .pri files
+      are not expanded into the output, which would surface as unstyled or missing controls,
+      so the probe captures a real tile and inspects it rather than treating a green build
+      as a rendered one.
+    -->
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
     <PublishReadyToRun>false</PublishReadyToRun>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250228001" />
+    <!-- Out of the box since .NET 7, and Windows only, which is exactly what this is.
+         Used purely to turn the HBITMAP from BitBlt into a PNG. -->
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
   </ItemGroup>
 </Project>
