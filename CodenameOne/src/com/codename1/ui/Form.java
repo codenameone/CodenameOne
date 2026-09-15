@@ -167,6 +167,15 @@ public class Form extends Container implements TopLevelContainer {
     private com.codename1.router.PopGuard popGuard;
     /// Default color for the screen tint when a dialog or a menu is shown
     private int tintColor;
+
+    /// Whether the application picked the tint colour itself, in which case the
+    /// theme must not take it back. show() runs initLaf() whenever the form has
+    /// no transition animator, so a tint set before showing -- the order every
+    /// sample uses, because there is nothing to set it on beforehand otherwise
+    /// -- was overwritten with the theme default on the way to the screen, and
+    /// the dialog that followed dimmed in the wrong colour with nothing to say
+    /// why.
+    private boolean tintColorSet;
     /// Listeners for key release events
     private HashMap<Integer, ArrayList<ActionListener>> keyListeners;
     /// Listeners for game key release events
@@ -1607,7 +1616,9 @@ public class Form extends Container implements TopLevelContainer {
             menuBar.initMenuBar(this);
         }
 
-        tintColor = laf.getDefaultFormTintColor();
+        if (!tintColorSet) {
+            tintColor = laf.getDefaultFormTintColor();
+        }
         tactileTouchDuration = laf.getTactileTouchDuration();
     }
 
@@ -4565,7 +4576,10 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// Desktop only, because nothing else generates hover events.
     private void updateHoveredComponent(Component cmp) {
-        if (hoveredComponent == cmp) {
+        // Identity is the question being asked -- whether this is the same
+        // component instance the pointer was already over -- so equals() would
+        // be wrong here as well as slower.
+        if (hoveredComponent == cmp) { //NOPMD CompareObjectsWithEquals
             return;
         }
         if (hoveredComponent != null) {
@@ -5359,6 +5373,7 @@ public class Form extends Container implements TopLevelContainer {
     @Override
     public void setTintColor(int tintColor) {
         this.tintColor = tintColor;
+        tintColorSet = true;
     }
 
     /// Sets the menu transitions for showing/hiding the menu, can be null...

@@ -75,6 +75,12 @@ public final class GuideFigureRenderer {
             if (variant.device() != device) {
                 continue;
             }
+            // Same reason as the toolbar global further down: a figure whose
+            // subject is the blur has to set this, and it is static, so without
+            // a restore the next figure in the list is rendered blurred by a
+            // setting it never asked for and nothing says so. Read outside the
+            // try so the restore can still see it.
+            float blurRadius = Dialog.getDefaultBlurBackgroundRadius();
             try {
                 Display.getInstance().setDarkMode(Boolean.valueOf(variant.darkMode()));
                 UIManager.getInstance().refreshTheme();
@@ -118,6 +124,8 @@ public final class GuideFigureRenderer {
                 // after build.
                 failures.append("\n  ").append(variant.fileName()).append(": ")
                         .append(err.getClass().getName()).append(": ").append(err.getMessage());
+            } finally {
+                Dialog.setDefaultBlurBackgroundRadius(blurRadius);
             }
         }
         System.out.println("Rendered " + rendered + " figure(s) for " + device.key());
@@ -251,7 +259,47 @@ public final class GuideFigureRenderer {
         // falling back to the content pane's stretched height, which produced a
         // toolbar with a blank page underneath.
         int used = content.getAbsoluteY() + bottom + content.getStyle().getPaddingBottom();
+        // Not everything a figure shows is in the content pane. An
+        // InteractionDialog floats in the layered pane, so measuring only the
+        // content left the figure cropped to the one label underneath it and the
+        // dialog that is the whole point of the picture fell outside the frame.
+        used = Math.max(used, layeredBottom(form));
         return Math.min(device.height(), Math.max(1, used));
+    }
+
+    /// How far down anything floating over the content reaches.
+    ///
+    /// Recursive because the layered pane is not flat: InteractionDialog asks
+    /// for a pane keyed by its own class and lands a couple of levels below the
+    /// root one, so looking only at direct children found nothing and cropped
+    /// the figure to the content underneath.
+    private static int layeredBottom(Form form) {
+        return deepBottom(form, form.getContentPane());
+    }
+
+    /// The whole form is walked rather than one named pane, because an overlay
+    /// does not necessarily live where the obvious reading says it does:
+    /// InteractionDialog asks for a pane keyed by its own class, which is not
+    /// under getLayeredPane(), so both of the narrower searches tried here found
+    /// nothing while the dialog was plainly being painted. The content pane is
+    /// skipped because the block above already measures it, and measuring it
+    /// this way instead would take its stretched full-height child and crop
+    /// nothing at all.
+    private static int deepBottom(Container parent, Container skip) {
+        int bottom = 0;
+        for (int i = 0; i < parent.getComponentCount(); i++) {
+            Component child = parent.getComponentAt(i);
+            if (child == skip) { //NOPMD CompareObjectsWithEquals
+                continue;
+            }
+            if (child.getWidth() > 0 && child.getHeight() > 0) {
+                bottom = Math.max(bottom, child.getAbsoluteY() + child.getHeight());
+            }
+            if (child instanceof Container) {
+                bottom = Math.max(bottom, deepBottom((Container) child, skip));
+            }
+        }
+        return bottom;
     }
 
     private static void write(ScreenshotSink sink, String fileName, Form form, FigureDevice device)
