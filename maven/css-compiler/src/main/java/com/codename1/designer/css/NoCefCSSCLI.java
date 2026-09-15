@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- *
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * Minimal CLI entry point for compiling a CSS theme to a .res file with the
  * strictNoCef flag enabled. Unlike CN1CSSCLI (in the Designer module),
  * this class does NOT
