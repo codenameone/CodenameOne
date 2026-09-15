@@ -4565,7 +4565,7 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// Desktop only, because nothing else generates hover events.
     private void updateHoveredComponent(Component cmp) {
-        if (hoveredComponent == cmp) {
+        if (hoveredComponent == cmp) { //NOPMD CompareObjectsWithEquals
             return;
         }
         if (hoveredComponent != null) {

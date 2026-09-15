@@ -4653,7 +4653,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             };
             backgroundMediaServiceConnection = mConnection;
-            boolean boundSuccess = getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
+            // Context.BIND_AUTO_CREATE, not getContext().BIND_AUTO_CREATE: it is a static
+            // constant, so reading it through an instance calls getContext() only to throw the
+            // result away -- which is what SpotBugs reports as
+            // RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT.
+            boolean boundSuccess = getContext().bindService(serviceIntent, mConnection,
+                    Context.BIND_AUTO_CREATE);
             if (!boundSuccess) {
                 throw new RuntimeException("Failed to bind background media service for uri "+uri);
             }
@@ -14236,7 +14241,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         FileSystemStorage.getInstance().toNativePath(databaseName), null,
                         KEEP_ON_CORRUPTION);
             } else {
-                db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE,
+                db = getContext().openOrCreateDatabase(databaseName, Context.MODE_PRIVATE,
                         null, KEEP_ON_CORRUPTION);
             }
         } catch (RuntimeException didNotOpen) {
