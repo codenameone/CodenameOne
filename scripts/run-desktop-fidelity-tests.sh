@@ -114,13 +114,19 @@ if [ -z "$SIM_JAR" ]; then
 fi
 
 set +e
-# The app classes come BEFORE the simulator jar on the class path, and that order is
-# load-bearing rather than tidy. The javase jar BUNDLES the native themes -- it ships
-# WindowsFluentTheme.res, GnomeAdwaitaTheme.res and MacOSAquaTheme.res -- so with the jar
-# first, every render used whatever theme was compiled into it at its last build instead of
-# the one in Themes/. A theme edit then scored identically to no edit at all, which reads
-# as "that CSS change did nothing" rather than as "the change was never loaded". Measured:
-# the jar's copy was missing three constants the source theme had.
+# Themes/ comes FIRST on the class path, and that order is load-bearing rather than tidy.
+# There are THREE copies of every native theme in a built tree -- Themes/ (the build output
+# and the single source of truth), a copy the fidelity module's pom stages into its
+# target/classes, and a copy BUNDLED INSIDE the javase jar -- and whichever the class loader
+# reaches first is the one that gets scored.
+#
+# Both stale copies were found the same way and neither announced itself: a theme edit
+# scored identically to no edit at all, which reads as "that CSS change did nothing" rather
+# than as "the change was never loaded". The jar's copy was missing three constants the
+# source had; the staged copy goes stale the moment build-native-themes.sh runs without a
+# module rebuild behind it.
+#
+# Putting the build output first means the thing just compiled is the thing measured.
 #
 # NOT -Djava.awt.headless=true. The JavaSE port creates a real AWT window during
 # Display.init and throws HeadlessException when it cannot, so the simulator needs a
@@ -142,7 +148,7 @@ fi
 ${DISPLAY_WRAPPER[@]+"${DISPLAY_WRAPPER[@]}"} "$JAVA_BIN" -Dcn1.simulator.useAppFrame=false \
     -Dcn1ss.fidelity.platform="$PLATFORM" \
     -Dcn1ss.fidelity.themeResource="/$THEME_RES.res" \
-    -cp "$REPO_ROOT/$CLASSES_DIR:$REPO_ROOT/$RUNNER_CLASSES:$REPO_ROOT/$SIM_JAR" \
+    -cp "$REPO_ROOT/Themes:$REPO_ROOT/$CLASSES_DIR:$REPO_ROOT/$RUNNER_CLASSES:$REPO_ROOT/$SIM_JAR" \
     com.codenameone.fidelity.DesktopTileRunner "$PLATFORM" "$THEME_RES" "$TILE_DIR"
 rc=$?
 set -e

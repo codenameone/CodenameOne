@@ -604,7 +604,10 @@ ListRendererFocus {
     Switch.hover { background-color: #575757; }
     Switch.disabled { background-color: #2e2e2e; }
 
-    Slider { background-color: #454545; }
+    /* color is the KNOB. Adwaita's dark knob is light grey, not white, and a white
+       one scored worse than the bar thumb it replaced until this was measured off
+       the committed dark golden. */
+    Slider { background-color: #454545; color: #d2d2d2; }
     SliderFull { background-color: #3584e4; color: #3584e4; }
     ProgressBar { background-color: #454545; }
     ProgressBarFull { background-color: #3584e4; color: #3584e4; }

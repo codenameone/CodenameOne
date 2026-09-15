@@ -641,7 +641,10 @@ ListRendererFocus {
     Switch.hover { background-color: #aaaaaa; }
     Switch.disabled { background-color: #434343; }
 
-    Slider { background-color: #9a9a9a; }
+    /* color is the KNOB. Fluent's dark knob is a dark grey ring, not white, and a white one scored 5 points
+       worse than the bar thumb it replaced until this was measured off the
+       committed dark golden. */
+    Slider { background-color: #9a9a9a; color: #424242; }
     SliderFull { background-color: #4cc2ff; color: #4cc2ff; }
     ProgressBar { background-color: #9a9a9a; }
     ProgressBarFull { background-color: #4cc2ff; color: #4cc2ff; }
