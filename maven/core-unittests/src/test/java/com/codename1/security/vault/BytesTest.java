@@ -124,7 +124,7 @@ class BytesTest extends UITestBase {
     }
 
     @Test
-    void everyUnlockOwnsItsKeyUntilItIsPublished() {
+    void everyPathThatDerivesAKeyOwnsItUntilItIsPublished() {
         // The data key exists from the moment a wrap opens, and every check after that point can
         // throw -- an edited record, a requirement added since enrolment. A key held in a local
         // inside the try is then left to the collector, which is the one thing this package
@@ -135,6 +135,10 @@ class BytesTest extends UITestBase {
             "public AsyncResource<Boolean> unlockWithPassword(final char[] password)",
             "public AsyncResource<Boolean> unlockRemembered()",
             "public AsyncResource<Boolean> unlockWithRecoveryCode(final char[] code)",
+            // Not an unlock, and the same contract: it derives the data key from a password wrap
+            // and publishes it, so every failure between those two points has to release it.
+            "public AsyncResource<Boolean> importSyncState(final byte[] state, "
+                + "final char[] password)",
         };
         for (String signature : unlocks) {
             String body = methodBody(source, signature);

@@ -1714,6 +1714,13 @@ public final class Vault {
         background(new Runnable() {
             @Override
             public void run() {
+                // Owned for the whole worker, like every other path that derives one. This is the
+                // real data key from the moment the wrap opens, and the steps after that can all
+                // throw -- requirePolicySupported, requireProtections, or commitMetadata losing
+                // to a concurrent write. Two places wiped it by hand and the rest fell through to
+                // a finally that cleared only the password, so a failed import left usable key
+                // material in the heap for a vault it never adopted.
+                byte[] key = null;
                 try {
                     VaultMetadata incoming = VaultMetadata.parse(
                             Bytes.fromUtf8(state, 0, state == null ? 0 : state.length));
@@ -1763,19 +1770,14 @@ public final class Vault {
                     }
                     // Opened before it is stored. A record that does not unwrap under this
                     // password would replace a working local record with one that cannot be used.
-                    byte[] key = SecureEnvelope.parse(incoming.passwordWrap).openWithPassword(
+                    key = SecureEnvelope.parse(incoming.passwordWrap).openWithPassword(
                             password, wrapBinding(incoming, PURPOSE_PASSWORD));
                     // Checked against the key this record itself describes, which is the only
                     // point at which the counter it claims can be believed.
-                    try {
-                        requireAuthenticRecord(incoming, key);
-                        if (local != null) {
-                            requireMetadataAncestry(local, incoming);
-                            requireKeyContinuity(local, incoming, key);
-                        }
-                    } catch (RuntimeException refused) {
-                        Bytes.zero(key);
-                        throw refused;
+                    requireAuthenticRecord(incoming, key);
+                    if (local != null) {
+                        requireMetadataAncestry(local, incoming);
+                        requireKeyContinuity(local, incoming, key);
                     }
                     // The configured policy governs this enrolment too. Importing sync state is
                     // how a SECOND device joins a vault, so it is an enrolment entry point in
@@ -1797,7 +1799,6 @@ public final class Vault {
                         // call and it succeeded. What is refused is leaving the vault unlocked
                         // afterwards, because the application asked for it to be locked.
                         commitMetadata(local, incoming);
-                        Bytes.zero(key);
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while the sync state was being imported");
                     }
@@ -1808,11 +1809,11 @@ public final class Vault {
                     // above is before the commit, and the commit is a storage write wide enough
                     // for a lock to land inside. publishKey withdraws the key and re-locks if it
                     // did, so an overlapping lock leaves the vault closed rather than reopened.
-                    // No `key = null` here, unlike unlockRemembered: that method's finally
-                    // zeroes the local, so it has to be released before publication. This one's
-                    // finally touches only the password, so nulling it is a dead store -- which
-                    // SpotBugs says outright, and it was copied from the other path by shape.
                     publishKey(generation, incoming, key);
+                    // Ownership transferred, so the finally must not wipe what the vault now
+                    // holds. This used to be a dead store and is not any more: the finally below
+                    // zeroes the key, which is the whole of the fix above.
+                    key = null;
                     // Established after the record is committed, because remembering wraps the
                     // key this record describes. A failure here is reported rather than
                     // swallowed: the device is enrolled, but not under the policy that was asked
@@ -1878,6 +1879,7 @@ public final class Vault {
                     // metadata under a worker that already passed requireUnlocked.
                     out.error(asVaultException(broke, "this vault operation could not complete"));
                 } finally {
+                    Bytes.zero(key);
                     Bytes.zero(password);
                 }
             }
