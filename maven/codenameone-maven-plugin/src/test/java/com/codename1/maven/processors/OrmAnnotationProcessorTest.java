@@ -112,6 +112,53 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void rejectsANestedEntity() throws Exception {
+        // A public static member class can have a public no-arg constructor, so
+        // this used to be ACCEPTED and then generated a dao naming the entity by
+        // its binary name, com.example.Outer$Nested, which javac reads as a
+        // top-level identifier and cannot resolve. The generated source did not
+        // compile, for a class the processor had already approved.
+        File classes = tmp.newFolder("classes");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Outer",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "public class Outer {\n"
+                                + "    @Entity public static class Nested {\n"
+                                + "        @Id public long id;\n"
+                                + "        public String label;\n"
+                                + "        public Nested() {}\n"
+                                + "    }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+        ProcessorContext ctx = runProcessor(classes);
+        assertTrue("a nested @Entity must be refused rather than generated for",
+                ctx.hasErrors());
+    }
+
+    @Test
+    public void acceptsATopLevelEntityWithADollarInItsName() throws Exception {
+        // THE CONTROL, and it is not pedantry: a dollar is legal in a top-level
+        // class name, so a refusal that keyed off the "$" in the binary name
+        // would reject this one too. The nesting test has to come from the
+        // InnerClasses attribute, which is what getSourceName reads.
+        File classes = tmp.newFolder("classes");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Od$d",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "@Entity public class Od$d {\n"
+                                + "    @Id public long id;\n"
+                                + "    public String label;\n"
+                                + "    public Od$d() {}\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+        ProcessorContext ctx = runProcessor(classes);
+        assertFalse("a top-level name containing a dollar is not a nested class",
+                ctx.hasErrors());
+    }
+
+    @Test
     public void rejectsEntityWithRelationshipField() throws Exception {
         File classes = tmp.newFolder("classes");
         JavaSourceCompiler.compile(

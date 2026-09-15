@@ -272,6 +272,35 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     + " is abstract or an interface");
             return;
         }
+        // A NESTED ENTITY IS REFUSED, and the refusal is the whole of the support
+        // rather than a missing feature nobody noticed.
+        //
+        // A public static member class can perfectly well have a public no-arg
+        // constructor, so this processor accepted one -- and then wrote its
+        // BINARY name, p.Outer$Note, into every type reference the dao emits.
+        // javac reads that as a top-level identifier and cannot resolve it, so
+        // the generated source did not compile for a class already approved.
+        //
+        // Using the source form fixes that one layer and uncovers two more: the
+        // dao's own name inherits the "$", and the translated header it produces
+        // is named from a different spelling, so the bootstrap fails to build --
+        // and flattening THAT leaves the nested entity class itself with no
+        // header emitted at all. Measured, in that order, each one behind the
+        // last. Supporting nested entities properly is a translator change, not
+        // a processor one, so this says so instead of generating output that
+        // cannot be built.
+        // getSourceName answers the binary name for a top-level class and the
+        // dotted form for a nested one, decided from the InnerClasses attribute
+        // rather than from the dollar sign -- which matters, because a dollar is
+        // legal in a top-level name and the two spellings are not interchangeable.
+        if (!cls.getSourceName().equals(cls.getBinaryName())) {
+            ctx.error(cls, "@Entity " + cls.getBinaryName() + " is a nested class. "
+                    + "Entities have to be top-level: the generated dao refers to the "
+                    + "entity by name, and a nested one cannot be named from the "
+                    + "top-level source the generator writes. Move it into a file of "
+                    + "its own.");
+            return;
+        }
         if (!hasPublicNoArgConstructor(cls)) {
             ctx.error(cls, "@Entity class " + cls.getBinaryName()
                     + " must declare a public no-arg constructor");
