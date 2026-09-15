@@ -226,6 +226,12 @@ final class RefApp: NSObject, NSApplicationDelegate {
 
         for b in blockers { FileHandle.standardError.write("NATIVEREF:BLOCKER \(b)\n".data(using: .utf8)!) }
         print("NATIVEREF:DONE exit=\(blockers.isEmpty ? 0 : 20)")
+        // Explicit flush. Launched through `open --stdout <file>`, stdout is a FILE, so it
+        // is block buffered rather than line buffered, and the build script reads the exit
+        // status back out of that last line. exit() does flush stdio, but the verdict line
+        // is the one thing the whole run is judged on and a macOS runner slot costs over an
+        // hour of queueing, so it is not left to inference.
+        fflush(stdout)
         exit(blockers.isEmpty ? 0 : 20)
     }
 
