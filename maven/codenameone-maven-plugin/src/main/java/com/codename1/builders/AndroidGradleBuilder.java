@@ -41,6 +41,7 @@ import java.awt.image.ImageFilter;
 import java.awt.image.ImageProducer;
 import java.awt.image.RGBImageFilter;
 import java.io.*;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import java.net.MalformedURLException;
@@ -51,6 +52,7 @@ import java.nio.charset.StandardCharsets;
 
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -5414,7 +5416,18 @@ public class AndroidGradleBuilder extends Executor {
         File colors = new File(valsDir, "colors.xml");
         String colorsStr = "";
         try {
-            colorsStr = buildThemeColorItems(colors);
+            Set<String> frameworkAttributes = frameworkThemeAttributes(androidSDKDir);
+            if (frameworkAttributes == null && colors.exists()) {
+                log("Could not read android.R$attr from any installed platform, so every color in "
+                        + "colors.xml is passed to the theme unchecked");
+            }
+            ThemeColors themeColors = buildThemeColorItems(colors, frameworkAttributes);
+            colorsStr = themeColors.items;
+            for (String skipped : themeColors.skipped) {
+                log("colors.xml declares '" + skipped + "', which is not an Android theme attribute, so it "
+                        + "stays an ordinary @color/" + skipped + " resource and does not reach the generated "
+                        + "theme. Only theme attribute names (colorPrimary, statusBarColor, ...) are applied.");
+            }
         } catch (Exception e) {
             error("Failed to create DocumentBuilder", e);
         }
@@ -10515,16 +10528,50 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     /**
-     * Renders the developer's {@code res/values/colors.xml} as {@code <item>}
-     * entries for the generated theme. Every color becomes an
-     * {@code android:<name>} item, so each name has to be an Android theme
-     * attribute -- that contract is what the developer guide documents for
-     * this file, and it is why nothing the builder generates for its own use
-     * may be written into it. Returns an empty string when the file is absent.
+     * What {@code res/values/colors.xml} contributed to the generated theme:
+     * the rendered {@code <item>} entries, and the color names that were left
+     * out because they are not Android theme attributes.
      */
-    static String buildThemeColorItems(File colorsFile) throws Exception {
+    static final class ThemeColors {
+        final String items;
+        final List<String> skipped;
+
+        ThemeColors(String items, List<String> skipped) {
+            this.items = items;
+            this.skipped = Collections.unmodifiableList(new ArrayList<String>(skipped));
+        }
+    }
+
+    /**
+     * Renders the developer's {@code res/values/colors.xml} as {@code <item>}
+     * entries for the generated theme.
+     *
+     * <p>A color becomes an {@code android:<name>} item, which aapt2 resolves
+     * as {@code android:attr/<name>} -- so the name has to be an Android theme
+     * attribute, and one that is not fails resource linking with "style
+     * attribute 'android:attr/<name>' not found", killing the whole build over
+     * a color (issue #5837). Since {@code colors.xml} is also where Android
+     * itself expects ordinary app colors to live -- an Android Studio project
+     * template puts {@code ic_launcher_background} there -- a name that is not
+     * an attribute is left out of the theme and reported, rather than passed
+     * through to fail the link. It remains an ordinary {@code @color/} resource
+     * either way.</p>
+     *
+     * <p>A color whose value is {@code true} or {@code false} is a boolean
+     * theme item such as {@code android:windowLightStatusBar}, so the value is
+     * written literally instead of as a {@code @color/} reference, which would
+     * not resolve.</p>
+     *
+     * @param colorsFile the developer's colors.xml; a file that does not exist
+     *                   contributes nothing
+     * @param frameworkAttributes the framework attribute names to accept, or
+     *                            {@code null} to accept every name unchecked
+     *                            when the platform could not be read
+     */
+    static ThemeColors buildThemeColorItems(File colorsFile, Set<String> frameworkAttributes) throws Exception {
+        List<String> skipped = new ArrayList<String>();
         if (!colorsFile.exists()) {
-            return "";
+            return new ThemeColors("", skipped);
         }
         StringBuilder colorsStr = new StringBuilder();
         DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -10534,11 +10581,71 @@ public class AndroidGradleBuilder extends Executor {
             Node color = nl.item(i);
             NamedNodeMap attr = color.getAttributes();
             Node key = attr.getNamedItem("name");
+            if (key == null) {
+                continue;
+            }
             String k = key.getNodeValue();
-            colorsStr.append("<item name=\"android:").append(k).append("\">@color/").append(k)
-                    .append("</item>\n");
+            if (frameworkAttributes != null && !frameworkAttributes.contains(k)) {
+                skipped.add(k);
+                continue;
+            }
+            String value = color.getTextContent() == null ? "" : color.getTextContent().trim();
+            if ("true".equals(value) || "false".equals(value)) {
+                colorsStr.append("<item name=\"android:").append(k).append("\">").append(value)
+                        .append("</item>\n");
+            } else {
+                colorsStr.append("<item name=\"android:").append(k).append("\">@color/").append(k)
+                        .append("</item>\n");
+            }
         }
-        return colorsStr.toString();
+        return new ThemeColors(colorsStr.toString(), skipped);
+    }
+
+    /**
+     * Every {@code android.R.attr} name the installed platforms declare, which
+     * is exactly the set aapt2 can resolve an {@code android:<name>} theme item
+     * against. Answers {@code null} when no platform could be read, so a caller
+     * can fall back to passing names through unchecked rather than silently
+     * dropping a developer's theming.
+     *
+     * <p>The union across installed platforms is deliberate: framework
+     * attributes are added and effectively never removed, so the union is the
+     * most permissive answer that is still derived from the platform rather
+     * than from a hand-maintained list.</p>
+     */
+    static Set<String> frameworkThemeAttributes(File androidSDKDir) {
+        File[] platforms = new File(androidSDKDir, "platforms").listFiles();
+        if (platforms == null) {
+            return null;
+        }
+        Set<String> names = new HashSet<String>();
+        for (File platform : platforms) {
+            File jar = new File(platform, "android.jar");
+            if (jar.isFile()) {
+                names.addAll(attributeNames(jar));
+            }
+        }
+        return names.isEmpty() ? null : names;
+    }
+
+    /**
+     * The {@code android.R.attr} field names declared by one platform jar.
+     * Loaded with the bootstrap loader as parent so nothing on our own
+     * classpath can answer instead, and without initializing the class -- only
+     * the field names are wanted. A jar that cannot be read contributes
+     * nothing.
+     */
+    static Set<String> attributeNames(File androidJar) {
+        Set<String> names = new HashSet<String>();
+        try (URLClassLoader loader = new URLClassLoader(new URL[]{androidJar.toURI().toURL()}, null)) {
+            Class<?> attrs = Class.forName("android.R$attr", false, loader);
+            for (Field field : attrs.getFields()) {
+                names.add(field.getName());
+            }
+        } catch (Exception | LinkageError e) {
+            return names;
+        }
+        return names;
     }
 
     /**

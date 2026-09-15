@@ -26,6 +26,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,18 +37,21 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The adaptive launcher icon background color must never reach the generated
- * theme as a framework attribute.
+ * {@code res/values/colors.xml} feeds the generated Android theme: every color
+ * in it becomes an {@code android:<name>} item, which aapt2 resolves as
+ * {@code android:attr/<name>}.
  *
- * <p>Every color in {@code res/values/colors.xml} is promoted to an
- * {@code android:<name>} item of {@code CustomTheme}, which aapt2 resolves as
- * {@code android:attr/<name>}. {@code ic_launcher_background} is not an
- * Android theme attribute, so a build that writes it there dies at resource
- * linking with "style attribute 'android:attr/ic_launcher_background' not
- * found" and produces no APK at all -- issue #5837, which is what
- * {@code android.enableAdaptiveIcons=true} did on the build server.</p>
+ * <p>A name that is not an Android theme attribute therefore fails resource
+ * linking with "style attribute 'android:attr/<name>' not found" and produces
+ * no APK at all. That is issue #5837: the adaptive launcher icon background
+ * was written into that file under the name {@code ic_launcher_background},
+ * which is not an attribute, so {@code android.enableAdaptiveIcons=true} broke
+ * the build outright.</p>
  */
 class AndroidAdaptiveIconBackgroundTest {
+
+    private static final Set<String> FRAMEWORK_ATTRIBUTES = new HashSet<String>(Arrays.asList(
+            "colorPrimary", "statusBarColor", "windowLightStatusBar", "windowActionBar"));
 
     @Test
     void backgroundColorStaysOutOfTheGeneratedTheme(@TempDir File valsDir) throws Exception {
@@ -58,20 +64,16 @@ class AndroidAdaptiveIconBackgroundTest {
         assertFalse(new File(valsDir, "colors.xml").exists(),
                 "colors.xml is the developer's theme-attribute file, not somewhere to stash our own resources");
 
-        assertEquals("", AndroidGradleBuilder.buildThemeColorItems(new File(valsDir, "colors.xml")),
+        assertEquals("", items(new File(valsDir, "colors.xml")),
                 "nothing the builder generates for itself may be promoted into the theme");
     }
 
     @Test
     void developerColorsAreStillPromotedToTheTheme(@TempDir File valsDir) throws Exception {
-        File colors = new File(valsDir, "colors.xml");
-        write(colors, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                + "<resources>\n"
-                + "    <color name=\"colorPrimary\">#ff00ff00</color>\n"
-                + "    <color name=\"statusBarColor\">#80ff0000</color>\n"
-                + "</resources>\n");
+        File colors = write(valsDir, "<color name=\"colorPrimary\">#ff00ff00</color>\n"
+                + "    <color name=\"statusBarColor\">#80ff0000</color>");
 
-        String items = AndroidGradleBuilder.buildThemeColorItems(colors);
+        String items = items(colors);
         assertTrue(items.contains("<item name=\"android:colorPrimary\">@color/colorPrimary</item>"),
                 "documented behavior: a color name that is a theme attribute reaches the theme");
         assertTrue(items.contains("<item name=\"android:statusBarColor\">@color/statusBarColor</item>"),
@@ -79,16 +81,56 @@ class AndroidAdaptiveIconBackgroundTest {
     }
 
     @Test
+    void aNameThatIsNotAnAttributeIsLeftOutAndReported(@TempDir File valsDir) throws Exception {
+        // The failure this whole class exists for. An Android Studio project
+        // template declares ic_launcher_background in colors.xml, so a
+        // developer who copies one in would otherwise lose the entire build to
+        // an aapt2 message that never mentions colors.xml.
+        File colors = write(valsDir, "<color name=\"colorPrimary\">#ff00ff00</color>\n"
+                + "    <color name=\"ic_launcher_background\">#000000</color>");
+
+        AndroidGradleBuilder.ThemeColors themeColors =
+                AndroidGradleBuilder.buildThemeColorItems(colors, FRAMEWORK_ATTRIBUTES);
+
+        assertFalse(themeColors.items.contains("ic_launcher_background"),
+                "a name aapt2 cannot resolve as android:attr must not reach the theme");
+        assertTrue(themeColors.items.contains("<item name=\"android:colorPrimary\">@color/colorPrimary</item>"),
+                "the developer's real theme attributes are unaffected");
+        assertEquals(Arrays.asList("ic_launcher_background"), themeColors.skipped,
+                "what was left out is reported, so a misspelled attribute is not silently ignored");
+    }
+
+    @Test
+    void aBooleanValuedAttributeIsWrittenLiterally(@TempDir File valsDir) throws Exception {
+        // android:windowLightStatusBar is a boolean theme item. "@color/x"
+        // would not resolve to a boolean, so the value passes through as-is.
+        File colors = write(valsDir, "<color name=\"windowLightStatusBar\">true</color>");
+
+        assertTrue(items(colors).contains("<item name=\"android:windowLightStatusBar\">true</item>"),
+                "a true/false value is a boolean theme item, not a color reference");
+    }
+
+    @Test
+    void anUnreadablePlatformLeavesEveryNameAlone(@TempDir File valsDir) throws Exception {
+        // With no platform to check against, dropping names would silently
+        // strip a developer's theming. Passing them through keeps the behavior
+        // that shipped before the check existed.
+        File colors = write(valsDir, "<color name=\"colorPrimary\">#ff00ff00</color>\n"
+                + "    <color name=\"somethingUnknown\">#000000</color>");
+
+        AndroidGradleBuilder.ThemeColors themeColors =
+                AndroidGradleBuilder.buildThemeColorItems(colors, null);
+
+        assertTrue(themeColors.items.contains("<item name=\"android:somethingUnknown\">@color/somethingUnknown</item>"),
+                "an unchecked build passes every name through, as it always did");
+        assertTrue(themeColors.skipped.isEmpty(), "nothing was checked, so nothing was skipped");
+    }
+
+    @Test
     void aDeveloperOwnedBackgroundColorIsNotDuplicated(@TempDir File valsDir) throws Exception {
-        // An Android Studio project template declares ic_launcher_background in
-        // colors.xml, so a developer may well have copied one in. Writing ours
-        // beside theirs is a duplicate resource, which fails linking just as
-        // surely as the attribute promotion does.
-        File colors = new File(valsDir, "colors.xml");
-        write(colors, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                + "<resources>\n"
-                + "    <color name=\"ic_launcher_background\">#123456</color>\n"
-                + "</resources>\n");
+        // Two files declaring one color name is a duplicate resource, which
+        // fails linking just as surely as the attribute promotion does.
+        write(valsDir, "<color name=\"ic_launcher_background\">#123456</color>");
 
         AndroidGradleBuilder.writeAdaptiveIconBackgroundColor(valsDir, "#000000");
 
@@ -96,11 +138,39 @@ class AndroidAdaptiveIconBackgroundTest {
                 "the developer's own declaration wins rather than colliding with ours");
     }
 
-    private static String read(File f) throws IOException {
-        return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+    @Test
+    void theAttributeSetComesFromThePlatformJar(@TempDir File sdkDir) throws Exception {
+        File platform = new File(sdkDir, "platforms/android-99");
+        assertTrue(platform.mkdirs(), "test platform directory");
+        AndroidAttrJar.write(new File(platform, "android.jar"), "colorPrimary", "statusBarColor");
+
+        Set<String> attributes = AndroidGradleBuilder.frameworkThemeAttributes(sdkDir);
+        assertTrue(attributes.contains("colorPrimary"), "read android.R$attr out of the platform jar");
+        assertTrue(attributes.contains("statusBarColor"), "read android.R$attr out of the platform jar");
+        assertFalse(attributes.contains("ic_launcher_background"),
+                "the platform is the authority on what is an attribute, not a list we maintain");
     }
 
-    private static void write(File f, String content) throws IOException {
-        Files.write(f.toPath(), content.getBytes(StandardCharsets.UTF_8));
+    @Test
+    void anSdkWithNoPlatformAnswersNull(@TempDir File sdkDir) {
+        assertEquals(null, AndroidGradleBuilder.frameworkThemeAttributes(sdkDir),
+                "no platform means no answer, which is what makes the caller pass names through unchecked");
+    }
+
+    private static String items(File colorsFile) throws Exception {
+        return AndroidGradleBuilder.buildThemeColorItems(colorsFile, FRAMEWORK_ATTRIBUTES).items;
+    }
+
+    private static File write(File valsDir, String colorElements) throws IOException {
+        File colors = new File(valsDir, "colors.xml");
+        Files.write(colors.toPath(), ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                + "<resources>\n"
+                + "    " + colorElements + "\n"
+                + "</resources>\n").getBytes(StandardCharsets.UTF_8));
+        return colors;
+    }
+
+    private static String read(File f) throws IOException {
+        return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
     }
 }
