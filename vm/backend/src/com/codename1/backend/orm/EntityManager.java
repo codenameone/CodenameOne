@@ -371,11 +371,36 @@ public final class EntityManager {
         // the second, and the second dao then selects columns that were never
         // created. The failure surfaces as a missing column on a query, far from
         // the two classes that explain it.
-        Map byTable = new LinkedHashMap();
+        // TWO PARALLEL LISTS AND A SCAN, not a map keyed by a folded name.
+        //
+        // asciiLower is what this used, and it only folds ASCII: the tables
+        // "Aerenden" and "aerenden" collide under it, but spell the first letter
+        // with an A-umlaut and they do not, while MySQL with
+        // lower_case_table_names=1 -- its default on Windows and macOS, which is
+        // the configuration this check exists for -- still resolves both to one
+        // table. CREATE TABLE IF NOT EXISTS then silently reuses the first
+        // entity's schema and the second dao queries columns that were never
+        // created, which is exactly the failure the check was written to stop and
+        // exactly the case it let through.
+        //
+        // equalsIgnoreCase, never toLowerCase: this runtime has no Locale to ask
+        // for the root one, and on a Turkish device an I folds to a dotless i.
+        // It compares character by character and is locale independent, and it
+        // folds non-ASCII, so it is what the column-collision check in Table uses
+        // for the same question. The cost is a scan over the ENTITIES, of which an
+        // application has a handful, once when the table set is built.
+        List claimedNames = new ArrayList();
+        List claimedBy = new ArrayList();
         for(int iter = 0 ; iter < all.length ; iter++) {
             EntityDefinition definition = all[iter];
-            String claimed = asciiLower(definition.table());
-            Object owner = byTable.get(claimed);
+            String claimed = definition.table();
+            Object owner = null;
+            for(int earlier = 0 ; earlier < claimedNames.size() ; earlier++) {
+                if(((String)claimedNames.get(earlier)).equalsIgnoreCase(claimed)) {
+                    owner = claimedBy.get(earlier);
+                    break;
+                }
+            }
             if(owner != null) {
                 if(clashes == null) {
                     clashes = new ArrayList();
@@ -391,7 +416,8 @@ public final class EntityManager {
                         + "'; give one of them @Entity(table = \"...\")");
                 continue;
             }
-            byTable.put(claimed, definition.type().getName());
+            claimedNames.add(claimed);
+            claimedBy.add(definition.type().getName());
             try {
                 out.put(definition.type().getName(), new Table(definition, dialect));
             } catch (IllegalStateException err) {
@@ -411,29 +437,4 @@ public final class EntityManager {
         return out;
     }
 
-    /**
-     * ASCII lower case, by hand.
-     *
-     * <p>String.toLowerCase() is locale sensitive and this runtime has no Locale
-     * to ask for the root one, so on a device set to Turkish the I of a table
-     * named "USERS" folds to a dotless i and two names that are the same table
-     * compare as different ones. A table name is ASCII by the schema's choice
-     * here; anything above it is left alone rather than guessed at.
-     */
-    private static String asciiLower(String name) {
-        if(name == null) {
-            return null;
-        }
-        char[] out = null;
-        for(int iter = 0 ; iter < name.length() ; iter++) {
-            char c = name.charAt(iter);
-            if(c >= 'A' && c <= 'Z') {
-                if(out == null) {
-                    out = name.toCharArray();
-                }
-                out[iter] = (char)(c + 32);
-            }
-        }
-        return out == null ? name : new String(out);
-    }
 }
