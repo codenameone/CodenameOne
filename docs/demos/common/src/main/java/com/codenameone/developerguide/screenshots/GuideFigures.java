@@ -74,6 +74,8 @@ public final class GuideFigures {
             new FigureVariant(new ComponentsImageViewerFigure(), FigureDevice.ANDROID, false, "components-imageviewer.png"),
             new FigureVariant(new ComponentsImageViewerZoomedFigure(), FigureDevice.ANDROID, false, "components-imageviewer-zoomed-in.png"),
             new FigureVariant(new ComponentsImageViewerMultiFigure(), FigureDevice.ANDROID, false, "components-imageviewer-multi.png"),
+            new FigureVariant(new ComponentsToolbarSideMenuFigure(), FigureDevice.ANDROID, false, "components-toolbar-sidemenu.png"),
+            new FigureVariant(new ComponentsTextComponentFigure(), FigureDevice.ANDROID, false, "components-text-component.png"),
             new FigureVariant(new ComponentsDialogModalSouthFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-south.png"),
             new FigureVariant(new ComponentsDialogBottomHalfFigure(), FigureDevice.ANDROID, false, "components-dialog-modal-bottom-half.png"),
             new FigureVariant(new ComponentsDialogTintFigure(), FigureDevice.ANDROID, false, "components-dialog-tint.png"),
