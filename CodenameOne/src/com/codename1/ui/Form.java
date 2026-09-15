@@ -1631,11 +1631,18 @@ public class Form extends Container implements TopLevelContainer {
         }
 
         int themeTint = laf.getDefaultFormTintColor();
+        // The marker only moves when the theme's answer is actually taken. A
+        // theme refresh can land while one of those temporary overrides is up
+        // -- the system appearance changing under an open ComboBox is enough --
+        // and advancing it there would leave the marker on a colour this form
+        // never wore. The override's teardown then restores the previous theme
+        // default, which no longer matches the marker, and the form would read
+        // as having chosen that colour for the rest of its life.
         if (!themeTintColorKnown || tintColor == themeTintColor) {
             tintColor = themeTint;
+            themeTintColor = themeTint;
+            themeTintColorKnown = true;
         }
-        themeTintColor = themeTint;
-        themeTintColorKnown = true;
         tactileTouchDuration = laf.getTactileTouchDuration();
     }
 

@@ -101,4 +101,34 @@ class FormTintColorTest extends UITestBase {
             setThemeTint(original);
         }
     }
+
+    /// A theme refresh can land while one of those temporary overrides is still
+    /// up. The form has to come out of that still following the theme, not stuck
+    /// on whichever default happened to be current when the override began.
+    @FormTest
+    void aThemeChangeDuringAnOverrideDoesNotStickTheTint() {
+        int original = UIManager.getInstance().getLookAndFeel().getDefaultFormTintColor();
+        try {
+            setThemeTint(0x66112233);
+            Form hi = new Form("Default");
+            hi.show();
+
+            int saved = hi.getTintColor();
+            hi.setTintColor(0);
+
+            // the appearance changes while the override is still up
+            setThemeTint(0x66445566);
+            hi.show();
+
+            hi.setTintColor(saved);
+
+            setThemeTint(0x66778899);
+            hi.show();
+
+            assertEquals(0x66778899, hi.getTintColor(),
+                    "the form was left stuck on the tint that was current when the override began");
+        } finally {
+            setThemeTint(original);
+        }
+    }
 }
