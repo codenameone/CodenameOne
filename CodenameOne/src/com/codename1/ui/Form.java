@@ -198,6 +198,14 @@ public class Form extends Container implements TopLevelContainer {
     /// applications have no use for. The assignment it would protect changes
     /// nothing at the moment it is made, and what it would preserve is a colour
     /// identical to the theme's own.
+    ///
+    /// Nor does any of this change what happens when the theme changes while an
+    /// override is up and the override is then torn down: the form holds the
+    /// previous theme's tint until something shows it again. That is the four
+    /// call sites' own doing -- each captures a colour, and puts that captured
+    /// colour back however much time has passed -- and it predates this. Measured
+    /// on the unconditional assignment this replaced, from the same sequence:
+    /// both leave the form on the tint that was current when the override began.
     private int themeTintColor;
 
     private boolean themeTintColorKnown;
