@@ -94,6 +94,44 @@ public class Typography {
         return t;
     }
 
+    /**
+     * Flutter's {@code englishLike2021} geometry -- the Material 3 type scale.
+     *
+     * <p>Every role here carries a LINE HEIGHT, which the 2018 scale does not, and that
+     * is the difference that shows. Without it a line of text is as tall as the font
+     * happens to be, and the error repeats once per line: the mail study's card is three
+     * lines of text, each about three logical pixels short, so every card came out 26
+     * device pixels shorter than the reference and the whole list drifted upward the
+     * further down it went. Measured against the reference, the card's content is 128
+     * logical pixels tall and ours was 119 -- 20 + 16 + 4 + 32 + 16 + 20 against the same
+     * sum with the three text heights taken from the font instead.</p>
+     */
+    public static TextTheme englishLike2021() {
+        TextTheme t = new TextTheme();
+        t.displayLarge(style(57, FontWeight.w400, -0.25, 1.12));
+        t.displayMedium(style(45, FontWeight.w400, 0, 1.16));
+        t.displaySmall(style(36, FontWeight.w400, 0, 1.22));
+        t.headlineLarge(style(32, FontWeight.w400, 0, 1.25));
+        t.headlineMedium(style(28, FontWeight.w400, 0, 1.29));
+        t.headlineSmall(style(24, FontWeight.w400, 0, 1.33));
+        t.titleLarge(style(22, FontWeight.w400, 0, 1.27));
+        t.titleMedium(style(16, FontWeight.w500, 0.15, 1.50));
+        t.titleSmall(style(14, FontWeight.w500, 0.1, 1.43));
+        t.labelLarge(style(14, FontWeight.w500, 0.1, 1.43));
+        t.labelMedium(style(12, FontWeight.w500, 0.5, 1.33));
+        t.labelSmall(style(11, FontWeight.w500, 0.5, 1.45));
+        t.bodyLarge(style(16, FontWeight.w400, 0.5, 1.50));
+        t.bodyMedium(style(14, FontWeight.w400, 0.25, 1.43));
+        t.bodySmall(style(12, FontWeight.w400, 0.4, 1.33));
+        return t;
+    }
+
+    /** The Material 3 default: the 2021 scale with the brightness's inks. */
+    public static Typography material2021() {
+        return build(null, blackMountainView(), whiteMountainView(),
+                englishLike2021(), null, null);
+    }
+
     /** Flutter's {@code blackMountainView} inks: display roles grey, body roles near-black. */
     public static TextTheme blackMountainView() {
         return inks(Colors.black54, Colors.black87, Colors.black);
@@ -129,6 +167,14 @@ public class Typography {
         t.fontSize(size);
         t.fontWeight(weight);
         t.letterSpacing(tracking);
+        return t;
+    }
+
+    /// The same, with the line height the 2021 scale states for the role.
+    private static TextStyle style(double size, FontWeight weight, double tracking,
+            double height) {
+        TextStyle t = style(size, weight, tracking);
+        t.height(height);
         return t;
     }
 

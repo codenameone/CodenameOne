@@ -210,9 +210,13 @@ public class ThemeData {
             return textTheme;
         }
         if (resolvedTextTheme == null) {
+            // No typography named means the Material 3 default, not "no type scale at
+            // all". An empty TextTheme leaves every role without a size or a line
+            // height, so text falls back to whatever the font measures -- which is a few
+            // logical pixels short per line, once per line, on every screen.
             resolvedTextTheme = typography instanceof Typography
                     ? ((Typography) typography).resolve(brightness == Brightness.dark)
-                    : new TextTheme();
+                    : Typography.material2021().resolve(brightness == Brightness.dark);
         }
         return resolvedTextTheme;
     }

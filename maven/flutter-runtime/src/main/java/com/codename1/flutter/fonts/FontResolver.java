@@ -159,6 +159,154 @@ public final class FontResolver {
         }
     }
 
+    /// Cached line-height ratios, keyed by the same name tryFile() looks a face up by.
+    private static final java.util.HashMap<String, Double> RATIOS =
+            new java.util.HashMap<String, Double>();
+
+    /**
+     * The line height this face should lay out at, as a multiple of the font size, or 0
+     * when it cannot be read.
+     *
+     * <p>A text style that names no height gets the FONT's line height, and which of a
+     * font's several vertical metrics that means is not settled between platforms.
+     * Codename One reports the typographic pair (sTypoAscender + sTypoDescender), which
+     * for Work Sans is 1.17 em. Flutter lays the same face out at about 1.35, and the
+     * difference is not cosmetic: the mail study's card is three lines of text, so each
+     * card came out 26 device pixels short and the list drifted further out of place the
+     * further down it went -- 11.9% of that screen wrong, the worst route in the sweep,
+     * for a reason that has nothing to do with the widgets.</p>
+     *
+     * <p>The pair that reproduces it is the WINDOW ascent with the typographic descent,
+     * which is what the reference measures to within a pixel over three lines. Read from
+     * the face itself rather than assumed, so a font with different metrics gets its own
+     * answer instead of this one's.</p>
+     */
+    public static double lineHeightRatio(String family, FontWeight weight, boolean italic) {
+        if (family == null || family.length() == 0) {
+            return 0;
+        }
+        String key = family + '|' + (weight == null ? "w400" : weight.name()) + '|' + italic;
+        synchronized (RATIOS) {
+            Double cached = RATIOS.get(key);
+            if (cached != null) {
+                return cached.doubleValue();
+            }
+        }
+        // The same candidate order load() uses, so the metrics come from the FACE that
+        // was actually resolved rather than from whichever file happens to be found first.
+        double ratio = 0;
+        String base = compact(family);
+        int want = index(weight);
+        outer:
+        for (int distance = 0; distance < VARIANTS.length; distance++) {
+            for (int sign = 0; sign < 2; sign++) {
+                int i = sign == 0 ? want + distance : want - distance;
+                if (i < 0 || i >= VARIANTS.length || (distance == 0 && sign == 1)) {
+                    continue;
+                }
+                ratio = readRatio(base + '-' + VARIANTS[i] + (italic ? "Italic" : ""));
+                if (ratio > 0) {
+                    break outer;
+                }
+            }
+        }
+        if (ratio <= 0) {
+            ratio = readRatio(base);
+        }
+        synchronized (RATIOS) {
+            RATIOS.put(key, Double.valueOf(ratio));
+        }
+        return ratio;
+    }
+
+    private static double readRatio(String baseName) {
+        for (int i = 0; i < FOLDERS.size(); i++) {
+            for (int e = 0; e < EXTENSIONS.length; e++) {
+                String flat = FlutterAssets.flatName(
+                        FOLDERS.get(i) + baseName + EXTENSIONS[e]);
+                byte[] data = readAll(flat);
+                if (data != null) {
+                    double r = metrics(data);
+                    if (r > 0) {
+                        return r;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+
+    private static byte[] readAll(String flatName) {
+        java.io.InputStream in = null;
+        try {
+            in = com.codename1.ui.Display.getInstance()
+                    .getResourceAsStream(FontResolver.class, "/" + flatName);
+            if (in == null) {
+                return null;
+            }
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try {
+                if (in != null) {
+                    in.close();
+                }
+            } catch (java.io.IOException ignore) {
+                // closing a font we already read is not worth failing over
+            }
+        }
+    }
+
+    private static int u16(byte[] d, int o) {
+        return ((d[o] & 0xff) << 8) | (d[o + 1] & 0xff);
+    }
+
+    private static int s16(byte[] d, int o) {
+        int v = u16(d, o);
+        return v > 0x7fff ? v - 0x10000 : v;
+    }
+
+    /// (usWinAscent + |sTypoDescender|) / unitsPerEm, or 0 when the tables are absent.
+    private static double metrics(byte[] d) {
+        try {
+            int tables = u16(d, 4);
+            int head = -1;
+            int os2 = -1;
+            for (int i = 0; i < tables; i++) {
+                int rec = 12 + 16 * i;
+                String tag = new String(d, rec, 4, "ISO-8859-1");
+                int off = (u16(d, rec + 8) << 16) | u16(d, rec + 10);
+                if ("head".equals(tag)) {
+                    head = off;
+                } else if ("OS/2".equals(tag)) {
+                    os2 = off;
+                }
+            }
+            if (head < 0 || os2 < 0) {
+                return 0;
+            }
+            int upem = u16(d, head + 18);
+            if (upem <= 0) {
+                return 0;
+            }
+            int typoDescender = s16(d, os2 + 70);
+            int winAscent = u16(d, os2 + 74);
+            if (winAscent <= 0) {
+                return 0;
+            }
+            return (winAscent + Math.abs(typoDescender)) / (double) upem;
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
     private static final String[] EXTENSIONS = {".ttf", ".otf"};
 
     private static Font tryFile(String baseName) {

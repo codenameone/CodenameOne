@@ -119,9 +119,21 @@ public class TextRenderElement extends RenderElement {
             double sp = ts == null || ts.getLetterSpacing() == null
                     ? 0 : Dp.px(ts.getLetterSpacing().doubleValue());
             ((WrappedLabel) l).spacingPx = sp;
+            // A stated height wins; otherwise the FACE's own line height, read from the
+            // font rather than taken from Codename One's typographic pair, which lays
+            // text out shorter than Flutter does for the same file.
             ((WrappedLabel) l).lineHeightPx = ts == null || ts.height() == null
                     || ts.getFontSize() == null ? 0
                     : Dp.px(ts.getFontSize().doubleValue() * ts.height().doubleValue());
+            if (((WrappedLabel) l).lineHeightPx <= 0 && ts != null
+                    && ts.getFontSize() != null && ts.fontFamily() != null) {
+                double ratio = com.codename1.flutter.fonts.FontResolver.lineHeightRatio(
+                        ts.fontFamily(), ts.getFontWeight(), false);
+                if (ratio > 0) {
+                    ((WrappedLabel) l).lineHeightPx =
+                            Dp.px(ts.getFontSize().doubleValue() * ratio);
+                }
+            }
             // A TRANSLUCENT ink is ordinary in Material: the 2018 type scale
             // paints its display roles at black54 and its body roles at
             // black87, and Codename One's Style carries only an opaque
