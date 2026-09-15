@@ -73,8 +73,27 @@ public class PageTransitionSwitcher extends AnimatedChildWidget {
         }
         PageTransitionSwitcherElement e = (PageTransitionSwitcherElement) context;
         e.noteChild(child, duration);
-        return ((dart.runtime.Funcs.Func3<com.codename1.flutter.Widget, Animation<Double>,
-                Animation<Double>, com.codename1.flutter.Widget>) transitionBuilder)
-                .call(child, e.primary(), e.secondary());
+        dart.runtime.Funcs.Func3<com.codename1.flutter.Widget, Animation<Double>,
+                Animation<Double>, com.codename1.flutter.Widget> build =
+                (dart.runtime.Funcs.Func3<com.codename1.flutter.Widget, Animation<Double>,
+                        Animation<Double>, com.codename1.flutter.Widget>) transitionBuilder;
+        com.codename1.flutter.Widget incoming =
+                build.call(child, e.primary(), e.secondary());
+        com.codename1.flutter.Widget out = e.leaving();
+        if (out == null) {
+            return incoming;
+        }
+        // Both at once, the outgoing one UNDER the incoming one. The transition itself
+        // decides what that looks like: it is handed the outgoing child as arrived
+        // (primary complete) and leaving (secondary running), which is how a shared axis
+        // fades one out while the other comes in.
+        com.codename1.flutter.widgets.Stack stack =
+                new com.codename1.flutter.widgets.Stack();
+        dart.core.DartList<com.codename1.flutter.Widget> kids =
+                new dart.core.DartList<com.codename1.flutter.Widget>();
+        kids.add(build.call(out, e.arrived(), e.primary()));
+        kids.add(incoming);
+        stack.children(kids);
+        return stack;
     }
 }

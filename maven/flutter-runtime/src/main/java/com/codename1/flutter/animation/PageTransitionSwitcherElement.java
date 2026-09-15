@@ -45,6 +45,8 @@ public class PageTransitionSwitcherElement extends AnimatedWidgetElement {
     private final AlwaysStoppedAnimation<Double> still =
             new AlwaysStoppedAnimation<Double>(Double.valueOf(0));
     private Widget shown;
+    /// The child on its way out, kept mounted until it has finished leaving.
+    private Widget leaving;
     private boolean subscribed;
 
     public PageTransitionSwitcherElement(PageTransitionSwitcher widget) {
@@ -76,7 +78,11 @@ public class PageTransitionSwitcherElement extends AnimatedWidgetElement {
         controller.duration(duration != null ? duration
                 : Duration.of(0, 0, 0, 0, DEFAULT_MS, 0));
         if (shown != null && !Widget.canUpdate(shown, child)) {
+            leaving = shown;
             controller.forward(Double.valueOf(0));
+        }
+        if (controller.value().doubleValue() >= 1.0) {
+            leaving = null;
         }
         shown = child;
     }
@@ -86,15 +92,29 @@ public class PageTransitionSwitcherElement extends AnimatedWidgetElement {
         return controller;
     }
 
-    /**
-     * The outgoing child's animation.
-     *
-     * <p>Held at zero. Running the two halves at once needs both children mounted at once,
-     * and a route's subtree here is a whole page -- the mail navigator or the search page
-     * -- so keeping the old one alive to fade it out would double the tree for the length
-     * of the run. The incoming half is the half that reads as the transition.</p>
-     */
+    /** The incoming child's secondary animation: it is not on its way anywhere. */
     Animation<Double> secondary() {
         return still;
     }
+
+    /** The child on its way out, or null when nothing is leaving. */
+    Widget leaving() {
+        return leaving;
+    }
+
+    /**
+     * The outgoing child's primary animation: arrived, and staying arrived.
+     *
+     * <p>A shared-axis transition fades the outgoing child out over the first part of the
+     * run and the incoming one in over the rest, so with only the incoming child built
+     * there is nothing on screen at all until the run is a third done. That is a blank
+     * flash where the reference shows one page dissolving into the other, and it is the
+     * most visible thing about opening search.</p>
+     */
+    Animation<Double> arrived() {
+        return done;
+    }
+
+    private final AlwaysStoppedAnimation<Double> done =
+            new AlwaysStoppedAnimation<Double>(Double.valueOf(1));
 }
