@@ -240,7 +240,10 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/D
 ----
 
 There is no JDBC driver involved. SQLite is linked into the binary, and the
-PostgreSQL and MySQL clients speak their wire protocols directly.
+PostgreSQL and MySQL clients speak their wire protocols directly. MySQL 8.0 or
+newer: a string key needs a case sensitive NO PAD collation, so `"A"` and `"a"`
+are two keys and `"token "` keeps its space, and such a collation arrived in
+8.0. Nothing else here depends on the version.
 
 Statements are written once, in one portable form: `?` for every parameter, and
 plain unquoted names. PostgreSQL binds `$1` rather than `?`, and that difference
