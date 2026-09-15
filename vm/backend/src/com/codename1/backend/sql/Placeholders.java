@@ -218,7 +218,8 @@ final class Placeholders {
                                boolean hashComments, boolean dollarQuotedStrings,
                                boolean dashCommentNeedsSpace, boolean bracketIdentifiers,
                                boolean executableComments) throws IOException {
-        if(executableComments && hasVersionGate(sql)) {
+        if(executableComments && hasVersionGate(sql, nestedComments, backslashEscapes,
+                hashComments, dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers)) {
             // UNKNOWABLE, which is not the same as "no tuples to count".
             // "/*!50100 , (2) */" adds a row on a server past 5.1 and nothing on
             // an older one; "/*!99999 ..." adds nothing anywhere today. This
@@ -429,19 +430,35 @@ final class Placeholders {
      * Whether the statement carries a MySQL version-gated executable comment --
      * "/*!" followed by digits.
      *
-     * <p>Scanned crudely on purpose: this runs before the tuple walk and only has
-     * to notice that a gate EXISTS. A "/*!" inside a string literal would be a
-     * false positive, and the cost of one is a refusal with a clear message
-     * rather than a wrong count.
+     * <p>Scanned AS SQL, not searched for as text. An earlier version used
+     * indexOf and said in this comment that a false positive was cheap, on the
+     * grounds that it costs a clear refusal rather than a wrong count. That was
+     * the wrong trade: the refusal falls on a VALID statement, so
+     * "INSERT INTO t(a) VALUES ('/*!99999 not a comment')" -- ordinary text that
+     * happens to start this way -- could not be inserted at all. A gate inside a
+     * string literal is not a gate, and the scanner that skips literals already
+     * exists.
      */
-    private static boolean hasVersionGate(String sql) {
-        int at = sql.indexOf("/*!");
-        while(at >= 0) {
-            int after = at + 3;
-            if(after < sql.length() && sql.charAt(after) >= '0' && sql.charAt(after) <= '9') {
+    private static boolean hasVersionGate(String sql, boolean nestedComments,
+                                          boolean backslashEscapes, boolean hashComments,
+                                          boolean dollarQuotedStrings,
+                                          boolean dashCommentNeedsSpace,
+                                          boolean bracketIdentifiers) throws IOException {
+        int at = 0;
+        int length = sql.length();
+        while(at < length) {
+            if(sql.charAt(at) == '/' && at + 3 < length && sql.charAt(at + 1) == '*'
+                    && sql.charAt(at + 2) == '!' && sql.charAt(at + 3) >= '0'
+                    && sql.charAt(at + 3) <= '9') {
                 return true;
             }
-            at = sql.indexOf("/*!", at + 3);
+            // executableComments is true here by construction -- only MySQL asks
+            // this question -- and passing it keeps skip stepping over the
+            // opener of an UNGATED "/*! ... */" rather than reading it as an
+            // ordinary comment, so what is inside stays scannable.
+            int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, true);
+            at = next > at ? next : at + 1;
         }
         return false;
     }

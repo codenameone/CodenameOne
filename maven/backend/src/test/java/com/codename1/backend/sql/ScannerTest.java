@@ -243,6 +243,22 @@ class ScannerTest {
         assertEquals("SELECT 1 /*!99999 + ? */",
                 Dialect.SQLITE.bind("SELECT 1 /*!99999 + ? */", 0));
 
+        // GATE-SHAPED TEXT IS NOT A GATE. The detector used to search for "/*!"
+        // with indexOf and argued a false positive was cheap -- but the refusal
+        // falls on a VALID statement, so ordinary data that happens to start
+        // this way could not be inserted at all. It is scanned as SQL now, so a
+        // literal and a comment are what they are.
+        rows("INSERT INTO t(a) VALUES ('/*!99999 not a comment')", 1, 1, 1);
+        rows("INSERT INTO t(a) VALUES (?) -- /*!99999 nor is this", 1, 1, 1);
+        // MySQL only: PostgreSQL nests block comments, so one "*/" would leave
+        // this genuinely unterminated there and refusing it is correct.
+        assertEquals(1, Dialect.MYSQL.countInsertRows(
+                "INSERT INTO t(a) VALUES (?) /* /*!99999 nor this */"));
+        // And binding agrees: a ? inside that literal is data, not a parameter,
+        // and the gate text does not make the real one unknowable.
+        assertEquals("INSERT INTO t(a, b) VALUES (?, '/*!99999 ?')",
+                Dialect.MYSQL.bind("INSERT INTO t(a, b) VALUES (?, '/*!99999 ?')", 1));
+
         // An ordinary block comment is still ignored on all three.
         rows("INSERT INTO t (a) VALUES (1) /* , (2) */", 1, 1, 1);
         // And a placeholder inside an executable comment is a placeholder there.
