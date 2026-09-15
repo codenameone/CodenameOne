@@ -155,13 +155,26 @@ public final class Database {
         }
         if(hasScheme(url, "mysql://") || hasScheme(url, "mariadb://")) {
             Url parsed = Url.parse(url, 3306);
-            return new Database(null, null, MySql.connect(parsed.host, parsed.port,
+            // The DIALECT COMES FROM THE SERVER, not from the scheme: MariaDB
+            // and MySQL do not have the same collations, and a mysql:// URL
+            // points at a MariaDB server perfectly often. See Dialect.MARIADB.
+            MySql session = MySql.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
-                    parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
-                    parsed.describe("mysql"), Dialect.MYSQL);
+                    parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis);
+            return new Database(null, null, session, parsed.describe("mysql"),
+                    session.isMariaDb() ? Dialect.MARIADB : Dialect.MYSQL);
         }
         refuseUnportableSqliteUri(url);
-        return new Database(Db.open(url), null, null, "sqlite:" + url, Dialect.SQLITE);
+        Db sqliteDb = Db.open(url);
+        // AT OPEN, not at pooling. LIKE folds ASCII case on SQLite and not on
+        // the other two, so it decides what a query MEANS -- and an earlier
+        // version set it in DataSource.configure, which EntityManager.open(db)
+        // and DataSource.of(db) never reach. Those paths then ran a
+        // case-insensitive LIKE against a schema the other engines compare
+        // case sensitively. The pragma is per connection, and this is the one
+        // place every SQLite connection comes from.
+        sqliteDb.useCaseSensitiveLike();
+        return new Database(sqliteDb, null, null, "sqlite:" + url, Dialect.SQLITE);
     }
 
     /**
@@ -658,10 +671,6 @@ public final class Database {
         if(sqlite != null) {
             sqlite.enableWriteAheadLog();
             sqlite.setBusyTimeout(busyTimeoutMillis);
-            // Per connection, like the two above: SQLite's LIKE folds ASCII case
-            // and the other two do not, so the same query answered different
-            // rows depending on the engine behind it.
-            sqlite.useCaseSensitiveLike();
         }
     }
 

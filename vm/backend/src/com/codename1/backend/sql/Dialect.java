@@ -86,6 +86,30 @@ public abstract class Dialect {
     public static final Dialect POSTGRES = new PostgresDialect();
     public static final Dialect MYSQL = new MySqlDialect();
 
+    /**
+     * MariaDB, which is the MySQL dialect with one difference: the collation it
+     * can name for a text column.
+     *
+     * <p>Both need a collation that is case sensitive AND NO PAD, so "A" and
+     * "a" are two keys and "token " keeps its space. Neither server has the
+     * other's. Measured, creating a key column under each name:
+     *
+     * <pre>
+     *                        mariadb 10.11   mariadb 11.8   mysql 8.0
+     *   utf8mb4_0900_bin     unknown         ok             ok
+     *   utf8mb4_nopad_bin    ok              ok             unknown
+     *   utf8mb4_bin          collides        collides       collides
+     * </pre>
+     *
+     * <p>So there is no single name, and utf8mb4_bin -- the one both have -- is
+     * PAD SPACE on both. Which is chosen comes from the SERVER's handshake
+     * banner rather than from the URL scheme, because a mysql:// URL points at
+     * a MariaDB server perfectly often. {@link #getName} still answers "mysql":
+     * this is the same wire protocol and the same SQL, and everything that
+     * branches on the engine name means that family.
+     */
+    public static final Dialect MARIADB = new MariaDbDialect();
+
     Dialect() {
     }
 
@@ -573,7 +597,22 @@ public abstract class Dialect {
         }
     }
 
-    private static final class MySqlDialect extends Dialect {
+    /** See {@link #MARIADB}. */
+    private static final class MariaDbDialect extends MySqlDialect {
+        String textCollation() {
+            return "utf8mb4_nopad_bin";
+        }
+    }
+
+    private static class MySqlDialect extends Dialect {
+        /**
+         * The case-sensitive NO PAD collation THIS server has; see
+         * {@link Dialect#MARIADB} for why the two differ.
+         */
+        String textCollation() {
+            return "utf8mb4_0900_bin";
+        }
+
         public String getName() {
             return "mysql";
         }
@@ -620,7 +659,7 @@ public abstract class Dialect {
                     // behaviour on, so they have to mean one thing.
                     // The NO PAD collation here too, so a trailing space is
                     // part of an ordinary value exactly as it is part of a key.
-                    return "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin";
+                    return "LONGTEXT CHARACTER SET utf8mb4 COLLATE " + textCollation();
             }
         }
 
@@ -703,8 +742,8 @@ public abstract class Dialect {
                 // October 2023, and the alternative -- VARBINARY -- would stop
                 // the column being text at all and change what every read of it
                 // returns.
-                return "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin "
-                        + "NOT NULL PRIMARY KEY";
+                return "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE " + textCollation()
+                        + " NOT NULL PRIMARY KEY";
             }
             return columnType(kind) + " NOT NULL PRIMARY KEY";
         }
