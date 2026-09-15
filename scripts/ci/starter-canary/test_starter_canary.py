@@ -202,6 +202,53 @@ class TargetGuards(unittest.TestCase):
             canary.check_target_is_cloud(self.launcher(self.CLOUD), "javascript_cloud")
         self.assertIn("javascript", str(caught.exception))
 
+    def test_windows_caret_escaped_target_is_parsed(self):
+        """build.bat spells it buildTarget^=, which the regex must accept."""
+        original = canary.WINDOWS
+        canary.WINDOWS = True
+        try:
+            directory = Path(tempfile.mkdtemp())
+            (directory / "build.bat").write_text(
+                ':javascript\ncall "%MVNW%" package -Dcodename1.buildTarget^=local-javascript -U -e\n')
+            with self.assertRaises(canary.CanaryFailure) as caught:
+                canary.check_target_is_cloud(directory, "javascript")
+            self.assertIn("local-javascript", str(caught.exception))
+        finally:
+            canary.WINDOWS = original
+
+    def test_windows_cloud_target_accepted(self):
+        original = canary.WINDOWS
+        canary.WINDOWS = True
+        try:
+            directory = Path(tempfile.mkdtemp())
+            (directory / "build.bat").write_text(
+                ':javascript\ncall "%MVNW%" package -Dcodename1.buildTarget^=javascript -U -e\n')
+            canary.check_target_is_cloud(directory, "javascript")
+        finally:
+            canary.WINDOWS = original
+
+    def test_prefix_named_neighbour_is_not_matched(self):
+        """`function ios` must not match inside `function ios_source`."""
+        text = ('function ios_source {\n  "$MVNW" "-Dcodename1.buildTarget=ios-source"\n}\n'
+                'function ios {\n  "$MVNW" "-Dcodename1.buildTarget=ios-device"\n}\n')
+        canary.check_target_is_cloud(self.launcher(text), "ios")
+
+    def test_body_does_not_bleed_into_the_next_target(self):
+        """A delegating target must not be judged on its neighbour's buildTarget."""
+        text = ('function ios_source {\n  xcode\n}\n'
+                'function android_source {\n  "$MVNW" "-Dcodename1.buildTarget=android-source"\n}\n')
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.check_target_is_cloud(self.launcher(text), "ios_source")
+        self.assertIn("could not read the buildTarget", str(caught.exception))
+        self.assertNotIn("android-source", str(caught.exception))
+
+    def test_unparseable_target_fails_closed(self):
+        """Not being able to read the target is not evidence that it is cloud."""
+        text = 'function javascript {\n  "$MVNW" "package" "-DskipTests"\n}\n'
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.check_target_is_cloud(self.launcher(text), "javascript")
+        self.assertIn("could not read the buildTarget", str(caught.exception))
+
     def test_source_target_rejected_before_the_long_poll(self):
         """*-source generates an IDE project locally and submits nothing."""
         text = ('function android_source {\n'

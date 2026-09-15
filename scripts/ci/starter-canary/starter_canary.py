@@ -369,17 +369,42 @@ def check_target_is_cloud(project, target):
     if not launcher.exists():
         raise CanaryFailure(f"the served starter has no {launcher.name}")
     text = launcher.read_text(encoding="utf-8", errors="replace")
-    marker = f":{target}" if WINDOWS else f"function {target}"
-    if marker not in text:
-        offered = re.findall(r"^:([a-z_0-9]+)" if WINDOWS else r"^function ([a-z_0-9]+)",
+    # Anchor the label to a whole line. A plain substring search for ":ios"
+    # matches inside ":ios_source", and "function ios" inside
+    # "function ios_source", so the check would read a neighbouring target's
+    # buildTarget and rule on the wrong one entirely.
+    marker = (r"^:%s\s*$" % re.escape(target)) if WINDOWS \
+        else (r"^function\s+%s\s*\{" % re.escape(target))
+    found = re.search(marker, text, re.MULTILINE)
+    if not found:
+        offered = re.findall(r"^:([a-z_0-9]+)\s*$" if WINDOWS else r"^function\s+([a-z_0-9]+)\s*\{",
                              text, re.MULTILINE)
         raise CanaryFailure(
             f"the served {launcher.name} has no '{target}' target. It offers: "
             f"{', '.join(sorted(set(offered))) or 'nothing recognisable'}."
         )
-    body = text.split(marker, 1)[1][:400]
-    built = re.search(r"codename1\.buildTarget=([A-Za-z0-9._-]+)", body)
-    resolved = built.group(1) if built else ""
+    # Bound the body to THIS target. A fixed-size window runs past the end of a
+    # short function into the next one, so a target that merely delegates to
+    # another (ios_source calls xcode) would be judged on its neighbour's
+    # buildTarget. Stop at the closing brace, or at the next label on Windows.
+    rest = text[found.end():]
+    terminator = re.search(r"^:[a-z_0-9]+\s*$" if WINDOWS else r"^\}\s*$",
+                           rest, re.MULTILINE)
+    body = rest[:terminator.start()] if terminator else rest
+    # build.bat escapes the separator for cmd, spelling it `buildTarget^=`, so
+    # the caret has to be optional -- without it this never matched on Windows
+    # and the check silently approved every target it was given.
+    built = re.search(r"codename1\.buildTarget\^?=([A-Za-z0-9._-]+)", body)
+    if not built:
+        # Fail closed. Not being able to read the target is not evidence that
+        # it is a cloud one, and guessing here costs a 30-minute poll and a
+        # false outage report.
+        raise CanaryFailure(
+            f"could not read the buildTarget for '{target}' out of the served "
+            f"{launcher.name}, so there is no way to tell whether it submits a "
+            "cloud build. Refusing to run rather than assume it does."
+        )
+    resolved = built.group(1)
     # Two shapes never reach the server: an explicitly local target, and a
     # *-source target, which generates an Android Studio or Xcode project on
     # the user's machine. Both would leave the canary polling for a build that
