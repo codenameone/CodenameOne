@@ -243,8 +243,7 @@ public final class FileIo {
             // link that is there answers true while a path that names nothing
             // answers false. Matches the lstat the translated arm does.
             try {
-                if(java.nio.file.Files.exists(java.nio.file.Paths.get(path),
-                        java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                if(danglingLinkIn(java.nio.file.Paths.get(path))) {
                     return OPEN_FAILED;
                 }
             } catch (Exception unnameable) {
@@ -265,6 +264,36 @@ public final class FileIo {
             // and it could not be opened", which nobody may quietly ignore.
             return OPEN_FAILED;
         }
+    }
+
+    /**
+     * Whether any component of {@code p} is a symlink whose target is missing.
+     *
+     * <p>EVERY COMPONENT, not just the last one. NOFOLLOW_LINKS asks about the
+     * entry the path names and nothing above it, so
+     * cn1.config.location=/config/current with current -> missing-release opened
+     * /config/current/application.properties, got NoSuchFileException for a
+     * component in the MIDDLE, and answered "absent" -- the same silent discard
+     * of every file-based setting, TLS paths included, that the final-component
+     * check was added to stop. A release directory swung by symlink is how most
+     * deployments roll forward, so the broken middle is the likelier half.
+     *
+     * <p>Walked from the root down, and a component that exists without following
+     * links but not with them is the answer: that is a link pointing at nothing.
+     * A path that simply names nothing has no such component and stays absent.
+     */
+    private static boolean danglingLinkIn(Path p) {
+        Path walked = p.isAbsolute() ? p.getRoot() : null;
+        java.util.Iterator<Path> parts = p.iterator();
+        while(parts.hasNext()) {
+            Path part = parts.next();
+            walked = walked == null ? part : walked.resolve(part);
+            if(java.nio.file.Files.exists(walked, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    && !java.nio.file.Files.exists(walked)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A file's identity, or null when the filesystem does not report one. */

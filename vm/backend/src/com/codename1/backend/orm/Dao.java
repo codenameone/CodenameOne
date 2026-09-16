@@ -178,13 +178,13 @@ public final class Dao<T> {
 
     /** Deletes the row with this key. */
     public boolean deleteById(Object id) throws IOException {
-        return execute(table.getDeleteSql(), new Object[] {Query.bound(id)}) > 0;
+        return execute(table.getDeleteSql(), new Object[] {table.checkedKey(id)}) > 0;
     }
 
     /** The row with this key, or null. */
     public T findById(Object id) throws IOException {
         List found = list(table.select(" WHERE " + table.getIdCondition()),
-                new Object[] {Query.bound(id)});
+                new Object[] {table.checkedKey(id)});
         return found.isEmpty() ? (T)null : (T)found.get(0);
     }
 

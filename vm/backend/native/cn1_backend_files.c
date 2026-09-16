@@ -43,6 +43,7 @@
 #include "cn1_globals.h"
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>   /* PATH_MAX, for the component walk below */
 #include <errno.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -142,6 +143,44 @@ JAVA_INT com_codename1_backend_FileIo_openBeneathImpl___java_lang_String_java_la
 #endif
 }
 
+/*
+ * Whether any component of `path` is a symlink whose target is missing.
+ *
+ * EVERY COMPONENT, not just the last one. lstat on the full path asks about the
+ * entry the path names and nothing above it, so cn1.config.location=/config/current
+ * with current -> missing-release opened /config/current/application.properties,
+ * got ENOENT for a component in the MIDDLE, and answered "absent" -- the same
+ * silent discard of every file-based setting, TLS paths included, that the
+ * final-component check was added to stop. A release directory swung by symlink is
+ * how most deployments roll forward, so the broken middle is the likelier half.
+ *
+ * Walked from the root down: a component that lstats but does not stat is a link
+ * pointing at nothing. A path that simply names nothing has no such component.
+ */
+static int cn1BackendDanglingLinkIn(const char* path) {
+    char buffer[PATH_MAX];
+    size_t len = strlen(path);
+    size_t iter;
+    if(len == 0 || len >= sizeof(buffer)) {
+        return 0;
+    }
+    memcpy(buffer, path, len + 1);
+    for(iter = 1 ; iter <= len ; iter++) {
+        if(buffer[iter] != '/' && buffer[iter] != 0) {
+            continue;
+        }
+        char saved = buffer[iter];
+        struct stat linkInfo;
+        struct stat targetInfo;
+        buffer[iter] = 0;
+        if(lstat(buffer, &linkInfo) == 0 && stat(buffer, &targetInfo) != 0) {
+            return 1;
+        }
+        buffer[iter] = saved;
+    }
+    return 0;
+}
+
 JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
 #ifdef _WIN32
     (void)path;
@@ -187,8 +226,7 @@ JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODE
              * present, so this is the "there is one and it could not be opened"
              * case, which nobody may quietly ignore.
              */
-            struct stat linkInfo;
-            if(lstat(p, &linkInfo) == 0) {
+            if(cn1BackendDanglingLinkIn(p)) {
                 return -2;
             }
             return -1;

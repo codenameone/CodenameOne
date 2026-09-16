@@ -206,6 +206,29 @@ final class Table {
         return tail == null || tail.length() == 0 ? head : head + tail;
     }
 
+    /**
+     * A key as the column stores it, refusing one the column cannot hold.
+     *
+     * <p>findById and deleteById take an Object, and until this they bound it
+     * without consulting the key's kind -- so findById("abc") on an integer key
+     * made PostgreSQL reject the text while MySQL coerced it to 0 and answered
+     * the row whose id is 0. deleteById is the same call and DELETES that row.
+     * The query predicates refuse this now, and the two lookups that take a bare
+     * key are where it matters most.
+     */
+    Object checkedKey(Object id) {
+        Object canonical = Query.bound(id);
+        int kind = columns[idIndex].getKind();
+        if(canonical == null || Query.fits(kind, canonical)) {
+            return canonical;
+        }
+        throw new IllegalArgumentException(definition.type().getName() + " has a "
+                + dialect.columnType(kind) + " key and cannot be looked up with "
+                + id.getClass().getName() + ". PostgreSQL refuses the comparison and "
+                + "MySQL coerces it, so the same call throws on one engine and answers "
+                + "or deletes the wrong row on another.");
+    }
+
     /** The quoted table name, for the few statements built outside this class. */
     String quotedTable() {
         return quotedTable;

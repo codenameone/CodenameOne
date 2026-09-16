@@ -323,7 +323,7 @@ public final class Query<T> {
     }
 
     /** Whether a value in its canonical form belongs in a column of this kind. */
-    private static boolean fits(int kind, Object canonical) {
+    static boolean fits(int kind, Object canonical) {
         if(kind == Dialect.TEXT) {
             return canonical instanceof String;
         }

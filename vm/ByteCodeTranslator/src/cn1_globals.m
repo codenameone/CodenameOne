@@ -3723,6 +3723,14 @@ void codenameOneGCMark() {
                 // function safe is how it got onto this list as SAFE the first time. A
                 // cross-platform helper has to be classified on its WORST platform.
                 JAVA_BOOLEAN forcedStop = JAVA_FALSE;
+                /*
+                 * A virtual thread that is RUNNING while this cycle looks at it.
+                 * Its state is neither waited for -- nothing can stop it -- nor
+                 * touched, for the same reason forcedStop skips the migration
+                 * below: the mutator is doing `pending[size] = o; size++` and the
+                 * migration would empty a table it is still appending to.
+                 */
+                JAVA_BOOLEAN vtExecuting = JAVA_FALSE;
                 // Deferred report for the escalation (see above). Zero means nothing to
                 // report; the values are captured under the freeze and printed after it.
                 long long forcedStopWaitUs = 0;
@@ -3834,7 +3842,20 @@ void codenameOneGCMark() {
                              * behaviour a correct flag would have produced -- and
                              * closing it needs the stop handshake to stop being
                              * per-TLD, which is a larger change than this one.
+                             *
+                             * BUT A RUNNING ONE IS NOT A PARKED ONE. Leaving the
+                             * wait is right either way -- nothing here can stop a
+                             * virtual thread -- and going on to MIGRATE its pending
+                             * table is not: the mutator is doing
+                             * `pending[size] = o; size++` at that moment, and
+                             * emptying the table under it loses an object or places
+                             * one twice, which is heap corruption rather than a
+                             * deferred reclaim. That is the same hazard forcedStop
+                             * already declines the migration for, so a running
+                             * virtual thread is marked and declines it too.
                              */
+                            vtExecuting = cn1VirtualThreadIsRunning(vtOfState)
+                                    ? JAVA_TRUE : JAVA_FALSE;
                             break;
                         }
                         usleep(500);
@@ -3963,7 +3984,7 @@ void codenameOneGCMark() {
                 // deferred reclaim and nothing else. It cannot grow without bound either:
                 // a table over its threshold parks its own thread at a safepoint, which is
                 // the cooperative stop this escalation was standing in for.
-                if(!forcedStop) {
+                if(!forcedStop && !vtExecuting) {
                     lockCriticalSection();
                     if(allThreads[iter] == t) {
                         if (!t->lightweightThread) {
@@ -4020,7 +4041,7 @@ void codenameOneGCMark() {
                     
                 }
                 
-                if(!forcedStop) {
+                if(!forcedStop && !vtExecuting) {
                     t->heapAllocationSize = 0;
                 }
 

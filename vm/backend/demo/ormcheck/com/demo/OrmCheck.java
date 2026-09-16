@@ -342,6 +342,27 @@ public class OrmCheck {
             inWrongType = "refused";
         }
         check("and so is one inside in()", "refused", inWrongType);
+        // findById and deleteById take a bare key and had the same hole: on an
+        // integer key findById("abc") makes PostgreSQL reject the text while MySQL
+        // coerces it to 0 and answers the row whose id is 0 -- and deleteById is
+        // the same call, so it DELETES that row.
+        String findWrongType;
+        try {
+            notes.findById("abc");
+            findWrongType = "accepted";
+        } catch(IllegalArgumentException err) {
+            findWrongType = "refused";
+        }
+        check("a text key against an integer id is refused on every engine",
+                "refused", findWrongType);
+        String deleteWrongType;
+        try {
+            notes.deleteById("abc");
+            deleteWrongType = "accepted";
+        } catch(IllegalArgumentException err) {
+            deleteWrongType = "refused";
+        }
+        check("and deleteById refuses it too", "refused", deleteWrongType);
         // THE CONTROL: the ordinary comparisons still work, so this cannot pass by
         // refusing everything. A narrow integral is what a caller actually writes.
         check("an int value against an integer field still works", "1",
@@ -651,8 +672,13 @@ public class OrmCheck {
                 + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
                 + ")", null);
         try {
+            // NEGATIVE, because an import can carry them and PostgreSQL accepts
+            // them: max(id) + 1 is then zero or negative and setval refuses it
+            // outright, since the identity's sequence starts at 1. The clamp is
+            // what keeps the resync portable, and an explicit 1 would not have
+            // exercised it.
             pool.execute("INSERT INTO " + table + " (id, name) VALUES (?, ?)",
-                    new Object[] {Long.valueOf(1L), "imported"});
+                    new Object[] {Long.valueOf(-5L), "imported"});
             String resync = pool.dialect().resyncGeneratedKey(
                     pool.dialect().quote(table), pool.dialect().quote("id"));
             check("only PostgreSQL needs the identity put back",
@@ -664,7 +690,7 @@ public class OrmCheck {
             long next = pool.insert("INSERT INTO " + table + " (name) VALUES (?)",
                     new Object[] {"after the import"}, "id");
             check("a generated key after an explicit one does not collide", "true",
-                    String.valueOf(next > 1L));
+                    String.valueOf(next > 0L));
             check("and both rows are there", "2",
                     String.valueOf(pool.query("SELECT name FROM " + table, null).size()));
         } finally {

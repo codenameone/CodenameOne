@@ -790,10 +790,17 @@ public abstract class Dialect {
          * a key on an empty table, which is harmless but wrong.
          */
         public String resyncGeneratedKey(String quotedTable, String quotedColumn) {
+            // CLAMPED TO 1, because an import can carry negative keys and
+            // PostgreSQL accepts them: max(id) + 1 is then zero or negative, and
+            // setval refuses that outright because the identity's sequence starts
+            // at 1. SQLite and MySQL are left ready to generate a positive key
+            // after such an import, so without the clamp the resync turns a
+            // portable capability into one that throws on one engine only -- the
+            // exact shape it was added to remove.
             return "SELECT setval(pg_get_serial_sequence('" + quotedTable + "', "
                     + "trim(both '\"' from '" + quotedColumn + "')), "
-                    + "coalesce((SELECT max(" + quotedColumn + ") FROM " + quotedTable
-                    + "), 0) + 1, false)";
+                    + "greatest(coalesce((SELECT max(" + quotedColumn + ") FROM "
+                    + quotedTable + "), 0) + 1, 1), false)";
         }
 
         public boolean generatedKeysThroughReturning() {
