@@ -23,6 +23,7 @@
 
 package com.codenameone.developerguide.screenshots;
 
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 
 /// One picture in the developer guide, expressed as the code that produces it.
@@ -57,5 +58,46 @@ public interface GuideFigure {
     ///
     /// - `form`: the form [#build] returned, now shown and laid out
     default void afterShow(Form form) {
+    }
+
+    /// Whether this figure's subject fills the screen it was given.
+    ///
+    /// The crop normally stops below the content, so a figure is the part of the
+    /// screen with something on it rather than a phone-shaped picture that is
+    /// mostly empty. That reads a component's preferred height, and a few
+    /// components fill whatever they are given while declaring a small one --
+    /// an ImageViewer asks for the size of its image, a CodeEditor for the size
+    /// of its text -- so the honest answer for those is the whole viewport, and
+    /// the measured one was a 70 pixel sliver.
+    default boolean fillsViewport() {
+        return false;
+    }
+
+    /// Runs the event thread for a while so animations finish.
+    ///
+    /// Several things a figure wants to show are only reachable through an
+    /// animation, and some of them offer no way to skip it: ImageViewer.setZoom
+    /// takes a flag, SwipeableContainer.openToRight does not -- it starts a
+    /// 300ms Motion and returns, so asking and photographing immediately gives
+    /// the closed row back.
+    ///
+    /// invokeAndBlock is what makes this work: it runs the event thread while
+    /// the block below sleeps on another one, which is the only way to let time
+    /// pass on the event thread from the event thread. A Motion reads the real
+    /// clock, so the wait has to be real too.
+    static void settleAnimations(int millis) {
+        long end = System.currentTimeMillis() + millis;
+        while (System.currentTimeMillis() < end) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(16);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            });
+        }
     }
 }

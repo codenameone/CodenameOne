@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -21,64 +21,38 @@
  * need additional information or have any questions.
  */
 
-package com.codenameone.developerguide.snippets.generated;
+package com.codenameone.developerguide.screenshots;
 
-import com.codename1.gpu.*;
-import com.codename1.ui.*;
-import com.codename1.ui.animations.*;
-import com.codename1.ui.events.*;
-import com.codename1.ui.geom.*;
-import com.codename1.ui.layouts.*;
-import com.codename1.ui.list.*;
-import com.codename1.ui.plaf.*;
-import com.codename1.ui.util.*;
-import com.codename1.components.*;
-import com.codename1.charts.models.*;
-import com.codename1.charts.renderers.*;
-import com.codename1.charts.views.*;
-import com.codename1.capture.*;
-import com.codename1.io.*;
-import com.codename1.l10n.*;
-import com.codename1.location.*;
-import com.codename1.maps.*;
-import com.codename1.media.*;
-import com.codename1.messaging.*;
-import com.codename1.payment.*;
-import com.codename1.processing.*;
-import com.codename1.properties.*;
-import com.codename1.push.*;
-import com.codename1.security.*;
-import com.codename1.social.*;
-import com.codename1.ui.spinner.*;
-import java.io.*;
-import java.util.*;
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.Tabs;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.components.SpanLabel;
 
+/// Swipeable tabs with an iOS-style carousel of dots for the tab bar.
+class ComponentsTabsSwipeFigure implements GuideFigure {
 
-class TheComponentsOfCodenameOneJava081Snippet {
+    private Tabs tabs;
 
-    Object context;
-    Object url;
-    Object value;
-    Object body;
-    Object event;
-    String apiKey = "test-key";
-    String myHttpsURL = "https://example.com";
-    java.util.List<String> validKeysList = new java.util.ArrayList<>();
-    Image myImage;
-    Graphics graphics;
-    Graphics g;
-    GraphicsDevice device;
-    Form form;
-    Form hi;
-    Container cnt;
-    Container myForm;
-    Component component;
-    Button button;
-    MultiButton myMultiButton;
-    Label label;
-    BrowserComponent browserComponent;
-    Resources theme;
-    void snippet() throws Exception {
+    @Override
+    public String id() {
+        return "components-tabs-swipe1";
+    }
+
+    /// The tagged region is what the chapter includes, so the listing beside the
+    /// picture is the code that drew it.
+    @Override
+    public Form build() {
         // tag::the-components-of-codename-one-java-081[]
         Form hi = new Form("Swipe Tabs", new LayeredLayout());
         Tabs t = new Tabs();
@@ -87,7 +61,8 @@ class TheComponentsOfCodenameOneJava081Snippet {
         Style s = UIManager.getInstance().getComponentStyle("Button");
         FontImage radioEmptyImage = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, s);
         FontImage radioFullImage = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, s);
-        ((DefaultLookAndFeel)UIManager.getInstance().getLookAndFeel()).setRadioButtonImages(radioFullImage, radioEmptyImage, radioFullImage, radioEmptyImage);
+        ((DefaultLookAndFeel) UIManager.getInstance().getLookAndFeel())
+                .setRadioButtonImages(radioFullImage, radioEmptyImage, radioFullImage, radioEmptyImage);
 
         Container container1 = BoxLayout.encloseY(new Label("Swipe the tab to see more"),
                 new Label("You can put anything here"));
@@ -106,19 +81,33 @@ class TheComponentsOfCodenameOneJava081Snippet {
         hi.add(BorderLayout.south(tabsFlow));
 
         t.addSelectionListener((i1, i2) -> {
-            switch(i2) {
+            switch (i2) {
                 case 0:
-                    if(!firstTab.isSelected()) {
+                    if (!firstTab.isSelected()) {
                         firstTab.setSelected(true);
                     }
                     break;
                 case 1:
-                    if(!secondTab.isSelected()) {
+                    if (!secondTab.isSelected()) {
                         secondTab.setSelected(true);
                     }
                     break;
-             }
+                default:
+                    break;
+            }
         });
         // end::the-components-of-codename-one-java-081[]
+        tabs = t;
+        hi.show();
+        return hi;
+    }
+
+    Tabs tabs() {
+        return tabs;
+    }
+
+    @Override
+    public boolean fillsViewport() {
+        return true;
     }
 }

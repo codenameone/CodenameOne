@@ -141,7 +141,7 @@
 ///
 /// ### List
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-generic-list-cell-renderer.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-generic-list-cell-renderer.png)
 /// `com.codename1.ui.List` a list of items, this is a rather elaborate component to work with!
 /// We often
 /// recommend just using `com.codename1.ui.Container`, `com.codename1.ui.InfiniteContainer` or
@@ -165,7 +165,7 @@
 ///
 /// ### SwipeableContainer
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-swipablecontainer.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-swipablecontainer.png)
 /// `com.codename1.ui.SwipeableContainer` enables side swipe gesture to expose additional
 /// functionality
 ///
@@ -179,12 +179,12 @@
 ///
 /// ### Carousel
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-tabs-swipe1.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-tabs-swipe1.png)
 /// `com.codename1.ui.Tabs` can also be used as a swipe carousel
 ///
 /// ### TextArea/Field
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-text-component.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-text-component.png)
 /// `com.codename1.ui.TextArea` & `com.codename1.ui.TextField` allow for user input
 /// via
 /// the keyboard (virtual or otherwise)
