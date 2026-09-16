@@ -159,7 +159,7 @@ First measured scores, against golden sets captured on hosted runners:
 |---|---|---:|---:|---|
 | Windows Fluent | `windows-11-fluent` | 60 | 82.1% | yes, on master |
 | GNOME Adwaita | `gnome-adwaita` | 60 | 85.9% | yes, on master |
-| macOS Aqua | `macos-aqua` | 60 | 84.6% (local) | not yet: no CI baseline |
+| macOS Aqua | `macos-aqua` | 60 | 84.6% (local) | yes, on master |
 
 These are starting points, not results. All three themes were written without a
 reference to check them against, so this is the first time any of them has been
@@ -345,12 +345,14 @@ anti-aliasing.
 
 ### Golden sets
 
-All three are captured, reviewed and committed. Windows and GNOME are baselined
-and gate on master; macOS has its goldens but not yet a CI-derived baseline, so
-it stays out of the automatic trigger -- the hosted macOS runner queue has not
-yielded a scoring slot. One green dispatch of `scripts-fidelity-desktop.yml -f
-targets=macos` produces the numbers; committing them and dropping `macos` from
-the job's `if` promotes it.
+All three are captured, reviewed, committed and gating on master.
+
+macOS gates without a baseline yet: the hosted macOS runner queue has not yielded
+a scoring slot. That is safe rather than a shortcut -- FidelityGate treats a pair
+with no baseline entry as new, prints its score and passes, so the first run that
+gets a runner establishes the numbers instead of failing on their absence. Record
+that run's baseline from its own `fidelity-compare.json` and the leg ratchets like
+the other two.
 
 A baseline is recorded from the runner that SCORES it, never locally. The CN1
 side renders on the leg's own OS, and a Mac-recorded baseline failed the gnome
