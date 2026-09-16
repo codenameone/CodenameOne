@@ -2284,3 +2284,76 @@ every optimization on this branch.
 Note what did NOT find it: the gauntlet, the GC verifier and the self-hosting gates all
 pass, because none of them runs under external memory pressure. The reproducer is the load
 generator in Round 17 plus an ASan build; that combination should become a gate.
+
+## Round 19: the crash is an UN-HANDSHAKED MAIN THREAD, and the code already said so
+
+Round 17 recorded an intermittent SIGSEGV and Round 18 retracted its guessed cause. The
+investigation has now found it, and the decisive part is three lines that were already in
+the tree:
+
+- `cn1_globals.m` ~3898, inside `codenameOneGCMark`: the collector raises
+  `threadBlockedByGC` and waits for `threadActive` to fall **only** inside
+  `if(t->lightweightThread)`.
+- `nativeMethods.m` 2407 and 3347 are the ONLY places that set `lightweightThread =
+  JAVA_TRUE`, and both are thread-CREATION paths.
+- `ByteCodeClass.java` 1412: "MAIN IS NOT REGISTERED AS A LIGHTWEIGHT THREAD, and that is
+  the behaviour every shipping build has always had."
+
+On the `clean` target the whole application runs on the process's initial thread. That
+thread is therefore **never cooperatively stopped**: it runs Java at full speed through the
+entire mark and the entire sweep, and its roots come from a single SIGUSR2 capture per
+cycle that is released as soon as they are taken. A probe measured it directly -- per run,
+9-15 thread scans of which **0 or 1** used the cooperative capture (`coop=0 sig=14`).
+
+The A/B is one binary and one environment variable, arms interleaved, three concurrent
+JDK 25 translations as load:
+
+    main flagged lightweight   crash=0  of 40
+    default (not flagged)      crash=5  of 40
+
+The corruption has many faces, all of them the same cause -- a live object reclaimed and
+its slot handed back out: a `ConcurrentModificationException` from a corrupted `modCount`
+int; a `NoSuchElementException` from corrupted iterator state; a SIGSEGV at
+`0x0000010100000012` where a String's `value` field held a `{mark=18, heapPosition=257}`
+header pair, i.e. the slot had been reused by another object; SIGBUS **inside
+`codenameOneGCSweep` itself**, walking a corrupt entry. The ASAN trace this started from is
+`Parser.java:878`, not 875: `for(String s : bc.getBaseInterfaces())` yielded a null element
+out of `Arrays.asList(interfaces)` -- a live array element read as 0.
+
+**Flagging main lightweight is a diagnostic, not the fix.** It costs ~5x (6.7-7.8s against
+1.3s) because a single-threaded program whose one mutator parks for the whole mark IS
+stop-the-world, and `ByteCodeClass.java` 1419 spells out the second hazard: "lightweight"
+is a promise that the thread parks, and the collector migrates `pendingHeapAllocations`
+without `threadHeapMutex` on the strength of it. On the native macOS target main becomes
+AppKit's event loop and must stay native.
+
+So the bug is not that main is unflagged; it is that **something the collector needs is not
+actually covered by SATB for a mutator that never parks**, and the current design gives
+main the cheaper treatment on purpose. The leading suspect from the investigation is the
+per-cycle BiBOP page-geometry snapshot in `cn1ConservativeResolve`: `CN1ConsPage` caches
+`slotSize/firstSlotOffset/slotCount/bumpIndex`, and the acquire-ordering argument at the
+refresh loop covers a reformat during the refresh but not one the mutator performs later in
+the same cycle -- which only a never-parked mutator can do.
+
+### Why every gate misses it, and what to change
+
+`CN1_GC_VERIFY` is structurally blind here. `cn1BibopSweep` poisons a reclaimed slot and
+then immediately pushes it onto the page free list; only LEGACY blocks are quarantined. By
+the next verify pass the slot is a live object again and the dangling field resolves
+cleanly. Measured: 60 verifier runs under load gave 2 crashes and `violations=0`.
+
+Three things follow, none of them done yet:
+
+1. **`CN1_GC_SIGNAL_STOP=1` is the reproducer** -- a runtime env var, no rebuild, and it
+   raises the rate about 8x (8 crashes in 17 runs against 1 in 27).
+2. **Quarantine freed BiBOP slots for N cycles** instead of returning them to the free list
+   immediately, so the verifier can observe a dangling reference before the slot is reused.
+   Without that, `run-gc-verify.sh` cannot catch this class of bug at all.
+3. **The gates need external memory pressure.** The gauntlet, the GC verifier and the
+   self-hosting gates all pass; none of them runs anything alongside the target.
+
+Ruled out with evidence: allocation returning JAVA_NULL (the Round 17 guess -- the retry is
+unbounded); `java.lang.ref` clearing (the program contains no Reference class); stack
+allocated arrays (zero `alloca` uses in the generated C); the force-stop escalation (its
+message never appeared, `noStop=0`); frameless object codegen (4 crashes either way over
+~55 interleaved pairs); and the aging slack (slack=2 crashed at iteration 6).
