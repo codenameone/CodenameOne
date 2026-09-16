@@ -1500,6 +1500,15 @@ public final class Vault {
                     if (dataKey != null) {
                         metadata = next;
                     }
+                    // Asked AGAIN after the assignment, because the test and the store are two
+                    // steps: a lock() landing between them cleared metadata and this then put it
+                    // straight back, leaving a locked instance warm with a record it would open
+                    // on the next unlock instead of reading storage. Clearing is the direction
+                    // that converges -- whichever way the two interleave, the LAST thing done
+                    // here is a check that removes the cache rather than one that installs it.
+                    if (dataKey == null) {
+                        metadata = null;
+                    }
                     passwordNeedsRewrap = false;
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {

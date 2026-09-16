@@ -40,14 +40,27 @@ public final class VaultCapabilities {
 
     /// Whether an unlock policy can be honoured on this device.
     ///
-    /// [UnlockPolicy#SESSION_ONLY] is always supported: it needs no key storage, because it
-    /// stores no key. The other two need a device key, and the strongest additionally needs that
-    /// key to be gated on user verification.
+    /// [UnlockPolicy#SESSION_ONLY] needs no key STORAGE, because it stores no key -- but it is
+    /// not free of platform prerequisites, and saying it was unconditionally supported was
+    /// wrong. Enrolling under it still persists a metadata record and still seals it with
+    /// AES-GCM, so a browser with no usable IndexedDB or Web Crypto -- a restricted private
+    /// window -- advertised a policy that could only fail, and fail after the user had already
+    /// typed a password.
+    ///
+    /// Refused only on a DEFINITE no, which is the same three-state discipline the rest of this
+    /// API follows: a store that cannot say is not a store that said no. On the browser
+    /// PERSISTENT is reported as crypto AND storage, which is exactly this prerequisite; on a
+    /// port whose device protection is the portable one it describes SecureStorage, which is
+    /// stronger than session-only needs -- so a definite NO there is still a platform that
+    /// cannot keep a record, and refusing is right.
+    ///
+    /// The other two need a device key, and the strongest additionally needs that key to be
+    /// gated on user verification.
     public boolean supports(UnlockPolicy policy) {
-        if (policy == UnlockPolicy.SESSION_ONLY) {
-            return true;
-        }
         ProtectionReport report = device.protection();
+        if (policy == UnlockPolicy.SESSION_ONLY) {
+            return report.answer(Protection.PERSISTENT) != ProtectionReport.NO;
+        }
         if (!report.provides(Protection.PERSISTENT)) {
             return false;
         }
