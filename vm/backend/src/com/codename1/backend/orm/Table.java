@@ -206,6 +206,16 @@ final class Table {
         return tail == null || tail.length() == 0 ? head : head + tail;
     }
 
+    /** The quoted table name, for the few statements built outside this class. */
+    String quotedTable() {
+        return quotedTable;
+    }
+
+    /** The quoted key column, for the same reason. */
+    String quotedId() {
+        return quoted(idIndex);
+    }
+
     /** The values an insert binds, in the order {@link #getInsertSql} names them. */
     Object[] insertParams(Object entity) throws IOException {
         Object[] out = new Object[insertColumns.length];

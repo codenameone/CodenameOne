@@ -116,6 +116,43 @@ public final class Dao<T> {
     }
 
     /**
+     * Puts the generated key back in step after rows were inserted with keys of
+     * their own.
+     *
+     * <p>Supplying your own key is a supported thing -- a data import, a test
+     * fixture, a restore -- and on SQLite and MySQL doing it also moves the
+     * counter, so the next generated insert carries on above what is there. On
+     * PostgreSQL it does not: an explicit value leaves the identity's sequence
+     * where it was, and the next generated insert reuses a key that already
+     * exists. MEASURED on a fresh table, explicit id 1 followed by a generated
+     * insert: SQLite and MySQL answer 2, PostgreSQL fails with "duplicate key
+     * value violates unique constraint".
+     *
+     * <p>Call this once after an import. It is a no-op on the engines that need
+     * none, so the caller writes the same line whatever it is deployed against --
+     * which is the whole reason it is here rather than in every importer.
+     *
+     * <p>Nothing calls it for you: the ORM's own insert never supplies a key for
+     * a generated column, so it cannot tell that an import happened.
+     */
+    public void resyncGeneratedKey() throws IOException {
+        if(!table.columns[table.idIndex].isGenerated()) {
+            return;
+        }
+        final String sql = table.dialect.resyncGeneratedKey(
+                table.quotedTable(), table.quotedId());
+        if(sql == null) {
+            return;
+        }
+        owner.run(new DataSource.Work() {
+            public Object run(Database db) throws Exception {
+                db.query(sql, null);
+                return null;
+            }
+        });
+    }
+
+    /**
      * Updates every non-key column of the row whose key {@code entity} carries.
      *
      * @return whether a row matched. False is the answer a handler turns into a

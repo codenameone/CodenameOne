@@ -156,7 +156,7 @@ public final class Query<T> {
         clause.append(" IN (");
         for(int iter = 0 ; iter < values.length ; iter++) {
             clause.append(iter > 0 ? ", ?" : "?");
-            params.add(bound(values[iter]));
+            params.add(checked(field, values[iter]));
         }
         clause.append(")");
         return raw(clause.toString());
@@ -276,14 +276,73 @@ public final class Query<T> {
         int index = table.definition.indexOfField(field);
         String quoted = column(field);
         boolean text = index >= 0 && table.columns[index].getKind() == Dialect.TEXT;
-        params.add(bound(value));
+        params.add(checked(field, value));
         return raw(table.dialect.comparison(quoted, text) + operator);
     }
 
     private Query<T> condition(String field, String operator, Object value) {
         String quoted = column(field);
-        params.add(bound(value));
+        params.add(checked(field, value));
         return raw(quoted + operator);
+    }
+
+    /**
+     * {@link #bound} plus the check that the value can go in that column at all.
+     *
+     * <p>THE ENGINES DISAGREE ABOUT A MISMATCH RATHER THAN AGREEING TO REFUSE IT,
+     * which is the one outcome this layer exists to prevent. {@code eq("views",
+     * "abc")} against an integer column: PostgreSQL infers an integer parameter
+     * and rejects the text, while MySQL coerces it to 0 and MATCHES every row
+     * whose views is 0. One call, an exception on one engine and a wrong answer
+     * on another -- and the wrong answer is the worse half, because nothing says
+     * anything happened.
+     *
+     * <p>Checked against the CANONICAL form rather than the Java type, so the
+     * conversions bound() performs are what the column sees: a Date and a
+     * Character are Longs by then and belong in an integer column, which is
+     * where the entity stores them.
+     *
+     * <p>A null is left alone -- eq and ne turn it into IS NULL before reaching
+     * here, and the ordering comparisons refuse it in required().
+     */
+    private Object checked(String field, Object value) {
+        Object canonical = bound(value);
+        int index = table.definition.indexOfField(field);
+        if(index < 0 || canonical == null) {
+            return canonical;
+        }
+        int kind = table.columns[index].getKind();
+        if(fits(kind, canonical)) {
+            return canonical;
+        }
+        throw new IllegalArgumentException(table.definition.type().getName() + "."
+                + field + " is stored as " + table.dialect.columnType(kind)
+                + " and cannot be compared with " + value.getClass().getName()
+                + ". PostgreSQL refuses the comparison and MySQL coerces it, so the "
+                + "same query throws on one engine and answers rows on another.");
+    }
+
+    /** Whether a value in its canonical form belongs in a column of this kind. */
+    private static boolean fits(int kind, Object canonical) {
+        if(kind == Dialect.TEXT) {
+            return canonical instanceof String;
+        }
+        if(kind == Dialect.BLOB) {
+            return canonical instanceof byte[];
+        }
+        if(kind == Dialect.REAL) {
+            // Any number, integral included: gt("score", 1) is ordinary
+            // arithmetic on every engine, not a mistake.
+            return canonical instanceof Number;
+        }
+        // INTEGER and BOOLEAN, which share a storage class. bound() turns a
+        // Boolean, a Date and a Character into a Long, and the narrow integrals
+        // arrive as themselves -- an Integer is what eq("views", 5) hands over,
+        // and the driver binds it as the integer it is. What this excludes is a
+        // String, a byte[] and a floating-point value, which are the three that
+        // make the engines disagree.
+        return canonical instanceof Long || canonical instanceof Integer
+                || canonical instanceof Short || canonical instanceof Byte;
     }
 
     private Query<T> raw(String clause) {
