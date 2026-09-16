@@ -304,10 +304,10 @@ static gboolean cn1DesktopOnButton(GtkWidget* widget, GdkEventButton* e, gpointe
     }
     if (e->type == GDK_BUTTON_PRESS) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_PRESSED,
-                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button));
+                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     } else if (e->type == GDK_BUTTON_RELEASE) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_RELEASED,
-                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button));
+                (int) e->x, (int) e->y, cn1DesktopButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return FALSE;
 }
@@ -319,7 +319,8 @@ static gboolean cn1DesktopOnLeave(GtkWidget* widget, GdkEventCrossing* e, gpoint
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
     (void) widget;
     if (w != 0 && e->detail != GDK_NOTIFY_INFERIOR) {
-        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_HOVER, -1, -1, 0);
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_HOVER, -1, -1,
+                cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return FALSE;
 }
@@ -340,14 +341,14 @@ static gboolean cn1DesktopOnMotion(GtkWidget* widget, GdkEventMotion* e, gpointe
     if (e->state & GDK_BUTTON3_MASK) { mask |= CN1_PE_MASK_SECONDARY; }
     if (mask != 0) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_DRAGGED,
-                (int) e->x, (int) e->y, mask);
+                (int) e->x, (int) e->y, mask | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     } else {
         /* Buttonless motion in a SECONDARY window is hover, dropped here for the same
          * reason it was dropped in the main window: a mobile port has no use for it.
          * windowPointerHover routes by window id, so a control in a secondary window
          * reaches the hover state like any other. */
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_HOVER,
-                (int) e->x, (int) e->y, 0);
+                (int) e->x, (int) e->y, cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return FALSE;
 }
@@ -559,8 +560,7 @@ static gboolean cn1DesktopOnDelete(GtkWidget* widget, GdkEvent* e, gpointer data
  * the touch handler drives the pointer instead -- otherwise every contact
  * dispatches twice, once unflagged. Same rule the main window applies. */
 static int cn1DesktopIsTouchSource(GdkEvent* e) {
-    GdkDevice* dev = gdk_event_get_source_device(e);
-    return dev != NULL && gdk_device_get_source(dev) == GDK_SOURCE_TOUCHSCREEN;
+    return cn1LinuxPointerSourceFlag(e) == CN1_PE_TOUCH_FLAG;
 }
 
 /* Real touch sequences, mirroring the main window's cn1OnTouch with the window id

@@ -101,12 +101,12 @@ typedef enum {
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
 #define CN1_GESTURE_FIXED 10000
 
-/* For pointer (pressed/released/dragged) events the otherwise-unused keyCode
+/* For pointer (pressed/released/dragged/hover) events the otherwise-unused keyCode
  * field carries the pointer metadata: the low bits are a button bitmask that
  * mirrors com.codename1.ui.events.PointerEvent.MASK_* (so a press/release carry
  * the button that changed and a drag carries the buttons held down), and the
- * high bits flag a touch digitizer so the Java side reports TYPE_TOUCH. A value
- * of 0 means "no detail" and defaults to a primary mouse press.
+ * high bits flag a touch digitizer or pen. Hover carries no button bits;
+ * a contact event with no button detail defaults to a primary press.
  * LinuxImplementation.drainInput decodes this. */
 #define CN1_PE_MASK_PRIMARY   1
 #define CN1_PE_MASK_SECONDARY 2
@@ -114,6 +114,7 @@ typedef enum {
 #define CN1_PE_MASK_BACK      8
 #define CN1_PE_MASK_FORWARD   16
 #define CN1_PE_TOUCH_FLAG     256
+#define CN1_PE_PEN_FLAG       512
 
 /* Pushes one event onto the ring buffer (called from the GTK thread). */
 /* Turns fractional smooth-scroll notches into whole ones, carrying the remainder

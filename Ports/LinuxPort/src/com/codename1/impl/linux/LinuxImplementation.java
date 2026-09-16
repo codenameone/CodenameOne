@@ -765,20 +765,25 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // not pump or drain on its own (it is not the window's owning thread).
     }
 
-    // High bit the native layer ORs into a pointer event's key field to flag a touch
-    // digitizer (see cn1_linux.h CN1_PE_TOUCH_FLAG); the low byte is the button
-    // bitmask (PointerEvent.MASK_*).
+    // High bits in the native key flag touch or pen input (see cn1_linux.h);
+    // the low byte is the button bitmask (PointerEvent.MASK_*).
     private static final int POINTER_BUTTON_BITS = 0xFF;
     private static final int POINTER_TOUCH_FLAG = 256;
+    private static final int POINTER_PEN_FLAG = 512;
 
-    // Decodes the native pointer key field (button mask + touch flag) into the
+    // Decodes the native pointer key field (button mask + touch/pen flags) into the
     // cross-platform PointerEvent metadata for the next dispatched pointer event, so
     // the rich pointer / context-menu APIs report the real button and device type.
     private void markPointer(int keyField) {
         int mask = keyField & POINTER_BUTTON_BITS;
-        int type = (keyField & POINTER_TOUCH_FLAG) != 0
-                ? com.codename1.ui.events.PointerEvent.TYPE_TOUCH
-                : com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        int type;
+        if ((keyField & POINTER_PEN_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_STYLUS;
+        } else if ((keyField & POINTER_TOUCH_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_TOUCH;
+        } else {
+            type = com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        }
         int button;
         if (mask == 0) {
             mask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
@@ -797,11 +802,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
         setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
     }
 
-    void dispatchPointerHover(int windowId, int x, int y) {
-        // The native bridge emits only buttonless mouse motion/leave here.
-        // Reset every field before dispatch so a previous touch cannot leak in.
-        setPointerEventMetadata(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0,
-                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 0f, 0f, 0f, 0f, 0, true);
+    void dispatchPointerHover(int windowId, int x, int y, int keyField) {
+        // Preserve the native source while clearing all earlier contact metadata.
+        // Hover is pressure-free for both mice and pens.
+        markPointer(keyField);
+        setPointerButton(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0);
+        setPointerPressure(0f);
+        setPointerHovering(true);
         windowPointerHover(windowId, x, y);
     }
 
@@ -859,7 +866,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     // window's own Desktop instance, so a control in one reaches the
                     // hover state like any other; the earlier main-window-only guard
                     // made hover unreachable there.
-                    dispatchPointerHover(windowId, x, y);
+                    dispatchPointerHover(windowId, x, y, key);
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, key);

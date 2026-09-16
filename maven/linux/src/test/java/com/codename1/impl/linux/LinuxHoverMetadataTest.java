@@ -28,15 +28,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LinuxHoverMetadataTest {
     @Test
-    void hoverAndLeaveReplacePriorPointerMetadataBeforeDispatch() throws Exception {
+    void mouseAndPenHoverReplaceContactMetadataBeforeDispatch() throws Exception {
         java.lang.reflect.Field singleton = LinuxImplementation.class.getDeclaredField("INSTANCE");
         singleton.setAccessible(true);
         Object previous = singleton.get(null);
         try {
             final int[] received = new int[3];
+            final int[] expectedType = new int[1];
             LinuxImplementation port = new LinuxImplementation() {
                 protected void windowPointerHover(int windowId, int x, int y) {
-                    assertEquals(PointerEvent.TYPE_MOUSE, getPointerType());
+                    assertEquals(expectedType[0], getPointerType());
                     assertEquals(PointerEvent.BUTTON_NONE, getPointerButton());
                     assertEquals(0, getPointerButtonMask());
                     assertEquals(0f, getPointerPressure());
@@ -48,12 +49,17 @@ class LinuxHoverMetadataTest {
                     received[0] = windowId; received[1] = x; received[2] = y;
                 }
             };
-            for (int source : new int[]{PointerEvent.TYPE_TOUCH, PointerEvent.TYPE_MOUSE}) {
-                for (int[] event : new int[][]{{0, 10, 20}, {7, -1, -1}}) {
-                    port.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY, PointerEvent.MASK_PRIMARY,
-                            source, 1f, 2f, 3f, 4f, 5, false);
-                    port.dispatchPointerHover(event[0], event[1], event[2]);
-                    assertArrayEquals(event, received);
+            // Native keys: no source flag means mouse; bit 512 means pen.
+            for (int key : new int[]{0, 512}) {
+                expectedType[0] = key == 0 ? PointerEvent.TYPE_MOUSE : PointerEvent.TYPE_STYLUS;
+                for (int source : new int[]{PointerEvent.TYPE_TOUCH, PointerEvent.TYPE_MOUSE,
+                        PointerEvent.TYPE_STYLUS}) {
+                    for (int[] event : new int[][]{{0, 10, 20}, {7, 10, 20}, {0, -1, -1}, {7, -1, -1}}) {
+                        port.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY, PointerEvent.MASK_PRIMARY,
+                                source, 1f, 2f, 3f, 4f, 5, false);
+                        port.dispatchPointerHover(event[0], event[1], event[2], key);
+                        assertArrayEquals(event, received);
+                    }
                 }
             }
         } finally {

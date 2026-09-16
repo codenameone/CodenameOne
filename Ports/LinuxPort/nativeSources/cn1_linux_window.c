@@ -484,12 +484,28 @@ static int cn1LinuxStateMask(guint state) {
     return mask;
 }
 
+/* Hover and contact must retain the same physical source. GDK_SOURCE_CURSOR
+ * is a tablet puck, not a pen; only the pen and its eraser map to TYPE_STYLUS. */
+int cn1LinuxPointerSourceFlag(GdkEvent* event) {
+    GdkDevice* device = gdk_event_get_source_device(event);
+    if (device == NULL) {
+        return 0;
+    }
+    GdkInputSource source = gdk_device_get_source(device);
+    if (source == GDK_SOURCE_TOUCHSCREEN) {
+        return CN1_PE_TOUCH_FLAG;
+    }
+    if (source == GDK_SOURCE_PEN || source == GDK_SOURCE_ERASER) {
+        return CN1_PE_PEN_FLAG;
+    }
+    return 0;
+}
+
 /* True when an event originated from a touchscreen. GTK also synthesizes button
  * / motion events from touch for widgets that ignore touch, so we drop those
  * here and let cn1OnTouch drive the pointer instead (avoids double dispatch). */
 static int cn1LinuxIsTouchSource(GdkEvent* e) {
-    GdkDevice* dev = gdk_event_get_source_device(e);
-    return dev != NULL && gdk_device_get_source(dev) == GDK_SOURCE_TOUCHSCREEN;
+    return cn1LinuxPointerSourceFlag(e) == CN1_PE_TOUCH_FLAG;
 }
 
 static gboolean cn1OnButton(GtkWidget* widget, GdkEventButton* e, gpointer data) {
@@ -499,7 +515,7 @@ static gboolean cn1OnButton(GtkWidget* widget, GdkEventButton* e, gpointer data)
         return TRUE;
     }
     cn1LinuxPushEvent(e->type == GDK_BUTTON_PRESS ? CN1_EVENT_POINTER_PRESSED : CN1_EVENT_POINTER_RELEASED,
-            (int) e->x, (int) e->y, cn1LinuxButtonMask(e->button));
+            (int) e->x, (int) e->y, cn1LinuxButtonMask(e->button) | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     return TRUE;
 }
 
@@ -511,14 +527,16 @@ static gboolean cn1OnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data)
     }
     int mask = cn1LinuxStateMask(e->state);
     if (mask != 0) {
-        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y, mask);
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_DRAGGED, (int) e->x, (int) e->y,
+                mask | cn1LinuxPointerSourceFlag((GdkEvent*) e));
     } else {
         /* No button held: this is hover, and it used to be dropped here.
          * Component's hover style is driven by Form.pointerHover, which has
          * nothing else to fire it, so every hover rule in a desktop theme was
          * inert. Droppable rather than protected: a lost hover costs nothing
          * because hover is idempotent and the next motion re-establishes it. */
-        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, (int) e->x, (int) e->y, 0);
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, (int) e->x, (int) e->y,
+                cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return TRUE;
 }
@@ -542,7 +560,7 @@ static gboolean cn1OnLeave(GtkWidget* widget, GdkEventCrossing* e, gpointer data
     (void) widget;
     (void) data;
     if (e->detail != GDK_NOTIFY_INFERIOR) {
-        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, -1, -1, 0);
+        cn1LinuxPushEvent(CN1_EVENT_POINTER_HOVER, -1, -1, cn1LinuxPointerSourceFlag((GdkEvent*) e));
     }
     return FALSE;
 }
