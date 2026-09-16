@@ -43,7 +43,7 @@ name: Desktop theme fidelity
         options: [all, windows, macos, gnome]
   push:
     branches: [master]
-    # Limit this to theme sources, their generator and compiled output, and this suite.
+    # Watch desktop rendering inputs, theme sources and output, and this suite.
     #
     # The list used to include scripts/lib/cn1ss.sh and scripts/common/java/**, which are
     # shared with the iOS and Android fidelity suites and with every screenshot runner in
@@ -56,6 +56,10 @@ name: Desktop theme fidelity
     paths:
       - '.github/workflows/scripts-fidelity-desktop.yml'
       - 'scripts/run-desktop-fidelity-tests.sh'
+      # These sources build the renderer used for every desktop capture. Mobile
+      # fidelity excludes Desktop* rows and cannot cover their hover/font behavior.
+      - 'CodenameOne/src/**'
+      - 'Ports/JavaSE/src/**'
       # Sync's GITHUB_TOKEN commit does not trigger another workflow. Score generator
       # changes from the original master push; this job rebuilds CSS before scoring.
       - 'maven/css-compiler/**'
