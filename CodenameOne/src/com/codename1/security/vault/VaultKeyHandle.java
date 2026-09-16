@@ -202,6 +202,7 @@ final class VaultKeyHandle extends KeyHandle {
     /// Crypto, storage and application callbacks run outside this monitor.
     private void completeBytes(AsyncResource<byte[]> out, final int at, final byte[] produced) {
         out.complete(produced, owner, new Runnable() {
+            @Override
             public void run() {
                 try {
                     requireStillOurs(at);
@@ -215,6 +216,7 @@ final class VaultKeyHandle extends KeyHandle {
 
     private void completeVerification(AsyncResource<Boolean> out, final int at, boolean same) {
         out.complete(Boolean.valueOf(same), owner, new Runnable() {
+            @Override
             public void run() {
                 requireStillOurs(at);
             }

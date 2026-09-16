@@ -1807,6 +1807,7 @@ public final class Vault {
                     final VaultMetadata published = next;
                     try {
                         completeUnlocked(out, generation, keyAt, code, new Runnable() {
+                            @Override
                             public void run() {
                                 metadata = published;
                             }
@@ -3335,6 +3336,7 @@ public final class Vault {
     private void completeUnlock(AsyncResource<Boolean> out, final int generation,
             final Boolean needsRewrap) {
         out.complete(Boolean.TRUE, this, new Runnable() {
+            @Override
             public void run() {
                 requireSameGeneration(generation);
                 if (needsRewrap != null) {
@@ -3482,6 +3484,7 @@ public final class Vault {
     private <T> void completeUnlocked(AsyncResource<T> out, final int generation,
             final int keyAt, final T result, final Runnable update) {
         out.complete(result, this, new Runnable() {
+            @Override
             public void run() {
                 try {
                     requireSameGeneration(generation);
