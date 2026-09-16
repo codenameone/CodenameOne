@@ -36,6 +36,28 @@
 // So this app refuses to produce a reference set it cannot vouch for. In probe mode it
 // answers the environment questions and exits; in capture mode it additionally writes
 // tiles, but only after the same assertions pass.
+// TWO STATIC-ANALYSIS RULES FIRE ALL OVER THIS FILE AND ARE ANSWERED HERE ONCE, because a
+// review thread is not read by whoever edits this next.
+//
+// "Calls to unmanaged code -- replace with managed code if possible." There is no managed
+// equivalent for any of it. This program exists to photograph what the Windows compositor
+// actually put on screen: PrintWindow with PW_RENDERFULLCONTENT, BitBlt with CAPTUREBLT,
+// DwmFlush, TrackMouseEvent, SystemParametersInfo. .NET exposes none of those, and a
+// managed screenshot API would answer a different question -- "what does XAML think it
+// drew" rather than "what did DWM composite" -- which is precisely the substitution that
+// made an earlier version of this app report success while capturing unstyled controls.
+//
+// "Generic catch clause." Deliberate, and narrowing them would make this app worse at its
+// one job. It is a capture probe whose contract is that it refuses to produce a reference
+// set it cannot vouch for: every failure has to become a recorded blocker, not an escaping
+// exception that kills the process with no manifest and no log. The broad catches are each
+// paired with a documented fallback (a zero rect, "(unidentifiable)", false, "") or with a
+// blocker that names the stage and the HRESULT. A typed list would have to enumerate every
+// COM failure a hosted runner can produce, and the ones it missed would crash silently
+// instead of being reported -- trading a described failure for an undescribed one.
+//
+// The floating-point finding on RasterizationScale was real and is fixed at its site.
+
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.UI.Composition.SystemBackdrops;
@@ -324,7 +346,12 @@ public partial class App : Application
                 + "measured in a substitute face, so the text residual would be font "
                 + "availability rather than theme fidelity.");
         }
-        if (rasterScale != 1.0 && rasterScale != 0)
+        // Tolerance rather than ==. RasterizationScale is a double, and a display that is
+        // 1x in every way that matters can report a value a hair off it; an exact compare
+        // would raise a blocker about a scale nobody set. 0 stays an exact compare because
+        // it is not a measurement -- it is the sentinel for "XamlRoot was null", assigned
+        // literally, and exactly representable.
+        if (Math.Abs(rasterScale - 1.0) > 0.001 && rasterScale != 0)
         {
             // Not fatal, but it must be recorded and matched on the Codename One side or
             // the absolute-position metric compares tiles of different sizes.
