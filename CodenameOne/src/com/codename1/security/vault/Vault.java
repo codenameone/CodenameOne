@@ -2328,13 +2328,35 @@ public final class Vault {
                 // setPolicy REJECTED before it changed anything into one that removed the user's
                 // remembered unlock. Nothing this method can do afterwards is safe if it does not
                 // know what it is rolling back to.
-                if (deviceRecordState() == ProtectionReport.UNKNOWN) {
-                    out.error(new VaultException(VaultError.TEMPORARILY_UNREADABLE,
-                            "a device record exists here and could not be read, so this policy "
-                            + "change cannot be undone if it fails; nothing was changed"));
+                //
+                // Both reads are wrapped, and deliberately NOT moved into the main try below.
+                // They can throw: readUncached answers TEMPORARILY_UNREADABLE when storage
+                // cannot say whether the record is there, and deviceRecordState goes through it
+                // -- so an exception here escaped a worker that had not completed `out`, and a
+                // caller blocked in get() waited for an answer that was never coming. A hang is
+                // the one failure this class refuses to produce.
+                //
+                // The main try is the wrong home for them because its catches roll back first,
+                // and the rollback deletes the device record whenever the snapshot is not a
+                // String -- so routing a read failure through it would remove the user's
+                // remembered unlock on a call that changed nothing, which is exactly what the
+                // guard below exists to prevent.
+                Object savedRecord;
+                try {
+                    if (deviceRecordState() == ProtectionReport.UNKNOWN) {
+                        out.error(new VaultException(VaultError.TEMPORARILY_UNREADABLE,
+                                "a device record exists here and could not be read, so this "
+                                + "policy change cannot be undone if it fails; nothing was "
+                                + "changed"));
+                        return;
+                    }
+                    savedRecord = readUncached(deviceRecordKey());
+                } catch (RuntimeException cannotRead) {
+                    out.error(asVaultException(cannotRead,
+                            "this device's remembered-unlock record could not be read, so the "
+                            + "policy change was not started"));
                     return;
                 }
-                Object savedRecord = readUncached(deviceRecordKey());
                 boolean settled = false;
                 // An array because the finally below reads it and this is a Java 5 source level;
                 // what it records is the one step of this transition that cannot be undone.
