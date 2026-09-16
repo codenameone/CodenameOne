@@ -217,6 +217,45 @@ class BackendTest {
     }
 
     @Test
+    @DisplayName("a backlog of zero or less is refused, and a positive one starts")
+    void refusesANonPositiveBacklog() throws Exception {
+        // The two runtimes disagree about a non-positive backlog and BOTH start:
+        // Java SE hands it to ServerSocketChannel.bind, where anything not
+        // positive selects an implementation default, and the packaged runtime
+        // hands it straight to listen(), whose behaviour there is
+        // platform-defined. So the same properties file gives development and
+        // production materially different accept queues and says nothing.
+        //
+        // Zero is refused rather than kept, unlike the shutdown timeout above:
+        // "wait for nothing" is a meaningful instruction, an accept queue that
+        // holds nothing is not.
+        for(String bad : new String[] {"0", "-1"}) {
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+            settings.setProperty(Config.SERVER_BACKLOG, bad);
+            IllegalStateException err = assertThrows(IllegalStateException.class,
+                    () -> Backend.builder(Config.of(settings, "test"))
+                            .quiet()
+                            .handler(ok())
+                            .start(),
+                    "a backlog of " + bad + " was accepted");
+            assertTrue(err.getMessage().indexOf(Config.SERVER_BACKLOG) >= 0,
+                    err.getMessage());
+        }
+
+        // AND THE ORDINARY CASE STILL STARTS, so this cannot pass by refusing
+        // every backlog there is.
+        Properties fine = new Properties();
+        fine.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        fine.setProperty(Config.SERVER_BACKLOG, "64");
+        Backend backend = Backend.builder(Config.of(fine, "test"))
+                .quiet()
+                .handler(ok())
+                .start();
+        backend.stop();
+    }
+
+    @Test
     @DisplayName("a server with no handlers is refused rather than started")
     void refusesAServerThatWouldAnswerNothing() {
         // Every request would be a 404, which is not a server anybody meant to

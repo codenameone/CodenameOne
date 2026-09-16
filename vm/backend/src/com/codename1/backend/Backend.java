@@ -421,6 +421,26 @@ public final class Backend {
                         + "close the sockets of every request in flight instead of waiting "
                         + "for them. Use 0 to stop immediately on purpose.");
             }
+            if(listenBacklog <= 0) {
+                // THE TWO RUNTIMES DO NOT AGREE ABOUT A NON-POSITIVE ONE, and
+                // both start anyway. Java SE hands it to ServerSocketChannel.bind,
+                // where anything not positive selects an implementation default;
+                // the packaged runtime hands it straight to listen(), whose
+                // behaviour for 0 or less is platform-defined and which reports
+                // success either way. So a mistyped properties file gives a
+                // development server and a production server materially different
+                // accept queues and says nothing -- which is the failure a backlog
+                // exists to make visible, arrived at by configuration.
+                //
+                // Only the CONFIGURED value can land here: a negative passed to
+                // the builder means "not set" to the ternary above, which is the
+                // sentinel port, backlog and workers all use.
+                throw new IllegalStateException(Config.SERVER_BACKLOG + " is "
+                        + listenBacklog + ", and an accept queue cannot be empty or "
+                        + "negative. It is the number of connections the kernel holds "
+                        + "while the server is busy; the two runtimes read a "
+                        + "non-positive one differently and both start regardless.");
+            }
             Tls context = resolveTls();
             // OURS ONLY WHEN WE MADE IT, the same rule the pool follows above: a
             // context handed to .tls(Tls) belongs to the caller. On the packaged

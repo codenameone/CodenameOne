@@ -85,6 +85,7 @@ public class OrmCheck {
                 anUpsertThatUpdatesStillAnswers(pool);
                 anIgnoredInsertAnswersNoKey(pool);
                 aMultiRowInsertIsRefused(pool);
+                aBackslashInANameSurvivesTheLiteral(pool);
                 aBackslashModeStillFailsClosed(pool);
                 anExactNumericKeyIsStillAKey(pool);
                 aValueTheFieldCannotHoldIsRefused(em, pool);
@@ -979,6 +980,51 @@ public class OrmCheck {
         } finally {
             pool.execute("DROP TABLE IF EXISTS cn1_bsmode", null);
             pool.execute("SET SESSION sql_mode=DEFAULT", null);
+        }
+    }
+
+    /**
+     * A name holding a backslash still resyncs when the session decodes escapes.
+     *
+     * <p>The resync passes the table and column to pg_get_serial_sequence as SQL
+     * string literals, and a quoted identifier will happily create a table whose
+     * name really contains a backslash. With standard_conforming_strings off --
+     * which a session can set -- a plain literal decodes that backslash as the
+     * start of an escape, so the name inside the literal stops being the name of
+     * the table. Measured before the fix: PostgreSQL 42P01, "relation does not
+     * exist", naming a relation with a NEWLINE in it.
+     *
+     * <p>The session is set off here deliberately. Leaving it at the default
+     * would pass whether or not the literal escapes anything, which is the test
+     * proving nothing.
+     */
+    private static void aBackslashInANameSurvivesTheLiteral(DataSource pool) throws Exception {
+        if(!"postgresql".equals(pool.dialect().getName())) {
+            return;
+        }
+        String raw = "cn1_bs\\ntable";
+        String quoted = pool.dialect().quote(raw);
+        pool.execute("SET standard_conforming_strings = off", null);
+        try {
+            pool.execute("DROP TABLE IF EXISTS " + quoted, null);
+            pool.execute("CREATE TABLE " + quoted + " (id "
+                    + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                    + ", name TEXT)", null);
+            try {
+                String outcome;
+                try {
+                    pool.query(pool.dialect().resyncGeneratedKey(raw, "id"), null);
+                    outcome = "resynced";
+                } catch(Exception err) {
+                    outcome = "failed: " + err.getMessage();
+                }
+                check("a backslash in a name survives the resync literal",
+                        "resynced", outcome);
+            } finally {
+                pool.execute("DROP TABLE IF EXISTS " + quoted, null);
+            }
+        } finally {
+            pool.execute("SET standard_conforming_strings = on", null);
         }
     }
 

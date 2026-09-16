@@ -449,23 +449,36 @@ public abstract class Dialect {
      * know about.
      */
     /**
-     * A SQL string literal holding {@code value}.
+     * A SQL string literal holding {@code value}, in PostgreSQL's E'' form --
+     * which means the same thing WHATEVER standard_conforming_strings is set to.
      *
-     * <p>Doubling the apostrophe is the whole of the escape a standard literal
-     * needs, and it is the reason this exists rather than each caller writing
-     * quotes around a name: a table called owner's_items is a perfectly ordinary
-     * identifier, and pasting it between apostrophes ends the literal early and
-     * leaves the rest of the statement as syntax.
+     * <p>It exists rather than each caller writing quotes around a name because
+     * a table called owner's_items is a perfectly ordinary identifier, and
+     * pasting it between apostrophes ends the literal early and leaves the rest
+     * of the statement as syntax. Doubling the apostrophe answers that.
      *
-     * <p>For NAMES only. Values are bound, always.
+     * <p>Doubling the apostrophe is NOT the whole of the escape, which is the
+     * part that took a second look. It is right only while
+     * standard_conforming_strings is on. With it off --
+     * and a session can turn it off -- a backslash in a plain literal starts an
+     * escape, so an @Entity(table) or column name containing one, which a quoted
+     * identifier creates perfectly happily, decodes to different text inside the
+     * literal: a name holding the two characters backslash and n reaches
+     * pg_get_serial_sequence as a newline, it looks for a relation nobody has,
+     * and the resync fails on a table that exists.
+     *
+     * <p>E'' always interprets escapes, so doubling the backslashes here is
+     * correct under both settings rather than under one of them. Deliberately
+     * NOT on the base class: E'' is a syntax error on MySQL, where the E would
+     * be read as an identifier.
      */
-    static String literal(String value) {
-        StringBuilder out = new StringBuilder(value.length() + 2);
-        out.append('\'');
+    static String postgresLiteral(String value) {
+        StringBuilder out = new StringBuilder(value.length() + 3);
+        out.append("E'");
         for(int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            if(c == '\'') {
-                out.append('\'');
+            if(c == '\'' || c == '\\') {
+                out.append(c);
             }
             out.append(c);
         }
@@ -866,8 +879,8 @@ public abstract class Dialect {
             // concurrent insert can take the very value this then installs as the
             // sequence's next one, so the following generated insert fails on a
             // duplicate key. EXCLUSIVE mode is what excludes that insert.
-            return "SELECT setval(pg_get_serial_sequence(" + literal(quotedTable)
-                    + ", " + literal(column) + "), "
+            return "SELECT setval(pg_get_serial_sequence(" + postgresLiteral(quotedTable)
+                    + ", " + postgresLiteral(column) + "), "
                     + "greatest(coalesce((SELECT max(" + quotedColumn + ") FROM "
                     + quotedTable + "), 0) + 1, 1), false)";
         }
