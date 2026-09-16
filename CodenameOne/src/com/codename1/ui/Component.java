@@ -8747,6 +8747,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (p instanceof BGPainter) {
                 ((BGPainter) p).radialCache = null;
             }
+            clearHoverOnDeinitialize();
             if (stateChangeListeners != null) {
                 stateChangeListeners.fireActionEvent(new ComponentStateChangeEvent(this, false));
             }
@@ -8763,6 +8764,25 @@ public class Component implements Animation, StyleListener, Editable {
                     f.removePointerPressedListener(refreshTaskDragListener);
                 }
             }
+        } else {
+            clearHoverOnDeinitialize();
+        }
+    }
+
+    private void clearHoverOnDeinitialize() {
+        // Removal outside a pointer callback must also release the owner's target.
+        // Reset directly: setHovered would register the newly active style for
+        // animation while this component is being torn down.
+        hovered = false;
+        clearInteractiveScrollHover();
+        Container root = TopLevelSupport.rootOf(this);
+        HoverTracker tracker = root == null ? null : root.getHoverTracker();
+        if (tracker != null) {
+            tracker.clearFor(this);
+        }
+        TooltipManager tooltip = TooltipManager.getInstance();
+        if (tooltip != null) {
+            tooltip.clearTooltipFor(this);
         }
     }
 

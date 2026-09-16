@@ -107,6 +107,12 @@ public class Window extends Container implements TopLevelContainer {
     /// definition of what hover means.
     private final HoverTracker hoverTracker = new HoverTracker();
 
+    @Override
+    HoverTracker getHoverTracker() {
+        return hoverTracker;
+    }
+
+
     private Graphics windowGraphics;
     /// Set as soon as dispose() begins, so re-entering it is a no-op.
     private boolean disposing;

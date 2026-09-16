@@ -79,6 +79,17 @@ class HoverTracker {
         }
     }
 
+    void clearFor(Component removed) {
+        if (isInSubtree(removed, hovered) || isInSubtree(removed, lastInteractiveScrollHover)) {
+            pointerOver(null, -1, -1);
+        }
+    }
+
+    static boolean isInSubtree(Component root, Component target) {
+        return target != null && (root == target //NOPMD CompareObjectsWithEquals
+                || root instanceof Container && ((Container) root).contains(target));
+    }
+
     boolean isOver(Component cmp) {
         return cmp != null && hovered == LeadUtil.leadComponentImpl(cmp); //NOPMD CompareObjectsWithEquals
     }

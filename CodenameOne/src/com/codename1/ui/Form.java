@@ -135,6 +135,12 @@ public class Form extends Container implements TopLevelContainer {
     // Last component whose interactive scrollbar showed a hover highlight, so the highlight can be
     // cleared when the pointer moves to a different scrollable (desktop interactive scrollbars only)
     private final HoverTracker hoverTracker = new HoverTracker();
+
+    @Override
+    HoverTracker getHoverTracker() {
+        return hoverTracker;
+    }
+
     private boolean enableCursors;
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;

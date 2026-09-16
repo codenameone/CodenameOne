@@ -233,6 +233,82 @@ class HoverDeliveryTest extends UITestBase {
     }
 
     @FormTest
+    void removalOutsideHoverDispatchClearsFlagsTrackerAndTooltip() throws Exception {
+        implementation.setDesktop(true);
+        implementation.setMultiWindowSupported(true);
+        java.lang.reflect.Field pending = TooltipManager.class.getDeclaredField("pendingTooltip");
+        java.lang.reflect.Field visible = TooltipManager.class.getDeclaredField("currentTooltip");
+        java.lang.reflect.Field anchor = TooltipManager.class.getDeclaredField("currentComponent");
+        pending.setAccessible(true);
+        visible.setAccessible(true);
+        anchor.setAccessible(true);
+        for (boolean secondary : new boolean[]{false, true}) {
+            for (boolean lead : new boolean[]{false, true}) {
+                Form main = new Form("removal", new com.codename1.ui.layouts.BoxLayout(
+                        com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+                main.show();
+                Window window = secondary ? new Window("removal", new com.codename1.ui.layouts.BoxLayout(
+                        com.codename1.ui.layouts.BoxLayout.Y_AXIS)) : null;
+                Container surface = window == null ? main : window;
+                Container row = new Container(new BorderLayout());
+                Button target = new Button("hovered");
+                row.add(BorderLayout.CENTER, target);
+                Label unrelated = new Label("unrelated");
+                surface.add(row);
+                surface.add(unrelated);
+                if (window != null) {
+                    window.setWindowSize(500, 400);
+                    window.show();
+                }
+                installHoverTheme(surface);
+                if (lead) {
+                    row.setLeadComponent(target);
+                }
+                Component hoverTarget = lead ? row : target;
+                hoverTarget.setTooltip("removed anchor");
+                TooltipManager previous = TooltipManager.getInstance();
+                TooltipManager manager = new TooltipManager();
+                manager.setTooltipShowDelay(60000);
+                TooltipManager.enableTooltips(manager);
+                try {
+                    surface.pointerHover(new int[]{target.getAbsoluteX() + target.getWidth() / 2},
+                            new int[]{target.getAbsoluteY() + target.getHeight() / 2});
+                    assertTrue(target.isHovered());
+                    assertNotNull(pending.get(manager));
+                    manager.showTooltip(hoverTarget.getTooltip(), hoverTarget);
+                    assertNotNull(visible.get(manager));
+                    surface.removeComponent(unrelated);
+                    assertTrue(target.isHovered(), "an unrelated removal must preserve hover");
+                    assertNotNull(pending.get(manager), "an unrelated removal must preserve the tooltip");
+                    assertNotNull(visible.get(manager));
+                    Container parent = lead ? surface : row;
+                    Component removed = lead ? row : target;
+                    parent.removeComponent(removed);
+                    assertFalse(target.isHovered(), "teardown must clear the flag without another pointer event");
+                    assertFalse(surface.getHoverTracker().isOver(hoverTarget), "the owner must release its detached target");
+                    assertNull(pending.get(manager));
+                    assertNull(visible.get(manager));
+                    assertNull(anchor.get(manager));
+                    if (lead) {
+                        parent.add(removed);
+                    } else {
+                        parent.add(BorderLayout.CENTER, removed);
+                    }
+                    surface.revalidate();
+                    assertFalse(target.isHovered(), "reattachment must not revive stale hover");
+                    assertNotEquals(0x44ff88, target.getStyle().getBgColor());
+                } finally {
+                    manager.clearTooltip();
+                    TooltipManager.enableTooltips(previous);
+                    if (window != null) {
+                        window.dispose();
+                    }
+                }
+            }
+        }
+    }
+
+    @FormTest
     void hoverCallbacksSeeCurrentStateAndCanDetachOrHide() {
         implementation.setDesktop(true);
         implementation.setMultiWindowSupported(true);

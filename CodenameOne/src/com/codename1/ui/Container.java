@@ -1466,6 +1466,11 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
+    // Only top-level containers own pointer hover tracking.
+    HoverTracker getHoverTracker() {
+        return null;
+    }
+
     /// Cleansup the initialization flags in the hierachy
     @Override
     void deinitializeImpl() {
