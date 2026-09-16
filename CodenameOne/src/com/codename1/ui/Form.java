@@ -4570,6 +4570,22 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
+    /// The component a hover at these coordinates resolves to: the deepest one that accepts
+    /// pointer events, mapped to its lead parent. Resolution only -- nothing is dispatched --
+    /// so a caller that just needs to know what is under the pointer does not also fire a
+    /// component's hover callback or start a tooltip timer.
+    private Component hoverTargetAt(int x, int y) {
+        Container actual = getActualPane(formLayeredPane, x, y);
+        if (actual == null) {
+            return null;
+        }
+        Component cmp = actual.getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
+        return cmp == null ? null : LeadUtil.leadParentImpl(cmp);
+    }
+
     /// {@inheritDoc}
     @Override
     public void pointerHover(int[] x, int[] y) {
@@ -4582,12 +4598,8 @@ public class Form extends Container implements TopLevelContainer {
         Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         Component cmp = null;
         if (actual != null) {
-            cmp = actual.getComponentAt(x[0], y[0]);
-            while (cmp != null && cmp.isIgnorePointerEvents()) {
-                cmp = cmp.getParent();
-            }
+            cmp = hoverTargetAt(x[0], y[0]);
             if (cmp != null) {
-                cmp = LeadUtil.leadParentImpl(cmp);
 
                 if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
@@ -4879,6 +4891,19 @@ public class Form extends Container implements TopLevelContainer {
             }
         } finally {
             currentPointerPress = null;
+            // Hover is deliberately NOT tracked during a drag -- pointerHover returns early
+            // while dragged is set -- so the release is where it has to be caught up. If the
+            // pointer then stays put no further motion event arrives (Windows sends none for
+            // a stationary cursor), which left whatever was hovered when the drag began still
+            // lit and whatever is under the pointer now never lit. Resolved rather than
+            // dispatched, so the release does not also fire a hover callback or a tooltip.
+            //
+            // In the finally, beside the other piece of end-of-gesture bookkeeping, because
+            // this method returns from six places inside the try above and a catch-up after
+            // the block is reached by none of them.
+            if (Display.getInstance().isDesktop()) {
+                hoverTracker.pointerOver(hoverTargetAt(x, y), x, y);
+            }
         }
     }
 

@@ -42,6 +42,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// nowhere at all.
 class HoverDeliveryTest extends UITestBase {
 
+    /// setDesktop is global to the implementation, so a test that turns it on has to put it
+    /// back or every later test in the run inherits a desktop it did not ask for.
+    @org.junit.jupiter.api.AfterEach
+    void restoreDesktopFlag() {
+        implementation.setDesktop(false);
+    }
+
     /// Theme with a hover colour on the row UIID and on a plain button.
     ///
     /// Installed AFTER the surface is shown and followed by a refresh: showing loads the
@@ -121,6 +128,46 @@ class HoverDeliveryTest extends UITestBase {
         f.pointerHover(new int[]{-1}, new int[]{-1});
         DisplayTest.flushEdt();
         assertEquals(0x112233, row.getStyle().getBgColor(), "leaving must clear it");
+    }
+
+    /// Releasing a drag over a different component moves the hover there.
+    ///
+    /// Hover is not tracked during a drag -- pointerHover returns early while a component is
+    /// being dragged -- and a pointer that stops moving after the release produces no further
+    /// motion event, so without a catch-up on release the component the drag STARTED on stays
+    /// hover-styled and the one under the pointer never lights up.
+    @FormTest
+    void releasingADragOverAnotherComponentMovesTheHover() {
+        // The catch-up is desktop-only, because nothing else generates hover, so the test
+        // has to be one -- otherwise it passes for the wrong reason on any implementation.
+        implementation.setDesktop(true);
+        Form f = new Form("drag", new com.codename1.ui.layouts.BoxLayout(
+                com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+        Button a = new Button("A");
+        Button b = new Button("B");
+        f.add(a);
+        f.add(b);
+        f.show();
+        DisplayTest.flushEdt();
+        installHoverTheme(f);
+
+        hoverForm(f, a);
+        DisplayTest.flushEdt();
+        assertEquals(0x44ff88, a.getStyle().getBgColor(), "A is hovered to begin with");
+
+        // Press on A, then release over B without any motion event in between -- which is
+        // what a drag that ends on a stationary pointer looks like to the form.
+        f.pointerPressed(new int[]{a.getAbsoluteX() + a.getWidth() / 2},
+                new int[]{a.getAbsoluteY() + a.getHeight() / 2});
+        DisplayTest.flushEdt();
+        f.pointerReleased(b.getAbsoluteX() + b.getWidth() / 2,
+                b.getAbsoluteY() + b.getHeight() / 2);
+        DisplayTest.flushEdt();
+
+        assertNotEquals(0x44ff88, a.getStyle().getBgColor(),
+                "the component the drag started on must not stay hovered");
+        assertEquals(0x44ff88, b.getStyle().getBgColor(),
+                "the component under the pointer at release must be hovered");
     }
 
     /// A control in a secondary window responds to hover.

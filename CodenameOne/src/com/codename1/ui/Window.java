@@ -3449,6 +3449,7 @@ public class Window extends Container implements TopLevelContainer {
                 // Still cleared: the gesture is over regardless of who handled it,
                 // and leaving these set would strand the next press.
                 endGesture(releasing);
+                refreshHoverAfterRelease(x, y);
                 return;
             }
         }
@@ -3461,6 +3462,7 @@ public class Window extends Container implements TopLevelContainer {
                 LeadUtil.dragFinished(releasingDragged, x, y);
             }
             endGesture(releasing);
+            refreshHoverAfterRelease(x, y);
             return;
         }
         Component target = releasingDragged != null ? releasingDragged : releasingPressed;
@@ -3477,6 +3479,25 @@ public class Window extends Container implements TopLevelContainer {
             }
         }
         endGesture(releasing);
+        refreshHoverAfterRelease(x, y);
+    }
+
+    /// Catches hover up at the end of a gesture, the way Form.pointerReleased does.
+    ///
+    /// Hover is not tracked while a drag is in progress, and a pointer that stops moving
+    /// after the release produces no further motion event, so the component hovered when the
+    /// drag began would stay lit and the one under the pointer now would never light up.
+    /// Resolved rather than dispatched, so a release raises no tooltip of its own.
+    ///
+    /// Called from each of this method's three exits rather than once at the bottom: two of
+    /// them return early, and a single call after the last endGesture is reached by neither
+    /// -- which is exactly how the same catch-up in Form started out as dead code.
+    private void refreshHoverAfterRelease(int x, int y) {
+        if (!Display.getInstance().isDesktop()) {
+            return;
+        }
+        Component after = resolveComponentAt(x, y);
+        hoverTracker.pointerOver(after == null ? null : LeadUtil.leadParentImpl(after), x, y);
     }
 
     /// Clears the pressed state for the gesture identified by `token`, and only that
