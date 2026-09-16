@@ -23,7 +23,6 @@
 
 package com.codenameone.developerguide.screenshots;
 
-import com.codename1.components.MultiButton;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
@@ -31,13 +30,12 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.list.MultiList;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-/// A MultiList over a million entries, scrolled a long way in.
+/// A MultiList over a million books, scrolled a long way in.
 class ComponentsMillionEntriesFigure implements GuideFigure {
-
-    private static final int ENTRIES = 1000000;
 
     private MultiList list;
 
@@ -46,8 +44,9 @@ class ComponentsMillionEntriesFigure implements GuideFigure {
         return "components-millionbooks";
     }
 
-    /// The tagged region is what the chapter includes, so the listing beside the
-    /// picture is the code that drew it.
+    /// Both tagged regions are what the chapter includes -- the model and the
+    /// line that uses it -- so the two listings around the picture are the code
+    /// that drew it.
     @Override
     public Form build() {
         // tag::the-components-of-codename-one-java-169[]
@@ -60,34 +59,49 @@ class ComponentsMillionEntriesFigure implements GuideFigure {
         return hi;
     }
 
-    /// The point of the sample is that nothing is held: a model of a million
-    /// entries builds each one as the list asks for it, so scrolling costs the
-    /// same at the end as at the start.
+    // tag::the-components-of-codename-one-java-168[]
     static class GRMMModel implements ListModel<Map<String, Object>> {
-
-        private int selected;
+        private int selection;
+        private final java.util.List<SelectionListener> selectionListeners = new ArrayList<>();
 
         @Override
         public Map<String, Object> getItemAt(int index) {
-            Map<String, Object> entry = new HashMap<>();
-            entry.put("Line1", "Entry " + index);
-            entry.put("Line2", "One of a million");
-            return entry;
+            int idx = index % 7;
+            switch (idx) {
+                case 0:
+                    return createListEntry("A Game of Thrones " + index, "1996");
+                case 1:
+                    return createListEntry("A Clash Of Kings " + index, "1998");
+                case 2:
+                    return createListEntry("A Storm Of Swords " + index, "2000");
+                case 3:
+                    return createListEntry("A Feast For Crows " + index, "2005");
+                case 4:
+                    return createListEntry("A Dance With Dragons " + index, "2011");
+                case 5:
+                    return createListEntry("The Winds of Winter " + index, "2016 (please, please, please)");
+                default:
+                    return createListEntry("A Dream of Spring " + index, "Ugh");
+            }
         }
 
         @Override
         public int getSize() {
-            return ENTRIES;
+            return 1000000;
         }
 
         @Override
         public int getSelectedIndex() {
-            return selected;
+            return selection;
         }
 
         @Override
         public void setSelectedIndex(int index) {
-            selected = index;
+            int old = selection;
+            selection = index;
+            for (SelectionListener l : selectionListeners) {
+                l.selectionChanged(old, index);
+            }
         }
 
         @Override
@@ -100,10 +114,12 @@ class ComponentsMillionEntriesFigure implements GuideFigure {
 
         @Override
         public void addSelectionListener(SelectionListener l) {
+            selectionListeners.add(l);
         }
 
         @Override
         public void removeSelectionListener(SelectionListener l) {
+            selectionListeners.remove(l);
         }
 
         @Override
@@ -113,6 +129,14 @@ class ComponentsMillionEntriesFigure implements GuideFigure {
         @Override
         public void removeItem(int index) {
         }
+    }
+    // end::the-components-of-codename-one-java-168[]
+
+    static Map<String, Object> createListEntry(String name, String date) {
+        Map<String, Object> entry = new HashMap<>();
+        entry.put("Line1", name);
+        entry.put("Line2", date);
+        return entry;
     }
 
     /// The caption is about having scrolled a long way in, which is the only
