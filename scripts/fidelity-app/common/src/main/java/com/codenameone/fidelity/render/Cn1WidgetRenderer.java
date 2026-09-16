@@ -43,6 +43,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codenameone.fidelity.spec.ComponentSpec;
 
@@ -77,6 +78,12 @@ public final class Cn1WidgetRenderer {
             return "Button";
         }
         return rest;
+    }
+
+    /// True when this row is one of the desktop rows, i.e. before desktopToMobileId()
+    /// rewrote its id onto the mobile kind that builds it.
+    private static boolean isDesktopRow(ComponentSpec spec) {
+        return spec != null && spec.getId() != null && spec.getId().startsWith("Desktop");
     }
 
     /** Returns true when this renderer knows how to build the given component id. */
@@ -143,7 +150,14 @@ public final class Cn1WidgetRenderer {
             // iOS 26 prominentGlass (RaisedButton) is a translucent fill -- the
             // backdrop shows faintly through the blue. Drop the fill alpha a touch
             // so the CN1 raised button reads as glass rather than a flat opaque blue.
-            if ("RaisedButton".equals(id)) {
+            //
+            // Keyed on the SPEC's own id, not the mapped kind: DesktopAccentButton maps
+            // onto RaisedButton to reuse this branch, but all three desktop themes give
+            // their accent button an OPAQUE fill, so applying the glass alpha there made
+            // the normal/pressed/disabled tiles artificially translucent -- and, because
+            // getAllStyles() excludes hover, left hover opaque, inventing a state
+            // difference the native controls do not have.
+            if ("RaisedButton".equals(id) && !isDesktopRow(spec)) {
                 b.getAllStyles().setBgTransparency(225);
             }
             c = b;
@@ -526,6 +540,23 @@ public final class Cn1WidgetRenderer {
     /// which is what a focused component renders with.
     private static void applyDesktopState(Component c, String state) {
         if ("hover".equals(state)) {
+            // The build branches zero their margin through getAllStyles(), which by design
+            // does NOT include the hover style, so the compiled hover style still carries
+            // the theme's app-facing margin. Left alone, the hover tile lays out at a
+            // different offset and size from both the native control and the component's
+            // own normal state, and the difference is scored as a fidelity loss that has
+            // nothing to do with the hover colours being measured.
+            //
+            // Copied from the normal style rather than forced to zero: not every branch
+            // zeroes its margin, and the invariant that matters is that hover lays out
+            // exactly like the state beside it.
+            Style hover = c.getHoverStyle();
+            if (hover != null) {
+                Style normal = c.getUnselectedStyle();
+                hover.setMarginUnit(normal.getMarginUnit());
+                hover.setMargin(normal.getMarginTop(), normal.getMarginBottom(),
+                        normal.getMarginLeft(false), normal.getMarginRight(false));
+            }
             c.setHovered(true);
         } else if ("focus".equals(state)) {
             c.setFocusable(true);

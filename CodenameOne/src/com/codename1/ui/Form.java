@@ -4595,7 +4595,6 @@ public class Form extends Container implements TopLevelContainer {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
-                updateInteractiveScrollHover(cmp, x[0], y[0]);
             }
             if (TooltipManager.getInstance() != null) {
                 // Guarded: cmp is reachable as null here. A desktop port reports the pointer
@@ -4609,9 +4608,13 @@ public class Form extends Container implements TopLevelContainer {
                 }
             }
         }
-        // Outside the null checks on purpose: hover has to be CLEARED when the pointer is
-        // over nothing, which is how a desktop port reports the cursor leaving the window.
-        // Updating it only when a component was found left the last one lit for good.
+        // Both of these are outside the null checks on purpose: hover has to be CLEARED
+        // when the pointer is over nothing, which is how a desktop port reports the cursor
+        // leaving the window. Updating them only when a component was found left the last
+        // component -- and the last scrollbar thumb -- lit for good. updateInteractiveScrollHover
+        // already handles a null cmp: it clears the previously-highlighted scrollable and
+        // forgets it, and the coordinates go unread because no scrollable is found.
+        updateInteractiveScrollHover(cmp, x[0], y[0]);
         updateHoveredComponent(cmp);
     }
 

@@ -220,6 +220,14 @@ public class ProcessScreenshots {
         // Per-directory cache of the backdrop colour each appearance's tiles were
         // painted on. See resolveTileBackground().
         Map<Path, Map<String, Integer>> tileBackgrounds = new java.util.HashMap<>();
+        // ...and the SEPARATE one the NATIVE golden was captured on. The two are
+        // not the same colour and must not be assumed to be: the macOS Aqua set
+        // is captured on #E7E7E7/#262626 (the real NSWindow backdrop) while the
+        // CN1 theme paints AppKit's nominal windowBackgroundColor #ECECEC/#323232.
+        // Masking the native tile with the CN1 colour puts 12 levels between them
+        // in dark mode -- past CONTENT_TAU -- so every backdrop pixel is classified
+        // as widget and the whole tile, not the control, dominates every score.
+        Map<Path, Map<String, Integer>> nativeBackgrounds = new java.util.HashMap<>();
         java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : actualEntries) {
             String testName = entry.getKey();
@@ -288,7 +296,10 @@ public class ProcessScreenshots {
                         // backdrop we render), so a near-white CN1 fill still counts
                         // as widget content rather than being mistaken for blank bg.
                         int bg = resolveTileBackground(tileBackgrounds, cn1Path, testName);
+                        int nativeBg = resolveNativeTileBackground(nativeBackgrounds, referenceDir,
+                                testName, bg);
                         details.put("tile_bg", String.format("#%06X", bg));
+                        details.put("native_tile_bg", String.format("#%06X", nativeBg));
                         double[] sf;
                         boolean glass = false;
                         String[] specInfo = resolveSpecInfo(specByComponent, testName);
@@ -308,7 +319,7 @@ public class ProcessScreenshots {
                                     details.put("material_note",
                                             "material=" + material + " but no backdrop reference was found; scored whole-tile");
                                 }
-                                sf = structuralFidelity(natc, cn1c, bg);
+                                sf = structuralFidelity(natc, cn1c, bg, nativeBg);
                             }
                         } else if (refArr != null && isGlassTile(natc, refArr, cw, ch)) {
                             // Legacy fallback: infer glass from the golden's corners
@@ -317,7 +328,7 @@ public class ProcessScreenshots {
                             glass = true;
                             sf = structuralFidelityGlass(natc, cn1c, refArr);
                         } else {
-                            sf = structuralFidelity(natc, cn1c, bg);
+                            sf = structuralFidelity(natc, cn1c, bg, nativeBg);
                         }
                         double meanDelta = meanChannelDelta(natc, cn1c);
                         boolean blankPair = sf[0] == BOTH_BLANK;
@@ -341,7 +352,7 @@ public class ProcessScreenshots {
                         int[] geoRef = glass ? refArr : geometryReference(
                                 specInfo != null ? specInfo[SPEC_BACKDROP] : null,
                                 backdropImg, cn1.width(), cn1.height(), cw, ch);
-                        details.put("geometry", geometryMetrics(natc, cn1c, bg, geoRef));
+                        details.put("geometry", geometryMetrics(natc, cn1c, bg, nativeBg, geoRef));
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
                         if (blankPair) {
@@ -352,7 +363,8 @@ public class ProcessScreenshots {
                             record.put("status", "blank_pair");
                             record.put("message", "Neither the native golden nor the CN1 render"
                                     + " has any widget content against the tile background "
-                                    + String.format("#%06X", bg) + ". That is a harness failure"
+                                    + String.format("#%06X", bg) + " / native "
+                                    + String.format("#%06X", nativeBg) + ". That is a harness failure"
                                     + " (an empty render, a capture taken before first paint, or"
                                     + " a widget positioned outside its tile), not a match.");
                         } else {
@@ -489,10 +501,15 @@ public class ProcessScreenshots {
     private static final double BOTH_BLANK = -1.0d;
     private static final int MIN_CONTENT_PIXELS = 4;
 
-    private static double[] structuralFidelity(PNGImage nativeImg, PNGImage cn1, int bgRgb) {
+    /// `bgRgb` is the backdrop the CN1 tile was painted on; `nativeBgRgb` is the one
+    /// the native golden was CAPTURED on. Each render is masked against its own --
+    /// they are independent facts about two different machines and coincide only by
+    /// luck (they do on Fluent and Adwaita; they differ by 12 levels on Aqua dark).
+    private static double[] structuralFidelity(PNGImage nativeImg, PNGImage cn1, int bgRgb,
+                                               int nativeBgRgb) {
         BufferedImage bn = toRgbImage(nativeImg);
         BufferedImage bc = toRgbImage(cn1);
-        int[] boxN = contentBBox(bn, bgRgb);
+        int[] boxN = contentBBox(bn, nativeBgRgb);
         int[] boxC = contentBBox(bc, bgRgb);
         boolean emptyN = boxN[2] <= 0;
         boolean emptyC = boxC[2] <= 0;
@@ -545,8 +562,8 @@ public class ProcessScreenshots {
         // min(fillSim, squared-salience structSim) is kept ONLY as a diagnostic:
         // its structural term could not tell "same widget, text a few px off" from
         // "different widget" and so crushed genuinely-faithful renders.
-        double fillSim = absoluteShapeSim(bn, bc, bgRgb);
-        double structSim = structuralSalienceSim(bn, bc, bgRgb);   // diagnostic only
+        double fillSim = absoluteShapeSim(bn, bc, bgRgb, nativeBgRgb);
+        double structSim = structuralSalienceSim(bn, bc, bgRgb);   // diagnostic only (gradient-based, bg unused)
         double ssim = computeSsim(nativeImg, cn1);
         double headline = Math.sqrt(Math.max(0.0d, fillSim) * Math.max(0.0d, ssim));
         double fidelity = 100.0d * headline;
@@ -921,7 +938,8 @@ public class ProcessScreenshots {
     /// identical (clipped) numbers on both sides.
     private static final int GEOMETRY_EDGE_TRIM = 2;
 
-    private static Map<String, Object> geometryMetrics(PNGImage nativeImg, PNGImage cn1, int bgRgb, int[] refArr) {
+    private static Map<String, Object> geometryMetrics(PNGImage nativeImg, PNGImage cn1, int bgRgb,
+            int nativeBgRgb, int[] refArr) {
         Map<String, Object> geo = new LinkedHashMap<>();
         BufferedImage bn = toRgbImage(nativeImg);
         BufferedImage bc = toRgbImage(cn1);
@@ -941,7 +959,7 @@ public class ProcessScreenshots {
             maskN = contentMaskRef(nArr, refArr, GLASS_TAU);
             maskC = contentMaskRef(cArr, refArr, GLASS_TAU);
         } else {
-            maskN = contentMaskBg(nArr, bgRgb, CONTENT_TAU);
+            maskN = contentMaskBg(nArr, nativeBgRgb, CONTENT_TAU);
             maskC = contentMaskBg(cArr, bgRgb, CONTENT_TAU);
         }
         trimEdges(maskN, w, h, GEOMETRY_EDGE_TRIM);
@@ -1176,18 +1194,81 @@ public class ProcessScreenshots {
             byAppearance = loadTileBackgrounds(dir);
             cache.put(dir, byAppearance);
         }
-        if (byAppearance != null) {
-            // Longest key first, so an appearance named "dark" cannot shadow one
-            // named "high-contrast-dark".
-            List<String> keys = new ArrayList<>(byAppearance.keySet());
-            keys.sort((a, b) -> b.length() - a.length());
-            for (String k : keys) {
-                if (testName.endsWith("_" + k)) {
-                    return byAppearance.get(k).intValue();
-                }
-            }
+        Integer hit = matchAppearance(byAppearance, testName);
+        if (hit != null) {
+            return hit.intValue();
         }
         return testName.contains("_dark") ? 0x000000 : 0xffffff;
+    }
+
+    /// The backdrop the NATIVE golden was captured on, which is a property of the
+    /// machine that captured it and NOT of the CN1 theme. Read from the golden
+    /// set's own capture-manifest.json (`backdrop_by_appearance`), which the
+    /// reference apps write from the real window backdrop they rendered into.
+    ///
+    /// Falls back to the CN1 value, which is what every mobile set wants: the iOS
+    /// and Android goldens are captured on the same white/black the CN1 tiles use,
+    /// they ship no manifest backdrops, and this must not change their scores.
+    private static int resolveNativeTileBackground(Map<Path, Map<String, Integer>> cache,
+                                                   Path referenceDir, String testName, int cn1Bg) {
+        Map<String, Integer> byAppearance = cache.get(referenceDir);
+        if (byAppearance == null) {
+            // A sidecar beside the goldens wins, so a set can correct itself without
+            // a manifest rewrite; otherwise the manifest the capture job produced.
+            byAppearance = loadTileBackgrounds(referenceDir);
+            if (byAppearance.isEmpty()) {
+                byAppearance = loadCaptureManifestBackdrops(referenceDir);
+            }
+            cache.put(referenceDir, byAppearance);
+        }
+        Integer hit = matchAppearance(byAppearance, testName);
+        return hit != null ? hit.intValue() : cn1Bg;
+    }
+
+    /// Longest key first, so an appearance named "dark" cannot shadow one named
+    /// "high-contrast-dark". Null when no appearance suffix matches.
+    private static Integer matchAppearance(Map<String, Integer> byAppearance, String testName) {
+        if (byAppearance == null || byAppearance.isEmpty()) {
+            return null;
+        }
+        List<String> keys = new ArrayList<>(byAppearance.keySet());
+        keys.sort((a, b) -> b.length() - a.length());
+        for (String k : keys) {
+            if (testName.endsWith("_" + k)) {
+                return byAppearance.get(k);
+            }
+        }
+        return null;
+    }
+
+    private static Map<String, Integer> loadCaptureManifestBackdrops(Path dir) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        Path f = dir.resolve("capture-manifest.json");
+        if (!Files.exists(f)) {
+            return out;
+        }
+        try {
+            Object root = JsonUtil.parse(new String(Files.readAllBytes(f),
+                    java.nio.charset.StandardCharsets.UTF_8));
+            // asObject() answers an EMPTY map for anything that is not an object,
+            // so a manifest without the key simply yields no entries and the caller
+            // falls back -- no null handling needed here.
+            Map<String, Object> byApp = JsonUtil.asObject(
+                    JsonUtil.asObject(root).get("backdrop_by_appearance"));
+            for (Map.Entry<String, Object> e : byApp.entrySet()) {
+                String val = String.valueOf(e.getValue()).trim();
+                if (val.startsWith("#")) {
+                    val = val.substring(1);
+                }
+                out.put(e.getKey(), Integer.valueOf((int) (Long.parseLong(val, 16) & 0xffffffL)));
+            }
+        } catch (Exception ex) {
+            // Same rule as loadTileBackgrounds: a manifest we cannot read must not
+            // silently fall back to the wrong colour, which is the bug this exists
+            // to fix.
+            throw new IllegalStateException("unreadable " + f + ": " + ex.getMessage(), ex);
+        }
+        return out;
     }
 
     private static Map<String, Integer> loadTileBackgrounds(Path dir) {
@@ -1257,8 +1338,10 @@ public class ProcessScreenshots {
     /// a different place (a wrong margin) the content simply does not line up and is
     /// scored as mismatch. Symmetric: each side searches the other and the worse
     /// direction is taken so content present on only one side is penalized.
-    private static double absoluteShapeSim(BufferedImage bn, BufferedImage bc, int bgRgb) {
+    private static double absoluteShapeSim(BufferedImage bn, BufferedImage bc, int bgRgb,
+                                           int nativeBgRgb) {
         int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;
+        int nbR = (nativeBgRgb >> 16) & 0xff, nbG = (nativeBgRgb >> 8) & 0xff, nbB = nativeBgRgb & 0xff;
         int w = Math.min(bn.getWidth(), bc.getWidth());
         int h = Math.min(bn.getHeight(), bc.getHeight());
         int[] nArr = new int[w * h];
@@ -1269,7 +1352,7 @@ public class ProcessScreenshots {
                 cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
             }
         }
-        boolean[] nC = contentMask(nArr, bgR, bgG, bgB);
+        boolean[] nC = contentMask(nArr, nbR, nbG, nbB);
         boolean[] cC = contentMask(cArr, bgR, bgG, bgB);
         long sum = 0;
         long count = 0;

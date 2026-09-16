@@ -4697,8 +4697,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             // somewhere else entirely. -1,-1 is the same "nothing is under the pointer"
             // coordinate the Windows and Linux ports send from their leave events; a real
             // canvas coordinate is never negative.
+            // Through windowPointerHover, NOT pointerHover: a secondary window's canvas
+            // has windowId > 0 and its hover must reach that window's Desktop entry, the
+            // way mouseMoved above sends it. Routing the leave to the main form instead
+            // left the secondary window's control hovered until another motion event
+            // happened to reach it.
             if (JavaSEPort.this.isDesktop()) {
-                JavaSEPort.this.pointerHover(new int[]{-1}, new int[]{-1});
+                JavaSEPort.this.windowPointerHover(windowId, -1, -1);
             }
         }
         public void mouseDragged(MouseEvent e) {

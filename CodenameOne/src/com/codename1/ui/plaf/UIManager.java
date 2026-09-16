@@ -702,7 +702,16 @@ public class UIManager {
         }
         String dotted = (id == null || id.length() == 0) ? "" : dottedId(id);
         String suffix = dotted + type + "#";
-        return hasStyleDefinition(suffix) || hasStyleDefinition("$Dark" + suffix);
+        if (hasStyleDefinition(suffix)) {
+            return true;
+        }
+        // A $Dark-only declaration counts ONLY while dark mode is actually on. In light
+        // mode the caller goes on to ask for the LIGHT key, which does not exist, and
+        // getComponentCustomStyle builds it out of blank defaults -- so a theme that
+        // declares $DarkButton.hover# and no light hover would drop the button to the
+        // default colours on hover instead of leaving its normal style alone.
+        Boolean darkMode = CN.isDarkMode();
+        return darkMode != null && darkMode.booleanValue() && hasStyleDefinition("$Dark" + suffix);
     }
 
     /// Returns the selected style of the component with the given baseStyle or a **new instance** of the default

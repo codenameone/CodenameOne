@@ -27,6 +27,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.util.MutableResource;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Hashtable;
@@ -168,12 +169,43 @@ public class ComponentHoverStyleTest extends UITestBase {
         assertEquals(0x44ff88, b.getStyle().getBgColor(), "hovered, straight from the stylesheet");
     }
 
-    /**
-     * A UIID that declares hover only in dark mode still counts as declaring it, because the
-     * CSS compiler emits a `@media (prefers-color-scheme: dark)` block as `$Dark&lt;UIID&gt;`.
-     */
+    /// Dark mode is global state on Display, so a test that sets it has to put it back or
+    /// every later test in the run inherits it.
+    @AfterEach
+    public void resetDarkMode() {
+        display.setDarkMode(null);
+    }
+
+    /// A UIID that declares hover ONLY in dark mode declares it only WHILE dark mode is on.
+    ///
+    /// The CSS compiler emits a `@media (prefers-color-scheme: dark)` block as
+    /// `$Dark<UIID>`, so `$DarkButton.hover#` is a real hover declaration -- for dark mode.
+    /// Counting it in light mode too made getHoverStyle() go on to request the LIGHT
+    /// `Button.hover#` key, which does not exist, and getComponentCustomStyle builds a style
+    /// out of blank defaults from a missing key: hovering would drop the button to the
+    /// default colours instead of leaving its normal light style alone.
     @Test
-    public void darkOnlyHoverDeclarationIsStillADeclaration() {
+    public void darkOnlyHoverDeclarationDoesNotApplyInLightMode() {
+        display.setDarkMode(Boolean.FALSE);
+        Hashtable theme = new Hashtable();
+        theme.put("Button.bgColor", "112233");
+        theme.put("$DarkButton.hover#bgColor", "44ff88");
+        UIManager.getInstance().setThemeProps(theme);
+
+        Component c = new Button("light");
+        c.setUIID("Button");
+        assertNull(c.getHoverStyle(),
+                "a dark-only hover declaration must not register while light mode is active");
+        c.setHovered(true);
+        assertEquals(0x112233, c.getStyle().getBgColor(),
+                "hovering must leave the normal light style untouched");
+    }
+
+    /// The other half of the same rule: in dark mode the $Dark declaration IS the hover
+    /// style, and hovering has to pick up the colour it declares.
+    @Test
+    public void darkOnlyHoverDeclarationAppliesInDarkMode() {
+        display.setDarkMode(Boolean.TRUE);
         Hashtable theme = new Hashtable();
         theme.put("Button.bgColor", "112233");
         theme.put("$DarkButton.hover#bgColor", "44ff88");
@@ -182,6 +214,8 @@ public class ComponentHoverStyleTest extends UITestBase {
         Component c = new Button("dark");
         c.setUIID("Button");
         assertNotNull(c.getHoverStyle(),
-                "a dark-only hover declaration must still register as declared");
+                "a dark-only hover declaration is a declaration while dark mode is active");
+        c.setHovered(true);
+        assertEquals(0x44ff88, c.getStyle().getBgColor(), "hovered, from the $Dark block");
     }
 }
