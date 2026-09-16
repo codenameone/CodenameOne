@@ -10,6 +10,7 @@ import contextlib
 import io
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -222,7 +223,6 @@ class TokenMinting(unittest.TestCase):
             return False
 
     def opener(self, *responses):
-        outer = self
 
         class Opener:
             def __init__(self):
@@ -253,6 +253,40 @@ class TokenMinting(unittest.TestCase):
         with self.assertRaises(canary.CanaryFailure) as caught:
             canary.mint_build_token(opener, "https://x")
         self.assertIn("set-user", str(caught.exception))
+
+
+class TimeoutHandling(unittest.TestCase):
+    """A timeout must not carry the command line into a public issue."""
+
+    def test_timeout_message_hides_the_credentials_in_the_command(self):
+        secret_token = "jwt-should-not-appear"
+        secret_email = "account-should-not-appear@example.com"
+        with self.assertRaises(canary.CanaryFailure) as caught:
+            canary.run(
+                [sys.executable, "-c",
+                 f"import time; print('{secret_token} {secret_email}'); time.sleep(30)"],
+                cwd=".", what="probe", timeout=1,
+                secrets=(secret_token, secret_email))
+        message = str(caught.exception)
+        self.assertNotIn(secret_token, message)
+        self.assertNotIn(secret_email, message)
+        self.assertIn("did not finish within", message)
+
+    def test_timeout_kills_the_whole_process_tree(self):
+        """A surviving grandchild could submit a build after this leg failed."""
+        marker = Path(tempfile.mkdtemp()) / "grandchild-survived"
+        # Parent spawns a child that outlives it and would write the marker.
+        script = (
+            "import subprocess,sys,time;"
+            f"subprocess.Popen([sys.executable,'-c',\"import time;time.sleep(4);"
+            f"open(r'{marker}','w').write('x')\"]);"
+            "time.sleep(30)"
+        )
+        with self.assertRaises(canary.CanaryFailure):
+            canary.run([sys.executable, "-c", script], cwd=".", what="probe", timeout=1)
+        time.sleep(6)
+        self.assertFalse(marker.exists(),
+                         "a spawned grandchild outlived the timeout")
 
 
 class Budgets(unittest.TestCase):

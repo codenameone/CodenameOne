@@ -34,6 +34,7 @@ import argparse
 import json
 import os
 import re
+import signal
 import shutil
 import stat
 import subprocess
@@ -308,22 +309,64 @@ def seed_token(project, mvn, email, token, plugin_version):
     log("seeded build-client token")
 
 
-def run(command, cwd, what, timeout, secrets=(), check=True):
-    result = subprocess.run(
-        command, cwd=str(cwd), capture_output=True, text=True, timeout=timeout
-    )
-    output = (result.stdout or "") + (result.stderr or "")
-    # Redact before this can reach a report, and so an issue body. The account
-    # address is passed to the goal as an argument, so a tool that echoes its
-    # arguments back in an error would otherwise carry it straight out.
+def redact(text, secrets):
     for value in secrets:
         if value:
-            output = output.replace(value, "***")
-    if check and result.returncode != 0:
+            text = text.replace(value, "***")
+    return text
+
+
+def terminate_tree(process):
+    """Kill the launcher AND everything it spawned.
+
+    subprocess kills only the direct child, but the launcher is a shell that
+    execs mvnw, which execs a JVM. Left alive, that JVM can submit a build
+    minutes after this leg has already failed -- and the next serialised leg
+    would then see a build id it did not create, which is exactly the
+    cross-leg confusion max-parallel is there to prevent.
+    """
+    try:
+        if WINDOWS:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                           capture_output=True, timeout=60)
+        else:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+    except Exception:  # noqa: BLE001 - best effort; the report matters more
+        process.kill()
+
+
+def run(command, cwd, what, timeout, secrets=(), check=True):
+    # Its own process group, so a timeout can take the whole tree down.
+    extra = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS \
+        else {"start_new_session": True}
+    process = subprocess.Popen(
+        command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, **extra
+    )
+    try:
+        output, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as expired:
+        terminate_tree(process)
+        # Bounded: if anything in the tree survived and still holds the pipe,
+        # draining it must not hang the phase we just gave up on.
+        try:
+            partial, _ = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            partial = ""
+        # Never surface the exception itself. Its str() carries the whole
+        # command line, which holds the minted token and the account address,
+        # and this text is written to the report and copied into a public issue.
         raise CanaryFailure(
-            f"{what} failed with exit {result.returncode}:\n{tail(output)}"
+            f"{what} did not finish within {timeout}s and was terminated.\n\n"
+            + tail(redact((expired.output or "") + (partial or ""), secrets))
+        ) from None
+    output = redact(output or "", secrets)
+    if check and process.returncode != 0:
+        raise CanaryFailure(
+            f"{what} failed with exit {process.returncode}:\n{tail(output)}"
         )
-    return result.returncode, output
+    return process.returncode, output
 
 
 def tail(text, lines=40):

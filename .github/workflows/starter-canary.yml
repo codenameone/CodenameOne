@@ -176,21 +176,27 @@ jobs:
             const read = (dir, label) => {
               const file = `reports/canary-${dir}/canary.json`;
               if (!fs.existsSync(file)) {
-                return `${label}: the canary job produced no report (it did not run, or the runner died).`;
+                return { problem: `${label}: the canary job produced no report (it did not run, or the runner died).` };
               }
               const raw = fs.readFileSync(file, 'utf8');
               try {
                 const data = JSON.parse(raw);
-                return data.ok ? null : `${label}: ${data.error}`;
+                if (!data.ok) return { problem: `${label}: ${data.error}` };
+                // An artefact-only dispatch proves nothing about cloud builds.
+                // Treating it as recovery would close an open outage and claim
+                // both platforms built, without a build having been submitted.
+                return { inconclusive: data.stage !== 'build' };
               } catch (e) {
-                return `${label}: unreadable canary report -- ${raw.slice(0, 300)}`;
+                return { problem: `${label}: unreadable canary report -- ${raw.slice(0, 300)}` };
               }
             };
 
-            const problems = [
+            const results = [
               read('ubuntu-latest', 'Linux'),
               read('windows-latest', 'Windows'),
-            ].filter(Boolean);
+            ];
+            const problems = results.map(r => r.problem).filter(Boolean);
+            const inconclusive = problems.length === 0 && results.some(r => r.inconclusive);
 
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner, repo, state: 'open', per_page: 100,
@@ -200,6 +206,16 @@ jobs:
               candidate.title === title &&
               (candidate.body || '').includes(marker)
             );
+
+            if (inconclusive) {
+              // Leave any open issue exactly as it is: not proven broken, and
+              // certainly not proven fixed.
+              await core.summary
+                .addHeading('Cloud starter canary')
+                .addRaw('Artefact checks passed; no cloud build was submitted, so this run neither confirms nor clears an outage.')
+                .write();
+              return;
+            }
 
             if (problems.length === 0) {
               await core.summary.addHeading('Cloud starter canary').addRaw('Healthy').write();
