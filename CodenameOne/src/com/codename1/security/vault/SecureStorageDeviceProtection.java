@@ -210,7 +210,16 @@ public class SecureStorageDeviceProtection extends DeviceProtection {
         if (existing != null) {
             return existing;
         }
-        if (keyState(keyId) != KEY_ABSENT) {
+        int state = keyState(keyId);
+        if (state == KEY_PRESENT) {
+            // Another process can create the key after load() saw absence. Adopt its value
+            // rather than treating a readable winner as an unavailable store.
+            existing = load(keyId);
+            if (existing != null) {
+                return existing;
+            }
+        }
+        if (state != KEY_ABSENT) {
             // The store has no key it can hand over and will not say the entry is absent. Writing
             // here is how a device key that was there all along gets overwritten.
             throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
