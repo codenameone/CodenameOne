@@ -491,7 +491,7 @@ static int cn1LinuxStateMask(guint state) {
 }
 
 /* Hover and contact must retain the same physical source. GDK_SOURCE_CURSOR
- * is a tablet puck, not a pen; only the pen and its eraser map to TYPE_STYLUS. */
+ * is a tablet puck, not a pen; pen and eraser retain their distinct pointer types. */
 int cn1LinuxPointerSourceFlag(GdkEvent* event) {
     GdkDevice* device = gdk_event_get_source_device(event);
     if (device == NULL) {
@@ -501,7 +501,10 @@ int cn1LinuxPointerSourceFlag(GdkEvent* event) {
     if (source == GDK_SOURCE_TOUCHSCREEN) {
         return CN1_PE_TOUCH_FLAG;
     }
-    if (source == GDK_SOURCE_PEN || source == GDK_SOURCE_ERASER) {
+    if (source == GDK_SOURCE_ERASER) {
+        return CN1_PE_ERASER_FLAG;
+    }
+    if (source == GDK_SOURCE_PEN) {
         return CN1_PE_PEN_FLAG;
     }
     return 0;

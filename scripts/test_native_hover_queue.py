@@ -60,6 +60,45 @@ int main(void) {
 
 
 class NativeHoverQueueTest(unittest.TestCase):
+    def test_linux_pointer_sources_remain_distinct(self):
+        native = REPO / 'Ports/LinuxPort/nativeSources'
+        header = (native / 'cn1_linux.h').read_text()
+        flags = '\n'.join(re.findall(r'^#define CN1_PE_(?:TOUCH|PEN|ERASER)_FLAG\s+\d+', header, re.M))
+        source = (native / 'cn1_linux_window.c').read_text()
+        helper = source[source.index('int cn1LinuxPointerSourceFlag('):source.index('/* True when an event originated')]
+        code = r'''
+#include <assert.h>
+#include <stddef.h>
+typedef enum { GDK_SOURCE_MOUSE, GDK_SOURCE_PEN, GDK_SOURCE_ERASER,
+               GDK_SOURCE_CURSOR, GDK_SOURCE_TOUCHSCREEN } GdkInputSource;
+typedef struct { GdkInputSource source; } GdkDevice;
+typedef struct { GdkDevice* device; } GdkEvent;
+static GdkDevice* gdk_event_get_source_device(GdkEvent* event) { return event->device; }
+static GdkInputSource gdk_device_get_source(GdkDevice* device) { return device->source; }
+''' + flags + '\n' + helper + r'''
+int main(void) {
+    GdkDevice device;
+    GdkEvent event = { &device };
+    GdkInputSource sources[] = { GDK_SOURCE_MOUSE, GDK_SOURCE_PEN, GDK_SOURCE_ERASER,
+                                GDK_SOURCE_CURSOR, GDK_SOURCE_TOUCHSCREEN };
+    int expected[] = { 0, 512, 1024, 0, 256 };
+    for (int i = 0; i < 5; i++) {
+        device.source = sources[i];
+        assert(cn1LinuxPointerSourceFlag(&event) == expected[i]);
+    }
+    event.device = NULL;
+    assert(cn1LinuxPointerSourceFlag(&event) == 0);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'sources.c'
+            binary = Path(directory) / 'sources'
+            path.write_text(code)
+            subprocess.run(shlex.split(os.environ.get('CC', 'cc')) +
+                           ['-std=c11', '-Wall', '-Wextra', '-Werror', str(path), '-o', str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
     def compile_and_run(self, platform):
         native = REPO / 'Ports' / (platform + 'Port') / 'nativeSources'
         stem = 'cn1_' + platform.lower()

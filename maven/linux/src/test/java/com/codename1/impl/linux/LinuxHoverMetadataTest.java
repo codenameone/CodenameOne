@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LinuxHoverMetadataTest {
     @Test
-    void mouseAndPenHoverReplaceContactMetadataBeforeDispatch() throws Exception {
+    void mousePenAndEraserHoverReplaceContactMetadataBeforeDispatch() throws Exception {
         java.lang.reflect.Field singleton = LinuxImplementation.class.getDeclaredField("INSTANCE");
         singleton.setAccessible(true);
         Object previous = singleton.get(null);
@@ -49,11 +49,19 @@ class LinuxHoverMetadataTest {
                     received[0] = windowId; received[1] = x; received[2] = y;
                 }
             };
-            // Native keys: no source flag means mouse; bit 512 means pen.
-            for (int key : new int[]{0, 512}) {
-                expectedType[0] = key == 0 ? PointerEvent.TYPE_MOUSE : PointerEvent.TYPE_STYLUS;
+            // Press, drag and release all decode the same key before dispatch.
+            java.lang.reflect.Method mark = LinuxImplementation.class.getDeclaredMethod("markPointer", int.class);
+            mark.setAccessible(true);
+            mark.invoke(port, 1024 | PointerEvent.MASK_PRIMARY);
+            assertEquals(PointerEvent.TYPE_ERASER, port.getPointerType());
+            assertEquals(PointerEvent.MASK_PRIMARY, port.getPointerButtonMask());
+            assertFalse(port.isPointerHovering());
+            // Native source flags: mouse = 0, pen = 512, eraser = 1024.
+            for (int key : new int[]{0, 512, 1024}) {
+                expectedType[0] = key == 0 ? PointerEvent.TYPE_MOUSE
+                        : key == 512 ? PointerEvent.TYPE_STYLUS : PointerEvent.TYPE_ERASER;
                 for (int source : new int[]{PointerEvent.TYPE_TOUCH, PointerEvent.TYPE_MOUSE,
-                        PointerEvent.TYPE_STYLUS}) {
+                        PointerEvent.TYPE_STYLUS, PointerEvent.TYPE_ERASER}) {
                     for (int[] event : new int[][]{{0, 10, 20}, {7, 10, 20}, {0, -1, -1}, {7, -1, -1}}) {
                         port.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY, PointerEvent.MASK_PRIMARY,
                                 source, 1f, 2f, 3f, 4f, 5, false);

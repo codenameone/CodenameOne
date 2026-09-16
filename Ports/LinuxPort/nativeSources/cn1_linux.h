@@ -115,6 +115,7 @@ typedef enum {
 #define CN1_PE_MASK_FORWARD   16
 #define CN1_PE_TOUCH_FLAG     256
 #define CN1_PE_PEN_FLAG       512
+#define CN1_PE_ERASER_FLAG    1024
 
 /* Pushes one event onto the ring buffer (called from the GTK thread). */
 /* Turns fractional smooth-scroll notches into whole ones, carrying the remainder

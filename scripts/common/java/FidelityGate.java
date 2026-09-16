@@ -119,6 +119,13 @@ public class FidelityGate {
         }
 
         if (arguments.updateBaseline != null) {
+            // New and legacy score-only pairs must acquire geometry when refreshed;
+            // otherwise the update would permanently exempt them from this contract.
+            for (String pair : current.keySet()) {
+                if (!baselineGeometry.containsKey(pair) && !currentGeometry.containsKey(pair)) {
+                    broken.add(pair + " (missing or incomplete geometry in baseline update)");
+                }
+            }
             // A baseline refresh from a PARTIAL run would silently ratchet only
             // the surviving pairs -- broken pairs must fail the update just like
             // they fail the gate.

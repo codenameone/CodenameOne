@@ -765,19 +765,22 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // not pump or drain on its own (it is not the window's owning thread).
     }
 
-    // High bits in the native key flag touch or pen input (see cn1_linux.h);
+    // High bits in the native key flag touch, pen, or eraser input (see cn1_linux.h);
     // the low byte is the button bitmask (PointerEvent.MASK_*).
     private static final int POINTER_BUTTON_BITS = 0xFF;
     private static final int POINTER_TOUCH_FLAG = 256;
     private static final int POINTER_PEN_FLAG = 512;
+    private static final int POINTER_ERASER_FLAG = 1024;
 
-    // Decodes the native pointer key field (button mask + touch/pen flags) into the
+    // Decodes the native pointer key field (button mask + pointer source flags) into the
     // cross-platform PointerEvent metadata for the next dispatched pointer event, so
     // the rich pointer / context-menu APIs report the real button and device type.
     private void markPointer(int keyField) {
         int mask = keyField & POINTER_BUTTON_BITS;
         int type;
-        if ((keyField & POINTER_PEN_FLAG) != 0) {
+        if ((keyField & POINTER_ERASER_FLAG) != 0) {
+            type = com.codename1.ui.events.PointerEvent.TYPE_ERASER;
+        } else if ((keyField & POINTER_PEN_FLAG) != 0) {
             type = com.codename1.ui.events.PointerEvent.TYPE_STYLUS;
         } else if ((keyField & POINTER_TOUCH_FLAG) != 0) {
             type = com.codename1.ui.events.PointerEvent.TYPE_TOUCH;

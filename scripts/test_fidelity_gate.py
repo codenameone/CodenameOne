@@ -47,7 +47,7 @@ class FidelityGateTest(unittest.TestCase):
         result = self.gate({"kept": 90})
         self.assertEqual(20, result.returncode)
         self.assertIn("removed (baseline pair absent", result.stderr)
-        self.assertEqual(0, self.gate({"kept": 90}, update=True).returncode)
+        self.assertEqual(0, self.gate({"kept": 90}, update=True, geometry={"center_offset": 0, "width_ratio": 1, "height_ratio": 1}).returncode)
         self.assertIn("removed", json.loads(self.baseline.read_text())["pairs"],
                       "a partial baseline update must not silently delete coverage")
         self.assertEqual(20, self.gate({"kept": 90}).returncode)
@@ -67,6 +67,19 @@ class FidelityGateTest(unittest.TestCase):
         # A partial refresh can omit a pair entirely without deleting its geometry.
         self.assertEqual(0, self.gate({}, update=True).returncode)
         self.assertEqual(geometry, json.loads(self.baseline.read_text())["geometry"]["kept"])
+
+    def test_baseline_updates_require_geometry_for_new_and_legacy_pairs(self):
+        geometry = {"center_offset": 0, "width_ratio": 1, "height_ratio": 1}
+        for name in ("new", "kept"):
+            for missing in (None, {}, {"empty": True}, {"center_offset": 0}):
+                with self.subTest(pair=name, geometry=missing):
+                    before = self.baseline.read_text()
+                    result = self.gate({name: 90}, update=True, geometry=missing)
+                    self.assertEqual(20, result.returncode)
+                    self.assertIn("missing or incomplete geometry", result.stderr)
+                    self.assertEqual(before, self.baseline.read_text())
+            self.assertEqual(0, self.gate({name: 90}, update=True, geometry=geometry).returncode)
+            self.assertEqual(geometry, json.loads(self.baseline.read_text())["geometry"][name])
 
     def test_empty_capture_set_cannot_pass_an_existing_baseline(self):
         result = self.gate({})
