@@ -2979,13 +2979,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (!isDesktopNativeThemeResource(resource)) {
             return "win".equals(platform) ? "ArialUnicodeMS" : "Arial";
         }
-        if ("win".equals(platform)) {
-            return "Segoe UI Variable Text";
+        if (!"win".equals(platform) && !"mac".equals(platform) && !"linux".equals(platform)) {
+            return "Arial";
         }
-        if ("mac".equals(platform)) {
-            return ".AppleSystemUIFont";
-        }
-        return "linux".equals(platform) ? "Cantarell" : "Arial";
+        String[] candidates = "mac".equals(platform)
+                ? new String[]{".AppleSystemUIFont", "SF Pro Text", "Helvetica Neue"}
+                : ("linux".equals(platform) ? new String[]{"Cantarell", "Adwaita Sans", "SansSerif"}
+                : new String[]{"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI"});
+        String installed = findFirstInstalledFontCandidate(candidates, getAvailableFontNamesLowercase());
+        return installed == null ? "SansSerif" : installed;
     }
 
     static String resolvePackagedDesktopNativeTheme(String platformName, Properties theme) {
@@ -5847,7 +5849,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     props.getProperty("monospaceFontFamily", "Monospaced"), false);
             desktopNativeFonts = isDesktopNativeThemeResource("/" + overrideTheme + ".res");
             if (desktopNativeFonts) {
-                fontFaceSystem = defaultSystemFontForTheme(platformName, "/" + overrideTheme + ".res");
+                fontFaceSystem = defaultSystemFontForTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"),
+                        "/" + overrideTheme + ".res");
             }
             int med;
             int sm;
@@ -14157,14 +14160,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private java.awt.Font desktopNativeFont(String alias) {
         String family = fontFaceSystem;
-        if (!fontFacesExplicitlyConfigured) {
-            String[] candidates = IS_MAC
-                    ? new String[]{".AppleSystemUIFont", "SF Pro Text", "Helvetica Neue"}
-                    : (IS_LINUX ? new String[]{"Cantarell", "Adwaita Sans", "SansSerif"}
-                    : new String[]{"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI"});
-            String installed = findFirstInstalledFontCandidate(candidates, getAvailableFontNamesLowercase());
-            family = installed == null ? "SansSerif" : installed;
-        }
+        // FACE_SYSTEM and native aliases share the installed family resolved at
+        // theme selection. Windows Java may expose "Segoe UI Variable" without
+        // the preferred "Text" suffix; retaining that missing name gives Dialog.
         String variant = alias.substring("native:".length());
         boolean italic = variant.startsWith("Italic");
         if (!italic && !variant.startsWith("Main")) {

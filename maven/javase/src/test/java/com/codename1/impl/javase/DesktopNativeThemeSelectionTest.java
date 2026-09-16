@@ -28,6 +28,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DesktopNativeThemeSelectionTest {
+    @org.junit.jupiter.api.AfterEach
+    void resetFontInventory() {
+        JavaSEPort.clearAvailableFontNamesLowercaseForTest();
+    }
+
+    @Test
+    void systemFaceUsesTheInstalledWindowsFamilyName() {
+        java.util.Set<String> installed = new java.util.HashSet<String>();
+        installed.add("segoe ui variable");
+        JavaSEPort.setAvailableFontNamesLowercaseForTest(installed);
+        assertEquals("Segoe UI Variable", JavaSEPort.defaultSystemFontForTheme("win", "/WindowsFluentTheme.res"));
+        installed.clear();
+        installed.add("segoe ui");
+        assertEquals("Segoe UI", JavaSEPort.defaultSystemFontForTheme("win", "/WindowsFluentTheme.res"));
+    }
+
     @Test
     void packagedHintSelectsTheHostThemeWithoutSourceSettings() {
         String previous = System.getProperty("codename1.arg.desktop.themeMode");
@@ -89,6 +105,11 @@ class DesktopNativeThemeSelectionTest {
 
     @Test
     void systemFontsAreOptInAndExplicitFacesRemainOverrides() throws Exception {
+        java.util.Set<String> installed = new java.util.HashSet<String>();
+        installed.add("segoe ui variable text");
+        installed.add(".applesystemuifont");
+        installed.add("cantarell");
+        JavaSEPort.setAvailableFontNamesLowercaseForTest(installed);
         for (String platform : new String[]{"win", "mac", "linux"}) {
             String legacy = "win".equals(platform) ? "ArialUnicodeMS" : "Arial";
             for (String resource : new String[]{null, "/NativeTheme.res", "/iOS7Theme.res", "/Custom.res"}) {
