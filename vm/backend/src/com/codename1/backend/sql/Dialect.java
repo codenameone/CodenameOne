@@ -337,6 +337,24 @@ public abstract class Dialect {
         // SQLite cannot say ESCAPE '' at all ("ESCAPE expression must be a
         // single character"), which is another reason the SQLite branch renders
         // something else entirely rather than sharing this string.
+        //
+        // AND THE MySQL FAMILY CAN, which review has now asked about twice: the
+        // suggestion is that those engines require exactly one character here
+        // and reject the statement, so every like() would fail on them. They do
+        // not. MySQL's own manual says the escape expression "must evaluate to a
+        // string that is empty or one character long", and measured by running
+        // SELECT 1 WHERE 'abc' LIKE ? ESCAPE '' with 'a%' bound:
+        //
+        //   MySQL 8.0.46        accepted, 1 row
+        //   MariaDB 11.8.9      accepted, 1 row
+        //   MariaDB 10.11.19    accepted, 1 row
+        //   MariaDB 10.4.34     accepted, 1 row
+        //   PostgreSQL 16.15    accepted, 1 row
+        //
+        // OrmCheck holds this without needing a case of its own: its five like()
+        // checks are not gated by dialect, so they run on all four MySQL-family
+        // arms of the matrix, and a rejected ESCAPE clause would fail every one
+        // of them rather than go unnoticed.
         return " LIKE ? ESCAPE ''";
     }
 
