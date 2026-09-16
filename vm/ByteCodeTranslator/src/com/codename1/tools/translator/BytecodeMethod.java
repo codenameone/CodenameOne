@@ -2068,6 +2068,13 @@ public class BytecodeMethod implements SignatureSet {
                 }
             }
         }
+        for(int sbIter = 0 ; sbIter < stackIterCount ; sbIter++) {
+            // long long for 8-alignment, which every object header needs. Declared for
+            // the whole frame rather than per loop: the iterator must stay valid until
+            // the loop ends, and a nested for-each needs its own buffer anyway.
+            b.append("    long long __cn1iterbuf_").append(sbIter)
+                    .append("[(CN1_ITER_BUF_BYTES + 7) / 8];\n");
+        }
         for(Instruction i : instructions) {
             i.setMethod(this);
             i.setMaxes(maxStack, maxLocals);
@@ -2880,18 +2887,84 @@ public class BytecodeMethod implements SignatureSet {
 
     /// The shape check and the splice for one candidate. Returns false -- changing
     /// nothing -- for any loop that is not exactly the canonical javac for-each.
-    private boolean rewriteForEachAt(int iterIdx) {
+    /// Number of stack-iterator buffers this method needs, one per surviving for-each.
+    private int stackIterCount;
+
+    /// Offer a C stack buffer to the iterator of every for-each this method still has.
+    ///
+    /// Runs AFTER lowerForEachToIndexed, so it only sees the loops that could not be
+    /// turned into indexed ones -- the ones whose receiver type is not provable, which is
+    /// where nearly all the remaining iterator allocation lives. It needs no receiver
+    /// type: the buffer is offered to whatever iterator() turns out to allocate, and only
+    /// a class the escape analysis cleared will take it.
+    ///
+    /// The OFFER is scoped to the call, not to the loop. Withdrawing it immediately after
+    /// the iterator is stored means a `break`, a `return` or a `throw` out of the loop
+    /// body cannot leave a pointer to a dead frame pending for some later allocation to
+    /// pick up. The buffer itself stays valid for the whole method, so the iterator living
+    /// in it is unaffected -- what is short-lived is permission to take it, not the
+    /// storage.
+    /// -Dcn1.stackIterators=false turns the whole mechanism off, so the A/B is one
+    /// translator flag rather than two source trees -- the only way to measure it without
+    /// the comparison picking up an unrelated difference.
+    static final boolean STACK_ITERATORS =
+            !"false".equals(System.getProperty("cn1.stackIterators"));
+
+    public void markStackIterators() {
+        if (!STACK_ITERATORS) {
+            return;
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke)) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            int op = inv.getOpcode();
+            if (op != Opcodes.INVOKEINTERFACE && op != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            if (!"iterator".equals(inv.getName())
+                    || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
+                continue;
+            }
+            int[] v = validateForEach(i);
+            if (v == null) {
+                continue;
+            }
+            int id = stackIterCount++;
+            String begin = "    cn1IterScopeBegin(threadStateData, __cn1iterbuf_" + id + ");\n";
+            String end = "    cn1IterScopeEnd(threadStateData);\n";
+            // Back to front so the earlier index stays valid: the store is after the call.
+            instructions.add(v[0] + 1, new CustomIntruction(end, end, new ArrayList<String>()));
+            instructions.add(i, new CustomIntruction(begin, begin, new ArrayList<String>()));
+            i++;   // step over the instruction just inserted
+        }
+    }
+
+    public int getStackIterCount() {
+        return stackIterCount;
+    }
+
+    /// The canonical javac for-each shape plus the iterator slot's lifetime, shared by
+    /// both consumers of that proof: the indexed lowering, and the stack-iterator scope.
+    ///
+    /// Returns {storeIdx, itSlot, ld1, hn, ifq, ld2, nx, endIdx} or null. Keeping it in
+    /// one place matters because the two callers rely on the SAME guarantee -- that the
+    /// iterator is read only by hasNext() and next() and is dead after the loop. If they
+    /// drifted apart, the stack-allocating one would be the one that crashed.
+    private int[] validateForEach(int iterIdx) {
         int storeIdx = nextExecutable(iterIdx + 1);
         if (storeIdx < 0) {
-            return false;
+            return null;
         }
         Instruction store = instructions.get(storeIdx);
         if (!(store instanceof VarOp) || store.getOpcode() != Opcodes.ASTORE) {
-            return false;
+            return null;
         }
         int itSlot = ((VarOp) store).getIndex();
         if (itSlot < firstNonParameterSlot()) {
-            return false;
+            return null;
         }
         // The condition label must follow the store immediately; anything executable in
         // between is not the shape javac emits.
@@ -2908,7 +2981,7 @@ public class BytecodeMethod implements SignatureSet {
             break;
         }
         if (condLabelIdx < 0) {
-            return false;
+            return null;
         }
         int ld1 = nextExecutable(condLabelIdx + 1);
         int hn = ld1 < 0 ? -1 : nextExecutable(ld1 + 1);
@@ -2916,25 +2989,25 @@ public class BytecodeMethod implements SignatureSet {
         int ld2 = ifq < 0 ? -1 : nextExecutable(ifq + 1);
         int nx = ld2 < 0 ? -1 : nextExecutable(ld2 + 1);
         if (nx < 0) {
-            return false;
+            return null;
         }
         if (!isALoadOf(ld1, itSlot) || !isIteratorCall(hn, "hasNext", "()Z")) {
-            return false;
+            return null;
         }
         Instruction jump = instructions.get(ifq);
         if (!(jump instanceof Jump) || jump.getOpcode() != Opcodes.IFEQ) {
-            return false;
+            return null;
         }
         if (!isALoadOf(ld2, itSlot) || !isIteratorCall(nx, "next", "()Ljava/lang/Object;")) {
-            return false;
+            return null;
         }
         Label endLabel = ((Jump) jump).getLabel();
         if (endLabel == null) {
-            return false;
+            return null;
         }
         int endIdx = indexOfLabel(endLabel);
         if (endIdx <= nx) {
-            return false;
+            return null;
         }
         // THE ITERATOR SLOT IS CHECKED OVER THIS LOOP'S LIFETIME, NOT OVER THE METHOD.
         // Counting ASTOREs and ALOADs across the whole method looks safer and is much
@@ -2952,7 +3025,7 @@ public class BytecodeMethod implements SignatureSet {
             if (touchesSlot(instructions.get(k), itSlot)) {
                 // A third read inside the loop is the body calling it.remove(), which
                 // an indexed loop cannot express. Refuse rather than guess.
-                return false;
+                return null;
             }
         }
         for (int k = endIdx; k < instructions.size(); k++) {
@@ -2965,8 +3038,20 @@ public class BytecodeMethod implements SignatureSet {
             if (in instanceof VarOp && in.getOpcode() == Opcodes.ASTORE) {
                 break;
             }
+            return null;
+        }
+        return new int[] {storeIdx, itSlot, ld1, hn, ifq, ld2, nx, endIdx};
+    }
+
+    private boolean rewriteForEachAt(int iterIdx) {
+        int[] v = validateForEach(iterIdx);
+        if (v == null) {
             return false;
         }
+        int storeIdx = v[0], itSlot = v[1], ld1 = v[2], hn = v[3], ifq = v[4];
+        int ld2 = v[5], nx = v[6], endIdx = v[7];
+        Jump jump = (Jump) instructions.get(ifq);
+        Label endLabel = jump.getLabel();
 
         int idxSlot = maxLocals;
         final String AL = "java/util/ArrayList";

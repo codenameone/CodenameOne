@@ -1366,7 +1366,21 @@ public class ByteCodeClass {
             b.append(clsName);
             b.append("(CODENAME_ONE_THREAD_STATE) {\n    __STATIC_INITIALIZER_");
             b.append(clsName);
-            b.append("(threadStateData);\n    JAVA_OBJECT o = codenameOneGcMalloc(threadStateData, sizeof(struct obj__");
+            b.append("(threadStateData);\n");
+            if(Parser.isStackIterator(clsName)) {
+                // This class is an iterator the translator proved cannot outlive the loop
+                // that creates it -- `this` escapes none of its own methods, and no site
+                // in the closed world lets the new object escape except by returning it.
+                // So if the caller left a stack buffer pending, build there instead of on
+                // the heap. sizeof is a compile-time constant in this translation unit, so
+                // a class too big for the buffer compiles the branch away entirely.
+                b.append("    {\n        JAVA_OBJECT __si = cn1IterScopeTake(threadStateData, &class__");
+                b.append(clsName);
+                b.append(", sizeof(struct obj__");
+                b.append(clsName);
+                b.append("));\n        if(__si != JAVA_NULL) {\n            return __si;\n        }\n    }\n");
+            }
+            b.append("    JAVA_OBJECT o = codenameOneGcMalloc(threadStateData, sizeof(struct obj__");
             b.append(clsName);
             b.append("), &class__");
             b.append(clsName);

@@ -15303,6 +15303,11 @@ static void cn1ReportUncaughtException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex
 }
 
 void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    // A pending stack-iterator offer belongs to a frame that this throw may unwind, and
+    // an offer outliving its frame would hand a later allocation a pointer into dead
+    // stack. The offer is cheap to re-make and worthless to keep, so drop it here rather
+    // than reason about which frames survive.
+    threadStateData->pendingStackIter = 0;
     #if defined(__OBJC__)
     //NSLog(@"Throwing exception!"); 
     #endif

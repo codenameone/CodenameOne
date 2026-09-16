@@ -938,12 +938,14 @@ public class Parser extends ClassVisitor {
                 // complete before the first rewrite consults it -- hence its own pass
                 // over every class rather than a lazy fill inside the loop below.
                 buildConcreteCollectionFields();
+                iteratorStackCensus();
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
                         // BEFORE lowerIteratorCalls, which retypes the very calls this
                         // recognises: after it they are INVOKEVIRTUAL on the concrete
                         // iterator and the for-each shape no longer matches.
                         fuseMtd.lowerForEachToIndexed();
+                        fuseMtd.markStackIterators();
                         fuseMtd.lowerIteratorCalls();
                         fuseMtd.elideToCharArrayScans();
                     }
@@ -2518,4 +2520,156 @@ public class Parser extends ClassVisitor {
             super.visitEnd();
         }
     }
+
+    /// -Dcn1.iteratorCensus=true: report which Iterator implementations could live in the
+    /// caller's stack frame, and why the rest could not.
+    ///
+    /// Round 23 established that the iterator universe is closed and ours -- 33 of 34
+    /// implementations are java.util classes, every one of them a parent reference plus a
+    /// handful of primitives. That makes a uniform stack buffer possible, but only for
+    /// classes whose instances provably cannot outlive the loop. Three conditions have to
+    /// hold together, and this census measures all three:
+    ///
+    ///   1. `this` does not escape any method of the iterator class, its constructor
+    ///      included -- a ctor that registers itself with its parent is the obvious way an
+    ///      iterator outlives the frame;
+    ///   2. at every site that allocates one, the new object does not escape that method
+    ///      except by being returned -- which covers an iterator() that caches what it
+    ///      hands out;
+    ///   3. the for-each site's own slot does not escape, which the indexed lowering
+    ///      already proves separately.
+    ///
+    /// Printed rather than assumed because the mechanism is only as sound as this set, and
+    /// a class silently dropping out of it is a performance regression that no gate would
+    /// otherwise report.
+    /// Classes whose instances may live in the caller's stack frame, by mangled name.
+    /// COMPUTED, never listed: a hand-written set goes stale the moment someone edits an
+    /// iterator, and the failure would be a dangling pointer rather than a compile error.
+    private static final java.util.Set<String> stackIterClasses = new java.util.HashSet<String>();
+
+    public static boolean isStackIterator(String mangledClsName) {
+        return stackIterClasses.contains(mangledClsName);
+    }
+
+    static void iteratorStackCensus() {
+        boolean verbose = "true".equals(System.getProperty("cn1.iteratorCensus"));
+        int total = 0, safeClasses = 0, leakThis = 0, unknownThis = 0;
+        int sites = 0, safeSites = 0, leakSites = 0, unknownSites = 0;
+        StringBuilder rejected = new StringBuilder();
+        StringBuilder accepted = new StringBuilder();
+        for (ByteCodeClass c : classes) {
+            if (!implementsIterator(c)) {
+                continue;
+            }
+            total++;
+            int worst = IteratorEscape.SAFE;
+            String why = null;
+            String reason = "";
+            for (BytecodeMethod m : c.getMethods()) {
+                int r = IteratorEscape.thisEscapes(m);
+                if (r != IteratorEscape.SAFE && worst == IteratorEscape.SAFE) {
+                    worst = r;
+                    why = m.getMethodName();
+                    // Captured HERE: lastReason is overwritten by every later method, so
+                    // reading it after the loop names the wrong instruction.
+                    reason = IteratorEscape.lastReason;
+                }
+            }
+            boolean eligible = worst == IteratorEscape.SAFE;
+            if (worst == IteratorEscape.SAFE) {
+                safeClasses++;
+            } else if (worst == IteratorEscape.ESCAPES) {
+                leakThis++;
+                rejected.append("    ").append(c.getClsName()).append(" -- this escapes in ")
+                        .append(why).append("\n");
+            } else {
+                unknownThis++;
+                rejected.append("    ").append(c.getClsName()).append(" -- unanalysable ")
+                        .append(why).append(": ").append(reason).append("\n");
+            }
+            // Every site that allocates this iterator, anywhere in the closed world.
+            String mangled = IteratorEscape.mangle(c.getClsName());
+            for (ByteCodeClass oc : classes) {
+                for (BytecodeMethod m : oc.getMethods()) {
+                    if (!allocates(m, mangled)) {
+                        continue;
+                    }
+                    sites++;
+                    int r = IteratorEscape.newEscapes(m, mangled);
+                    if (r != IteratorEscape.SAFE) {
+                        // ONE leaking site disqualifies the whole class. The buffer is
+                        // taken by class, not by site -- __NEW_X cannot tell which caller
+                        // it is serving -- so eligibility must hold everywhere the class
+                        // is allocated, not merely at the sites we like.
+                        eligible = false;
+                    }
+                    if (r == IteratorEscape.SAFE) {
+                        safeSites++;
+                        accepted.append("    OK ").append(oc.getClsName()).append(".")
+                                .append(m.getMethodName()).append(" -> ")
+                                .append(c.getClsName()).append("\n");
+                    } else if (r == IteratorEscape.ESCAPES) {
+                        leakSites++;
+                        rejected.append("    site ").append(oc.getClsName()).append(".")
+                                .append(m.getMethodName()).append(" leaks a ")
+                                .append(c.getClsName()).append("\n");
+                    } else {
+                        unknownSites++;
+                        rejected.append("    site ").append(oc.getClsName()).append(".")
+                                .append(m.getMethodName()).append(" unanalysable for ")
+                                .append(c.getClsName()).append(": ")
+                                .append(IteratorEscape.lastReason).append("\n");
+                    }
+                }
+            }
+            if (eligible) {
+                stackIterClasses.add(mangled);
+            }
+        }
+        if (!verbose) {
+            return;
+        }
+        System.out.println("[ITER] Iterator implementations=" + total
+                + " thisSafe=" + safeClasses + " thisEscapes=" + leakThis
+                + " unanalysable=" + unknownThis);
+        System.out.println("[ITER] allocation sites=" + sites
+                + " safe=" + safeSites + " escaping=" + leakSites
+                + " unanalysable=" + unknownSites);
+        System.out.println("[ITER] stack-eligible classes=" + stackIterClasses.size());
+        System.out.println("[ITER] eligible set=" + stackIterClasses);
+        if (accepted.length() > 0) {
+            System.out.println("[ITER] eligible allocation sites:");
+            System.out.print(accepted);
+        }
+        if (rejected.length() > 0) {
+            System.out.println("[ITER] refusals:");
+            System.out.print(rejected);
+        }
+    }
+
+    private static boolean allocates(BytecodeMethod m, String mangledOwner) {
+        for (com.codename1.tools.translator.bytecodes.Instruction i : m.getInstructions()) {
+            if (i instanceof com.codename1.tools.translator.bytecodes.TypeInstruction
+                    && i.getOpcode() == org.objectweb.asm.Opcodes.NEW
+                    && mangledOwner.equals(IteratorEscape.mangle(
+                        ((com.codename1.tools.translator.bytecodes.TypeInstruction) i).getTypeName()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean implementsIterator(ByteCodeClass c) {
+        for (ByteCodeClass w = c; w != null; w = w.getBaseClassObject()) {
+            for (String i : w.getBaseInterfaces()) {
+                String n = IteratorEscape.mangle(i);
+                if ("java_util_Iterator".equals(n) || "java_util_ListIterator".equals(n)
+                        || "java_util_Enumeration".equals(n)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }

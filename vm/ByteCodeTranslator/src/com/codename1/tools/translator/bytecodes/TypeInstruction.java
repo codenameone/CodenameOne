@@ -331,7 +331,13 @@ public class TypeInstruction extends Instruction {
                 // CN1_FAST_NEW inlines the BiBOP bump fast-path at the allocation
                 // site (Lever 1, -DCN1_INLINE_ALLOC); with the flag off it expands
                 // verbatim to __NEW_<type>(threadStateData).
-                b.append("PUSH_POINTER(CN1_FAST_NEW(");
+                // An iterator the escape analysis cleared takes the caller's pending
+                // stack buffer when one is on offer; CN1_ITER_NEW falls through to
+                // CN1_FAST_NEW when there is none, so this is the same allocation
+                // everywhere else.
+                b.append("PUSH_POINTER(")
+                 .append(com.codename1.tools.translator.Parser.isStackIterator(type)
+                         ? "CN1_ITER_NEW(" : "CN1_FAST_NEW(");
                 b.append(type);
                 b.append(")); /* NEW */\n");
                 break;
