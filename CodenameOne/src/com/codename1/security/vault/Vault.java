@@ -422,7 +422,9 @@ public final class Vault {
     ///
     /// a resource completing when the vault is set up and unlocked, or erroring with
     /// [VaultError#CONFLICT] if one already exists, [VaultError#POLICY_NOT_MET] if a required
-    /// protection is missing, or [VaultError#STORAGE_UNAVAILABLE] if nothing could be written
+    /// protection is missing, or [VaultError#STORAGE_UNAVAILABLE] if nothing could be written.
+    /// [VaultError#LOCKED] means locking interrupted setup; a committed password record can
+    /// remain, so check [#state()] and unlock it instead of enrolling again.
     public AsyncResource<Boolean> enroll(final char[] password, VaultOptions opts) {
         if (opts != null) {
             // Copied, for the reason configure gives: this is the second way a caller's mutable
@@ -438,7 +440,7 @@ public final class Vault {
             public void run() {
                 try {
                     enrollNow(password, generation);
-                    out.complete(Boolean.TRUE);
+                    completeUnlock(out, generation);
                 } catch (VaultException failed) {
                     out.error(failed);
                 } catch (CryptoException failed) {

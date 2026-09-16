@@ -117,7 +117,7 @@ class VaultSourceInvariantsTest extends UITestBase {
         assertFalse(completion.contains("synchronized"));
         String adopt = codeOnly(methodBody(source, "private synchronized void adoptSession("));
         assertTrue(adopt.indexOf("touch()") >= 0 && adopt.indexOf("touch()") < adopt.indexOf("adoptKey("));
-        for (String name : new String[] {"unlockWithPassword", "unlockRemembered", "unlockWithRecoveryCode"}) {
+        for (String name : new String[] {"enroll", "unlockWithPassword", "unlockRemembered", "unlockWithRecoveryCode"}) {
             String body = codeOnly(methodBody(source, "public AsyncResource<Boolean> " + name + "("));
             assertTrue(body.contains("completeUnlock(out, generation"), name);
             assertFalse(body.contains("out.complete("), name);

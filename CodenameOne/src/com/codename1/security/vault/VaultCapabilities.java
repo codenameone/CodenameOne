@@ -69,10 +69,6 @@ public final class VaultCapabilities {
         if (policy == UnlockPolicy.SESSION_ONLY) {
             return true;
         }
-        ProtectionReport report = device.protection();
-        if (!report.provides(Protection.PERSISTENT)) {
-            return false;
-        }
         if (policy == UnlockPolicy.REQUIRE_USER_VERIFICATION) {
             DeviceProtection gated = device.userVerifying();
             if (gated == null || !gated.requiresUserVerification()) {
@@ -87,7 +83,7 @@ public final class VaultCapabilities {
             return gatedReport.provides(Protection.PERSISTENT)
                     && gatedReport.provides(Protection.USER_VERIFICATION);
         }
-        return true;
+        return device.protection().provides(Protection.PERSISTENT);
     }
 
     /// What a vault enrolled under this policy would be protected by, if it were enrolled now.

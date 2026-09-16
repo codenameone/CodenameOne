@@ -773,6 +773,20 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void persistentGatedProviderDoesNotRequirePersistentBaseStorage() {
+        device.refuseWrites = true;
+        VaultOptions options = fast().policy(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        Vault vault = Vault.named(freshName()).configure(options);
+        assertTrue(vault.capabilities().supports(UnlockPolicy.SESSION_ONLY));
+        assertFalse(vault.capabilities().supports(UnlockPolicy.REMEMBER_DEVICE));
+        assertTrue(vault.capabilities().supports(UnlockPolicy.REQUIRE_USER_VERIFICATION),
+                "the gated provider owns this policy's storage");
+        assertTrue(vault.enroll(pw("p"), options).get().booleanValue());
+        vault.lock();
+        assertTrue(Vault.named(vault.getName()).configure(options).unlockRemembered().get().booleanValue());
+    }
+
+    @Test
     void capabilitiesDescribeTheMechanismEachPolicyWouldUse() {
         Vault vault = Vault.named(freshName()).configure(fast());
         assertTrue(vault.capabilities().supports(UnlockPolicy.SESSION_ONLY));
@@ -1470,6 +1484,32 @@ class VaultTest extends UITestBase {
         Vault reopened = Vault.named(name).configure(fast());
         assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()));
         assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+    }
+
+    @Test
+    void lockingDuringRememberedEnrollmentReportsLockedAfterCleanup() throws Exception {
+        for (UnlockPolicy policy : new UnlockPolicy[] {UnlockPolicy.REMEMBER_DEVICE,
+                UnlockPolicy.REQUIRE_USER_VERIFICATION}) {
+            VaultOptions options = fast().policy(policy);
+            final Vault vault = Vault.named(freshName()).configure(options);
+            TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+            java.lang.reflect.Method deviceKey = Vault.class.getDeclaredMethod("deviceRecordKey");
+            deviceKey.setAccessible(true);
+            impl.setDuringStorageWrite((String) deviceKey.invoke(vault), () -> vault.lock());
+            try {
+                assertEquals(VaultError.LOCKED, errorOf(vault.enroll(pw("p"), options)),
+                        "the requested remembered policy was interrupted by locking");
+            } finally {
+                impl.setDuringStorageWrite(null, null);
+            }
+            assertFalse(vault.isUnlocked());
+            assertEquals(UnlockPolicy.SESSION_ONLY, vault.getPolicy());
+            Vault reopened = Vault.named(vault.getName()).configure(fast());
+            assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()));
+            assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue(),
+                    "committed enrollment still opens with the password");
+            reopened.lock();
+        }
     }
 
     @Test
