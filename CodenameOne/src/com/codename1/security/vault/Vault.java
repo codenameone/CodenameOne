@@ -2497,7 +2497,23 @@ public final class Vault {
     /// Always a copy, even for the current version, so the caller can zero what it is given
     /// without reaching into the vault's own key.
     byte[] dataKeyAtVersion(int wanted) {
-        return keyAtVersion(metadata, dataKey, wanted);
+        // Both fields SNAPSHOTTED and checked here, rather than read live inside keyAtVersion.
+        // lock() nulls metadata and dataKey together, and a lock landing between a caller's
+        // requireUnlocked() and this read made keyAtVersion dereference a null record --
+        // a NullPointerException thrown synchronously out of an API whose callers catch
+        // VaultException, so VaultKeyHandle.open() never completed its AsyncResource with
+        // LOCKED and the exception escaped to whatever was on the stack instead.
+        //
+        // Both callers are on this path: openAnyVersion, which every retired-version read goes
+        // through, and subkeyAtVersion behind a post-rotation KeyHandle.
+        VaultMetadata record = metadata;
+        byte[] live = dataKey;
+        if (record == null || live == null) {
+            throw new VaultException(VaultError.LOCKED,
+                    "the vault was locked while a record sealed under an earlier key version "
+                    + "was being opened");
+        }
+        return keyAtVersion(record, live, wanted);
     }
 
     /// Walks `record`'s retired chain back from its current data key to version `wanted`.
@@ -3385,12 +3401,29 @@ public final class Vault {
             return false;
         }
         String prefix = secretKey("");
+        boolean sawOurOwnRecord = false;
         for (String entry : entries) {
-            if (entry != null && entry.startsWith(prefix)) {
+            if (entry == null) {
+                continue;
+            }
+            if (entry.startsWith(prefix)) {
                 return false;
             }
+            if (entry.equals(metadataKey())) {
+                sawOurOwnRecord = true;
+            }
         }
-        return true;
+        // The listing has to PROVE itself before its silence counts as absence. Null is JavaSE
+        // saying it failed; the browser does not say so at all -- HTML5Implementation catches
+        // the IndexedDB error and answers an EMPTY array, which reads exactly like a store that
+        // holds nothing. A tab storing a secret while a remembered-policy enrolment waited on
+        // its prompt, and an enumeration that then failed alongside that prompt, made this
+        // answer "untouched" and the rollback deleted the metadata protecting that ciphertext.
+        //
+        // This vault's own record is on disk right now -- the comparison above just read it --
+        // so a listing that does not contain it is contradicting something already established
+        // and is not evidence of anything.
+        return sawOurOwnRecord;
     }
 
     /// One storage entry, read past the cache.

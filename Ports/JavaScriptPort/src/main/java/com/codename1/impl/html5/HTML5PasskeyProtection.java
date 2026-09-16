@@ -66,16 +66,30 @@ public final class HTML5PasskeyProtection extends DeviceProtection {
     private static HTML5PasskeyProtection instance;
 
     /// Set from [com.codename1.security.vault.VaultOptions#requireDeviceBoundPasskey()] before
-    /// enrolment. Instance state on a singleton rather than a parameter, because it changes how
-    /// a key is created and the SPI creates keys through [#ensureKey(String)].
-    private boolean deviceBoundRequired;
+    /// enrolment, because it changes how a key is created and the SPI creates keys through
+    /// [#ensureKey(String)], which takes no such parameter.
+    ///
+    /// PER THREAD, not per instance. This class is a singleton and the setter runs immediately
+    /// before ensureKey on the same call chain -- so as plain instance state, two vaults
+    /// enrolling at once shared it: a vault that does NOT require a device-bound passkey could
+    /// set it false between a stricter vault's setter and its read, and that stricter vault then
+    /// enrolled a syncable credential while believing it had refused one. A requirement that
+    /// belongs to one enrolment has to travel with that enrolment, and the setter and the read
+    /// are always the same thread.
+    private static final ThreadLocal<Boolean> DEVICE_BOUND_REQUIRED = new ThreadLocal<Boolean>();
 
     private HTML5PasskeyProtection() {
     }
 
     @Override
     public void setDeviceBoundRequired(boolean required) {
-        deviceBoundRequired = required;
+        DEVICE_BOUND_REQUIRED.set(required ? Boolean.TRUE : Boolean.FALSE);
+    }
+
+    /// What this thread's enrolment asked for; false when nothing set it.
+    private static boolean deviceBoundRequired() {
+        Boolean required = DEVICE_BOUND_REQUIRED.get();
+        return required != null && required.booleanValue();
     }
 
     /// The port's singleton.
@@ -157,9 +171,10 @@ public final class HTML5PasskeyProtection extends DeviceProtection {
     @Override
     public AsyncResource<Boolean> ensureKey(String keyId) {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        byte[] answer = nativePrfEnroll(keyId, "Codename One vault", deviceBoundRequired);
+        boolean deviceBound = deviceBoundRequired();
+        byte[] answer = nativePrfEnroll(keyId, "Codename One vault", deviceBound);
         VaultException failure = failureOf(answer,
-                deviceBoundRequired
+                deviceBound
                         ? "no authenticator here could provide a passkey that cannot leave this "
                           + "device; most passkeys sync, and an unverifiable answer is treated as "
                           + "\"may leave\" rather than accepted"
