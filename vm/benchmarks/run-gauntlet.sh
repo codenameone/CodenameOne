@@ -45,7 +45,15 @@ J8="${JDK_8_HOME:?set JDK_8_HOME}"
 # allocates nor gets traced -- it never held a real reference across a collection. That
 # gap hid a live-object loss: MapTorture2 failed on its first run with "LOST held key k1",
 # and MapTorture, the gauntlet and the self-hosting gates were all green at the time.
-TORTURES="MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT"
+#
+# LambdaT gates the non-capturing-lambda singleton: a lambda with no captured fields has no
+# distinguishable instances, so the factory returns a shared one instead of allocating per
+# evaluation. It deliberately does NOT assert reference identity between evaluations -- the
+# JLS does not guarantee a lambda expression yields a new object and the JDK caches
+# non-capturing instances too, so `a == b` is unspecified on both sides. What it does check
+# is that capturing lambdas still see their OWN captures, which is what a shared-instance
+# bug would break first.
+TORTURES="MapTorture MapTorture2 IdmTorture HtTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync BoxEdge ConcatCorrupt ToCharT ForEachT LambdaT"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)

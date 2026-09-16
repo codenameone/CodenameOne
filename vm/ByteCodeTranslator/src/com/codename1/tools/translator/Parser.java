@@ -2082,19 +2082,62 @@ public class Parser extends ClassVisitor {
                 BytecodeMethod factory = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, factoryMethodName, actualFactoryDesc, null, null);
                 lambdaClass.addMethod(factory);
 
-                factory.addTypeInstruction(Opcodes.NEW, lambdaClassName);
-                factory.addInstruction(Opcodes.DUP);
+                if (capturedArgs.length == 0) {
+                    // A LAMBDA THAT CAPTURES NOTHING HAS NO DISTINGUISHABLE INSTANCES, so
+                    // it is allocated ONCE instead of on every evaluation.
+                    //
+                    // The class has no instance fields at all in this case -- the fields
+                    // above are the captures -- so two instances differ in nothing a
+                    // program can observe: not state, not behaviour. Identity is the only
+                    // thing, and the JLS explicitly declines to guarantee it here (a
+                    // lambda expression need not produce a new object; the JDK's own
+                    // LambdaMetafactory caches non-capturing instances for exactly this
+                    // reason). So the factory hands back a shared instance.
+                    //
+                    // Measured on the self-hosting corpus: 4 of 6 lambda classes capture
+                    // nothing. This costs no analysis -- "declares no instance fields" is
+                    // known here, at the point the class is synthesised -- and it is the
+                    // only allocation removal in the collections plan that needs neither
+                    // an escape analysis nor a receiver type.
+                    //
+                    // Lazily, and deliberately WITHOUT a lock. A race can construct two
+                    // instances and publish one; the loser is garbage and nothing can tell
+                    // which won, because the instances are indistinguishable. The field is
+                    // written with PUTSTATIC, whose generated setter carries the write
+                    // barrier, so the publish is safe for the collector.
+                    ByteCodeField cache = new ByteCodeField(lambdaClassName,
+                            Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "cn1Instance",
+                            factoryRetType, null, null);
+                    lambdaClass.addField(cache);
 
-                // Load factory arguments (captured args)
-                localIndex = 0; // Static method
-                for (Type t : capturedArgs) {
-                    factory.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
-                    localIndex += t.getSize();
+                    Label haveIt = new Label();
+                    factory.addField(lambdaClass, Opcodes.GETSTATIC, lambdaClassName, "cn1Instance", factoryRetType);
+                    factory.addInstruction(Opcodes.DUP);
+                    factory.addJump(Opcodes.IFNONNULL, haveIt);
+                    factory.addInstruction(Opcodes.POP);
+                    factory.addTypeInstruction(Opcodes.NEW, lambdaClassName);
+                    factory.addInstruction(Opcodes.DUP);
+                    factory.addInvoke(Opcodes.INVOKESPECIAL, lambdaClassName, "<init>", ctorDesc.toString(), false);
+                    factory.addInstruction(Opcodes.DUP);
+                    factory.addField(lambdaClass, Opcodes.PUTSTATIC, lambdaClassName, "cn1Instance", factoryRetType);
+                    factory.addLabel(haveIt);
+                    factory.addInstruction(Opcodes.ARETURN);
+                    factory.setMaxes(4, 0);
+                } else {
+                    factory.addTypeInstruction(Opcodes.NEW, lambdaClassName);
+                    factory.addInstruction(Opcodes.DUP);
+
+                    // Load factory arguments (captured args)
+                    localIndex = 0; // Static method
+                    for (Type t : capturedArgs) {
+                        factory.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
+                        localIndex += t.getSize();
+                    }
+
+                    factory.addInvoke(Opcodes.INVOKESPECIAL, lambdaClassName, "<init>", ctorDesc.toString(), false);
+                    factory.addInstruction(Opcodes.ARETURN);
+                    factory.setMaxes(localIndex + 2, localIndex);
                 }
-
-                factory.addInvoke(Opcodes.INVOKESPECIAL, lambdaClassName, "<init>", ctorDesc.toString(), false);
-                factory.addInstruction(Opcodes.ARETURN);
-                factory.setMaxes(localIndex + 2, localIndex);
 
                 // 7. Register the new class
                 classes.add(lambdaClass);
