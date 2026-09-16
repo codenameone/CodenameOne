@@ -149,7 +149,7 @@ final class InputValidationUITests: XCTestCase {
         // repeats a slow start can leave in front of it are harmless.
         //
         // Stopped by the driver's keytype.stop gate, written as soon as the step
-        // resolves either way, AND by a deadline inside the app's exit grace. The
+        // resolves either way, AND by a deadline inside the STEP's own budget. The
         // app exits SUITE_EXIT_DELAY_MS (8 seconds) after the suite finishes, and
         // typing into a process that has left fails the XCUITest run even though
         // every event landed.
@@ -166,26 +166,33 @@ final class InputValidationUITests: XCTestCase {
         //
         // The sleep is sliced for the same reason: a whole second of not looking is
         // most of the margin the gate buys.
-        // BOUNDED BY THE APP'S EXIT GRACE, not by a pass count, and that is what
-        // this loop was missing rather than another gate check.
+        // BOUNDED BY THE STEP'S OWN BUDGET, not by a pass count and not by the
+        // app's exit grace.
         //
-        // GestureSuite.SUITE_EXIT_DELAY_MS is 8 seconds: the app leaves 8 seconds
-        // after CN1IV:SUITE:FINISHED whatever this loop is doing. A pass here costs
-        // three keystrokes and a one-second sleep, and a keystroke is not cheap --
+        // A pass count was the original defect: fifteen passes of three keystrokes
+        // and a one-second sleep is eighty seconds, and a keystroke is not cheap --
         // MEASURED on the failing run, one `Type '1' key` to the next `Type 'c' key`
         // was 1.5 seconds, because every key waits for the app to idle while the
-        // simulator is also serving accessibility snapshots. So a pass is up to five
-        // and a half seconds and fifteen of them are eighty, against a grace of
-        // eight. Missing the stop gate therefore did not risk typing into a departed
-        // app, it GUARANTEED it -- the loop was always going to outlive the app by a
-        // factor of ten, and the only thing keeping runs green was the gate winning
-        // a race it wins most of the time.
+        // simulator is also serving accessibility snapshots.
         //
-        // The deadline keeps the whole loop inside the grace, so the worst case is
-        // that the app is still there and nobody typed into a ghost. The gate is
-        // still checked before every key, because when it arrives it is the earlier
-        // and cheaper signal.
-        let deadline = Date().addingTimeInterval(6.0)
+        // Bounding it by the 8-second exit grace instead was the WRONG CLOCK, and
+        // the fix for one failure caused another. That grace starts when the suite
+        // FINISHES, not when this loop starts; the step it is feeding has its own
+        // 30-second budget (GestureSuite.DEFAULT_STEP_TIMEOUT_MS) and the native
+        // editor can take three and a half seconds to appear before a keystroke
+        // lands anywhere. A six-second deadline therefore expires before a second
+        // complete pass can land on a slow runner -- this returns, KeyTypeStep goes
+        // on waiting, and the step times out at thirty. Failing the keyboard test
+        // on exactly the slow CI runs the retry loop exists to support.
+        //
+        // The step's budget is the lifecycle this loop belongs to, so the deadline
+        // is inside THAT, and what stops it promptly is the gate rather than the
+        // clock: written as soon as the step resolves either way, and checked
+        // before every key rather than once a pass, so the loop stops within one
+        // keystroke of the step finishing -- 1.5 seconds against the 8 the app then
+        // waits before leaving. The clock is only the backstop for a gate that
+        // never arrives.
+        let deadline = Date().addingTimeInterval(25.0)
         while Date() < deadline {
             if stopRequested("keytype", syncDir: syncDir) {
                 return
@@ -194,6 +201,9 @@ final class InputValidationUITests: XCTestCase {
                 if stopRequested("keytype", syncDir: syncDir) {
                     return
                 }
+                // app.state is the second stop: once the app has gone there is
+                // nothing to type into, and a key synthesised into a departed
+                // process fails the whole XCUITest run.
                 guard app.state == .runningForeground, Date() < deadline else {
                     return
                 }

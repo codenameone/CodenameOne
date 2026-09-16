@@ -494,7 +494,18 @@ public final class Config {
                         + "silently.");
             }
             if(FileIo.stat(fd, info) < 0) {
-                return null;
+                // NOT ABSENT EITHER. The descriptor is already OPEN, so the file
+                // exists and this is the filesystem failing to describe it -- an
+                // I/O error, or a stale handle on a network or container mount
+                // that went away underneath us. Reading that as "no configuration"
+                // is the same silent fallback the open failure above refuses:
+                // every setting in the file becomes an environment default, and a
+                // deployment naming its TLS certificate and key there comes up in
+                // plaintext because the mount blinked.
+                throw new IOException(path + " is open but its size could not be read. "
+                        + "A configuration file that is present must be readable: every "
+                        + "setting in it would otherwise fall back to a default, "
+                        + "silently.");
             }
             long size = info[0];
             // A configuration file is kilobytes. The ceiling is here because the
