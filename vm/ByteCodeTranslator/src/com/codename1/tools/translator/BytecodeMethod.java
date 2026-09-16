@@ -2699,6 +2699,26 @@ public class BytecodeMethod implements SignatureSet {
             Field f = (Field) recv;
             return Parser.concreteCollectionFieldType(f.getOwner(), f.getFieldName());
         }
+        // A GETTER'S RETURN IS ITS FIELD. This is the single step that widened the proof
+        // most, and it costs nothing new: asInlinableFieldAccess already decides whether a
+        // call resolves monomorphically to a trivial `return this.f` and hands back the
+        // Field it reads, so a receiver of the form `x.getFoo()` is exactly as provable as
+        // the field behind it.
+        //
+        // It matters because of what the refusals actually were. Of the ~224 for-each
+        // sites the analysis could not prove, the largest group was method returns, and
+        // they are overwhelmingly getters over a field the store map already answers:
+        // ByteCodeClass.getMethods 13 sites, BytecodeMethod.getInstructions 7,
+        // ByteCodeClass.getFields 3, getBaseInterfacesObject 3. Chasing a general
+        // return-type fixpoint would reach the rest (Map.entrySet and friends, which build
+        // a fresh view object per call and are a different problem); this reaches the part
+        // that is one dereference deep, which is where the sites are.
+        if (recv instanceof Invoke) {
+            Field folded = ((Invoke) recv).asInlinableFieldAccess();
+            if (folded != null) {
+                return Parser.concreteCollectionFieldType(folded.getOwner(), folded.getFieldName());
+            }
+        }
         if (recv instanceof VarOp && recv.getOpcode() == Opcodes.ALOAD) {
             int slot = ((VarOp) recv).getIndex();
             // Same reasoning as lowerIteratorCalls: a parameter reaches its slot with
@@ -2719,6 +2739,15 @@ public class BytecodeMethod implements SignatureSet {
                     if (sv instanceof Invoke && sv.getOpcode() == Opcodes.INVOKESPECIAL
                             && "<init>".equals(((Invoke) sv).getName())) {
                         return ((Invoke) sv).getOwner();
+                    }
+                    // `List<X> l = obj.getFoo(); for (X x : l)` -- one transitive step, the
+                    // same getter rule as above applied to the value the local was given.
+                    if (sv instanceof Invoke) {
+                        Field folded = ((Invoke) sv).asInlinableFieldAccess();
+                        if (folded != null) {
+                            return Parser.concreteCollectionFieldType(folded.getOwner(),
+                                    folded.getFieldName());
+                        }
                     }
                     return null;
                 }
