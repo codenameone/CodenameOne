@@ -655,6 +655,20 @@ public final class HTML5SecureStorage extends SecureStorage {
             return false;
         }
         Storage storage = Storage.getInstance();
+        // Read BEFORE anything is deleted, so the gate release below can tell this account's
+        // record from one a concurrent set() put there while this ran.
+        String settledWhenAsked = null;
+        try {
+            byte[] answer = nativeRead(encryptedKey(account));
+            if (answer != null && answer.length > 0 && answer[0] == STATUS_OK) {
+                settledWhenAsked = new String(answer, 1, answer.length - 1, "UTF-8");
+            }
+        } catch (RuntimeException noBridge) {
+            // No gate store in this build; the release below handles that the same way.
+            settledWhenAsked = null;
+        } catch (java.io.UnsupportedEncodingException noUtf8) {
+            settledWhenAsked = null;
+        }
         storage.deleteStorageFile(encryptedKey(account));
         storage.deleteStorageFile(legacyKey(account));
         // The gate as well, or the value is gone while the record that settled it remains -- and
@@ -666,7 +680,18 @@ public final class HTML5SecureStorage extends SecureStorage {
             // write the forgotten credential or managed database key into ordinary storage
             // again. Reporting failure is what makes the caller try again rather than believe
             // the secret is gone.
-            if (!gateAccepted(nativeForget(encryptedKey(account)))) {
+            // Compare-and-delete against the record that was there when this began. A set()
+            // in another tab can replace it while this runs, and deleting THAT discards a
+            // ciphertext whose own call is about to mirror it and report success -- after which
+            // a third tab that had already seen the ordinary entry as absent wins the emptied
+            // gate and overwrites the value that set() stored.
+            //
+            // An empty snapshot means there was no record to begin with, and nothing is removed:
+            // anything there now arrived after this call started and is not this call's to take.
+            // The return below re-reads the ordinary entries, so a set() that re-created one is
+            // reported as a removal that did not complete.
+            if (settledWhenAsked != null && settledWhenAsked.length() > 0
+                    && !gateAccepted(nativeForgetIf(encryptedKey(account), settledWhenAsked))) {
                 Log.p("SecureStorage: the create gate for this entry could not be released",
                         Log.WARNING);
                 return false;

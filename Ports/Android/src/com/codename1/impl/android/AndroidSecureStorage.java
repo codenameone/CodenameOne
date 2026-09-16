@@ -1009,7 +1009,23 @@ public final class AndroidSecureStorage extends SecureStorage {
                     // marked. The removed account became uncreatable and another process could
                     // recreate or overwrite the wrong one.
                     handle = new java.io.RandomAccessFile(gate, "rw");
-                    java.nio.channels.FileLock taken = handle.getChannel().lock();
+                    // tryLock, NOT lock. This is the only place that takes MANY gates, and a
+                    // blocking acquisition here deadlocks across processes: a write for account
+                    // A enters the reset still holding A's gate while a write for B holds B's,
+                    // and each then waits forever for the other's. Nothing in a file lock breaks
+                    // that cycle, and the HELD_GATE special case cannot -- it recognises this
+                    // thread's own lock, not another process's.
+                    //
+                    // Failing to take one immediately is already a case this method handles: it
+                    // aborts and changes nothing, and the next reset retries. Turning a deadlock
+                    // into a retry is the whole trade.
+                    java.nio.channels.FileLock taken = handle.getChannel().tryLock();
+                    if (taken == null) {
+                        // Somebody else holds it right now. Not ours -- HELD_GATE is checked in
+                        // the catch below for that -- so this reset does not get to run.
+                        everyGateHeld = false;
+                        continue;
+                    }
                     handles.add(handle);
                     locks.add(taken);
                     held.add(account);

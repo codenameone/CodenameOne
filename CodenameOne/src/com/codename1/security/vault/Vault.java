@@ -3188,6 +3188,27 @@ public final class Vault {
     /// asking for. A caller that raced is told LOCKED rather than handed an open vault, and
     /// the transient is a few statements wide and self-correcting rather than permanent.
     private void publishKey(int generation, VaultMetadata meta, byte[] key) {
+        // The stored record has to still be the one this key was derived FROM. Deriving takes as
+        // long as the KDF profile asks, and a rotation committing inside that window leaves this
+        // about to publish version N over a vault whose persisted record says N+1 -- both calls
+        // reporting success, this instance holding the old database key and storage holding the
+        // new one. A caller that then derives a database key after the rotation it was told
+        // succeeded rekeys with the superseded value and cannot reopen the database after a
+        // restart.
+        //
+        // Compared as METADATA rather than by the key generation, which would also fire for a
+        // second unlock of an already-open vault publishing the very same key -- a benign
+        // duplicate this must not turn into an error. A record that has not changed means
+        // nothing rotated, whoever else is unlocking.
+        //
+        // All four publish paths go through here: the two password unlocks, the remembered one,
+        // and the import. Only the first was reported.
+        VaultMetadata settled = loadMetadataFresh();
+        if (settled == null || !settled.serialize().equals(meta.serialize())) {
+            throw new VaultException(VaultError.CONFLICT,
+                    "this vault's record changed while the key was being derived, so the key this "
+                    + "unlock produced is not the one the vault now describes; try again");
+        }
         metadata = meta;
         adoptKey(key);
         if (generation != lockGeneration) {
