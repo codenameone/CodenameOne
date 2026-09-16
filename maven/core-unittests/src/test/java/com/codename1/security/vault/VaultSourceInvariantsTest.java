@@ -103,6 +103,24 @@ class VaultSourceInvariantsTest extends UITestBase {
         }
     }
 
+    /// One method body with its comment lines removed.
+    ///
+    /// A shape check counts occurrences of a call, and the comment EXPLAINING why there must be
+    /// only one occurrence naturally spells that call out -- so the explanation made the check
+    /// fail on correct code. Comments are documentation for the reader, not code for the rule.
+    private static String codeOnly(String body) {
+        StringBuilder b = new StringBuilder();
+        String[] lines = body.split("\n", -1);
+        for (int iter = 0; iter < lines.length; iter++) {
+            String trimmed = lines[iter].trim();
+            if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) {
+                continue;
+            }
+            b.append(lines[iter]).append('\n');
+        }
+        return b.toString();
+    }
+
     /// The body of one method, by brace counting from its signature.
     private static String methodBody(String source, String signature) {
         int at = source.indexOf(signature);
@@ -301,6 +319,24 @@ class VaultSourceInvariantsTest extends UITestBase {
                 + "withdrawDeviceRecordIfLocked(generation) when the operation beside it is "
                 + "already committed, or requireDeviceRecordStillWanted(generation, ...) when it "
                 + "is not.");
+    }
+
+    @Test
+    void isEnrolledAsksForTheStateOnceAndComparesThatOneAnswer() {
+        // state() is not a pure read: it runs checkAutoLock() and can consult storage. Asking it
+        // twice and comparing each answer separately meant an unlocked vault crossing its
+        // auto-lock deadline between the two calls answered UNLOCKED and then LOCKED -- both
+        // comparisons false -- so a vault that is plainly enrolled reported that it was not. A
+        // storage read recovering between the two does the same through STATE_UNKNOWN.
+        //
+        // A shape check because the window is sub-millisecond and sits between two statements: a
+        // test cannot land inside it, which is why the defect reads as obviously wrong and still
+        // shipped.
+        String body = codeOnly(methodBody(readVaultSource(), "public boolean isEnrolled()"));
+        int first = body.indexOf("state()");
+        assertTrue(first > 0, "isEnrolled must ask for the state");
+        assertTrue(body.indexOf("state()", first + 1) < 0,
+                "isEnrolled must ask ONCE and compare that one answer: " + body);
     }
 
     @Test

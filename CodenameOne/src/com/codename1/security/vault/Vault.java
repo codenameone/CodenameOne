@@ -271,7 +271,13 @@ public final class Vault {
 
     /// Whether this vault has been set up on this device.
     public boolean isEnrolled() {
-        return state() == LOCKED || state() == UNLOCKED;
+        // ONE call, compared twice. state() is not a pure read -- it runs checkAutoLock() and can
+        // consult storage -- so two calls can disagree: an unlocked vault crossing its auto-lock
+        // deadline between them answers UNLOCKED and then LOCKED, and both comparisons fail, so a
+        // vault that is plainly enrolled reports that it is not. A storage read that recovers
+        // between the two does the same thing through STATE_UNKNOWN.
+        int now = state();
+        return now == LOCKED || now == UNLOCKED;
     }
 
     /// Whether the data key is currently available.
@@ -2241,7 +2247,13 @@ public final class Vault {
                         // deleting the outgoing key there would delete the incoming one that was
                         // just written.
                         DeviceProtection outgoing = deviceProtection(previous);
-                        if (outgoing != deviceProtection(policy)) {
+                        // Snapshotted, not re-derived. deviceProtection() asks the store for its
+                        // user-verifying variant each time, and on the browser that answer
+                        // depends on a capability probe -- so calling it again here could compare
+                        // against a different object than the one this transition actually used
+                        // and delete the outgoing key when the two are in fact the same store.
+                        DeviceProtection incoming = deviceProtection(policy);
+                        if (outgoing != incoming) {
                             requireKeyDeleted(outgoing,
                                     "the previous device key could not be deleted");
                             outgoingKeyGone[0] = true;

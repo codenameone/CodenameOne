@@ -1337,6 +1337,35 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aProviderThatVanishesBetweenTheCheckAndTheUseDoesNotThrow() throws Exception {
+        // protectionFor asked userVerifying() twice -- once for the null check and once for the
+        // value -- and that is a LIVE question: on the browser it depends on a capability probe
+        // that resolves asynchronously at startup, so the first call can expose the passkey
+        // provider and the second observe extensionPrf=false. The null then reached protection()
+        // and threw, out of a method whose whole job is to describe what a policy would get.
+        final java.util.concurrent.atomic.AtomicInteger asked =
+                new java.util.concurrent.atomic.AtomicInteger();
+        FakeDeviceProtection flickering = new FakeDeviceProtection() {
+            @Override
+            public DeviceProtection userVerifying() {
+                // Present the first time it is asked and gone afterwards, which is the startup
+                // window this reproduces.
+                return asked.getAndIncrement() == 0 ? this : null;
+            }
+        };
+        flickering.userVerification = true;
+
+        VaultCapabilities capabilities = Vault.named(freshName())
+                .configure(fast().deviceProtection(flickering))
+                .capabilities();
+
+        ProtectionReport report =
+                capabilities.protectionFor(UnlockPolicy.REQUIRE_USER_VERIFICATION);
+        assertNotNull(report, "describing a policy must not throw when the provider flickers");
+        assertTrue(asked.get() >= 1, "the provider must actually have been asked");
+    }
+
+    @Test
     void aPolicyChangeWhoseRollbackCannotBeWrittenSaysSoRatherThanItsOriginalError()
             throws Exception {
         // The rollback used to only LOG a refused restore, on a reasoning that went stale when it

@@ -81,8 +81,13 @@ public final class VaultCapabilities {
         }
         // Reported from the protection that policy would actually use, which on the browser is a
         // different mechanism for the gated policy than for the unattended one.
-        DeviceProtection forPolicy = policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
-                && device.userVerifying() != null ? device.userVerifying() : device;
+        // Asked ONCE and reused. userVerifying() is a live question -- on the browser it
+        // depends on a capability probe that resolves asynchronously at startup -- so the null
+        // check and the use could see different answers, and a provider that appeared for the
+        // first and vanished for the second made this a null whose protection() call threw.
+        DeviceProtection gated = policy == UnlockPolicy.REQUIRE_USER_VERIFICATION
+                ? device.userVerifying() : null;
+        DeviceProtection forPolicy = gated != null ? gated : device;
         ProtectionReport report = forPolicy.protection();
         // Taken from the store rather than assumed. A remembered vault is only as encrypted at
         // rest as the wrapping key is: where that key sits in the clear beside the ciphertext --
