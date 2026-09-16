@@ -24,6 +24,7 @@ package com.codenameone.fidelity;
 
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -231,6 +232,17 @@ public final class DesktopTileRunner {
             comp.setPreferredW(w);
         }
         comp.getAllStyles().setMargin(0, 0, 0, 0);
+        // getAllStyles() deliberately EXCLUDES the hover style, so it is zeroed here as well
+        // -- and here rather than inside the renderer, because this clear runs AFTER build()
+        // returns. A renderer that normalised hover during build had its work undone one line
+        // later for every component whose own branch did not zero margins (DesktopSwitch and
+        // DesktopSlider keep the theme's 0.5/0.8mm), leaving the hover tile at a different
+        // offset and size from both the native control and the CN1 normal state -- scored as
+        // a fidelity loss that has nothing to do with the hover colours being measured.
+        Style hoverStyle = comp.getHoverStyle();
+        if (hoverStyle != null) {
+            hoverStyle.setMargin(0, 0, 0, 0);
+        }
 
         // NORTH, not CENTER: BorderLayout's centre region would centre the widget
         // vertically in whatever space is left, and the contract is top-left.

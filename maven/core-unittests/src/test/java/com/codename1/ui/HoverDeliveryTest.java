@@ -1,0 +1,164 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Hashtable;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/// Hover DELIVERY: what actually happens when a port reports a pointer position.
+///
+/// `ComponentHoverStyleTest` covers the style resolution with the flag set by hand. The two
+/// cases here are the ones that looked right in that test and still rendered nothing on a
+/// real desktop, because the flag was being put somewhere `getStyle()` does not read, or
+/// nowhere at all.
+class HoverDeliveryTest extends UITestBase {
+
+    /// Theme with a hover colour on the row UIID and on a plain button.
+    ///
+    /// Installed AFTER the surface is shown and followed by a refresh: showing loads the
+    /// default theme, and a component caches the style it already built, so props set before
+    /// show are overwritten and props set after show are not picked up without the refresh.
+    private static void installHoverTheme(Container refresh) {
+        Hashtable theme = new Hashtable();
+        theme.put("LeadRow.bgColor", "112233");
+        theme.put("LeadRow.hover#bgColor", "44ff88");
+        theme.put("Button.bgColor", "112233");
+        theme.put("Button.hover#bgColor", "44ff88");
+        // The selected colours are pinned to the normal ones because showing a surface
+        // focuses its first focusable component, and getStyle() answers the SELECTED style
+        // for a focused component. Without these the baseline reads as the blank default and
+        // says nothing about hover. It also makes the hover assertion sharper: hover outranks
+        // focus, which is the desktop behaviour, so 44ff88 can only come from the hover style.
+        theme.put("LeadRow.sel#bgColor", "112233");
+        theme.put("Button.sel#bgColor", "112233");
+        // addThemeProps, and the full refresh sequence a live theme change uses. setThemeProps
+        // REPLACES the table, which drops the defaults the surface was built against, and a
+        // component keeps the style it already built until the surface is refreshed.
+        UIManager.getInstance().addThemeProps(theme);
+        UIManager.getInstance().refreshTheme();
+        refresh.refreshTheme(true);
+        refresh.revalidate();
+        DisplayTest.flushEdt();
+    }
+
+    /// Hovers the centre of a component the way a port does.
+    private static void hoverForm(Form f, Component cmp) {
+        f.pointerHover(new int[]{cmp.getAbsoluteX() + cmp.getWidth() / 2},
+                new int[]{cmp.getAbsoluteY() + cmp.getHeight() / 2});
+    }
+
+    /// A container with a lead component paints its own hover style when the pointer is over
+    /// any of its children.
+    ///
+    /// This is the case a MultiButton, a SpanButton or a toolbar command container is: the
+    /// pointer lands on an inner label, `Form.pointerHover` resolves it to the lead PARENT,
+    /// and `Component.getStyle()` returns out of its lead branch after consulting the lead
+    /// COMPONENT. Marking the parent therefore satisfied nothing that paints, and the row
+    /// stayed at its normal colour with the pointer sitting on it.
+    @FormTest
+    void aLeadContainerShowsItsHoverStyleWhenAChildIsHovered() {
+        Form f = new Form("lead", new BorderLayout());
+        Container row = new Container(new BorderLayout());
+        row.setUIID("LeadRow");
+        Button lead = new Button("lead");
+        Label child = new Label("child");
+        row.add(BorderLayout.WEST, lead);
+        row.add(BorderLayout.CENTER, child);
+        f.add(BorderLayout.NORTH, row);
+        f.show();
+        DisplayTest.flushEdt();
+        // After showing: setLeadComponent only builds the lead hierarchy on an initialized
+        // container, so doing this before show leaves hasLead false and the test proves
+        // nothing about lead components at all.
+        row.setLeadComponent(lead);
+        f.revalidate();
+        DisplayTest.flushEdt();
+        installHoverTheme(f);
+
+        assertEquals(0x112233, row.getStyle().getBgColor(), "before any hover");
+
+        hoverForm(f, child);
+        DisplayTest.flushEdt();
+        assertEquals(0x44ff88, row.getStyle().getBgColor(),
+                "hovering a child of a lead container must paint the container's hover style");
+        // The child does NOT take the row's hover colour. Hover is opt-in per UIID and the
+        // theme declares none for Label, so the lead gives the label the ability to resolve
+        // hover from the row's pointer -- and resolving it yields nothing, which is the
+        // property that keeps every pre-hover application looking the way it always did.
+        assertNotEquals(0x44ff88, child.getStyle().getBgColor(),
+                "a UIID with no hover entry must not inherit the row's hover colour");
+
+        // And away again: the ports report leaving the window as a hover at (-1,-1).
+        f.pointerHover(new int[]{-1}, new int[]{-1});
+        DisplayTest.flushEdt();
+        assertEquals(0x112233, row.getStyle().getBgColor(), "leaving must clear it");
+    }
+
+    /// A control in a secondary window responds to hover.
+    ///
+    /// `Window` is not a `Form` -- it extends `Container` -- and its `pointerHover` only
+    /// forwarded the event. Nothing recorded which component the pointer was over, so with
+    /// the native ports now delivering hover per window, a control there still could not
+    /// paint a hover style its theme declared.
+    @FormTest
+    void aComponentInAWindowShowsItsHoverStyle() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        Button b = new Button("hover me");
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        DisplayTest.flushEdt();
+        installHoverTheme(w);
+
+        assertEquals(0x112233, b.getStyle().getBgColor(), "before any hover");
+
+        w.pointerHover(new int[]{b.getAbsoluteX() + b.getWidth() / 2},
+                new int[]{b.getAbsoluteY() + b.getHeight() / 2});
+        DisplayTest.flushEdt();
+        assertTrue(b.isHovered(), "the window has to record what its pointer is over");
+        assertEquals(0x44ff88, b.getStyle().getBgColor(),
+                "a component in a window must paint its hover style");
+
+        w.pointerHover(new int[]{-1}, new int[]{-1});
+        DisplayTest.flushEdt();
+        assertFalse(b.isHovered(), "leaving the window has to clear it");
+        assertEquals(0x112233, b.getStyle().getBgColor(), "and it must paint normally again");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+}

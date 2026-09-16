@@ -102,6 +102,11 @@ public class Window extends Container implements TopLevelContainer {
     /// caps how many windows can be dragged at once.
     private final com.codename1.impl.PointerDragActivation dragActivation =
             new com.codename1.impl.PointerDragActivation();
+    /// Which component the pointer is over, and the scrollbar thumb it lit. Shared with Form
+    /// rather than reimplemented: a window that tracked this differently would be a second
+    /// definition of what hover means.
+    private final HoverTracker hoverTracker = new HoverTracker();
+
     private Graphics windowGraphics;
     /// Set as soon as dispose() begins, so re-entering it is a no-op.
     private boolean disposing;
@@ -2728,6 +2733,10 @@ public class Window extends Container implements TopLevelContainer {
         }
         nativePeer = null;
         windowGraphics = null;
+        // A window that is going away must not leave a component believing the pointer is
+        // still over it -- the flag outlives the window and the component would paint
+        // hovered the next time it is shown. Same reason Form clears it in deinitialize.
+        hoverTracker.pointerOver(null, -1, -1);
         // showModal parks on Display.lock and wakes on this flag, so publish it under
         // the very monitor the waiter is blocked on
         synchronized (Display.lock) {
@@ -4292,8 +4301,16 @@ public class Window extends Container implements TopLevelContainer {
         }
         Component cmp = resolveComponentAt(x[0], y[0]);
         if (cmp != null) {
+            cmp = LeadUtil.leadParentImpl(cmp);
             LeadUtil.pointerHover(cmp, x, y);
         }
+        // Outside the null check, and the reason this window tracks hover at all: routing the
+        // native event here is not enough on its own, because nothing in this method used to
+        // record WHICH component the pointer was over, so a control in a secondary window
+        // could never paint a hover style its theme declared. Null is the pointer leaving the
+        // window -- the ports report that as a hover at (-1, -1) -- and it has to clear the
+        // state or the last control stays lit with the cursor somewhere else.
+        hoverTracker.pointerOver(cmp, x[0], y[0]);
         // The tooltip timer starts here or it never starts at all: this is the only
         // hover dispatch a window has. The manager resolves the surface through
         // getTopLevelContainer() and hosts the tooltip on it, so a tooltip raised from

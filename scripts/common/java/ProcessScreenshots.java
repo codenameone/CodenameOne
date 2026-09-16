@@ -564,10 +564,57 @@ public class ProcessScreenshots {
         // "different widget" and so crushed genuinely-faithful renders.
         double fillSim = absoluteShapeSim(bn, bc, bgRgb, nativeBgRgb);
         double structSim = structuralSalienceSim(bn, bc, bgRgb);   // diagnostic only (gradient-based, bg unused)
-        double ssim = computeSsim(nativeImg, cn1);
+        // SSIM sees the WHOLE tile, and the backdrop is most of it. When the two backdrops
+        // are different colours -- Aqua dark is #262626 against the theme's #323232 -- SSIM's
+        // luminance term is depressed across every flat region, so the headline carries a
+        // constant penalty that has nothing to do with the widget, and a change to the Form
+        // background alone would move every score on the set. Masking fillSim was not enough
+        // on its own because the headline multiplies the two.
+        //
+        // So the native tile's backdrop is repainted in the CN1 backdrop colour before SSIM,
+        // which leaves the widget pixels untouched and makes the flat regions agree. Only
+        // when the colours actually differ: where they are equal (every mobile set, Fluent,
+        // Adwaita) nothing is rewritten at all, so no committed baseline moves.
+        PNGImage ssimNative = nativeBgRgb == bgRgb
+                ? nativeImg
+                : repaintBackdrop(nativeImg, nativeBgRgb, bgRgb);
+        double ssim = computeSsim(ssimNative, cn1);
         double headline = Math.sqrt(Math.max(0.0d, fillSim) * Math.max(0.0d, ssim));
         double fidelity = 100.0d * headline;
         return new double[]{fidelity, structSim, fillSim};
+    }
+
+    /// Returns a copy of `img` with every pixel within CONTENT_TAU of `fromRgb` replaced by
+    /// `toRgb`, so two tiles captured on different backdrops can be compared by a whole-tile
+    /// metric without the backdrop difference dominating it.
+    ///
+    /// CONTENT_TAU is the same threshold the content mask uses, so exactly the pixels the
+    /// mask calls background are the ones rewritten -- a pixel that counts as widget is never
+    /// touched, including the antialiased edge where a widget meets the backdrop.
+    private static PNGImage repaintBackdrop(PNGImage img, int fromRgb, int toRgb) {
+        BufferedImage src = toRgbImage(img);
+        int w = src.getWidth(), h = src.getHeight();
+        int fr = (fromRgb >> 16) & 0xff, fg = (fromRgb >> 8) & 0xff, fb = fromRgb & 0xff;
+        int tr = (toRgb >> 16) & 0xff, tg = (toRgb >> 8) & 0xff, tb = toRgb & 0xff;
+        // Emitted as a plain 8-bit RGB PNGImage (colorType 2): toRgbImage has already
+        // composited any alpha away, so the result carries exactly what every consumer of
+        // this record reads.
+        byte[] out = new byte[w * h * 3];
+        int offset = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = src.getRGB(x, y);
+                int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+                boolean background = Math.abs(r - fr) <= CONTENT_TAU
+                        && Math.abs(g - fg) <= CONTENT_TAU
+                        && Math.abs(b - fb) <= CONTENT_TAU;
+                out[offset] = (byte) (background ? tr : r);
+                out[offset + 1] = (byte) (background ? tg : g);
+                out[offset + 2] = (byte) (background ? tb : b);
+                offset += 3;
+            }
+        }
+        return new PNGImage(w, h, 8, 2, out, 3);
     }
 
     /// A pixel further than this (mean channel delta) from the backdrop reference

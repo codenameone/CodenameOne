@@ -132,11 +132,9 @@ public class Form extends Container implements TopLevelContainer {
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
-    /// The component the pointer is currently over; see updateHoveredComponent.
-    private Component hoveredComponent;
     // Last component whose interactive scrollbar showed a hover highlight, so the highlight can be
     // cleared when the pointer moves to a different scrollable (desktop interactive scrollbars only)
-    private Component lastInteractiveScrollHover;
+    private final HoverTracker hoverTracker = new HoverTracker();
     private boolean enableCursors;
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;
@@ -2841,7 +2839,7 @@ public class Form extends Container implements TopLevelContainer {
         // A form that is going away must not leave a component believing the pointer is still
         // over it: the flag would survive into the next time the form is shown, and the
         // component would paint hovered with the pointer somewhere else entirely.
-        updateHoveredComponent(null);
+        hoverTracker.pointerOver(null, -1, -1);
     }
 
     /// The four kinds of pointer listener an embedded form hands to its host.
@@ -4608,61 +4606,13 @@ public class Form extends Container implements TopLevelContainer {
                 }
             }
         }
-        // Both of these are outside the null checks on purpose: hover has to be CLEARED
-        // when the pointer is over nothing, which is how a desktop port reports the cursor
-        // leaving the window. Updating them only when a component was found left the last
-        // component -- and the last scrollbar thumb -- lit for good. updateInteractiveScrollHover
-        // already handles a null cmp: it clears the previously-highlighted scrollable and
-        // forgets it, and the coordinates go unread because no scrollable is found.
-        updateInteractiveScrollHover(cmp, x[0], y[0]);
-        updateHoveredComponent(cmp);
+        // Outside the null checks on purpose: hover has to be CLEARED when the pointer is
+        // over nothing, which is how a desktop port reports the cursor leaving the window.
+        // Updating only when a component was found left the last component -- and the last
+        // scrollbar thumb -- lit for good.
+        hoverTracker.pointerOver(cmp, x[0], y[0]);
     }
 
-    /// Moves the hover state to the component under the pointer, clearing whichever component
-    /// had it before.
-    ///
-    /// Hover is tracked here rather than in Component because only the form knows what the
-    /// pointer left: a component is never told the pointer moved off it, it is simply no
-    /// longer the one under it. Component.setHovered is a no-op when the state is unchanged
-    /// and repaints only when the theme actually defines a hover style, so on a theme that
-    /// does not use hover this costs one reference comparison per pointer move.
-    ///
-    /// Desktop only, because nothing else generates hover events.
-    private void updateHoveredComponent(Component cmp) {
-        // Identity is the question being asked -- whether this is the same
-        // component instance the pointer was already over -- so equals() would
-        // be wrong here as well as slower.
-        if (hoveredComponent == cmp) { //NOPMD CompareObjectsWithEquals
-            return;
-        }
-        if (hoveredComponent != null) {
-            hoveredComponent.setHovered(false);
-        }
-        hoveredComponent = cmp;
-        if (cmp != null) {
-            cmp.setHovered(true);
-        }
-    }
-
-    /// Routes a hover to the nearest scrollable ancestor of the hovered component so an interactive
-    /// (desktop) scrollbar can highlight its thumb, and clears the highlight on the previously
-    /// hovered scrollable. Inert unless interactive scrollbars are enabled.
-    private void updateInteractiveScrollHover(Component cmp, int x, int y) {
-        if (!getUIManager().getLookAndFeel().isInteractiveScroll()) {
-            return;
-        }
-        Component scrollable = cmp;
-        while (scrollable != null && !scrollable.isScrollableY() && !scrollable.isScrollableX()) {
-            scrollable = scrollable.getParent();
-        }
-        if (lastInteractiveScrollHover != null && lastInteractiveScrollHover != scrollable) { //NOPMD CompareObjectsWithEquals
-            lastInteractiveScrollHover.clearInteractiveScrollHover();
-        }
-        if (scrollable != null) {
-            scrollable.updateInteractiveScrollHover(x, y);
-        }
-        lastInteractiveScrollHover = scrollable;
-    }
 
     /// Returns true if there is only one focusable member in this form. This is useful
     /// so setHandlesInput would always be true for this case.

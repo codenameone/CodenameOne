@@ -43,7 +43,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.plaf.Border;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codenameone.fidelity.spec.ComponentSpec;
 
@@ -540,23 +539,9 @@ public final class Cn1WidgetRenderer {
     /// which is what a focused component renders with.
     private static void applyDesktopState(Component c, String state) {
         if ("hover".equals(state)) {
-            // The build branches zero their margin through getAllStyles(), which by design
-            // does NOT include the hover style, so the compiled hover style still carries
-            // the theme's app-facing margin. Left alone, the hover tile lays out at a
-            // different offset and size from both the native control and the component's
-            // own normal state, and the difference is scored as a fidelity loss that has
-            // nothing to do with the hover colours being measured.
-            //
-            // Copied from the normal style rather than forced to zero: not every branch
-            // zeroes its margin, and the invariant that matters is that hover lays out
-            // exactly like the state beside it.
-            Style hover = c.getHoverStyle();
-            if (hover != null) {
-                Style normal = c.getUnselectedStyle();
-                hover.setMarginUnit(normal.getMarginUnit());
-                hover.setMargin(normal.getMarginTop(), normal.getMarginBottom(),
-                        normal.getMarginLeft(false), normal.getMarginRight(false));
-            }
+            // Margin normalisation is NOT done here. The tile runner zeroes margins AFTER
+            // build() returns, so anything copied at this point is overwritten a line later;
+            // DesktopTileRunner owns it for every component, hover style included.
             c.setHovered(true);
         } else if ("focus".equals(state)) {
             c.setFocusable(true);
