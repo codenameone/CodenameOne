@@ -2169,3 +2169,118 @@ it needs its own reproducer (the load generator above is one), and the fix is in
 allocation-failure path rather than anywhere this branch has touched. It is also why the
 gauntlet and the GC verifier did not catch it -- neither runs under external memory
 pressure.
+
+## Round 18: RETRACTION -- the JVM comparison in Round 15 used the wrong number
+
+Round 15 ended with "our reachable live set is 364MB, the JVM's entire heap is 273MB" and
+projected from there that 32-bit references would still leave ~1.5x. **The 273MB was not a
+live set.** It was G1's `used` at peak against a 1032MB ceiling -- i.e. mostly uncollected
+garbage, because a JVM with that much headroom has no reason to collect. Measured with
+`-Xlog:gc`, this program provokes exactly ONE collection in a default JVM:
+
+    GC(0) Pause Young (Normal) (G1 Evacuation Pause) 49M->12M(1032M) 7.241ms
+
+Everything after it accumulates. Projecting a representation saving onto that figure was
+arithmetic on a number that did not mean what it was used for, and the conclusion drawn
+from it should not have been stated.
+
+### The number that is actually comparable: what each VM can COMPLETE in
+
+    JDK 25  -Xmx32m   OutOfMemory, 0 files
+            -Xmx48m   OutOfMemory, 0 files
+            -Xmx64m   OutOfMemory, 11 files
+            -Xmx96m   798 files, footprint 239MB, 1.28s
+            -Xmx128m  798 files, footprint 280MB, 1.14s
+            default   798 files, footprint ~485MB, 0.75s
+
+    parpar  default   798 files, footprint ~680MB, 1.00s
+            CN1_SIMULATE_PROC_MEMORY_LIMIT=128MB -- did NOT complete, wedged
+                      (>2min against 1s; the documented pacing bistability)
+
+So the honest statement is: **the JVM does this job in a 96MB heap / 239MB process, and we
+need ~680MB.** That is 2.8x on process footprint against a JVM that has been told to be
+frugal, and 1.4x against a JVM left to sprawl. Both are worth quoting; neither is the
+1.5x-after-32-bit-refs claim Round 15 made.
+
+### Conservative roots are NOT the explanation, and that is measured now
+
+The obvious hypothesis for holding ~4x what the JVM holds is the conservative stack scan
+retaining garbage. `-DCN1_DISABLE_CONSERVATIVE_GC_ROOTS` with the required codegen pairing
+(`-Dcn1.frameless.objects=false -Dcn1.frameless.instance=false`, via CN1_SELFHOST_JAVA_OPTS
+-- note the variable name, an earlier attempt used a name build-selfhost.sh ignores and
+silently measured frameless-with-precise-roots, which is the unsafe combination):
+
+| arm | peak | wall |
+|---|---:|---:|
+| base (conservative roots, frameless) | 737 680 678 MB | 1.00-1.05s |
+| precise roots (shadow stack) | 602 563 670 MB | 1.52-1.58s |
+
+**-12% memory for +55% time.** Conservative roots are worth about a tenth of the gap, not
+most of it, and buying that tenth costs more than it is worth. The hypothesis is answered
+and the arm should not be re-run for this purpose.
+
+### What the per-object numbers actually say
+
+From the live census, average bytes per object against what HotSpot would spend:
+
+| | ours | HotSpot equivalent |
+|---|---:|---:|
+| `Object[]`, ~24 refs | 225 B | ~112 B (16B header + 24x4) |
+| `char[]` | 270 B | ~270 B (comparable) |
+| `String` (fused, payload inline) | 109 B | ~24 B + its payload |
+
+So **roughly 2x per object on reference-bearing shapes, and parity on primitive payload.**
+2x is the representation gap and it is real -- but 2x does not explain needing 680MB where
+the JVM needs 239MB. The rest is that we HOLD more: 91MB of slack in pages we cannot
+compact, freed slots that only a moving collector reclaims, and a legacy heap whose blocks
+go back to malloc rather than to the OS.
+
+### The direction this points, which is not compressed oops
+
+Compressed oops is the answer Java reached for BEFORE it had a compacting collector, and it
+is worth ~2x on reference fields only. What actually lets a JVM run this in 96MB is that
+**it compacts**: live objects are moved together, so there is no slack, no size-class
+rounding and no fragmentation, and the heap is exactly as big as the live set.
+
+This VM cannot move objects -- natives hold interior pointers and conservative roots pin
+whatever they resolve -- so the equivalent has to be bought a different way, and the closed
+world is what makes that possible. The fused String/StringBuilder is the existing proof:
+the payload is placed INSIDE the owner at translate time, which removes a header, a
+reference and the slack of a second allocation simultaneously, and needs no collector
+support at all. The census says where the same trick has the most left to give: `Object[]`
+at 124MB over 577,239 arrays, of which the ArrayList and HashMap backing stores are a known
+and statically identifiable majority.
+
+That is the line to scope next, and it is a translate-time layout question rather than a
+collector one.
+
+### And the intermittent SIGSEGV, localized
+
+Round 17 recorded a crash 1 run in 16 under memory pressure and guessed at the cause --
+"an allocation returning JAVA_NULL ... CN1_FAST_NEW's inlined bump path does not go through
+[the retry loop]". **That guess was wrong and is retracted.** `CN1_FAST_NEW` falls back to
+`__NEW_X` when the bump path returns 0, `__NEW_X` calls `codenameOneGcMalloc`, and that
+function never returns null: its retry is unbounded by design ("this VM has no way to fail
+an allocation"). Arrays take the same path. There is no allocation-failure bug there.
+
+An AddressSanitizer build caught the real one on the 14th iteration under load:
+
+    SEGV on unknown address 0x1c
+      #0 java_lang_String_replace___char_char_R_java_lang_String
+      #1 com_codename1_tools_translator_Parser_getClassByName
+      #2 com_codename1_tools_translator_Parser_writeOutput
+
+`getClassByName` is `classIndex().get(name.replace('/','_').replace('$','_'))`, so `name`
+is NULL and a null receiver on the clean target is a hard SEGV rather than an NPE -- that
+target installs no signal handler; only the iOS port does. The call at Parser.java:875 is
+`getClassByName(bc.getBaseClass())`.
+
+**The JVM runs this identical code over this identical corpus and never fails**, so
+`getBaseClass()` is not legitimately null here. A field reading null intermittently, only
+under memory pressure, is a live object being reclaimed or a header being overwritten --
+a VM correctness bug, not a translator one. It reproduces on 389a7e9341, so it predates
+every optimization on this branch.
+
+Note what did NOT find it: the gauntlet, the GC verifier and the self-hosting gates all
+pass, because none of them runs under external memory pressure. The reproducer is the load
+generator in Round 17 plus an ASan build; that combination should become a gate.
