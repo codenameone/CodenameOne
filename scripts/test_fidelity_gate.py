@@ -29,9 +29,9 @@ class FidelityGateTest(unittest.TestCase):
         self.comparison = path / "compare.json"
         self.baseline.write_text(json.dumps({"pairs": {"kept": 90, "removed": 80}}))
 
-    def gate(self, scores, update=False):
+    def gate(self, scores, update=False, geometry=None):
         self.comparison.write_text(json.dumps({"results": [
-            {"test": key, "status": "compared", "details": {"fidelity_percent": value}}
+            {"test": key, "status": "compared", "details": {"fidelity_percent": value, **({"geometry": geometry} if geometry is not None else {})}}
             for key, value in scores.items()]}))
         command = [self.java, "-cp", self.classes.name, "FidelityGate",
                    "--compare-json", str(self.comparison), "--baseline", str(self.baseline)]
@@ -53,6 +53,20 @@ class FidelityGateTest(unittest.TestCase):
         self.assertEqual(20, self.gate({"kept": 90}).returncode)
         self.baseline.write_text(json.dumps({"pairs": {"kept": 90}}))
         self.assertEqual(0, self.gate({"kept": 90}).returncode)
+
+    def test_existing_geometry_cannot_disappear_or_be_incomplete(self):
+        geometry = {"center_offset": 0, "width_ratio": 1, "height_ratio": 1}
+        self.baseline.write_text(json.dumps({"pairs": {"kept": 90}, "geometry": {"kept": geometry}}))
+        self.assertEqual(0, self.gate({"kept": 90}, geometry=geometry).returncode)
+        for missing in (None, {}, {"empty": True}, {"center_offset": 0, "width_ratio": 1}):
+            for update in (False, True):
+                with self.subTest(geometry=missing, update=update):
+                    result = self.gate({"kept": 90}, update=update, geometry=missing)
+                    self.assertEqual(20, result.returncode)
+                    self.assertIn("missing or incomplete geometry", result.stderr)
+        # A partial refresh can omit a pair entirely without deleting its geometry.
+        self.assertEqual(0, self.gate({}, update=True).returncode)
+        self.assertEqual(geometry, json.loads(self.baseline.read_text())["geometry"]["kept"])
 
     def test_empty_capture_set_cannot_pass_an_existing_baseline(self):
         result = self.gate({})

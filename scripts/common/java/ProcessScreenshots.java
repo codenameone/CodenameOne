@@ -351,8 +351,12 @@ public class ProcessScreenshots {
                         // bbox on exactly the geometry-isolation tiles.
                         int[] geoRef = glass ? refArr : geometryReference(
                                 specInfo != null ? specInfo[SPEC_BACKDROP] : null,
-                                backdropImg, cn1.width(), cn1.height(), cw, ch);
-                        details.put("geometry", geometryMetrics(natc, cn1c, bg, nativeBg, geoRef));
+                                backdropImg, cn1.width(), cn1.height(), cw, ch, testName.contains("_dark"));
+                        // Grouped white cells differ from their light backdrop by only
+                        // 11 mean channel levels; the glass threshold would erase them.
+                        int geometryTau = specInfo != null && "grouped".equals(specInfo[SPEC_BACKDROP])
+                                ? CONTENT_TAU : GLASS_TAU;
+                        details.put("geometry", geometryMetrics(natc, cn1c, bg, nativeBg, geoRef, geometryTau));
                         details.put("ssim", round4(computeSsim(natc, cn1c)));
                         details.put("mean_channel_delta", round2(meanDelta));
                         if (blankPair) {
@@ -986,7 +990,7 @@ public class ProcessScreenshots {
     private static final int GEOMETRY_EDGE_TRIM = 2;
 
     private static Map<String, Object> geometryMetrics(PNGImage nativeImg, PNGImage cn1, int bgRgb,
-            int nativeBgRgb, int[] refArr) {
+            int nativeBgRgb, int[] refArr, int referenceTau) {
         Map<String, Object> geo = new LinkedHashMap<>();
         BufferedImage bn = toRgbImage(nativeImg);
         BufferedImage bc = toRgbImage(cn1);
@@ -1003,8 +1007,8 @@ public class ProcessScreenshots {
         boolean[] maskN;
         boolean[] maskC;
         if (refArr != null) {
-            maskN = contentMaskRef(nArr, refArr, GLASS_TAU);
-            maskC = contentMaskRef(cArr, refArr, GLASS_TAU);
+            maskN = contentMaskRef(nArr, refArr, referenceTau);
+            maskC = contentMaskRef(cArr, refArr, referenceTau);
         } else {
             maskN = contentMaskBg(nArr, nativeBgRgb, CONTENT_TAU);
             maskC = contentMaskBg(cArr, bgRgb, CONTENT_TAU);
@@ -1041,11 +1045,12 @@ public class ProcessScreenshots {
     /// widget pixels are the ones that differ from it. Mirrors the device
     /// renderer's applyBackdrop: a 6-hex value is a solid fill, "gradient" is a
     /// vertical #1e64ff -> #28c850 ramp over the full tile, "photo" is the
-    /// shared backdrop PNG (scaleToFill). Returns null when the tile has no
+    /// shared backdrop PNG (scaleToFill), and "grouped" uses the appearance-specific
+    /// systemGroupedBackground fill. Returns null when the tile has no
     /// backdrop (callers fall back to the plain bg-colour mask) or the photo
     /// asset is unavailable.
     private static int[] geometryReference(String backdrop, BufferedImage backdropImg,
-            int fullW, int fullH, int cw, int ch) {
+            int fullW, int fullH, int cw, int ch, boolean dark) {
         if (backdrop == null) {
             return null;
         }
@@ -1053,6 +1058,12 @@ public class ProcessScreenshots {
             return backdropImg != null ? stretchCropTopLeft(backdropImg, fullW, fullH, cw, ch) : null;
         }
         int[] out = new int[cw * ch];
+        if ("grouped".equals(backdrop)) {
+            // A full-tile bbox can still be correct for an edge-to-edge field;
+            // mask the actual backdrop without forcing margins or a smaller bbox.
+            java.util.Arrays.fill(out, dark ? 0x1c1c1e : 0xf2f2f7);
+            return out;
+        }
         if ("gradient".equals(backdrop)) {
             int sr = 0x1e, sg = 0x64, sb = 0xff;
             int er = 0x28, eg = 0xc8, eb = 0x50;

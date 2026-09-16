@@ -109,6 +109,15 @@ public class FidelityGate {
             }
         }
 
+        Map<String, Map<String, Double>> baselineGeometry = loadBaselineGeometry(arguments.baselineJson);
+        // A compared pair cannot evade its geometry contract by returning no metrics.
+        // Check updates too, while allowing partial runs to retain untouched entries.
+        for (String pair : baselineGeometry.keySet()) {
+            if (current.containsKey(pair) && !currentGeometry.containsKey(pair)) {
+                broken.add(pair + " (missing or incomplete geometry for an existing baseline)");
+            }
+        }
+
         if (arguments.updateBaseline != null) {
             // A baseline refresh from a PARTIAL run would silently ratchet only
             // the surviving pairs -- broken pairs must fail the update just like
@@ -127,7 +136,6 @@ public class FidelityGate {
         }
 
         Map<String, Double> baseline = loadBaseline(arguments.baselineJson);
-        Map<String, Map<String, Double>> baselineGeometry = loadBaselineGeometry(arguments.baselineJson);
         // Deleting a row AND its golden produces no broken result. Baseline keys are
         // the coverage contract too: remove them explicitly for an intentional deletion.
         // Update mode above still merges partial runs, so it cannot silently drop coverage.

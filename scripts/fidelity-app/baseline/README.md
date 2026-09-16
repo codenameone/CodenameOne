@@ -53,3 +53,13 @@ current rendering differences, including larger CN1 control geometry, rather
 than claiming a pixel match. The committed native references and the existing
 2-point score tolerance are unchanged. Subsequent runs now gate both score
 and geometry regressions against these runner measurements.
+
+The grouped-backdrop geometry mask was corrected using the iOS captures from
+[run 35086524544](https://github.com/codenameone/CodenameOne/actions/runs/35086524544)
+(commit `af6d3ed25b`). The appearance-specific grouped fill is excluded at the
+normal content threshold so a white field remains detectable. Re-scoring changes
+only `TextField_disabled_light` among the three gated geometry metrics: center
+offset 0.71 px, height ratio 0.996, and width ratio 0.9991. The other three fields
+retain their measured edge-to-edge bounds. Score baselines and native references
+are unchanged; all non-field geometry and the current Android capture geometry
+are unchanged.

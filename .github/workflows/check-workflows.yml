@@ -54,4 +54,6 @@ jobs:
           java-version: '21'
 
       - name: Check fidelity baseline coverage enforcement
-        run: python3 scripts/test_fidelity_gate.py
+        run: |
+          python3 scripts/test_fidelity_gate.py
+          python3 scripts/test_fidelity_geometry.py
