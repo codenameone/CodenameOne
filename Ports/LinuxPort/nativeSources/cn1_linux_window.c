@@ -1448,26 +1448,51 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_captureWindowToPngBytes___R_byt
 
 /* The desktop's colour scheme: 1 dark, 0 light, -1 unknown.
  *
- * Asked of GtkSettings, which this port already links and already initialises for its
- * own window -- so no D-Bus, no xdg-desktop-portal round trip, and no subprocess.
- * gtk-application-prefer-dark-theme is what a GTK session sets from the desktop's
- * colour-scheme preference, and it is the same value every GTK application reads.
+ * Asked of the DESKTOP's setting, not of GTK's. The obvious-looking
+ * gtk-application-prefer-dark-theme is the wrong source: it expresses whether the
+ * application is ASKING for a dark GTK theme, and stays false unless the application sets
+ * it -- so reading it reported light on a GNOME desktop in dark mode, and every $Dark
+ * entry in the Adwaita theme stayed unreachable.
  *
- * -1 is a real answer here, not an error code being smuggled: a session with no
- * settings daemon (a bare Xvfb, a minimal container) has no default to report, and
- * calling that "light" would be a guess presented as a fact. The Java side maps it to
- * null, which UIManager's dark-mode resolution tests for explicitly.
+ * org.gnome.desktop.interface color-scheme is what the user's toggle actually writes, and
+ * what the XDG appearance portal reports to sandboxed apps. Queried through GSettings
+ * rather than over D-Bus so there is no round trip and no portal dependency.
+ *
+ * The schema is looked up before it is opened. g_settings_new ABORTS the process when the
+ * schema is not installed, which is a real configuration on a minimal container or a
+ * non-GNOME desktop, and a theme query has no business killing the application.
+ *
+ * -1 is a real answer, not an error smuggled into the return: a session with no such
+ * schema has no preference to report, and calling that "light" would be a guess presented
+ * as a fact. The Java side maps it to null.
  *
  * The signature is ParparVM's and is checked by nothing at build time -- a wrong name
  * compiles, links, and leaves the Java method looking unused to the dead-code pass,
  * which then removes it. scripts/check-native-signatures.sh is what catches that.
  */
 JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME_ONE_THREAD_STATE) {
-    GtkSettings* settings = gtk_settings_get_default();
-    if (settings == NULL) {
+    GSettingsSchemaSource* source = g_settings_schema_source_get_default();
+    if (source == NULL) {
         return -1;
     }
-    gboolean dark = FALSE;
-    g_object_get(settings, "gtk-application-prefer-dark-theme", &dark, NULL);
-    return dark ? 1 : 0;
+    GSettingsSchema* schema = g_settings_schema_source_lookup(source,
+            "org.gnome.desktop.interface", TRUE);
+    if (schema == NULL) {
+        return -1;
+    }
+    int result = -1;
+    /* has_key as well as the schema lookup: color-scheme arrived in GNOME 42, and the
+     * schema exists without it on older desktops. g_settings_get_string on a missing key
+     * aborts the same way a missing schema does. */
+    if (g_settings_schema_has_key(schema, "color-scheme")) {
+        GSettings* settings = g_settings_new("org.gnome.desktop.interface");
+        gchar* scheme = g_settings_get_string(settings, "color-scheme");
+        if (scheme != NULL) {
+            result = strcmp(scheme, "prefer-dark") == 0 ? 1 : 0;
+            g_free(scheme);
+        }
+        g_object_unref(settings);
+    }
+    g_settings_schema_unref(schema);
+    return result;
 }

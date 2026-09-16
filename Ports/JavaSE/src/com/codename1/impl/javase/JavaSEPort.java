@@ -4691,6 +4691,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     com.codename1.ui.TooltipManager.hideTooltip();
                 }
             });
+            // And clear the hover. Motion simply stops when the pointer leaves the canvas,
+            // and Form only re-points its tracked hover when a DIFFERENT component is
+            // reported, so without this the last control stayed lit with the cursor
+            // somewhere else entirely. -1,-1 is the same "nothing is under the pointer"
+            // coordinate the Windows and Linux ports send from their leave events; a real
+            // canvas coordinate is never negative.
+            if (JavaSEPort.this.isDesktop()) {
+                JavaSEPort.this.pointerHover(new int[]{-1}, new int[]{-1});
+            }
         }
         public void mouseDragged(MouseEvent e) {
             e.consume();

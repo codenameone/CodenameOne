@@ -54,10 +54,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MacOSStubThemeTest {
 
     @Test
-    void theGeneratedStubInstallsTheModernThemeByDefault(@TempDir Path tmp) throws Exception {
+    void theGeneratedStubInstallsTheAquaThemeByDefault(@TempDir Path tmp) throws Exception {
         String stub = generateStub(tmp, new HashMap<String, String>());
-        assertTrue(stub.contains("setIosMode(\"modern\")"),
-                "the stub must select the only theme that declares @darkModeBool; got:\n" + stub);
+        assertTrue(stub.contains("setIosMode(\"aqua\")"),
+                "the stub must select the macOS theme, not an iOS one; got:\n" + stub);
     }
 
     @Test

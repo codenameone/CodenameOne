@@ -846,12 +846,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     windowPointerDragged(windowId, x, y);
                     break;
                 case EVENT_POINTER_HOVER:
-                    // Only the main window. Form.pointerHover resolves against the
-                    // showing Form, so routing a secondary window's motion here would
-                    // hover a component under coordinates from a different window.
-                    if (windowId == 0) {
-                        pointerHover(new int[]{x}, new int[]{y});
-                    }
+                    // Routed by window id rather than restricted to the main one.
+                    // windowPointerHover hands a secondary window's event to that
+                    // window's own Desktop instance, so a control in one reaches the
+                    // hover state like any other; the earlier main-window-only guard
+                    // made hover unreachable there.
+                    windowPointerHover(windowId, x, y);
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, key);
