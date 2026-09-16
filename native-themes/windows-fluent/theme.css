@@ -34,6 +34,10 @@
  * scale, which is what a theme needs; the fidelity TILES are sized in logical px for the
  * opposite reason, since they describe the reference frame rather than the design.
  *
+ * TYPOGRAPHY uses Fluent's 14 logical-pixel body size (3.7mm at 96 dpi).
+ * See https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/typography
+ * The old 3.2mm value was measured through the simulator's mobile density fallback.
+ *
  * MICA is not expressed here. It is a window-level backdrop the compositor draws behind the
  * window, not a fill any control owns, so it belongs to port code setting
  * DWMWA_SYSTEMBACKDROP_TYPE rather than to a stylesheet. Surfaces below use the solid Fluent
@@ -123,14 +127,14 @@ Form {
     background-color: var(--window-bg-color, #f3f3f3);
     color: var(--text-color, #1a1a1a);
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 Label {
     color: var(--text-color, #1a1a1a);
     background-color: transparent;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 /* --- Button ---------------------------------------------------------------------------- */
@@ -149,7 +153,7 @@ Button {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -161,7 +165,7 @@ Button.hover {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -173,7 +177,7 @@ Button.pressed {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -185,7 +189,7 @@ Button.disabled {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -197,7 +201,7 @@ RaisedButton {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -208,7 +212,7 @@ RaisedButton.hover {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -219,7 +223,7 @@ RaisedButton.pressed {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -230,7 +234,7 @@ RaisedButton.disabled {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -242,7 +246,7 @@ FlatButton {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -253,7 +257,7 @@ FlatButton.hover {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -264,7 +268,7 @@ FlatButton.pressed {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: center;
 }
 
@@ -288,7 +292,7 @@ TextField {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 TextField.hover {
@@ -302,7 +306,7 @@ TextField.hover {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 /* Focused: white field, accent underline. */
@@ -317,7 +321,7 @@ TextField.selected {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 TextField.disabled {
@@ -328,7 +332,7 @@ TextField.disabled {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 TextArea { cn1-derive: TextField; }
@@ -341,7 +345,7 @@ CheckBox {
     padding: 0.8mm;
     margin: 0.5mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 CheckBox.selected { color: var(--accent-color, #0078d4); background-color: transparent; }
@@ -354,7 +358,7 @@ RadioButton {
     padding: 0.8mm;
     margin: 0.5mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 RadioButton.selected { color: var(--accent-color, #0078d4); background-color: transparent; }
@@ -447,7 +451,7 @@ ComboBox {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 ComboBox.hover {
@@ -458,7 +462,7 @@ ComboBox.hover {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 ComboBox.disabled {
@@ -469,7 +473,7 @@ ComboBox.disabled {
     padding: 1.3mm 3.1mm 1.3mm 3.1mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 /* A native slider highlights its track and thumb under the pointer. Without this the hover
@@ -500,7 +504,7 @@ Title {
     color: var(--text-color, #1a1a1a);
     background-color: transparent;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
     text-align: left;
 }
 
@@ -539,7 +543,7 @@ DialogBody {
     color: var(--text-color, #1a1a1a);
     background-color: transparent;
     font-family: "native:MainRegular";
-    font-size: 3.2mm;
+    font-size: 3.7mm;
 }
 
 /* --- Lists and scrollbars -------------------------------------------------------------- */

@@ -36,6 +36,10 @@
  * display, which is what a desktop theme needs. The TILES in fidelity-tests.yaml are sized
  * in logical px for the opposite reason: they describe the reference frame, not the design.
  *
+ * TYPOGRAPHY uses the native reference's Cantarell 11pt (3.88mm), with a 13pt
+ * title (4.59mm). Pango points are 1/72 inch; treating 11pt as 11 logical pixels
+ * made the text too small once the fidelity runner used the correct 96 dpi.
+ *
  * Adwaita is deliberately FLAT. There is no Mica analogue and no vibrancy; surfaces are
  * solid colours separated by hairlines and radii. That is a property of the design language
  * rather than a limitation here, and it is why this theme needs no backdrop primitive while
@@ -120,14 +124,14 @@ Form {
     background-color: var(--window-bg-color, #fafafa);
     color: var(--text-color, #2e3436);
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 Label {
     color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 /* --- Button ---------------------------------------------------------------------------- */
@@ -144,7 +148,7 @@ Button {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -155,7 +159,7 @@ Button.hover {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -166,7 +170,7 @@ Button.pressed {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -177,7 +181,7 @@ Button.disabled {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -189,7 +193,7 @@ RaisedButton {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -200,7 +204,7 @@ RaisedButton.hover {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -211,7 +215,7 @@ RaisedButton.pressed {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -222,7 +226,7 @@ RaisedButton.disabled {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -234,7 +238,7 @@ FlatButton {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -245,7 +249,7 @@ FlatButton.hover {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -256,7 +260,7 @@ FlatButton.pressed {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -270,7 +274,7 @@ TextField {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 TextField.hover {
@@ -281,7 +285,7 @@ TextField.hover {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 /* Focused: the accent ring Adwaita draws round an active entry. */
@@ -293,7 +297,7 @@ TextField.selected {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 TextField.disabled {
@@ -304,7 +308,7 @@ TextField.disabled {
     padding: 1.3mm 2.6mm 1.3mm 2.6mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 TextArea { cn1-derive: TextField; }
@@ -317,7 +321,7 @@ CheckBox {
     padding: 0.8mm;
     margin: 0.5mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 CheckBox.selected { color: var(--accent-color, #3584e4); background-color: transparent; }
@@ -330,7 +334,7 @@ RadioButton {
     padding: 0.8mm;
     margin: 0.5mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 RadioButton.selected { color: var(--accent-color, #3584e4); background-color: transparent; }
@@ -423,7 +427,7 @@ ComboBox {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 ComboBox.hover {
@@ -434,7 +438,7 @@ ComboBox.hover {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 ComboBox.disabled {
@@ -445,7 +449,7 @@ ComboBox.disabled {
     padding: 1.3mm 4.2mm 1.3mm 4.2mm;
     margin: 0.8mm;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 /* A native slider highlights its track under the pointer. Without this the hover tile was
@@ -481,7 +485,7 @@ Title {
     color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainBold";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
     text-align: center;
 }
 
@@ -505,7 +509,7 @@ DialogTitle {
     color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainBold";
-    font-size: 3.4mm;
+    font-size: 4.59mm;
     text-align: center;
 }
 
@@ -513,7 +517,7 @@ DialogBody {
     color: var(--text-color, #2e3436);
     background-color: transparent;
     font-family: "native:MainRegular";
-    font-size: 2.9mm;
+    font-size: 3.88mm;
 }
 
 /* --- Lists and scrollbars -------------------------------------------------------------- */
