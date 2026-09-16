@@ -1255,8 +1255,8 @@ public class Component implements Animation, StyleListener, Editable {
             // Showing it again must wait for a fresh pointer event, including tooltips.
             clearHoverForInactiveSubtree();
         }
-        if (hovered && hoverStyle != null) {
-            checkAnimation();
+        if (hovered) {
+            checkHoverAnimationHierarchy();
         }
         accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE);
     }
@@ -4415,8 +4415,8 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.focused = focused;
-        if (hovered && hoverStyle != null) {
-            checkAnimation();
+        if (hovered) {
+            checkHoverAnimationHierarchy();
         }
         accessibilityChanged(AccessibilityManager.CHANGE_FOCUS);
     }
@@ -7670,6 +7670,11 @@ public class Component implements Animation, StyleListener, Editable {
             if (hoverStyle.getBgPainter() == null) {
                 hoverStyle.setBgPainter(new BGPainter());
             }
+            // UIID and inline-style changes rebuild this lazily while the pointer can
+            // remain stationary. Start the new background once the style is complete.
+            if (initialized && isEffectivelyHovered()) {
+                checkAnimation();
+            }
         }
         return hoverStyle;
     }
@@ -7732,10 +7737,9 @@ public class Component implements Animation, StyleListener, Editable {
         }
         this.hovered = hovered;
         if (getHoverStyle() != null) {
-            // A hover-only image or painter can become animated after initialization.
-            checkAnimation();
             repaint();
         }
+        checkHoverAnimationHierarchy();
     }
 
     /// Sets the Component Style for the pressed state allowing us to manipulate
@@ -8152,8 +8156,44 @@ public class Component implements Animation, StyleListener, Editable {
     private Animation hoverBackgroundAnimation;
     private TopLevelContainer hoverAnimationHost;
 
+    private boolean isEffectivelyHovered() {
+        if (hasLead && !blockLead) {
+            Component lead = getLeadComponent();
+            return lead != null && lead.isHovered();
+        }
+        return hovered;
+    }
+
+    void checkHoverAnimationHierarchy() {
+        checkAnimation();
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent != null && leadParent != this) { // NOPMD CompareObjectsWithEquals
+            leadParent.checkLeadHoverAnimations(this);
+        }
+    }
+
+    private void checkLeadHoverAnimations(Component lead) {
+        // Only the lead owns the pointer flag, but its parent and siblings paint
+        // their own state styles. Each affected background owns its own registration.
+        if (this != lead && initialized && hasLead && !blockLead // NOPMD CompareObjectsWithEquals
+                && getLeadComponent() == lead) { // NOPMD CompareObjectsWithEquals
+            checkAnimation();
+        }
+        if (this instanceof Container) {
+            Container container = (Container) this;
+            for (int i = 0; i < container.getComponentCount(); i++) {
+                container.getComponentAt(i).checkLeadHoverAnimations(lead);
+            }
+        }
+    }
+
     private boolean hasAnimatedHoverBackground() {
-        if (!hovered || !isVisible() || hoverStyle == null || getStyle() != hoverStyle) { // NOPMD CompareObjectsWithEquals
+        if (!isEffectivelyHovered() || !isVisible()) {
+            return false;
+        }
+        // Resolve first: an active UIID/inline change may have cleared hoverStyle.
+        Style active = getStyle();
+        if (hoverStyle == null || active != hoverStyle) { // NOPMD CompareObjectsWithEquals
             return false;
         }
         Image image = hoverStyle.getBgImage();
@@ -8208,7 +8248,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     void checkAnimation() {
-        if (hovered && !isVisible()) {
+        if (isEffectivelyHovered() && !isVisible()) {
             stopHoverBackgroundAnimation();
             return;
         }
@@ -9190,8 +9230,8 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.enabled = enabled;
-        if (hovered && hoverStyle != null) {
-            checkAnimation();
+        if (hovered) {
+            checkHoverAnimationHierarchy();
         }
         accessibilityChanged(AccessibilityManager.CHANGE_STATE);
         repaint();

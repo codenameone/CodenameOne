@@ -27,7 +27,9 @@ KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
     "id", "cn1_uiid", "text", "backdrop", "material", "states", "platforms", "frames",
     "tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px",
 }
-KNOWN_PLATFORMS = {"ios", "android", "windows", "macos", "gnome", "linux"}
+PLATFORM_NATIVE_KEYS = {"ios": "native", "android": "native_android", "windows": "native_win",
+                        "macos": "native_mac", "gnome": "native_gnome", "linux": "native_gnome"}
+KNOWN_PLATFORMS = set(PLATFORM_NATIVE_KEYS)
 KNOWN_STATES = {"normal", "pressed", "disabled", "selected", "hover", "focus"}
 KNOWN_MATERIALS = {"normal", "glass", "lens"}
 KNOWN_BACKDROPS = {"photo", "gradient", "grouped"}
@@ -205,12 +207,23 @@ def main():
             if st not in KNOWN_STATES:
                 yield_error(f"{where}: unknown state '{st}' (known: {sorted(KNOWN_STATES)})")
 
-        for platform in [p.strip() for p in r.get("platforms", "").split(",") if p.strip()]:
+        platforms = [unquote(p.strip()) for p in r.get("platforms", "").split(",") if p.strip()]
+        for platform in platforms:
             # ComponentSpec deliberately matches prefixes in either direction. In
             # particular, "window" is valid for "windows", as are "win" and "and".
             if not any(host.startswith(platform) or platform.startswith(host)
                        for host in KNOWN_PLATFORMS):
                 yield_error(f"{where}: unknown platform '{platform}'")
+
+        # Frame captures are CN1-only and need no native reference key. Ordinary rows
+        # must reach a declared native target after applying the runtime's prefix filter.
+        targets = set(PLATFORM_NATIVE_KEYS) if r.get("frames") else {
+            host for host, key in PLATFORM_NATIVE_KEYS.items() if r.get(key)
+        }
+        if not targets or platforms and not any(
+                host.startswith(platform) or platform.startswith(host)
+                for host in targets for platform in platforms):
+            yield_error(f"{where}: platforms allow-list excludes every declared capture target")
 
         # Hover is a desktop state. A mobile row asking for it would never be captured, because
         # a touch device has no pointer to hover with.

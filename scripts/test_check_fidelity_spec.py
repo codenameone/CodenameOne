@@ -93,6 +93,24 @@ class FidelitySpecTest(unittest.TestCase):
                 validator.SPEC.write_text(original.replace(marker, "frames: " + value, 1))
                 self.assertEqual(0, self.check())
 
+    def test_platform_allow_list_must_reach_a_declared_capture_target(self):
+        original = validator.SPEC.read_text()
+        for row, platforms in (("DesktopButton", "ios"), ("Button", "windows,gnome")):
+            with self.subTest(row=row, platforms=platforms):
+                marker = "  - id: " + row + "\n"
+                validator.SPEC.write_text(original.replace(marker, marker + "    platforms: " + platforms + "\n", 1))
+                self.assertEqual(1, self.check())
+                self.assertTrue(any("excludes every declared capture target" in error for error in validator.ERRORS))
+        for row, platforms in (("DesktopButton", "win"), ("DesktopButton", "ios,window"),
+                               ("Button", "and"), ("Button", '"ios"')):
+            with self.subTest(row=row, platforms=platforms):
+                marker = "  - id: " + row + "\n"
+                validator.SPEC.write_text(original.replace(marker, marker + "    platforms: " + platforms + "\n", 1))
+                self.assertEqual(0, self.check())
+        # The committed SwitchMorph/TabsMorph rows intentionally have only frames.
+        validator.SPEC.write_text(original)
+        self.assertEqual(0, self.check())
+
     def test_unknown_defaults_are_rejected(self):
         original = validator.SPEC.read_text()
         for old, new in (("appearances:", "appearance:"), ("tile_width_px:", "tile_wdith_px:"),

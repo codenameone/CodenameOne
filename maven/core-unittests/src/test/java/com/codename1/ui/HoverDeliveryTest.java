@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /// Hover DELIVERY: what actually happens when a port reports a pointer position.
 ///
@@ -117,6 +118,111 @@ class HoverDeliveryTest extends UITestBase {
                 if (secondary) { window.dispose(); }
             }
         }
+    }
+
+    private static class CountingHoverPainter implements Painter, com.codename1.ui.animations.Animation {
+        int ticks;
+        public void paint(Graphics g, com.codename1.ui.geom.Rectangle rect) { }
+        public void paint(Graphics g) { }
+        public boolean animate() { ticks++; return true; }
+    }
+
+    @FormTest
+    void leadParentsAndSiblingsAnimateTheirEffectiveHoverStyles() {
+        implementation.setMultiWindowSupported(true);
+        for (boolean secondary : new boolean[]{false, true}) {
+            Form form = new Form("lead animation", new BorderLayout());
+            form.show();
+            Window window = secondary ? new Window("lead animation", new BorderLayout()) : null;
+            Container surface = secondary ? window : form;
+            Container row = new Container(new BorderLayout());
+            Button lead = new Button("lead");
+            Label sibling = new Label("sibling");
+            row.add(BorderLayout.WEST, lead).add(BorderLayout.CENTER, sibling);
+            surface.add(BorderLayout.CENTER, row);
+            if (secondary) { window.setWindowSize(500, 400); window.show(); }
+            surface.revalidate();
+            DisplayTest.flushEdt();
+            row.setLeadComponent(lead);
+            CountingHoverPainter parentPainter = new CountingHoverPainter();
+            CountingHoverPainter childPainter = new CountingHoverPainter();
+            com.codename1.ui.plaf.Style parentHover = new com.codename1.ui.plaf.Style(row.getUnselectedStyle());
+            parentHover.setBgPainter(parentPainter);
+            row.setHoverStyle(parentHover);
+            com.codename1.ui.plaf.Style childHover = new com.codename1.ui.plaf.Style(sibling.getUnselectedStyle());
+            childHover.setBgPainter(childPainter);
+            sibling.setHoverStyle(childHover);
+            try {
+                surface.pointerHover(new int[]{sibling.getAbsoluteX() + sibling.getWidth() / 2},
+                        new int[]{sibling.getAbsoluteY() + sibling.getHeight() / 2});
+                assertTrue(lead.isHovered());
+                assertFalse(row.isHovered(), "only the lead owns the pointer flag");
+                for (int transition = 0; transition < 3; transition++) {
+                    int parentBefore = parentPainter.ticks;
+                    int childBefore = childPainter.ticks;
+                    if (secondary) { window.repaintAnimations(); } else { form.repaintAnimations(); }
+                    assertEquals(parentBefore + 1, parentPainter.ticks);
+                    assertEquals(childBefore + 1, childPainter.ticks);
+                    lead.setState(Button.STATE_PRESSED);
+                    assertFalse(secondary ? window.hasAnimations() : form.hasAnimations());
+                    lead.setState(Button.STATE_DEFAULT);
+                    assertTrue(secondary ? window.hasAnimations() : form.hasAnimations());
+                }
+                surface.pointerHover(new int[]{-1}, new int[]{-1});
+                assertFalse(secondary ? window.hasAnimations() : form.hasAnimations());
+            } finally {
+                if (secondary) { window.dispose(); }
+            }
+        }
+    }
+
+    private static class CountingHoverImage extends Image {
+        int ticks;
+        CountingHoverImage() { super(Image.createImage(2, 2).getImage()); }
+        public boolean isAnimation() { return true; }
+        public boolean animate() { ticks++; return true; }
+    }
+
+    @FormTest
+    void lazyHoverStyleReplacementStartsAnimationWithoutPointerReentry() {
+        Form form = new Form("replacement", new BorderLayout());
+        Label label = new Label("hover");
+        form.add(BorderLayout.CENTER, label);
+        form.show();
+        DisplayTest.flushEdt();
+        UIManager manager = UIManager.getInstance();
+        Hashtable theme = new Hashtable();
+        theme.put("StaticHover.hover#bgColor", "123456");
+        CountingHoverImage painter = new CountingHoverImage();
+        manager.addThemeProps(theme);
+        com.codename1.ui.plaf.Style animatedStyle = new com.codename1.ui.plaf.Style();
+        animatedStyle.setBgImage(painter);
+        manager.setComponentStyle("AnimatedHover", animatedStyle, "hover");
+        label.setUIID("StaticHover");
+        label.setHovered(true);
+        assertFalse(form.hasAnimations());
+        label.setUIID("AnimatedHover");
+        assertSame(painter, label.getStyle().getBgImage());
+        assertTrue(form.hasAnimations(), "lazy UIID resolution must register the replacement");
+        int before = painter.ticks;
+        form.repaintAnimations();
+        assertEquals(before + 1, painter.ticks, "replacement must not also register the Component");
+        label.setUIID("StaticHover");
+        label.getStyle();
+        assertFalse(form.hasAnimations());
+        // Invalidation by inline setters takes the same lazy path, even when no inline
+        // Resources are installed and the replacement still comes from the theme.
+        CountingHoverImage replacement = new CountingHoverImage();
+        com.codename1.ui.plaf.Style installed = new com.codename1.ui.plaf.Style();
+        installed.setBgImage(replacement);
+        manager.setComponentStyle("StaticHover", installed, "hover");
+        label.setInlineAllStyles("fgColor:abcdef;");
+        assertSame(replacement, label.getStyle().getBgImage());
+        assertTrue(form.hasAnimations());
+        form.repaintAnimations();
+        assertEquals(1, replacement.ticks);
+        label.setHovered(false);
+        assertFalse(form.hasAnimations());
     }
 
     @FormTest
