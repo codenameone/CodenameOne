@@ -51,6 +51,21 @@ def check_tile_dimension(key, value, where):
         yield_error(f"{where}: '{key}' must be a positive Java integer")
 
 
+def check_frames(value, where):
+    seen = set()
+    for token in value.split(","):
+        token = token.strip()
+        # The runner pads the raw token into _tNNN filenames; the comparator requires
+        # exactly three digits. Signs and overlong zero-padding are not valid frames.
+        if not re.fullmatch(r"[0-9]{1,3}", token) or int(token) > 100:
+            yield_error(f"{where}: invalid frame '{token}'; use integers from 0 to 100")
+            continue
+        frame = int(token)
+        if frame in seen:
+            yield_error(f"{where}: duplicate frame value {frame}")
+        seen.add(frame)
+
+
 def check_default(key, value, line):
     where = f"defaults (line {line})"
     if key not in DEFAULT_KEYS:
@@ -157,6 +172,9 @@ def main():
                             "or a six-digit hexadecimal color")
         for key in sorted(TILE_KEYS & set(r)):
             check_tile_dimension(key, r[key], where)
+
+        if "frames" in r:
+            check_frames(r["frames"], where)
 
         has_desktop = bool(DESKTOP_KEYS & set(r))
         has_mobile = bool(MOBILE_KEYS & set(r))

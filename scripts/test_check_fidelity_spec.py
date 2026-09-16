@@ -78,6 +78,21 @@ class FidelitySpecTest(unittest.TestCase):
                 validator.SPEC.write_text(original.replace("backdrop: grouped", "backdrop: " + value, 1))
                 self.assertEqual(0, self.check())
 
+    def test_frames_are_unique_valid_progress_values_and_capture_names(self):
+        original = validator.SPEC.read_text()
+        marker = "frames: 0,25,50,75,100"
+        self.assertIn(marker, original)
+        for value in ("0,5O,100", "", "0,,100", "0,0,100", "0,00,100", "0,101", "-1",
+                      "0,+50,100", "0000", "2147483648", "0,'50',100", "0,50.5,100"):
+            with self.subTest(value=value):
+                validator.SPEC.write_text(original.replace(marker, "frames: " + value, 1))
+                self.assertEqual(1, self.check())
+                self.assertTrue(any("frame" in error for error in validator.ERRORS))
+        for value in ("0,50,100", "000,050,100", "0", "100", '"0, 25, 100"'):
+            with self.subTest(value=value):
+                validator.SPEC.write_text(original.replace(marker, "frames: " + value, 1))
+                self.assertEqual(0, self.check())
+
     def test_unknown_defaults_are_rejected(self):
         original = validator.SPEC.read_text()
         for old, new in (("appearances:", "appearance:"), ("tile_width_px:", "tile_wdith_px:"),
