@@ -1,7 +1,0 @@
-{
-  "//": "WindowsAppSDK 1.6's MrtCore PRI generation loads Microsoft.Build.Packaging.Pri.Tasks.dll from the SDK's AppxPackage folder, which .NET SDK 10 no longer lays out the same way -- the build dies with MSB4062 before compiling a line. setup-dotnet installs 9.0.x, but dotnet picks the NEWEST installed SDK unless pinned here, and the runner ships 10.0.400. rollForward latestFeature keeps this working as 9.0.x moves.",
-  "sdk": {
-    "version": "9.0.100",
-    "rollForward": "latestFeature"
-  }
-}

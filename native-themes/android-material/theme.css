@@ -698,13 +698,9 @@ Dialog {
     /* Material 3 dialog corner = 28dp (4.4mm at 160dpi); 6mm read visibly
        rounder than the native alert. */
     border-radius: 4.4mm;
-    /* Native Material dialogs sit on an elevation shadow. This approximates the
-       soft edge with a thin outline-variant stroke; 0.2mm rounded to <1px on
-       Android and vanished, so 0.4mm guarantees it renders.
-       A real black box-shadow is no longer CEF-only -- it compiles to
-       RoundRectBorder's native shadow (see native-themes/README.md) -- but
-       swapping this stroke for one moves every Dialog fidelity score, so it is a
-       deliberate, separately-measured change rather than a drive-by. */
+    /* Native Material dialogs sit on an elevation shadow; box-shadow is CEF-only,
+       so approximate the soft edge with a thin outline-variant stroke. 0.2mm
+       rounded to <1px on Android and vanished -- 0.4mm guarantees it renders. */
     border: 0.4mm solid #cac4d0;
 }
 DialogBody {

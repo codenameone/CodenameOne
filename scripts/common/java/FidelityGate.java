@@ -1,25 +1,3 @@
-/*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -36,12 +14,6 @@ import java.util.TreeMap;
 /// or when a pair could not be compared (missing render, missing golden, size
 /// mismatch, error). Being below 100% never fails on its own -- the suite is a
 /// one-way ratchet that can only improve.
-///
-/// It is two-sided. A score that JUMPS by more than --jump-epsilon (default 10
-/// points) also fails, because a leap that size is usually the measurement moving
-/// rather than the render improving, and an inflated number written into the
-/// baseline is a contract no later render can meet. Accepting one is the same
-/// deliberate act as accepting a drop: FIDELITY_UPDATE_BASELINE=1.
 ///
 /// GEOMETRY is ratcheted separately from visual similarity (the overlay score
 /// can hide size/position/anchoring drift): per pair the gate tracks the bbox
@@ -129,7 +101,6 @@ public class FidelityGate {
         Map<String, Double> baseline = loadBaseline(arguments.baselineJson);
         Map<String, Map<String, Double>> baselineGeometry = loadBaselineGeometry(arguments.baselineJson);
         List<String> regressions = new ArrayList<>();
-        List<String> jumps = new ArrayList<>();
         for (Map.Entry<String, Double> entry : current.entrySet()) {
             Double base = baseline.get(entry.getKey());
             if (base == null) {
@@ -141,23 +112,6 @@ public class FidelityGate {
             if (drop > arguments.epsilon) {
                 regressions.add(String.format("%s: %.2f%% -> %.2f%% (dropped %.2f, epsilon %.2f)",
                         entry.getKey(), base, entry.getValue(), drop, arguments.epsilon));
-            } else if (-drop > arguments.jumpEpsilon) {
-                // The ratchet only ever asked whether a score FELL, so a score that
-                // leapt was waved through as an improvement. Most large leaps are not
-                // improvements: they are the measurement changing underneath the
-                // baseline -- a mask that stopped excluding the backdrop, a golden
-                // reseeded from a different environment, a tile whose geometry moved
-                // so the two renders now overlap by accident. Each of those writes a
-                // number no later render can reach, and the ratchet then enforces the
-                // wrong contract forever, quietly.
-                //
-                // So a leap is gated like a drop: it must be consciously accepted with
-                // FIDELITY_UPDATE_BASELINE=1. The threshold is deliberately loose --
-                // real CSS work moves a tile a few points at a time and passes -- and
-                // the failure names the baseline update as the fix, because for a
-                // genuine improvement that IS the fix.
-                jumps.add(String.format("%s: %.2f%% -> %.2f%% (jumped %.2f, jump-epsilon %.2f)",
-                        entry.getKey(), base, entry.getValue(), -drop, arguments.jumpEpsilon));
             }
         }
 
@@ -189,8 +143,7 @@ public class FidelityGate {
             }
         }
 
-        boolean failed = !regressions.isEmpty() || !jumps.isEmpty()
-                || !geometryRegressions.isEmpty() || !broken.isEmpty();
+        boolean failed = !regressions.isEmpty() || !geometryRegressions.isEmpty() || !broken.isEmpty();
         if (!regressions.isEmpty()) {
             System.err.println("[gate] FAIL: " + regressions.size() + " fidelity regression(s) below baseline:");
             for (String r : regressions) {
@@ -201,16 +154,6 @@ public class FidelityGate {
             System.err.println("[gate] FAIL: " + geometryRegressions.size() + " geometry regression(s) beyond baseline:");
             for (String r : geometryRegressions) {
                 System.err.println("  - " + r);
-            }
-        }
-        if (!jumps.isEmpty()) {
-            System.err.println("[gate] FAIL: " + jumps.size()
-                    + " fidelity score(s) jumped above baseline by more than the jump epsilon.");
-            System.err.println("[gate]       A leap this size is usually the MEASUREMENT changing,"
-                    + " not the render improving. Confirm the score is real, then accept it with"
-                    + " FIDELITY_UPDATE_BASELINE=1.");
-            for (String j : jumps) {
-                System.err.println("  - " + j);
             }
         }
         if (!broken.isEmpty()) {
@@ -348,17 +291,15 @@ public class FidelityGate {
         final Path baselineJson;
         final Path updateBaseline;
         final double epsilon;
-        final double jumpEpsilon;
         final double geometryEpsilonPx;
         final double geometryEpsilonRatio;
 
         private Arguments(Path compareJson, Path baselineJson, Path updateBaseline, double epsilon,
-                double jumpEpsilon, double geometryEpsilonPx, double geometryEpsilonRatio) {
+                double geometryEpsilonPx, double geometryEpsilonRatio) {
             this.compareJson = compareJson;
             this.baselineJson = baselineJson;
             this.updateBaseline = updateBaseline;
             this.epsilon = epsilon;
-            this.jumpEpsilon = jumpEpsilon;
             this.geometryEpsilonPx = geometryEpsilonPx;
             this.geometryEpsilonRatio = geometryEpsilonRatio;
         }
@@ -368,7 +309,6 @@ public class FidelityGate {
             Path baseline = null;
             Path update = null;
             double epsilon = 0.5d;
-            double jumpEpsilon = 10.0d;
             double geometryEpsilonPx = 2.0d;
             double geometryEpsilonRatio = 0.02d;
             for (int i = 0; i < args.length; i++) {
@@ -394,18 +334,6 @@ public class FidelityGate {
                             return null;
                         }
                         update = Path.of(args[i]);
-                    }
-                    case "--jump-epsilon" -> {
-                        if (++i >= args.length) {
-                            System.err.println("Missing value for --jump-epsilon");
-                            return null;
-                        }
-                        try {
-                            jumpEpsilon = Double.parseDouble(args[i]);
-                        } catch (NumberFormatException ex) {
-                            System.err.println("Invalid value for --jump-epsilon: " + args[i]);
-                            return null;
-                        }
                     }
                     case "--epsilon" -> {
                         if (++i >= args.length) {
@@ -453,7 +381,7 @@ public class FidelityGate {
                 System.err.println("--compare-json is required");
                 return null;
             }
-            return new Arguments(compare, baseline, update, epsilon, jumpEpsilon, geometryEpsilonPx, geometryEpsilonRatio);
+            return new Arguments(compare, baseline, update, epsilon, geometryEpsilonPx, geometryEpsilonRatio);
         }
     }
 

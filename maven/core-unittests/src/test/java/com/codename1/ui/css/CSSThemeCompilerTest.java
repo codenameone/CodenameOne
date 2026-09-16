@@ -1,25 +1,3 @@
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
 package com.codename1.ui.css;
 
 import com.codename1.junit.UITestBase;
@@ -92,36 +70,9 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 compiler.compile("Button{color:#ff00ff;text-align:middle;}", resource, "Theme")
         );
-        // Deliberately a nonsense pseudo state rather than a real-but-unimplemented one.
-        // This assertion used ":hover", which stopped throwing the moment hover became a
-        // supported state -- and then the test read as a regression instead of as a feature
-        // landing. A name no state will ever be called keeps it testing what it is for:
-        // that an unknown pseudo state is rejected rather than silently ignored.
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
-                compiler.compile("Button:notarealstate{color:#ff00ff;}", resource, "Theme")
+                compiler.compile("Button:hover{color:#ff00ff;}", resource, "Theme")
         );
-    }
-
-    /**
-     * Both spellings of the hover state reach the same prefix. This compiler accepts a pseudo
-     * (`:hover`) and a dot-class (`.hover`) selector interchangeably - {@code selector()}
-     * splits on whichever separator comes first - whereas the build-time compiler in
-     * maven/css-compiler only understands the dot-class form, which is what
-     * native-themes/README.md tells theme authors to write. Pinning both here means the
-     * looser one cannot quietly drift.
-     */
-    @Test
-    public void testCompilesHoverInBothSelectorSpellings() {
-        CSSThemeCompiler compiler = new CSSThemeCompiler();
-        MutableResource resource = new MutableResource();
-        compiler.compile("Button{color:#111111;}"
-                + "Button:hover{color:#222222;}"
-                + "Label{color:#333333;}"
-                + "Label.hover{color:#444444;}", resource, "Theme");
-
-        Hashtable theme = resource.getTheme("Theme");
-        assertEquals("222222", theme.get("Button.hover#fgColor"));
-        assertEquals("444444", theme.get("Label.hover#fgColor"));
     }
 
     @Test

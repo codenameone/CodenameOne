@@ -115,13 +115,7 @@ typedef enum {
     /* Touchpad pinch phases, kept on the same numbers the Linux port uses so the
      * two desktop wire protocols do not drift apart. */
     CN1_EVENT_PINCH_BEGIN = 20,
-    CN1_EVENT_PINCH_END = 21,
-    /* Pointer motion with NO button held. Dropped entirely before the desktop
-     * themes existed, because a mobile port has no use for it: WM_MOUSEMOVE with
-     * an empty button mask simply returned. It is what drives Component's hover
-     * style, so without it a Fluent button never lights up under the cursor and
-     * the theme's hover rules are dead entries in the .res. */
-    CN1_EVENT_POINTER_HOVER = 22
+    CN1_EVENT_PINCH_END = 21
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */

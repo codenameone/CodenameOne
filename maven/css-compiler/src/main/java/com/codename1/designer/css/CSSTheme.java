@@ -2370,14 +2370,12 @@ public class CSSTheme {
                 Map<String,LexicalUnit> unselectedStyles = el.getUnselected().getFlattenedStyle();
                 Map<String,LexicalUnit> selectedStyles = el.getSelected().getFlattenedStyle();
                 Map<String,LexicalUnit> pressedStyles  = el.getPressed().getFlattenedStyle();
-                Map<String,LexicalUnit> hoverStyles    = el.getHover().getFlattenedStyle();
                 Map<String,LexicalUnit> disabledStyles = el.getDisabled().getFlattenedStyle();
 
                 Element selected = el.getSelected();
                 String selId = id+".sel";
                 String unselId = id;
                 String pressedId = id+".press";
-                String hoverId = id+".hover";
                 String disabledId = id+".dis";
                 currToken = "padding";
                 res.setThemeProperty(themeName, unselId+".padding", el.getThemePadding(unselectedStyles));
@@ -2692,99 +2690,7 @@ public class CSSTheme {
                     res.setThemeProperty(themeName, disabledId+"#border", el.getThemeBorder(disabledStyles));
                 }
 
-                // --- hover ---------------------------------------------------------
-                // The desktop state. Emitted as its own `.hover#` prefix rather than
-                // folded into `.sel#`, because a desktop control distinguishes "the
-                // pointer is over me" from "I have keyboard focus" and draws them
-                // differently -- Fluent and Adwaita both do. The runtime only builds a
-                // hover style when a UIID actually declares one (Component.getHoverStyle),
-                // so a theme that never mentions hover emits nothing here and costs
-                // nothing there.
-                currToken = "hover padding";
-                // Emitted only for a UIID that actually declares a hover rule. Every other
-                // state writes its padding, margin, font and the rest unconditionally, which is
-                // fine for states the runtime only consults on components that opt into them.
-                // Hover is different on both ends: it would add a full key set to every UIID of
-                // every theme ever recompiled, and Component.getHoverStyle decides whether a
-                // component has a hover style by asking the theme whether it declares one. An
-                // unconditional emission would answer yes everywhere and hand back a style built
-                // from blank defaults -- the exact regression that guard exists to prevent.
-                if (el.declaresHover()) {
-                    currToken = "hover iconGap";
-                    // Recomputed rather than reusing the fan-out locals above: the icon gap is
-                    // derived from the UNSELECTED style and shared by every state, and gapUnit is
-                    // scoped to the else branch that produced it.
-                    float hoverGap = el.getThemeIconGap(unselectedStyles);
-                    if (hoverGap < 0) {
-                        res.setThemeProperty(themeName, hoverId+"#iconGap", null);
-                        res.setThemeProperty(themeName, hoverId+"#iconGapUnit", null);
-                    } else {
-                        res.setThemeProperty(themeName, hoverId+"#iconGap", hoverGap);
-                        res.setThemeProperty(themeName, hoverId+"#iconGapUnit", el.getThemeIconGapUnit(unselectedStyles));
-                    }
-                    currToken = "hover padding";
-                    res.setThemeProperty(themeName, hoverId+"#padding", el.getThemePadding(hoverStyles));
-                    currToken = "hover padUnit";
-                    res.setThemeProperty(themeName, hoverId+"#padUnit", el.getThemePaddingUnit(hoverStyles));
-                    currToken = "hover margin";
-                    res.setThemeProperty(themeName, hoverId+"#margin", el.getThemeMargin(hoverStyles));
-                    currToken = "hover marUnit";
-                    res.setThemeProperty(themeName, hoverId+"#marUnit", el.getThemeMarginUnit(hoverStyles));
-                    currToken = "hover elevation";
-                    if (hoverStyles.containsKey("elevation")) {
-                        res.setThemeProperty(themeName, hoverId + "#elevation", el.getThemeElevation(hoverStyles));
-                    }
-                    currToken = "hover letterSpacing";
-                    if (hoverStyles.containsKey("letter-spacing")) {
-                        res.setThemeProperty(themeName, hoverId+"#letterSpacing", el.getThemeLetterSpacing(hoverStyles));
-                    }
-                    currToken = "hover surface";
-                    if (hoverStyles.containsKey("surface")) {
-                        res.setThemeProperty(themeName, hoverId + "#surface", el.getThemeSurface(hoverStyles));
-                    }
-                    currToken = "hover fgColor";
-                    res.setThemeProperty(themeName, hoverId+"#fgColor", el.getThemeFgColor(hoverStyles));
-                    emitColorBinding(res, themeName, hoverId+"#fgColor", el.getHover(), "color");
-                    currToken = "hover fgAlpha";
-                    res.setThemeProperty(themeName, hoverId+"#fgAlpha", el.getThemeFgAlpha(hoverStyles));
-                    currToken = "hover bgColor";
-                    res.setThemeProperty(themeName, hoverId+"#bgColor", el.getThemeBgColor(hoverStyles));
-                    emitColorBinding(res, themeName, hoverId+"#bgColor", el.getHover(), "background-color");
-                    currToken = "hover transparency";
-                    res.setThemeProperty(themeName, hoverId+"#transparency", el.getThemeTransparency(hoverStyles));
-                    currToken = "hover align";
-                    res.setThemeProperty(themeName, hoverId+"#align", el.getThemeAlignment(hoverStyles));
-                    currToken = "hover font";
-                    res.setThemeProperty(themeName, hoverId+"#font", el.getThemeFont(hoverStyles));
-                    currToken = "hover textDecoration";
-                    res.setThemeProperty(themeName, hoverId+"#textDecoration", el.getThemeTextDecoration(hoverStyles));
-                    currToken = "hover bgGradient";
-                    res.setThemeProperty(themeName, hoverId+"#bgGradient", el.getThemeBgGradient(hoverStyles));
-                    currToken = "hover bgType";
-                    res.setThemeProperty(themeName, hoverId+"#bgType", el.getThemeBgType(hoverStyles));
-                    currToken = "hover bgGradientEx";
-                    res.setThemeProperty(themeName, hoverId+"#bgGradientEx", el.getThemeGradient(hoverStyles));
-                    emitFilterBlur(res, hoverId+"#filterBlur", el.getFilterBlurRadius(hoverStyles));
-                    emitFilterBlur(res, hoverId+"#backdropFilterBlur", el.getBackdropFilterBlurRadius(hoverStyles));
-                    emitFilterColorMatrix(res, hoverId+"#filterColorMatrix", el.getFilterColorMatrix(hoverStyles));
-                    emitFilterColorMatrix(res, hoverId+"#backdropFilterColorMatrix", el.getBackdropFilterColorMatrix(hoverStyles));
-                    currToken = "hover derive";
-                    res.setThemeProperty(themeName, hoverId+"#derive", el.getThemeDerive(hoverStyles, ".hover"));
-                    currToken = "hover opacity";
-                    res.setThemeProperty(themeName, hoverId+"#opacity", el.getThemeOpacity(hoverStyles));
-                    currToken = "hover bgImage";
-                    if (el.hasBackgroundImage(hoverStyles) && !el.requiresBackgroundImageGeneration(hoverStyles) && !el.requiresImageBorder(hoverStyles)) {
-                        Image[] imageId = getBackgroundImages(hoverStyles);
-                        if (imageId != null && imageId.length > 0) {
-
-                            res.setThemeProperty(themeName, hoverId+"#bgImage", imageId[0]);
-                        }
-                    }
-                    currToken = "hover border";
-                    if (!el.requiresImageBorder(hoverStyles) && !el.requiresBackgroundImageGeneration(hoverStyles)) {
-                        res.setThemeProperty(themeName, hoverId+"#border", el.getThemeBorder(hoverStyles));
-                    }
-                }
+            
             } catch (RuntimeException t) {
                 System.err.println("An error occurred while updating resources for UIID "+id+".  Processing property "+currToken);
                 throw t;
@@ -3496,14 +3402,14 @@ public class CSSTheme {
 
     private void enforceNoCef() {
         List<String> offenders = new ArrayList<String>();
-        String[] states = new String[] {"unselected", "selected", "pressed", "hover", "disabled"};
+        String[] states = new String[] {"unselected", "selected", "pressed", "disabled"};
         for (String id : elements.keySet()) {
             if (!isModified(id)) {
                 continue;
             }
             Element e = (Element) elements.get(id);
             Element[] stateElements = new Element[] {
-                e.getUnselected(), e.getSelected(), e.getPressed(), e.getHover(), e.getDisabled()
+                e.getUnselected(), e.getSelected(), e.getPressed(), e.getDisabled()
             };
             for (int i = 0; i < stateElements.length; i++) {
                 Map<String, LexicalUnit> styles =
@@ -3690,57 +3596,6 @@ public class CSSTheme {
                     }
                 }
 
-                // Same declaration guard as the property emission: no hover rule, no work,
-                // and above all no image generated under a .hover# key nothing asked for.
-                if (e.declaresHover()) {
-                    Element hover = e.getHover();
-                    Map<String, LexicalUnit> hoverStyles = (Map<String, LexicalUnit>) hover.getFlattenedStyle();
-
-                    b = hover.createBorder(hoverStyles);
-                    Border hoverBorder = b;
-                    if (e.requiresImageBorder(hoverStyles)) {
-                        if (!borders.contains(b)) {
-                            borders.add(b);
-                            resm.addImageProcessor(id + ".hover", (img) -> {
-                                Insets insets = hover.getImageBorderInsets(hoverStyles, img.getWidth(), img.getHeight());
-
-                                resm.targetDensity = getSourceDensity(hoverStyles, resm.targetDensity);
-                                com.codename1.ui.plaf.Border border = resm.create9PieceBorder(img, id, (int) insets.top, (int) insets.right, (int) insets.bottom, (int) insets.left);
-
-                                resm.put(id + ".hover#border", border);
-                                hoverBorder.border = border;
-                                resm.targetDensity = targetDensity;
-                            });
-                        } else {
-                            onComplete.add(() -> {
-                                resm.put(id + ".hover#border", borders.get(borders.indexOf(hoverBorder)).border);
-                            });
-
-                        }
-                    } else if (e.requiresBackgroundImageGeneration(hoverStyles)) {
-                        if (!borders.contains(b)) {
-                            borders.add(b);
-                            resm.addImageProcessor(id + ".hover", (img) -> {
-                                int i = 1;
-                                while (res.containsResource(id + "_" + i + ".png")) {
-                                    i++;
-                                }
-                                String prefix = id + "_" + i + ".png";
-                                resm.targetDensity = getSourceDensity(hoverStyles, resm.targetDensity);
-                                Image im = resm.storeImage(EncodedImage.create(ResourcesMutator.toPngOrJpeg(img)), prefix, false);
-                                hoverBorder.imageId = prefix;
-                                resm.put(id + ".hover#bgImage", im/*res.findId(im, true)*/);
-                                resm.targetDensity = targetDensity;
-                                //resm.put(id+".hover#bgType", Style.B)
-                            });
-                        } else {
-                            onComplete.add(() -> {
-                                resm.put(id + ".hover#bgImage", res.findId(hoverBorder.imageId, true));
-                            });
-                        }
-                    }
-                }
-
                 Element disabled = e.getDisabled();
                 Map<String, LexicalUnit> disabledStyles = (Map<String, LexicalUnit>) disabled.getFlattenedStyle();
 
@@ -3904,7 +3759,7 @@ public class CSSTheme {
                      }
                  }
             }
-            if (hasUnequalBorders() || (this.hasGradient() && !supportedGradient) || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || (hasBoxShadow() && !boxShadowIsNativeRoundRect(styles)) || hasBorderImage()) {
+            if (hasUnequalBorders() || (this.hasGradient() && !supportedGradient) || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow() || hasBorderImage()) {
                 return false;
             }
             
@@ -4075,40 +3930,6 @@ public class CSSTheme {
             return !isNone(bs);
         }
         
-        /// True when this rule's `box-shadow` is one {@link com.codename1.ui.plaf.RoundRectBorder}
-        /// can draw natively, so it needs no CEF-rasterized image border.
-        ///
-        /// `createRoundRectBorder` already translates every shadow property the resource
-        /// format carries -- shadowX, shadowY, shadowBlur, shadowSpread and shadowOpacity.
-        /// That code was simply unreachable: the predicate above used to reject any
-        /// box-shadow outright, so an elevated surface fell through to rasterization and,
-        /// in a native theme, to a hard `strictNoCef` failure.
-        ///
-        /// Two shapes genuinely have no RoundRectBorder equivalent and stay rejected:
-        ///
-        /// - An `inset` shadow. RoundRectBorder only draws an outer drop shadow.
-        /// - A shadow tinted anything other than black. The reader never reads a shadow
-        ///   colour (`Resources` cases 0xff13 and 0xff15 stop at shadowY), so a coloured
-        ///   shadow would round-trip to black and the hue would vanish silently -- which is
-        ///   worse than refusing it, because nothing downstream could tell.
-        ///
-        /// An alpha on the colour is fine: it is carried as shadowOpacity, which is exactly
-        /// what it means.
-        public boolean boxShadowIsNativeRoundRect(Map<String,LexicalUnit> styles) {
-            if (!hasBoxShadow()) {
-                return false;
-            }
-            LexicalUnit inset = styles.get("cn1-box-shadow-inset");
-            if (inset != null && "inset".equals(inset.getStringValue())) {
-                return false;
-            }
-            LexicalUnit color = styles.get("cn1-box-shadow-color");
-            if (color != null && !isNone(color) && (getColorInt(color) & 0xffffff) != 0) {
-                return false;
-            }
-            return true;
-        }
-
         public boolean hasBorderImage() {
             String bs = borderImage;
             if (bs != null) {
@@ -4198,7 +4019,6 @@ public class CSSTheme {
         Element unselected;
         Element selected;
         Element pressed;
-        Element hover;
         Element disabled;
         
         public String getChecksum() {
@@ -4207,7 +4027,6 @@ public class CSSTheme {
                     .append(";UNSELECTED=").append(this.getFlattenedUnselectedStyle())
                     .append(";SELECTED=").append(this.getFlattenedSelectedStyle())
                     .append(";PRESSED=").append(this.getFlattenedPressedStyle())
-                    .append(";HOVER=").append(this.getFlattenedHoverStyle())
                     .append(";DISABLED=").append(this.getFlattenedDisabledStyle());
             
             return generateMD5(sb.toString());
@@ -4406,49 +4225,6 @@ public class CSSTheme {
             return out;
         }
         
-        /// True when a `.hover` rule was actually written for this UIID or for something it
-        /// inherits from.
-        ///
-        /// `getFlattenedHoverStyle()` cannot answer this: like every other state it inherits
-        /// the base UIID's properties, so it is non-empty for every element in the sheet and
-        /// would report that all of them declare hover. What distinguishes a real declaration
-        /// is the state Element carrying style properties of its OWN. The walk mirrors the
-        /// flattener's inheritance chain and deliberately reads `hover` directly rather than
-        /// calling `getHover()`, which would create the very thing being tested for.
-        boolean declaresHover() {
-            Element el = this;
-            while (el != null) {
-                if (el.hover != null && !el.hover.style.isEmpty()) {
-                    return true;
-                }
-                el = el.parent != null ? el.parent.parent : null;
-            }
-            return false;
-        }
-
-        Map getFlattenedHoverStyle() {
-            Map out = new LinkedHashMap();
-
-            LinkedList<Map> stack = new LinkedList<Map>();
-            Element el = this;
-            if (!el.isHoverStyle()) {
-                el = el.getHover();
-            }
-            while (el != null) {
-                stack.push(el.style);
-
-                el = el.parent.parent;
-                if (el != null) {
-                    el = el.getHover();
-                }
-            }
-
-            while (!stack.isEmpty()) {
-                out.putAll(stack.pop());
-            }
-            return out;
-        }
-
         Map getFlattenedUnselectedStyle() {
             Map out = new LinkedHashMap();
             
@@ -4566,14 +4342,6 @@ public class CSSTheme {
                 //disabled.style.putAll(style);
             }
             return disabled;
-        }
-
-        Element getHover() {
-            if (hover == null) {
-                hover = new Element();
-                hover.parent = this;
-            }
-            return hover;
         }
 
         /// Returns the var name a given CSS property is bound to, walking
@@ -4757,10 +4525,6 @@ public class CSSTheme {
             
         }
         
-        boolean isHoverStyle() {
-            return parent != null && parent.hover == this;
-        }
-
         boolean isDisabledStyle() {
             return parent != null && parent.disabled == this;
         }
@@ -6699,20 +6463,8 @@ public class CSSTheme {
 
             LexicalUnit shadowColor = styles.get("cn1-box-shadow-color");
             if (shadowColor != null) {
-                // Only the alpha survives: RoundRectBorder's shadow colour is not part of the
-                // resource format (Resources cases 0xff13 / 0xff15 stop at shadowY). Warn only
-                // when there is actually a hue to lose -- boxShadowIsNativeRoundRect refuses a
-                // coloured shadow before it can reach this method, so a rule that arrived here
-                // through the border predicate is black by construction, and warning anyway
-                // would print four lines per elevated UIID on every native-theme build. That is
-                // how compiler output stops being read.
-                //
-                // The identical unconditional warning in createRoundBorder above has the same
-                // false-positive problem; it is left alone because that path is unchanged here.
-                if ((getColorInt(shadowColor) & 0xffffff) != 0) {
-                    System.err.println("In file "+baseURL);
-                    System.err.println("Shadow color is not carried by the resource format. Ignoring RGB portion, only using alpha");
-                }
+                System.err.println("In file "+baseURL);
+                System.err.println("Shadow color not supported for background type cn1-round-border.  Ignoring RGB Portion  Only using Alpha");
                 Integer alpha = getColorAlphaInt(shadowColor);
                 if (alpha != null) {
                     out.shadowOpacity(alpha);
@@ -6746,13 +6498,7 @@ public class CSSTheme {
             // switching dispatch fixes Dialog without changing iOS /
             // Android pixels (RoundRectBorder produces a visually-
             // equivalent rounded rect there).
-            // A box-shadow reaches RoundRectBorder here whether or not the rule also asked
-            // for a radius: an elevated surface with square corners is still a RoundRectBorder,
-            // just one with cornerRadius 0. Without the second term it would fall past this
-            // branch, past the CSSBorder branch (which rejects shadows outright) and into
-            // rasterization.
-            if (b.canBeAchievedWithRoundRectBorder(styles)
-                    && (b.hasBorderRadius() || b.boxShadowIsNativeRoundRect(styles))
+            if (b.canBeAchievedWithRoundRectBorder(styles) && b.hasBorderRadius()
                     && !b.hasBorderImage() && !b.hasUnequalBorders()) {
                 return createRoundRectBorder(styles);
             }
@@ -7967,8 +7713,6 @@ public class CSSTheme {
                                         return parent.getUnselected();
                                     case "pressed" :
                                         return parent.getPressed();
-                                    case "hover" :
-                                        return parent.getHover();
                                     case "disabled" :
                                         return parent.getDisabled();
                                     default :
@@ -7992,8 +7736,6 @@ public class CSSTheme {
                                         return parent.getUnselected();
                                     case "pressed" :
                                         return parent.getPressed();
-                                    case "hover" :
-                                        return parent.getHover();
                                     case "disabled" :
                                         return parent.getDisabled();
                                     default :
