@@ -69,7 +69,7 @@ Windows, macOS and GNOME have their own native themes, selected with
 `fluent` / `aqua` / `adwaita` +
 `custom`
 |Unset is `legacy`: an existing desktop project keeps the theme it has
-always loaded, so upgrading the framework does not restyle an application
+always loaded, so upgrading the framework doesn't restyle an application
 nobody asked to restyle. `auto` and `native` opt in and both mean
 "whatever this machine is" -- Windows 11 Fluent, macOS Aqua or GNOME
 Adwaita -- which is the only sensible reading on desktop, where one binary
