@@ -4106,22 +4106,18 @@ public class CSSTheme {
             if (color != null && !isNone(color) && (getColorInt(color) & 0xffffff) != 0) {
                 return false;
             }
-            // A usable SPREAD is required, and this is the difference between a shadow that
-            // renders and one that silently disappears.
+            // A review asked for a spread>0 guard here, on the grounds that
+            // createRoundRectBorder() leaves shadowSpread at zero so the software shadow
+            // loop `for (iter = shadowSpreadL - 1; iter >= 0; iter--)` runs zero times, and
+            // that the blur is stored negative. Both halves were checked and both are
+            // wrong, so there is no guard: RoundRectBorder's constructor seeds
+            // shadowSpread to convertToPixels(0.2f), a NON-zero default that survives
+            // unless the CSS sets a spread explicitly, and the minus in
+            // shadowBlur(-calculateShadowRatio(...)) cancels the one inside that method's
+            // px branch, yielding a positive blur.
             //
-            // RoundRectBorder's software path draws the shadow as
-            // `for (iter = shadowSpreadL - 1; iter >= 0; iter--)`. With the CSS default
-            // spread of zero that loop runs zero times, so `box-shadow: 0 2px 4px rgba(...)`
-            // -- the ordinary shape of the property -- would compile to a border that draws
-            // no shadow at all on any renderer without shape-shadow support. Rasterizing it
-            // is worse-looking and correct, which beats native-looking and absent.
-            //
-            // Not currently reachable: no theme in the tree declares box-shadow. It is
-            // gated here so the first one that does gets the rendering it asked for.
-            ScaledUnit spread = (ScaledUnit) styles.get("cn1-box-shadow-spread");
-            if (spread == null || spread.getNumericValue() <= 0) {
-                return false;
-            }
+            // Adding the guard made `box-shadow: 0 2px 4px rgba(...)` rasterize again and
+            // broke CSSBoxShadowNativeBorderTest, which exists to pin exactly that case.
             return true;
         }
 
