@@ -6,11 +6,55 @@
 #
 #   run-gauntlet.sh
 #
-# Requirements: JDK_8_HOME, BENCH_JAVA or `java` on PATH, Maven, clang.
+# TWO references, not one, because Java itself has two answers.
+#
+# JDK-4511638 replaced FloatingDecimal with the Raffaello Giulietti shortest-repr
+# algorithm in Java 19, so Double/Float.toString changed for values whose old rendering
+# carried a redundant digit. Measured on this machine, all from one unchanged BoxEdge:
+#
+#     JDK 25 / 21 / 19   4.611686018427388E18    2.1474836E9
+#     JDK 17 / 11 / 8    4.6116860184273879E18   2.14748365E9
+#     ParparVM           4.611686018427388E18    2.1474836E9   (cn1ShortestDouble)
+#
+# ParparVM implements the modern algorithm deliberately, so the reference JVM's VERSION
+# decides whether BoxEdge passes. That made the gate silently dependent on $PATH: run it
+# in a shell that has sourced tools/env.sh -- which every other instruction here tells you
+# to do, and which puts JDK 8 on PATH -- and BoxEdge reports DIVERGE on a tree with no bug
+# in it. Worse in the other direction: the 'fix' that reading suggests is to make the VM
+# emit the pre-19 form, which would break it against every JDK anyone still ships.
+#
+# So the gate now pins a MODERN reference and checks the LEGACY one as well:
+#
+#   * the target must be byte-identical to the modern JDK (19+) -- the shipping contract;
+#   * the target must also equal the legacy JDK (8) on every line where the two JDKs
+#     agree with each other. Lines where they disagree are the era-dependent ones, and
+#     they are derived by diffing the two references rather than hand-listed, so no list
+#     can go stale.
+#
+# What that buys: a real divergence that happens to land on a floating-point line is still
+# caught, because it would differ from legacy on a line where legacy and modern agree.
+#
+# Requirements: JDK_8_HOME, a JDK 19+ as BENCH_JAVA or `java` on PATH, Maven, clang.
 set -e
 cd "$(dirname "$0")"
 REF_JAVA="${BENCH_JAVA:-java}"
 J8="${JDK_8_HOME:?set JDK_8_HOME}"
+
+# Refuse a pre-19 reference outright rather than reporting its era difference as a VM bug.
+# Java 8 spells it "1.8", everything since spells it "17"/"25" -- take the part after
+# the "1." when there is one, or the whole number when there is not, so the refusal names
+# the version a human recognises instead of reporting JDK 8 as "Java 1".
+refFeature="$("$REF_JAVA" -XshowSettings:properties -version 2>&1 \
+    | sed -nE 's/.*java\.specification\.version = (1\.)?([0-9]+).*/\2/p' | head -1)"
+if [ -z "$refFeature" ] || [ "$refFeature" -lt 19 ] 2>/dev/null; then
+    echo "run-gauntlet: reference JVM is Java ${refFeature:-unknown} ($REF_JAVA)" >&2
+    echo "  Java 19+ is required: Double/Float.toString changed in 19 (JDK-4511638) and" >&2
+    echo "  ParparVM implements the modern form, so an older reference reports BoxEdge as" >&2
+    echo "  DIVERGE on a correct tree. Set BENCH_JAVA to a JDK 19 or newer." >&2
+    echo "  Note tools/env.sh puts JDK 8 on PATH, which is how this is usually hit." >&2
+    exit 2
+fi
+echo "run-gauntlet: modern reference Java $refFeature ($REF_JAVA); legacy reference $J8"
 
 # TaggedSync guards Java monitor semantics on tagged boxed Integers (mutual
 # exclusion + wait/notify) -- regression test for the tagged monitorEnter/Exit
@@ -69,11 +113,33 @@ for t in $TORTURES; do
     # torture that emitted a "[...]" diagnostic diverged against its own host run -- and
     # stderr is no way around that, because System.err reaches fd 1 on the clean target.
     b="$("$REF_JAVA" -cp target/host-classes "com.bench.$t" 2>/dev/null | grep -v '^\[')"
-    if [ -n "$a" ] && [ "$a" = "$b" ]; then
-        echo "$t: MATCH"
-    else
+    if [ -z "$a" ] || [ "$a" != "$b" ]; then
         echo "$t: DIVERGE"
+        diff <(printf '%s\n' "$b") <(printf '%s\n' "$a") | head -8
         fail=1
+        continue
+    fi
+    # Second reference: the legacy JDK. The target already equals modern, so any line
+    # where it differs from legacy must be a line where the two JDKs differ from each
+    # other -- an era-dependent rendering. A line where the JDKs AGREE and the target
+    # does not is a genuine bug that the modern comparison alone would have accepted
+    # only if modern itself had regressed; checking both closes that gap.
+    l="$("$J8/bin/java" -cp target/host-classes "com.bench.$t" 2>/dev/null | grep -v '^\[')"
+    if [ "$a" = "$l" ]; then
+        echo "$t: MATCH (both)"
+    else
+        # Lines that differ between the two REFERENCES: the era-dependent set.
+        eraOnly="$(diff <(printf '%s\n' "$l") <(printf '%s\n' "$b") | grep -c '^<' || true)"
+        targetVsLegacy="$(diff <(printf '%s\n' "$l") <(printf '%s\n' "$a") | grep -c '^<' || true)"
+        if [ "$eraOnly" -gt 0 ] && [ "$targetVsLegacy" -eq "$eraOnly" ] \
+           && [ -z "$(diff <(diff <(printf '%s\n' "$l") <(printf '%s\n' "$b")) \
+                          <(diff <(printf '%s\n' "$l") <(printf '%s\n' "$a")))" ]; then
+            echo "$t: MATCH (modern; $eraOnly line(s) era-dependent vs Java 8)"
+        else
+            echo "$t: DIVERGE from Java 8 on lines the JDKs agree on"
+            diff <(printf '%s\n' "$l") <(printf '%s\n' "$a") | head -8
+            fail=1
+        fi
     fi
 done
 
