@@ -728,6 +728,47 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void ignoresVersionedEntitiesInMultiReleaseJars() throws Exception {
+        File base = compileFixture("com.example.Shared",
+                "package com.example; import com.codename1.annotations.*; "
+                + "@Entity public class Shared { @Id public long id; public String name; }");
+        File versioned = compileFixture("com.example.Shared",
+                "package com.example; import com.codename1.annotations.*; "
+                + "@Entity public class Shared { @Id public long id; public String later; }");
+        File onlyVersioned = compileFixture("com.example.Later",
+                "package com.example; import com.codename1.annotations.*; "
+                + "@Entity public class Later { @Id public long id; }");
+        File jar = tmp.newFile("multi-release.jar");
+        java.util.jar.Manifest manifest = new java.util.jar.Manifest();
+        manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
+        manifest.getMainAttributes().putValue("Multi-Release", "true");
+        try (java.util.jar.JarOutputStream out = new java.util.jar.JarOutputStream(
+                new java.io.FileOutputStream(jar), manifest)) {
+            // Put the override first so an accidental first-match scan cannot pass.
+            addJarClass(out, "META-INF/versions/9/com/example/Shared.class",
+                    new File(versioned, "com/example/Shared.class"));
+            addJarClass(out, "META-INF/versions/11/com/example/Later.class",
+                    new File(onlyVersioned, "com/example/Later.class"));
+            addJarClass(out, "com/example/Shared.class",
+                    new File(base, "com/example/Shared.class"));
+        }
+        File module = tmp.newFolder();
+        List<String> classpath = new ArrayList<String>(backendClasspath());
+        classpath.add(jar.getAbsolutePath());
+        ProcessorContext ctx = runProcessor(module, classpath);
+        assertFalse("errors: " + ctx.getErrors(), ctx.hasErrors());
+        assertTrue(new File(module, "com/example/SharedCn1BackendDao.class").exists());
+        assertFalse(new File(module, "com/example/LaterCn1BackendDao.class").exists());
+    }
+
+    private static void addJarClass(java.util.jar.JarOutputStream out, String name,
+                                   File cls) throws Exception {
+        out.putNextEntry(new java.util.jar.JarEntry(name));
+        Files.copy(cls.toPath(), out);
+        out.closeEntry();
+    }
+
+    @Test
     public void theEntryPointCompilesAgainstTheDaosGeneratedBeforeIt() throws Exception {
         // The packaging order, as a test rather than as a convention.
         //

@@ -159,6 +159,12 @@ class EntityManagerTest {
             assertEquals(0, notes.query().in("title", new Object[0]).count());
             assertEquals(3, notes.query().isNull("body").count());
 
+            assertThrows(IllegalArgumentException.class, () -> notes.query().limit(-1));
+            assertThrows(IllegalArgumentException.class, () -> notes.query().limit(-2));
+            assertThrows(IllegalArgumentException.class, () -> notes.query().offset(-1));
+            assertEquals(0, notes.query().limit(0).list().size());
+            assertEquals(3, notes.query().offset(0).list().size());
+
             List<Note> ordered = notes.query().orderBy("views", false).limit(2).list();
             assertEquals(2, ordered.size());
             assertEquals("high", ordered.get(0).title);

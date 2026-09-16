@@ -560,6 +560,7 @@ public class OrmCheck {
             em.transaction(new EntityManager.Work() {
                 public Object run(EntityManager tx) throws Exception {
                     tx.dao(Note.class).insert(note("rolled back", 1, false, 1L));
+                    tx.dao(Note.class).resyncGeneratedKey();
                     throw new IllegalStateException("deliberate");
                 }
             });
@@ -573,6 +574,7 @@ public class OrmCheck {
         em.transaction(new EntityManager.Work() {
             public Object run(EntityManager tx) throws Exception {
                 tx.dao(Note.class).insert(note("committed", 1, false, 1L));
+                tx.dao(Note.class).resyncGeneratedKey();
                 return null;
             }
         });

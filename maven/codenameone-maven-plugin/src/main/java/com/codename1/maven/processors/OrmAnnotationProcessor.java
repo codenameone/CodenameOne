@@ -891,7 +891,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
-                if (!name.endsWith(".class") || skipPackage(name)) {
+                // Backend bytecode targets Java 8, so only the base entries of a
+                // multi-release JAR are visible to the generated daos.
+                if (!name.endsWith(".class") || name.startsWith("META-INF/versions/")
+                        || skipPackage(name)) {
                     continue;
                 }
                 AnnotatedClass cls = readEntry(zip, entry, archive, ctx);

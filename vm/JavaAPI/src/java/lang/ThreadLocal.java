@@ -143,8 +143,12 @@ public class ThreadLocal<T> extends Object {
             // when it is null -- a ThreadLocal deliberately set to null must not be
             // re-initialised on every read, which is what the Set this replaces was
             // for.
+            // A failed initializer must be retried. Look up the entry again
+            // because initialValue() may itself remove or replace it.
+            T value = initialValue();
+            e = entryOfCurrentThread(true);
+            e.value = value;
             e.initialised = true;
-            e.value = initialValue();
         }
         return (T)e.value;
     }

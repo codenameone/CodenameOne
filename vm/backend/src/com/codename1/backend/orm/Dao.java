@@ -158,6 +158,13 @@ public final class Dao<T> {
                     db.query(sql, null);
                     return null;
                 }
+                // A nested BEGIN/COMMIT on PostgreSQL commits the caller's
+                // transaction. Keep its lock and writes inside that boundary.
+                if(owner.isTransactionScoped()) {
+                    db.execute(lock, null);
+                    db.query(sql, null);
+                    return null;
+                }
                 return db.transaction(new Database.Work() {
                     public Object run(Database inTransaction) throws Exception {
                         inTransaction.execute(lock, null);

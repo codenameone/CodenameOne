@@ -210,6 +210,7 @@ public class SelfTest {
     }
 
     public static void main(String[] args) throws Exception {
+        threadLocalInitialization();
         crypto();
         jwt();
         base64Url();
@@ -235,6 +236,61 @@ public class SelfTest {
     }
 
     // ------------------------------------------------------------------
+
+    private static void threadLocalInitialization() {
+        final int[] attempts = new int[1];
+        ThreadLocal<String> retry = new ThreadLocal<String>() {
+            protected String initialValue() {
+                if(++attempts[0] == 1) {
+                    throw new IllegalStateException("first initialization fails");
+                }
+                return "ready";
+            }
+        };
+        boolean threw = false;
+        try {
+            retry.get();
+        } catch (IllegalStateException expected) {
+            threw = true;
+        }
+        check("ThreadLocal propagates initializer failure", "true", String.valueOf(threw));
+        check("ThreadLocal retries initialization", "ready", retry.get());
+        check("ThreadLocal caches successful initialization", "ready", retry.get());
+        check("ThreadLocal initializes twice after one failure", "2", String.valueOf(attempts[0]));
+        retry.remove();
+        check("ThreadLocal initializes after remove", "ready", retry.get());
+        check("ThreadLocal remove resets initialization", "3", String.valueOf(attempts[0]));
+        retry.set(null);
+        check("ThreadLocal preserves an explicit null", "null", String.valueOf(retry.get()));
+        check("ThreadLocal null does not reinitialize", "3", String.valueOf(attempts[0]));
+
+        final int[] removals = new int[1];
+        ThreadLocal<String> removesDuringInitialization = new ThreadLocal<String>() {
+            protected String initialValue() {
+                removals[0]++;
+                remove();
+                set("temporary");
+                return "final";
+            }
+        };
+        check("ThreadLocal installs after initializer removes entry", "final",
+                removesDuringInitialization.get());
+        check("ThreadLocal retains initializer result", "final",
+                removesDuringInitialization.get());
+        check("ThreadLocal does not repeat a successful initializer", "1",
+                String.valueOf(removals[0]));
+        ThreadLocal<String> overridesSet = new ThreadLocal<String>() {
+            protected String initialValue() { return "initialized"; }
+            public void set(String value) {
+                throw new IllegalStateException("get must not invoke an overridden set");
+            }
+        };
+        check("ThreadLocal initialization does not invoke overridden set", "initialized",
+                overridesSet.get());
+        overridesSet.remove();
+        retry.remove();
+        removesDuringInitialization.remove();
+    }
 
     private static void crypto() throws Exception {
         // Known-answer tests, not round trips. A round trip passes just as happily

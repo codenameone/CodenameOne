@@ -193,12 +193,18 @@ public final class Query<T> {
 
     /** At most this many rows. */
     public Query<T> limit(int count) {
+        if(count < 0) {
+            throw new IllegalArgumentException("Query limit must be non-negative");
+        }
         limit = count;
         return this;
     }
 
     /** Skips this many rows. Pair it with an order, or the rows skipped are arbitrary. */
     public Query<T> offset(int count) {
+        if(count < 0) {
+            throw new IllegalArgumentException("Query offset must be non-negative");
+        }
         offset = count;
         return this;
     }

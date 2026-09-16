@@ -310,6 +310,11 @@ public final class EntityManager {
         return new IOException(err.getClass().getName() + ": " + err.getMessage());
     }
 
+    /** Whether DAO work must join a transaction already opened by this manager. */
+    boolean isTransactionScoped() {
+        return transactionScoped;
+    }
+
     /** The pool behind this manager, or null when it is pinned to one connection. */
     public DataSource dataSource() {
         return pool;
