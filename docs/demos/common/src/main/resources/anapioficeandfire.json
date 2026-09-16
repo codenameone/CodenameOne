@@ -1,34 +1,77 @@
-{
-    "root": [
-        {
-            "url": "https://anapioficeandfire.com/api/characters/583",
-            "name": "Jon Snow",
-            "titles": ["Lord Commander of the Night's Watch"],
-            "aliases": ["Lord Snow", "The Bastard of Winterfell"]
-        },
-        {
-            "url": "https://anapioficeandfire.com/api/characters/148",
-            "name": "Daenerys Targaryen",
-            "titles": ["Queen of the Andals", "Breaker of Chains"],
-            "aliases": ["Dany", "Mother of Dragons"]
-        },
-        {
-            "url": "https://anapioficeandfire.com/api/characters/232",
-            "name": "",
-            "titles": ["Ser"],
-            "aliases": ["The Hound"]
-        },
-        {
-            "url": "https://anapioficeandfire.com/api/characters/1303",
-            "name": "Tyrion Lannister",
-            "titles": ["Hand of the Queen"],
-            "aliases": ["The Imp", "Halfman"]
-        },
-        {
-            "url": "https://anapioficeandfire.com/api/characters/271",
-            "name": "Arya Stark",
-            "titles": [],
-            "aliases": ["Arry", "No One"]
-        }
+[
+  {
+    "url": "http://www.anapioficeandfire.com/api/characters/13",
+    "name": "Chayle",
+    "culture": "",
+    "born": "",
+    "died": "In 299 AC, at Winterfell",
+    "titles": [
+      "Septon"
+    ],
+    "aliases": [],
+    "father": "",
+    "mother": "",
+    "spouse": "",
+    "allegiances": [],
+    "books": [
+      "http://www.anapioficeandfire.com/api/books/1",
+      "http://www.anapioficeandfire.com/api/books/2",
+      "http://www.anapioficeandfire.com/api/books/3"
+    ],
+    "povBooks": [],
+    "tvSeries": [],
+    "playedBy": []
+  },
+  {
+    "url": "http://www.anapioficeandfire.com/api/characters/14",
+    "name": "Gillam",
+    "culture": "",
+    "born": "",
+    "died": "",
+    "titles": [
+      "Brother"
+    ],
+    "aliases": [],
+    "father": "",
+    "mother": "",
+    "spouse": "",
+    "allegiances": [],
+    "books": [
+      "http://www.anapioficeandfire.com/api/books/5"
+    ],
+    "povBooks": [],
+    "tvSeries": [],
+    "playedBy": []
+  },
+  {
+    "url": "http://www.anapioficeandfire.com/api/characters/15",
+    "name": "High Septon",
+    "culture": "",
+    "born": "",
+    "died": "",
+    "titles": [
+      "High Septon",
+      "His High Holiness",
+      "Father of the Faithful",
+      "Voice of the Seven on Earth"
+    ],
+    "aliases": [
+      "The High Sparrow"
+    ],
+    "father": "",
+    "mother": "",
+    "spouse": "",
+    "allegiances": [],
+    "books": [
+      "http://www.anapioficeandfire.com/api/books/5",
+      "http://www.anapioficeandfire.com/api/books/8"
+    ],
+    "povBooks": [],
+    "tvSeries": [
+      "Season 5"
+    ],
+    "playedBy": [
+      "Jonathan Pryce"
     ]
-}
+  }
+]

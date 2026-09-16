@@ -46,7 +46,10 @@ class IoJsonParsingFigure implements GuideFigure {
     /// The tagged region is what the chapter includes, so the listing beside the
     /// picture is the code that drew it. The document it reads is packaged with
     /// the demo rather than fetched, which is what makes the picture the same
-    /// every time it is taken.
+    /// every time it is taken, and it is byte for byte the array the chapter
+    /// prints a few lines above and tells the reader to save under this name.
+    /// That the array has no "root" key is the point of the first annotation:
+    /// JSONParser synthesises one when the document's root is a list.
     @Override
     @SuppressWarnings("unchecked")
     public Form build() {
