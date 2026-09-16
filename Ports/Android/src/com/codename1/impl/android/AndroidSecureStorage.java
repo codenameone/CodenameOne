@@ -452,9 +452,15 @@ public final class AndroidSecureStorage extends SecureStorage {
                         handle.write(GATE_SETTLED);
                         handle.getChannel().force(true);
                     } catch (java.io.IOException cannotMark) {
-                        // The value is real and is being returned either way; what is lost is
-                        // the protection for NEXT time, which the next call through here retries.
+                        // FAILS CLOSED rather than returning it. An earlier version logged this
+                        // and handed the value back on the reasoning that only next time's
+                        // protection was lost -- but the gate is still unmarked at the moment
+                        // this returns, so a second process whose cache says the account is
+                        // absent takes it, installs a different managed database or vault key,
+                        // and orphans whatever the value just handed out is protecting.
+                        // Answering null means the caller retries instead of building on it.
                         Log.e(cannotMark);
+                        return null;
                     }
                 }
                 return stored;

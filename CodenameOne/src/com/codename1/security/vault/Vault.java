@@ -3047,6 +3047,16 @@ public final class Vault {
     /// through publishKey, which re-reads the counter and locks again if it moved, so a worker
     /// that loses the race leaves the vault closed rather than open.
     ///
+    /// A later round asked for the same keyword on a second ground -- that observing the counter
+    /// would also publish the KEY CLEARING that precedes it -- so that is worth answering too. A
+    /// worker holds the data key as a reference it captured before lock() ran, and lock() zeroes
+    /// that same array in place; whether those zeroes are visible to it is the same race, one
+    /// level down. It does not change the outcome, and this is why: a worker that sees neither
+    /// the increment nor the zeroes finishes its work under the key it started with, which is an
+    /// operation that was legitimately in flight, and it still cannot PUBLISH -- publishKey and
+    /// the requireSameKey/requireSameGeneration checks all re-read on the way out. The failure
+    /// mode is a missed abort, never a wrong answer and never an open vault.
+    ///
     /// lock() promises that nothing in flight delivers afterwards, and an operation that reads
     /// storage and decrypts is in flight for long enough to matter -- an EDT caller's lifecycle
     /// callback can land squarely inside it. The generation has to be captured on the CALLING
