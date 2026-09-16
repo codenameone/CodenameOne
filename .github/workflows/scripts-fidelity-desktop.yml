@@ -158,7 +158,7 @@ jobs:
       # simulator starts.
       - name: Install xvfb
         if: matrix.platform == 'gnome'
-        run: bash scripts/ci/apt-get-install.sh xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb fonts-cantarell
 
       - name: Build the core, the simulator and the fidelity app
         shell: bash

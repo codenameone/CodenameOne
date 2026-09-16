@@ -95,7 +95,7 @@ class DesktopNativeThemeSelectionTest {
                 assertEquals(legacy, JavaSEPort.defaultSystemFontForTheme(platform, resource));
             }
             String modern = "win".equals(platform) ? "Segoe UI Variable Text"
-                    : ("mac".equals(platform) ? "SF Pro Text" : "Cantarell");
+                    : ("mac".equals(platform) ? ".AppleSystemUIFont" : "Cantarell");
             for (String resource : new String[]{"/WindowsFluentTheme.res", "/MacOSAquaTheme.res", "/GnomeAdwaitaTheme.res"}) {
                 assertEquals(modern, JavaSEPort.defaultSystemFontForTheme(platform, resource));
             }
@@ -130,7 +130,7 @@ class DesktopNativeThemeSelectionTest {
     private static java.util.Map<String, Object> saveFontState() throws Exception {
         java.util.Map<String, Object> state = new java.util.HashMap<String, Object>();
         for (String name : new String[]{"fontFaceSystem", "fontFaceProportional", "fontFaceMonospace",
-                "fontFacesExplicitlyConfigured", "DEFAULT_FONT", "autoAdjustFontSize"}) {
+                "fontFacesExplicitlyConfigured", "desktopNativeFonts", "DEFAULT_FONT", "autoAdjustFontSize"}) {
             state.put(name, field(name).get(null));
         }
         return state;

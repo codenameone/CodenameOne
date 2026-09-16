@@ -797,6 +797,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
         setPointerEventMetadata(button, mask, type, 1f, 0, 0, 0, 0, false);
     }
 
+    void dispatchPointerHover(int windowId, int x, int y) {
+        // The native bridge emits only buttonless mouse motion/leave here.
+        // Reset every field before dispatch so a previous touch cannot leak in.
+        setPointerEventMetadata(com.codename1.ui.events.PointerEvent.BUTTON_NONE, 0,
+                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 0f, 0f, 0f, 0f, 0, true);
+        windowPointerHover(windowId, x, y);
+    }
+
     private void drainInput() {
         while (LinuxNative.pollEvent(eventScratch)) {
             int type = eventScratch[0];
@@ -851,7 +859,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     // window's own Desktop instance, so a control in one reaches the
                     // hover state like any other; the earlier main-window-only guard
                     // made hover unreachable there.
-                    windowPointerHover(windowId, x, y);
+                    dispatchPointerHover(windowId, x, y);
                     break;
                 case EVENT_KEY_PRESSED:
                     windowKeyPressed(windowId, key);

@@ -120,6 +120,14 @@ public final class DesktopTileRunner {
     }
 
     private static int renderAll(String platform, String themeRes, File outDir) throws Exception {
+        java.awt.Font nativeFont = (java.awt.Font) com.codename1.impl.javase.JavaSEPort.instance.loadTrueTypeFont(
+                "native:MainRegular", "native:MainRegular");
+        String family = nativeFont.getFamily();
+        System.out.println("Desktop native font: " + nativeFont.getName() + " (family=" + family + ")");
+        boolean expected = "gnome".equals(platform) ? "Cantarell".equals(family)
+                : ("macos".equals(platform) ? ".AppleSystemUIFont".equals(family)
+                : family.startsWith("Segoe UI Variable"));
+        if (!expected) throw new IllegalStateException("Native reference font unavailable: " + family);
         FidelitySpec spec = FidelitySpecParser.parse(readSpec());
         int count = 0;
         List appearances = spec.getAppearances();

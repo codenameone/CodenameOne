@@ -244,6 +244,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static final boolean isWindows;
     private static String fontFaceSystem;
     private static boolean fontFacesExplicitlyConfigured;
+    private static boolean desktopNativeFonts;
+    private final java.util.Map<java.awt.Font, Boolean> desktopAliasFonts =
+            new java.util.WeakHashMap<java.awt.Font, Boolean>();
     private Boolean darkMode;
     private AutoLocalizationBundle autoLocalizationBundle;
     private boolean autoUpdateDefaultResourceBundle;
@@ -2958,6 +2961,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             resFile = resolvePackagedDesktopNativeTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), theme);
         }
         nativeTheme = resFile;
+        desktopNativeFonts = isDesktopNativeThemeResource(resFile);
         if (!fontFacesExplicitlyConfigured) {
             fontFaceSystem = defaultSystemFontForTheme(IS_MAC ? "mac" : (IS_LINUX ? "linux" : "win"), resFile);
             // Theme selection changes FACE_SYSTEM, not the default font's size. Its
@@ -2979,7 +2983,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "Segoe UI Variable Text";
         }
         if ("mac".equals(platform)) {
-            return "SF Pro Text";
+            return ".AppleSystemUIFont";
         }
         return "linux".equals(platform) ? "Cantarell" : "Arial";
     }
@@ -5594,6 +5598,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             byte[] nativeThemeData = null;
             nativeThemeRes = null;
             nativeTheme = null;
+            desktopNativeFonts = false;
             while (e != null) {
                 String name = e.getName();
                 if (name.equals("skin.png")) {
@@ -5840,7 +5845,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"), false);
-            if (isDesktopNativeThemeResource("/" + overrideTheme + ".res")) {
+            desktopNativeFonts = isDesktopNativeThemeResource("/" + overrideTheme + ".res");
+            if (desktopNativeFonts) {
                 fontFaceSystem = defaultSystemFontForTheme(platformName, "/" + overrideTheme + ".res");
             }
             int med;
@@ -14149,11 +14155,49 @@ public class JavaSEPort extends CodenameOneImplementation {
                 && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
+    private java.awt.Font desktopNativeFont(String alias) {
+        String family = fontFaceSystem;
+        if (!fontFacesExplicitlyConfigured) {
+            String[] candidates = IS_MAC
+                    ? new String[]{".AppleSystemUIFont", "SF Pro Text", "Helvetica Neue"}
+                    : (IS_LINUX ? new String[]{"Cantarell", "Adwaita Sans", "SansSerif"}
+                    : new String[]{"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI"});
+            String installed = findFirstInstalledFontCandidate(candidates, getAvailableFontNamesLowercase());
+            family = installed == null ? "SansSerif" : installed;
+        }
+        String variant = alias.substring("native:".length());
+        boolean italic = variant.startsWith("Italic");
+        if (!italic && !variant.startsWith("Main")) {
+            throw new IllegalArgumentException("Unsupported native font type: " + alias);
+        }
+        String weightName = variant.substring(italic ? 6 : 4);
+        Float weight;
+        if ("Thin".equals(weightName)) weight = TextAttribute.WEIGHT_EXTRA_LIGHT;
+        else if ("Light".equals(weightName)) weight = TextAttribute.WEIGHT_LIGHT;
+        else if ("Regular".equals(weightName)) weight = TextAttribute.WEIGHT_REGULAR;
+        else if ("Bold".equals(weightName)) weight = TextAttribute.WEIGHT_BOLD;
+        else if ("Black".equals(weightName)) weight = TextAttribute.WEIGHT_HEAVY;
+        else throw new IllegalArgumentException("Unsupported native font type: " + alias);
+        java.util.Map<TextAttribute, Object> attributes = new java.util.HashMap<TextAttribute, Object>();
+        attributes.put(TextAttribute.FAMILY, family);
+        attributes.put(TextAttribute.SIZE, Float.valueOf(medianFontSize));
+        attributes.put(TextAttribute.WEIGHT, weight);
+        attributes.put(TextAttribute.POSTURE, italic ? TextAttribute.POSTURE_OBLIQUE : TextAttribute.POSTURE_REGULAR);
+        java.awt.Font out = new java.awt.Font(attributes);
+        desktopAliasFonts.put(out, Boolean.TRUE);
+        return out;
+    }
+
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
         File fontFile = null;
         try {
             if(fontName.startsWith("native:")) {
+                // Desktop CSS uses native: aliases too. Changing FACE_SYSTEM alone
+                // leaves these aliases on the mobile Roboto path.
+                if (desktopNativeFonts) {
+                    return desktopNativeFont(fontName);
+                }
                 if(isIOS) {
                     String nn = nativeFontName(fontName);
                     if (nn != null) {
@@ -14295,11 +14339,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ((weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC) {
             style = style | java.awt.Font.ITALIC;
         }
-        java.awt.Font fff = fnt.deriveFont(style, (float)(size * getFontScale()));
+        java.awt.Font fff;
+        if (desktopAliasFonts.containsKey(fnt)) {
+            // STYLE_PLAIN must retain the alias's light/bold/italic attributes.
+            java.util.Map<TextAttribute, Object> attributes = new java.util.HashMap<TextAttribute, Object>();
+            attributes.put(TextAttribute.SIZE, Float.valueOf((float)(size * getFontScale())));
+            if ((style & java.awt.Font.BOLD) != 0) attributes.put(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD);
+            if ((style & java.awt.Font.ITALIC) != 0) attributes.put(TextAttribute.POSTURE, TextAttribute.POSTURE_OBLIQUE);
+            fff = fnt.deriveFont(attributes);
+            desktopAliasFonts.put(fff, Boolean.TRUE);
+        } else {
+            fff = fnt.deriveFont(style, (float)(size * getFontScale()));
+        }
         
         if(Math.abs(size / 2 - fff.getSize())  < 3) {
             // retina display bug!
-            return fnt.deriveFont(style, (float)(size * 2 * getFontScale()));
+            java.awt.Font retina = fff.deriveFont((float)(size * 2 * getFontScale()));
+            if (desktopAliasFonts.containsKey(fnt)) desktopAliasFonts.put(retina, Boolean.TRUE);
+            return retina;
         }
         return fff;
     }
