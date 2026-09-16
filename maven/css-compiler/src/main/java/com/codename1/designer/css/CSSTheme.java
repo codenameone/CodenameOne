@@ -4106,6 +4106,22 @@ public class CSSTheme {
             if (color != null && !isNone(color) && (getColorInt(color) & 0xffffff) != 0) {
                 return false;
             }
+            // A usable SPREAD is required, and this is the difference between a shadow that
+            // renders and one that silently disappears.
+            //
+            // RoundRectBorder's software path draws the shadow as
+            // `for (iter = shadowSpreadL - 1; iter >= 0; iter--)`. With the CSS default
+            // spread of zero that loop runs zero times, so `box-shadow: 0 2px 4px rgba(...)`
+            // -- the ordinary shape of the property -- would compile to a border that draws
+            // no shadow at all on any renderer without shape-shadow support. Rasterizing it
+            // is worse-looking and correct, which beats native-looking and absent.
+            //
+            // Not currently reachable: no theme in the tree declares box-shadow. It is
+            // gated here so the first one that does gets the rendering it asked for.
+            ScaledUnit spread = (ScaledUnit) styles.get("cn1-box-shadow-spread");
+            if (spread == null || spread.getNumericValue() <= 0) {
+                return false;
+            }
             return true;
         }
 

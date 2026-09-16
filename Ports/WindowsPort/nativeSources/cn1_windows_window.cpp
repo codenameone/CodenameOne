@@ -723,8 +723,17 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
                  * next motion re-establishes it. A lost RELEASE, by contrast,
                  * leaves a button held for good, which is why that one is
                  * protected. */
-                cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
-                        cn1WinTouchFlag());
+                /* Touch-promoted motion is NOT hover. Windows turns touch and pen input
+                 * into tagged mouse messages, so a finger dragging across the window
+                 * arrives here with no button held and would light a control in a
+                 * desktop-only hover style that nothing clears until the next pointer
+                 * event. Dropped at the source rather than filtered on the Java side,
+                 * because the tag is carried in the event's key field and the hover
+                 * routing does not read it. */
+                if (cn1WinTouchFlag() == 0) {
+                    cn1WinPushEvent(CN1_EVENT_POINTER_HOVER, GET_X_LPARAM(lParam),
+                            GET_Y_LPARAM(lParam), 0);
+                }
                 /* Ask for one WM_MOUSELEAVE. Without it the cursor can move straight off
                  * the window and the last hovered control stays lit: motion simply stops,
                  * and Form only clears its tracked hover when a DIFFERENT component is

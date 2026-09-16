@@ -383,7 +383,10 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                  * same reason it was dropped in the main window: a mobile port has no use
                  * for it. windowPointerHover routes by window id, so a control in a
                  * secondary window reaches the hover state like any other. */
-                cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_HOVER, lParam, cn1WinTouchFlag());
+                /* Touch-promoted motion is not hover; see the main window's handler. */
+                if (cn1WinTouchFlag() == 0) {
+                    cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_HOVER, lParam, 0);
+                }
                 /* One-shot, so re-armed on every hover. Without it the pointer can leave
                  * this window and the last control stays lit. */
                 TRACKMOUSEEVENT tme;

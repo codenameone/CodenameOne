@@ -7537,6 +7537,18 @@ public class Component implements Animation, StyleListener, Editable {
                     return getPressedStyle();
                 }
 
+                // Hover, in the same position as the main path below: it outranks focus.
+                // Form.pointerHover marks the LEAD parent hovered, not the child under the
+                // pointer, so this asks the lead -- without it a MultiButton, a SpanButton
+                // or a toolbar command container could never show a declared hover style,
+                // because this branch returns before the main path is reached.
+                if (lead.isHovered()) {
+                    Style hover = getHoverStyle();
+                    if (hover != null) {
+                        return hover;
+                    }
+                }
+
                 if (lead.hasFocus() && Display.getInstance().shouldRenderSelection(this)) {
                     return getSelectedStyle();
                 }
