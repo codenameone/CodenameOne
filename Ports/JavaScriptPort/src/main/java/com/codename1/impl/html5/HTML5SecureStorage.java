@@ -299,6 +299,24 @@ public final class HTML5SecureStorage extends SecureStorage {
         }
     }
 
+    /// Gives back the gate record a migration installed but could not finish mirroring.
+    ///
+    /// Compare-and-delete, so it can only ever remove the record this migration put there: by the
+    /// time this runs another tab may own the gate, and taking that would discard a value whose
+    /// own call reported success.
+    private void releaseMigrationGate(String account, String sealed) {
+        try {
+            if (!gateAccepted(nativeForgetIf(encryptedKey(account), sealed))) {
+                Log.p("SecureStorage: a migration could not give back the gate it took",
+                        Log.WARNING);
+            }
+        } catch (RuntimeException noBridge) {
+            // A build with no gate store never took one.
+            Log.p("SecureStorage: migration gate not released: " + reasonOf(noBridge),
+                    Log.WARNING);
+        }
+    }
+
     /// Copies the settled ciphertext into ordinary Storage, and keeps going until the two agree.
     ///
     /// The create answers what the gate held at the moment it ran, and that is not necessarily
@@ -341,6 +359,14 @@ public final class HTML5SecureStorage extends SecureStorage {
                 return value;
             }
             value = current;
+        }
+        // One last write, because the loop's exit used to return a value it had never mirrored.
+        // The final pass writes the PREVIOUS value, reads a newer one into `value`, and falls out
+        // here -- so setIfAbsent answered the plaintext of the newest gate record while every
+        // later get() read the preceding ciphertext out of ordinary storage. Whatever this
+        // returns has now been written, which is the property the caller depends on.
+        if (!Storage.getInstance().writeObject(encryptedKey(account), value)) {
+            return null;
         }
         return value;
     }
@@ -592,6 +618,12 @@ public final class HTML5SecureStorage extends SecureStorage {
                 return;
             }
             if (!Storage.getInstance().writeObject(encryptedKey(account), sealed)) {
+                // The gate holds the ciphertext this migration installed and ordinary storage
+                // does not, and leaving it there is PERMANENT: every later attempt seals the
+                // same plaintext with a fresh nonce, so its own add loses to this record, the
+                // equality check above sends it home, and the entry stays in plaintext for good.
+                // Released so the next attempt can win it.
+                releaseMigrationGate(account, sealed);
                 return;
             }
             // Uncached. writeObject populates the cache, so reading it back through readObject
@@ -600,8 +632,10 @@ public final class HTML5SecureStorage extends SecureStorage {
             Object verify = readUncached(encryptedKey(account));
             if (!(verify instanceof String) || !value.equals(open(account, asString(verify)))) {
                 // The encrypted copy does not read back as the original. Leave the plaintext
-                // alone: it is the only correct copy there is.
+                // alone: it is the only correct copy there is -- and take the gate record with
+                // the entry, for the same reason the write failure above does.
                 Storage.getInstance().deleteStorageFile(encryptedKey(account));
+                releaseMigrationGate(account, sealed);
                 return;
             }
             // Asked once more before the plaintext goes. It is the only copy of anything that
