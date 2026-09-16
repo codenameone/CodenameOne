@@ -4116,6 +4116,16 @@ public class CSSTheme {
                         && spread.getNumericValue() < 1)) {
                 return false;
             }
+            switch (spread.getLexicalUnitType()) {
+                case LexicalUnit.SAC_PIXEL:
+                case LexicalUnit.SAC_MILLIMETER:
+                case LexicalUnit.SAC_CENTIMETER:
+                case LexicalUnit.SAC_INCH:
+                case LexicalUnit.SAC_POINT:
+                    break;
+                default:
+                    return false; // The native constructor cannot translate relative spread units.
+            }
             return true;
         }
 
@@ -6137,8 +6147,28 @@ public class CSSTheme {
             return 0;
         }
         
+        private float shadowLengthMM(ScaledUnit value) {
+            float amount = (float)value.getNumericValue();
+            switch (value.getLexicalUnitType()) {
+                case LexicalUnit.SAC_MILLIMETER: return amount;
+                case LexicalUnit.SAC_CENTIMETER: return amount * 10f;
+                case LexicalUnit.SAC_INCH: return in2mm(amount);
+                case LexicalUnit.SAC_POINT: return pt2mm(amount);
+                default: return amount / 72f * 25.4f;
+            }
+        }
+
         private float calculateShadowRatio(com.codename1.ui.plaf.Border out, boolean spreadMM, float spreadMMVal, ScaledUnit value) {
             float val = (float)value.getNumericValue();
+            if (out instanceof RoundRectBorder && spreadMM && spreadMMVal > 0) {
+                // Convert lengths using the compiler's physical-unit scale, not the
+                // headless Display's pixel conversion (which can return zero).
+                if (value.getLexicalUnitType() == LexicalUnit.SAC_INTEGER
+                        || value.getLexicalUnitType() == LexicalUnit.SAC_REAL) {
+                    return val; // Explicit CN1 unitless properties are position ratios.
+                }
+                return 0.5f - shadowLengthMM(value) / (2f * spreadMMVal);
+            }
             if (val == 0 || getShadowSpreadPx(out) == 0) {
                 // leave alone
                 if (val == 0) {
@@ -6675,25 +6705,29 @@ public class CSSTheme {
                 switch (shadowSpread.getLexicalUnitType()) {
 
                     case LexicalUnit.SAC_PIXEL:
-                        out.shadowSpread((int)shadowSpread.getNumericValue());
+                        // The resource stores float millimeters. Preserve fractional pixels
+                        // with the compiler's px-to-mm scale, independent of headless Display.
+                        spreadMMVal = shadowLengthMM(shadowSpread);
+                        spreadMM = true;
+                        out.shadowSpread(spreadMMVal);
                         break;
                     case LexicalUnit.SAC_MILLIMETER:
-                        spreadMMVal = (float)Math.max(1, Math.round(shadowSpread.getNumericValue()));
+                        spreadMMVal = (float)shadowSpread.getNumericValue();
                         spreadMM = true;
                         out.shadowSpread((float)spreadMMVal);
                         break;
                     case LexicalUnit.SAC_INCH:
-                        spreadMMVal = (float)Math.max(1, Math.round(in2mm((float)shadowSpread.getNumericValue())));
+                        spreadMMVal = in2mm((float)shadowSpread.getNumericValue());
                         spreadMM = true;
                         out.shadowSpread((float)spreadMMVal);
                         break;
                     case LexicalUnit.SAC_CENTIMETER:
-                        spreadMMVal = (float)Math.max(1, Math.round(10*shadowSpread.getNumericValue()));
+                        spreadMMVal = (float)(10 * shadowSpread.getNumericValue());
                         spreadMM = true;
                         out.shadowSpread((float)spreadMMVal);
                         break;
                     case LexicalUnit.SAC_POINT:
-                        spreadMMVal = (float)Math.max(1, Math.round(pt2mm((float)shadowSpread.getNumericValue())));
+                        spreadMMVal = pt2mm((float)shadowSpread.getNumericValue());
                         spreadMM = true;
                         out.shadowSpread((float)spreadMMVal);
                         break;
@@ -6719,7 +6753,11 @@ public class CSSTheme {
             if (boxShadowBlur != null) {
                 // Blur is a radius, not an offset ratio. Dividing by spread can make it
                 // negative (including for zero blur) before it reaches gaussianBlurImage.
-                out.shadowBlur(Math.max(0, boxShadowBlur.getPixelValue()));
+                short blurUnit = boxShadowBlur.getLexicalUnitType();
+                float blurPixels = blurUnit == LexicalUnit.SAC_PIXEL || blurUnit == LexicalUnit.SAC_INTEGER
+                        || blurUnit == LexicalUnit.SAC_REAL ? (float)boxShadowBlur.getNumericValue()
+                        : shadowLengthMM(boxShadowBlur) * 72f / 25.4f;
+                out.shadowBlur(Math.max(0, blurPixels));
             }
 
             LexicalUnit shadowColor = styles.get("cn1-box-shadow-color");

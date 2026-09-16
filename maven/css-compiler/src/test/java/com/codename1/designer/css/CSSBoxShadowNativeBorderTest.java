@@ -33,7 +33,7 @@ import java.nio.file.Path;
 import java.util.Hashtable;
 
 /**
- * A drop shadow is a native primitive, not a rasterized image.
+ * Supported positive-spread shadows compile to native rounded borders.
  *
  * <p>The resource format has always carried RoundRectBorder's shadow -- shadowBlur,
  * shadowOpacity, shadowSpread, shadowX and shadowY all round-trip through
@@ -144,6 +144,27 @@ public class CSSBoxShadowNativeBorderTest {
                 + " cn1-box-shadow-h: 0; cn1-box-shadow-v: 0; }").get("Card.border");
         assertTrue(ratios.getShadowX() == 0 && ratios.getShadowY() == 0,
                 "explicit CN1 properties retain their ratio semantics");
+    }
+
+    @Test
+    void testFractionalNativeSpreadsKeepTheirPrecision() throws Exception {
+        String[] spreads = {"0.2mm", "0.02cm", "0.6pt", "1.5px"};
+        float[] expectedMM = {0.2f, 0.2f, 0.6f * 25.4f / 72f,
+                1.5f * 25.4f / 72f};
+        for (int i = 0; i < spreads.length; i++) {
+            RoundRectBorder border = (RoundRectBorder) compile("Card { background-color: #ffffff;"
+                    + " box-shadow: 0 2px 4px " + spreads[i] + " rgba(0,0,0,0.2); }").get("Card.border");
+            assertTrue(Math.abs(border.getShadowSpread() - expectedMM[i]) < 0.0001f,
+                    "fractional spread changed for " + spreads[i] + ": " + border.getShadowSpread());
+            assertTrue(!Float.isInfinite(border.getShadowY()) && !Float.isNaN(border.getShadowY()),
+                    "offset conversion must be independent of headless Display density");
+        }
+        RoundRectBorder border = (RoundRectBorder) compile("Card { background-color: #ffffff;"
+                + " box-shadow: 0.5px 1.5px 0.5px 1.5px black; }").get("Card.border");
+        assertTrue(Math.abs(border.getShadowX() - (0.5f - 0.5f / 3f)) < 0.0001f,
+                "fractional x offset must survive");
+        assertTrue(Math.abs(border.getShadowY()) < 0.0001f, "fractional y offset must survive");
+        assertTrue(border.getShadowBlur() == 0.5f, "fractional blur must survive");
     }
 
     /** Compiles the sheet and returns the resulting theme properties. */
