@@ -2049,33 +2049,33 @@ public final class Vault {
                     // either outcome the check was choosing between.
                     adoptSession(generation, next, fresh);
                     fresh = null;
-                    DeviceRecord remembered = deviceRecord();
-                    if (remembered != null) {
-                        // The device wrap holds the old key. Re-wrapping is part of the rotation;
-                        // leaving it would let a remembered unlock produce a key that no longer
-                        // opens anything new. Under the policy the device is actually enrolled
-                        // with, not the one this caller happens to have configured.
-                        //
-                        // The metadata above is already committed, so a failure here cannot be
-                        // rolled back -- the rotation happened. What it can do is not leave a wrap
-                        // of the superseded key lying about: that is discarded, and the vault is
-                        // still openable by password. The version stamped into the record makes
-                        // the same state safe after a crash, where this handler never runs.
-                        //
-                        // And it is NOT rethrown. The rewrap is the last step of a rotation that
-                        // has already been committed, so reporting the whole call as failed
-                        // describes a state that does not exist -- and the caller acts on that
-                        // report. The sequence this breaks is the ordinary one: rotate the vault
-                        // key, then rekey the database under it. An exception here makes the
-                        // caller skip the rekey, so the database stays under the superseded key
-                        // while every later unlock derives the new one, and it cannot be opened
-                        // again after a restart. Losing a remembered unlock is recoverable with a
-                        // password; losing the database is not.
-                        //
-                        // The degradation is still observable: the device record is gone, so
-                        // getPolicy() answers SESSION_ONLY, which is the state the device is
-                        // actually in. A caller that cares re-establishes it with remember(...).
-                        try {
+                    try {
+                        DeviceRecord remembered = deviceRecord();
+                        if (remembered != null) {
+                            // The device wrap holds the old key. Re-wrapping is part of the rotation;
+                            // leaving it would let a remembered unlock produce a key that no longer
+                            // opens anything new. Under the policy the device is actually enrolled
+                            // with, not the one this caller happens to have configured.
+                            //
+                            // The metadata above is already committed, so a failure here cannot be
+                            // rolled back -- the rotation happened. What it can do is not leave a wrap
+                            // of the superseded key lying about: that is discarded, and the vault is
+                            // still openable by password. The version stamped into the record makes
+                            // the same state safe after a crash, where this handler never runs.
+                            //
+                            // And it is NOT rethrown. The rewrap is the last step of a rotation that
+                            // has already been committed, so reporting the whole call as failed
+                            // describes a state that does not exist -- and the caller acts on that
+                            // report. The sequence this breaks is the ordinary one: rotate the vault
+                            // key, then rekey the database under it. An exception here makes the
+                            // caller skip the rekey, so the database stays under the superseded key
+                            // while every later unlock derives the new one, and it cannot be opened
+                            // again after a restart. Losing a remembered unlock is recoverable with a
+                            // password; losing the database is not.
+                            //
+                            // The degradation is still observable: the device record is gone, so
+                            // getPolicy() answers SESSION_ONLY, which is the state the device is
+                            // actually in. A caller that cares re-establishes it with remember(...).
                             rememberNow(remembered.policy);
                             // A lock landing inside that is worse than a failure, because it
                             // SUCCEEDS. rememberNow snapshots the data key it was handed and
@@ -2090,17 +2090,17 @@ public final class Vault {
                             // rotation is committed and stays reported as done, and what is
                             // discarded is a wrap that cannot open anything.
                             withdrawDeviceRecordIfLocked(generation);
-                        } catch (RuntimeException rewrapFailed) {
-                            // The same discard as the success path above, and it has to be the
-                            // same DISCARD: a re-wrap that threw partway can have written the
-                            // record before it failed, and a delete that is then dropped
-                            // silently -- both real ports can -- leaves getPolicy() reporting a
-                            // remembering policy over a wrap that opens nothing. Routed through
-                            // the helper so the record's mechanism is destroyed when the record
-                            // itself will not go, rather than repeating the blind delete this
-                            // used to make.
-                            discardDeviceRecord();
                         }
+                    } catch (RuntimeException rewrapFailed) {
+                        // The same discard as the success path above, and it has to be the
+                        // same DISCARD: a re-wrap that threw partway can have written the
+                        // record before it failed, and a delete that is then dropped
+                        // silently -- both real ports can -- leaves getPolicy() reporting a
+                        // remembering policy over a wrap that opens nothing. Routed through
+                        // the helper so the record's mechanism is destroyed when the record
+                        // itself will not go, rather than repeating the blind delete this
+                        // used to make.
+                        discardDeviceRecord();
                     }
                     out.complete(Boolean.TRUE);
                 } catch (VaultException failed) {
@@ -3397,9 +3397,15 @@ public final class Vault {
     /// beside an operation that is already committed and stays reported as done, so neither can
     /// refuse -- which is exactly why the delete has to be checked rather than assumed.
     private void discardDeviceRecord() {
-        Storage.getInstance().deleteStorageFile(deviceRecordKey());
-        if (definitelyGone(deviceRecordKey())) {
-            return;
+        try {
+            Storage.getInstance().deleteStorageFile(deviceRecordKey());
+            if (definitelyGone(deviceRecordKey())) {
+                return;
+            }
+        } catch (RuntimeException unreadableStore) {
+            // Cleanup is post-commit. A thrown delete or lookup needs the same mechanism
+            // fallback as a silently refused delete, rather than failing the committed change.
+            Log.p("Vault: device-record cleanup could not be confirmed", Log.WARNING);
         }
         // The delete is void-returning and both real ports can drop one silently, so this used to
         // report the operation as successfully degraded to session-only over a record that was

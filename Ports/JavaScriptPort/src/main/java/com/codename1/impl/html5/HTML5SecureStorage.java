@@ -729,22 +729,42 @@ public final class HTML5SecureStorage extends SecureStorage {
             return false;
         }
         Storage storage = Storage.getInstance();
+        Object encryptedWhenAsked = readUncached(encryptedKey(account));
+        Object legacyWhenAsked = readUncached(legacyKey(account));
         // Read BEFORE anything is deleted, so the gate release below can tell this account's
         // record from one a concurrent set() put there while this ran.
         String settledWhenAsked = null;
         try {
             byte[] answer = nativeRead(encryptedKey(account));
-            if (answer != null && answer.length > 0 && answer[0] == STATUS_OK) {
-                settledWhenAsked = new String(answer, 1, answer.length - 1, "UTF-8");
+            if (answer == null || answer.length == 0 || answer[0] != STATUS_OK) {
+                return false;
             }
+            settledWhenAsked = new String(answer, 1, answer.length - 1, "UTF-8");
         } catch (RuntimeException noBridge) {
             // No gate store in this build; the release below handles that the same way.
             settledWhenAsked = null;
         } catch (java.io.UnsupportedEncodingException noUtf8) {
             settledWhenAsked = null;
         }
-        storage.deleteStorageFile(encryptedKey(account));
-        storage.deleteStorageFile(legacyKey(account));
+        // The gate lookup can yield to another tab's completed set(). Refuse before deleting
+        // either ordinary entry if its snapshot has been replaced. Storage has no atomic
+        // compare-and-delete, so each destructive call also gets its own fresh comparison.
+        if (!stillStored(encryptedKey(account), encryptedWhenAsked)
+                || !stillStored(legacyKey(account), legacyWhenAsked)) {
+            return false;
+        }
+        if (encryptedWhenAsked != null) {
+            if (!stillStored(encryptedKey(account), encryptedWhenAsked)) {
+                return false;
+            }
+            storage.deleteStorageFile(encryptedKey(account));
+        }
+        if (legacyWhenAsked != null) {
+            if (!stillStored(legacyKey(account), legacyWhenAsked)) {
+                return false;
+            }
+            storage.deleteStorageFile(legacyKey(account));
+        }
         // The gate as well, or the value is gone while the record that settled it remains -- and
         // the next setIfAbsent would hand back a credential this call was told to forget.
         try {
@@ -780,7 +800,22 @@ public final class HTML5SecureStorage extends SecureStorage {
         // Checked, because deleteStorageFile cannot report anything: it returns void. A forgotten
         // key that is still there would leave entryState answering PRESENT for a key the caller
         // believes is gone, and ManagedKeys then refuses to generate a replacement.
-        return definitelyGone(encryptedKey(account)) && definitelyGone(legacyKey(account));
+        if (!definitelyGone(encryptedKey(account)) || !definitelyGone(legacyKey(account))) {
+            return false;
+        }
+        try {
+            byte[] current = nativeRead(encryptedKey(account));
+            // A concurrent setter can own just the gate while its mirror is being written.
+            // That record can recreate the entry, so ordinary absence alone is insufficient.
+            return current != null && current.length == 1 && current[0] == STATUS_OK;
+        } catch (RuntimeException noBridge) {
+            return true;
+        }
+    }
+
+    private boolean stillStored(String entry, Object expected) {
+        Object current = readUncached(entry);
+        return expected == null ? current == null && definitelyGone(entry) : expected.equals(current);
     }
 
     public int entryState(String account) {

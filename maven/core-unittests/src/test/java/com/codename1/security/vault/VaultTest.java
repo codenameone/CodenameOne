@@ -3322,6 +3322,49 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void unreadableDeviceRecordsDoNotTurnACommittedRotationIntoFailure() {
+        for (int mode = 0; mode < 3; mode++) {
+            final int failureMode = mode;
+            VaultOptions options = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+            Vault vault = Vault.named(freshName()).configure(options);
+            vault.enroll(pw("p"), options).get();
+            byte[] oldDatabaseKey = vault.databaseKey("db").get();
+            final String record = deviceRecordName(vault.getName());
+            final TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+            impl.setDuringStorageWrite(metadataName(vault.getName()), () -> {
+                if (failureMode == 0) {
+                    impl.setStorageExistenceUnknown(record);
+                } else {
+                    impl.putStorageEntry(record,
+                            encodeStorageObject("CN1VAULTDEV1\nversion=1\nwrap=zz\n"));
+                }
+                if (failureMode == 2) {
+                    impl.setDuringStorageDelete(record, () -> {
+                        throw new IllegalStateException("injected device cleanup failure");
+                    });
+                }
+            });
+            try {
+                assertTrue(vault.rotateDataKey(pw("p")).get().booleanValue(),
+                        "device lookup or cleanup failure must not hide a committed rotation");
+            } finally {
+                impl.setStorageExistenceUnknown(null);
+                impl.setDuringStorageDelete(null, null);
+                impl.setDuringStorageWrite(null, null);
+            }
+            assertEquals(2, vault.getDataKeyVersion());
+            byte[] newDatabaseKey = vault.databaseKey("db").get();
+            assertFalse(java.util.Arrays.equals(oldDatabaseKey, newDatabaseKey));
+            vault.lock();
+            Vault reopened = Vault.named(vault.getName()).configure(fast());
+            assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue());
+            assertArrayEquals(newDatabaseKey, reopened.databaseKey("db").get());
+            assertArrayEquals(oldDatabaseKey, reopened.databaseKey("db", 1).get());
+            reopened.lock();
+        }
+    }
+
+    @Test
     void aRotationThatCannotRewrapTheDeviceKeyStillReportsSuccess() {
         // Rewrapping the remembered-device key is the LAST step of a rotation whose metadata and
         // data key are already committed, so a failure there -- a cancelled passkey prompt, a

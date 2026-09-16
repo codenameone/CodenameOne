@@ -59,6 +59,12 @@ class JavascriptSecureStorageRollbackTest {
                 new String[] {"private String mirrorUntilItAgreesWithTheGate("});
     }
 
+    @Test
+    void removalPreservesReplacementsAndRefusesASurvivingGate() throws Exception {
+        runHarness("JavascriptStorageRemoveHarness", new String[] {"public boolean remove(",
+                "private boolean stillStored("});
+    }
+
     private void runHarness(String name, String[] signatures) throws Exception {
         String source = new String(Files.readAllBytes(Paths.get("../../Ports/JavaScriptPort/"
                 + "src/main/java/com/codename1/impl/html5/HTML5SecureStorage.java")),
