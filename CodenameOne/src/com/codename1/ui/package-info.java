@@ -141,7 +141,7 @@
 ///
 /// ### List
 ///
-/// ![](https://www.codenameone.com/developer-guide/img/components-generic-list-cell-renderer.png)
+/// ![](https://www.codenameone.com/developer-guide/img/generated/components-generic-list-cell-renderer.png)
 /// `com.codename1.ui.List` a list of items, this is a rather elaborate component to work with!
 /// We often
 /// recommend just using `com.codename1.ui.Container`, `com.codename1.ui.InfiniteContainer` or

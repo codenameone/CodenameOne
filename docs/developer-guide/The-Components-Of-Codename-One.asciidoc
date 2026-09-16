@@ -1134,11 +1134,11 @@ You can now replace the existing model by removing all the model related logic a
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava169Snippet.java[tag=the-components-of-codename-one-java-169,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsMillionEntriesFigure.java[tag=the-components-of-codename-one-java-169,indent=0]
 ----
 
 .It took ages to scroll this far... This goes to a million...
-image::img/components-millionbooks.png[It took ages to scroll this far... This goes to a million...,scaledwidth=20%]
+image::img/generated/components-millionbooks.png[It took ages to scroll this far... This goes to a million...,scaledwidth=20%]
 
 
 ==== List cell renderer
@@ -1238,11 +1238,11 @@ Here is a simple example of a list with checkboxes that gets updated automatical
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava060Snippet.java[tag=the-components-of-codename-one-java-060,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsGenericRendererFigure.java[tag=the-components-of-codename-one-java-060,indent=0]
 ----
 
 .GenericListCellRenderer demo code
-image::img/components-generic-list-cell-renderer.png[GenericListCellRenderer demo code,scaledwidth=20%]
+image::img/generated/components-generic-list-cell-renderer.png[GenericListCellRenderer demo code,scaledwidth=20%]
 
 ===== Custom UIID of entry in GenericListCellRenderer/MultiList
 
