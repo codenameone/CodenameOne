@@ -1072,9 +1072,6 @@ public final class AndroidSecureStorage extends SecureStorage {
                 }
                 SharedPreferences prefs = plainPrefs();
                 if (prefs != null) {
-                    // commit(), for the reason it always was: deleting the key and dropping the
-                    // ciphertexts it protected is one step, and an asynchronous clear can be
-                    // reordered after a writer's pending write.
                     // `held`, not `candidates`. An account whose gate could not be locked keeps
                     // its MARK -- the clearing loop below deliberately skips it -- so removing
                     // its value here left the pair that nothing can recover from: setIfAbsent
@@ -1082,28 +1079,44 @@ public final class AndroidSecureStorage extends SecureStorage {
                     // database or vault key for good. Leaving the value in place keeps the
                     // account consistent and lets a later reset, which may well get the lock,
                     // finish the job.
+                    // The MARKS FIRST, then the values. That order is what keeps every partial
+                    // outcome retryable, and the other way round did not: an account is a
+                    // candidate for a later reset only because its VALUE is still in
+                    // preferences, so removing the value and then failing to clear its mark left
+                    // no value, a settled gate, and nothing that would ever revisit it -- the
+                    // managed database or vault key could not be recreated without the user
+                    // clearing application data. Failing the other way leaves a value with a
+                    // cleared mark, which the next reset finds and finishes.
+                    //
+                    // Safe to widen the window like this because the gates are held for the whole
+                    // reset: no other process can act on a cleared mark while this runs.
+                    for (int iter = 0; iter < held.size(); iter++) {
+                        try {
+                            java.io.RandomAccessFile handle = handles.get(iter);
+                            handle.setLength(0);
+                            handle.getChannel().force(true);
+                        } catch (java.io.IOException cannotClear) {
+                            Log.e(cannotClear);
+                            Log.p("SecureStorage could not clear the gate mark for "
+                                    + held.get(iter) + "; its value is left in place so a later "
+                                    + "reset finds it again", Log.WARNING);
+                        }
+                    }
                     SharedPreferences.Editor editor = prefs.edit();
                     for (String account : held) {
                         editor.remove(account);
                     }
-                    editor.commit();
-                }
-            }
-
-            // The marks, while the gates are still held. An account whose gate could not be
-            // locked above is not in this list and keeps its mark.
-            for (int iter = 0; iter < held.size(); iter++) {
-                try {
-                    java.io.RandomAccessFile handle = handles.get(iter);
-                    handle.setLength(0);
-                    handle.getChannel().force(true);
-                } catch (java.io.IOException cannotClear) {
-                    // Best effort and logged rather than fatal: this path is already the recovery
-                    // from a key that can no longer decrypt anything, and a mark left standing
-                    // refuses a later create rather than corrupting one.
-                    Log.e(cannotClear);
-                    Log.p("SecureStorage could not clear the gate mark for " + held.get(iter),
-                            Log.WARNING);
+                    // commit(), for the reason it always was: deleting the key and dropping the
+                    // ciphertexts it protected is one step, and an asynchronous clear can be
+                    // reordered after a writer's pending write. Its ANSWER is read now too -- a
+                    // refused commit leaves ciphertext that no key can open, and saying nothing
+                    // about it let the next setIfAbsent see an entry that is present, refuse to
+                    // recreate, and stay that way. The marks are already cleared, so the account
+                    // is still a candidate and the next reset retries it.
+                    if (!editor.commit()) {
+                        Log.p("SecureStorage: the values this reset removed could not be "
+                                + "committed; they will be retried", Log.WARNING);
+                    }
                 }
             }
         } finally {
