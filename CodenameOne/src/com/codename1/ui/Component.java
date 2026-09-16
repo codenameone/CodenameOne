@@ -345,9 +345,6 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean scrollSizeRequestedByUser = false;
     private Style unSelectedStyle;
     private Style pressedStyle;
-    private Style hoverStyle;
-    /// Set only on the desktop; see setHovered.
-    private boolean hovered;
     private Style selectedStyle;
     private Style disabledStyle;
     private Style allStyles;
@@ -759,13 +756,6 @@ public class Component implements Animation, StyleListener, Editable {
     /// hi.add(BorderLayout.CENTER, cmp);
     /// hi.show();
     /// ```
-    ///
-    /// The hover style is deliberately NOT part of this proxy. A component only has one when
-    /// its theme declares hover for that UIID, so including it would either force one into
-    /// existence for every component this is called on -- the blank-default repaint
-    /// {@link #getHoverStyle()} exists to prevent -- or make the proxy cover four states
-    /// sometimes and five others, depending on the theme and on when it was first called.
-    /// Style hover in the theme, which is where the desktop themes do it.
     ///
     /// #### Returns
     ///
@@ -1887,7 +1877,6 @@ public class Component implements Animation, StyleListener, Editable {
         selectedStyle = null;
         disabledStyle = null;
         pressedStyle = null;
-        hoverStyle = null;
         allStyles = null;
         if (!sizeRequestedByUser) {
             preferredSize = null;
@@ -1900,7 +1889,6 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
-            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -1946,7 +1934,6 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
-            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -1983,7 +1970,6 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
-            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -2021,7 +2007,6 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
-            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -2058,7 +2043,6 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
-            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -2095,7 +2079,6 @@ public class Component implements Animation, StyleListener, Editable {
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
-            hoverStyle = null;
             allStyles = null;
             if (!sizeRequestedByUser) {
                 preferredSize = null;
@@ -7553,18 +7536,6 @@ public class Component implements Animation, StyleListener, Editable {
             return getPressedStyle();
         }
 
-        // Hover outranks focus, and only reaches here on the desktop because nothing else
-        // ever sets the flag. That order is what the desktop design languages do: pointing at
-        // a focused control shows the hover fill, and the focus ring is drawn separately
-        // rather than being part of this style. getHoverStyle() answers null unless the theme
-        // actually declares the state, so a theme that predates hover falls straight through.
-        if (hovered) {
-            Style hover = getHoverStyle();
-            if (hover != null) {
-                return hover;
-            }
-        }
-
         if (hasFocus() && Display.getInstance().shouldRenderSelection(this)) {
             return getSelectedStyle();
         }
@@ -7602,95 +7573,6 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         return pressedStyle;
-    }
-
-    /// Returns the Component Style for the hover state, or `null` when the theme says
-    /// nothing about hovering this UIID.
-    ///
-    /// Hover is the one desktop state the mobile design languages never needed, and it is the
-    /// state a Fluent or Adwaita control is mostly made of. It is deliberately the only
-    /// per-state getter here that can return null, and the null is the whole point: a theme
-    /// authored before hover existed declares no `hover#` entries, and
-    /// {@link com.codename1.ui.plaf.UIManager#getComponentCustomStyle(String, String)} never
-    /// returns null -- asked for a type the theme does not define it hands back a copy of the
-    /// blank default style: white background, black foreground. Building one unconditionally would therefore
-    /// repaint every hovered component in an existing application the moment the pointer
-    /// crossed it. So the theme is asked first, and a theme with no opinion leaves
-    /// {@link #getStyle()} to fall through to the ordinary chain.
-    ///
-    /// #### Returns
-    ///
-    /// the component Style object for the hover state, or null when the theme defines none
-    public Style getHoverStyle() {
-        if (hoverStyle == null) {
-            if (!getUIManager().hasComponentCustomStyle(getUIID(), "hover")) {
-                return null;
-            }
-            hoverStyle = getUIManager().getComponentCustomStyle(getUIID(), "hover");
-            if (initialized && hoverStyle.getElevation() > 0) {
-                registerElevatedInternal(this);
-            }
-            if (initialized) {
-                setSurface(hoverStyle.isSurface());
-            }
-            hoverStyle.addStyleListener(this);
-            if (hoverStyle.getBgPainter() == null) {
-                hoverStyle.setBgPainter(new BGPainter());
-            }
-        }
-        return hoverStyle;
-    }
-
-    /// Sets the Component Style for the hover state allowing us to manipulate the look of the
-    /// component when the pointer is over it.
-    ///
-    /// #### Parameters
-    ///
-    /// - `style`: the component Style object
-    public void setHoverStyle(Style style) {
-        if (hoverStyle != null) {
-            hoverStyle.removeStyleListener(this);
-        }
-        hoverStyle = style;
-        if (initialized && hoverStyle.getElevation() > 0) {
-            registerElevatedInternal(this);
-        }
-        if (initialized) {
-            setSurface(hoverStyle.isSurface());
-        }
-        hoverStyle.addStyleListener(this);
-        if (hoverStyle.getBgPainter() == null) {
-            hoverStyle.setBgPainter(new BGPainter());
-        }
-        setShouldCalcPreferredSize(true);
-        checkAnimation();
-    }
-
-    /// True while the pointer is over this component. Only ever set on the desktop, by
-    /// {@link Form#pointerHover(int[], int[])}; a touch device has no hover to report.
-    ///
-    /// #### Returns
-    ///
-    /// true when the pointer is currently over this component
-    public boolean isHovered() {
-        return hovered;
-    }
-
-    /// Marks this component as hovered, repainting when the state actually changes AND the
-    /// theme has a hover style to show for it -- otherwise the repaint would be pure cost,
-    /// because nothing about the render depends on the flag.
-    ///
-    /// #### Parameters
-    ///
-    /// - `hovered`: true when the pointer is over this component
-    public void setHovered(boolean hovered) {
-        if (this.hovered == hovered) {
-            return;
-        }
-        this.hovered = hovered;
-        if (getHoverStyle() != null) {
-            repaint();
-        }
     }
 
     /// Sets the Component Style for the pressed state allowing us to manipulate
@@ -8029,30 +7911,12 @@ public class Component implements Animation, StyleListener, Editable {
                     setPressedStyle(mergeStyle(pressedStyle, manager.getComponentCustomStyle(id, "press")));
                 }
             }
-            // Only re-merged when one was already built. A theme swap that drops hover
-            // entirely leaves the old style in place here, which is why setUIID and the
-            // wholesale branch below null it instead; this arm exists for the ordinary case
-            // where the same UIID is re-resolved against a refreshed theme.
-            if (hoverStyle != null) {
-                if (manager.hasComponentCustomStyle(id, "hover")) {
-                    setHoverStyle(mergeStyle(hoverStyle, manager.getComponentCustomStyle(id, "hover")));
-                } else {
-                    // The refreshed theme dropped hover for this UIID. Unregister before
-                    // letting go: every other arm in this block goes through a setter that
-                    // removes the listener first, and a Style left holding a listener to a
-                    // component that no longer reads it is both a leak and a source of
-                    // spurious style callbacks.
-                    hoverStyle.removeStyleListener(this);
-                    hoverStyle = null;
-                }
-            }
         } else {
             unSelectedStyle = null;
             getUnselectedStyle();
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;
-            hoverStyle = null;
             allStyles = null;
 
         }

@@ -132,8 +132,6 @@ public class Form extends Container implements TopLevelContainer {
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
-    /// The component the pointer is currently over; see updateHoveredComponent.
-    private Component hoveredComponent;
     // Last component whose interactive scrollbar showed a hover highlight, so the highlight can be
     // cleared when the pointer moves to a different scrollable (desktop interactive scrollbars only)
     private Component lastInteractiveScrollHover;
@@ -2838,10 +2836,6 @@ public class Form extends Container implements TopLevelContainer {
         componentsAwaitingRelease = null;
         pressedCmp = null;
         dragged = null;
-        // A form that is going away must not leave a component believing the pointer is still
-        // over it: the flag would survive into the next time the form is shown, and the
-        // component would paint hovered with the pointer somewhere else entirely.
-        updateHoveredComponent(null);
     }
 
     /// The four kinds of pointer listener an embedded form hands to its host.
@@ -4594,7 +4588,6 @@ public class Form extends Container implements TopLevelContainer {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
-                updateHoveredComponent(cmp);
                 updateInteractiveScrollHover(cmp, x[0], y[0]);
             }
             if (TooltipManager.getInstance() != null) {
@@ -4605,32 +4598,6 @@ public class Form extends Container implements TopLevelContainer {
                     TooltipManager.getInstance().clearTooltip();
                 }
             }
-        }
-    }
-
-    /// Moves the hover state to the component under the pointer, clearing whichever component
-    /// had it before.
-    ///
-    /// Hover is tracked here rather than in Component because only the form knows what the
-    /// pointer left: a component is never told the pointer moved off it, it is simply no
-    /// longer the one under it. Component.setHovered is a no-op when the state is unchanged
-    /// and repaints only when the theme actually defines a hover style, so on a theme that
-    /// does not use hover this costs one reference comparison per pointer move.
-    ///
-    /// Desktop only, because nothing else generates hover events.
-    private void updateHoveredComponent(Component cmp) {
-        // Identity is the question being asked -- whether this is the same
-        // component instance the pointer was already over -- so equals() would
-        // be wrong here as well as slower.
-        if (hoveredComponent == cmp) { //NOPMD CompareObjectsWithEquals
-            return;
-        }
-        if (hoveredComponent != null) {
-            hoveredComponent.setHovered(false);
-        }
-        hoveredComponent = cmp;
-        if (cmp != null) {
-            cmp.setHovered(true);
         }
     }
 

@@ -117,14 +117,6 @@ android_material_copies() {
     "Ports/Android/src/AndroidMaterialTheme.res"
 }
 
-# The desktop themes have NO committed consumer copies. Every desktop consumer
-# (maven/javase, maven/windows, maven/linux, maven/mac) stages straight out of Themes/ at
-# build time, so there is no second binary to drift out of sync -- which is the problem the
-# copies above exist to solve for the ports that do embed one.
-gnome_adwaita_copies() { :; }
-windows_fluent_copies() { :; }
-macos_aqua_copies() { :; }
-
 compile_theme() {
   local jar="$1" name="$2" basename="$3"
   local css="$CSS_SRC_ROOT/$name/theme.css"
@@ -154,9 +146,6 @@ main() {
   jar="$(ensure_jar)"
   compile_theme "$jar" ios-modern iOSModernTheme.res
   compile_theme "$jar" android-material AndroidMaterialTheme.res
-  compile_theme "$jar" gnome-adwaita GnomeAdwaitaTheme.res
-  compile_theme "$jar" windows-fluent WindowsFluentTheme.res
-  compile_theme "$jar" macos-aqua MacOSAquaTheme.res
   log "Native themes written to $OUT_DIR/ and committed consumer copies"
 }
 

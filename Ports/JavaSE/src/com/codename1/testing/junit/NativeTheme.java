@@ -60,16 +60,7 @@ public enum NativeTheme {
     ANDROID_HOLO_LIGHT("/android_holo_light.res", "Android Holo Light"),
 
     /** "Android Legacy" -- the pre-Material Android look. */
-    ANDROID_LEGACY("/androidTheme.res", "Android Legacy"),
-
-    /** "Windows 11 Fluent" -- the WinUI 3 desktop look. */
-    WINDOWS_FLUENT("/WindowsFluentTheme.res", "Windows 11 Fluent"),
-
-    /** "macOS Aqua" -- the AppKit desktop look. */
-    MACOS_AQUA("/MacOSAquaTheme.res", "macOS Aqua"),
-
-    /** "GNOME Adwaita" -- the GTK4 / libadwaita desktop look. */
-    GNOME_ADWAITA("/GnomeAdwaitaTheme.res", "GNOME Adwaita");
+    ANDROID_LEGACY("/androidTheme.res", "Android Legacy");
 
     private final String resourcePath;
     private final String displayName;
