@@ -50,6 +50,12 @@ class SliderNativeProgressSizeTest extends UITestBase {
         assertTrue(progress.getPreferredH() >= textHeight + 4, "value text must fit after toggling a cached size");
         progress.setRenderValueOnTop(false);
         assertEquals(trackHeight + 4, progress.getPreferredH());
+        progress.setEditable(true);
+        assertTrue(progress.getPreferredH() >= Font.getDefaultFont().getHeight() + 4,
+                "editable sliders must discard the cached thin progress height");
+        progress.setEditable(false);
+        assertEquals(trackHeight + 4, progress.getPreferredH(),
+                "switching back to a progress bar must discard the cached slider height");
         progress.setInfinite(true);
         assertTrue(progress.getPreferredH() >= Font.getDefaultFont().getHeight() + 4,
                 "indeterminate mode must discard the cached thin-track height");

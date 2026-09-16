@@ -47,3 +47,11 @@ jobs:
 
       - name: Check desktop hover queues under saturation
         run: python3 scripts/test_native_hover_queue.py
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Check fidelity baseline coverage enforcement
+        run: python3 scripts/test_fidelity_gate.py

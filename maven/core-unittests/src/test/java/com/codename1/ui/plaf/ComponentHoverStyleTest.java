@@ -23,6 +23,12 @@
 package com.codename1.ui.plaf;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.ui.Form;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.Container;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.css.CSSThemeCompiler;
@@ -125,8 +131,8 @@ public class ComponentHoverStyleTest extends UITestBase {
     }
 
     /**
-     * Hover outranks focus. Pointing at a focused control shows the hover fill on every
-     * desktop; the focus indicator is drawn separately rather than being this style.
+     * Buttons retain hover feedback while focused. Text inputs separately preserve
+     * their selected style because it carries the editing focus indicator.
      */
     @Test
     public void hoverOutranksSelectedStyle() {
@@ -141,6 +147,38 @@ public class ComponentHoverStyleTest extends UITestBase {
         b.setHovered(true);
         assertEquals(0x44ff88, b.getStyle().getBgColor(),
                 "hover must win over the selected/focus style");
+    }
+
+    @FormTest
+    public void focusedTextInputsKeepTheirFocusStyleDuringHover() {
+        Form form = new Form(BoxLayout.y());
+        Button other = new Button("other");
+        TextField field = new TextField("field");
+        TextArea area = new TextArea("area");
+        Container leadRow = new Container(BoxLayout.y());
+        TextField lead = new TextField("lead");
+        leadRow.add(lead);
+        form.add(field).add(area).add(leadRow).add(other);
+        form.show();
+        leadRow.setLeadComponent(lead);
+        for (TextArea input : new TextArea[]{field, area, lead}) {
+            Style hover = new Style(input.getUnselectedStyle());
+            hover.setBorder(Border.createLineBorder(1, 0x777777));
+            input.setHoverStyle(hover);
+            input.getSelectedStyle().setBorder(Border.createLineBorder(2, 0x0078d4));
+            form.setFocused(input);
+            input.setHovered(true);
+            assertSame(input.getSelectedStyle(), input.getStyle(), "focus survives a stationary pointer");
+            if (input == lead) {
+                assertSame(leadRow.getSelectedStyle(), leadRow.getStyle(), "lead styling follows its focused input");
+            }
+            input.setEnabled(false);
+            assertSame(input.getDisabledStyle(), input.getStyle());
+            input.setEnabled(true);
+            form.setFocused(other);
+            assertSame(hover, input.getStyle(), "unfocused inputs still show hover feedback");
+            input.setHovered(false);
+        }
     }
 
     /** Disabled still outranks everything, as it does for pressed. */

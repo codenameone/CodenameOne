@@ -4415,6 +4415,9 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.focused = focused;
+        if (hovered && hoverStyle != null) {
+            checkAnimation();
+        }
         accessibilityChanged(AccessibilityManager.CHANGE_FOCUS);
     }
 
@@ -7545,11 +7548,13 @@ public class Component implements Animation, StyleListener, Editable {
                     return getPressedStyle();
                 }
 
-                // Hover, in the same position as the main path below: it outranks focus.
-                // Form.pointerHover marks the LEAD parent hovered, not the child under the
-                // pointer, so this asks the lead -- without it a MultiButton, a SpanButton
-                // or a toolbar command container could never show a declared hover style,
-                // because this branch returns before the main path is reached.
+                if (keepTextInputFocusStyle(lead)) {
+                    return getSelectedStyle();
+                }
+
+                // Hover follows the same text-input focus exception as the main path.
+                // The tracker marks the lead component; its parent and siblings paint
+                // the same state through this branch before the main path is reached.
                 if (lead.isHovered()) {
                     Style hover = getHoverStyle();
                     if (hover != null) {
@@ -7573,11 +7578,14 @@ public class Component implements Animation, StyleListener, Editable {
             return getPressedStyle();
         }
 
-        // Hover outranks focus, and only reaches here on the desktop because nothing else
-        // ever sets the flag. That order is what the desktop design languages do: pointing at
-        // a focused control shows the hover fill, and the focus ring is drawn separately
-        // rather than being part of this style. getHoverStyle() answers null unless the theme
-        // actually declares the state, so a theme that predates hover falls straight through.
+        // Text inputs encode the focus ring in their selected style. Keep the complete
+        // style (including its border padding and background) while the pointer remains;
+        // copying only its border onto hover would mix incompatible geometry. Buttons
+        // retain hover feedback while focused, since their selected state is not editing.
+        if (keepTextInputFocusStyle(this)) {
+            return getSelectedStyle();
+        }
+        // An undeclared hover state still falls through for legacy themes.
         if (hovered) {
             Style hover = getHoverStyle();
             if (hover != null) {
@@ -7590,6 +7598,11 @@ public class Component implements Animation, StyleListener, Editable {
         }
         isUnselectedStyle = true;
         return unSelectedStyle;
+    }
+
+    private boolean keepTextInputFocusStyle(Component owner) {
+        return owner instanceof TextArea && owner.hasFocus()
+                && Display.getInstance().shouldRenderSelection(this);
     }
 
     boolean isPressedStyle() {

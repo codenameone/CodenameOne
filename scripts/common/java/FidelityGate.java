@@ -128,6 +128,15 @@ public class FidelityGate {
 
         Map<String, Double> baseline = loadBaseline(arguments.baselineJson);
         Map<String, Map<String, Double>> baselineGeometry = loadBaselineGeometry(arguments.baselineJson);
+        // Deleting a row AND its golden produces no broken result. Baseline keys are
+        // the coverage contract too: remove them explicitly for an intentional deletion.
+        // Update mode above still merges partial runs, so it cannot silently drop coverage.
+        for (String pair : baseline.keySet()) {
+            if (!current.containsKey(pair)) {
+                broken.add(pair + " (baseline pair absent from current comparisons; "
+                        + "remove the baseline entry explicitly if intentional)");
+            }
+        }
         List<String> regressions = new ArrayList<>();
         List<String> jumps = new ArrayList<>();
         for (Map.Entry<String, Double> entry : current.entrySet()) {

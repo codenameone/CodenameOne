@@ -749,6 +749,9 @@ public class Slider extends Label implements ActionSource {
     ///
     /// - `editable`: true if the slider is editable
     public void setEditable(boolean editable) {
+        if (this.editable != editable) {
+            setShouldCalcPreferredSize(true);
+        }
         this.editable = editable;
         setFocusable(editable);
     }
