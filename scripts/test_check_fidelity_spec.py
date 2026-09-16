@@ -35,6 +35,21 @@ class FidelitySpecTest(unittest.TestCase):
     def test_current_sources(self):
         self.assertEqual(0, self.check())
 
+    def test_material_values_match_comparator_modes(self):
+        original = validator.SPEC.read_text()
+        self.assertIn("    material: glass", original)
+        for material in ("glas", "Glass", "glass,lens", ""):
+            with self.subTest(material=material):
+                validator.SPEC.write_text(original.replace("material: glass", "material: " + material, 1))
+                self.assertEqual(1, self.check())
+                self.assertTrue(any("unknown material" in error for error in validator.ERRORS))
+        for material in ("normal", "glass", "lens", '"glass"', "'lens'"):
+            with self.subTest(material=material):
+                validator.SPEC.write_text(original.replace("material: glass", "material: " + material, 1))
+                self.assertEqual(0, self.check())
+        validator.SPEC.write_text(original.replace("    material: glass\n", "", 1))
+        self.assertEqual(0, self.check(), "omitting material retains the legacy heuristic")
+
     def test_unknown_defaults_are_rejected(self):
         original = validator.SPEC.read_text()
         for old, new in (("appearances:", "appearance:"), ("tile_width_px:", "tile_wdith_px:"),

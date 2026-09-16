@@ -61,6 +61,7 @@ name: Desktop theme fidelity
       - 'maven/css-compiler/**'
       - 'scripts/build-native-themes.sh'
       - 'scripts/fidelity-app/desktop-runner/**'
+      - 'scripts/fidelity-app/common/src/main/resources/fidelity-tests.yaml'
       - 'scripts/fidelity-app/goldens/windows-11-fluent/**'
       - 'scripts/fidelity-app/goldens/gnome-adwaita/**'
       - 'scripts/fidelity-app/goldens/macos-aqua/**'

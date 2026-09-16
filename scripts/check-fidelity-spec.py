@@ -29,6 +29,7 @@ KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
 }
 KNOWN_PLATFORMS = {"ios", "android", "windows", "macos", "gnome", "linux"}
 KNOWN_STATES = {"normal", "pressed", "disabled", "selected", "hover", "focus"}
+KNOWN_MATERIALS = {"normal", "glass", "lens"}
 
 DEFAULT_KEYS = {"tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px", "bg", "appearances"}
 
@@ -137,6 +138,12 @@ def main():
             if k != "__line" and k not in KNOWN_KEYS:
                 yield_error(f"{where}: unknown key '{k}'. The on-device parser ignores what it "
                             f"does not recognise, so this silently does nothing")
+
+        # ProcessScreenshots falls back to normal for unknown values, which can count
+        # the shared backdrop as matching widget content. Explicit intent must be valid.
+        if "material" in r and r["material"] not in KNOWN_MATERIALS:
+            yield_error(f"{where}: unknown material '{r['material']}' "
+                        f"(known: {sorted(KNOWN_MATERIALS)})")
 
         has_desktop = bool(DESKTOP_KEYS & set(r))
         has_mobile = bool(MOBILE_KEYS & set(r))
