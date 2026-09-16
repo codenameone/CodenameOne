@@ -958,6 +958,36 @@
     });
   }
 
+  /// Releases the gate for one entry ONLY while it still holds the record the caller wrote.
+  ///
+  /// A rollback deletes the gate because the value it just settled could not be mirrored. By the
+  /// time it runs, another tab may have replaced that record through cn1SecureStoreSet -- and
+  /// deleting unconditionally then discards a value whose set() has already reported success,
+  /// after which a third tab that had observed absence wins the empty gate and mirrors over it.
+  /// The comparison and the delete are in ONE transaction, so nothing can land between them.
+  ///
+  /// Declining is not a failure: it means somebody else owns the record now, which is exactly
+  /// when the caller must not remove it.
+  function cn1SecureStoreForgetIf(entry, expected) {
+    return cn1VaultOpenDb().then(function(db) {
+      var tx = db.transaction(CN1_VAULT_STORE, 'readwrite');
+      var id = CN1_SECURE_STORE_PREFIX + String(entry);
+      var store = tx.objectStore(CN1_VAULT_STORE);
+      return cn1VaultRequest(store, function(s) {
+        return s.get(id);
+      }).then(function(found) {
+        if (!found || typeof found.sealed !== 'string' || found.sealed !== String(expected)) {
+          return cn1VaultCommit(tx);
+        }
+        return cn1VaultRequest(store, function(s) {
+          return s.delete(id);
+        }).then(function() {
+          return cn1VaultCommit(tx);
+        });
+      });
+    });
+  }
+
   /// Releases the gate for one entry, so a later create can win it again.
   ///
   /// remove() clears the value from ordinary storage; without this the record that settled the
@@ -1262,6 +1292,13 @@
           // store that answered "nothing here" lead to opposite decisions on
           // the Java side, and collapsing them is how a device key that was
           // there all along gets replaced.
+          return cn1VaultReply(cn1VaultStatusOf(error), null);
+        });
+      }
+      if (op === 'secureStoreForgetIf') {
+        return cn1SecureStoreForgetIf(request.entry, request.sealed).then(function() {
+          return cn1VaultReply(CN1V_OK, null);
+        }, function(error) {
           return cn1VaultReply(cn1VaultStatusOf(error), null);
         });
       }

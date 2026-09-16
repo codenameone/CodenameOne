@@ -1362,6 +1362,18 @@ bindNative([
   }));
 });
 
+// Releases the gate only while it still holds the record this tab wrote, which is what a
+// rollback needs: by then another tab may own it.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5SecureStorage_nativeForgetIf_java_lang_String_java_lang_String_R_byte_1ARRAY"
+], function*(entry, sealed) {
+  return cn1VaultJavaBytes(yield* cn1VaultHost({
+    op: "secureStoreForgetIf",
+    entry: jvm.toNativeString(entry),
+    sealed: jvm.toNativeString(sealed)
+  }));
+});
+
 // Releases the create gate, so remove() leaves nothing behind that a later setIfAbsent could
 // answer with.
 bindNative([

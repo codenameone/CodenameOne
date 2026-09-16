@@ -265,9 +265,15 @@ public final class HTML5SecureStorage extends SecureStorage {
                 // value from a call that reported failure visible as though it had been stored.
                 // Released only when this tab is the one that won -- the loser is looking at
                 // somebody else's live record and must not delete it.
+                // Only this tab's own record, and only while the store still holds it: the
+                // equality here says this tab WON the create, and the compare-and-delete says
+                // nobody has replaced the record since.
                 if (sealed.equals(created)) {
                     try {
-                        nativeForget(encryptedKey(account));
+                        if (!gateAccepted(nativeForgetIf(encryptedKey(account), created))) {
+                            Log.p("SecureStorage: the gate record this create settled could not "
+                                    + "be released", Log.WARNING);
+                        }
                     } catch (RuntimeException noBridge) {
                         Log.p("SecureStorage could not release the create gate it had just "
                                 + "taken: " + reasonOf(noBridge), Log.WARNING);
@@ -362,6 +368,16 @@ public final class HTML5SecureStorage extends SecureStorage {
     /// re-read sees the newer record and adopts it.
     static native byte[] nativeSet(String entry, String sealed);
 
+    /// Releases the gate ONLY while it still holds the record this call wrote.
+    ///
+    /// What a rollback needs. By the time one runs, another tab may have replaced the record
+    /// through nativeSet -- and deleting unconditionally then discards a value whose set() has
+    /// already reported success, after which a third tab that had observed absence wins the empty
+    /// gate and mirrors over it. The comparison and the delete are one transaction on the bridge
+    /// side, so nothing can land between them. Declining is not a failure: it means somebody else
+    /// owns the record, which is exactly when this must not remove it.
+    static native byte[] nativeForgetIf(String entry, String sealed);
+
     /// Releases the gate for one entry, so a later create can win it again.
     ///
     /// Without this, remove() would clear the value while the gate still held the old ciphertext,
@@ -420,8 +436,16 @@ public final class HTML5SecureStorage extends SecureStorage {
                 //
                 // These two are the whole set: nativeSet here and nativeSetIfAbsent in the create
                 // are the only writers of the gate store, and nativeForget is the only remover.
+                // Compare-and-delete, not a plain delete. Another tab can have replaced this
+                // record through its own set() before this rollback runs, and removing THAT
+                // would discard a value whose set() has already reported success -- after which
+                // a third tab that had observed absence wins the empty gate and mirrors its
+                // candidate over it.
                 try {
-                    nativeForget(encryptedKey(account));
+                    if (!gateAccepted(nativeForgetIf(encryptedKey(account), sealed))) {
+                        Log.p("SecureStorage: the gate record this write settled could not be "
+                                + "released", Log.WARNING);
+                    }
                 } catch (RuntimeException noBridge) {
                     Log.p("SecureStorage could not release the create gate after a failed write: "
                             + reasonOf(noBridge), Log.WARNING);

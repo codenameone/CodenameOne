@@ -800,11 +800,21 @@ public final class AndroidSecureStorage extends SecureStorage {
                 if (gate == null) {
                     continue;
                 }
+                java.io.RandomAccessFile handle = null;
                 try {
-                    java.io.RandomAccessFile handle = new java.io.RandomAccessFile(gate, "rw");
+                    // Nothing is recorded until the LOCK succeeds, and the three lists therefore
+                    // stay the same length. Adding the handle first meant a failed lock left an
+                    // extra entry in `handles` with none in `held` -- and the clearing loop
+                    // indexes handles by held's index, so from that point on it truncated the
+                    // gate of an account it had never locked while leaving the locked one
+                    // marked. The removed account became uncreatable and another process could
+                    // recreate or overwrite the wrong one.
+                    handle = new java.io.RandomAccessFile(gate, "rw");
+                    java.nio.channels.FileLock taken = handle.getChannel().lock();
                     handles.add(handle);
-                    locks.add(handle.getChannel().lock());
+                    locks.add(taken);
                     held.add(account);
+                    handle = null;
                 } catch (java.io.IOException cannotLock) {
                     // This account keeps its mark, which is better than clearing one this reset
                     // cannot hold -- that is the whole defect above.
@@ -813,6 +823,16 @@ public final class AndroidSecureStorage extends SecureStorage {
                     // OverlappingFileLockException among them, which would mean this process
                     // already holds that gate. Refusing to clear is the safe answer either way.
                     Log.e(cannotLock);
+                } finally {
+                    // Non-null only when the lock was not taken, so this closes the handle that
+                    // never made it into the lists rather than leaking it for the whole reset.
+                    if (handle != null) {
+                        try {
+                            handle.close();
+                        } catch (java.io.IOException ignored) {
+                            Log.e(ignored);
+                        }
+                    }
                 }
             }
 

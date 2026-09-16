@@ -1337,6 +1337,49 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aWithdrawnDeviceRecordThatWillNotGoHasItsMechanismDestroyed() throws Exception {
+        // A lock landing inside rememberNow's prompt leaves a wrap of the ZEROED key, and the
+        // withdrawal discards it. The delete is void-returning and both real ports can drop one
+        // silently, so this reported the operation as successfully degraded to session-only over
+        // a record that was still there -- getPolicy() then answers a remembering policy and
+        // every later unlockRemembered() dies on metadata authentication with nothing to say why.
+        String name = freshName();
+        VaultOptions remember = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+        final Vault vault = Vault.named(name).configure(remember);
+        vault.enroll(pw("p"), remember).get();
+        String record = deviceRecordName(name);
+        assertTrue(vault.unlockWithPassword(pw("p")).get().booleanValue());
+
+        TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(record);
+        try {
+            // The rotation re-wraps for the device, and a lock inside that prompt is what makes
+            // the withdrawal run. The rotation itself stays committed either way.
+            whileTheDeviceStoreIsPrompting(
+                    new java.util.concurrent.Callable<VaultError>() {
+                        public VaultError call() {
+                            return errorOf(vault.rotateDataKey(pw("p")));
+                        }
+                    },
+                    new Runnable() {
+                        public void run() {
+                            vault.lock();
+                        }
+                    });
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+        }
+
+        // The record may survive the refused delete, but it must not be able to open anything:
+        // its mechanism is destroyed, so a remembered unlock fails for a reason the caller can
+        // act on rather than silently producing a key that authenticates nothing.
+        Vault reopened = Vault.named(name).configure(remember);
+        assertEquals(VaultError.KEY_MISSING, errorOf(reopened.unlockRemembered()),
+                "a record that could not be withdrawn must not still name a usable key");
+        assertTrue(reopened.unlockWithPassword(pw("p")).get().booleanValue(),
+                "and the password must still open the vault");
+    }
+
+    @Test
     void aProviderThatVanishesBetweenTheCheckAndTheUseDoesNotThrow() throws Exception {
         // protectionFor asked userVerifying() twice -- once for the null check and once for the
         // value -- and that is a LIVE question: on the browser it depends on a capability probe

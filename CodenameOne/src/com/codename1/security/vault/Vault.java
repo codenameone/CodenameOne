@@ -3006,6 +3006,28 @@ public final class Vault {
             return;
         }
         Storage.getInstance().deleteStorageFile(deviceRecordKey());
+        if (definitelyGone(deviceRecordKey())) {
+            return;
+        }
+        // The delete is void-returning and both real ports can drop one silently, so this used to
+        // report the operation as successfully degraded to session-only over a record that was
+        // still there -- and that record wraps the ZEROED key, so getPolicy() answers a
+        // remembering policy and every later unlockRemembered() dies on metadata authentication
+        // with nothing to say why.
+        //
+        // The mechanism goes instead of the caller being told. The enrolment, import or rotation
+        // beside this is committed and stays reported as done -- that is the whole reason this
+        // withdraws rather than throws -- so what is left to do is make the surviving record
+        // unable to open anything, which destroying its key does.
+        try {
+            forgetEveryMechanism();
+        } catch (RuntimeException alsoFailed) {
+            // Nothing here can reach a half-made key, and the record is already unusable in
+            // practice: it wraps zeroes. Logged rather than raised, because raising it would
+            // fail an operation that did happen.
+            Log.p("Vault: a device record written under a lock could not be withdrawn and its "
+                    + "mechanism could not be destroyed either", Log.WARNING);
+        }
     }
 
     private void requireDeviceRecordStillWanted(int generation, String restore) {
