@@ -299,6 +299,77 @@ public final class AndroidSecureStorage extends SecureStorage {
         if (account == null || value == null) {
             return false;
         }
+        // Through the GATE, for the reason the browser tier settles its ordinary writes there
+        // too. An ordinary write that skipped it let this happen: setIfAbsent passes its absence
+        // checks under the gate, a set() lands before it reaches its own write, and the create
+        // then overwrites that value and returns its candidate -- so a caller already using the
+        // set() value as a managed database or vault key has its data orphaned. No sequential
+        // ordering of the two produces that, which is what makes it a defect rather than a
+        // race the caller chose.
+        java.io.File gate = gateFile(account);
+        if (gate == null) {
+            // No gate to coordinate through. setIfAbsent refuses outright here; a plain set()
+            // still has to work, because an application that never creates through the gate
+            // would otherwise be unable to store anything at all.
+            return setUnderHeldGate(account, value);
+        }
+        java.io.RandomAccessFile handle = null;
+        java.nio.channels.FileLock lock = null;
+        try {
+            handle = new java.io.RandomAccessFile(gate, "rw");
+            lock = handle.getChannel().lock();
+            if (!setUnderHeldGate(account, value)) {
+                return false;
+            }
+            // Marked, so this account stops being ambiguous: an unmarked gate beside a value is
+            // what an older build left, and the create cannot tell that from a free one.
+            try {
+                handle.setLength(0);
+                handle.seek(0);
+                handle.write(GATE_SETTLED);
+                handle.getChannel().force(true);
+            } catch (java.io.IOException cannotMark) {
+                // The value IS stored and this reports that truthfully. What is lost is the
+                // protection for the next create, which the next write through here restores.
+                Log.e(cannotMark);
+            }
+            return true;
+        } catch (java.io.IOException cannotLock) {
+            Log.e(cannotLock);
+            return false;
+        } catch (RuntimeException cannotLock) {
+            // OverlappingFileLockException: a thread in this process already holds the gate.
+            // createUnderGate is the one that does, and it calls setUnderHeldGate directly, so
+            // reaching here means an unexpected nesting rather than that path.
+            Log.e(cannotLock);
+            return false;
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+        }
+    }
+
+    /// The write itself, with the account's gate ALREADY held by the caller.
+    ///
+    /// createUnderGate calls this rather than set(), because taking the gate a second time from
+    /// the same thread raises OverlappingFileLockException instead of blocking.
+    private boolean setUnderHeldGate(String account, String value) {
+        // The pre-keystore tier, and it belongs HERE rather than ahead of the gate in set().
+        // Sitting there it was skipped by createUnderGate, which calls this directly -- so on an
+        // API 22 device a create would have gone down the keystore path that device does not
+        // have. Both writers reach it here, and both coordinate through the same gate.
         if (Build.VERSION.SDK_INT < 23) {
             return legacyPlainSet(account, value);
         }
@@ -539,7 +610,9 @@ public final class AndroidSecureStorage extends SecureStorage {
     /// tombstone left by a removal this process could not see.
     private String createUnderGate(java.io.RandomAccessFile handle, String account, String value)
             throws java.io.IOException {
-            if (!set(account, value)) {
+            // setUnderHeldGate, never set(): this thread already holds this account's gate, and
+            // taking it again raises OverlappingFileLockException rather than blocking.
+            if (!setUnderHeldGate(account, value)) {
                 return null;
             }
             try {
