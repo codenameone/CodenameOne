@@ -79,28 +79,38 @@ public final class DesktopTileRunner {
         Display.init(new java.awt.Container());
         final int[] written = new int[1];
         final Throwable[] failure = new Throwable[1];
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 try {
                     written[0] = renderAll(platform, themeRes, outDir);
                 } catch (Throwable t) {
                     failure[0] = t;
+                } finally {
+                    done.countDown();
                 }
             }
         });
 
-        // The EDT does the work; this thread waits for it. Bounded rather than open-ended so
-        // a hang fails the run instead of holding a CI job until the job timeout.
-        long deadline = System.currentTimeMillis() + 120000L;
-        while (written[0] == 0 && failure[0] == null && System.currentTimeMillis() < deadline) {
-            Thread.sleep(200);
+        // The EDT does the work; this thread waits for it. Through a latch rather than a
+        // sleep loop over the two arrays: a plain field written on one thread has no
+        // happens-before edge to a read on another, so nothing required this thread to ever
+        // observe the render finishing. A JVM is free to keep serving the initial values,
+        // wait out the entire timeout and report "no tiles were rendered" for a run that
+        // rendered everything -- or to swallow the real exception behind that message.
+        // await() supplies the edge, so everything the EDT wrote before countDown() is
+        // visible here. Bounded rather than open-ended so a genuine hang fails the run
+        // instead of holding a CI job until the job timeout.
+        if (!done.await(120, java.util.concurrent.TimeUnit.SECONDS)) {
+            System.err.println("DesktopTileRunner: the render did not finish within the deadline");
+            System.exit(4);
         }
         if (failure[0] != null) {
             failure[0].printStackTrace();
             System.exit(3);
         }
         if (written[0] == 0) {
-            System.err.println("DesktopTileRunner: no tiles were rendered before the deadline");
+            System.err.println("DesktopTileRunner: no tiles were rendered");
             System.exit(4);
         }
         System.out.println("CN1SS:INFO desktop tiles written: " + written[0]);

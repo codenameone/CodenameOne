@@ -3233,10 +3233,16 @@ public class WindowsImplementation extends CodenameOneImplementation {
     ///
     /// Desktop layers. Matches the JavaSE desktop port and the macOS port
     /// (`desktop`, `tablet`, ...) so one override written for the desktop covers all
-    /// three, with `windows` last so a layer can name this port specifically.
+    /// three, with the port's own name last so a layer can name this port specifically.
+    ///
+    /// That last entry is `win`, spelled exactly as getPlatformName() reports it above:
+    /// Resources.openLayered appends the value literally as `<resource>_<name>.ovr`, and the
+    /// resource editor writes the Windows override as `_win.ovr`. Spelling it `windows` here
+    /// asked for a file nothing produces, so the layer this method exists to load would never
+    /// have been found. The macOS and Linux ports pair the same two the same way.
     @Override
     public String[] getPlatformOverrides() {
-        return new String[] {"desktop", "tablet", "windows"};
+        return new String[] {"desktop", "tablet", "win"};
     }
 
     /// @inheritDoc
