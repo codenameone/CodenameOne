@@ -533,8 +533,7 @@ public final class Vault {
                         "another session finished setting up this vault first; unlock with "
                         + "the password instead of enrolling again");
             }
-            metadata = verified;
-            adoptKey(key);
+            adoptSession(generation, verified, key);
             key = null;
             touch();
             // Asked AGAIN, after publishing. The check above is a read, and the publication that
@@ -1670,17 +1669,11 @@ public final class Vault {
                     // Every other assignment to this field adopts a key in the same breath --
                     // enrolment, publishKey, the rotation, the recovery code -- so this is the
                     // only one that can be holding nothing.
-                    if (dataKey != null) {
-                        metadata = next;
-                    }
-                    // Asked AGAIN after the assignment, because the test and the store are two
-                    // steps: a lock() landing between them cleared metadata and this then put it
-                    // straight back, leaving a locked instance warm with a record it would open
-                    // on the next unlock instead of reading storage. Clearing is the direction
-                    // that converges -- whichever way the two interleave, the LAST thing done
-                    // here is a check that removes the cache rather than one that installs it.
-                    if (dataKey == null) {
-                        metadata = null;
+                    synchronized (Vault.this) {
+                        // Never repopulate a locked session's metadata, even transiently.
+                        if (dataKey != null) {
+                            metadata = next;
+                        }
                     }
                     setPasswordNeedsRewrap(false);
                     out.complete(Boolean.TRUE);
@@ -2018,9 +2011,8 @@ public final class Vault {
                     // the key the persisted record now describes. Refusing would leave the vault
                     // OPEN holding a key its own metadata no longer names, which is worse than
                     // either outcome the check was choosing between.
-                    adoptKey(fresh);
+                    adoptSession(generation, next, fresh);
                     fresh = null;
-                    metadata = next;
                     DeviceRecord remembered = deviceRecord();
                     if (remembered != null) {
                         // The device wrap holds the old key. Re-wrapping is part of the rotation;
@@ -3291,13 +3283,15 @@ public final class Vault {
                     "this vault's record changed while the key was being derived, so the key this "
                     + "unlock produced is not the one the vault now describes; try again");
         }
-        synchronized (this) {
-            // Refuse before publishing either field. Installing and then undoing would expose
-            // an unlocked session between these operations after lock() had already returned.
-            requireSameGeneration(generation);
-            metadata = meta;
-            adoptKey(key);
-        }
+        adoptSession(generation, meta, key);
+    }
+
+    /// Enrollment, unlock and rotation publish both fields under the lock monitor. A stale
+    /// operation is rejected before it can make even a temporary unlocked session visible.
+    private synchronized void adoptSession(int generation, VaultMetadata meta, byte[] key) {
+        requireSameGeneration(generation);
+        metadata = meta;
+        adoptKey(key);
     }
 
     /// Withdraws a device record that a lock landed on top of, and reports the lock.

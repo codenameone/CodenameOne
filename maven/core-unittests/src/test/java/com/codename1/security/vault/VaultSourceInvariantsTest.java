@@ -84,6 +84,23 @@ class VaultSourceInvariantsTest extends UITestBase {
     }
 
     @Test
+    void everySessionPublicationUsesTheGuardedAdoptionBoundary() throws Exception {
+        assertTrue(java.lang.reflect.Modifier.isSynchronized(Vault.class.getDeclaredMethod(
+                "adoptSession", int.class, VaultMetadata.class, byte[].class).getModifiers()));
+        String source = readVaultSource();
+        String publication = codeOnly(methodBody(source, "private synchronized void adoptSession("));
+        int check = publication.indexOf("requireSameGeneration(generation)");
+        assertTrue(check >= 0 && check < publication.indexOf("metadata = meta"));
+        assertTrue(check < publication.indexOf("adoptKey(key)"));
+        for (String signature : new String[] {"private void enrollNow(", "private void publishKey(",
+                "public AsyncResource<Boolean> rotateDataKey("}) {
+            String body = codeOnly(methodBody(source, signature));
+            assertTrue(body.contains("adoptSession(generation,"), signature);
+            assertFalse(body.contains("adoptKey("), signature);
+        }
+    }
+
+    @Test
     void generationChecksAcquireTheMonitorThatPublishesStateChanges() throws Exception {
         // A stress test cannot prove Java memory-model visibility. Assert the synchronization
         // boundary directly, alongside the behavioural lock and rotation race tests.
@@ -265,7 +282,7 @@ class VaultSourceInvariantsTest extends UITestBase {
         assertTrue(body.lastIndexOf("requireSameKey(", commit) > 0,
                 "the recheck must come before the commit, while a refusal still means the "
                 + "rotation did not happen: " + body);
-        int adopt = body.indexOf("adoptKey(");
+        int adopt = body.indexOf("adoptSession(");
         assertTrue(adopt > 0, "the rotation must adopt the fresh key");
         assertTrue(body.indexOf("requireSameKey(", commit) < 0
                         || body.indexOf("requireSameKey(", commit) > adopt,
@@ -408,7 +425,7 @@ class VaultSourceInvariantsTest extends UITestBase {
         // survived a behavioural suite.
         String body = codeOnly(methodBody(readVaultSource(),
                 "private void enrollNow(char[] password, int generation)"));
-        int publish = body.indexOf("adoptKey(");
+        int publish = body.indexOf("adoptSession(");
         assertTrue(publish > 0, "enrolment must publish the key it derived");
         String after = body.substring(publish);
         assertTrue(after.indexOf("loadMetadataFresh()") > 0,
