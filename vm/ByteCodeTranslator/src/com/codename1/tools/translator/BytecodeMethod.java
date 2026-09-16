@@ -2676,10 +2676,10 @@ public class BytecodeMethod implements SignatureSet {
             String allocated = null;
             int src = prevExecutable(i - 1);
             if (src >= 0) {
-                Instruction s = instructions.get(src);
-                if (s instanceof Invoke && s.getOpcode() == Opcodes.INVOKESPECIAL
-                        && "<init>".equals(((Invoke) s).getName())) {
-                    allocated = ((Invoke) s).getOwner();
+                Instruction sv = instructions.get(src);
+                if (sv instanceof Invoke && sv.getOpcode() == Opcodes.INVOKESPECIAL
+                        && "<init>".equals(((Invoke) sv).getName())) {
+                    allocated = ((Invoke) sv).getOwner();
                 }
             }
             Parser.recordCollectionFieldStore(out, f.getOwner(), f.getFieldName(), allocated);
@@ -2844,6 +2844,15 @@ public class BytecodeMethod implements SignatureSet {
                 continue;
             }
             String coll = provableCollectionClass(recvIdx);
+            if (FRAMELESS_CENSUS) {
+                Instruction rv = instructions.get(recvIdx);
+                String shape = rv instanceof Field ? "field"
+                        : (rv instanceof VarOp && rv.getOpcode() == Opcodes.ALOAD
+                            ? (((VarOp) rv).getIndex() < firstNonParameterSlot() ? "PARAMETER" : "local")
+                            : (rv instanceof Invoke ? "call:" + ((Invoke) rv).getOwner() + "." + ((Invoke) rv).getName()
+                               : "other" + rv.getOpcode()));
+                System.out.println("[FE] " + (coll == null ? "REFUSED-TYPE" : ("type=" + coll)) + " recv=" + shape);
+            }
             // ArrayList ONLY, and by exact name. A subclass would reach this through a
             // different allocation, and every other collection has a different backing
             // shape -- LinkedList has no array at all.

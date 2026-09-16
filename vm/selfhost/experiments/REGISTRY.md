@@ -2554,3 +2554,77 @@ three that is pure profit with no analysis and no GC interaction.
 The collector precondition from Round 20 still stands for anything that moves references
 into block storage; it does NOT apply to 1, 2 or 3, none of which change where a reference
 lives -- they change whether an object is allocated at all.
+
+## Round 22: two of the four landed, and the third measured zero
+
+Round 21 listed four items. Two are done and measured; the third was built and reverted
+for buying nothing; the fourth is bounded by an analysis neither of them needed.
+
+### 1. Non-capturing lambdas are singletons -- DONE
+
+A lambda is emitted as a class whose captures are instance fields, built by a synthesized
+`lambda$factory` doing `CN1_FAST_NEW` on every evaluation. With no captures the class has
+no instance fields, so instances are indistinguishable and one shared instance serves.
+Measured on `LambdaT`, where capturing and non-capturing lambdas sit in the SAME loops:
+
+| lambda | captures | allocations over the run |
+|---|---|---:|
+| lambda_0/1/4/5 | none | **1 each** |
+| lambda_2 | 1 | 597 |
+| lambda_3 | 1 | 384 |
+
+~2,000 allocations become 4. Costs no analysis: "declares no instance fields" is known
+where the class is synthesised. The JLS does not guarantee a lambda yields a new object and
+the JDK caches non-capturing instances itself, so identity is not being broken -- and
+`LambdaT` deliberately does not assert identity, because that would test the host.
+
+### 2. A getter's return is its field -- DONE
+
+`Invoke.asInlinableFieldAccess` already decides whether a call resolves monomorphically to
+`return this.f` and hands back the Field. Asking it in the receiver rule made `x.getFoo()`
+exactly as provable as the field behind it:
+
+    for-each sites lowered      71 -> 95        (+34%)
+    iterator allocations   724,829 -> 522,140   (-28%)
+    all allocations      7,627,446 -> 7,403,935 (-2.9%)
+
+### 3. Transitive field forwarding -- BUILT, MEASURED ZERO, REVERTED
+
+`this.items = other.items` is as provable as the field on the right, which a single pass
+cannot say. A fixpoint over the store map resolved 3 more fields and **zero more lowered
+sites** -- the 3 were HashSet and TreeSet, which the ArrayList-only lowering skips anyway.
+The hypothesis that the 57 refused fields were mostly forwarded stores is refuted: they are
+stored from parameters and from values this analysis does not follow. Reverted rather than
+kept on "it will help once other containers are supported", which is the justification this
+file exists to refuse.
+
+### Where the remaining refusals are, measured
+
+A `-Dcn1.framelessCensus=true` census over every for-each site, by receiver shape:
+
+| receiver | sites | resolved? |
+|---|---:|---|
+| field | 73 | ArrayList |
+| field | 57 | **REFUSED** |
+| parameter | 52 | **REFUSED** |
+| local | 22 | **REFUSED** |
+| `getMethods`/`getInstructions`/`getFields` | 24 | ArrayList |
+| local | 12 | ArrayList |
+| `entrySet()` | 21 | **REFUSED** -- a fresh view object per call, no field to resolve |
+| field | 9 | HashSet / TreeSet |
+
+**Parameters (52) are now the largest tractable group.** Proving one needs call-site
+propagation -- every caller passing a provably-identical concrete class -- which needs the
+argument-to-parameter mapping, and that needs operand-stack simulation to know which
+instruction produced argument i. That is a materially bigger piece of work than items 1-3,
+and it is the honest reason it is not in this round.
+
+### 4. Stack-allocating the iterator -- SUBSUMED where it would have applied
+
+Round 21 proposed hoisting the `iterator()` allocation and stack-allocating it. The census
+above shows why that is not the next move: wherever the receiver's class is provable the
+INDEXED lowering already fires and removes the iterator entirely, which is strictly better
+than stack-allocating one. Stack allocation would only help sites that resolve but are
+refused on loop SHAPE -- `it.remove()` in the body, a non-canonical loop -- and those are a
+handful. The remaining 522,140 iterator allocations are at sites where the type is not
+proven, so they need item 2 widened, not a different allocation strategy.
