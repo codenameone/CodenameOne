@@ -2996,10 +2996,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             mode = theme.getProperty("desktop.themeMode");
         }
         if (mode == null) {
+            // Mobile nativeTheme hints must not opt existing desktop apps into a new theme.
             mode = buildHint("desktop.themeMode");
-            if (mode == null) {
-                mode = sharedNativeThemeHint();
-            }
         }
         mode = mode == null ? null : mode.trim();
         // Custom means no framework base; legacy still uses the stub's historical resource.
@@ -3218,11 +3216,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (platformName == null) {
             return null;
         }
-        String mode = buildHint("desktop.themeMode");
-        if (mode == null) {
-            mode = sharedNativeThemeHint();
-        }
-        return resolveDesktopNativeTheme(platformName, mode);
+        // Desktop selection is independent of the shared iOS/Android nativeTheme hint.
+        return resolveDesktopNativeTheme(platformName, buildHint("desktop.themeMode"));
     }
 
     private static String resolveDesktopNativeTheme(String platformName, String mode) {

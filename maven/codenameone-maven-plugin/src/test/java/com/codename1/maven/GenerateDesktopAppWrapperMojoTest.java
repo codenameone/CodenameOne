@@ -133,6 +133,26 @@ class GenerateDesktopAppWrapperMojoTest {
     }
 
     @Test
+    void mobileThemeHintsDoNotChangeThePackagedDesktopDefault(@TempDir Path root) throws Exception {
+        GenerateDesktopAppWrapperMojo mojo = new GenerateDesktopAppWrapperMojo();
+        mojo.project = new MavenProject();
+        mojo.project.getBuild().setOutputDirectory(root.toString());
+        mojo.properties = new Properties();
+        for (String hint : new String[]{"nativeTheme", "cn1.nativeTheme"}) {
+            for (String mode : new String[]{"modern", "custom", "legacy"}) {
+                mojo.properties.clear();
+                mojo.properties.setProperty("codename1.arg." + hint, mode);
+                mojo.generateThemeConfiguration();
+                Properties packaged = new Properties();
+                try (InputStream in = Files.newInputStream(root.resolve("codenameone-desktop.properties"))) {
+                    packaged.load(in);
+                }
+                assertEquals("legacy", packaged.getProperty("desktop.themeMode"), hint + "=" + mode);
+            }
+        }
+    }
+
+    @Test
     void defaultWrapperPreservesPlatformFontsAndExplicitOverrides() throws Exception {
         String source = render(null, null);
         assertFalse(source.contains("setFontFaces(\"Arial"));

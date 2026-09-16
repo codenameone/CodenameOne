@@ -74,8 +74,8 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     // have no source settings file; JavaSEPort reads this beside the bundled NativeTheme.res.
     void generateThemeConfiguration() throws MojoExecutionException {
         Properties theme = new Properties();
-        theme.setProperty("desktop.themeMode", arg("desktop.themeMode",
-                arg("nativeTheme", arg("cn1.nativeTheme", "legacy"))));
+        // Shared nativeTheme hints select mobile themes; desktop must opt in independently.
+        theme.setProperty("desktop.themeMode", arg("desktop.themeMode", "legacy"));
         File output = new File(project.getBuild().getOutputDirectory(), "codenameone-desktop.properties");
         try {
             Files.createDirectories(output.toPath().getParent());

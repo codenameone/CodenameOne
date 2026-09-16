@@ -45,6 +45,50 @@ class DesktopNativeThemeSelectionTest {
     }
 
     @Test
+    void mobileHintsDoNotSelectDesktopThemesInSimulatorOrPackagedApps() throws Exception {
+        String[] keys = {"codename1.arg.desktop.themeMode", "codename1.arg.nativeTheme",
+                "codename1.arg.cn1.nativeTheme"};
+        String[] previous = new String[keys.length];
+        for (int i = 0; i < keys.length; i++) {
+            previous[i] = System.getProperty(keys[i]);
+            System.clearProperty(keys[i]);
+        }
+        java.lang.reflect.Method resolver = JavaSEPort.class.getDeclaredMethod("resolveAutoNativeTheme", String.class);
+        resolver.setAccessible(true);
+        try {
+            for (String hint : new String[]{keys[1], keys[2]}) {
+                for (String mode : new String[]{"modern", "custom", "legacy"}) {
+                    System.setProperty(hint, mode);
+                    for (String host : new String[]{"win", "mac", "linux"}) {
+                        assertNull(resolver.invoke(null, host), hint + "=" + mode);
+                        assertEquals("/NativeTheme.res", JavaSEPort.resolvePackagedDesktopNativeTheme(host, new Properties()));
+                    }
+                    if ("custom".equals(mode)) {
+                        assertNull(resolver.invoke(null, "ios"));
+                        assertNull(resolver.invoke(null, "and"));
+                    } else if ("modern".equals(mode)) {
+                        assertEquals("iOSModernTheme", resolver.invoke(null, "ios"));
+                        assertEquals("AndroidMaterialTheme", resolver.invoke(null, "and"));
+                    }
+                }
+                System.clearProperty(hint);
+            }
+            System.setProperty(keys[1], "custom");
+            System.setProperty(keys[0], "auto");
+            assertEquals("WindowsFluentTheme", resolver.invoke(null, "win"));
+            assertEquals("/WindowsFluentTheme.res", JavaSEPort.resolvePackagedDesktopNativeTheme("win", new Properties()));
+        } finally {
+            for (int i = 0; i < keys.length; i++) {
+                if (previous[i] == null) {
+                    System.clearProperty(keys[i]);
+                } else {
+                    System.setProperty(keys[i], previous[i]);
+                }
+            }
+        }
+    }
+
+    @Test
     void packagedHintSelectsTheHostThemeWithoutSourceSettings() {
         String previous = System.getProperty("codename1.arg.desktop.themeMode");
         System.clearProperty("codename1.arg.desktop.themeMode");
