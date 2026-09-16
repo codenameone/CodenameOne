@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Printer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.printing</a> &gt; <span class="el_source">Printer.java</span></div><h1>Printer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.printing;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.ImageIO;
+import java.io.IOException;
+import java.io.OutputStream;
+
+/// Cross platform printing API that hands a document to the platform
+/// printing system, typically by popping up the native print dialog where
+/// the user picks a printer and options.
+///
+/// The document is a file in [com.codename1.io.FileSystemStorage]
+/// identified by its path and mime type. All platforms accept PDF
+/// (`application/pdf`) and common image types (`image/png`, `image/jpeg`);
+/// other mime types fail with [PrintResult#STATUS_FAILED] on platforms that
+/// can't render them.
+///
+/// Sample usage:
+///
+/// ```java
+/// if (Printer.isPrintingSupported()) {
+///     Printer.print(reportPath, &quot;application/pdf&quot;, new PrintResultListener() {
+///         public void onResult(PrintResult result) {
+///             if (result.isFailed()) {
+///                 ToastBar.showErrorMessage(&quot;Print failed: &quot; + result.getError());
+///             }
+///         }
+///     });
+/// }
+/// ```
+public final class Printer {
+
+    private Printer() {
+    }
+
+    /// Returns true if the underlying platform can print documents. When
+    /// this returns false [#print] reports [PrintResult#STATUS_FAILED] to
+    /// its listener without showing any UI.
+    public static boolean isPrintingSupported() {
+<span class="fc" id="L64">        return Display.getInstance().isPrintingSupported();</span>
+    }
+
+    /// Print a document file through the platform printing system,
+    /// typically showing the native print dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filePath`: path of the document in [com.codename1.io.FileSystemStorage]
+    ///
+    /// - `mimeType`: the document type, e.g. `application/pdf`, `image/png`
+    ///
+    /// - `listener`: callback for the print outcome, invoked on the EDT. May be null.
+    public static void print(String filePath, String mimeType, PrintResultListener listener) {
+<span class="fc" id="L78">        Display.getInstance().print(filePath, mimeType, listener);</span>
+<span class="fc" id="L79">    }</span>
+
+    /// Convenience variant of [#print(String,String,PrintResultListener)]
+    /// for PDF documents.
+    public static void printPDF(String filePath, PrintResultListener listener) {
+<span class="fc" id="L84">        print(filePath, &quot;application/pdf&quot;, listener);</span>
+<span class="fc" id="L85">    }</span>
+
+    /// Print an image through the platform printing system. The image is
+    /// encoded to a temporary PNG file that is deleted once the print flow
+    /// finishes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image to print
+    ///
+    /// - `listener`: callback for the print outcome, invoked on the EDT. May be null.
+    public static void printImage(Image image, final PrintResultListener listener) {
+<span class="nc" id="L97">        final FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L98">        final String path = fs.getAppHomePath() + &quot;cn1-print-image-temp.png&quot;;</span>
+        try {
+<span class="nc" id="L100">            OutputStream os = fs.openOutputStream(path);</span>
+            try {
+<span class="nc" id="L102">                ImageIO.getImageIO().save(image, os, ImageIO.FORMAT_PNG, 1);</span>
+            } finally {
+<span class="nc" id="L104">                os.close();</span>
+            }
+<span class="nc" id="L106">        } catch (IOException err) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (listener != null) {</span>
+<span class="nc" id="L108">                listener.onResult(PrintResult.failed(err.toString()));</span>
+            }
+<span class="nc" id="L110">            return;</span>
+<span class="nc" id="L111">        }</span>
+<span class="nc" id="L112">        print(path, &quot;image/png&quot;, new PrintResultListener() {</span>
+            @Override
+            public void onResult(PrintResult result) {
+<span class="nc" id="L115">                fs.delete(path);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                if (listener != null) {</span>
+<span class="nc" id="L117">                    listener.onResult(result);</span>
+                }
+<span class="nc" id="L119">            }</span>
+        });
+<span class="nc" id="L121">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

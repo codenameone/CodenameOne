@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSSFilterParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">CSSFilterParser.java</span></div><h1>CSSFilterParser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.plaf;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Runtime parser for CSS `filter:` / `backdrop-filter:` chains. Mirrors
+/// the build-time css-compiler's parser. Returns a [Style.FilterChain]
+/// holding a blur radius (in pixels) and a 4x5 color matrix that
+/// composes the chain's color-style functions
+/// (brightness / contrast / grayscale / hue-rotate / invert / opacity /
+/// saturate / sepia). The matrix is null when the chain reduces to the
+/// identity transform (no color-style functions present, or all of them
+/// at their no-op argument).
+public final class CSSFilterParser {
+    private CSSFilterParser() {
+    }
+
+    /// Parsed filter chain payload.
+    public static final class FilterChain {
+        public final float blurRadius;
+        public final float[] colorMatrix;
+
+<span class="fc" id="L45">        FilterChain(float blurRadius, float[] colorMatrix) {</span>
+<span class="fc" id="L46">            this.blurRadius = blurRadius;</span>
+<span class="fc" id="L47">            this.colorMatrix = colorMatrix;</span>
+<span class="fc" id="L48">        }</span>
+    }
+
+    /// Parses a CSS filter chain. Returns null when `css` is null, empty,
+    /// or literally `none`. Throws `IllegalArgumentException` when a
+    /// function name or argument is unrecognised.
+    public static FilterChain parse(String css) {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (css == null) {</span>
+<span class="fc" id="L56">            return null;</span>
+        }
+<span class="fc" id="L58">        String s = css.trim();</span>
+<span class="fc bfc" id="L59" title="All 4 branches covered.">        if (s.length() == 0 || &quot;none&quot;.equalsIgnoreCase(s)) {</span>
+<span class="fc" id="L60">            return null;</span>
+        }
+<span class="fc" id="L62">        List&lt;String&gt; calls = splitFunctions(s);</span>
+<span class="fc" id="L63">        float blurRadius = 0f;</span>
+<span class="fc" id="L64">        float[] matrix = null;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (String rawCall : calls) {</span>
+<span class="fc" id="L66">            String call = rawCall.trim();</span>
+<span class="fc" id="L67">            int open = call.indexOf('(');</span>
+<span class="pc bpc" id="L68" title="1 of 4 branches missed.">            if (open &lt; 0 || !call.endsWith(&quot;)&quot;)) {</span>
+<span class="fc" id="L69">                throw new IllegalArgumentException(&quot;Bad filter function: &quot; + call);</span>
+            }
+<span class="fc" id="L71">            String name = call.substring(0, open).trim().toLowerCase();</span>
+<span class="fc" id="L72">            String arg = call.substring(open + 1, call.length() - 1).trim();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (&quot;blur&quot;.equals(name)) {</span>
+<span class="fc" id="L74">                blurRadius += parseLengthPx(arg);</span>
+<span class="fc" id="L75">                continue;</span>
+            }
+<span class="fc" id="L77">            float[] m = colorMatrixForFunction(name, arg);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            matrix = (matrix == null) ? m : compose(m, matrix);</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc bfc" id="L80" title="All 4 branches covered.">        if (matrix != null &amp;&amp; isIdentity(matrix)) {</span>
+<span class="fc" id="L81">            matrix = null;</span>
+        }
+<span class="fc" id="L83">        return new FilterChain(blurRadius, matrix);</span>
+    }
+
+    private static float[] colorMatrixForFunction(String name, String arg) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (&quot;brightness&quot;.equals(name)) {</span>
+<span class="fc" id="L88">            return brightnessMatrix(parseAmount(arg, 1f));</span>
+        }
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (&quot;contrast&quot;.equals(name)) {</span>
+<span class="fc" id="L91">            return contrastMatrix(parseAmount(arg, 1f));</span>
+        }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (&quot;grayscale&quot;.equals(name)) {</span>
+<span class="fc" id="L94">            return grayscaleMatrix(clamp01(parseAmount(arg, 1f)));</span>
+        }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (&quot;invert&quot;.equals(name)) {</span>
+<span class="fc" id="L97">            return invertMatrix(clamp01(parseAmount(arg, 1f)));</span>
+        }
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (&quot;opacity&quot;.equals(name)) {</span>
+<span class="fc" id="L100">            return opacityMatrix(clamp01(parseAmount(arg, 1f)));</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (&quot;saturate&quot;.equals(name)) {</span>
+<span class="fc" id="L103">            return saturateMatrix(parseAmount(arg, 1f));</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (&quot;sepia&quot;.equals(name)) {</span>
+<span class="fc" id="L106">            return sepiaMatrix(clamp01(parseAmount(arg, 1f)));</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (&quot;hue-rotate&quot;.equals(name)) {</span>
+<span class="fc" id="L109">            return hueRotateMatrix(parseAngleDeg(arg));</span>
+        }
+<span class="fc" id="L111">        throw new IllegalArgumentException(&quot;Unknown filter function: &quot; + name);</span>
+    }
+
+    private static float parseAmount(String arg, float defaultValue) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (arg.length() == 0) {</span>
+<span class="nc" id="L116">            return defaultValue;</span>
+        }
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (arg.endsWith(&quot;%&quot;)) {</span>
+<span class="fc" id="L119">            return Float.parseFloat(arg.substring(0, arg.length() - 1).trim()) / 100f;</span>
+        }
+<span class="fc" id="L121">        return Float.parseFloat(arg.trim());</span>
+    }
+
+    private static float parseAngleDeg(String arg) {
+<span class="fc" id="L125">        String lower = arg.toLowerCase();</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (lower.endsWith(&quot;deg&quot;)) {</span>
+<span class="fc" id="L127">            return Float.parseFloat(lower.substring(0, lower.length() - 3).trim());</span>
+        }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (lower.endsWith(&quot;grad&quot;)) {</span>
+<span class="nc" id="L130">            return Float.parseFloat(lower.substring(0, lower.length() - 4).trim()) * 0.9f;</span>
+        }
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (lower.endsWith(&quot;turn&quot;)) {</span>
+<span class="nc" id="L133">            return Float.parseFloat(lower.substring(0, lower.length() - 4).trim()) * 360f;</span>
+        }
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (lower.endsWith(&quot;rad&quot;)) {</span>
+<span class="nc" id="L136">            return (float) (Float.parseFloat(lower.substring(0, lower.length() - 3).trim())</span>
+                    * 180.0 / Math.PI);
+        }
+<span class="nc" id="L139">        return Float.parseFloat(arg.trim());</span>
+    }
+
+    private static float parseLengthPx(String arg) {
+<span class="fc" id="L143">        String lower = arg.trim().toLowerCase();</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (lower.length() == 0) {</span>
+<span class="nc" id="L145">            return 0f;</span>
+        }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (lower.endsWith(&quot;px&quot;)) {</span>
+<span class="fc" id="L148">            return Float.parseFloat(lower.substring(0, lower.length() - 2).trim());</span>
+        }
+<span class="fc" id="L150">        return Float.parseFloat(lower);</span>
+    }
+
+    private static float clamp01(float v) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (v &lt; 0f) {</span>
+<span class="nc" id="L155">            return 0f;</span>
+        }
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (v &gt; 1f) {</span>
+<span class="nc" id="L158">            return 1f;</span>
+        }
+<span class="fc" id="L160">        return v;</span>
+    }
+
+    /// Splits &quot;fn1(...) fn2(...) ...&quot; on top-level whitespace boundaries.
+    private static List&lt;String&gt; splitFunctions(String s) {
+<span class="fc" id="L165">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L166">        int depth = 0;</span>
+<span class="fc" id="L167">        int start = 0;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L169">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (c == '(') {</span>
+<span class="fc" id="L171">                depth++;</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            } else if (c == ')') {</span>
+<span class="fc" id="L173">                depth--;</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                if (depth == 0) {</span>
+<span class="fc" id="L175">                    out.add(s.substring(start, i + 1));</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                    while (i + 1 &lt; s.length()</span>
+<span class="pc bpc" id="L177" title="1 of 4 branches missed.">                            &amp;&amp; (s.charAt(i + 1) == ' ' || s.charAt(i + 1) == '\t')) {</span>
+<span class="fc" id="L178">                        i++;</span>
+                    }
+<span class="fc" id="L180">                    start = i + 1;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (start &lt; s.length()) {</span>
+<span class="fc" id="L185">            String tail = s.substring(start).trim();</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (tail.length() &gt; 0) {</span>
+<span class="fc" id="L187">                out.add(tail);</span>
+            }
+        }
+<span class="fc" id="L190">        return out;</span>
+    }
+
+    private static float[] identity() {
+<span class="fc" id="L194">        return new float[]{</span>
+                1, 0, 0, 0, 0,
+                0, 1, 0, 0, 0,
+                0, 0, 1, 0, 0,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] brightnessMatrix(float b) {
+<span class="fc" id="L203">        return new float[]{</span>
+                b, 0, 0, 0, 0,
+                0, b, 0, 0, 0,
+                0, 0, b, 0, 0,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] contrastMatrix(float c) {
+<span class="fc" id="L212">        float offset = 128f * (1f - c);</span>
+<span class="fc" id="L213">        return new float[]{</span>
+                c, 0, 0, 0, offset,
+                0, c, 0, 0, offset,
+                0, 0, c, 0, offset,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] grayscaleMatrix(float a) {
+        // Rec 709 luma weights.
+<span class="fc" id="L223">        float rW = 0.2126f;</span>
+<span class="fc" id="L224">        float gW = 0.7152f;</span>
+<span class="fc" id="L225">        float bW = 0.0722f;</span>
+<span class="fc" id="L226">        return new float[]{</span>
+                (1f - a) + rW * a, gW * a, bW * a, 0, 0,
+                rW * a, (1f - a) + gW * a, bW * a, 0, 0,
+                rW * a, gW * a, (1f - a) + bW * a, 0, 0,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] invertMatrix(float a) {
+<span class="fc" id="L235">        return new float[]{</span>
+                1f - 2f * a, 0, 0, 0, 255f * a,
+                0, 1f - 2f * a, 0, 0, 255f * a,
+                0, 0, 1f - 2f * a, 0, 255f * a,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] opacityMatrix(float a) {
+<span class="fc" id="L244">        return new float[]{</span>
+                1, 0, 0, 0, 0,
+                0, 1, 0, 0, 0,
+                0, 0, 1, 0, 0,
+                0, 0, 0, a, 0
+        };
+    }
+
+    private static float[] saturateMatrix(float s) {
+        // Rec 601 luma weights, per the CSS Filter Effects spec.
+<span class="fc" id="L254">        float rW = 0.213f;</span>
+<span class="fc" id="L255">        float gW = 0.715f;</span>
+<span class="fc" id="L256">        float bW = 0.072f;</span>
+<span class="fc" id="L257">        return new float[]{</span>
+                rW + (1f - rW) * s, gW - gW * s, bW - bW * s, 0, 0,
+                rW - rW * s, gW + (1f - gW) * s, bW - bW * s, 0, 0,
+                rW - rW * s, gW - gW * s, bW + (1f - bW) * s, 0, 0,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] sepiaMatrix(float a) {
+<span class="fc" id="L266">        float i = 1f - a;</span>
+<span class="fc" id="L267">        return new float[]{</span>
+                0.393f * a + i, 0.769f * a, 0.189f * a, 0, 0,
+                0.349f * a, 0.686f * a + i, 0.168f * a, 0, 0,
+                0.272f * a, 0.534f * a, 0.131f * a + i, 0, 0,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] hueRotateMatrix(float deg) {
+<span class="fc" id="L276">        double rad = deg * Math.PI / 180.0;</span>
+<span class="fc" id="L277">        float cos = (float) Math.cos(rad);</span>
+<span class="fc" id="L278">        float sin = (float) Math.sin(rad);</span>
+<span class="fc" id="L279">        return new float[]{</span>
+                0.213f + cos * 0.787f - sin * 0.213f,
+                0.715f - cos * 0.715f - sin * 0.715f,
+                0.072f - cos * 0.072f + sin * 0.928f, 0, 0,
+                0.213f - cos * 0.213f + sin * 0.143f,
+                0.715f + cos * 0.285f + sin * 0.140f,
+                0.072f - cos * 0.072f - sin * 0.283f, 0, 0,
+                0.213f - cos * 0.213f - sin * 0.787f,
+                0.715f - cos * 0.715f + sin * 0.715f,
+                0.072f + cos * 0.928f + sin * 0.072f, 0, 0,
+                0, 0, 0, 1, 0
+        };
+    }
+
+    private static float[] compose(float[] applySecond, float[] applyFirst) {
+        // Both are 4x5 matrices treated as 5x5 with an implicit
+        // [0,0,0,0,1] row. Multiply applySecond * applyFirst.
+<span class="fc" id="L296">        float[] out = new float[20];</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (int r = 0; r &lt; 4; r++) {</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            for (int c = 0; c &lt; 5; c++) {</span>
+<span class="fc" id="L299">                float sum = 0f;</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">                for (int k = 0; k &lt; 4; k++) {</span>
+<span class="fc" id="L301">                    sum += applySecond[r * 5 + k] * applyFirst[k * 5 + c];</span>
+                }
+<span class="fc bfc" id="L303" title="All 2 branches covered.">                if (c == 4) {</span>
+<span class="fc" id="L304">                    sum += applySecond[r * 5 + 4];</span>
+                }
+<span class="fc" id="L306">                out[r * 5 + c] = sum;</span>
+            }
+        }
+<span class="fc" id="L309">        return out;</span>
+    }
+
+    private static boolean isIdentity(float[] m) {
+<span class="fc" id="L313">        float[] id = identity();</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        for (int i = 0; i &lt; 20; i++) {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (Math.abs(m[i] - id[i]) &gt; 1e-4f) {</span>
+<span class="fc" id="L316">                return false;</span>
+            }
+        }
+<span class="fc" id="L319">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

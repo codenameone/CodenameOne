@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompanionDevices.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.companion</a> &gt; <span class="el_source">CompanionDevices.java</span></div><h1>CompanionDevices.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.companion;
+
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.async.PendingMap;
+import com.codename1.impl.nearby.NearbyRequests;
+import com.codename1.impl.nearby.NearbyWire;
+import com.codename1.nearby.NearbyAvailability;
+import com.codename1.nearby.NearbyError;
+import com.codename1.nearby.NearbyException;
+import com.codename1.nearby.spi.NearbyBridge;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Companion-device association: the OS-managed relationship between this
+/// app and one particular accessory.
+///
+/// Associating is not pairing. It is the app telling the operating system
+/// &quot;this is my device&quot;, through a chooser the OS draws and the user picks
+/// from, and getting back privileges that an ordinary Bluetooth scan does
+/// not carry:
+///
+/// - **The OS watches for the device instead of the app.**
+///   [#startObservingPresence] asks the platform to wake the app when the
+///   accessory comes into range, which replaces a scan the app would
+///   otherwise run -- and pay for in battery -- forever.
+/// - **Scanning stops needing location permission.** On Android, finding
+///   your own associated device is not the same question as finding out
+///   where the user is, and the platform treats it accordingly.
+/// - **The user sees one honest prompt** naming one device, instead of a
+///   blanket &quot;this app wants to find nearby devices&quot;.
+///
+/// ```java
+/// AssociationRequest req = new AssociationRequest.Builder()
+///         .addFilter(DeviceFilter.bleService(&quot;180D&quot;))
+///         .build();
+/// CompanionDevices.associate(req).onResult((device, err) -&gt; {
+///     if (err == null) {
+///         Preferences.set(&quot;sensor&quot;, device.getId());
+///         CompanionDevices.startObservingPresence(device.getId());
+///     }
+/// });
+/// ```
+///
+/// #### Platform support
+///
+/// - **Android** -- `CompanionDeviceManager`, with presence observation.
+/// - **iOS** -- AccessorySetupKit, on iOS 18 and later. The picker returns
+///   an accessory the app may then talk to over
+///   `com.codename1.bluetooth` without holding the blanket Bluetooth
+///   authorization. Earlier iOS versions report [#isSupported()] false;
+///   there the app scans with `com.codename1.bluetooth` as before.
+/// - **Simulator, desktop and JavaScript** -- a simulated association store
+///   reporting [NearbyAvailability#LOCAL_ONLY].
+/// - **Every other port** -- unsupported, and every call fails fast.
+public final class CompanionDevices {
+
+<span class="fc" id="L82">    private static final PendingMap&lt;CompanionDevice&gt; PENDING_ASSOCIATE =</span>
+            new PendingMap&lt;CompanionDevice&gt;();
+<span class="fc" id="L84">    private static final PendingMap&lt;Boolean&gt; PENDING_DISASSOCIATE =</span>
+            new PendingMap&lt;Boolean&gt;();
+<span class="fc" id="L86">    private static final List&lt;PresenceListener&gt; LISTENERS =</span>
+            new ArrayList&lt;PresenceListener&gt;();
+    /// Presence events that arrived before any listener existed. The platform
+    /// may start the process purely to deliver one -- that is the whole point
+    /// of companion association -- and in that process the app's `init()` has
+    /// not run yet, so a straight dispatch reaches an empty listener list and
+    /// the wake-up is lost for good. Parked here instead, and replayed by
+    /// [#addPresenceListener].
+<span class="fc" id="L94">    private static final List&lt;PendingPresence&gt; PENDING_PRESENCE =</span>
+            new ArrayList&lt;PendingPresence&gt;();
+    /// Bounds the parked backlog. An app that never registers a listener must
+    /// not accumulate events forever; the oldest is dropped first, because the
+    /// most recent sighting is the one worth reporting.
+    private static final int MAX_PENDING_PRESENCE = 64;
+    /// True while a replay is handing the backlog to the EDT.
+    ///
+    /// Clearing the backlog under the lock is not enough on its own: an event
+    /// arriving after the lock is released but before the replay has finished
+    /// queueing sees an empty backlog, dispatches straight away, and can land
+    /// on the EDT ahead of parked events that are older than it. A parked
+    /// appearance followed by a live disappearance then arrived in the wrong
+    /// order and left the listener holding the wrong final state. While this
+    /// is set, everything parks and the replay loop picks it up.
+    private static boolean replayingPresence;
+
+    /// One parked presence event. Static so it holds no implicit reference to
+    /// anything but the device it carries.
+    private static final class PendingPresence {
+        final CompanionDevice device;
+        final boolean present;
+
+<span class="fc" id="L117">        PendingPresence(CompanionDevice device, boolean present) {</span>
+<span class="fc" id="L118">            this.device = device;</span>
+<span class="fc" id="L119">            this.present = present;</span>
+<span class="fc" id="L120">        }</span>
+    }
+
+    private CompanionDevices() {
+    }
+
+    /// `true` when this port can associate companion devices.
+    public static boolean isSupported() {
+<span class="fc" id="L128">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        return b != null &amp;&amp; b.isCompanionSupported();</span>
+    }
+
+    /// How usable association is right now.
+    ///
+    /// #### Returns
+    ///
+    /// the current availability, never null
+    public static NearbyAvailability getAvailability() {
+<span class="fc" id="L138">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">        if (b == null || !b.isCompanionSupported()) {</span>
+<span class="fc" id="L140">            return NearbyAvailability.NOT_SUPPORTED;</span>
+        }
+<span class="fc" id="L142">        NearbyAvailability[] all = NearbyAvailability.values();</span>
+<span class="fc" id="L143">        int o = b.getCompanionAvailability();</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        return o &gt;= 0 &amp;&amp; o &lt; all.length ? all[o]</span>
+                : NearbyAvailability.NOT_SUPPORTED;
+    }
+
+    /// Shows the system device chooser and associates whatever the user
+    /// picks.
+    ///
+    /// This always involves the user -- there is no way to associate
+    /// silently on either platform, by design.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: what to offer the user
+    ///
+    /// #### Returns
+    ///
+    /// resolves with the associated device, or fails with
+    /// [NearbyError#USER_CANCELED] when the user dismissed the chooser
+    public static AsyncResource&lt;CompanionDevice&gt; associate(
+            AssociationRequest request) {
+<span class="fc" id="L164">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L165" title="1 of 4 branches missed.">        if (b == null || !b.isCompanionSupported()) {</span>
+<span class="fc" id="L166">            EdtResult&lt;CompanionDevice&gt; out = new EdtResult&lt;CompanionDevice&gt;();</span>
+<span class="fc" id="L167">            out.error(new NearbyException(NearbyError.NOT_SUPPORTED,</span>
+                    &quot;this platform does not support companion devices&quot;));
+<span class="fc" id="L169">            return out;</span>
+        }
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L172">            request = new AssociationRequest.Builder().build();</span>
+        }
+<span class="fc" id="L174">        List&lt;DeviceFilter&gt; filters = request.getFilters();</span>
+<span class="fc" id="L175">        String[] encoded = new String[filters.size()];</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int i = 0; i &lt; encoded.length; i++) {</span>
+<span class="fc" id="L177">            encoded[i] = NearbyWire.encodeFilter(filters.get(i));</span>
+        }
+<span class="fc" id="L179">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L180">        EdtResult&lt;CompanionDevice&gt; out = PENDING_ASSOCIATE.open(id);</span>
+<span class="fc" id="L181">        b.associate(id, request.getProfile().ordinal(),</span>
+<span class="fc" id="L182">                request.isSingleDevice(), encoded);</span>
+<span class="fc" id="L183">        return out;</span>
+    }
+
+    /// Every association this app currently holds.
+    ///
+    /// Associations survive restarts, so this is what an app calls on
+    /// startup to find the accessory it was using last time rather than
+    /// asking the user again.
+    ///
+    /// #### Returns
+    ///
+    /// the associations, never null and possibly empty
+    public static List&lt;CompanionDevice&gt; getAssociations() {
+<span class="fc" id="L196">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">        if (b == null || !b.isCompanionSupported()) {</span>
+<span class="fc" id="L198">            return Collections.emptyList();</span>
+        }
+<span class="fc" id="L200">        String[] rows = b.getAssociations();</span>
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        if (rows == null || rows.length == 0) {</span>
+<span class="fc" id="L202">            return Collections.emptyList();</span>
+        }
+<span class="fc" id="L204">        List&lt;CompanionDevice&gt; out =</span>
+                new ArrayList&lt;CompanionDevice&gt;(rows.length);
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (String row : rows) {</span>
+<span class="fc" id="L207">            CompanionDevice d = NearbyWire.decodeCompanionDevice(row);</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (d != null) {</span>
+<span class="fc" id="L209">                out.add(d);</span>
+            }
+        }
+<span class="fc" id="L212">        return Collections.unmodifiableList(out);</span>
+    }
+
+    /// Drops an association and the privileges that came with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `associationId`: the id from [CompanionDevice#getId()]
+    ///
+    /// #### Returns
+    ///
+    /// resolves `true` once the association is gone
+    public static AsyncResource&lt;Boolean&gt; disassociate(String associationId) {
+<span class="fc" id="L225">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L226" title="1 of 4 branches missed.">        if (b == null || !b.isCompanionSupported()) {</span>
+<span class="fc" id="L227">            EdtResult&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L228">            out.error(new NearbyException(NearbyError.NOT_SUPPORTED,</span>
+                    &quot;this platform does not support companion devices&quot;));
+<span class="fc" id="L230">            return out;</span>
+        }
+<span class="fc" id="L232">        int id = NearbyRequests.nextId();</span>
+<span class="fc" id="L233">        EdtResult&lt;Boolean&gt; out = PENDING_DISASSOCIATE.open(id);</span>
+<span class="fc" id="L234">        b.disassociate(id, associationId);</span>
+<span class="fc" id="L235">        return out;</span>
+    }
+
+    /// Asks the platform to watch for the device and tell this app when it
+    /// comes and goes, delivering to every registered [PresenceListener].
+    ///
+    /// #### Parameters
+    ///
+    /// - `associationId`: the id from [CompanionDevice#getId()]
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the platform accepted the request. `false` where
+    /// presence observation is unsupported -- the association itself is
+    /// unaffected, so an app can carry on scanning for the device itself.
+    public static boolean startObservingPresence(String associationId) {
+<span class="fc" id="L251">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L252" title="2 of 6 branches missed.">        if (b == null || !b.isCompanionSupported() || associationId == null) {</span>
+<span class="fc" id="L253">            return false;</span>
+        }
+<span class="fc" id="L255">        return b.startObservingPresence(associationId);</span>
+    }
+
+    /// Stops watching an association. Idempotent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `associationId`: the id from [CompanionDevice#getId()]
+    public static void stopObservingPresence(String associationId) {
+<span class="fc" id="L264">        NearbyBridge b = NearbyRequests.bridge();</span>
+<span class="pc bpc" id="L265" title="1 of 4 branches missed.">        if (b != null &amp;&amp; associationId != null) {</span>
+<span class="fc" id="L266">            b.stopObservingPresence(associationId);</span>
+        }
+<span class="fc" id="L268">    }</span>
+
+    /// Notified once the parked backlog has been handed to the listeners.
+    ///
+    /// A port that keeps a DURABLE copy of an event needs to know when the
+    /// in-memory one has been consumed, or it replays on the next launch
+    /// something the app has already handled. Nothing else can tell it:
+    /// parking happens here, and so does the replay.
+    private static Runnable presenceBacklogDrained;
+
+    /// Registers the hook above. Replaces any previous one.
+    ///
+    /// @hidden not part of the public API; for ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onDrained`: run on the EDT after the backlog empties, or null
+    public static void setPresenceBacklogDrainedHook(Runnable onDrained) {
+<span class="nc" id="L286">        synchronized (LISTENERS) {</span>
+<span class="nc" id="L287">            presenceBacklogDrained = onDrained;</span>
+<span class="nc" id="L288">        }</span>
+<span class="nc" id="L289">    }</span>
+
+    /// Whether any listener is registered to receive presence right now.
+    ///
+    /// For a PORT deciding whether an event needs to outlive the process.
+    /// One that can be delivered now does not: it goes to the listeners and
+    /// is done with. One that arrives with nobody listening is parked here,
+    /// and that in-memory backlog dies with the process -- which is the
+    /// case, and the only case, a durable copy is for.
+    ///
+    /// @hidden not part of the public API; for ports.
+    ///
+    /// #### Returns
+    ///
+    /// true when a presence listener is registered
+    public static boolean hasPresenceListener() {
+<span class="nc" id="L305">        synchronized (LISTENERS) {</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            return !LISTENERS.isEmpty();</span>
+        }
+    }
+
+    /// Registers a presence listener. Callbacks arrive on the EDT.
+    ///
+    /// Register from the app's `init()`: presence is exactly the event that
+    /// can arrive during a cold start, because the platform may start the
+    /// process to deliver it. An event that arrived before any listener
+    /// existed is replayed to the listeners as soon as the first one
+    /// registers, so a sighting delivered into a process whose `init()` had
+    /// not run yet is not lost. At most the 64 most recent are kept.
+    ///
+    /// This is not background execution. The platform starting the process
+    /// does not make the application run: Android hands the event to a
+    /// service, and Codename One does not initialize an app there, because an
+    /// `init()` may build a `Form` and a service has nowhere to put one. The
+    /// listener hears about the sighting, in order, when the app next
+    /// initializes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public static void addPresenceListener(PresenceListener l) {
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (l == null) {</span>
+<span class="nc" id="L331">            return;</span>
+        }
+        // Asked for BEFORE the backlog is replayed, and the answer thrown
+        // away. Building the bridge is what gives a port the chance to put
+        // back events that outlived the process they arrived in -- Android
+        // persists them, because the platform starts a service for a
+        // sighting without starting the app, and an idle process reclaimed
+        // before the user opens it took the in-memory backlog with it.
+        // Nothing else on this path would have touched the bridge, so an app
+        // whose init() only registers a listener never restored them.
+<span class="fc" id="L341">        NearbyRequests.bridge();</span>
+<span class="fc" id="L342">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L343">            LISTENERS.add(l);</span>
+<span class="pc bpc" id="L344" title="1 of 4 branches missed.">            if (PENDING_PRESENCE.isEmpty() || replayingPresence) {</span>
+                // Nothing parked, or another registration is already draining
+                // it -- and that drain will pick up anything that arrives
+                // while it runs.
+<span class="fc" id="L348">                return;</span>
+            }
+<span class="fc" id="L350">            replayingPresence = true;</span>
+<span class="fc" id="L351">        }</span>
+<span class="fc" id="L352">        replayPresence();</span>
+<span class="fc" id="L353">    }</span>
+
+    /// Hands the parked backlog to the EDT, oldest first, until nothing is
+    /// left.
+    ///
+    /// Loops rather than taking one batch: an event that arrives while the
+    /// batch is being dispatched parks behind it (deliverPresenceChanged sees
+    /// replayingPresence), and the next turn of this loop sends it on. That
+    /// is what keeps a live event from overtaking older parked ones.
+    private static void replayPresence() {
+        while (true) {
+            List&lt;PendingPresence&gt; batch;
+<span class="fc" id="L365">            synchronized (LISTENERS) {</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">                if (PENDING_PRESENCE.isEmpty()) {</span>
+                    // Cleared from a runnable queued BEHIND the replay, not
+                    // here. dispatchPresence only queues -- so clearing on
+                    // this thread released the marker while the backlog was
+                    // still waiting to run, and a live event delivered on the
+                    // EDT then ran inline in front of it. The sentinel takes
+                    // its turn after every callback this drain queued.
+<span class="fc" id="L373">                    NearbyRequests.onEdt(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L376">                            finishReplay();</span>
+<span class="fc" id="L377">                        }</span>
+                    });
+<span class="fc" id="L379">                    return;</span>
+                }
+<span class="fc" id="L381">                batch = new ArrayList&lt;PendingPresence&gt;(PENDING_PRESENCE);</span>
+<span class="fc" id="L382">                PENDING_PRESENCE.clear();</span>
+<span class="fc" id="L383">            }</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            for (PendingPresence parked : batch) {</span>
+<span class="fc" id="L385">                dispatchPresence(parked.device, parked.present);</span>
+<span class="fc" id="L386">            }</span>
+<span class="fc" id="L387">        }</span>
+    }
+
+    /// Ends the replay, or continues it when events parked while the backlog
+    /// was in flight.
+    private static void finishReplay() {
+        boolean finished;
+<span class="fc" id="L394">        Runnable drained = null;</span>
+<span class="fc" id="L395">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L396">            finished = PENDING_PRESENCE.isEmpty();</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            if (finished) {</span>
+<span class="fc" id="L398">                replayingPresence = false;</span>
+<span class="fc" id="L399">                drained = presenceBacklogDrained;</span>
+            }
+<span class="fc" id="L401">        }</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        if (!finished) {</span>
+<span class="nc" id="L403">            replayPresence();</span>
+<span class="nc" id="L404">            return;</span>
+        }
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">        if (drained != null) {</span>
+            // Outside the lock: a port's hook touches its own storage, and
+            // holding this monitor across it is how a deadlock is built.
+<span class="nc" id="L409">            drained.run();</span>
+        }
+<span class="fc" id="L411">    }</span>
+
+    /// Removes a listener added by [#addPresenceListener].
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public static void removePresenceListener(PresenceListener l) {
+<span class="nc" id="L419">        synchronized (LISTENERS) {</span>
+<span class="nc" id="L420">            LISTENERS.remove(l);</span>
+<span class="nc" id="L421">        }</span>
+<span class="nc" id="L422">    }</span>
+
+
+    /// Clears every in-flight request, so one test cannot see the requests of
+    /// the test that ran before it. Reached through
+    /// `com.codename1.impl.nearby.NearbyRequests#resetForTest`.
+    ///
+    /// In-flight requests are failed rather than dropped: a resource that
+    /// never settles is worse than one that fails, and a test holding one
+    /// would hang rather than report.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public static void resetForTest() {
+<span class="fc" id="L435">        NearbyException reset = new NearbyException(NearbyError.UNKNOWN,</span>
+                &quot;the nearby framework was reset&quot;);
+<span class="fc" id="L437">        PENDING_ASSOCIATE.failAll(reset);</span>
+<span class="fc" id="L438">        PENDING_DISASSOCIATE.failAll(reset);</span>
+<span class="fc" id="L439">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L440">            LISTENERS.clear();</span>
+<span class="fc" id="L441">            PENDING_PRESENCE.clear();</span>
+<span class="fc" id="L442">            replayingPresence = false;</span>
+<span class="fc" id="L443">        }</span>
+<span class="fc" id="L444">    }</span>
+
+    // ------------------------------------------------------------------
+    // Port entry points
+    // ------------------------------------------------------------------
+
+    /// Answers [#associate].
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `encodedDevice`: the device, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    public static void deliverAssociated(int requestId, String encodedDevice) {
+<span class="fc" id="L460">        EdtResult&lt;CompanionDevice&gt; r = PENDING_ASSOCIATE.take(requestId);</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L462">            return;</span>
+        }
+<span class="fc" id="L464">        CompanionDevice d = NearbyWire.decodeCompanionDevice(encodedDevice);</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">        if (d == null) {</span>
+<span class="nc" id="L466">            r.error(new NearbyException(NearbyError.UNKNOWN,</span>
+                    &quot;the port reported an association with no id&quot;));
+        } else {
+<span class="fc" id="L469">            r.complete(d);</span>
+        }
+<span class="fc" id="L471">    }</span>
+
+    /// Answers [#disassociate].
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    public static void deliverDisassociated(int requestId) {
+<span class="fc" id="L481">        EdtResult&lt;Boolean&gt; r = PENDING_DISASSOCIATE.take(requestId);</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        if (r != null) {</span>
+<span class="fc" id="L483">            r.complete(Boolean.TRUE);</span>
+        }
+<span class="fc" id="L485">    }</span>
+
+    /// Fails whichever companion request carries this id.
+    ///
+    /// @hidden not part of the public API; called by ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the request was made with
+    /// - `errorOrdinal`: the ordinal of a `com.codename1.nearby.NearbyError`
+    ///   constant
+    /// - `message`: a human-readable detail, may be null
+    public static void deliverRequestFailed(int requestId, int errorOrdinal,
+            String message) {
+<span class="fc" id="L499">        NearbyException ex = NearbyWire.decodeError(errorOrdinal, message);</span>
+<span class="fc" id="L500">        EdtResult&lt;CompanionDevice&gt; a = PENDING_ASSOCIATE.take(requestId);</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">        if (a != null) {</span>
+<span class="fc" id="L502">            a.error(ex);</span>
+<span class="fc" id="L503">            return;</span>
+        }
+<span class="fc" id="L505">        EdtResult&lt;Boolean&gt; d = PENDING_DISASSOCIATE.take(requestId);</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        if (d != null) {</span>
+<span class="fc" id="L507">            d.error(ex);</span>
+        }
+<span class="fc" id="L509">    }</span>
+
+    /// Reports that an associated device came into or went out of range.
+    ///
+    /// @hidden not part of the public API; called by ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encodedDevice`: the device, encoded by
+    ///   `com.codename1.impl.nearby.NearbyWire`
+    /// - `present`: true when it appeared, false when it disappeared
+    public static void deliverPresenceChanged(String encodedDevice,
+            final boolean present) {
+<span class="fc" id="L522">        final CompanionDevice d =</span>
+<span class="fc" id="L523">                NearbyWire.decodeCompanionDevice(encodedDevice);</span>
+<span class="fc bfc" id="L524" title="All 2 branches covered.">        if (d == null) {</span>
+<span class="fc" id="L525">            return;</span>
+        }
+<span class="fc" id="L527">        synchronized (LISTENERS) {</span>
+<span class="pc bpc" id="L528" title="2 of 6 branches missed.">            if (LISTENERS.isEmpty() || !PENDING_PRESENCE.isEmpty()</span>
+                    || replayingPresence) {
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                while (PENDING_PRESENCE.size() &gt;= MAX_PENDING_PRESENCE) {</span>
+<span class="nc" id="L531">                    PENDING_PRESENCE.remove(0);</span>
+                }
+<span class="fc" id="L533">                PENDING_PRESENCE.add(new PendingPresence(d, present));</span>
+<span class="fc" id="L534">                return;</span>
+            }
+<span class="fc" id="L536">        }</span>
+<span class="fc" id="L537">        dispatchPresence(d, present);</span>
+<span class="fc" id="L538">    }</span>
+
+    /// Hands one presence event to the listeners on the EDT.
+    private static void dispatchPresence(final CompanionDevice d,
+            final boolean present) {
+<span class="fc" id="L543">        NearbyRequests.onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+                PresenceListener[] ls;
+<span class="fc" id="L547">                synchronized (LISTENERS) {</span>
+<span class="fc" id="L548">                    ls = LISTENERS.toArray(</span>
+<span class="fc" id="L549">                            new PresenceListener[LISTENERS.size()]);</span>
+<span class="fc" id="L550">                }</span>
+<span class="fc bfc" id="L551" title="All 2 branches covered.">                for (PresenceListener l : ls) {</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">                    if (present) {</span>
+<span class="fc" id="L553">                        l.deviceAppeared(d);</span>
+                    } else {
+<span class="fc" id="L555">                        l.deviceDisappeared(d);</span>
+                    }
+                }
+<span class="fc" id="L558">            }</span>
+        });
+<span class="fc" id="L560">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

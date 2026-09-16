@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TunnelHost.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vpn.tunnel</a> &gt; <span class="el_source">TunnelHost.java</span></div><h1>TunnelHost.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vpn.tunnel;
+
+/// Runs a [VpnTunnel] over a [TunnelTransport]. Called by the ports.
+///
+/// In this package rather than `impl` because it drives the tunnel's
+/// package-private entry points, which exist so an application cannot invoke
+/// its own lifecycle by hand.
+///
+/// @hidden not part of the public API.
+public final class TunnelHost {
+
+    private final VpnTunnel tunnel;
+    private final TunnelTransport transport;
+    private boolean stopped;
+
+    /// Orders a start against a stop, whole.
+    ///
+    /// The `stopped` flag makes each transition atomic on its own and does
+    /// not order the two SEQUENCES. Testing it and then attaching left a
+    /// window: a stop landing in between ran finish(), detached and closed,
+    /// and the returning start then reattached the closed transport and
+    /// called onStart -- the application hearing onStop and then onStart for
+    /// a link that was already dead, which is the thing the flag was added
+    /// to prevent.
+    ///
+    /// Its own lock rather than this instance's, because the loop tests
+    /// `stopped` on every read and must not queue behind an onStart the
+    /// application is still inside. Held across application code
+    /// deliberately: ordering the two is the point, and it is reentrant, so
+    /// a tunnel that calls Tunnels.stop() from its own onStart -- which the
+    /// simulation runs on the calling thread -- is not deadlocked by it.
+    ///
+    /// NOT held across the read loop. The loop parks on the transport, and
+    /// closing the transport is what ends it, so a stop has to be able to
+    /// run while it is parked.
+<span class="fc" id="L58">    private final Object lifecycle = new Object();</span>
+
+    /// @hidden not part of the public API.
+<span class="fc" id="L61">    public TunnelHost(VpnTunnel tunnel, TunnelTransport transport) {</span>
+<span class="fc" id="L62">        this.tunnel = tunnel;</span>
+<span class="fc" id="L63">        this.transport = transport;</span>
+<span class="fc" id="L64">    }</span>
+
+    /// Starts the tunnel and, on a blocking transport, its read loop.
+    ///
+    /// Returns once the loop ends on a blocking transport, and immediately
+    /// on a callback-driven one, where blocking would deadlock the host --
+    /// which is why [TunnelTransport#isBlocking] exists rather than the host
+    /// testing the platform.
+    ///
+    /// @hidden not part of the public API.
+    public void start(String server, String[] routes, String[] dns, int mtu,
+            String data) {
+<span class="fc" id="L76">        synchronized (lifecycle) {</span>
+<span class="fc" id="L77">            synchronized (this) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                if (stopped) {</span>
+                    // A host stops ONCE and never restarts -- a port builds
+                    // a new one per start -- so a start arriving after the
+                    // stop is a race, not a restart. Unguarded it
+                    // reattached the closed transport and called onStart, so
+                    // a tunnel torn down while its opener was still
+                    // committing delivered onStop and then onStart to the
+                    // application, for a link that was already dead.
+<span class="fc" id="L86">                    return;</span>
+                }
+<span class="fc" id="L88">            }</span>
+            // The test and the two calls it guards under ONE lock. Split, a
+            // stop landing after the test ran the whole teardown and this
+            // then attached and began on top of it.
+<span class="fc" id="L92">            tunnel.attach(transport);</span>
+<span class="fc" id="L93">            tunnel.begin(new TunnelConfiguration(server, routes, dns, mtu,</span>
+                    data));
+<span class="fc" id="L95">        }</span>
+        // OUTSIDE it; see lifecycle.
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (transport.isBlocking()) {</span>
+<span class="fc" id="L98">            loop();</span>
+        }
+<span class="fc" id="L100">    }</span>
+
+    /// Delivers one batch, for a callback-driven transport.
+    ///
+    /// @hidden not part of the public API.
+    public void pump() {
+<span class="fc" id="L106">        PacketBuffer[] buffers = transport.buffers();</span>
+<span class="fc" id="L107">        int n = transport.read(buffers);</span>
+<span class="fc" id="L108">        deliver(buffers, n);</span>
+<span class="fc" id="L109">    }</span>
+
+    /// Hands a batch to the tunnel, unless the tunnel has stopped.
+    ///
+    /// Under the lifecycle lock, so onPacket cannot BEGIN after onStop. The
+    /// read that produced this batch is deliberately outside it -- a
+    /// blocking transport parks there and closing it is what ends the park
+    /// -- so a stop can land between the read and the delivery. Unordered,
+    /// the application was handed packets after being told the tunnel was
+    /// over, for signalling and media it had already released.
+    ///
+    /// A stop from another thread therefore waits for the batch in flight,
+    /// which is the same trade the start sequence makes: ordering the two is
+    /// the point.
+    private void deliver(PacketBuffer[] buffers, int n) {
+<span class="fc" id="L124">        synchronized (lifecycle) {</span>
+<span class="fc" id="L125">            synchronized (this) {</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                if (stopped) {</span>
+<span class="nc" id="L127">                    return;</span>
+                }
+<span class="fc" id="L129">            }</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L131">                tunnel.deliver(buffers[i]);</span>
+            }
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">    }</span>
+
+    /// Stops the tunnel, once.
+    ///
+    /// @hidden not part of the public API.
+    public void stop(int reasonOrdinal) {
+        // Under the same lock the start sequence takes, so the two cannot
+        // interleave; see lifecycle.
+<span class="fc" id="L142">        synchronized (lifecycle) {</span>
+<span class="fc" id="L143">            synchronized (this) {</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                if (stopped) {</span>
+<span class="fc" id="L145">                    return;</span>
+                }
+<span class="fc" id="L147">                stopped = true;</span>
+<span class="fc" id="L148">            }</span>
+<span class="fc" id="L149">            TunnelStopReason[] values = TunnelStopReason.values();</span>
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">            tunnel.finish(reasonOrdinal &lt; 0 || reasonOrdinal &gt;= values.length</span>
+                    ? TunnelStopReason.UNKNOWN : values[reasonOrdinal]);
+<span class="fc" id="L152">            tunnel.attach(null);</span>
+<span class="fc" id="L153">            transport.close();</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">    }</span>
+
+    private void loop() {
+<span class="fc" id="L158">        PacketBuffer[] buffers = transport.buffers();</span>
+        while (true) {
+<span class="fc" id="L160">            synchronized (this) {</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                if (stopped) {</span>
+<span class="nc" id="L162">                    return;</span>
+                }
+<span class="fc" id="L164">            }</span>
+<span class="fc" id="L165">            int n = transport.read(buffers);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (n &lt;= 0) {</span>
+                // Zero is how a blocking transport says the link is going
+                // down; anything else and the loop would spin on a closed
+                // descriptor for as long as the process lived.
+                //
+                // NOT retired here, deliberately. Only the TRANSPORT knows
+                // what a zero-length read meant: on a descriptor it is a
+                // link that failed or closed, and in a pumped simulation it
+                // is a queue that happens to be empty. Retiring the tunnel
+                // from this side turned the second into the first and
+                // announced a stop the caller had not asked for. The port
+                // that owns the transport ends the tunnel when its loop
+                // returns -- see CN1VpnService.Loop -- because that is where
+                // the difference is known.
+<span class="fc" id="L180">                return;</span>
+            }
+<span class="fc" id="L182">            deliver(buffers, n);</span>
+<span class="fc" id="L183">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecureStorage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">SecureStorage.java</span></div><h1>SecureStorage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+/// Biometric-gated secure storage backed by the platform keychain. Reading
+/// an entry prompts the user for biometric authentication; writing or
+/// deleting may or may not, depending on the platform.
+///
+/// Entries are bound to the current set of enrolled biometrics. If the user
+/// adds a fingerprint, enrols a new face, or disables device security, every
+/// stored entry is automatically invalidated and subsequent
+/// [#get(String, String)] calls fail with [BiometricError#KEY_REVOKED]. The
+/// application must then re-prompt the user for the original value and
+/// [#set(String, String, String)] it again.
+///
+/// Use this for short, secret strings (auth tokens, refresh tokens,
+/// encryption keys). For larger data, encrypt with a key stored here.
+///
+/// #### Platform support
+///
+/// - **iOS** -- backed by Security.framework (`SecItemAdd` /
+///   `SecItemCopyMatching` / `SecItemDelete`) with
+///   `kSecAccessControlTouchIDCurrentSet`. Sharing entries with App
+///   Extensions requires both the `ios.keychainAccessGroup` build hint AND
+///   a call to [#setKeychainAccessGroup(String)] passing the same
+///   Team-ID-prefixed group identifier.
+/// - **Android** -- AES/CBC/PKCS7 ciphertext stored in `SharedPreferences`
+///   with the key in the `AndroidKeyStore`, locked via
+///   `setUserAuthenticationRequired(true)`. The `BiometricPrompt` (API 29+)
+///   or `FingerprintManager` (API 23-28) unlocks the cipher for one
+///   operation per prompt.
+/// - **JavaSE simulator** -- backed by `java.util.prefs.Preferences`, gated
+///   on the same Biometric Simulation menu used by [Biometrics]. Useful for
+///   testing the round-trip and `KEY_REVOKED` paths without a device.
+/// - **All other platforms** -- this base class is returned as-is and acts
+///   as a non-supporting fallback: every method completes with
+///   [BiometricError#NOT_AVAILABLE]. Application code does not need
+///   platform `if` statements.
+public class SecureStorage {
+
+    /// Subclasses are constructed by the port. Application code obtains the
+    /// active instance via [#getInstance()].
+<span class="fc" id="L66">    protected SecureStorage() {</span>
+<span class="fc" id="L67">    }</span>
+
+    /// Returns the platform-specific singleton owned by the current port.
+    /// On ports that do not implement secure storage this returns a base
+    /// [SecureStorage] instance whose methods report
+    /// [BiometricError#NOT_AVAILABLE].
+    public static SecureStorage getInstance() {
+<span class="fc" id="L74">        SecureStorage s = Display.getInstance().getSecureStorage();</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        return s != null ? s : DEFAULT;</span>
+    }
+
+<span class="fc" id="L78">    private static final SecureStorage DEFAULT = new SecureStorage();</span>
+
+    /// Retrieves a previously-stored entry, prompting for biometric
+    /// authentication. The returned `AsyncResource` completes with the
+    /// value, or with a [BiometricException] on failure (including
+    /// [BiometricError#KEY_REVOKED] when biometrics have been re-enrolled
+    /// since the entry was written). On the fallback base class this
+    /// completes immediately with [BiometricError#NOT_AVAILABLE].
+    public AsyncResource&lt;String&gt; get(String reason, String account) {
+<span class="fc" id="L87">        AsyncResource&lt;String&gt; r = new AsyncResource&lt;String&gt;();</span>
+<span class="fc" id="L88">        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,</span>
+                &quot;Secure storage is not available on this platform&quot;));
+<span class="fc" id="L90">        return r;</span>
+    }
+
+    /// Stores or overwrites a value for the given account. On iOS the user
+    /// is typically not prompted (Apple's keychain accepts writes without
+    /// re-authenticating); on Android the user is prompted because the
+    /// underlying cipher requires biometric authentication. On the fallback
+    /// base class this completes immediately with
+    /// [BiometricError#NOT_AVAILABLE].
+    public AsyncResource&lt;Boolean&gt; set(String reason, String account, String value) {
+<span class="fc" id="L100">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L101">        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,</span>
+                &quot;Secure storage is not available on this platform&quot;));
+<span class="fc" id="L103">        return r;</span>
+    }
+
+    /// Removes a previously-stored entry. No authentication is required
+    /// since deletion does not reveal the value. On the fallback base class
+    /// this completes immediately with [BiometricError#NOT_AVAILABLE].
+    public AsyncResource&lt;Boolean&gt; remove(String reason, String account) {
+<span class="fc" id="L110">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L111">        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,</span>
+                &quot;Secure storage is not available on this platform&quot;));
+<span class="fc" id="L113">        return r;</span>
+    }
+
+    /// Configures the iOS keychain access group for sharing entries between
+    /// the main app and its extensions. The argument must include the Team
+    /// ID prefix (e.g. `&quot;ABCDE12345.group.com.example.app&quot;`). Pass `null`
+    /// or empty to clear. Ignored on non-iOS platforms and on the fallback
+    /// base class.
+    ///
+    /// The `ios.keychainAccessGroup` build hint must declare the same group
+    /// in the app's entitlements for this to work.
+    public void setKeychainAccessGroup(String group) {
+        // No-op fallback.
+<span class="fc" id="L126">    }</span>
+
+    // -----------------------------------------------------------------
+    // Non-prompting (no-biometric) storage
+    // -----------------------------------------------------------------
+    //
+    // The methods above all gate reads on biometric authentication.
+    // That is the right contract for refresh tokens and other things
+    // the user actively unlocks, but it is the wrong contract for
+    // secrets that the app needs to read on every network call --
+    // notably LLM API keys, where prompting at chat-call time would
+    // be unusable.
+    //
+    // The single-argument overloads below provide a quieter store
+    // that the platform persists with the OS's strong-but-non-
+    // interactive secrets backend:
+    //
+    // - iOS: keychain with `kSecAttrAccessibleAfterFirstUnlock`, no
+    //   `SecAccessControl`. Entries survive app updates and OS
+    //   reboots; they are extracted only after the user unlocks the
+    //   device at least once after each reboot.
+    // - Android: AES-GCM under a dedicated AndroidKeyStore key created
+    //   without `setUserAuthenticationRequired(true)`, persisted to a
+    //   private preferences file. No biometric prompt. Devices below
+    //   API 23 fall back to obfuscated (not encrypted) storage.
+    // - JavaSE simulator: `java.util.prefs.Preferences` encrypted
+    //   with an AES key derived from the OS user account. Useful
+    //   for round-tripping `LlmClient.openai(SecureStorage.getInstance().get(&quot;openai_key&quot;))`
+    //   during simulator runs without storing the key in plaintext
+    //   in the project tree.
+    // - All other platforms: the base class returns null / false so
+    //   the call is observable but harmless. Treat `null` from
+    //   `get(account)` the same way you'd treat &quot;not configured&quot;.
+
+    /// Quietly stores or overwrites an entry under `account`. The
+    /// user is not prompted. Returns `false` on the fallback base
+    /// class.
+    public boolean set(String account, String value) {
+<span class="fc" id="L164">        return false;</span>
+    }
+
+    /// Quietly retrieves a previously-stored entry. Returns `null`
+    /// when the entry does not exist or when the platform does not
+    /// provide non-prompting storage.
+    public String get(String account) {
+<span class="fc" id="L171">        return null;</span>
+    }
+
+    /// Quietly removes an entry. Returns `false` on the fallback
+    /// base class.
+    public boolean remove(String account) {
+<span class="fc" id="L177">        return false;</span>
+    }
+
+    /// The entry is there.
+    /// Stores a value only if this account has none, and reports what the store ended up holding.
+    ///
+    /// The operation a first-time key needs. Reading, generating and storing as three steps is
+    /// safe within one process and not between two: `synchronized` covers threads in one VM, while
+    /// an application can be opened from more than one -- Android components declared with their
+    /// own `android:process`, or simply two runs of a desktop build -- and both can see nothing
+    /// stored, generate different keys, and each overwrite the other. The database is then
+    /// encrypted with whichever key did not survive, and nothing can open it again.
+    ///
+    /// The return value is what makes racing callers agree: a caller that lost stores nothing and
+    /// is handed the value that won, so both go on to open the database with the same key.
+    ///
+    /// This default is the best a store with no create-if-absent of its own can do -- the check
+    /// and the write are still two operations, so a second process can land between them, and what
+    /// it prevents is the divergence rather than the race. A port whose store can do this in one
+    /// step overrides it; iOS does, because the keychain's own add fails when the item exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the account to create
+    ///
+    /// - `value`: the value to store if there is none
+    ///
+    /// #### Returns
+    ///
+    /// the value now stored, which may be another caller's, or null if the store cannot say
+    public String setIfAbsent(String account, String value) {
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">        if (account == null || value == null) {</span>
+<span class="nc" id="L209">            return null;</span>
+        }
+<span class="fc bfc" id="L211" title="All 4 branches covered.">        if (entryState(account) == ENTRY_ABSENT &amp;&amp; set(account, value)) {</span>
+            // Read back rather than assuming: another process may have written between the check
+            // and the write, and its value is the one to agree on.
+<span class="fc" id="L214">            String stored = get(account);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            return stored != null ? stored : value;</span>
+        }
+<span class="fc" id="L217">        return get(account);</span>
+    }
+
+    /// A name unique to this application, for a store the platform shares between applications.
+    ///
+    /// The mobile ports do not need this: an OS sandbox already separates one application's
+    /// keychain or keystore from another's. A native desktop build has no sandbox -- its storage
+    /// is a plain directory under the user account -- so two applications that ask for the same
+    /// account name reach the same entry. For a managed database key that means one application
+    /// reading another's key, and forgetting it in either one removing the other's only copy.
+    ///
+    /// The package is what the installer, the store and the build all treat as the application's
+    /// identity. A display name is the fallback because a build without a package still has one,
+    /// though it is weaker: two vendors can both ship &quot;Notes&quot;.
+    ///
+    /// #### Returns
+    ///
+    /// an identifier safe to embed in a storage name, never null and never empty
+    protected static String applicationNamespace() {
+<span class="fc" id="L236">        return applicationNamespace(null);</span>
+    }
+
+    /// The same identifier, for a port that knows the application before `Display` can say.
+    ///
+    /// The simulator is that case: it builds its store while the port is still coming up, so
+    /// `Display` cannot answer yet -- and it has the launcher's main class in hand, which is where
+    /// its `package_name` comes from in the first place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `preferred`: an identity the port already knows, or null to ask `Display`
+    ///
+    /// #### Returns
+    ///
+    /// an identifier safe to embed in a storage name, never null and never empty
+    protected static String applicationNamespace(String preferred) {
+<span class="fc" id="L253">        String id = preferred;</span>
+<span class="pc bpc" id="L254" title="3 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+            try {
+<span class="fc" id="L256">                id = Display.getInstance().getProperty(&quot;package_name&quot;, null);</span>
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">                if (id == null || id.length() == 0) {</span>
+<span class="fc" id="L258">                    id = Display.getInstance().getProperty(&quot;AppName&quot;, null);</span>
+                }
+<span class="nc" id="L260">            } catch (RuntimeException tooEarly) {</span>
+                // Asked before Display is ready, which is not a reason to fail an entry lookup.
+<span class="nc" id="L262">                id = null;</span>
+<span class="fc" id="L263">            }</span>
+        }
+<span class="pc bpc" id="L265" title="1 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+            // A build that stamped neither. A constant rather than something that looks unique
+            // and is not: sharing one namespace is the thing this exists to fix, and a name that
+            // pretended otherwise would hide it.
+<span class="fc" id="L269">            return &quot;cn1app&quot;;</span>
+        }
+<span class="fc" id="L271">        return sanitizeNamespace(id);</span>
+    }
+
+    /// The file name a port uses to gate the creation of one account, for the ports whose
+    /// create-if-absent is a file.
+    ///
+    /// Derived from the account itself rather than from its hash, because a hash is not a name:
+    /// `Aa` and `BB` hash alike, so two aliases would share one gate and whichever asked second
+    /// could never create its key -- it would find no value of its own and no gate to take. The
+    /// escape is the one `#applicationNamespace()` uses, so the result is reversible and two
+    /// accounts that differ keep different gates.
+    ///
+    /// A name too long to be a file gets its first part plus a hash of the whole, which is the
+    /// one place a hash is the right answer: the alternative is a name the filesystem refuses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the account being created
+    ///
+    /// #### Returns
+    ///
+    /// a file name, unique to this application and account
+    protected static String gateName(String account) {
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        String encoded = sanitizeNamespace(account == null ? &quot;&quot; : account);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (encoded.length() &gt; MAX_GATE_NAME) {</span>
+<span class="fc" id="L296">            encoded = encoded.substring(0, MAX_GATE_NAME)</span>
+<span class="fc" id="L297">                    + &quot;-&quot; + Integer.toHexString(account.hashCode());</span>
+        }
+<span class="fc" id="L299">        return &quot;cn1ss-gate-&quot; + applicationNamespace() + &quot;-&quot; + encoded;</span>
+    }
+
+    /// Leaves room for the application namespace and the prefix inside a 255 byte file name.
+    private static final int MAX_GATE_NAME = 120;
+
+    /// Reduces an identity to what a storage name, a preferences node or a keychain service holds.
+    ///
+    /// Reversibly, which is the whole point of it: folding every character it cannot carry onto
+    /// one replacement made `com.acme.foo$bar` and `com.acme.foo_bar` the same namespace, and
+    /// &quot;My App&quot; and &quot;My_App&quot; as well -- so two applications that collide there share a store this
+    /// exists to keep apart, and forgetting a key in one takes the other's. The escape is the one
+    /// `ManagedKeys#accountName(String)` already uses on the account half of the same name, so
+    /// the two halves are encoded the same way.
+    private static String sanitizeNamespace(String id) {
+<span class="fc" id="L314">        StringBuilder b = new StringBuilder(id.length());</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        for (int iter = 0; iter &lt; id.length(); iter++) {</span>
+<span class="fc" id="L316">            char c = id.charAt(iter);</span>
+<span class="pc bpc" id="L317" title="2 of 16 branches missed.">            boolean safe = (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z')</span>
+                    || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '.' || c == '-';
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            if (safe) {</span>
+<span class="fc" id="L320">                b.append(c);</span>
+            } else {
+                // Including the escape character itself, or &quot;a%0020b&quot; and &quot;a b&quot; would encode alike.
+<span class="fc" id="L323">                b.append('%');</span>
+<span class="fc" id="L324">                b.append(HEX.charAt((c &gt;&gt; 12) &amp; 0x0f));</span>
+<span class="fc" id="L325">                b.append(HEX.charAt((c &gt;&gt; 8) &amp; 0x0f));</span>
+<span class="fc" id="L326">                b.append(HEX.charAt((c &gt;&gt; 4) &amp; 0x0f));</span>
+<span class="fc" id="L327">                b.append(HEX.charAt(c &amp; 0x0f));</span>
+            }
+        }
+<span class="fc" id="L330">        return b.toString();</span>
+    }
+
+    /// The digits `#sanitizeNamespace(String)` escapes with.
+    private static final String HEX = &quot;0123456789abcdef&quot;;
+
+    public static final int ENTRY_PRESENT = 1;
+
+    /// The store answered, and there is nothing under that account.
+    public static final int ENTRY_ABSENT = 0;
+
+    /// The store could not be asked, so nothing is known about the entry.
+    public static final int ENTRY_UNKNOWN = -1;
+
+    /// Whether an entry exists, as distinct from whether it can be read.
+    ///
+    /// `#get(String)` cannot answer this: it returns null for an entry that is not there and for
+    /// one it could not read, and a caller that treats those alike will eventually treat a store
+    /// that is briefly unavailable as a store that is empty. Where that caller then writes -- a
+    /// managed database key is the case this was added for -- it overwrites a key that was there
+    /// all along, and the database encrypted under the old one can never be opened again.
+    ///
+    /// A port answers `#ENTRY_PRESENT` for an entry it can see even if it cannot decrypt it: the
+    /// question is existence, not readability. The default is `#ENTRY_UNKNOWN`, which is the
+    /// honest answer for a platform with no non-prompting store, and callers must treat it as
+    /// &quot;do not write&quot;.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry to ask about
+    ///
+    /// #### Returns
+    ///
+    /// one of `#ENTRY_PRESENT`, `#ENTRY_ABSENT` or `#ENTRY_UNKNOWN`
+    public int entryState(String account) {
+<span class="nc" id="L365">        return ENTRY_UNKNOWN;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

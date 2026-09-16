@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationChannelBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.notifications</a> &gt; <span class="el_source">NotificationChannelBuilder.java</span></div><h1>NotificationChannelBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.notifications;
+
+import com.codename1.ui.Display;
+
+/// Builds and registers a notification channel. Notification channels are an Android
+/// concept (introduced in Android O) that let the user control the behavior of groups
+/// of notifications: importance, sound, vibration, lights, lockscreen visibility and
+/// whether a badge is shown. Once a channel is created its user-controllable settings
+/// cannot be changed programmatically, so build it once at app startup.
+///
+/// On platforms without a channel concept (iOS, desktop) registering a channel is a
+/// no-op, but the channel id you assign to a `LocalNotification` is still carried so the
+/// notification behaves consistently.
+///
+/// Usage
+/// ```java
+/// new NotificationChannelBuilder(&quot;messages&quot;, &quot;Messages&quot;)
+///         .description(&quot;Incoming chat messages&quot;)
+///         .importance(NotificationChannelBuilder.IMPORTANCE_HIGH)
+///         .sound(&quot;/notification_sound_ping.mp3&quot;)
+///         .enableVibration(true)
+///         .register();
+/// ```
+///
+/// #### See also
+///
+/// - LocalNotification#setChannelId(String)
+public class NotificationChannelBuilder {
+
+    /// Channel importance: a no-importance channel does not appear in the shade.
+    public static final int IMPORTANCE_NONE = 0;
+
+    /// Channel importance: shows nowhere, is not intrusive.
+    public static final int IMPORTANCE_MIN = 1;
+
+    /// Channel importance: shows in the shade and status bar but is not intrusive.
+    public static final int IMPORTANCE_LOW = 2;
+
+    /// Channel importance: shows everywhere, makes noise but does not visually intrude.
+    public static final int IMPORTANCE_DEFAULT = 3;
+
+    /// Channel importance: makes noise and shows as a heads-up notification.
+    public static final int IMPORTANCE_HIGH = 4;
+
+    /// Channel importance: the highest level (rarely needed).
+    public static final int IMPORTANCE_MAX = 5;
+
+    /// Lockscreen visibility: do not reveal any part of the notification on a secure
+    /// lockscreen.
+    public static final int VISIBILITY_SECRET = -1;
+
+    /// Lockscreen visibility: show the notification but hide sensitive content on a
+    /// secure lockscreen.
+    public static final int VISIBILITY_PRIVATE = 0;
+
+    /// Lockscreen visibility: show the notification in its entirety on the lockscreen.
+    public static final int VISIBILITY_PUBLIC = 1;
+
+    private final String id;
+    private final String name;
+    private String description;
+<span class="fc" id="L84">    private int importance = IMPORTANCE_DEFAULT;</span>
+    private String sound;
+    private boolean vibrationEnabled;
+    private long[] vibrationPattern;
+    private boolean lightsEnabled;
+    private int lightColor;
+<span class="fc" id="L90">    private int lockscreenVisibility = VISIBILITY_PRIVATE;</span>
+    private String group;
+<span class="fc" id="L92">    private boolean showBadge = true;</span>
+
+    /// Creates a channel builder.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: a stable channel id used when posting notifications
+    ///
+    /// - `name`: the user-visible channel name shown in the system settings
+<span class="fc" id="L101">    public NotificationChannelBuilder(String id, String name) {</span>
+<span class="fc" id="L102">        this.id = id;</span>
+<span class="fc" id="L103">        this.name = name;</span>
+<span class="fc" id="L104">    }</span>
+
+    /// Sets the user-visible channel description.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the description
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder description(String d) {
+<span class="fc" id="L116">        this.description = d;</span>
+<span class="fc" id="L117">        return this;</span>
+    }
+
+    /// Sets the channel importance, one of the `IMPORTANCE_` constants.
+    ///
+    /// #### Parameters
+    ///
+    /// - `imp`: the importance level
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder importance(int imp) {
+<span class="fc" id="L130">        this.importance = imp;</span>
+<span class="fc" id="L131">        return this;</span>
+    }
+
+    /// Sets the sound played for notifications on this channel. The file name must start
+    /// with the &quot;notification_sound&quot; prefix and be bundled with the app.
+    ///
+    /// #### Parameters
+    ///
+    /// - `soundFile`: the sound file path
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder sound(String soundFile) {
+<span class="fc" id="L145">        this.sound = soundFile;</span>
+<span class="fc" id="L146">        return this;</span>
+    }
+
+    /// Enables or disables vibration for this channel.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to enable vibration
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder enableVibration(boolean b) {
+<span class="nc" id="L159">        this.vibrationEnabled = b;</span>
+<span class="nc" id="L160">        return this;</span>
+    }
+
+    /// Sets the vibration pattern (alternating off/on durations in milliseconds) and
+    /// enables vibration.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pattern`: the vibration pattern
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder vibrationPattern(long[] pattern) {
+<span class="fc" id="L174">        this.vibrationPattern = pattern;</span>
+<span class="fc" id="L175">        this.vibrationEnabled = true;</span>
+<span class="fc" id="L176">        return this;</span>
+    }
+
+    /// Enables or disables the notification light for this channel.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to enable lights
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder enableLights(boolean b) {
+<span class="nc" id="L189">        this.lightsEnabled = b;</span>
+<span class="nc" id="L190">        return this;</span>
+    }
+
+    /// Sets the notification light color (as an RGB integer) and enables lights.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: the light color
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder lightColor(int rgb) {
+<span class="fc" id="L203">        this.lightColor = rgb;</span>
+<span class="fc" id="L204">        this.lightsEnabled = true;</span>
+<span class="fc" id="L205">        return this;</span>
+    }
+
+    /// Sets the lockscreen visibility, one of the `VISIBILITY_` constants.
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the lockscreen visibility
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder lockscreenVisibility(int v) {
+<span class="fc" id="L218">        this.lockscreenVisibility = v;</span>
+<span class="fc" id="L219">        return this;</span>
+    }
+
+    /// Assigns this channel to a channel group. The group must be created with
+    /// `#createChannelGroup(String, String)` before or after the channel is registered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupId`: the channel group id
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder group(String groupId) {
+<span class="fc" id="L233">        this.group = groupId;</span>
+<span class="fc" id="L234">        return this;</span>
+    }
+
+    /// Controls whether notifications on this channel may show a launcher badge.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: true to allow a badge
+    ///
+    /// #### Returns
+    ///
+    /// this builder for chaining
+    public NotificationChannelBuilder showBadge(boolean b) {
+<span class="fc" id="L247">        this.showBadge = b;</span>
+<span class="fc" id="L248">        return this;</span>
+    }
+
+    /// Returns the channel id.
+    ///
+    /// #### Returns
+    ///
+    /// the channel id
+    public String getId() {
+<span class="fc" id="L257">        return id;</span>
+    }
+
+    /// Returns the user-visible channel name.
+    ///
+    /// #### Returns
+    ///
+    /// the channel name
+    public String getName() {
+<span class="fc" id="L266">        return name;</span>
+    }
+
+    /// Returns the channel description.
+    ///
+    /// #### Returns
+    ///
+    /// the description, or null
+    public String getDescription() {
+<span class="fc" id="L275">        return description;</span>
+    }
+
+    /// Returns the channel importance.
+    ///
+    /// #### Returns
+    ///
+    /// the importance level
+    public int getImportance() {
+<span class="fc" id="L284">        return importance;</span>
+    }
+
+    /// Returns the channel sound file path.
+    ///
+    /// #### Returns
+    ///
+    /// the sound file, or null
+    public String getSound() {
+<span class="fc" id="L293">        return sound;</span>
+    }
+
+    /// Returns true if vibration is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// true if vibration is enabled
+    public boolean isVibrationEnabled() {
+<span class="fc" id="L302">        return vibrationEnabled;</span>
+    }
+
+    /// Returns the vibration pattern.
+    ///
+    /// #### Returns
+    ///
+    /// the vibration pattern, or null
+    public long[] getVibrationPattern() {
+<span class="fc" id="L311">        return vibrationPattern;</span>
+    }
+
+    /// Returns true if lights are enabled.
+    ///
+    /// #### Returns
+    ///
+    /// true if lights are enabled
+    public boolean isLightsEnabled() {
+<span class="fc" id="L320">        return lightsEnabled;</span>
+    }
+
+    /// Returns the light color.
+    ///
+    /// #### Returns
+    ///
+    /// the light color as an RGB integer
+    public int getLightColor() {
+<span class="fc" id="L329">        return lightColor;</span>
+    }
+
+    /// Returns the lockscreen visibility.
+    ///
+    /// #### Returns
+    ///
+    /// the lockscreen visibility
+    public int getLockscreenVisibility() {
+<span class="fc" id="L338">        return lockscreenVisibility;</span>
+    }
+
+    /// Returns the channel group id.
+    ///
+    /// #### Returns
+    ///
+    /// the group id, or null
+    public String getGroup() {
+<span class="fc" id="L347">        return group;</span>
+    }
+
+    /// Returns true if a launcher badge is allowed.
+    ///
+    /// #### Returns
+    ///
+    /// true if a badge is allowed
+    public boolean isShowBadge() {
+<span class="fc" id="L356">        return showBadge;</span>
+    }
+
+    /// Registers this channel with the platform. On platforms without channels this is a
+    /// no-op.
+    public void register() {
+<span class="nc" id="L362">        Display.getInstance().registerNotificationChannel(this);</span>
+<span class="nc" id="L363">    }</span>
+
+    /// Deletes a previously registered channel. On platforms without channels this is a
+    /// no-op.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the channel id to delete
+    public static void deleteChannel(String id) {
+<span class="nc" id="L372">        Display.getInstance().deleteNotificationChannel(id);</span>
+<span class="nc" id="L373">    }</span>
+
+    /// Creates a channel group, which visually groups channels in the system settings.
+    /// On platforms without channels this is a no-op.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupId`: a stable group id
+    ///
+    /// - `groupName`: the user-visible group name
+    public static void createChannelGroup(String groupId, String groupName) {
+<span class="nc" id="L384">        Display.getInstance().createNotificationChannelGroup(groupId, groupName);</span>
+<span class="nc" id="L385">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OBBViewportTransform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.common</a> &gt; <span class="el_source">OBBViewportTransform.java</span></div><h1>OBBViewportTransform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.common;
+
+/// Orientated bounding box viewport transform
+///
+/// @author Daniel Murphy
+public class OBBViewportTransform implements IViewportTransform {
+
+<span class="fc" id="L31">  public static class OBB {</span>
+<span class="fc" id="L32">    public final Mat22 R = new Mat22();</span>
+<span class="fc" id="L33">    public final Vec2 center = new Vec2();</span>
+<span class="fc" id="L34">    public final Vec2 extents = new Vec2();</span>
+  }
+
+<span class="fc" id="L37">  protected final OBB box = new OBB();</span>
+<span class="fc" id="L38">  private boolean yFlip = false;</span>
+<span class="fc" id="L39">  private final Mat22 yFlipMat = new Mat22(1, 0, 0, -1);</span>
+<span class="fc" id="L40">  private final Mat22 yFlipMatInv = yFlipMat.invert();</span>
+
+<span class="fc" id="L42">  public OBBViewportTransform() {</span>
+<span class="fc" id="L43">    box.R.setIdentity();</span>
+<span class="fc" id="L44">  }</span>
+
+  public void set(OBBViewportTransform vpt) {
+<span class="fc" id="L47">    box.center.set(vpt.box.center);</span>
+<span class="fc" id="L48">    box.extents.set(vpt.box.extents);</span>
+<span class="fc" id="L49">    box.R.set(vpt.box.R);</span>
+<span class="fc" id="L50">    yFlip = vpt.yFlip;</span>
+<span class="fc" id="L51">  }</span>
+
+  /// @see IViewportTransform#setCamera(float, float, float)
+  public void setCamera(float x, float y, float scale) {
+<span class="fc" id="L55">    box.center.set(x, y);</span>
+<span class="fc" id="L56">    Mat22.createScaleTransform(scale, box.R);</span>
+<span class="fc" id="L57">  }</span>
+
+  /// @see IViewportTransform#getExtents()
+  public Vec2 getExtents() {
+<span class="fc" id="L61">    return box.extents;</span>
+  }
+
+  /// @see IViewportTransform#setExtents(Vec2)
+  public void setExtents(Vec2 argExtents) {
+<span class="fc" id="L66">    box.extents.set(argExtents);</span>
+<span class="fc" id="L67">  }</span>
+
+  /// @see IViewportTransform#setExtents(float, float)
+  public void setExtents(float argHalfWidth, float argHalfHeight) {
+<span class="fc" id="L71">    box.extents.set(argHalfWidth, argHalfHeight);</span>
+<span class="fc" id="L72">  }</span>
+
+  /// @see IViewportTransform#getCenter()
+  public Vec2 getCenter() {
+<span class="fc" id="L76">    return box.center;</span>
+  }
+
+  /// @see IViewportTransform#setCenter(Vec2)
+  public void setCenter(Vec2 argPos) {
+<span class="nc" id="L81">    box.center.set(argPos);</span>
+<span class="nc" id="L82">  }</span>
+
+  /// @see IViewportTransform#setCenter(float, float)
+  public void setCenter(float x, float y) {
+<span class="fc" id="L86">    box.center.set(x, y);</span>
+<span class="fc" id="L87">  }</span>
+
+  /// gets the transform of the viewport, transforms around the center. Not a copy.
+  ///
+  /// @return
+  public Mat22 getTransform() {
+<span class="fc" id="L93">    return box.R;</span>
+  }
+
+  /// Sets the transform of the viewport. Transforms about the center.
+  ///
+  /// @param transform
+  public void setTransform(Mat22 transform) {
+<span class="nc" id="L100">    box.R.set(transform);</span>
+<span class="nc" id="L101">  }</span>
+
+  /// Multiplies the obb transform by the given transform
+  ///
+  /// @param argTransform
+  public void mulByTransform(Mat22 argTransform) {
+<span class="fc" id="L107">    box.R.mulLocal(argTransform);</span>
+<span class="fc" id="L108">  }</span>
+
+  /// @see IViewportTransform#isYFlip()
+  public boolean isYFlip() {
+<span class="fc" id="L112">    return yFlip;</span>
+  }
+
+  /// @see IViewportTransform#setYFlip(boolean)
+  public void setYFlip(boolean yFlip) {
+<span class="fc" id="L117">    this.yFlip = yFlip;</span>
+<span class="fc" id="L118">  }</span>
+
+  // djm pooling
+<span class="fc" id="L121">  private final Mat22 inv = new Mat22();</span>
+
+  /// @see IViewportTransform#getScreenVectorToWorld(Vec2, Vec2)
+  public void getScreenVectorToWorld(Vec2 argScreen, Vec2 argWorld) {
+<span class="nc" id="L125">    inv.set(box.R);</span>
+<span class="nc" id="L126">    inv.invertLocal();</span>
+<span class="nc" id="L127">    inv.mulToOut(argScreen, argWorld);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">    if (yFlip) {</span>
+<span class="nc" id="L129">      yFlipMatInv.mulToOut(argWorld, argWorld);</span>
+    }
+<span class="nc" id="L131">  }</span>
+
+  /// @see IViewportTransform#getWorldVectorToScreen(Vec2, Vec2)
+  public void getWorldVectorToScreen(Vec2 argWorld, Vec2 argScreen) {
+<span class="nc" id="L135">    box.R.mulToOut(argWorld, argScreen);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">    if (yFlip) {</span>
+<span class="nc" id="L137">      yFlipMatInv.mulToOut(argScreen, argScreen);</span>
+    }
+<span class="nc" id="L139">  }</span>
+
+  public void getWorldToScreen(Vec2 argWorld, Vec2 argScreen) {
+<span class="fc" id="L142">    argScreen.x = argWorld.x - box.center.x;</span>
+<span class="fc" id="L143">    argScreen.y = argWorld.y - box.center.y;</span>
+<span class="fc" id="L144">    box.R.mulToOut(argScreen, argScreen);</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">    if (yFlip) {</span>
+<span class="nc" id="L146">      yFlipMat.mulToOut(argScreen, argScreen);</span>
+    }
+<span class="fc" id="L148">    argScreen.x += box.extents.x;</span>
+<span class="fc" id="L149">    argScreen.y += box.extents.y;</span>
+<span class="fc" id="L150">  }</span>
+
+<span class="fc" id="L152">  private final Mat22 inv2 = new Mat22();</span>
+
+  /// @see IViewportTransform#getScreenToWorld(Vec2, Vec2)
+  public void getScreenToWorld(Vec2 argScreen, Vec2 argWorld) {
+<span class="fc" id="L156">    argWorld.set(argScreen);</span>
+<span class="fc" id="L157">    argWorld.subLocal(box.extents);</span>
+<span class="fc" id="L158">    box.R.invertToOut(inv2);</span>
+<span class="fc" id="L159">    inv2.mulToOut(argWorld, argWorld);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">    if (yFlip) {</span>
+<span class="nc" id="L161">      yFlipMatInv.mulToOut(argWorld, argWorld);</span>
+    }
+<span class="fc" id="L163">    argWorld.addLocal(box.center);</span>
+<span class="fc" id="L164">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

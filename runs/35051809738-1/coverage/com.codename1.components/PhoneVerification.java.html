@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PhoneVerification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">PhoneVerification.java</span></div><h1>PhoneVerification.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Container;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.util.UITimer;
+
+/// The two stages of verifying that a user holds a phone number: enter the
+/// number, then enter the code that arrives by SMS.
+///
+/// The application supplies both server calls. This component owns everything
+/// around them: the number entry, the code entry, the wait before a resend is
+/// offered, the way back to a mistyped number, and the errors either call
+/// reports.
+///
+/// #### Example
+///
+/// ```java
+/// PhoneVerification verify = new PhoneVerification();
+/// verify.setCodeSender((number, response) -&gt; myServer.sendSms(number, response));
+/// verify.setCodeVerifier((number, code, response) -&gt; myServer.check(number, code, response));
+/// verify.addVerifiedListener(e -&gt; showMainScreen());
+/// form.add(verify);
+/// ```
+///
+/// A sender is handed the number and a `Response`, and calls exactly one of
+/// `Response#succeeded()` or `Response#failed(String)` when its server answers
+/// -- from any thread. Until then the button it came from stays disabled, so a
+/// second tap cannot send a second message.
+///
+/// #### The code is offered by the platform
+///
+/// The code field is an `OtpField`, so it carries the one-time-code hint and
+/// the platform offers the arriving code on the keyboard or through autofill.
+/// Nothing here reads messages, and no messaging permission is involved.
+///
+/// #### Styling
+///
+/// The component uses the UIID &quot;PhoneVerification&quot;, its explanatory lines
+/// &quot;PhoneVerificationText&quot;, its error line &quot;PhoneVerificationError&quot; and its
+/// buttons &quot;PhoneVerificationButton&quot; -- except the resend and change-number
+/// buttons, which use &quot;PhoneVerificationLink&quot;.
+public class PhoneVerification extends Container {
+
+    /// The application's answer to one request. Exactly one of its methods
+    /// takes effect, and later calls are ignored rather than rejected: a server
+    /// wrapper that answers twice on a retry is a nuisance, not a reason to
+    /// leave the screen stuck.
+    ///
+    /// Either method may be called from any thread.
+    public static final class Response {
+
+        private final PhoneVerification owner;
+        private final int generation;
+        private final boolean sending;
+        private boolean answered;
+
+<span class="fc" id="L85">        Response(PhoneVerification owner, int generation, boolean sending) {</span>
+<span class="fc" id="L86">            this.owner = owner;</span>
+<span class="fc" id="L87">            this.generation = generation;</span>
+<span class="fc" id="L88">            this.sending = sending;</span>
+<span class="fc" id="L89">        }</span>
+
+        /// The request succeeded: the message was sent, or the code was
+        /// correct.
+        public void succeeded() {
+<span class="fc" id="L94">            deliver(true, null);</span>
+<span class="fc" id="L95">        }</span>
+
+        /// The request failed.
+        ///
+        /// #### Parameters
+        ///
+        /// - `message`: what to show the user; a default is shown when null
+        public void failed(String message) {
+<span class="fc" id="L103">            deliver(false, message);</span>
+<span class="fc" id="L104">        }</span>
+
+        private void deliver(final boolean ok, final String message) {
+<span class="fc" id="L107">            synchronized (this) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                if (answered) {</span>
+<span class="fc" id="L109">                    return;</span>
+                }
+<span class="fc" id="L111">                answered = true;</span>
+<span class="fc" id="L112">            }</span>
+<span class="fc" id="L113">            CN.callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L116">                    owner.requestAnswered(generation, sending, ok, message);</span>
+<span class="fc" id="L117">                }</span>
+            });
+<span class="fc" id="L119">        }</span>
+    }
+
+    /// Asks the application's server to send a code to a number.
+    public interface CodeSender {
+        /// Sends the code.
+        ///
+        /// #### Parameters
+        ///
+        /// - `e164Number`: the number in E.164 form, e.g. &quot;+972501234567&quot;
+        ///
+        /// - `response`: answered when the server replies
+        void sendCode(String e164Number, Response response);
+    }
+
+    /// Asks the application's server whether a code matches a number.
+    public interface CodeVerifier {
+        /// Verifies the code.
+        ///
+        /// #### Parameters
+        ///
+        /// - `e164Number`: the number the code was sent to
+        ///
+        /// - `code`: the code the user entered
+        ///
+        /// - `response`: answered when the server replies
+        void verifyCode(String e164Number, String code, Response response);
+    }
+
+<span class="fc" id="L148">    private final PhoneNumberField phone = new PhoneNumberField();</span>
+    private final OtpField code;
+<span class="fc" id="L150">    private final Label sentTo = new Label();</span>
+<span class="fc" id="L151">    private final Label error = new Label();</span>
+<span class="fc" id="L152">    private final Button send = new Button();</span>
+<span class="fc" id="L153">    private final Button verify = new Button();</span>
+<span class="fc" id="L154">    private final Button resend = new Button();</span>
+<span class="fc" id="L155">    private final Button changeNumber = new Button();</span>
+<span class="fc" id="L156">    private final Container numberStage = new Container(BoxLayout.y());</span>
+<span class="fc" id="L157">    private final Container codeStage = new Container(BoxLayout.y());</span>
+<span class="fc" id="L158">    private final EventDispatcher verifiedListeners = new EventDispatcher();</span>
+<span class="fc" id="L159">    private final EventDispatcher failedListeners = new EventDispatcher();</span>
+
+    private CodeSender codeSender;
+    private CodeVerifier codeVerifier;
+    private String number;
+    /// The number a send is out for, which becomes `number` only if it succeeds.
+    private String pendingNumber;
+<span class="fc" id="L166">    private int resendDelay = 60;</span>
+    private int resendRemaining;
+    private UITimer resendTimer;
+    private int generation;
+    private boolean busy;
+    /// Set when the code stage was entered before there was a form to focus into --
+    /// the documented way to start at the second stage does exactly that -- so the
+    /// keyboard can be opened once the component is attached instead of not at all.
+    private boolean focusCodeWhenAttached;
+
+    /// Builds the flow with a six digit code.
+    public PhoneVerification() {
+<span class="fc" id="L178">        this(6);</span>
+<span class="fc" id="L179">    }</span>
+
+    /// Builds the flow with a code of the given length.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codeLength`: the number of digits in the code
+    public PhoneVerification(int codeLength) {
+<span class="fc" id="L187">        super(BoxLayout.y());</span>
+<span class="fc" id="L188">        setUIID(&quot;PhoneVerification&quot;);</span>
+<span class="fc" id="L189">        code = new OtpField(codeLength);</span>
+<span class="fc" id="L190">        sentTo.setUIID(&quot;PhoneVerificationText&quot;);</span>
+<span class="fc" id="L191">        error.setUIID(&quot;PhoneVerificationError&quot;);</span>
+<span class="fc" id="L192">        error.setVisible(false);</span>
+<span class="fc" id="L193">        send.setUIID(&quot;PhoneVerificationButton&quot;);</span>
+<span class="fc" id="L194">        verify.setUIID(&quot;PhoneVerificationButton&quot;);</span>
+<span class="fc" id="L195">        resend.setUIID(&quot;PhoneVerificationLink&quot;);</span>
+<span class="fc" id="L196">        changeNumber.setUIID(&quot;PhoneVerificationLink&quot;);</span>
+<span class="fc" id="L197">        send.setText(localize(&quot;PhoneVerification.Send&quot;, &quot;Send code&quot;));</span>
+<span class="fc" id="L198">        verify.setText(localize(&quot;PhoneVerification.Verify&quot;, &quot;Verify&quot;));</span>
+<span class="fc" id="L199">        changeNumber.setText(localize(&quot;PhoneVerification.ChangeNumber&quot;, &quot;Change number&quot;));</span>
+
+<span class="fc" id="L201">        send.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L204">                requestCode(phone.getE164());</span>
+<span class="nc" id="L205">            }</span>
+        });
+<span class="fc" id="L207">        verify.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L210">                submitCode();</span>
+<span class="nc" id="L211">            }</span>
+        });
+<span class="fc" id="L213">        resend.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L216">                requestCode(number);</span>
+<span class="nc" id="L217">            }</span>
+        });
+<span class="fc" id="L219">        changeNumber.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L222">                showNumberStage();</span>
+<span class="nc" id="L223">            }</span>
+        });
+<span class="fc" id="L225">        code.addCompleteListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                // a complete code is the user saying they are done; asking them
+                // to press a button as well is a step no verification screen has
+<span class="fc" id="L230">                submitCode();</span>
+<span class="fc" id="L231">            }</span>
+        });
+
+<span class="fc" id="L234">        numberStage.add(phone).add(send);</span>
+<span class="fc" id="L235">        codeStage.add(sentTo).add(code).add(verify).add(resend).add(changeNumber);</span>
+<span class="fc" id="L236">        add(error);</span>
+<span class="fc" id="L237">        showNumberStage();</span>
+<span class="fc" id="L238">    }</span>
+
+    private String localize(String key, String defaultValue) {
+<span class="fc" id="L241">        return getUIManager().localize(key, defaultValue);</span>
+    }
+
+    // ---- stages ----
+
+    /// Returns to the first stage, with the number as it was left, and clears
+    /// any code that was typed.
+    public void showNumberStage() {
+<span class="fc" id="L249">        abandonPendingRequest();</span>
+<span class="fc" id="L250">        stopResendTimer();</span>
+<span class="fc" id="L251">        code.setText(&quot;&quot;);</span>
+<span class="fc" id="L252">        replaceStage(numberStage);</span>
+<span class="fc" id="L253">        setError(null);</span>
+<span class="fc" id="L254">        setBusy(false);</span>
+<span class="fc" id="L255">    }</span>
+
+    /// Moves to the code stage for a number, as though the code had just been
+    /// sent. Useful when the application sent the message itself rather than
+    /// through `#setCodeSender(CodeSender)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e164Number`: the number the code went to
+    public void showCodeStage(String e164Number) {
+<span class="fc" id="L265">        abandonPendingRequest();</span>
+<span class="fc" id="L266">        number = e164Number;</span>
+<span class="fc" id="L267">        phone.setE164(e164Number);</span>
+<span class="fc" id="L268">        sentTo.setText(localize(&quot;PhoneVerification.SentTo&quot;, &quot;Code sent to&quot;) + &quot; &quot; + e164Number);</span>
+<span class="fc" id="L269">        code.setText(&quot;&quot;);</span>
+<span class="fc" id="L270">        replaceStage(codeStage);</span>
+<span class="fc" id="L271">        setError(null);</span>
+<span class="fc" id="L272">        setBusy(false);</span>
+<span class="fc" id="L273">        startResendTimer();</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        focusCodeWhenAttached = getComponentForm() == null;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (!focusCodeWhenAttached) {</span>
+<span class="fc" id="L276">            code.startEditing();</span>
+        }
+<span class="fc" id="L278">    }</span>
+
+    /// Retires whatever request is still out. A stage transition is the user
+    /// saying the request they were waiting for no longer describes the screen:
+    /// they backed out of a verification, or changed a number a code was being
+    /// sent to. Without this the answer still matches the current generation
+    /// when it lands, so a late success would report a number as verified after
+    /// the user left that screen, or drag them back to a code stage they had
+    /// just abandoned.
+    ///
+    /// Answers already delivered are unaffected -- this only invalidates one
+    /// that has not arrived yet.
+    private void abandonPendingRequest() {
+        // busy is left to the caller: both transitions set it through setBusy so
+        // the buttons follow, and a second owner of that flag would be one too many
+<span class="fc" id="L293">        generation++;</span>
+<span class="fc" id="L294">    }</span>
+
+    private void replaceStage(Container stage) {
+<span class="fc bfc" id="L297" title="All 4 branches covered.">        if (getComponentCount() &gt; 1 &amp;&amp; getComponentAt(1) == stage) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L298">            return;</span>
+        }
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (getComponentCount() &gt; 1) {</span>
+<span class="fc" id="L301">            removeComponent(getComponentAt(1));</span>
+        }
+<span class="fc" id="L303">        add(stage);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (isInitialized()) {</span>
+<span class="fc" id="L305">            animateLayout(150);</span>
+        }
+<span class="fc" id="L307">    }</span>
+
+    /// True when the code stage is showing.
+    public boolean isCodeStage() {
+<span class="pc bpc" id="L311" title="1 of 4 branches missed.">        return getComponentCount() &gt; 1 &amp;&amp; getComponentAt(1) == codeStage; //NOPMD CompareObjectsWithEquals</span>
+    }
+
+    // ---- requests ----
+
+    /// Sends a code to a number, moving to the code stage when the server
+    /// accepts it. Called by the send and resend buttons; an application driving
+    /// the flow from its own button calls it directly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e164Number`: the number to send to
+    public void requestCode(String e164Number) {
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (busy) {</span>
+<span class="fc" id="L325">            return;</span>
+        }
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (!isPlausibleE164(e164Number)) {</span>
+<span class="fc" id="L328">            setError(localize(&quot;PhoneVerification.BadNumber&quot;, &quot;Enter a valid phone number&quot;));</span>
+<span class="fc" id="L329">            return;</span>
+        }
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (codeSender == null) {</span>
+<span class="fc" id="L332">            setError(localize(&quot;PhoneVerification.NoSender&quot;, &quot;No verification service is configured&quot;));</span>
+<span class="fc" id="L333">            return;</span>
+        }
+        // Held, not committed. The number a code was sent to only becomes this
+        // component's number when the server says it sent one: a custom layout can call
+        // this from the code stage with a different number, and if that send is refused
+        // the screen still describes the number that worked -- so the code the user is
+        // looking at must still be verified against that one, and getPhoneNumber must
+        // still name it.
+<span class="fc" id="L341">        pendingNumber = e164Number;</span>
+<span class="fc" id="L342">        setError(null);</span>
+<span class="fc" id="L343">        setBusy(true);</span>
+<span class="fc" id="L344">        generation++;</span>
+<span class="fc" id="L345">        codeSender.sendCode(e164Number, new Response(this, generation, true));</span>
+<span class="fc" id="L346">    }</span>
+
+    /// The shape a number must have before a request is worth making: a &quot;+&quot;,
+    /// then between five and fifteen digits, which is what E.164 allows. It is
+    /// not a check that the number exists -- that is the sending service's
+    /// answer, and its refusal is shown to the user like any other failure.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e164Number`: the number to check
+    ///
+    /// #### Returns
+    ///
+    /// true when the number is worth sending to
+    public static boolean isPlausibleE164(String e164Number) {
+<span class="fc bfc" id="L361" title="All 4 branches covered.">        if (e164Number == null || !e164Number.startsWith(&quot;+&quot;)) {</span>
+<span class="fc" id="L362">            return false;</span>
+        }
+<span class="fc" id="L364">        int digits = 0;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (int i = 1; i &lt; e164Number.length(); i++) {</span>
+<span class="fc" id="L366">            char c = e164Number.charAt(i);</span>
+<span class="pc bpc" id="L367" title="1 of 4 branches missed.">            if (c &lt; '0' || c &gt; '9') {</span>
+<span class="fc" id="L368">                return false;</span>
+            }
+            // A calling code never starts with zero -- E.164 reserves that digit -- so a
+            // number that does is not one, however many digits follow it.
+<span class="fc bfc" id="L372" title="All 4 branches covered.">            if (digits == 0 &amp;&amp; c == '0') {</span>
+<span class="fc" id="L373">                return false;</span>
+            }
+<span class="fc" id="L375">            digits++;</span>
+        }
+<span class="fc bfc" id="L377" title="All 4 branches covered.">        return digits &gt;= 5 &amp;&amp; digits &lt;= 15;</span>
+    }
+
+    /// Verifies the code currently entered. Called when the last box is filled
+    /// and by the verify button.
+    public void submitCode() {
+<span class="pc bpc" id="L383" title="2 of 4 branches missed.">        if (busy || !isCodeStage()) {</span>
+<span class="nc" id="L384">            return;</span>
+        }
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (!code.isComplete()) {</span>
+<span class="fc" id="L387">            setError(localize(&quot;PhoneVerification.ShortCode&quot;, &quot;Enter the whole code&quot;));</span>
+<span class="fc" id="L388">            return;</span>
+        }
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        if (codeVerifier == null) {</span>
+<span class="nc" id="L391">            setError(localize(&quot;PhoneVerification.NoVerifier&quot;, &quot;No verification service is configured&quot;));</span>
+<span class="nc" id="L392">            return;</span>
+        }
+<span class="fc" id="L394">        setError(null);</span>
+<span class="fc" id="L395">        setBusy(true);</span>
+<span class="fc" id="L396">        generation++;</span>
+<span class="fc" id="L397">        codeVerifier.verifyCode(number, code.getText(), new Response(this, generation, false));</span>
+<span class="fc" id="L398">    }</span>
+
+    /// Delivered on the EDT by `Response`. A response from a request that has
+    /// since been superseded -- the user went back and sent to another number
+    /// while the first server call was still out -- is dropped, because acting
+    /// on it would move a screen the user has already left.
+    void requestAnswered(int forGeneration, boolean sending, boolean ok, String message) {
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        if (forGeneration != generation) {</span>
+<span class="fc" id="L406">            return;</span>
+        }
+<span class="fc" id="L408">        setBusy(false);</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        if (ok) {</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            if (sending) {</span>
+                // and now it is the number, because a code was sent to it
+<span class="fc" id="L412">                showCodeStage(pendingNumber);</span>
+            } else {
+<span class="fc" id="L414">                fireVerified();</span>
+            }
+<span class="fc" id="L416">            return;</span>
+        }
+<span class="pc bpc" id="L418" title="1 of 4 branches missed.">        setError(message != null ? message</span>
+<span class="pc" id="L419">                : sending ? localize(&quot;PhoneVerification.SendFailed&quot;, &quot;The code could not be sent&quot;)</span>
+<span class="fc" id="L420">                        : localize(&quot;PhoneVerification.WrongCode&quot;, &quot;That code is not correct&quot;));</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (!sending) {</span>
+<span class="fc" id="L422">            code.clear();</span>
+        }
+<span class="fc" id="L424">        failedListeners.fireActionEvent(new ActionEvent(this));</span>
+<span class="fc" id="L425">    }</span>
+
+    private void fireVerified() {
+<span class="fc" id="L428">        verifiedListeners.fireActionEvent(new ActionEvent(this));</span>
+<span class="fc" id="L429">    }</span>
+
+    private void setBusy(boolean busy) {
+<span class="fc" id="L432">        this.busy = busy;</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        send.setEnabled(!busy);</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        verify.setEnabled(!busy);</span>
+<span class="fc bfc" id="L435" title="All 4 branches covered.">        resend.setEnabled(!busy &amp;&amp; resendRemaining &lt;= 0);</span>
+<span class="fc" id="L436">    }</span>
+
+    private void setError(String message) {
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        error.setText(message == null ? &quot;&quot; : message);</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        error.setVisible(message != null);</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (isInitialized()) {</span>
+<span class="fc" id="L442">            revalidateLater();</span>
+        }
+<span class="fc" id="L444">    }</span>
+
+    // ---- resend countdown ----
+
+    private void startResendTimer() {
+<span class="fc" id="L449">        stopResendTimer();</span>
+<span class="fc" id="L450">        resendRemaining = resendDelay;</span>
+<span class="fc" id="L451">        updateResendLabel();</span>
+        // no form yet means the countdown starts when the component is added;
+        // initComponent arms it then
+<span class="fc bfc" id="L454" title="All 4 branches covered.">        if (resendRemaining &lt;= 0 || getComponentForm() == null) {</span>
+<span class="fc" id="L455">            return;</span>
+        }
+<span class="fc" id="L457">        resendTimer = UITimer.timer(1000, true, getComponentForm(), new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L460">                tickResend();</span>
+<span class="nc" id="L461">            }</span>
+        });
+<span class="fc" id="L463">    }</span>
+
+    private void tickResend() {
+<span class="nc bnc" id="L466" title="All 2 branches missed.">        if (resendRemaining &gt; 0) {</span>
+<span class="nc" id="L467">            resendRemaining--;</span>
+<span class="nc" id="L468">            updateResendLabel();</span>
+<span class="nc bnc" id="L469" title="All 2 branches missed.">            if (resendRemaining &lt;= 0) {</span>
+<span class="nc" id="L470">                stopResendTimer();</span>
+            }
+        }
+<span class="nc" id="L473">    }</span>
+
+    private void updateResendLabel() {
+<span class="fc bfc" id="L476" title="All 2 branches covered.">        if (resendRemaining &gt; 0) {</span>
+<span class="fc" id="L477">            resend.setEnabled(false);</span>
+<span class="fc" id="L478">            resend.setText(localize(&quot;PhoneVerification.ResendIn&quot;, &quot;Resend in&quot;)</span>
+                    + &quot; &quot; + resendRemaining);
+        } else {
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            resend.setEnabled(!busy);</span>
+<span class="fc" id="L482">            resend.setText(localize(&quot;PhoneVerification.Resend&quot;, &quot;Resend code&quot;));</span>
+        }
+<span class="fc" id="L484">    }</span>
+
+    private void stopResendTimer() {
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        if (resendTimer != null) {</span>
+<span class="fc" id="L488">            resendTimer.cancel();</span>
+<span class="fc" id="L489">            resendTimer = null;</span>
+        }
+<span class="fc" id="L491">    }</span>
+
+    @Override
+    protected void deinitialize() {
+        // a timer bound to a form that is going away would otherwise keep
+        // ticking against a screen nobody is looking at
+<span class="fc" id="L497">        stopResendTimer();</span>
+<span class="fc" id="L498">        super.deinitialize();</span>
+<span class="fc" id="L499">    }</span>
+
+    /*
+     * Leaving the form does NOT retire a pending request, and that asymmetry with
+     * showNumberStage is deliberate.
+     *
+     * A stage transition is the user saying they are done waiting for this answer --
+     * they went back to fix the number. Deinitialization says nothing of the kind: it
+     * happens whenever the component stops being displayed, including when an
+     * application shows a progress screen over the wait, which is a reasonable thing
+     * to do and would then never hear the result. Silently losing a verification the
+     * server did answer is worse than the two things dropping it would prevent, and
+     * both of those are mild: a detached component moving to its code stage is the
+     * state it should be in when it is shown again, and a listener firing late belongs
+     * to the application, which can remove it if it has moved on.
+     *
+     * PhoneVerificationTest pins this, so that a later reading of the same evidence
+     * does not quietly reverse it.
+     */
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L521">        super.initComponent();</span>
+<span class="pc bpc" id="L522" title="1 of 4 branches missed.">        if (focusCodeWhenAttached &amp;&amp; isCodeStage()) {</span>
+            // Once, and only for a request that had nowhere to go. Focusing on every
+            // initComponent would take focus back and reopen the keyboard each time the
+            // user returned to this screen. Deferred a beat because the form settles its
+            // own initial focus as it is shown, and the later of the two wins.
+<span class="fc" id="L527">            focusCodeWhenAttached = false;</span>
+<span class="fc" id="L528">            CN.callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">                    if (isCodeStage()) {</span>
+<span class="fc" id="L532">                        code.startEditing();</span>
+                    }
+<span class="fc" id="L534">                }</span>
+            });
+        }
+<span class="pc bpc" id="L537" title="3 of 8 branches missed.">        if (isCodeStage() &amp;&amp; resendRemaining &gt; 0 &amp;&amp; resendTimer == null &amp;&amp; getComponentForm() != null) {</span>
+<span class="fc" id="L538">            resendTimer = UITimer.timer(1000, true, getComponentForm(), new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L541">                    tickResend();</span>
+<span class="nc" id="L542">                }</span>
+            });
+        }
+<span class="fc" id="L545">    }</span>
+
+    // ---- configuration ----
+
+    /// Sets the server call that sends a code to a number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codeSender`: the sender
+    public void setCodeSender(CodeSender codeSender) {
+<span class="fc" id="L555">        this.codeSender = codeSender;</span>
+<span class="fc" id="L556">    }</span>
+
+    /// Sets the server call that checks a code.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codeVerifier`: the verifier
+    public void setCodeVerifier(CodeVerifier codeVerifier) {
+<span class="fc" id="L564">        this.codeVerifier = codeVerifier;</span>
+<span class="fc" id="L565">    }</span>
+
+    /// The seconds the user waits before a resend is offered; 60 by default.
+    public int getResendDelay() {
+<span class="fc" id="L569">        return resendDelay;</span>
+    }
+
+    /// Sets the seconds before a resend is offered. Zero offers it at once.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the delay
+    public void setResendDelay(int seconds) {
+<span class="fc" id="L578">        this.resendDelay = Math.max(0, seconds);</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">        if (resendRemaining &gt; resendDelay) {</span>
+            // A countdown already running is shortened to the new delay, so setting zero
+            // offers the resend now rather than at the next stage change. A LONGER delay
+            // is not applied to it: extending a wait somebody is already serving is not
+            // something a setter should do behind their back, and it takes effect on the
+            // next code like any other change.
+<span class="fc" id="L585">            resendRemaining = resendDelay;</span>
+<span class="fc" id="L586">            updateResendLabel();</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">            if (resendRemaining &lt;= 0) {</span>
+<span class="fc" id="L588">                stopResendTimer();</span>
+            }
+        }
+<span class="fc" id="L591">    }</span>
+
+    /// The number the code was sent to, in E.164 form, or null before a code
+    /// has been requested.
+    public String getPhoneNumber() {
+<span class="fc" id="L596">        return number;</span>
+    }
+
+    /// The number entry field, exposed for theming and for narrowing the
+    /// country list.
+    public PhoneNumberField getPhoneNumberField() {
+<span class="fc" id="L602">        return phone;</span>
+    }
+
+    /// The code entry field, exposed for theming.
+    public OtpField getOtpField() {
+<span class="fc" id="L607">        return code;</span>
+    }
+
+    /// The button that sends the first code, exposed for theming and for
+    /// relabelling.
+    public Button getSendButton() {
+<span class="nc" id="L613">        return send;</span>
+    }
+
+    /// The button that submits a typed code, exposed for theming. The code is
+    /// also submitted as soon as the last box is filled.
+    public Button getVerifyButton() {
+<span class="nc" id="L619">        return verify;</span>
+    }
+
+    /// The button that asks for another code, exposed for theming.
+    public Button getResendButton() {
+<span class="fc" id="L624">        return resend;</span>
+    }
+
+    /// The button that returns to the number stage, exposed for theming.
+    public Button getChangeNumberButton() {
+<span class="nc" id="L629">        return changeNumber;</span>
+    }
+
+    /// Adds a listener fired when a code is accepted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addVerifiedListener(ActionListener l) {
+<span class="fc" id="L638">        verifiedListeners.addListener(l);</span>
+<span class="fc" id="L639">    }</span>
+
+    /// Removes a previously-registered listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeVerifiedListener(ActionListener l) {
+<span class="nc" id="L647">        verifiedListeners.removeListener(l);</span>
+<span class="nc" id="L648">    }</span>
+
+    /// Adds a listener fired when either server call reports a failure. The
+    /// failure is already shown to the user; this is for an application that
+    /// wants to count attempts or log them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addFailedListener(ActionListener l) {
+<span class="fc" id="L658">        failedListeners.addListener(l);</span>
+<span class="fc" id="L659">    }</span>
+
+    /// Removes a previously-registered listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeFailedListener(ActionListener l) {
+<span class="nc" id="L667">        failedListeners.removeListener(l);</span>
+<span class="nc" id="L668">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

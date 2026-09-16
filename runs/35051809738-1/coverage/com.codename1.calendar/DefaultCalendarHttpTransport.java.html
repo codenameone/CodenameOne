@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultCalendarHttpTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">DefaultCalendarHttpTransport.java</span></div><h1>DefaultCalendarHttpTransport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Util;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.StringUtil;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Default asynchronous transport backed by Codename One networking.
+<span class="nc" id="L36">public class DefaultCalendarHttpTransport implements CalendarHttpTransport {</span>
+
+    @Override
+    public AsyncResource&lt;CalendarHttpResponse&gt; execute(final CalendarHttpRequest spec) {
+<span class="nc" id="L40">        final AsyncResource&lt;CalendarHttpResponse&gt; out = new AsyncResource&lt;CalendarHttpResponse&gt;();</span>
+<span class="nc" id="L41">        ConnectionRequest request = new ConnectionRequest() {</span>
+
+<span class="nc" id="L43">            private final Map&lt;String, String&gt; responseHeaders = new HashMap&lt;String, String&gt;();</span>
+
+            private boolean finished;
+
+            @Override
+            protected void readHeaders(Object connection) throws IOException {
+<span class="nc" id="L49">                capture(connection);</span>
+<span class="nc" id="L50">            }</span>
+
+            @Override
+            protected void readErrorCodeHeaders(Object connection) throws IOException {
+<span class="nc" id="L54">                capture(connection);</span>
+<span class="nc" id="L55">            }</span>
+
+            private void capture(Object c) throws IOException {
+                // Redirect hops call this once per response; reset so headers from
+                // an intermediate 3xx are never attributed to the final response.
+<span class="nc" id="L60">                responseHeaders.clear();</span>
+<span class="nc" id="L61">                String[] names = { &quot;ETag&quot;, &quot;WWW-Authenticate&quot;, &quot;Location&quot;, &quot;Retry-After&quot;, &quot;Sync-Token&quot; };</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                for (String name : names) {</span>
+<span class="nc" id="L63">                    String value = getHeader(c, name);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                    if (value != null) {</span>
+<span class="nc" id="L65">                        responseHeaders.put(name, value);</span>
+                    }
+                }
+<span class="nc" id="L68">            }</span>
+
+            @Override
+            public boolean onRedirect(String redirectUrl) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                if (sameOrigin(spec.getUrl(), redirectUrl)) {</span>
+<span class="nc" id="L73">                    return false;</span>
+                }
+                // Following would re-send the Authorization header to a different
+                // host, leaking the user's credentials or token.
+<span class="nc" id="L77">                errorOnce(new CalendarException(CalendarError.NETWORK,</span>
+                        &quot;Refusing to follow cross-origin redirect&quot;));
+<span class="nc" id="L79">                return true;</span>
+            }
+
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                byte[] bytes = input == null ? new byte[0] : Util.readInputStream(input);</span>
+<span class="nc" id="L85">                String body = StringUtil.newString(bytes);</span>
+<span class="nc" id="L86">                completeOnce(new CalendarHttpResponse(getResponseCode(), body, responseHeaders));</span>
+<span class="nc" id="L87">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // readResponse() handles error responses too.  Completing here
+                // would race with that callback and loses the response body,
+                // since ConnectionRequest hasn't read it yet.
+<span class="nc" id="L94">            }</span>
+
+            @Override
+            protected void handleException(Exception error) {
+<span class="nc" id="L98">                errorOnce(new CalendarException(CalendarError.NETWORK, error.getMessage(), error));</span>
+<span class="nc" id="L99">            }</span>
+
+            private synchronized void completeOnce(CalendarHttpResponse response) {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (!finished) {</span>
+<span class="nc" id="L103">                    finished = true;</span>
+<span class="nc" id="L104">                    out.complete(response);</span>
+                }
+<span class="nc" id="L106">            }</span>
+
+            private synchronized void errorOnce(Throwable error) {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (!finished) {</span>
+<span class="nc" id="L110">                    finished = true;</span>
+<span class="nc" id="L111">                    out.error(error);</span>
+                }
+<span class="nc" id="L113">            }</span>
+        };
+<span class="nc" id="L115">        request.setUrl(spec.getUrl());</span>
+<span class="nc" id="L116">        request.setReadResponseForErrors(true);</span>
+<span class="nc bnc" id="L117" title="All 4 branches missed.">        request.setPost(!&quot;GET&quot;.equals(spec.getMethod()) &amp;&amp; !&quot;DELETE&quot;.equals(spec.getMethod()));</span>
+<span class="nc" id="L118">        request.setHttpMethod(spec.getMethod());</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; h : spec.getHeaders().entrySet()) {</span>
+<span class="nc" id="L120">            request.addRequestHeader(h.getKey(), h.getValue());</span>
+<span class="nc" id="L121">        }</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (spec.getBody() != null) {</span>
+<span class="nc" id="L123">            request.setRequestBody(spec.getBody());</span>
+        }
+<span class="nc" id="L125">        NetworkManager.getInstance().addToQueue(request);</span>
+<span class="nc" id="L126">        return out;</span>
+    }
+
+    static boolean sameOrigin(String a, String b) {
+<span class="nc" id="L130">        return origin(a).equals(origin(b));</span>
+    }
+
+    // Locale-independent lowering: default-locale toLowerCase() would map
+    // 'I' to a dotless i under Turkish locales and break host comparison.
+    private static String asciiLowerCase(String value) {
+<span class="nc" id="L136">        StringBuilder out = new StringBuilder(value.length());</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L138">            char c = value.charAt(i);</span>
+<span class="nc bnc" id="L139" title="All 4 branches missed.">            out.append(c &gt;= 'A' &amp;&amp; c &lt;= 'Z' ? (char) (c + ('a' - 'A')) : c);</span>
+        }
+<span class="nc" id="L141">        return out.toString();</span>
+    }
+
+    private static String origin(String url) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L146">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L148">        int schemeEnd = url.indexOf(&quot;://&quot;);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (schemeEnd &lt; 0) {</span>
+<span class="nc" id="L150">            return url;</span>
+        }
+<span class="nc" id="L152">        String scheme = asciiLowerCase(url.substring(0, schemeEnd));</span>
+<span class="nc" id="L153">        String rest = url.substring(schemeEnd + 3);</span>
+<span class="nc" id="L154">        int pathStart = rest.length();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        for (int i = 0; i &lt; rest.length(); i++) {</span>
+<span class="nc" id="L156">            char c = rest.charAt(i);</span>
+<span class="nc bnc" id="L157" title="All 6 branches missed.">            if (c == '/' || c == '?' || c == '#') {</span>
+<span class="nc" id="L158">                pathStart = i;</span>
+<span class="nc" id="L159">                break;</span>
+            }
+        }
+<span class="nc" id="L162">        String authority = rest.substring(0, pathStart);</span>
+<span class="nc" id="L163">        int at = authority.lastIndexOf('@');</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (at &gt;= 0) {</span>
+<span class="nc" id="L165">            authority = authority.substring(at + 1);</span>
+        }
+<span class="nc" id="L167">        authority = asciiLowerCase(authority);</span>
+<span class="nc" id="L168">        String host = authority;</span>
+<span class="nc" id="L169">        String port = null;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (authority.startsWith(&quot;[&quot;)) {</span>
+<span class="nc" id="L171">            int close = authority.indexOf(']');</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            if (close &gt;= 0) {</span>
+<span class="nc" id="L173">                host = authority.substring(0, close + 1);</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                if (close + 1 &lt; authority.length() &amp;&amp; authority.charAt(close + 1) == ':') {</span>
+<span class="nc" id="L175">                    port = authority.substring(close + 2);</span>
+                }
+            }
+<span class="nc" id="L178">        } else {</span>
+<span class="nc" id="L179">            int colon = authority.indexOf(':');</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (colon &gt;= 0) {</span>
+<span class="nc" id="L181">                host = authority.substring(0, colon);</span>
+<span class="nc" id="L182">                port = authority.substring(colon + 1);</span>
+            }
+        }
+<span class="nc bnc" id="L185" title="All 4 branches missed.">        if (port == null || port.length() == 0) {</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            port = &quot;https&quot;.equals(scheme) ? &quot;443&quot; : &quot;80&quot;;</span>
+        }
+<span class="nc" id="L188">        return scheme + &quot;://&quot; + host + &quot;:&quot; + port;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

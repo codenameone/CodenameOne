@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShieldHosts.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield</a> &gt; <span class="el_source">ShieldHosts.java</span></div><h1>ShieldHosts.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+/// Case folding for hostnames and URL schemes, fixed to ASCII.
+///
+/// #### Why not `String.toLowerCase()`
+///
+/// It folds using the device's locale. Under the Turkish locale an uppercase ASCII `I` becomes a
+/// dotless lowercase letter outside ASCII, so a request to `API.example.com` stops matching a
+/// policy registered as `api.example.com`. The consequence is not a display glitch: the host
+/// silently looks unprotected,
+/// so no token is attached and no pin is enforced -- on precisely the devices whose users the
+/// developer never tests with.
+///
+/// `toLowerCase(Locale.ENGLISH)` would fix it too, but hostnames and URL schemes are ASCII by
+/// definition, so folding them by hand removes the locale from the question entirely and keeps this
+/// working on the ports with a reduced `java.util.Locale`.
+final class ShieldHosts {
+
+    private ShieldHosts() {
+    }
+
+    /// Lowercases the ASCII letters and drops a terminal DNS root dot. Null in, null out.
+    ///
+    /// `https://api.example.com./` is a valid absolute name that resolves identically to
+    /// `api.example.com`, so keeping the dot would leave a normally registered policy unmatched --
+    /// and the failure is the silent kind: no token attached, no pin enforced. Applied to
+    /// configured, runtime, request and pin hosts alike, since they all pass through here.
+    static String normalize(String s) {
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L52">            return null;</span>
+        }
+        // Only one, and never on a bare &quot;.&quot; -- an empty host is not an improvement.
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (s.length() &gt; 1 &amp;&amp; s.charAt(s.length() - 1) == '.') {</span>
+<span class="nc" id="L56">            s = s.substring(0, s.length() - 1);</span>
+        }
+<span class="fc" id="L58">        int len = s.length();</span>
+<span class="fc" id="L59">        StringBuilder sb = null;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L61">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L62" title="All 4 branches covered.">            if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                if (sb == null) {</span>
+<span class="fc" id="L64">                    sb = new StringBuilder(len);</span>
+<span class="fc" id="L65">                    sb.append(s, 0, i);</span>
+                }
+<span class="fc" id="L67">                sb.append((char) (c + 32));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            } else if (sb != null) {</span>
+<span class="fc" id="L69">                sb.append(c);</span>
+            }
+        }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        return sb == null ? s : sb.toString();</span>
+    }
+
+    /// The keys a host can match, most specific first: the host itself, then a `*.` wildcard
+    /// for each parent domain outward.
+    ///
+    /// One generator, because two resolutions are one bug. Runtime registrations went into a
+    /// table looked up by exact name only, so `addProtectedHost(&quot;*.example.com&quot;)` covered
+    /// nothing at all: `api.example.com` missed it, fell through to the startup configuration
+    /// which had never heard of the host, and went out with no token and no pin check -- the
+    /// host the app went out of its way to protect being the one host unprotected.
+    ///
+    /// The apex is deliberately absent: `*.example.com` is subdomains, and `example.com`
+    /// itself has to be registered on its own. Nothing here can escape the name either --
+    /// the wildcards are built from the suffixes of the host being resolved, so
+    /// `example.com.evil.test` produces `*.com.evil.test` and never `*.example.com`.
+    static String[] lookupKeys(String host) {
+<span class="fc" id="L89">        String h = normalize(host);</span>
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">        if (h == null || h.length() == 0) {</span>
+<span class="nc" id="L91">            return new String[0];</span>
+        }
+<span class="fc" id="L93">        java.util.Vector keys = new java.util.Vector();</span>
+<span class="fc" id="L94">        keys.addElement(h);</span>
+<span class="fc" id="L95">        int dot = h.indexOf('.');</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        while (dot &gt;= 0 &amp;&amp; dot &lt; h.length() - 1) {</span>
+<span class="fc" id="L97">            keys.addElement(&quot;*.&quot; + h.substring(dot + 1));</span>
+<span class="fc" id="L98">            dot = h.indexOf('.', dot + 1);</span>
+        }
+<span class="fc" id="L100">        String[] out = new String[keys.size()];</span>
+<span class="fc" id="L101">        keys.copyInto(out);</span>
+<span class="fc" id="L102">        return out;</span>
+    }
+
+    /// True when the URL carries the given lowercase ASCII scheme prefix, whatever case it is in.
+    static boolean startsWithIgnoreCase(String value, String lowerPrefix) {
+<span class="pc bpc" id="L107" title="2 of 6 branches missed.">        if (value == null || lowerPrefix == null || value.length() &lt; lowerPrefix.length()) {</span>
+<span class="fc" id="L108">            return false;</span>
+        }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (int i = 0; i &lt; lowerPrefix.length(); i++) {</span>
+<span class="fc" id="L111">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L112" title="All 4 branches covered.">            if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="fc" id="L113">                c = (char) (c + 32);</span>
+            }
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (c != lowerPrefix.charAt(i)) {</span>
+<span class="fc" id="L116">                return false;</span>
+            }
+        }
+<span class="fc" id="L119">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

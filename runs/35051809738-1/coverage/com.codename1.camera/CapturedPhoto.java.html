@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CapturedPhoto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.camera</a> &gt; <span class="el_source">CapturedPhoto.java</span></div><h1>CapturedPhoto.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.camera;
+
+import com.codename1.ui.Image;
+
+import java.io.IOException;
+
+/// Result of a still-photo capture via `CameraSession#takePhoto()`.
+///
+/// Both an in-memory JPEG byte array and a file path are returned; the framework
+/// always saves to the app-private storage so that the bytes survive the callback
+/// scope.
+public final class CapturedPhoto {
+    private final byte[] jpegBytes;
+    private final String filePath;
+    private final int width;
+    private final int height;
+
+    /// Used by platform implementations.
+<span class="fc" id="L41">    public CapturedPhoto(byte[] jpegBytes, String filePath, int width, int height) {</span>
+<span class="fc" id="L42">        this.jpegBytes = jpegBytes;</span>
+<span class="fc" id="L43">        this.filePath = filePath;</span>
+<span class="fc" id="L44">        this.width = width;</span>
+<span class="fc" id="L45">        this.height = height;</span>
+<span class="fc" id="L46">    }</span>
+
+    /// JPEG-encoded bytes of the captured photo. Hand directly to the
+    /// `com.codename1.ai.*` modules without re-reading from disk.
+    public byte[] getJpegBytes() {
+<span class="nc" id="L51">        return jpegBytes;</span>
+    }
+
+    /// FileSystemStorage path the JPEG was saved to. The file is in the
+    /// application's private storage and persists until the app deletes it.
+    public String getFilePath() {
+<span class="nc" id="L57">        return filePath;</span>
+    }
+
+    /// Pixel width of the captured photo.
+    public int getWidth() {
+<span class="fc" id="L62">        return width;</span>
+    }
+
+    /// Pixel height of the captured photo.
+    public int getHeight() {
+<span class="nc" id="L67">        return height;</span>
+    }
+
+    /// Convenience: decode the JPEG bytes into a Codename One `Image`.
+    public Image toImage() throws IOException {
+<span class="nc" id="L72">        return Image.createImage(jpegBytes, 0, jpegBytes.length);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

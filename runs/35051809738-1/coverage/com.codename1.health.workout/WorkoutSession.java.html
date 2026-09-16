@@ -1,0 +1,787 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkoutSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.workout</a> &gt; <span class="el_source">WorkoutSession.java</span></div><h1>WorkoutSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.workout;
+
+import com.codename1.health.AggregateMetric;
+import com.codename1.health.HealthDataType;
+import com.codename1.health.HealthError;
+import com.codename1.health.HealthException;
+import com.codename1.health.HealthQuantity;
+import com.codename1.health.HealthSample;
+import com.codename1.health.HealthUnit;
+import com.codename1.health.QuantitySample;
+import com.codename1.health.SeriesSample;
+import com.codename1.health.WorkoutSample;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import com.codename1.impl.async.EdtResult;
+
+/// A workout being recorded.
+///
+/// Obtained from
+/// [WorkoutManager#startSession(WorkoutConfiguration)]. The state machine,
+/// the elapsed clock and the rollup of fed samples live here in shared
+/// code; ports implement only the `do*` methods.
+///
+/// #### Live and recorded sessions
+///
+/// [#isLive()] tells you whether the operating system is running a real
+/// workout session -- keeping the app alive and collecting sensor data
+/// itself. **It is false everywhere in this release**: the only
+/// implementation here is a recorded session, and
+/// [WorkoutManager#isLiveSessionSupported()] says so on every platform.
+/// `HKWorkoutSession` on watchOS and iOS 26, and the Wear OS exercise
+/// client, are what would change that answer; nothing here drives them
+/// yet. Do not assume the OS keeps your app alive or collects data for
+/// you -- backgrounding can end the process and take the session with it.
+///
+/// On an Android phone it could not be live in any case, because Health
+/// Connect has no such concept: Google's documented approach there is to
+/// record the session yourself and write it when it ends, which is exactly
+/// what a recorded session does. So a recorded session is not a degraded
+/// shim -- it is the platform-correct design -- but it does mean **nothing is collected
+/// unless you feed it**, through [#addSamples(List)] or by attaching a
+/// Bluetooth sensor with
+/// [com.codename1.health.sensors.SensorSessionOptions#setWorkoutSession(WorkoutSession)].
+///
+/// Check [WorkoutManager#isSensorCollectionSupported()] before building UI
+/// that assumes a heart rate will appear on its own.
+///
+/// #### A killed workout is over
+///
+/// Sessions are deliberately not restored after the process dies. `end()`
+/// was never called, so nothing is written. An app that needs
+/// crash-resilient workouts should write partial records as it goes --
+/// which is what the recorded path does anyway.
+public abstract class WorkoutSession {
+
+    private final WorkoutConfiguration configuration;
+<span class="fc" id="L84">    private final List&lt;WorkoutSessionListener&gt; listeners =</span>
+            new ArrayList&lt;WorkoutSessionListener&gt;();
+<span class="fc" id="L86">    private final Map&lt;String, HealthQuantity&gt; statistics =</span>
+            new HashMap&lt;String, HealthQuantity&gt;();
+<span class="fc" id="L88">    private final Map&lt;String, Integer&gt; counts = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L89">    private final List&lt;WorkoutEvent&gt; events = new ArrayList&lt;WorkoutEvent&gt;();</span>
+
+    /// Guards the state and the clocks it is read alongside.
+    ///
+    /// Samples arrive on a Bluetooth callback thread while the transitions
+    /// are driven from the EDT, so reading the state and then acting on it
+    /// is two steps with the other thread able to run between them -- and
+    /// on a field neither side synchronizes, the sensor thread is not
+    /// obliged to observe the transition at all.
+    /// The manager that handed this session out, so a terminal transition
+    /// can release it there rather than leaving it to be noticed later.
+    private WorkoutManager manager;
+
+    /// Called by [WorkoutManager] as it hands the session to a caller.
+    final void setManager(WorkoutManager manager) {
+<span class="fc" id="L104">        this.manager = manager;</span>
+<span class="fc" id="L105">    }</span>
+
+<span class="fc" id="L107">    private final Object stateLock = new Object();</span>
+
+<span class="fc" id="L109">    private WorkoutSessionState state = WorkoutSessionState.NOT_STARTED;</span>
+    private long startedAtMillis;
+    private long endedAtMillis;
+    private long accumulatedMillis;
+    private long resumedAtMillis;
+
+    /// Ports and the framework construct sessions.
+<span class="fc" id="L116">    protected WorkoutSession(WorkoutConfiguration configuration) {</span>
+        // A snapshot. The builder is fluent and callers reuse one across
+        // workouts, and doEnd reads the activity type and title only when
+        // the session ends -- so a run was persisted under whatever the
+        // configuration had been changed to since it started.
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        this.configuration = configuration == null</span>
+<span class="fc" id="L122">                ? new WorkoutConfiguration() : configuration.copy();</span>
+<span class="fc" id="L123">    }</span>
+
+    /// The configuration this session was started with.
+    ///
+    /// A copy, so that reconfiguring what this returns cannot change a
+    /// workout already under way -- the same reason the session took a
+    /// snapshot of what it was given. Without it the constructor's
+    /// snapshot only moved the problem: `getConfiguration().setTitle(..)`
+    /// reached the very instance `doEnd` reads when it persists.
+    public final WorkoutConfiguration getConfiguration() {
+<span class="fc" id="L133">        return configuration.copy();</span>
+    }
+
+    /// The session's own copy, which is not handed out.
+    final WorkoutConfiguration configuration() {
+<span class="fc" id="L138">        return configuration;</span>
+    }
+
+    /// The current state.
+    public final WorkoutSessionState getState() {
+<span class="fc" id="L143">        synchronized (stateLock) {</span>
+<span class="fc" id="L144">            return state;</span>
+        }
+    }
+
+    /// Whether the operating system is running a real workout session --
+    /// see the class documentation. `false` means the clock and the saved
+    /// record are real but collection is entirely up to you.
+    public boolean isLive() {
+<span class="fc" id="L152">        return false;</span>
+    }
+
+    /// Warms up sensors ahead of [#start()], for apps that show a
+    /// countdown. Optional; `start()` works without it.
+    public final AsyncResource&lt;Boolean&gt; prepare() {
+<span class="nc" id="L158">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="nc" id="L159">        synchronized (stateLock) {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (!requireState(out, WorkoutSessionState.NOT_STARTED,</span>
+                    &quot;prepare&quot;)) {
+<span class="nc" id="L162">                return out;</span>
+            }
+<span class="nc" id="L164">            setState(WorkoutSessionState.PREPARING);</span>
+<span class="nc" id="L165">        }</span>
+<span class="nc" id="L166">        doPrepare(out);</span>
+<span class="nc" id="L167">        return out;</span>
+    }
+
+    /// Starts recording.
+    public final AsyncResource&lt;Boolean&gt; start() {
+<span class="fc" id="L172">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L173">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L174" title="3 of 4 branches missed.">            if (state != WorkoutSessionState.NOT_STARTED</span>
+                    &amp;&amp; state != WorkoutSessionState.PREPARING) {
+<span class="nc" id="L176">                failState(out, &quot;start&quot;);</span>
+<span class="nc" id="L177">                return out;</span>
+            }
+<span class="fc" id="L179">            startedAtMillis = System.currentTimeMillis();</span>
+<span class="fc" id="L180">            resumedAtMillis = startedAtMillis;</span>
+<span class="fc" id="L181">            accumulatedMillis = 0;</span>
+<span class="fc" id="L182">            setState(WorkoutSessionState.RUNNING);</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        doStart(out);</span>
+<span class="fc" id="L185">        return out;</span>
+    }
+
+    /// Pauses recording. The elapsed clock stops.
+    public final AsyncResource&lt;Boolean&gt; pause() {
+<span class="fc" id="L190">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc" id="L191">        synchronized (stateLock) {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (!requireState(out, WorkoutSessionState.RUNNING, &quot;pause&quot;)) {</span>
+<span class="fc" id="L193">                return out;</span>
+            }
+<span class="fc" id="L195">            accumulatedMillis += System.currentTimeMillis() - resumedAtMillis;</span>
+<span class="fc" id="L196">            setState(WorkoutSessionState.PAUSED);</span>
+<span class="fc" id="L197">        }</span>
+<span class="fc" id="L198">        addEvent(new WorkoutEvent(WorkoutEvent.Kind.PAUSE,</span>
+<span class="fc" id="L199">                System.currentTimeMillis(), null));</span>
+<span class="fc" id="L200">        doPause(out);</span>
+<span class="fc" id="L201">        return out;</span>
+    }
+
+    /// Resumes after a pause.
+    public final AsyncResource&lt;Boolean&gt; resume() {
+<span class="fc" id="L206">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+        long resumedAt;
+<span class="fc" id="L208">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if (!requireState(out, WorkoutSessionState.PAUSED, &quot;resume&quot;)) {</span>
+<span class="nc" id="L210">                return out;</span>
+            }
+<span class="fc" id="L212">            resumedAtMillis = System.currentTimeMillis();</span>
+<span class="fc" id="L213">            resumedAt = resumedAtMillis;</span>
+<span class="fc" id="L214">            setState(WorkoutSessionState.RUNNING);</span>
+<span class="fc" id="L215">        }</span>
+<span class="fc" id="L216">        addEvent(new WorkoutEvent(WorkoutEvent.Kind.RESUME,</span>
+                resumedAt, null));
+<span class="fc" id="L218">        doResume(out);</span>
+<span class="fc" id="L219">        return out;</span>
+    }
+
+    /// Ends the workout and writes it to the health store, resolving with
+    /// the persisted record.
+    public final AsyncResource&lt;WorkoutSample&gt; end() {
+<span class="fc" id="L225">        AsyncResource&lt;WorkoutSample&gt; out = new EdtResult&lt;WorkoutSample&gt;();</span>
+        // The whole claim under one lock, so a sample being accepted on a
+        // sensor thread is either already in what doEnd is about to
+        // snapshot or is refused. Checked separately, a reading could pass
+        // the state check, wait, and then roll itself into totals whose
+        // workout had already been written -- reported as accepted while
+        // absent from the record, or present in the totals with no sample
+        // behind it.
+<span class="fc" id="L233">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">            if (state != WorkoutSessionState.RUNNING</span>
+                    &amp;&amp; state != WorkoutSessionState.PAUSED) {
+<span class="fc" id="L236">                out.error(new HealthException(HealthError.SESSION_STATE,</span>
+                        &quot;cannot end a workout in state &quot; + state));
+<span class="fc" id="L238">                return out;</span>
+            }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (state == WorkoutSessionState.RUNNING) {</span>
+<span class="fc" id="L241">                accumulatedMillis +=</span>
+<span class="fc" id="L242">                        System.currentTimeMillis() - resumedAtMillis;</span>
+            }
+<span class="fc" id="L244">            endedAtMillis = System.currentTimeMillis();</span>
+<span class="fc" id="L245">            setState(WorkoutSessionState.STOPPED);</span>
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">        doEnd(out);</span>
+<span class="fc" id="L248">        return out;</span>
+    }
+
+    /// Abandons the workout without writing anything.
+    ///
+    /// A no-op once the workout has ended, and once [#end()] has been
+    /// called it is too late: the store write is already in flight, and
+    /// claiming to have abandoned the session while that write lands --
+    /// then having its callback move the state back to `ENDED` -- would
+    /// break the one promise in this method's name. Discard before ending,
+    /// or delete the samples afterwards through the identifiers the write
+    /// reports.
+    public final void discard() {
+<span class="fc" id="L261">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">            if (state == WorkoutSessionState.ENDED</span>
+                    || state == WorkoutSessionState.STOPPED) {
+<span class="nc" id="L264">                return;</span>
+            }
+<span class="fc" id="L266">            setState(WorkoutSessionState.FAILED);</span>
+<span class="fc" id="L267">        }</span>
+<span class="fc" id="L268">        doDiscard();</span>
+<span class="fc" id="L269">    }</span>
+
+    /// Time spent recording, excluding pauses.
+    public final long getElapsedMillis() {
+<span class="fc" id="L273">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">            if (state == WorkoutSessionState.RUNNING) {</span>
+<span class="nc" id="L275">                return accumulatedMillis</span>
+<span class="nc" id="L276">                        + (System.currentTimeMillis() - resumedAtMillis);</span>
+            }
+<span class="fc" id="L278">            return accumulatedMillis;</span>
+        }
+    }
+
+    /// When the workout started, epoch millis, or 0 before [#start()].
+    public final long getStartedAtMillis() {
+<span class="fc" id="L284">        synchronized (stateLock) {</span>
+<span class="fc" id="L285">            return startedAtMillis;</span>
+        }
+    }
+
+    /// When it ended, epoch millis, or 0 while still running.
+    public final long getEndedAtMillis() {
+<span class="fc" id="L291">        synchronized (stateLock) {</span>
+<span class="fc" id="L292">            return endedAtMillis;</span>
+        }
+    }
+
+    /// A live statistic, or **`null`** when the platform does not compute
+    /// it and nothing has been fed in.
+    ///
+    /// Never fabricates a zero. On a recorded session with no sensor
+    /// attached every statistic is null, and showing &quot;0 bpm&quot; instead would
+    /// be a claim the app cannot support.
+    public final HealthQuantity getStatistic(HealthDataType type,
+            AggregateMetric metric) {
+<span class="pc bpc" id="L304" title="2 of 4 branches missed.">        if (type == null || metric == null) {</span>
+<span class="nc" id="L305">            return null;</span>
+        }
+<span class="fc" id="L307">        synchronized (statistics) {</span>
+<span class="fc" id="L308">            return statistics.get(key(type, metric));</span>
+        }
+    }
+
+    /// Feeds samples into the workout. On a recorded session this is the
+    /// only way anything is collected.
+    public final AsyncResource&lt;Boolean&gt; addSamples(List&lt;HealthSample&gt; samples) {
+<span class="fc" id="L315">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+        // Held across the acceptance, not just the check. end() claims its
+        // transition under this same lock before doEnd takes any snapshot,
+        // so a reading arriving from a sensor thread either lands in the
+        // workout that is being written or is refused -- never accepted
+        // into a record that has already been sealed.
+<span class="fc" id="L321">        synchronized (stateLock) {</span>
+<span class="fc" id="L322">            return addSamplesLocked(samples, out);</span>
+        }
+    }
+
+    private AsyncResource&lt;Boolean&gt; addSamplesLocked(
+            List&lt;HealthSample&gt; samples, AsyncResource&lt;Boolean&gt; out) {
+<span class="pc bpc" id="L328" title="3 of 4 branches missed.">        if (state != WorkoutSessionState.RUNNING</span>
+                &amp;&amp; state != WorkoutSessionState.PAUSED) {
+<span class="nc" id="L330">            failState(out, &quot;addSamples&quot;);</span>
+<span class="nc" id="L331">            return out;</span>
+        }
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (state == WorkoutSessionState.PAUSED) {</span>
+            // Accepted but dropped. A strap stays connected across a pause
+            // and keeps notifying, and the elapsed clock already excludes
+            // the paused span -- so rolling these in produced a saved
+            // workout whose totals covered time its own duration says did
+            // not happen. Callers explicitly feeding history can add it
+            // after resuming.
+<span class="nc" id="L340">            out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L341">            return out;</span>
+        }
+<span class="pc bpc" id="L343" title="2 of 4 branches missed.">        if (samples == null || samples.isEmpty()) {</span>
+<span class="nc" id="L344">            out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L345">            return out;</span>
+        }
+        // Copied and filtered rather than passed through. rollUp ignores
+        // a null, but the list went on to be stored whole, and doEnd
+        // dereferences what it stored -- so a single null entry threw out
+        // of end() after the session had already moved to STOPPED,
+        // leaving the caller with neither a result nor a session it could
+        // retry.
+<span class="fc" id="L353">        List&lt;HealthSample&gt; kept = new ArrayList&lt;HealthSample&gt;(</span>
+<span class="fc" id="L354">                samples.size());</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        for (HealthSample sample : samples) {</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">            if (sample != null) {</span>
+<span class="fc" id="L357">                kept.add(sample);</span>
+            }
+<span class="fc" id="L359">        }</span>
+        // Every value resolved before a single total moves. Converting a
+        // quantity into its type's canonical unit is the one step here
+        // that can fail -- a sample whose unit measures the wrong
+        // dimension -- and rolling up as we went left the earlier
+        // samples' totals applied while the batch itself was refused, so
+        // the workout ended reporting a total with no child sample
+        // behind it.
+<span class="fc" id="L367">        List&lt;QuantitySample&gt; flat = new ArrayList&lt;QuantitySample&gt;();</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        for (HealthSample sample : kept) {</span>
+<span class="fc" id="L369">            flatten(sample, flat);</span>
+<span class="fc" id="L370">        }</span>
+<span class="fc" id="L371">        double[] values = new double[flat.size()];</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        for (int i = 0; i &lt; flat.size(); i++) {</span>
+<span class="fc" id="L373">            QuantitySample q = flat.get(i);</span>
+            try {
+<span class="fc" id="L375">                values[i] = q.getValue(q.getType().getCanonicalUnit());</span>
+<span class="nc" id="L376">            } catch (RuntimeException incompatible) {</span>
+                // Reported, not thrown. addSamples is called from the
+                // sensor callback thread as well as the app's own, and an
+                // exception escaping there lands in the Bluetooth stack.
+<span class="nc" id="L380">                out.error(new HealthException(HealthError.INVALID_ARGUMENT,</span>
+<span class="nc" id="L381">                        &quot;a &quot; + q.getType().getId() + &quot; sample is measured&quot;</span>
+<span class="nc" id="L382">                                + &quot; in &quot; + q.getQuantity().getUnit()</span>
+<span class="nc" id="L383">                                        .getSymbol()</span>
+                                + &quot;, which is not a &quot;
+<span class="nc" id="L385">                                + q.getType().getCanonicalUnit().getSymbol()</span>
+                                + &quot;; the batch was not accepted&quot;,
+                        incompatible));
+<span class="nc" id="L388">                return out;</span>
+<span class="fc" id="L389">            }</span>
+        }
+        // Folded first, announced once. A heart-rate trace can carry
+        // tens of thousands of points, and one EDT runnable per
+        // measurement floods the queue with callbacks that each report
+        // the same final figure by the time they run -- while every one
+        // of them holds the listener and the session until it does.
+<span class="fc" id="L396">        List&lt;HealthDataType&gt; touched = new ArrayList&lt;HealthDataType&gt;();</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        for (int i = 0; i &lt; flat.size(); i++) {</span>
+<span class="fc" id="L398">            QuantitySample q = flat.get(i);</span>
+<span class="fc" id="L399">            applyRollUp(q, values[i]);</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">            if (!touched.contains(q.getType())) {</span>
+<span class="fc" id="L401">                touched.add(q.getType());</span>
+            }
+        }
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (HealthDataType type : touched) {</span>
+<span class="fc" id="L405">            fireStatisticsUpdated(type);</span>
+<span class="fc" id="L406">        }</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (kept.isEmpty()) {</span>
+<span class="fc" id="L408">            out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L409">            return out;</span>
+        }
+<span class="fc" id="L411">        doAddSamples(kept, out);</span>
+<span class="fc" id="L412">        return out;</span>
+    }
+
+    /// Records an event -- a lap, a marker, a segment boundary.
+    public final AsyncResource&lt;Boolean&gt; addEvent(WorkoutEvent event) {
+<span class="fc" id="L417">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (event == null) {</span>
+<span class="nc" id="L419">            out.complete(Boolean.FALSE);</span>
+<span class="nc" id="L420">            return out;</span>
+        }
+<span class="fc" id="L422">        synchronized (events) {</span>
+<span class="fc" id="L423">            events.add(event);</span>
+<span class="fc" id="L424">        }</span>
+<span class="fc" id="L425">        fireEvent(event);</span>
+<span class="fc" id="L426">        out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L427">        return out;</span>
+    }
+
+    /// Every event recorded so far.
+    public final List&lt;WorkoutEvent&gt; getEvents() {
+<span class="fc" id="L432">        synchronized (events) {</span>
+<span class="fc" id="L433">            return new ArrayList&lt;WorkoutEvent&gt;(events);</span>
+        }
+    }
+
+    /// Registers a listener for state, statistics and events.
+    public final void addListener(WorkoutSessionListener listener) {
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="nc" id="L440">            return;</span>
+        }
+<span class="fc" id="L442">        synchronized (listeners) {</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            if (!listeners.contains(listener)) {</span>
+<span class="fc" id="L444">                listeners.add(listener);</span>
+            }
+<span class="fc" id="L446">        }</span>
+<span class="fc" id="L447">    }</span>
+
+    /// Removes a listener.
+    public final void removeListener(WorkoutSessionListener listener) {
+<span class="nc" id="L451">        synchronized (listeners) {</span>
+<span class="nc" id="L452">            listeners.remove(listener);</span>
+<span class="nc" id="L453">        }</span>
+<span class="nc" id="L454">    }</span>
+
+    // ------------------------------------------------------------------
+    // statistics rollup
+    // ------------------------------------------------------------------
+
+    /// Folds one sample into the running totals, minima, maxima, averages
+    /// and latest values. Shared by every port, so a session reports its
+    /// statistics the same way wherever it runs -- and would go on doing
+    /// so if a live session were feeding it instead of the app.
+    /// The measurements `sample` contributes to the rollup, expanded but
+    /// not yet converted.
+    ///
+    /// A heart-rate trace fed in whole is workout data like any other.
+    /// Skipping series left AVERAGE, MINIMUM, MAXIMUM and LATEST null or
+    /// stale for measurements the session was collecting and would go on
+    /// to persist. A sample with no numeric value, or of a type with no
+    /// canonical unit, contributes nothing and is dropped here rather
+    /// than checked again downstream.
+    private static void flatten(HealthSample sample,
+            List&lt;QuantitySample&gt; out) {
+<span class="fc bfc" id="L475" title="All 2 branches covered.">        if (sample instanceof SeriesSample) {</span>
+<span class="fc" id="L476">            SeriesSample series = (SeriesSample) sample;</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">            for (int i = 0; i &lt; series.size(); i++) {</span>
+<span class="fc" id="L478">                flatten(series.toQuantitySample(i), out);</span>
+            }
+<span class="fc" id="L480">            return;</span>
+        }
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">        if (!(sample instanceof QuantitySample)) {</span>
+<span class="nc" id="L483">            return;</span>
+        }
+<span class="fc" id="L485">        QuantitySample q = (QuantitySample) sample;</span>
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">        if (q.getType().getCanonicalUnit() == null) {</span>
+<span class="nc" id="L487">            return;</span>
+        }
+<span class="fc" id="L489">        out.add(q);</span>
+<span class="fc" id="L490">    }</span>
+
+    /// Folds one already-converted measurement into the rollup. Cannot
+    /// fail, which is what lets the batch be all-or-nothing.
+    private void applyRollUp(QuantitySample sample, double v) {
+<span class="fc" id="L495">        QuantitySample q = sample;</span>
+<span class="fc" id="L496">        HealthDataType type = q.getType();</span>
+<span class="fc" id="L497">        HealthUnit unit = type.getCanonicalUnit();</span>
+<span class="fc" id="L498">        synchronized (statistics) {</span>
+<span class="fc" id="L499">            Integer nBox = counts.get(type.getId());</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            int n = nBox == null ? 0 : nBox.intValue();</span>
+<span class="fc" id="L501">            counts.put(type.getId(), Integer.valueOf(n + 1));</span>
+
+<span class="pc bpc" id="L503" title="1 of 3 branches missed.">            switch (type.getAggregationStyle()) {</span>
+                case CUMULATIVE:
+<span class="fc" id="L505">                    put(type, AggregateMetric.TOTAL,</span>
+<span class="fc" id="L506">                            valueOf(type, AggregateMetric.TOTAL, unit) + v,</span>
+                            unit);
+<span class="fc" id="L508">                    break;</span>
+                case DISCRETE:
+<span class="fc" id="L510">                    double sum = valueOf(type, AggregateMetric.TOTAL, unit) + v;</span>
+<span class="fc" id="L511">                    put(type, AggregateMetric.TOTAL, sum, unit);</span>
+                    // Weighted by how long each sample covers, matching the
+                    // aggregate semantics. An arithmetic mean reported ten
+                    // minutes at 60 bpm followed by one minute at 120 as
+                    // 90 bpm rather than about 65.
+<span class="fc" id="L516">                    double w = Math.max(1, sample.getDurationMillis());</span>
+<span class="fc" id="L517">                    double weighted = weightedSum(type) + v * w;</span>
+<span class="fc" id="L518">                    double totalWeight = weightOf(type) + w;</span>
+<span class="fc" id="L519">                    setWeightedSum(type, weighted);</span>
+<span class="fc" id="L520">                    setWeight(type, totalWeight);</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">                    put(type, AggregateMetric.AVERAGE,</span>
+                            totalWeight == 0 ? v : weighted / totalWeight,
+                            unit);
+<span class="fc" id="L524">                    HealthQuantity min =</span>
+<span class="fc" id="L525">                            statistics.get(key(type, AggregateMetric.MINIMUM));</span>
+<span class="fc bfc" id="L526" title="All 4 branches covered.">                    if (min == null || v &lt; min.getValue(unit)) {</span>
+<span class="fc" id="L527">                        put(type, AggregateMetric.MINIMUM, v, unit);</span>
+                    }
+<span class="fc" id="L529">                    HealthQuantity max =</span>
+<span class="fc" id="L530">                            statistics.get(key(type, AggregateMetric.MAXIMUM));</span>
+<span class="fc bfc" id="L531" title="All 4 branches covered.">                    if (max == null || v &gt; max.getValue(unit)) {</span>
+<span class="fc" id="L532">                        put(type, AggregateMetric.MAXIMUM, v, unit);</span>
+                    }
+                    // Latest by timestamp, not by arrival. A delayed
+                    // device reading or an unsorted history batch made an
+                    // older value overwrite a newer one, so the workout
+                    // reported a stale number as the current one.
+<span class="fc" id="L538">                    Long seen = latestAt.get(type.getId());</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">                    if (seen == null</span>
+<span class="fc bfc" id="L540" title="All 2 branches covered.">                            || q.getStartMillis() &gt;= seen.longValue()) {</span>
+<span class="fc" id="L541">                        latestAt.put(type.getId(),</span>
+<span class="fc" id="L542">                                Long.valueOf(q.getStartMillis()));</span>
+<span class="fc" id="L543">                        put(type, AggregateMetric.LATEST, v, unit);</span>
+                    }
+                    break;
+                default:
+                    break;
+            }
+<span class="fc" id="L549">        }</span>
+<span class="fc" id="L550">    }</span>
+
+    /// When each type's LATEST value was measured, so a sample arriving
+    /// late cannot pass itself off as the newest.
+<span class="fc" id="L554">    private final Map&lt;String, Long&gt; latestAt = new HashMap&lt;String, Long&gt;();</span>
+
+<span class="fc" id="L556">    private final Map&lt;String, Double&gt; weightedSums =</span>
+            new HashMap&lt;String, Double&gt;();
+<span class="fc" id="L558">    private final Map&lt;String, Double&gt; weights =</span>
+            new HashMap&lt;String, Double&gt;();
+
+    private double weightedSum(HealthDataType type) {
+<span class="fc" id="L562">        Double v = weightedSums.get(type.getId());</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        return v == null ? 0 : v.doubleValue();</span>
+    }
+
+    private void setWeightedSum(HealthDataType type, double v) {
+<span class="fc" id="L567">        weightedSums.put(type.getId(), Double.valueOf(v));</span>
+<span class="fc" id="L568">    }</span>
+
+    private double weightOf(HealthDataType type) {
+<span class="fc" id="L571">        Double v = weights.get(type.getId());</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">        return v == null ? 0 : v.doubleValue();</span>
+    }
+
+    private void setWeight(HealthDataType type, double v) {
+<span class="fc" id="L576">        weights.put(type.getId(), Double.valueOf(v));</span>
+<span class="fc" id="L577">    }</span>
+
+    private double valueOf(HealthDataType type, AggregateMetric metric,
+            HealthUnit unit) {
+<span class="fc" id="L581">        HealthQuantity existing = statistics.get(key(type, metric));</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">        return existing == null ? 0 : existing.getValue(unit);</span>
+    }
+
+    private void put(HealthDataType type, AggregateMetric metric, double value,
+            HealthUnit unit) {
+<span class="fc" id="L587">        statistics.put(key(type, metric), new HealthQuantity(value, unit));</span>
+<span class="fc" id="L588">    }</span>
+
+    private static String key(HealthDataType type, AggregateMetric metric) {
+<span class="fc" id="L591">        return type.getId() + ' ' + metric.name();</span>
+    }
+
+    /// The accumulated statistics, for ports assembling the final record.
+    protected final Map&lt;String, HealthQuantity&gt; getStatisticsSnapshot() {
+<span class="nc" id="L596">        synchronized (statistics) {</span>
+<span class="nc" id="L597">            return new HashMap&lt;String, HealthQuantity&gt;(statistics);</span>
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // port SPI
+    // ------------------------------------------------------------------
+
+    /// Warms up sensors. Default completes immediately.
+    protected void doPrepare(AsyncResource&lt;Boolean&gt; out) {
+<span class="nc" id="L607">        out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L608">    }</span>
+
+    /// Starts platform collection.
+    protected abstract void doStart(AsyncResource&lt;Boolean&gt; out);
+
+    /// Pauses platform collection.
+    protected abstract void doPause(AsyncResource&lt;Boolean&gt; out);
+
+    /// Resumes platform collection.
+    protected abstract void doResume(AsyncResource&lt;Boolean&gt; out);
+
+    /// Stops collection and persists the workout.
+    protected abstract void doEnd(AsyncResource&lt;WorkoutSample&gt; out);
+
+    /// Abandons the workout without persisting.
+    protected abstract void doDiscard();
+
+    /// Hands fed samples to the platform. Default accepts them into the
+    /// shared rollup only.
+    protected void doAddSamples(List&lt;HealthSample&gt; samples,
+            AsyncResource&lt;Boolean&gt; out) {
+<span class="nc" id="L629">        out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L630">    }</span>
+
+    // ------------------------------------------------------------------
+    // event plumbing
+    // ------------------------------------------------------------------
+
+    /// Moves to a new state and notifies listeners. Ports call this for
+    /// transitions the platform initiated.
+    protected final void setState(WorkoutSessionState newState) {
+        boolean terminal;
+<span class="fc" id="L640">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L641" title="2 of 4 branches missed.">            if (newState == null || newState == state) {</span>
+<span class="nc" id="L642">                return;</span>
+            }
+<span class="fc" id="L644">            state = newState;</span>
+<span class="fc bfc" id="L645" title="All 6 branches covered.">            terminal = newState == WorkoutSessionState.STOPPED</span>
+                    || newState == WorkoutSessionState.ENDED
+                    || newState == WorkoutSessionState.FAILED;
+            // Published under the lock, so listeners are told about the
+            // transitions in the order they happened. Enqueued outside
+            // it, a transition that had already released the lock could
+            // hand its notification to the EDT after end() had handed
+            // over STOPPED, and an app would watch an ended workout
+            // appear to resume while getState() said otherwise.
+            //
+            // Only the enqueue: callSerially appends and returns, and the
+            // runnable runs later on the EDT, so no listener runs while
+            // this is held.
+<span class="fc" id="L658">            Object[] snapshot = listenerSnapshot();</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">            if (snapshot != null) {</span>
+<span class="nc" id="L660">                Display.getInstance().callSerially(</span>
+<span class="nc" id="L661">                        makeStateRunnable(this, snapshot, newState));</span>
+            }
+<span class="fc" id="L663">        }</span>
+    
+        // Told, rather than waiting to be asked. The manager used to drop a
+        // finished session only when getActiveSession() next ran, so an app
+        // that ended its one workout and released its own reference left the
+        // session -- its listeners, events and statistics -- reachable
+        // through the singleton for the rest of the process. Nothing was
+        // going to call the getter again.
+<span class="fc bfc" id="L671" title="All 2 branches covered.">        if (terminal) {</span>
+<span class="fc" id="L672">            WorkoutManager owner = manager;</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">            if (owner != null) {</span>
+<span class="fc" id="L674">                owner.releaseIfCurrent(this);</span>
+            }
+        }
+<span class="fc" id="L677">    }</span>
+
+    /// Notifies listeners that a statistic changed.
+    protected final void fireStatisticsUpdated(HealthDataType type) {
+<span class="fc" id="L681">        Object[] snapshot = listenerSnapshot();</span>
+<span class="fc bfc" id="L682" title="All 2 branches covered.">        if (snapshot != null) {</span>
+<span class="fc" id="L683">            Display.getInstance().callSerially(</span>
+<span class="fc" id="L684">                    makeStatsRunnable(this, snapshot, type));</span>
+        }
+<span class="fc" id="L686">    }</span>
+
+    /// Notifies listeners of an event.
+    protected final void fireEvent(WorkoutEvent event) {
+<span class="fc" id="L690">        Object[] snapshot = listenerSnapshot();</span>
+<span class="pc bpc" id="L691" title="1 of 2 branches missed.">        if (snapshot != null) {</span>
+<span class="nc" id="L692">            Display.getInstance().callSerially(</span>
+<span class="nc" id="L693">                    makeEventRunnable(this, snapshot, event));</span>
+        }
+<span class="fc" id="L695">    }</span>
+
+    /// Reports an unrecoverable failure and moves to
+    /// [WorkoutSessionState#FAILED].
+    protected final void fireFailed(HealthException error) {
+<span class="nc" id="L700">        setState(WorkoutSessionState.FAILED);</span>
+<span class="nc" id="L701">        Object[] snapshot = listenerSnapshot();</span>
+<span class="nc bnc" id="L702" title="All 2 branches missed.">        if (snapshot != null) {</span>
+<span class="nc" id="L703">            Display.getInstance().callSerially(</span>
+<span class="nc" id="L704">                    makeFailedRunnable(this, snapshot, error));</span>
+        }
+<span class="nc" id="L706">    }</span>
+
+    private Object[] listenerSnapshot() {
+<span class="fc" id="L709">        synchronized (listeners) {</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">            if (listeners.isEmpty()) {</span>
+<span class="fc" id="L711">                return null;</span>
+            }
+<span class="fc" id="L713">            return listeners.toArray();</span>
+        }
+    }
+
+    private boolean requireState(AsyncResource out,
+            WorkoutSessionState required, String what) {
+<span class="fc bfc" id="L719" title="All 2 branches covered.">        if (state == required) {</span>
+<span class="fc" id="L720">            return true;</span>
+        }
+<span class="fc" id="L722">        failState(out, what);</span>
+<span class="fc" id="L723">        return false;</span>
+    }
+
+    private void failState(AsyncResource out, String what) {
+<span class="fc" id="L727">        out.error(new HealthException(HealthError.SESSION_STATE,</span>
+                &quot;cannot &quot; + what + &quot; a workout in state &quot; + state));
+<span class="fc" id="L729">    }</span>
+
+    // Dispatch runnables are built in static methods so they carry no
+    // synthetic reference to the enclosing session (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+
+    private static Runnable makeStateRunnable(final WorkoutSession session,
+            final Object[] listeners, final WorkoutSessionState state) {
+<span class="nc" id="L737">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L740" title="All 2 branches missed.">                for (Object listener : listeners) {</span>
+<span class="nc" id="L741">                    ((WorkoutSessionListener) listener)</span>
+<span class="nc" id="L742">                            .workoutStateChanged(session, state);</span>
+                }
+<span class="nc" id="L744">            }</span>
+        };
+    }
+
+    private static Runnable makeStatsRunnable(final WorkoutSession session,
+            final Object[] listeners, final HealthDataType type) {
+<span class="fc" id="L750">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L753" title="All 2 branches covered.">                for (Object listener : listeners) {</span>
+<span class="fc" id="L754">                    ((WorkoutSessionListener) listener)</span>
+<span class="fc" id="L755">                            .workoutStatisticsUpdated(session, type);</span>
+                }
+<span class="fc" id="L757">            }</span>
+        };
+    }
+
+    private static Runnable makeEventRunnable(final WorkoutSession session,
+            final Object[] listeners, final WorkoutEvent event) {
+<span class="nc" id="L763">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L766" title="All 2 branches missed.">                for (Object listener : listeners) {</span>
+<span class="nc" id="L767">                    ((WorkoutSessionListener) listener)</span>
+<span class="nc" id="L768">                            .workoutEvent(session, event);</span>
+                }
+<span class="nc" id="L770">            }</span>
+        };
+    }
+
+    private static Runnable makeFailedRunnable(final WorkoutSession session,
+            final Object[] listeners, final HealthException error) {
+<span class="nc" id="L776">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L779" title="All 2 branches missed.">                for (Object listener : listeners) {</span>
+<span class="nc" id="L780">                    ((WorkoutSessionListener) listener)</span>
+<span class="nc" id="L781">                            .workoutFailed(session, error);</span>
+                }
+<span class="nc" id="L783">            }</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Primitives.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Primitives.java</span></div><h1>Primitives.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+/// Factory helpers that build common `Mesh` primitives. Every primitive uses the
+/// `VertexFormat.POSITION_NORMAL_TEXCOORD` layout so it can be drawn with any of
+/// the built in materials, lit or unlit, textured or not.
+public final class Primitives {
+    private Primitives() {
+    }
+
+    /// Builds a unit-normal axis aligned cube centered at the origin with the
+    /// supplied edge length. Each face has its own normals and a full 0..1
+    /// texture coordinate quad.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that allocates the buffers
+    ///
+    /// - `size`: the edge length of the cube
+    ///
+    /// #### Returns
+    ///
+    /// an indexed triangle mesh
+    public static Mesh cube(GraphicsDevice device, float size) {
+<span class="fc" id="L33">        float h = size * 0.5f;</span>
+        // 6 faces * 4 vertices, interleaved px,py,pz, nx,ny,nz, u,v
+<span class="fc" id="L35">        float[] v = {</span>
+                // front (+z)
+                -h, -h, h, 0, 0, 1, 0, 1,
+                h, -h, h, 0, 0, 1, 1, 1,
+                h, h, h, 0, 0, 1, 1, 0,
+                -h, h, h, 0, 0, 1, 0, 0,
+                // back (-z)
+                h, -h, -h, 0, 0, -1, 0, 1,
+                -h, -h, -h, 0, 0, -1, 1, 1,
+                -h, h, -h, 0, 0, -1, 1, 0,
+                h, h, -h, 0, 0, -1, 0, 0,
+                // left (-x)
+                -h, -h, -h, -1, 0, 0, 0, 1,
+                -h, -h, h, -1, 0, 0, 1, 1,
+                -h, h, h, -1, 0, 0, 1, 0,
+                -h, h, -h, -1, 0, 0, 0, 0,
+                // right (+x)
+                h, -h, h, 1, 0, 0, 0, 1,
+                h, -h, -h, 1, 0, 0, 1, 1,
+                h, h, -h, 1, 0, 0, 1, 0,
+                h, h, h, 1, 0, 0, 0, 0,
+                // top (+y)
+                -h, h, h, 0, 1, 0, 0, 1,
+                h, h, h, 0, 1, 0, 1, 1,
+                h, h, -h, 0, 1, 0, 1, 0,
+                -h, h, -h, 0, 1, 0, 0, 0,
+                // bottom (-y)
+                -h, -h, -h, 0, -1, 0, 0, 1,
+                h, -h, -h, 0, -1, 0, 1, 1,
+                h, -h, h, 0, -1, 0, 1, 0,
+                -h, -h, h, 0, -1, 0, 0, 0
+        };
+<span class="fc" id="L67">        int[] idx = new int[36];</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int face = 0; face &lt; 6; face++) {</span>
+<span class="fc" id="L69">            int b = face * 4;</span>
+<span class="fc" id="L70">            int o = face * 6;</span>
+<span class="fc" id="L71">            idx[o] = b;</span>
+<span class="fc" id="L72">            idx[o + 1] = b + 1;</span>
+<span class="fc" id="L73">            idx[o + 2] = b + 2;</span>
+<span class="fc" id="L74">            idx[o + 3] = b;</span>
+<span class="fc" id="L75">            idx[o + 4] = b + 2;</span>
+<span class="fc" id="L76">            idx[o + 5] = b + 3;</span>
+        }
+
+<span class="fc" id="L79">        VertexBuffer vb = device.createVertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, 24);</span>
+<span class="fc" id="L80">        vb.setData(v);</span>
+<span class="fc" id="L81">        IndexBuffer ib = device.createIndexBuffer(36);</span>
+<span class="fc" id="L82">        ib.setData(idx);</span>
+<span class="fc" id="L83">        return new Mesh(vb, ib, PrimitiveType.TRIANGLES);</span>
+    }
+
+    /// Builds a flat quad in the XY plane centered at the origin facing +Z.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that allocates the buffers
+    ///
+    /// - `size`: the edge length of the quad
+    ///
+    /// #### Returns
+    ///
+    /// an indexed triangle mesh
+    public static Mesh quad(GraphicsDevice device, float size) {
+<span class="fc" id="L98">        float h = size * 0.5f;</span>
+<span class="fc" id="L99">        float[] v = {</span>
+                -h, -h, 0, 0, 0, 1, 0, 1,
+                h, -h, 0, 0, 0, 1, 1, 1,
+                h, h, 0, 0, 0, 1, 1, 0,
+                -h, h, 0, 0, 0, 1, 0, 0
+        };
+<span class="fc" id="L105">        int[] idx = {0, 1, 2, 0, 2, 3};</span>
+<span class="fc" id="L106">        VertexBuffer vb = device.createVertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, 4);</span>
+<span class="fc" id="L107">        vb.setData(v);</span>
+<span class="fc" id="L108">        IndexBuffer ib = device.createIndexBuffer(6);</span>
+<span class="fc" id="L109">        ib.setData(idx);</span>
+<span class="fc" id="L110">        return new Mesh(vb, ib, PrimitiveType.TRIANGLES);</span>
+    }
+
+    /// Builds a UV sphere centered at the origin with equirectangular texture
+    /// coordinates: `u` wraps the longitude from 0 to 1 and `v` runs from 0 at
+    /// the north pole (+Y) to 1 at the south pole. This is the mapping used by
+    /// 360 degree panorama images. The seam column and the pole rows duplicate
+    /// vertices so texture coordinates stay continuous. For an inside-out
+    /// sphere the `u` direction is reversed so a panorama viewed from the
+    /// center reads correctly instead of mirror-imaged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that allocates the buffers
+    ///
+    /// - `radius`: the sphere radius
+    ///
+    /// - `latBands`: the number of latitude subdivisions, at least 2
+    ///
+    /// - `lonBands`: the number of longitude subdivisions, at least 3
+    ///
+    /// - `insideOut`: when true the normals point toward the center and the
+    ///   winding is flipped so the inner surface faces the viewer, as needed
+    ///   when rendering a panorama from inside the sphere
+    ///
+    /// #### Returns
+    ///
+    /// an indexed triangle mesh
+    public static Mesh sphere(GraphicsDevice device, float radius, int latBands, int lonBands,
+                              boolean insideOut) {
+<span class="fc" id="L140">        return sphere(radius, latBands, lonBands, insideOut);</span>
+    }
+
+    /// Builds a UV sphere without a `GraphicsDevice`, allocating the buffers
+    /// directly. Behaves exactly like
+    /// `sphere(GraphicsDevice, float, int, int, boolean)`; useful for preparing
+    /// geometry off the render thread or handing meshes to non GPU consumers
+    /// such as the AR content pipeline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radius`: the sphere radius
+    ///
+    /// - `latBands`: the number of latitude subdivisions, at least 2
+    ///
+    /// - `lonBands`: the number of longitude subdivisions, at least 3
+    ///
+    /// - `insideOut`: when true the normals point toward the center and the
+    ///   winding is flipped
+    ///
+    /// #### Returns
+    ///
+    /// an indexed triangle mesh
+    public static Mesh sphere(float radius, int latBands, int lonBands, boolean insideOut) {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (radius &lt;= 0.0f) {</span>
+<span class="fc" id="L165">            throw new IllegalArgumentException(&quot;radius must be positive&quot;);</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (latBands &lt; 2) {</span>
+<span class="fc" id="L168">            throw new IllegalArgumentException(&quot;latBands must be at least 2&quot;);</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (lonBands &lt; 3) {</span>
+<span class="fc" id="L171">            throw new IllegalArgumentException(&quot;lonBands must be at least 3&quot;);</span>
+        }
+<span class="fc" id="L173">        int vertexCount = (latBands + 1) * (lonBands + 1);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (vertexCount &gt; 65536) {</span>
+<span class="fc" id="L175">            throw new IllegalArgumentException(&quot;sphere tessellation exceeds the 16 bit index range&quot;);</span>
+        }
+<span class="fc" id="L177">        float[] v = new float[vertexCount * 8];</span>
+<span class="fc" id="L178">        int o = 0;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (int lat = 0; lat &lt;= latBands; lat++) {</span>
+<span class="fc" id="L180">            double theta = Math.PI * lat / latBands;</span>
+<span class="fc" id="L181">            float sinTheta = (float) Math.sin(theta);</span>
+<span class="fc" id="L182">            float cosTheta = (float) Math.cos(theta);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            for (int lon = 0; lon &lt;= lonBands; lon++) {</span>
+<span class="fc" id="L184">                double phi = 2.0 * Math.PI * lon / lonBands;</span>
+<span class="fc" id="L185">                float nx = sinTheta * (float) Math.sin(phi);</span>
+<span class="fc" id="L186">                float ny = cosTheta;</span>
+<span class="fc" id="L187">                float nz = sinTheta * (float) Math.cos(phi);</span>
+<span class="fc" id="L188">                v[o] = nx * radius;</span>
+<span class="fc" id="L189">                v[o + 1] = ny * radius;</span>
+<span class="fc" id="L190">                v[o + 2] = nz * radius;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                if (insideOut) {</span>
+<span class="fc" id="L192">                    v[o + 3] = -nx;</span>
+<span class="fc" id="L193">                    v[o + 4] = -ny;</span>
+<span class="fc" id="L194">                    v[o + 5] = -nz;</span>
+                } else {
+<span class="fc" id="L196">                    v[o + 3] = nx;</span>
+<span class="fc" id="L197">                    v[o + 4] = ny;</span>
+<span class="fc" id="L198">                    v[o + 5] = nz;</span>
+                }
+                // Looking outward from inside the sphere reverses the
+                // apparent horizontal direction, so flip u for inside-out
+                // spheres to keep panorama content un-mirrored.
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                v[o + 6] = insideOut ? 1f - (float) lon / lonBands : (float) lon / lonBands;</span>
+<span class="fc" id="L204">                v[o + 7] = (float) lat / latBands;</span>
+<span class="fc" id="L205">                o += 8;</span>
+            }
+        }
+<span class="fc" id="L208">        int[] idx = new int[latBands * lonBands * 6];</span>
+<span class="fc" id="L209">        int i = 0;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (int lat = 0; lat &lt; latBands; lat++) {</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            for (int lon = 0; lon &lt; lonBands; lon++) {</span>
+<span class="fc" id="L212">                int first = lat * (lonBands + 1) + lon;</span>
+<span class="fc" id="L213">                int second = first + lonBands + 1;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                if (insideOut) {</span>
+<span class="fc" id="L215">                    idx[i] = first;</span>
+<span class="fc" id="L216">                    idx[i + 1] = first + 1;</span>
+<span class="fc" id="L217">                    idx[i + 2] = second;</span>
+<span class="fc" id="L218">                    idx[i + 3] = second;</span>
+<span class="fc" id="L219">                    idx[i + 4] = first + 1;</span>
+<span class="fc" id="L220">                    idx[i + 5] = second + 1;</span>
+                } else {
+<span class="fc" id="L222">                    idx[i] = first;</span>
+<span class="fc" id="L223">                    idx[i + 1] = second;</span>
+<span class="fc" id="L224">                    idx[i + 2] = first + 1;</span>
+<span class="fc" id="L225">                    idx[i + 3] = second;</span>
+<span class="fc" id="L226">                    idx[i + 4] = second + 1;</span>
+<span class="fc" id="L227">                    idx[i + 5] = first + 1;</span>
+                }
+<span class="fc" id="L229">                i += 6;</span>
+            }
+        }
+<span class="fc" id="L232">        VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, vertexCount);</span>
+<span class="fc" id="L233">        vb.setData(v);</span>
+<span class="fc" id="L234">        IndexBuffer ib = new IndexBuffer(idx.length);</span>
+<span class="fc" id="L235">        ib.setData(idx);</span>
+<span class="fc" id="L236">        return new Mesh(vb, ib, PrimitiveType.TRIANGLES);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

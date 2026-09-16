@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MouseJoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">MouseJoint.java</span></div><h1>MouseJoint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.Mat22;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.SolverData;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+
+/// A mouse joint is used to make a point on a body track a specified world point. This a soft
+/// constraint with a maximum force. This allows the constraint to stretch and without applying huge
+/// forces. NOTE: this joint is not documented in the manual because it was developed to be used in
+/// the testbed. If you want to learn how to use the mouse joint, look at the testbed.
+///
+/// @author Daniel
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">public class MouseJoint extends Joint {</span>
+
+<span class="fc" id="L43">  private final Vec2 m_localAnchorB = new Vec2();</span>
+<span class="fc" id="L44">  private final Vec2 m_targetA = new Vec2();</span>
+  private float m_frequencyHz;
+  private float m_dampingRatio;
+  private float m_beta;
+
+  // Solver shared
+<span class="fc" id="L50">  private final Vec2 m_impulse = new Vec2();</span>
+  private float m_maxForce;
+  private float m_gamma;
+
+  // Solver temp
+  private int m_indexB;
+<span class="fc" id="L56">  private final Vec2 m_rB = new Vec2();</span>
+<span class="fc" id="L57">  private final Vec2 m_localCenterB = new Vec2();</span>
+  private float m_invMassB;
+  private float m_invIB;
+<span class="fc" id="L60">  private final Mat22 m_mass = new Mat22();</span>
+<span class="fc" id="L61">  private final Vec2 m_C = new Vec2();</span>
+
+  protected MouseJoint(IWorldPool argWorld, MouseJointDef def) {
+<span class="fc" id="L64">    super(argWorld, def);</span>
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">    assert (def.target.isValid());</span>
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">    assert (def.maxForce &gt;= 0);</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">    assert (def.frequencyHz &gt;= 0);</span>
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">    assert (def.dampingRatio &gt;= 0);</span>
+
+<span class="fc" id="L70">    m_targetA.set(def.target);</span>
+<span class="fc" id="L71">    Transform.mulTransToOutUnsafe(m_bodyB.getTransform(), m_targetA, m_localAnchorB);</span>
+
+<span class="fc" id="L73">    m_maxForce = def.maxForce;</span>
+<span class="fc" id="L74">    m_impulse.setZero();</span>
+
+<span class="fc" id="L76">    m_frequencyHz = def.frequencyHz;</span>
+<span class="fc" id="L77">    m_dampingRatio = def.dampingRatio;</span>
+
+<span class="fc" id="L79">    m_beta = 0;</span>
+<span class="fc" id="L80">    m_gamma = 0;</span>
+<span class="fc" id="L81">  }</span>
+
+  public void getAnchorA(Vec2 argOut) {
+<span class="nc" id="L84">    argOut.set(m_targetA);</span>
+<span class="nc" id="L85">  }</span>
+
+  public void getAnchorB(Vec2 argOut) {
+<span class="nc" id="L88">    m_bodyB.getWorldPointToOut(m_localAnchorB, argOut);</span>
+<span class="nc" id="L89">  }</span>
+
+  public void getReactionForce(float invDt, Vec2 argOut) {
+<span class="nc" id="L92">    argOut.set(m_impulse).mulLocal(invDt);</span>
+<span class="nc" id="L93">  }</span>
+
+  public float getReactionTorque(float invDt) {
+<span class="nc" id="L96">    return invDt * 0.0f;</span>
+  }
+
+
+  public void setTarget(Vec2 target) {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">    if (m_bodyB.isAwake() == false) {</span>
+<span class="nc" id="L102">      m_bodyB.setAwake(true);</span>
+    }
+<span class="fc" id="L104">    m_targetA.set(target);</span>
+<span class="fc" id="L105">  }</span>
+
+  public Vec2 getTarget() {
+<span class="nc" id="L108">    return m_targetA;</span>
+  }
+
+  // / set/get the maximum force in Newtons.
+  public void setMaxForce(float force) {
+<span class="nc" id="L113">    m_maxForce = force;</span>
+<span class="nc" id="L114">  }</span>
+
+  public float getMaxForce() {
+<span class="nc" id="L117">    return m_maxForce;</span>
+  }
+
+  // / set/get the frequency in Hertz.
+  public void setFrequency(float hz) {
+<span class="nc" id="L122">    m_frequencyHz = hz;</span>
+<span class="nc" id="L123">  }</span>
+
+  public float getFrequency() {
+<span class="nc" id="L126">    return m_frequencyHz;</span>
+  }
+
+  // / set/get the damping ratio (dimensionless).
+  public void setDampingRatio(float ratio) {
+<span class="nc" id="L131">    m_dampingRatio = ratio;</span>
+<span class="nc" id="L132">  }</span>
+
+  public float getDampingRatio() {
+<span class="nc" id="L135">    return m_dampingRatio;</span>
+  }
+
+  public void initVelocityConstraints(final SolverData data) {
+<span class="fc" id="L139">    m_indexB = m_bodyB.m_islandIndex;</span>
+<span class="fc" id="L140">    m_localCenterB.set(m_bodyB.m_sweep.localCenter);</span>
+<span class="fc" id="L141">    m_invMassB = m_bodyB.m_invMass;</span>
+<span class="fc" id="L142">    m_invIB = m_bodyB.m_invI;</span>
+
+<span class="fc" id="L144">    Vec2 cB = data.positions[m_indexB].c;</span>
+<span class="fc" id="L145">    float aB = data.positions[m_indexB].a;</span>
+<span class="fc" id="L146">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L147">    float wB = data.velocities[m_indexB].w;</span>
+
+<span class="fc" id="L149">    final Rot qB = pool.popRot();</span>
+
+<span class="fc" id="L151">    qB.set(aB);</span>
+
+<span class="fc" id="L153">    float mass = m_bodyB.getMass();</span>
+
+    // Frequency
+<span class="fc" id="L156">    float omega = 2.0f * MathUtils.PI * m_frequencyHz;</span>
+
+    // Damping coefficient
+<span class="fc" id="L159">    float d = 2.0f * mass * m_dampingRatio * omega;</span>
+
+    // Spring stiffness
+<span class="fc" id="L162">    float k = mass * (omega * omega);</span>
+
+    // magic formulas
+    // gamma has units of inverse mass.
+    // beta has units of inverse time.
+<span class="fc" id="L167">    float h = data.step.dt;</span>
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">    assert (d + h * k &gt; Settings.EPSILON);</span>
+<span class="fc" id="L169">    m_gamma = h * (d + h * k);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">    if (m_gamma != 0.0f) {</span>
+<span class="fc" id="L171">      m_gamma = 1.0f / m_gamma;</span>
+    }
+<span class="fc" id="L173">    m_beta = h * k * m_gamma;</span>
+
+<span class="fc" id="L175">    Vec2 temp = pool.popVec2();</span>
+
+    // Compute the effective mass matrix.
+<span class="fc" id="L178">    Rot.mulToOutUnsafe(qB, temp.set(m_localAnchorB).subLocal(m_localCenterB), m_rB);</span>
+
+    // K = [(1/m1 + 1/m2) * eye(2) - skew(r1) * invI1 * skew(r1) - skew(r2) * invI2 * skew(r2)]
+    // = [1/m1+1/m2 0 ] + invI1 * [r1.y*r1.y -r1.x*r1.y] + invI2 * [r1.y*r1.y -r1.x*r1.y]
+    // [ 0 1/m1+1/m2] [-r1.x*r1.y r1.x*r1.x] [-r1.x*r1.y r1.x*r1.x]
+<span class="fc" id="L183">    final Mat22 K = pool.popMat22();</span>
+<span class="fc" id="L184">    K.ex.x = m_invMassB + m_invIB * m_rB.y * m_rB.y + m_gamma;</span>
+<span class="fc" id="L185">    K.ex.y = -m_invIB * m_rB.x * m_rB.y;</span>
+<span class="fc" id="L186">    K.ey.x = K.ex.y;</span>
+<span class="fc" id="L187">    K.ey.y = m_invMassB + m_invIB * m_rB.x * m_rB.x + m_gamma;</span>
+
+<span class="fc" id="L189">    K.invertToOut(m_mass);</span>
+
+<span class="fc" id="L191">    m_C.set(cB).addLocal(m_rB).subLocal(m_targetA);</span>
+<span class="fc" id="L192">    m_C.mulLocal(m_beta);</span>
+
+    // Cheat with some damping
+<span class="fc" id="L195">    wB *= 0.98f;</span>
+
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">    if (data.step.warmStarting) {</span>
+<span class="fc" id="L198">      m_impulse.mulLocal(data.step.dtRatio);</span>
+<span class="fc" id="L199">      vB.x += m_invMassB * m_impulse.x;</span>
+<span class="fc" id="L200">      vB.y += m_invMassB * m_impulse.y;</span>
+<span class="fc" id="L201">      wB += m_invIB * Vec2.cross(m_rB, m_impulse);</span>
+    } else {
+<span class="nc" id="L203">      m_impulse.setZero();</span>
+    }
+
+//    data.velocities[m_indexB].v.set(vB);
+<span class="fc" id="L207">    data.velocities[m_indexB].w = wB;</span>
+
+<span class="fc" id="L209">    pool.pushVec2(1);</span>
+<span class="fc" id="L210">    pool.pushMat22(1);</span>
+<span class="fc" id="L211">    pool.pushRot(1);</span>
+<span class="fc" id="L212">  }</span>
+
+  public boolean solvePositionConstraints(final SolverData data) {
+<span class="fc" id="L215">    return true;</span>
+  }
+
+  public void solveVelocityConstraints(final SolverData data) {
+
+<span class="fc" id="L220">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L221">    float wB = data.velocities[m_indexB].w;</span>
+
+    // Cdot = v + cross(w, r)
+<span class="fc" id="L224">    final Vec2 Cdot = pool.popVec2();</span>
+<span class="fc" id="L225">    Vec2.crossToOutUnsafe(wB, m_rB, Cdot);</span>
+<span class="fc" id="L226">    Cdot.addLocal(vB);</span>
+
+<span class="fc" id="L228">    final Vec2 impulse = pool.popVec2();</span>
+<span class="fc" id="L229">    final Vec2 temp = pool.popVec2();</span>
+
+<span class="fc" id="L231">    temp.set(m_impulse).mulLocal(m_gamma).addLocal(m_C).addLocal(Cdot).negateLocal();</span>
+<span class="fc" id="L232">    Mat22.mulToOutUnsafe(m_mass, temp, impulse);</span>
+
+<span class="fc" id="L234">    Vec2 oldImpulse = temp;</span>
+<span class="fc" id="L235">    oldImpulse.set(m_impulse);</span>
+<span class="fc" id="L236">    m_impulse.addLocal(impulse);</span>
+<span class="fc" id="L237">    float maxImpulse = data.step.dt * m_maxForce;</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">    if (m_impulse.lengthSquared() &gt; maxImpulse * maxImpulse) {</span>
+<span class="fc" id="L239">      m_impulse.mulLocal(maxImpulse / m_impulse.length());</span>
+    }
+<span class="fc" id="L241">    impulse.set(m_impulse).subLocal(oldImpulse);</span>
+
+<span class="fc" id="L243">    vB.x += m_invMassB * impulse.x;</span>
+<span class="fc" id="L244">    vB.y += m_invMassB * impulse.y;</span>
+<span class="fc" id="L245">    wB += m_invIB * Vec2.cross(m_rB, impulse);</span>
+
+//    data.velocities[m_indexB].v.set(vB);
+<span class="fc" id="L248">    data.velocities[m_indexB].w = wB;</span>
+    
+<span class="fc" id="L250">    pool.pushVec2(3);</span>
+<span class="fc" id="L251">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

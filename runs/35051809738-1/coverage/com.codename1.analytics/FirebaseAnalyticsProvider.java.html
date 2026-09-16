@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FirebaseAnalyticsProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics</a> &gt; <span class="el_source">FirebaseAnalyticsProvider.java</span></div><h1>FirebaseAnalyticsProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics;
+
+import java.util.Map;
+
+/// A provider that forwards analytics to the native Firebase Analytics SDK.
+/// On Android and iOS, with Firebase configured in the build, events flow to
+/// the Firebase console. Where no native implementation is wired (the
+/// simulator, the desktop build, or a build without Firebase set up) the
+/// provider degrades silently to a no-op, so it is always safe to register:
+///
+/// ```java
+/// Analytics.addProvider(new FirebaseAnalyticsProvider());
+/// ```
+///
+/// ### How the native call is wired
+///
+/// Unlike a {@code NativeInterface} (which exists for the build server to
+/// generate per-app native peers), this provider talks to the platform through
+/// a small {@link Bridge}. The Codename One build supplies the concrete bridge
+/// for the target and registers it via {@link #registerBridge(Bridge)} before
+/// the app starts:
+///
+/// - **Android**: a bridge that calls
+///   `FirebaseAnalytics.getInstance(context).logEvent(...)` /
+///   `setUserId` / `setUserProperty` directly. Requires
+///   `google-services.json` and the Firebase Gradle plugin in the build.
+/// - **iOS**: a bridge whose methods are declared `native` and implemented in
+///   Objective-C (`FIRAnalytics`). Requires `GoogleService-Info.plist` and the
+///   Firebase pods.
+/// - **Everything else** (simulator, desktop): no bridge is registered, so the
+///   provider is a no-op.
+///
+/// Firebase is enabled with the {@code codename1.arg.android.firebaseAnalytics}
+/// / {@code codename1.arg.ios.firebaseAnalytics} build hints, which is what
+/// makes the build register the bridge.
+<span class="fc" id="L58">public class FirebaseAnalyticsProvider extends AbstractAnalyticsProvider {</span>
+
+    /// The platform's connection to the native Firebase SDK. The Codename One
+    /// build implements this for Android (direct SDK calls) and iOS (native
+    /// methods) and hands it to {@link #registerBridge(Bridge)}. Application
+    /// code never implements this directly.
+    public interface Bridge {
+        /// Whether the native Firebase SDK is present and initialised.
+        ///
+        /// #### Returns
+        ///
+        /// true when events can be delivered
+        boolean isSupported();
+
+        /// Logs a named event with a JSON object of parameters.
+        ///
+        /// #### Parameters
+        ///
+        /// - `name`: the event name
+        ///
+        /// - `paramsJson`: a JSON object of parameters, may be empty
+        void logEvent(String name, String paramsJson);
+
+        /// Logs a screen view.
+        ///
+        /// #### Parameters
+        ///
+        /// - `screenName`: the screen name
+        void logScreen(String screenName);
+
+        /// Sets the Firebase user id.
+        ///
+        /// #### Parameters
+        ///
+        /// - `id`: the user id, or null to clear
+        void setUserId(String id);
+
+        /// Sets a Firebase user property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: the property name
+        ///
+        /// - `value`: the property value
+        void setUserProperty(String key, String value);
+    }
+
+    private static Bridge registeredBridge;
+
+    /// Registers the platform bridge. Called by the Codename One build for a
+    /// Firebase-enabled Android / iOS target; never called by application code.
+    /// Passing null clears the registration (the provider becomes a no-op).
+    ///
+    /// #### Parameters
+    ///
+    /// - `bridge`: the platform bridge, or null
+    public static void registerBridge(Bridge bridge) {
+<span class="nc" id="L115">        registeredBridge = bridge;</span>
+<span class="nc" id="L116">    }</span>
+
+    private Bridge bridge;
+    private boolean available;
+
+    @Override
+    public String getName() {
+<span class="nc" id="L123">        return &quot;firebase&quot;;</span>
+    }
+
+    @Override
+    public void init(AnalyticsContext context) {
+<span class="fc" id="L128">        super.init(context);</span>
+<span class="fc" id="L129">        bridge = registeredBridge;</span>
+        try {
+<span class="pc bpc" id="L131" title="3 of 4 branches missed.">            available = bridge != null &amp;&amp; bridge.isSupported();</span>
+<span class="nc" id="L132">        } catch (Throwable t) {</span>
+<span class="nc" id="L133">            available = false;</span>
+<span class="fc" id="L134">        }</span>
+<span class="fc" id="L135">    }</span>
+
+    @Override
+    public void trackScreen(String name, String referrer) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (available) {</span>
+<span class="nc" id="L140">            bridge.logScreen(name);</span>
+        }
+<span class="fc" id="L142">    }</span>
+
+    @Override
+    public void trackEvent(AnalyticsEvent event) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (available) {</span>
+<span class="nc" id="L147">            bridge.logEvent(event.getName(), paramsJson(event.getParameters()));</span>
+        }
+<span class="fc" id="L149">    }</span>
+
+    @Override
+    public void setUserId(String id) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (available) {</span>
+<span class="nc" id="L154">            bridge.setUserId(id);</span>
+        }
+<span class="fc" id="L156">    }</span>
+
+    @Override
+    public void setUserProperty(String key, String value) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (available) {</span>
+<span class="nc" id="L161">            bridge.setUserProperty(key, value);</span>
+        }
+<span class="fc" id="L163">    }</span>
+
+    @Override
+    public void reportCrash(AnalyticsCrashReport report) {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (!available) {</span>
+<span class="fc" id="L168">            return;</span>
+        }
+<span class="nc" id="L170">        String description = report.getMessage();</span>
+<span class="nc bnc" id="L171" title="All 6 branches missed.">        if ((description == null || description.length() == 0) &amp;&amp; report.getThrowable() != null) {</span>
+<span class="nc" id="L172">            description = report.getThrowable().getClass().getName();</span>
+        }
+<span class="nc" id="L174">        StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L175">        b.append('{');</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        AnalyticsJson.appendString(b, &quot;description&quot;, description == null ? &quot;&quot; : description, true);</span>
+<span class="nc" id="L177">        AnalyticsJson.appendBoolean(b, &quot;fatal&quot;, report.isFatal(), false);</span>
+<span class="nc" id="L178">        b.append('}');</span>
+<span class="nc" id="L179">        bridge.logEvent(&quot;app_exception&quot;, b.toString());</span>
+<span class="nc" id="L180">    }</span>
+
+    @Override
+    public boolean supports(AnalyticsCapability capability) {
+<span class="pc bpc" id="L184" title="4 of 8 branches missed.">        return capability == AnalyticsCapability.SCREEN_VIEWS</span>
+                || capability == AnalyticsCapability.EVENTS
+                || capability == AnalyticsCapability.USER_PROPERTIES
+                || capability == AnalyticsCapability.CRASH_REPORTING;
+    }
+
+    private static String paramsJson(Map&lt;String, Object&gt; params) {
+<span class="nc" id="L191">        StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L192">        b.append('{');</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (params != null) {</span>
+<span class="nc" id="L194">            boolean first = true;</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            for (Map.Entry&lt;String, Object&gt; e : params.entrySet()) {</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L197">                    b.append(',');</span>
+                }
+<span class="nc" id="L199">                b.append('&quot;');</span>
+<span class="nc" id="L200">                AnalyticsJson.escape(b, e.getKey());</span>
+<span class="nc" id="L201">                b.append(&quot;\&quot;:&quot;);</span>
+<span class="nc" id="L202">                AnalyticsJson.appendValue(b, e.getValue());</span>
+<span class="nc" id="L203">                first = false;</span>
+<span class="nc" id="L204">            }</span>
+        }
+<span class="nc" id="L206">        b.append('}');</span>
+<span class="nc" id="L207">        return b.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

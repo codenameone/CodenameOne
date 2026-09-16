@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlassRecipe.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">GlassRecipe.java</span></div><h1>GlassRecipe.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.plaf;
+
+/// A typed, named recipe for the &quot;Liquid Glass&quot; backdrop materials (iOS 26).
+///
+/// A glass surface is described by its material INTENT -- which named recipe
+/// it uses -- rather than by loose per-parameter theme constants. Each recipe
+/// bundles the bounded, measured parameters of one native material (the colour
+/// transform the real UIVisualEffectView / UIGlassEffect applies to the blurred
+/// backdrop, plus the edge optics), so similar glass surfaces cannot silently
+/// diverge and a theme cannot tune itself into an incoherent material. The
+/// available recipes:
+///
+/// - `blur`   -- {@link Kind#PLAIN_BLUR}: backdrop blur only, no
+/// material colour transform (a plain CSS backdrop-filter).
+/// - `chrome` -- {@link Kind#LIQUID_CHROME}: the rectangular chrome
+/// bars anchored at a screen edge (navigation / title bars). Very
+/// transparent; the backdrop reads through at near-full saturation.
+/// - `pill`   -- {@link Kind#LIQUID_PILL}: the floating pill chrome
+/// (the iOS 26 tab bar). Frostier than the edge bars -- in light mode it
+/// washes strongly toward white while boosting saturation.
+/// - `panel`  -- {@link Kind#LIQUID_PANEL}: a bare glass panel or
+/// button capsule (UIGlassEffect). The strongest material: heavy wash,
+/// plus edge refraction and a specular rim so the glass reads as a layer
+/// on top of the content rather than a flat hole.
+///
+/// A theme assigns a recipe per UIID with the theme constant
+/// `&lt;UIID&gt;GlassRecipe` (for example `ToolbarGlassRecipe: chrome`),
+/// with `glassRecipeDefault` as the theme-wide default (`panel`
+/// when unset). The recipe is resolved at paint time by
+/// `Component.internalPaintImpl` and its parameters are passed to the
+/// port through `Graphics.glassRegion`; ports never read material
+/// constants themselves.
+///
+/// The travelling tab-selection lens is the remaining glass surface; it is
+/// an optics-over-content effect bound to the morph motion, so its typed
+/// parameters live with the motion model (`TabSelectionMorph`) rather
+/// than here.
+public final class GlassRecipe {
+
+    /// The material kind a {@link GlassRecipe} renders.
+<span class="nc" id="L63">    public enum Kind {</span>
+        /// Backdrop blur only -- no material colour transform.
+<span class="nc" id="L65">        PLAIN_BLUR,</span>
+        /// Rectangular chrome bar anchored at a screen edge (nav/title bar).
+<span class="nc" id="L67">        LIQUID_CHROME,</span>
+        /// Floating pill chrome (the iOS 26 tab bar).
+<span class="nc" id="L69">        LIQUID_PILL,</span>
+        /// Bare glass panel / button capsule (UIGlassEffect).
+<span class="nc" id="L71">        LIQUID_PANEL</span>
+    }
+
+    private final Kind kind;
+    private final float saturation;
+    private final float scale;
+    private final float offset;
+    private final float refraction;
+    private final float specular;
+
+    private GlassRecipe(Kind kind, float saturation, float scale, float offset,
+<span class="nc" id="L82">            float refraction, float specular) {</span>
+<span class="nc" id="L83">        this.kind = kind;</span>
+<span class="nc" id="L84">        this.saturation = saturation;</span>
+<span class="nc" id="L85">        this.scale = scale;</span>
+<span class="nc" id="L86">        this.offset = offset;</span>
+<span class="nc" id="L87">        this.refraction = refraction;</span>
+<span class="nc" id="L88">        this.specular = specular;</span>
+<span class="nc" id="L89">    }</span>
+
+    /// Plain backdrop blur with no material transform.
+    ///
+    /// @return the plain-blur recipe
+    public static GlassRecipe plainBlur() {
+<span class="nc" id="L95">        return new GlassRecipe(Kind.PLAIN_BLUR, 1f, 1f, 0f, 0f, 0f);</span>
+    }
+
+    /// The rectangular edge-anchored chrome bar material (navigation/title
+    /// bars). Measured against the iOS 26 UINavigationBar glass: the backdrop
+    /// passes through at near-full strength with only a light wash.
+    ///
+    /// @param dark true for the dark appearance
+    /// @return the chrome-bar recipe
+    public static GlassRecipe liquidChrome(boolean dark) {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        return dark</span>
+                ? new GlassRecipe(Kind.LIQUID_CHROME, 1.6f, 1.0f, 12f, 0f, 0f)
+                : new GlassRecipe(Kind.LIQUID_CHROME, 1.1f, 0.85f, 20f, 0f, 0f);
+    }
+
+    /// The floating pill chrome material (the iOS 26 tab bar). Frostier than
+    /// the edge bars: light mode washes strongly toward white while boosting
+    /// saturation, and a faint specular rim keeps the pill edge legible.
+    ///
+    /// @param dark true for the dark appearance
+    /// @return the floating-pill recipe
+    public static GlassRecipe liquidPill(boolean dark) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return dark</span>
+                ? new GlassRecipe(Kind.LIQUID_PILL, 2.5f, 0.3f, 13f, 0f, 0.2f)
+                : new GlassRecipe(Kind.LIQUID_PILL, 1.8f, 1.0f, 108f, 0f, 0.2f);
+    }
+
+    /// The bare glass panel / button capsule material (UIGlassEffect). The
+    /// strongest material: a heavy wash plus edge refraction (lensing) and a
+    /// specular rim, so a free-standing glass element reads as a layer on top
+    /// of the content.
+    ///
+    /// @param dark true for the dark appearance
+    /// @return the glass-panel recipe
+    public static GlassRecipe liquidPanel(boolean dark) {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        return dark</span>
+                ? new GlassRecipe(Kind.LIQUID_PANEL, 2.5f, 0.238f, 28.4f, 0.4f, 0.5f)
+                : new GlassRecipe(Kind.LIQUID_PANEL, 1.95f, 0.303f, 174.3f, 0.4f, 0.5f);
+    }
+
+    /// Looks up a recipe by its theme name (`blur`, `chrome`,
+    /// `pill` or `panel`). Unknown names fall back to the panel
+    /// recipe -- the safest default for a free-standing glass surface.
+    ///
+    /// @param name the recipe name from the theme
+    /// @param dark true for the dark appearance
+    /// @return the named recipe, never null
+    public static GlassRecipe named(String name, boolean dark) {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        String n = name == null ? &quot;&quot; : name.trim();</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (&quot;blur&quot;.equals(n)) {</span>
+<span class="nc" id="L145">            return plainBlur();</span>
+        }
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (&quot;chrome&quot;.equals(n)) {</span>
+<span class="nc" id="L148">            return liquidChrome(dark);</span>
+        }
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (&quot;pill&quot;.equals(n)) {</span>
+<span class="nc" id="L151">            return liquidPill(dark);</span>
+        }
+<span class="nc" id="L153">        return liquidPanel(dark);</span>
+    }
+
+    /// Resolves the recipe for a UIID from the theme: the per-UIID
+    /// `&lt;UIID&gt;GlassRecipe` constant wins, then the theme-wide
+    /// `glassRecipeDefault`, then the panel recipe.
+    ///
+    /// @param manager the UI manager holding the theme
+    /// @param uiid    the component's UIID
+    /// @param dark    true for the dark appearance
+    /// @return the resolved recipe, never null
+    public static GlassRecipe resolve(UIManager manager, String uiid, boolean dark) {
+<span class="nc" id="L165">        String name = manager.getThemeConstant(uiid + &quot;GlassRecipe&quot;, null);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L167">            name = manager.getThemeConstant(&quot;glassRecipeDefault&quot;, &quot;panel&quot;);</span>
+        }
+<span class="nc" id="L169">        return named(name, dark);</span>
+    }
+
+    /// The material kind this recipe renders.
+    ///
+    /// @return the kind, never null
+    public Kind getKind() {
+<span class="nc" id="L176">        return kind;</span>
+    }
+
+    /// The saturation boost applied to the blurred backdrop.
+    ///
+    /// @return the saturation multiplier
+    public float getSaturation() {
+<span class="nc" id="L183">        return saturation;</span>
+    }
+
+    /// The colour scale multiplier of the material's affine colour transform.
+    ///
+    /// @return the scale factor
+    public float getScale() {
+<span class="nc" id="L190">        return scale;</span>
+    }
+
+    /// The colour offset (wash floor) of the material's affine colour transform,
+    /// in 0..255 channel units.
+    ///
+    /// @return the offset
+    public float getOffset() {
+<span class="nc" id="L198">        return offset;</span>
+    }
+
+    /// The edge refraction (lensing) strength -- bends the backdrop toward the
+    /// edges so the glass reads as a layer on top rather than a flat hole.
+    ///
+    /// @return the refraction strength, 0 = none
+    public float getRefraction() {
+<span class="nc" id="L206">        return refraction;</span>
+    }
+
+    /// The brightness of the specular edge rim (the bright glint).
+    ///
+    /// @return the specular strength, 0 = none
+    public float getSpecular() {
+<span class="nc" id="L213">        return specular;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpriteSheet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">SpriteSheet.java</span></div><h1>SpriteSheet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.ui.Image;
+
+/// Slices a single texture atlas image into a grid of equally sized frames.
+///
+/// Frames are addressed either by linear index (row major, starting at 0) or by
+/// column/row. Each frame is cut once with
+/// `com.codename1.ui.Image#subImage(int, int, int, int, boolean)` and then cached,
+/// because cutting a sub image copies pixel data and is far too expensive to repeat
+/// every animation frame.
+public class SpriteSheet {
+    private final Image sheet;
+    private final int frameWidth;
+    private final int frameHeight;
+    private final int columns;
+    private final int rows;
+    private final Image[] cache;
+
+    /// Creates a sprite sheet over the given image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sheet`: the atlas image
+    ///
+    /// - `frameWidth`: width of a single frame in pixels
+    ///
+    /// - `frameHeight`: height of a single frame in pixels
+<span class="fc" id="L51">    public SpriteSheet(Image sheet, int frameWidth, int frameHeight) {</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (sheet == null) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;sheet is null&quot;);</span>
+        }
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (frameWidth &lt;= 0 || frameHeight &lt;= 0) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;frame size must be positive&quot;);</span>
+        }
+<span class="fc" id="L58">        this.sheet = sheet;</span>
+<span class="fc" id="L59">        this.frameWidth = frameWidth;</span>
+<span class="fc" id="L60">        this.frameHeight = frameHeight;</span>
+<span class="fc" id="L61">        this.columns = sheet.getWidth() / frameWidth;</span>
+<span class="fc" id="L62">        this.rows = sheet.getHeight() / frameHeight;</span>
+<span class="fc" id="L63">        this.cache = new Image[columns * rows];</span>
+<span class="fc" id="L64">    }</span>
+
+    /// The number of frame columns in the sheet.
+    public int getColumns() {
+<span class="fc" id="L68">        return columns;</span>
+    }
+
+    /// The number of frame rows in the sheet.
+    public int getRows() {
+<span class="fc" id="L73">        return rows;</span>
+    }
+
+    /// The total number of frames (columns times rows).
+    public int getFrameCount() {
+<span class="fc" id="L78">        return cache.length;</span>
+    }
+
+    public int getFrameWidth() {
+<span class="fc" id="L82">        return frameWidth;</span>
+    }
+
+    public int getFrameHeight() {
+<span class="fc" id="L86">        return frameHeight;</span>
+    }
+
+    /// Returns the frame at the given linear index, cutting and caching it on first
+    /// access.
+    public Image getFrame(int index) {
+<span class="fc bfc" id="L92" title="All 4 branches covered.">        if (index &lt; 0 || index &gt;= cache.length) {</span>
+<span class="fc" id="L93">            throw new IndexOutOfBoundsException(&quot;frame index &quot; + index + &quot; out of 0..&quot; + (cache.length - 1));</span>
+        }
+<span class="fc" id="L95">        Image img = cache[index];</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (img == null) {</span>
+<span class="fc" id="L97">            int col = index % columns;</span>
+<span class="fc" id="L98">            int row = index / columns;</span>
+<span class="fc" id="L99">            img = sheet.subImage(col * frameWidth, row * frameHeight, frameWidth, frameHeight, true);</span>
+<span class="fc" id="L100">            cache[index] = img;</span>
+        }
+<span class="fc" id="L102">        return img;</span>
+    }
+
+    /// Returns the frame at the given column and row.
+    public Image getFrame(int col, int row) {
+<span class="fc" id="L107">        return getFrame(row * columns + col);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

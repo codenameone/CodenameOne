@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Island.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics</a> &gt; <span class="el_source">Island.java</span></div><h1>Island.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics;
+
+import com.codename1.gaming.physics.box2d.callbacks.ContactImpulse;
+import com.codename1.gaming.physics.box2d.callbacks.ContactListener;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactSolver;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactSolver.ContactSolverDef;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactVelocityConstraint;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Position;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Velocity;
+import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
+
+/*
+ Position Correction Notes
+ =========================
+ I tried the several algorithms for position correction of the 2D revolute joint.
+ I looked at these systems:
+ - simple pendulum (1m diameter sphere on massless 5m stick) with initial angular velocity of 100 rad/s.
+ - suspension bridge with 30 1m long planks of length 1m.
+ - multi-link chain with 30 1m long links.
+
+ Here are the algorithms:
+
+ Baumgarte - A fraction of the position error is added to the velocity error. There is no
+ separate position solver.
+
+ Pseudo Velocities - After the velocity solver and position integration,
+ the position error, Jacobian, and effective mass are recomputed. Then
+ the velocity constraints are solved with pseudo velocities and a fraction
+ of the position error is added to the pseudo velocity error. The pseudo
+ velocities are initialized to zero and there is no warm-starting. After
+ the position solver, the pseudo velocities are added to the positions.
+ This is also called the First Order World method or the Position LCP method.
+
+ Modified Nonlinear Gauss-Seidel (NGS) - Like Pseudo Velocities except the
+ position error is re-computed for each raint and the positions are updated
+ after the raint is solved. The radius vectors (aka Jacobians) are
+ re-computed too (otherwise the algorithm has horrible instability). The pseudo
+ velocity states are not needed because they are effectively zero at the beginning
+ of each iteration. Since we have the current position error, we allow the
+ iterations to terminate early if the error becomes smaller than Settings.linearSlop.
+
+ Full NGS or just NGS - Like Modified NGS except the effective mass are re-computed
+ each time a raint is solved.
+
+ Here are the results:
+ Baumgarte - this is the cheapest algorithm but it has some stability problems,
+ especially with the bridge. The chain links separate easily close to the root
+ and they jitter as they struggle to pull together. This is one of the most common
+ methods in the field. The big drawback is that the position correction artificially
+ affects the momentum, thus leading to instabilities and false bounce. I used a
+ bias factor of 0.2. A larger bias factor makes the bridge less stable, a smaller
+ factor makes joints and contacts more spongy.
+
+ Pseudo Velocities - the is more stable than the Baumgarte method. The bridge is
+ stable. However, joints still separate with large angular velocities. Drag the
+ simple pendulum in a circle quickly and the joint will separate. The chain separates
+ easily and does not recover. I used a bias factor of 0.2. A larger value lead to
+ the bridge collapsing when a heavy cube drops on it.
+
+ Modified NGS - this algorithm is better in some ways than Baumgarte and Pseudo
+ Velocities, but in other ways it is worse. The bridge and chain are much more
+ stable, but the simple pendulum goes unstable at high angular velocities.
+
+ Full NGS - stable in all tests. The joints display good stiffness. The bridge
+ still sags, but this is better than infinite forces.
+
+ Recommendations
+ Pseudo Velocities are not really worthwhile because the bridge and chain cannot
+ recover from joint separation. In other cases the benefit over Baumgarte is small.
+
+ Modified NGS is not a robust method for the revolute joint due to the violent
+ instability seen in the simple pendulum. Perhaps it is viable with other raint
+ types, especially scalar constraints where the effective mass is a scalar.
+
+ This leaves Baumgarte and Full NGS. Baumgarte has small, but manageable instabilities
+ and is very fast. I don't think we can escape Baumgarte, especially in highly
+ demanding cases where high raint fidelity is not needed.
+
+ Full NGS is robust and easy on the eyes. I recommend this as an option for
+ higher fidelity simulation and certainly for suspension bridges and long chains.
+ Full NGS might be a good choice for ragdolls, especially motorized ragdolls where
+ joint separation can be problematic. The number of NGS iterations can be reduced
+ for better performance without harming robustness much.
+
+ Each joint in a can be handled differently in the position solver. So I recommend
+ a system where the user can select the algorithm on a per joint basis. I would
+ probably default to the slower Full NGS and let the user select the faster
+ Baumgarte method in performance critical scenarios.
+ */
+
+/*
+ Cache Performance
+
+ The Box2D solvers are dominated by cache misses. Data structures are designed
+ to increase the number of cache hits. Much of misses are due to random access
+ to body data. The raint structures are iterated over linearly, which leads
+ to few cache misses.
+
+ The bodies are not accessed during iteration. Instead read only data, such as
+ the mass values are stored with the constraints. The mutable data are the raint
+ impulses and the bodies velocities/positions. The impulses are held inside the
+ raint structures. The body velocities/positions are held in compact, temporary
+ arrays to increase the number of cache hits. Linear and angular velocity are
+ stored in a single array since multiple arrays lead to multiple misses.
+ */
+
+/*
+ 2D Rotation
+
+ R = [cos(theta) -sin(theta)]
+ [sin(theta) cos(theta) ]
+
+ thetaDot = omega
+
+ Let q1 = cos(theta), q2 = sin(theta).
+ R = [q1 -q2]
+ [q2  q1]
+
+ q1Dot = -thetaDot * q2
+ q2Dot = thetaDot * q1
+
+ q1_new = q1_old - dt * w * q2
+ q2_new = q2_old + dt * w * q1
+ then normalize.
+
+ This might be faster than computing sin+cos.
+ However, we can compute sin+cos of the same angle fast.
+ */
+
+/// This is an internal class.
+///
+/// @author Daniel Murphy
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">public class Island {</span>
+
+  public ContactListener m_listener;
+
+  public Body[] m_bodies;
+  public Contact[] m_contacts;
+  public Joint[] m_joints;
+
+  public Position[] m_positions;
+  public Velocity[] m_velocities;
+
+  public int m_bodyCount;
+  public int m_jointCount;
+  public int m_contactCount;
+
+  public int m_bodyCapacity;
+  public int m_contactCapacity;
+  public int m_jointCapacity;
+
+<span class="fc" id="L179">  public Island() {</span>
+
+<span class="fc" id="L181">  }</span>
+
+  public void init(int bodyCapacity, int contactCapacity, int jointCapacity,
+      ContactListener listener) {
+    // System.out.println(&quot;Initializing Island&quot;);
+<span class="fc" id="L186">    m_bodyCapacity = bodyCapacity;</span>
+<span class="fc" id="L187">    m_contactCapacity = contactCapacity;</span>
+<span class="fc" id="L188">    m_jointCapacity = jointCapacity;</span>
+<span class="fc" id="L189">    m_bodyCount = 0;</span>
+<span class="fc" id="L190">    m_contactCount = 0;</span>
+<span class="fc" id="L191">    m_jointCount = 0;</span>
+
+<span class="fc" id="L193">    m_listener = listener;</span>
+
+<span class="fc bfc" id="L195" title="All 4 branches covered.">    if (m_bodies == null || m_bodyCapacity &gt; m_bodies.length) {</span>
+<span class="fc" id="L196">      m_bodies = new Body[m_bodyCapacity];</span>
+    }
+<span class="fc bfc" id="L198" title="All 4 branches covered.">    if (m_joints == null || m_jointCapacity &gt; m_joints.length) {</span>
+<span class="fc" id="L199">      m_joints = new Joint[m_jointCapacity];</span>
+    }
+<span class="fc bfc" id="L201" title="All 4 branches covered.">    if (m_contacts == null || m_contactCapacity &gt; m_contacts.length) {</span>
+<span class="fc" id="L202">      m_contacts = new Contact[m_contactCapacity];</span>
+    }
+
+    // dynamic array
+<span class="fc bfc" id="L206" title="All 4 branches covered.">    if (m_velocities == null || m_bodyCapacity &gt; m_velocities.length) {</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">      final Velocity[] old = m_velocities == null ? new Velocity[0] : m_velocities;</span>
+<span class="fc" id="L208">      m_velocities = new Velocity[m_bodyCapacity];</span>
+<span class="fc" id="L209">      System.arraycopy(old, 0, m_velocities, 0, old.length);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">      for (int i = old.length; i &lt; m_velocities.length; i++) {</span>
+<span class="fc" id="L211">        m_velocities[i] = new Velocity();</span>
+      }
+    }
+
+    // dynamic array
+<span class="fc bfc" id="L216" title="All 4 branches covered.">    if (m_positions == null || m_bodyCapacity &gt; m_positions.length) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">      final Position[] old = m_positions == null ? new Position[0] : m_positions;</span>
+<span class="fc" id="L218">      m_positions = new Position[m_bodyCapacity];</span>
+<span class="fc" id="L219">      System.arraycopy(old, 0, m_positions, 0, old.length);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">      for (int i = old.length; i &lt; m_positions.length; i++) {</span>
+<span class="fc" id="L221">        m_positions[i] = new Position();</span>
+      }
+    }
+<span class="fc" id="L224">  }</span>
+
+  public void clear() {
+<span class="fc" id="L227">    m_bodyCount = 0;</span>
+<span class="fc" id="L228">    m_contactCount = 0;</span>
+<span class="fc" id="L229">    m_jointCount = 0;</span>
+<span class="fc" id="L230">  }</span>
+
+<span class="fc" id="L232">  private final ContactSolver contactSolver = new ContactSolver();</span>
+  // Profiling stopwatch: holds the millis timestamp of its last reset.
+<span class="fc" id="L234">  private long timer = System.currentTimeMillis();</span>
+<span class="fc" id="L235">  private final SolverData solverData = new SolverData();</span>
+<span class="fc" id="L236">  private final ContactSolverDef solverDef = new ContactSolverDef();</span>
+
+  public void solve(Profile profile, TimeStep step, Vec2 gravity, boolean allowSleep) {
+
+    // System.out.println(&quot;Solving Island&quot;);
+<span class="fc" id="L241">    float h = step.dt;</span>
+
+    // Integrate velocities and apply damping. Initialize the body state.
+<span class="fc bfc" id="L244" title="All 2 branches covered.">    for (int i = 0; i &lt; m_bodyCount; ++i) {</span>
+<span class="fc" id="L245">      final Body b = m_bodies[i];</span>
+<span class="fc" id="L246">      final Vec2 c = b.m_sweep.c;</span>
+<span class="fc" id="L247">      float a = b.m_sweep.a;</span>
+<span class="fc" id="L248">      final Vec2 v = b.m_linearVelocity;</span>
+<span class="fc" id="L249">      float w = b.m_angularVelocity;</span>
+
+      // Store positions for continuous collision.
+<span class="fc" id="L252">      b.m_sweep.c0.set(b.m_sweep.c);</span>
+<span class="fc" id="L253">      b.m_sweep.a0 = b.m_sweep.a;</span>
+
+<span class="fc bfc" id="L255" title="All 2 branches covered.">      if (b.m_type == BodyType.DYNAMIC) {</span>
+        // Integrate velocities.
+        // v += h * (b.m_gravityScale * gravity + b.m_invMass * b.m_force);
+<span class="fc" id="L258">        v.x += h * (b.m_gravityScale * gravity.x + b.m_invMass * b.m_force.x);</span>
+<span class="fc" id="L259">        v.y += h * (b.m_gravityScale * gravity.y + b.m_invMass * b.m_force.y);</span>
+<span class="fc" id="L260">        w += h * b.m_invI * b.m_torque;</span>
+
+        // Apply damping.
+        // ODE: dv/dt + c * v = 0
+        // Solution: v(t) = v0 * exp(-c * t)
+        // Time step: v(t + dt) = v0 * exp(-c * (t + dt)) = v0 * exp(-c * t) * exp(-c * dt) = v *
+        // exp(-c * dt)
+        // v2 = exp(-c * dt) * v1
+        // Taylor expansion:
+        // v2 = (1.0f - c * dt) * v1
+<span class="fc" id="L270">        float a1 = MathUtils.clamp(1.0f - h * b.m_linearDamping, 0.0f, 1.0f);</span>
+<span class="fc" id="L271">        v.x *= a1;</span>
+<span class="fc" id="L272">        v.y *= a1;</span>
+<span class="fc" id="L273">        w *= MathUtils.clamp(1.0f - h * b.m_angularDamping, 0.0f, 1.0f);</span>
+      }
+
+<span class="fc" id="L276">      m_positions[i].c.x = c.x;</span>
+<span class="fc" id="L277">      m_positions[i].c.y = c.y;</span>
+<span class="fc" id="L278">      m_positions[i].a = a;</span>
+<span class="fc" id="L279">      m_velocities[i].v.x = v.x;</span>
+<span class="fc" id="L280">      m_velocities[i].v.y = v.y;</span>
+<span class="fc" id="L281">      m_velocities[i].w = w;</span>
+    }
+
+<span class="fc" id="L284">    timer = System.currentTimeMillis();</span>
+
+    // Solver data
+<span class="fc" id="L287">    solverData.step = step;</span>
+<span class="fc" id="L288">    solverData.positions = m_positions;</span>
+<span class="fc" id="L289">    solverData.velocities = m_velocities;</span>
+
+    // Initialize velocity constraints.
+<span class="fc" id="L292">    solverDef.step = step;</span>
+<span class="fc" id="L293">    solverDef.contacts = m_contacts;</span>
+<span class="fc" id="L294">    solverDef.count = m_contactCount;</span>
+<span class="fc" id="L295">    solverDef.positions = m_positions;</span>
+<span class="fc" id="L296">    solverDef.velocities = m_velocities;</span>
+
+<span class="fc" id="L298">    contactSolver.init(solverDef);</span>
+    // System.out.println(&quot;island init vel&quot;);
+<span class="fc" id="L300">    contactSolver.initializeVelocityConstraints();</span>
+
+<span class="fc bfc" id="L302" title="All 2 branches covered.">    if (step.warmStarting) {</span>
+      // System.out.println(&quot;island warm start&quot;);
+<span class="fc" id="L304">      contactSolver.warmStart();</span>
+    }
+
+<span class="fc bfc" id="L307" title="All 2 branches covered.">    for (int i = 0; i &lt; m_jointCount; ++i) {</span>
+<span class="fc" id="L308">      m_joints[i].initVelocityConstraints(solverData);</span>
+    }
+
+<span class="fc" id="L311">    profile.solveInit = (System.currentTimeMillis() - timer);</span>
+
+    // Solve velocity constraints
+<span class="fc" id="L314">    timer = System.currentTimeMillis();</span>
+    // System.out.println(&quot;island solving velocities&quot;);
+<span class="fc bfc" id="L316" title="All 2 branches covered.">    for (int i = 0; i &lt; step.velocityIterations; ++i) {</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">      for (int j = 0; j &lt; m_jointCount; ++j) {</span>
+<span class="fc" id="L318">        m_joints[j].solveVelocityConstraints(solverData);</span>
+      }
+
+<span class="fc" id="L321">      contactSolver.solveVelocityConstraints();</span>
+    }
+
+    // Store impulses for warm starting
+<span class="fc" id="L325">    contactSolver.storeImpulses();</span>
+<span class="fc" id="L326">    profile.solveVelocity = (System.currentTimeMillis() - timer);</span>
+
+    // Integrate positions
+<span class="fc bfc" id="L329" title="All 2 branches covered.">    for (int i = 0; i &lt; m_bodyCount; ++i) {</span>
+<span class="fc" id="L330">      final Vec2 c = m_positions[i].c;</span>
+<span class="fc" id="L331">      float a = m_positions[i].a;</span>
+<span class="fc" id="L332">      final Vec2 v = m_velocities[i].v;</span>
+<span class="fc" id="L333">      float w = m_velocities[i].w;</span>
+
+      // Check for large velocities
+<span class="fc" id="L336">      float translationx = v.x * h;</span>
+<span class="fc" id="L337">      float translationy = v.y * h;</span>
+
+<span class="fc bfc" id="L339" title="All 2 branches covered.">      if (translationx * translationx + translationy * translationy &gt; Settings.maxTranslationSquared) {</span>
+<span class="fc" id="L340">        float ratio = Settings.maxTranslation</span>
+<span class="fc" id="L341">            / MathUtils.sqrt(translationx * translationx + translationy * translationy);</span>
+<span class="fc" id="L342">        v.x *= ratio;</span>
+<span class="fc" id="L343">        v.y *= ratio;</span>
+      }
+
+<span class="fc" id="L346">      float rotation = h * w;</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">      if (rotation * rotation &gt; Settings.maxRotationSquared) {</span>
+<span class="nc" id="L348">        float ratio = Settings.maxRotation / MathUtils.abs(rotation);</span>
+<span class="nc" id="L349">        w *= ratio;</span>
+      }
+
+      // Integrate
+<span class="fc" id="L353">      c.x += h * v.x;</span>
+<span class="fc" id="L354">      c.y += h * v.y;</span>
+<span class="fc" id="L355">      a += h * w;</span>
+
+<span class="fc" id="L357">      m_positions[i].a = a;</span>
+<span class="fc" id="L358">      m_velocities[i].w = w;</span>
+    }
+
+    // Solve position constraints
+<span class="fc" id="L362">    timer = System.currentTimeMillis();</span>
+<span class="fc" id="L363">    boolean positionSolved = false;</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">    for (int i = 0; i &lt; step.positionIterations; ++i) {</span>
+<span class="fc" id="L365">      boolean contactsOkay = contactSolver.solvePositionConstraints();</span>
+
+<span class="fc" id="L367">      boolean jointsOkay = true;</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">      for (int j = 0; j &lt; m_jointCount; ++j) {</span>
+<span class="fc" id="L369">        boolean jointOkay = m_joints[j].solvePositionConstraints(solverData);</span>
+<span class="fc bfc" id="L370" title="All 4 branches covered.">        jointsOkay = jointsOkay &amp;&amp; jointOkay;</span>
+      }
+
+<span class="fc bfc" id="L373" title="All 4 branches covered.">      if (contactsOkay &amp;&amp; jointsOkay) {</span>
+        // Exit early if the position errors are small.
+<span class="fc" id="L375">        positionSolved = true;</span>
+<span class="fc" id="L376">        break;</span>
+      }
+    }
+
+    // Copy state buffers back to the bodies
+<span class="fc bfc" id="L381" title="All 2 branches covered.">    for (int i = 0; i &lt; m_bodyCount; ++i) {</span>
+<span class="fc" id="L382">      Body body = m_bodies[i];</span>
+<span class="fc" id="L383">      body.m_sweep.c.x = m_positions[i].c.x;</span>
+<span class="fc" id="L384">      body.m_sweep.c.y = m_positions[i].c.y;</span>
+<span class="fc" id="L385">      body.m_sweep.a = m_positions[i].a;</span>
+<span class="fc" id="L386">      body.m_linearVelocity.x = m_velocities[i].v.x;</span>
+<span class="fc" id="L387">      body.m_linearVelocity.y = m_velocities[i].v.y;</span>
+<span class="fc" id="L388">      body.m_angularVelocity = m_velocities[i].w;</span>
+<span class="fc" id="L389">      body.synchronizeTransform();</span>
+    }
+
+<span class="fc" id="L392">    profile.solvePosition = (System.currentTimeMillis() - timer);</span>
+
+<span class="fc" id="L394">    report(contactSolver.m_velocityConstraints);</span>
+
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">    if (allowSleep) {</span>
+<span class="fc" id="L397">      float minSleepTime = Float.MAX_VALUE;</span>
+
+<span class="fc" id="L399">      final float linTolSqr = Settings.linearSleepTolerance * Settings.linearSleepTolerance;</span>
+<span class="fc" id="L400">      final float angTolSqr = Settings.angularSleepTolerance * Settings.angularSleepTolerance;</span>
+
+<span class="fc bfc" id="L402" title="All 2 branches covered.">      for (int i = 0; i &lt; m_bodyCount; ++i) {</span>
+<span class="fc" id="L403">        Body b = m_bodies[i];</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (b.getType() == BodyType.STATIC) {</span>
+<span class="fc" id="L405">          continue;</span>
+        }
+
+<span class="pc bpc" id="L408" title="1 of 4 branches missed.">        if ((b.m_flags &amp; Body.e_autoSleepFlag) == 0</span>
+            || b.m_angularVelocity * b.m_angularVelocity &gt; angTolSqr
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            || Vec2.dot(b.m_linearVelocity, b.m_linearVelocity) &gt; linTolSqr) {</span>
+<span class="fc" id="L411">          b.m_sleepTime = 0.0f;</span>
+<span class="fc" id="L412">          minSleepTime = 0.0f;</span>
+        } else {
+<span class="fc" id="L414">          b.m_sleepTime += h;</span>
+<span class="fc" id="L415">          minSleepTime = MathUtils.min(minSleepTime, b.m_sleepTime);</span>
+        }
+      }
+
+<span class="pc bpc" id="L419" title="1 of 4 branches missed.">      if (minSleepTime &gt;= Settings.timeToSleep &amp;&amp; positionSolved) {</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        for (int i = 0; i &lt; m_bodyCount; ++i) {</span>
+<span class="fc" id="L421">          Body b = m_bodies[i];</span>
+<span class="fc" id="L422">          b.setAwake(false);</span>
+        }
+      }
+    }
+<span class="fc" id="L426">  }</span>
+
+<span class="fc" id="L428">  private final ContactSolver toiContactSolver = new ContactSolver();</span>
+<span class="fc" id="L429">  private final ContactSolverDef toiSolverDef = new ContactSolverDef();</span>
+
+  public void solveTOI(TimeStep subStep, int toiIndexA, int toiIndexB) {
+<span class="pc bpc" id="L432" title="2 of 4 branches missed.">    assert (toiIndexA &lt; m_bodyCount);</span>
+<span class="pc bpc" id="L433" title="2 of 4 branches missed.">    assert (toiIndexB &lt; m_bodyCount);</span>
+
+    // Initialize the body state.
+<span class="fc bfc" id="L436" title="All 2 branches covered.">    for (int i = 0; i &lt; m_bodyCount; ++i) {</span>
+<span class="fc" id="L437">      m_positions[i].c.x = m_bodies[i].m_sweep.c.x;</span>
+<span class="fc" id="L438">      m_positions[i].c.y = m_bodies[i].m_sweep.c.y;</span>
+<span class="fc" id="L439">      m_positions[i].a = m_bodies[i].m_sweep.a;</span>
+<span class="fc" id="L440">      m_velocities[i].v.x = m_bodies[i].m_linearVelocity.x;</span>
+<span class="fc" id="L441">      m_velocities[i].v.y = m_bodies[i].m_linearVelocity.y;</span>
+<span class="fc" id="L442">      m_velocities[i].w = m_bodies[i].m_angularVelocity;</span>
+    }
+
+<span class="fc" id="L445">    toiSolverDef.contacts = m_contacts;</span>
+<span class="fc" id="L446">    toiSolverDef.count = m_contactCount;</span>
+<span class="fc" id="L447">    toiSolverDef.step = subStep;</span>
+<span class="fc" id="L448">    toiSolverDef.positions = m_positions;</span>
+<span class="fc" id="L449">    toiSolverDef.velocities = m_velocities;</span>
+<span class="fc" id="L450">    toiContactSolver.init(toiSolverDef);</span>
+
+    // Solve position constraints.
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">    for (int i = 0; i &lt; subStep.positionIterations; ++i) {</span>
+<span class="fc" id="L454">      boolean contactsOkay = toiContactSolver.solveTOIPositionConstraints(toiIndexA, toiIndexB);</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">      if (contactsOkay) {</span>
+<span class="fc" id="L456">        break;</span>
+      }
+    }
+    // #if 0
+    // // Is the new position really safe?
+    // for (int i = 0; i &lt; m_contactCount; ++i)
+    // {
+    // Contact* c = m_contacts[i];
+    // Fixture* fA = c.GetFixtureA();
+    // Fixture* fB = c.GetFixtureB();
+    //
+    // Body bA = fA.GetBody();
+    // Body bB = fB.GetBody();
+    //
+    // int indexA = c.GetChildIndexA();
+    // int indexB = c.GetChildIndexB();
+    //
+    // DistanceInput input;
+    // input.proxyA.Set(fA.GetShape(), indexA);
+    // input.proxyB.Set(fB.GetShape(), indexB);
+    // input.transformA = bA.GetTransform();
+    // input.transformB = bB.GetTransform();
+    // input.useRadii = false;
+    //
+    // DistanceOutput output;
+    // SimplexCache cache;
+    // cache.count = 0;
+    // Distance(&amp;output, &amp;cache, &amp;input);
+    //
+    // if (output.distance == 0 || cache.count == 3)
+    // {
+    // cache.count += 0;
+    // }
+    // }
+    // #endif
+
+    // Leap of faith to new safe state.
+<span class="fc" id="L493">    m_bodies[toiIndexA].m_sweep.c0.x = m_positions[toiIndexA].c.x;</span>
+<span class="fc" id="L494">    m_bodies[toiIndexA].m_sweep.c0.y = m_positions[toiIndexA].c.y;</span>
+<span class="fc" id="L495">    m_bodies[toiIndexA].m_sweep.a0 = m_positions[toiIndexA].a;</span>
+<span class="fc" id="L496">    m_bodies[toiIndexB].m_sweep.c0.set(m_positions[toiIndexB].c);</span>
+<span class="fc" id="L497">    m_bodies[toiIndexB].m_sweep.a0 = m_positions[toiIndexB].a;</span>
+
+    // No warm starting is needed for TOI events because warm
+    // starting impulses were applied in the discrete solver.
+<span class="fc" id="L501">    toiContactSolver.initializeVelocityConstraints();</span>
+
+    // Solve velocity constraints.
+<span class="fc bfc" id="L504" title="All 2 branches covered.">    for (int i = 0; i &lt; subStep.velocityIterations; ++i) {</span>
+<span class="fc" id="L505">      toiContactSolver.solveVelocityConstraints();</span>
+    }
+
+    // Don't store the TOI contact forces for warm starting
+    // because they can be quite large.
+
+<span class="fc" id="L511">    float h = subStep.dt;</span>
+
+    // Integrate positions
+<span class="fc bfc" id="L514" title="All 2 branches covered.">    for (int i = 0; i &lt; m_bodyCount; ++i) {</span>
+<span class="fc" id="L515">      Vec2 c = m_positions[i].c;</span>
+<span class="fc" id="L516">      float a = m_positions[i].a;</span>
+<span class="fc" id="L517">      Vec2 v = m_velocities[i].v;</span>
+<span class="fc" id="L518">      float w = m_velocities[i].w;</span>
+
+      // Check for large velocities
+<span class="fc" id="L521">      float translationx = v.x * h;</span>
+<span class="fc" id="L522">      float translationy = v.y * h;</span>
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">      if (translationx * translationx + translationy * translationy &gt; Settings.maxTranslationSquared) {</span>
+<span class="nc" id="L524">        float ratio = Settings.maxTranslation</span>
+<span class="nc" id="L525">            / MathUtils.sqrt(translationx * translationx + translationy * translationy);</span>
+<span class="nc" id="L526">        v.mulLocal(ratio);</span>
+      }
+
+<span class="fc" id="L529">      float rotation = h * w;</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">      if (rotation * rotation &gt; Settings.maxRotationSquared) {</span>
+<span class="nc" id="L531">        float ratio = Settings.maxRotation / MathUtils.abs(rotation);</span>
+<span class="nc" id="L532">        w *= ratio;</span>
+      }
+
+      // Integrate
+<span class="fc" id="L536">      c.x += v.x * h;</span>
+<span class="fc" id="L537">      c.y += v.y * h;</span>
+<span class="fc" id="L538">      a += h * w;</span>
+
+<span class="fc" id="L540">      m_positions[i].c.x = c.x;</span>
+<span class="fc" id="L541">      m_positions[i].c.y = c.y;</span>
+<span class="fc" id="L542">      m_positions[i].a = a;</span>
+<span class="fc" id="L543">      m_velocities[i].v.x = v.x;</span>
+<span class="fc" id="L544">      m_velocities[i].v.y = v.y;</span>
+<span class="fc" id="L545">      m_velocities[i].w = w;</span>
+
+      // Sync bodies
+<span class="fc" id="L548">      Body body = m_bodies[i];</span>
+<span class="fc" id="L549">      body.m_sweep.c.x = c.x;</span>
+<span class="fc" id="L550">      body.m_sweep.c.y = c.y;</span>
+<span class="fc" id="L551">      body.m_sweep.a = a;</span>
+<span class="fc" id="L552">      body.m_linearVelocity.x = v.x;</span>
+<span class="fc" id="L553">      body.m_linearVelocity.y = v.y;</span>
+<span class="fc" id="L554">      body.m_angularVelocity = w;</span>
+<span class="fc" id="L555">      body.synchronizeTransform();</span>
+    }
+
+<span class="fc" id="L558">    report(toiContactSolver.m_velocityConstraints);</span>
+<span class="fc" id="L559">  }</span>
+
+  public void add(Body body) {
+<span class="pc bpc" id="L562" title="2 of 4 branches missed.">    assert (m_bodyCount &lt; m_bodyCapacity);</span>
+<span class="fc" id="L563">    body.m_islandIndex = m_bodyCount;</span>
+<span class="fc" id="L564">    m_bodies[m_bodyCount] = body;</span>
+<span class="fc" id="L565">    ++m_bodyCount;</span>
+<span class="fc" id="L566">  }</span>
+
+  public void add(Contact contact) {
+<span class="pc bpc" id="L569" title="2 of 4 branches missed.">    assert (m_contactCount &lt; m_contactCapacity);</span>
+<span class="fc" id="L570">    m_contacts[m_contactCount++] = contact;</span>
+<span class="fc" id="L571">  }</span>
+
+  public void add(Joint joint) {
+<span class="pc bpc" id="L574" title="2 of 4 branches missed.">    assert (m_jointCount &lt; m_jointCapacity);</span>
+<span class="fc" id="L575">    m_joints[m_jointCount++] = joint;</span>
+<span class="fc" id="L576">  }</span>
+
+<span class="fc" id="L578">  private final ContactImpulse impulse = new ContactImpulse();</span>
+
+  public void report(ContactVelocityConstraint[] constraints) {
+<span class="fc bfc" id="L581" title="All 2 branches covered.">    if (m_listener == null) {</span>
+<span class="fc" id="L582">      return;</span>
+    }
+
+<span class="fc bfc" id="L585" title="All 2 branches covered.">    for (int i = 0; i &lt; m_contactCount; ++i) {</span>
+<span class="fc" id="L586">      Contact c = m_contacts[i];</span>
+
+<span class="fc" id="L588">      ContactVelocityConstraint vc = constraints[i];</span>
+<span class="fc" id="L589">      impulse.count = vc.pointCount;</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">      for (int j = 0; j &lt; vc.pointCount; ++j) {</span>
+<span class="fc" id="L591">        impulse.normalImpulses[j] = vc.points[j].normalImpulse;</span>
+<span class="fc" id="L592">        impulse.tangentImpulses[j] = vc.points[j].tangentImpulse;</span>
+      }
+
+<span class="fc" id="L595">      m_listener.postSolve(c, impulse);</span>
+    }
+<span class="fc" id="L597">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

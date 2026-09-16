@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VisionPipeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">VisionPipeline.java</span></div><h1>VisionPipeline.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+import com.codename1.camera.CameraFrame;
+import com.codename1.camera.CameraSession;
+import com.codename1.camera.FrameListener;
+import com.codename1.camera.FrameFormat;
+import com.codename1.ui.Display;
+import com.codename1.util.SuccessCallback;
+
+/// Connects a camera frame stream to a reusable analyzer with keep-only-latest
+/// backpressure. At most one analysis and one pending frame are retained, so a
+/// slow model cannot build an unbounded queue. Results and errors arrive on
+/// the EDT. The pipeline owns and closes the analyzer but not the camera
+/// session.
+///
+/// Use this when the application already owns a {@link CameraSession} -- it is
+/// taking photos or recording video as well as analyzing. When the screen only
+/// needs a preview that analyzes, {@link VisionCameraView} does the same thing
+/// and owns the session too, which is one less lifecycle to get right.
+///
+/// ```java
+/// CameraSession session = Camera.open(Camera.getDefault(CameraFacing.BACK),
+///         new CameraSessionOptions().frameMaxFps(10).captureAudio(false));
+/// form.add(BorderLayout.CENTER, session.createView());
+///
+/// VisionPipeline&lt;Barcode[]&gt; pipeline = new VisionPipeline&lt;Barcode[]&gt;(
+///         session, new BarcodeScanner(),
+///         new VisionPipelineListener&lt;Barcode[]&gt;() {
+///             public void result(Barcode[] codes, VisionImage source) {
+///                 if (codes.length &gt; 0) {
+///                     found(codes[0].getValue());
+///                 }
+///             }
+///             public void error(Throwable error) {
+///                 Log.e(error);
+///             }
+///         });
+///
+/// // Closing the pipeline detaches the frame listener and closes the
+/// // analyzer. The session is yours to close.
+/// form.addCloseListener(e -&gt; {
+///     pipeline.close();
+///     session.close();
+/// });
+/// ```
+public final class VisionPipeline&lt;T&gt; implements AutoCloseable {
+    private final CameraSession session;
+    private final VisionAnalyzer&lt;T&gt; analyzer;
+    private final VisionPipelineListener&lt;T&gt; listener;
+    private final FrameListener frameListener;
+    private PendingFrame pending;
+    private boolean busy;
+    private boolean closed;
+
+    /// Attaches immediately as the session's frame listener.
+    /// @param session active camera session whose frames should be analyzed
+    /// @param analyzer reusable analyzer owned by this pipeline
+    /// @param listener EDT result/error listener
+    public VisionPipeline(CameraSession session, VisionAnalyzer&lt;T&gt; analyzer,
+<span class="fc" id="L82">                          VisionPipelineListener&lt;T&gt; listener) {</span>
+<span class="pc bpc" id="L83" title="3 of 6 branches missed.">        if (session == null || analyzer == null || listener == null) {</span>
+<span class="nc" id="L84">            throw new NullPointerException(&quot;session, analyzer, and listener are required&quot;);</span>
+        }
+<span class="fc" id="L86">        this.session = session;</span>
+<span class="fc" id="L87">        this.analyzer = analyzer;</span>
+<span class="fc" id="L88">        this.listener = listener;</span>
+<span class="fc" id="L89">        frameListener = new FrameListener() {</span>
+            @Override
+            public void onFrame(CameraFrame frame) {
+<span class="fc" id="L92">                accept(frame);</span>
+<span class="fc" id="L93">            }</span>
+        };
+<span class="fc" id="L95">        session.setFrameListener(frameListener);</span>
+<span class="fc" id="L96">    }</span>
+
+    private void accept(CameraFrame frame) {
+<span class="fc" id="L99">        synchronized (this) {</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L101">                return;</span>
+            }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (busy) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                if (pending == null) {</span>
+<span class="fc" id="L105">                    pending = new PendingFrame();</span>
+                }
+<span class="fc" id="L107">                pending.copyFrom(frame);</span>
+<span class="fc" id="L108">                return;</span>
+            }
+<span class="fc" id="L110">            busy = true;</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">        process(VisionImage.fromCameraFrame(frame));</span>
+<span class="fc" id="L113">    }</span>
+
+    private void process(final VisionImage image) {
+        final com.codename1.util.AsyncResource&lt;T&gt; operation;
+        try {
+<span class="fc" id="L118">            synchronized (this) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (closed) {</span>
+<span class="fc" id="L120">                    busy = false;</span>
+<span class="fc" id="L121">                    pending = null;</span>
+<span class="fc" id="L122">                    return;</span>
+                }
+<span class="fc" id="L124">            }</span>
+            // Native analyzers may complete synchronously or re-enter app
+            // code. Do not invoke them while holding the pipeline monitor.
+<span class="fc" id="L127">            operation = analyzer.process(image);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (operation == null) {</span>
+<span class="nc" id="L129">                throw new IllegalStateException(</span>
+                        &quot;Vision analyzer returned no operation&quot;);
+            }
+<span class="fc" id="L132">        } catch (final Throwable error) {</span>
+<span class="fc" id="L133">            onFinished(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L136">                    listener.error(error);</span>
+<span class="fc" id="L137">                }</span>
+            });
+<span class="fc" id="L139">            return;</span>
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">        operation.ready(new SuccessCallback&lt;T&gt;() {</span>
+            @Override
+            public void onSucess(final T value) {
+<span class="fc" id="L144">                onFinished(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="fc" id="L147">                        listener.result(value, image);</span>
+<span class="fc" id="L148">                    }</span>
+                });
+<span class="fc" id="L150">            }</span>
+<span class="fc" id="L151">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(final Throwable error) {
+<span class="nc" id="L154">                onFinished(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc" id="L157">                        listener.error(error);</span>
+<span class="nc" id="L158">                    }</span>
+                });
+<span class="nc" id="L160">            }</span>
+        });
+<span class="fc" id="L162">    }</span>
+
+    private void onFinished(final Runnable notification) {
+<span class="fc" id="L165">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+                PendingFrame pendingFrame;
+<span class="fc" id="L169">                synchronized (VisionPipeline.this) {</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                    if (closed) {</span>
+<span class="nc" id="L171">                        busy = false;</span>
+<span class="nc" id="L172">                        pending = null;</span>
+<span class="nc" id="L173">                        return;</span>
+                    }
+<span class="fc" id="L175">                    pendingFrame = pending;</span>
+<span class="fc" id="L176">                    pending = null;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                    busy = pendingFrame != null;</span>
+<span class="fc" id="L178">                }</span>
+                try {
+<span class="fc" id="L180">                    notification.run();</span>
+                } finally {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                    if (pendingFrame != null) {</span>
+<span class="fc" id="L183">                        process(pendingFrame.toImage());</span>
+                    }
+                }
+<span class="fc" id="L186">            }</span>
+        });
+<span class="fc" id="L188">    }</span>
+
+    /// Returns whether a frame is currently being analyzed.
+    ///
+    /// @return {@code true} while the open pipeline has an analysis in flight
+    public boolean isBusy() {
+<span class="fc" id="L194">        synchronized (this) {</span>
+<span class="fc" id="L195">            return busy;</span>
+        }
+    }
+
+    /// Stops accepting frames, detaches from the camera session, discards the
+    /// pending frame, clears the busy state, and closes the analyzer. A pending
+    /// frame already selected for dispatch is rechecked and discarded before
+    /// it can reach the closed analyzer. Calling this method more than once
+    /// has no effect.
+    @Override
+    public void close() {
+<span class="fc" id="L206">        synchronized (this) {</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (closed) {</span>
+<span class="fc" id="L208">                return;</span>
+            }
+<span class="fc" id="L210">            closed = true;</span>
+<span class="fc" id="L211">            busy = false;</span>
+<span class="fc" id="L212">            pending = null;</span>
+<span class="fc" id="L213">        }</span>
+<span class="fc" id="L214">        session.removeFrameListener(frameListener);</span>
+<span class="fc" id="L215">        analyzer.close();</span>
+<span class="fc" id="L216">    }</span>
+
+    private static final class PendingFrame {
+        private byte[] data;
+        private boolean raw;
+        private int width;
+        private int height;
+        private int rotationDegrees;
+        private long timestampNanos;
+        private FrameFormat format;
+
+        void copyFrom(CameraFrame frame) {
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            FrameFormat requested = frame.getFormat() == null</span>
+<span class="fc" id="L229">                    ? FrameFormat.JPEG : frame.getFormat();</span>
+<span class="fc" id="L230">            byte[] rawBytes = frame.getRawBytes();</span>
+<span class="pc bpc" id="L231" title="5 of 6 branches missed.">            raw = requested != FrameFormat.JPEG</span>
+                    &amp;&amp; rawBytes != null &amp;&amp; rawBytes.length &gt; 0;
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            byte[] source = raw ? rawBytes : frame.getJpegBytes();</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (source == null) {</span>
+<span class="nc" id="L235">                source = new byte[0];</span>
+            }
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">            if (data == null || data.length != source.length) {</span>
+<span class="fc" id="L238">                data = new byte[source.length];</span>
+            }
+<span class="fc" id="L240">            System.arraycopy(source, 0, data, 0, source.length);</span>
+<span class="fc" id="L241">            width = frame.getWidth();</span>
+<span class="fc" id="L242">            height = frame.getHeight();</span>
+<span class="fc" id="L243">            rotationDegrees = frame.getRotationDegrees();</span>
+<span class="fc" id="L244">            timestampNanos = frame.getTimestampNanos();</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            format = raw ? requested : FrameFormat.JPEG;</span>
+<span class="fc" id="L246">        }</span>
+
+        VisionImage toImage() {
+<span class="fc" id="L249">            return VisionImage.detachedCameraData(data, raw, width, height,</span>
+                    rotationDegrees, timestampNanos, format);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

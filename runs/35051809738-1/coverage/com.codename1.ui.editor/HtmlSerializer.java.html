@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HtmlSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">HtmlSerializer.java</span></div><h1>HtmlSerializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import java.util.List;
+
+/// Serializes the pure rich text editor model (text + `InlineStyles` + `RichBlocks`) back into an HTML
+/// string for `RichTextArea#getHtml`. The output is model canonical rather than byte identical, which
+/// matches how a `contenteditable` surface normalized HTML in the previous backend.
+public final class HtmlSerializer {
+    private HtmlSerializer() {
+    }
+
+    /// Serializes the model into HTML.
+    ///
+    /// #### Parameters
+    ///
+    /// - `doc`: the text document
+    ///
+    /// - `inline`: the inline style model
+    ///
+    /// - `blocks`: the block attribute model
+    public static String serialize(EditorDocument doc, InlineStyles inline, RichBlocks blocks,
+                                   List&lt;String&gt; links, List&lt;String&gt; imageSources) {
+<span class="fc" id="L46">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L47">        String currentList = null;</span>
+<span class="fc" id="L48">        int lineCount = doc.getLineCount();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int p = 0; p &lt; lineCount; p++) {</span>
+<span class="fc" id="L50">            RichBlocks.BlockAttr b = blocks.get(p);</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            String desiredList = b.listType == RichBlocks.LIST_ORDERED ? &quot;ol&quot;</span>
+                    : b.listType == RichBlocks.LIST_UNORDERED ? &quot;ul&quot; : null;
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (!eq(desiredList, currentList)) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                if (currentList != null) {</span>
+<span class="nc" id="L55">                    sb.append(&quot;&lt;/&quot;).append(currentList).append(&quot;&gt;&quot;);</span>
+                }
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                if (desiredList != null) {</span>
+<span class="nc" id="L58">                    sb.append(&quot;&lt;&quot;).append(desiredList).append(&quot;&gt;&quot;);</span>
+                }
+<span class="nc" id="L60">                currentList = desiredList;</span>
+            }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            String tag = desiredList != null ? &quot;li&quot; : tagForType(b.type);</span>
+<span class="fc" id="L63">            sb.append(&quot;&lt;&quot;).append(tag).append(alignAttr(b.align)).append(indentAttr(b.indent)).append(&quot;&gt;&quot;);</span>
+<span class="fc" id="L64">            appendInline(sb, doc, inline, links, imageSources, p);</span>
+<span class="fc" id="L65">            sb.append(&quot;&lt;/&quot;).append(tag).append(&quot;&gt;&quot;);</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (currentList != null) {</span>
+<span class="nc" id="L68">            sb.append(&quot;&lt;/&quot;).append(currentList).append(&quot;&gt;&quot;);</span>
+        }
+<span class="fc" id="L70">        return sb.toString();</span>
+    }
+
+    private static void appendInline(StringBuilder sb, EditorDocument doc, InlineStyles inline,
+                                     List&lt;String&gt; links, List&lt;String&gt; imageSources, int paragraph) {
+<span class="fc" id="L75">        int start = doc.getLineStart(paragraph);</span>
+<span class="fc" id="L76">        String text = doc.getLineText(paragraph);</span>
+<span class="fc" id="L77">        int col = 0;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        while (col &lt; text.length()) {</span>
+<span class="fc" id="L79">            int offset = start + col;</span>
+<span class="fc" id="L80">            String imageSource = valueAt(imageSources, offset);</span>
+<span class="fc" id="L81">            String href = valueAt(links, offset);</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">            if (text.charAt(col) == '\uFFFC' &amp;&amp; imageSource != null) {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                if (href != null) {</span>
+<span class="nc" id="L84">                    sb.append(&quot;&lt;a href=\&quot;&quot;).append(escapeAttribute(href)).append(&quot;\&quot;&gt;&quot;);</span>
+                }
+<span class="fc" id="L86">                sb.append(&quot;&lt;img src=\&quot;&quot;).append(escapeAttribute(imageSource)).append(&quot;\&quot;&gt;&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                if (href != null) {</span>
+<span class="nc" id="L88">                    sb.append(&quot;&lt;/a&gt;&quot;);</span>
+                }
+<span class="fc" id="L90">                col++;</span>
+<span class="fc" id="L91">                continue;</span>
+            }
+<span class="fc" id="L93">            TextStyle st = inline.styleAt(start + col);</span>
+<span class="fc" id="L94">            int end = col + 1;</span>
+<span class="fc bfc" id="L95" title="All 4 branches covered.">            while (end &lt; text.length() &amp;&amp; text.charAt(end) != '\uFFFC'</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                    &amp;&amp; inline.styleAt(start + end).equals(st)</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                    &amp;&amp; eq(href, valueAt(links, start + end))) {</span>
+<span class="fc" id="L98">                end++;</span>
+            }
+<span class="fc" id="L100">            appendRun(sb, st, href, text.substring(col, end));</span>
+<span class="fc" id="L101">            col = end;</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">    }</span>
+
+    private static void appendRun(StringBuilder sb, TextStyle st, String href, String text) {
+<span class="fc" id="L106">        StringBuilder span = new StringBuilder();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (st.getForeColor() &gt;= 0) {</span>
+<span class="fc" id="L108">            span.append(&quot;color:&quot;).append(css(st.getForeColor())).append(&quot;;&quot;);</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (st.getHighlight() &gt;= 0) {</span>
+<span class="nc" id="L111">            span.append(&quot;background-color:&quot;).append(css(st.getHighlight())).append(&quot;;&quot;);</span>
+        }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (st.getFontSizeLevel() &gt; 0) {</span>
+<span class="nc" id="L114">            span.append(&quot;font-size:&quot;).append(fontSizePercent(st.getFontSizeLevel())).append(&quot;%;&quot;);</span>
+        }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        boolean hasSpan = span.length() &gt; 0;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (hasSpan) {</span>
+<span class="fc" id="L118">            sb.append(&quot;&lt;span style=\&quot;&quot;).append(span).append(&quot;\&quot;&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (href != null) {</span>
+<span class="fc" id="L121">            sb.append(&quot;&lt;a href=\&quot;&quot;).append(escapeAttribute(href)).append(&quot;\&quot;&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (st.isBold()) {</span>
+<span class="fc" id="L124">            sb.append(&quot;&lt;b&gt;&quot;);</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (st.isItalic()) {</span>
+<span class="nc" id="L127">            sb.append(&quot;&lt;i&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (st.isUnderline()) {</span>
+<span class="fc" id="L130">            sb.append(&quot;&lt;u&gt;&quot;);</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (st.isStrike()) {</span>
+<span class="nc" id="L133">            sb.append(&quot;&lt;s&gt;&quot;);</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (st.isMonospace()) {</span>
+<span class="nc" id="L136">            sb.append(&quot;&lt;code&gt;&quot;);</span>
+        }
+<span class="fc" id="L138">        sb.append(escape(text));</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (st.isMonospace()) {</span>
+<span class="nc" id="L140">            sb.append(&quot;&lt;/code&gt;&quot;);</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (st.isStrike()) {</span>
+<span class="nc" id="L143">            sb.append(&quot;&lt;/s&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (st.isUnderline()) {</span>
+<span class="fc" id="L146">            sb.append(&quot;&lt;/u&gt;&quot;);</span>
+        }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (st.isItalic()) {</span>
+<span class="nc" id="L149">            sb.append(&quot;&lt;/i&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (st.isBold()) {</span>
+<span class="fc" id="L152">            sb.append(&quot;&lt;/b&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (href != null) {</span>
+<span class="fc" id="L155">            sb.append(&quot;&lt;/a&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (hasSpan) {</span>
+<span class="fc" id="L158">            sb.append(&quot;&lt;/span&gt;&quot;);</span>
+        }
+<span class="fc" id="L160">    }</span>
+
+    private static String tagForType(int type) {
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">        if (type &gt;= RichBlocks.H1 &amp;&amp; type &lt;= RichBlocks.H1 + 5) {</span>
+<span class="fc" id="L164">            return &quot;h&quot; + (type - RichBlocks.H1 + 1);</span>
+        }
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (type == RichBlocks.PRE) {</span>
+<span class="nc" id="L167">            return &quot;pre&quot;;</span>
+        }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (type == RichBlocks.BLOCKQUOTE) {</span>
+<span class="nc" id="L170">            return &quot;blockquote&quot;;</span>
+        }
+<span class="fc" id="L172">        return &quot;p&quot;;</span>
+    }
+
+    private static String alignAttr(int align) {
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (align == RichBlocks.ALIGN_CENTER) {</span>
+<span class="nc" id="L177">            return &quot; style=\&quot;text-align:center\&quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (align == RichBlocks.ALIGN_RIGHT) {</span>
+<span class="nc" id="L180">            return &quot; style=\&quot;text-align:right\&quot;&quot;;</span>
+        }
+<span class="fc" id="L182">        return &quot;&quot;;</span>
+    }
+
+    private static String indentAttr(int indent) {
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (indent &gt; 0) {</span>
+<span class="nc" id="L187">            return &quot; data-indent=\&quot;&quot; + indent + &quot;\&quot;&quot;;</span>
+        }
+<span class="fc" id="L189">        return &quot;&quot;;</span>
+    }
+
+    private static int fontSizePercent(int level) {
+<span class="nc bnc" id="L193" title="All 7 branches missed.">        switch (level) {</span>
+            case 1:
+<span class="nc" id="L195">                return 70;</span>
+            case 2:
+<span class="nc" id="L197">                return 85;</span>
+            case 4:
+<span class="nc" id="L199">                return 115;</span>
+            case 5:
+<span class="nc" id="L201">                return 150;</span>
+            case 6:
+<span class="nc" id="L203">                return 200;</span>
+            case 7:
+<span class="nc" id="L205">                return 250;</span>
+            default:
+<span class="nc" id="L207">                return 100;</span>
+        }
+    }
+
+    private static String css(int rgb) {
+<span class="fc" id="L212">        String s = Integer.toHexString(rgb &amp; 0xffffff);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        while (s.length() &lt; 6) {</span>
+<span class="nc" id="L214">            s = &quot;0&quot; + s;</span>
+        }
+<span class="fc" id="L216">        return &quot;#&quot; + s;</span>
+    }
+
+    private static boolean eq(String a, String b) {
+<span class="pc bpc" id="L220" title="1 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    private static String valueAt(List&lt;String&gt; values, int index) {
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">        return index &gt;= 0 &amp;&amp; index &lt; values.size() ? values.get(index) : null;</span>
+    }
+
+    private static String escapeAttribute(String value) {
+<span class="fc" id="L228">        StringBuilder sb = new StringBuilder(value.length());</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L230">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (c == '&amp;') {</span>
+<span class="fc" id="L232">                sb.append(&quot;&amp;amp;&quot;);</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            } else if (c == '&lt;') {</span>
+<span class="nc" id="L234">                sb.append(&quot;&amp;lt;&quot;);</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            } else if (c == '&gt;') {</span>
+<span class="nc" id="L236">                sb.append(&quot;&amp;gt;&quot;);</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            } else if (c == '&quot;') {</span>
+<span class="nc" id="L238">                sb.append(&quot;&amp;quot;&quot;);</span>
+            } else {
+<span class="fc" id="L240">                sb.append(c);</span>
+            }
+        }
+<span class="fc" id="L243">        return sb.toString();</span>
+    }
+
+    private static String escape(String s) {
+<span class="fc" id="L247">        StringBuilder sb = new StringBuilder(s.length());</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L249">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            if (c == '\uFFFC') {</span>
+<span class="nc" id="L251">                sb.append(&quot;&amp;#xfffc;&quot;);</span>
+<span class="nc" id="L252">                continue;</span>
+            }
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            if (c == '&amp;') {</span>
+<span class="nc" id="L255">                sb.append(&quot;&amp;amp;&quot;);</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            } else if (c == '&lt;') {</span>
+<span class="nc" id="L257">                sb.append(&quot;&amp;lt;&quot;);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            } else if (c == '&gt;') {</span>
+<span class="nc" id="L259">                sb.append(&quot;&amp;gt;&quot;);</span>
+            } else {
+<span class="fc" id="L261">                sb.append(c);</span>
+            }
+        }
+<span class="fc" id="L264">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

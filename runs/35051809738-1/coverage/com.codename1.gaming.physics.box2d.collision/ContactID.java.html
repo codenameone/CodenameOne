@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContactID.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.collision</a> &gt; <span class="el_source">ContactID.java</span></div><h1>ContactID.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+/*
+ * JBox2D - A Java Port of Erin Catto's Box2D
+ * 
+ * JBox2D homepage: http://jbox2d.sourceforge.net/
+ * Box2D homepage: http://www.box2d.org
+ * 
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ * 
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ * 
+ * 1. The origin of this software must not be misrepresented; you must not
+ * claim that you wrote the original software. If you use this software
+ * in a product, an acknowledgment in the product documentation would be
+ * appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ * misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+package com.codename1.gaming.physics.box2d.collision;
+
+/// Contact ids to facilitate warm starting. Note: the ContactFeatures class is just embedded in here
+public class ContactID implements Comparable&lt;ContactID&gt; {
+
+<span class="fc" id="L51">  public static enum Type {</span>
+<span class="fc" id="L52">    VERTEX, FACE</span>
+  }
+
+  public byte indexA;
+  public byte indexB;
+  public byte typeA;
+  public byte typeB;
+
+  public int getKey() {
+<span class="fc" id="L61">    return ((int) indexA) &lt;&lt; 24 | ((int) indexB) &lt;&lt; 16 | ((int) typeA) &lt;&lt; 8 | ((int) typeB);</span>
+  }
+
+  public boolean isEqual(final ContactID cid) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    return getKey() == cid.getKey();</span>
+  }
+
+<span class="fc" id="L68">  public ContactID() {}</span>
+
+<span class="nc" id="L70">  public ContactID(final ContactID c) {</span>
+<span class="nc" id="L71">    set(c);</span>
+<span class="nc" id="L72">  }</span>
+
+  public void set(final ContactID c) {
+<span class="fc" id="L75">    indexA = c.indexA;</span>
+<span class="fc" id="L76">    indexB = c.indexB;</span>
+<span class="fc" id="L77">    typeA = c.typeA;</span>
+<span class="fc" id="L78">    typeB = c.typeB;</span>
+<span class="fc" id="L79">  }</span>
+
+  public void flip() {
+<span class="nc" id="L82">    byte tempA = indexA;</span>
+<span class="nc" id="L83">    indexA = indexB;</span>
+<span class="nc" id="L84">    indexB = tempA;</span>
+<span class="nc" id="L85">    tempA = typeA;</span>
+<span class="nc" id="L86">    typeA = typeB;</span>
+<span class="nc" id="L87">    typeB = tempA;</span>
+<span class="nc" id="L88">  }</span>
+
+  /// zeros out the data
+  public void zero() {
+<span class="fc" id="L92">    indexA = 0;</span>
+<span class="fc" id="L93">    indexB = 0;</span>
+<span class="fc" id="L94">    typeA = 0;</span>
+<span class="fc" id="L95">    typeB = 0;</span>
+<span class="fc" id="L96">  }</span>
+
+  public int compareTo(ContactID o) {
+<span class="nc" id="L99">    return getKey() - o.getKey();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

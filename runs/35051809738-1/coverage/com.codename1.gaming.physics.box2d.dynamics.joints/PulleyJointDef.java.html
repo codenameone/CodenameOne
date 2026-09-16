@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PulleyJointDef.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">PulleyJointDef.java</span></div><h1>PulleyJointDef.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+/// Created at 12:11:41 PM Jan 23, 2011
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+
+/// Pulley joint definition. This requires two ground anchors, two dynamic body anchor points, and a
+/// pulley ratio.
+///
+/// @author Daniel Murphy
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">public class PulleyJointDef extends JointDef {</span>
+
+  /// The first ground anchor in world coordinates. This point never moves.
+  public Vec2 groundAnchorA;
+
+  /// The second ground anchor in world coordinates. This point never moves.
+  public Vec2 groundAnchorB;
+
+  /// The local anchor point relative to bodyA's origin.
+  public Vec2 localAnchorA;
+
+  /// The local anchor point relative to bodyB's origin.
+  public Vec2 localAnchorB;
+
+  /// The a reference length for the segment attached to bodyA.
+  public float lengthA;
+
+  /// The a reference length for the segment attached to bodyB.
+  public float lengthB;
+
+  /// The pulley ratio, used to simulate a block-and-tackle.
+  public float ratio;
+
+<span class="fc" id="L58">  public PulleyJointDef() {</span>
+<span class="fc" id="L59">    type = JointType.PULLEY;</span>
+<span class="fc" id="L60">    groundAnchorA = new Vec2(-1.0f, 1.0f);</span>
+<span class="fc" id="L61">    groundAnchorB = new Vec2(1.0f, 1.0f);</span>
+<span class="fc" id="L62">    localAnchorA = new Vec2(-1.0f, 0.0f);</span>
+<span class="fc" id="L63">    localAnchorB = new Vec2(1.0f, 0.0f);</span>
+<span class="fc" id="L64">    lengthA = 0.0f;</span>
+<span class="fc" id="L65">    lengthB = 0.0f;</span>
+<span class="fc" id="L66">    ratio = 1.0f;</span>
+<span class="fc" id="L67">    collideConnected = true;</span>
+<span class="fc" id="L68">  }</span>
+
+  /// Initialize the bodies, anchors, lengths, max lengths, and ratio using the world anchors.
+  public void initialize(Body b1, Body b2, Vec2 ga1, Vec2 ga2, Vec2 anchor1, Vec2 anchor2, float r) {
+<span class="fc" id="L72">    bodyA = b1;</span>
+<span class="fc" id="L73">    bodyB = b2;</span>
+<span class="fc" id="L74">    groundAnchorA = ga1;</span>
+<span class="fc" id="L75">    groundAnchorB = ga2;</span>
+<span class="fc" id="L76">    localAnchorA = bodyA.getLocalPoint(anchor1);</span>
+<span class="fc" id="L77">    localAnchorB = bodyB.getLocalPoint(anchor2);</span>
+<span class="fc" id="L78">    Vec2 d1 = anchor1.sub(ga1);</span>
+<span class="fc" id="L79">    lengthA = d1.length();</span>
+<span class="fc" id="L80">    Vec2 d2 = anchor2.sub(ga2);</span>
+<span class="fc" id="L81">    lengthB = d2.length();</span>
+<span class="fc" id="L82">    ratio = r;</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">    assert (ratio &gt; Settings.EPSILON);</span>
+<span class="fc" id="L84">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

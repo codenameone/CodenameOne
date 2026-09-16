@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarTask.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarTask.java</span></div><h1>CalendarTask.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A task/reminder in a task collection.
+<span class="fc" id="L33">public class CalendarTask {</span>
+
+    private String id;
+
+    private String calendarId;
+
+    private String sourceId;
+
+    private String version;
+
+    private String title;
+
+    private String description;
+
+    private String location;
+
+    private CalendarDateTime start;
+
+    private CalendarDateTime due;
+
+    private CalendarRecurrenceRule recurrence;
+
+    private boolean completed;
+
+    private Instant completionTime;
+
+    private int priority;
+
+<span class="fc" id="L61">    private final List&lt;CalendarAlarm&gt; alarms = new ArrayList&lt;CalendarAlarm&gt;();</span>
+
+<span class="fc" id="L63">    private final List&lt;CalendarAttachment&gt; attachments = new ArrayList&lt;CalendarAttachment&gt;();</span>
+
+<span class="fc" id="L65">    private final Map&lt;String, String&gt; providerData = new HashMap&lt;String, String&gt;();</span>
+
+    public String getId() {
+<span class="fc" id="L68">        return id;</span>
+    }
+
+    public CalendarTask setId(String v) {
+<span class="fc" id="L72">        id = v;</span>
+<span class="fc" id="L73">        return this;</span>
+    }
+
+    public String getCalendarId() {
+<span class="fc" id="L77">        return calendarId;</span>
+    }
+
+    public CalendarTask setCalendarId(String v) {
+<span class="fc" id="L81">        calendarId = v;</span>
+<span class="fc" id="L82">        return this;</span>
+    }
+
+    public String getSourceId() {
+<span class="fc" id="L86">        return sourceId;</span>
+    }
+
+    public CalendarTask setSourceId(String v) {
+<span class="fc" id="L90">        sourceId = v;</span>
+<span class="fc" id="L91">        return this;</span>
+    }
+
+    public String getVersion() {
+<span class="fc" id="L95">        return version;</span>
+    }
+
+    public CalendarTask setVersion(String v) {
+<span class="fc" id="L99">        version = v;</span>
+<span class="fc" id="L100">        return this;</span>
+    }
+
+    public String getTitle() {
+<span class="fc" id="L104">        return title;</span>
+    }
+
+    public CalendarTask setTitle(String v) {
+<span class="fc" id="L108">        title = v;</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+
+    public String getDescription() {
+<span class="fc" id="L113">        return description;</span>
+    }
+
+    public CalendarTask setDescription(String v) {
+<span class="fc" id="L117">        description = v;</span>
+<span class="fc" id="L118">        return this;</span>
+    }
+
+    public String getLocation() {
+<span class="fc" id="L122">        return location;</span>
+    }
+
+    public CalendarTask setLocation(String v) {
+<span class="fc" id="L126">        location = v;</span>
+<span class="fc" id="L127">        return this;</span>
+    }
+
+    public CalendarDateTime getStart() {
+<span class="fc" id="L131">        return start;</span>
+    }
+
+    public CalendarTask setStart(CalendarDateTime v) {
+<span class="fc" id="L135">        start = v;</span>
+<span class="fc" id="L136">        return this;</span>
+    }
+
+    public CalendarDateTime getDue() {
+<span class="fc" id="L140">        return due;</span>
+    }
+
+    public CalendarTask setDue(CalendarDateTime v) {
+<span class="fc" id="L144">        due = v;</span>
+<span class="fc" id="L145">        return this;</span>
+    }
+
+    public CalendarRecurrenceRule getRecurrence() {
+<span class="fc" id="L149">        return recurrence;</span>
+    }
+
+    public CalendarTask setRecurrence(CalendarRecurrenceRule v) {
+<span class="fc" id="L153">        recurrence = v;</span>
+<span class="fc" id="L154">        return this;</span>
+    }
+
+    public boolean isCompleted() {
+<span class="fc" id="L158">        return completed;</span>
+    }
+
+    public CalendarTask setCompleted(boolean v) {
+<span class="fc" id="L162">        completed = v;</span>
+<span class="fc" id="L163">        return this;</span>
+    }
+
+    public Instant getCompletionTime() {
+<span class="fc" id="L167">        return completionTime;</span>
+    }
+
+    public CalendarTask setCompletionTime(Instant v) {
+<span class="fc" id="L171">        completionTime = v;</span>
+<span class="fc" id="L172">        return this;</span>
+    }
+
+    public int getPriority() {
+<span class="fc" id="L176">        return priority;</span>
+    }
+
+    public CalendarTask setPriority(int v) {
+<span class="fc" id="L180">        priority = v;</span>
+<span class="fc" id="L181">        return this;</span>
+    }
+
+    public CalendarTask addAlarm(CalendarAlarm v) {
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (v != null) {</span>
+<span class="fc" id="L186">            alarms.add(v);</span>
+        }
+<span class="fc" id="L188">        return this;</span>
+    }
+
+    public List&lt;CalendarAlarm&gt; getAlarms() {
+<span class="fc" id="L192">        return Collections.unmodifiableList(alarms);</span>
+    }
+
+    public CalendarTask removeAlarm(CalendarAlarm v) {
+<span class="nc" id="L196">        alarms.remove(v);</span>
+<span class="nc" id="L197">        return this;</span>
+    }
+
+    public CalendarTask clearAlarms() {
+<span class="nc" id="L201">        alarms.clear();</span>
+<span class="nc" id="L202">        return this;</span>
+    }
+
+    public CalendarTask addAttachment(CalendarAttachment v) {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (v != null) {</span>
+<span class="nc" id="L207">            attachments.add(v);</span>
+        }
+<span class="nc" id="L209">        return this;</span>
+    }
+
+    public List&lt;CalendarAttachment&gt; getAttachments() {
+<span class="fc" id="L213">        return Collections.unmodifiableList(attachments);</span>
+    }
+
+    public CalendarTask removeAttachment(CalendarAttachment v) {
+<span class="nc" id="L217">        attachments.remove(v);</span>
+<span class="nc" id="L218">        return this;</span>
+    }
+
+    public CalendarTask clearAttachments() {
+<span class="nc" id="L222">        attachments.clear();</span>
+<span class="nc" id="L223">        return this;</span>
+    }
+
+    public CalendarTask putProviderData(String k, String v) {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (k != null) {</span>
+<span class="nc" id="L228">            providerData.put(k, v);</span>
+        }
+<span class="nc" id="L230">        return this;</span>
+    }
+
+    public Map&lt;String, String&gt; getProviderData() {
+<span class="fc" id="L234">        return Collections.unmodifiableMap(providerData);</span>
+    }
+
+    public CalendarTask removeProviderData(String key) {
+<span class="nc" id="L238">        providerData.remove(key);</span>
+<span class="nc" id="L239">        return this;</span>
+    }
+
+    public CalendarTask clearProviderData() {
+<span class="nc" id="L243">        providerData.clear();</span>
+<span class="nc" id="L244">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

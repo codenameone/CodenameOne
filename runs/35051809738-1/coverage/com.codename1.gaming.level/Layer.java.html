@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Layer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">Layer.java</span></div><h1>Layer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// A named drawing band in a `GameLevel`: the editor's &quot;Background / Terrain / Items /
+/// Actors&quot; rows, and the rendering order behind them.
+///
+/// A layer has a `#getKind()` -- `Kind#TILE` layers paint a grid of asset ids into
+/// cells (stored as a `&quot;col,row&quot; -&gt; assetId` map), while `Kind#ENTITY` and
+/// `Kind#MODEL` layers just group freely-placed `GameElement`s. `#isVisible()` and
+/// `#isLocked()` mirror the editor toggles; `#getBand()` is the layer's slot in the
+/// stack and is folded into the rendered z-order (`band * 1000 + per-sprite z`) so a
+/// higher layer always draws over a lower one.
+public class Layer {
+    /// What a layer holds, which decides how its content is realized.
+<span class="fc" id="L39">    public enum Kind {</span>
+        /// A grid of tiles addressed by cell, each cell holding an asset id.
+<span class="fc" id="L41">        TILE(&quot;tile&quot;),</span>
+        /// A group of freely placed 2D entities (sprites).
+<span class="fc" id="L43">        ENTITY(&quot;entity&quot;),</span>
+        /// A group of freely placed 3D models.
+<span class="fc" id="L45">        MODEL(&quot;model&quot;);</span>
+
+        private final String wire;
+
+<span class="fc" id="L49">        Kind(String wire) {</span>
+<span class="fc" id="L50">            this.wire = wire;</span>
+<span class="fc" id="L51">        }</span>
+
+        /// The lowercase JSON token for this kind (`&quot;tile&quot;` / `&quot;entity&quot;` / `&quot;model&quot;`).
+        public String wireName() {
+<span class="fc" id="L55">            return wire;</span>
+        }
+
+        /// The kind for a JSON token (case-insensitive); defaults to `#ENTITY`.
+        public static Kind fromWire(String name) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (&quot;tile&quot;.equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L61">                return TILE;</span>
+            }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (&quot;model&quot;.equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L64">                return MODEL;</span>
+            }
+<span class="fc" id="L66">            return ENTITY;</span>
+        }
+    }
+
+    private String name;
+<span class="pc" id="L71">    private Kind kind = Kind.ENTITY;</span>
+<span class="pc" id="L72">    private boolean visible = true;</span>
+    private boolean locked;
+    private int band;
+<span class="pc" id="L75">    private float parallaxX = 1;</span>
+<span class="pc" id="L76">    private float parallaxY = 1;</span>
+
+    /// cellKey (&quot;col,row&quot;) -&gt; assetId, only used by `Kind#TILE` layers. Insertion
+    /// ordered so a saved level reloads its tiles in a stable order.
+<span class="pc" id="L80">    private final Map&lt;String, String&gt; tiles = new LinkedHashMap&lt;String, String&gt;();</span>
+
+<span class="nc" id="L82">    public Layer() {</span>
+<span class="nc" id="L83">    }</span>
+
+<span class="fc" id="L85">    public Layer(String name, Kind kind) {</span>
+<span class="fc" id="L86">        this.name = name;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        this.kind = kind == null ? Kind.ENTITY : kind;</span>
+<span class="fc" id="L88">    }</span>
+
+    public String getName() {
+<span class="fc" id="L91">        return name;</span>
+    }
+
+    public Layer setName(String name) {
+<span class="nc" id="L95">        this.name = name;</span>
+<span class="nc" id="L96">        return this;</span>
+    }
+
+    /// What this layer holds (`Kind#TILE` / `Kind#ENTITY` / `Kind#MODEL`).
+    public Kind getKind() {
+<span class="fc" id="L101">        return kind;</span>
+    }
+
+    public Layer setKind(Kind kind) {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        this.kind = kind == null ? Kind.ENTITY : kind;</span>
+<span class="nc" id="L106">        return this;</span>
+    }
+
+    public boolean isVisible() {
+<span class="fc" id="L110">        return visible;</span>
+    }
+
+    public Layer setVisible(boolean visible) {
+<span class="fc" id="L114">        this.visible = visible;</span>
+<span class="fc" id="L115">        return this;</span>
+    }
+
+    public boolean isLocked() {
+<span class="fc" id="L119">        return locked;</span>
+    }
+
+    public Layer setLocked(boolean locked) {
+<span class="fc" id="L123">        this.locked = locked;</span>
+<span class="fc" id="L124">        return this;</span>
+    }
+
+    public int getBand() {
+<span class="fc" id="L128">        return band;</span>
+    }
+
+    public Layer setBand(int band) {
+<span class="fc" id="L132">        this.band = band;</span>
+<span class="fc" id="L133">        return this;</span>
+    }
+
+    /// The horizontal parallax factor applied to every sprite realized from this layer
+    /// (default `1` = scrolls with the world). A background layer of clouds/mountains
+    /// uses a small factor (e.g. `0.3`) so it drifts behind the foreground as the
+    /// camera scrolls.
+    public float getParallaxX() {
+<span class="fc" id="L141">        return parallaxX;</span>
+    }
+
+    /// The vertical parallax factor for this layer (default `1`); see `#getParallaxX()`.
+    public float getParallaxY() {
+<span class="fc" id="L146">        return parallaxY;</span>
+    }
+
+    public Layer setParallax(float x, float y) {
+<span class="fc" id="L150">        this.parallaxX = x;</span>
+<span class="fc" id="L151">        this.parallaxY = y;</span>
+<span class="fc" id="L152">        return this;</span>
+    }
+
+    /// The raw `&quot;col,row&quot; -&gt; assetId` map for a tile layer.
+    public Map&lt;String, String&gt; tiles() {
+<span class="fc" id="L157">        return tiles;</span>
+    }
+
+    /// The cell key used in the tile map for a column and row.
+    public static String cellKey(int col, int row) {
+<span class="fc" id="L162">        return col + &quot;,&quot; + row;</span>
+    }
+
+    /// Paints an asset into a tile cell (no-op safety: a null assetId clears it).
+    public Layer putTile(int col, int row, String assetId) {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (assetId == null) {</span>
+<span class="fc" id="L168">            tiles.remove(cellKey(col, row));</span>
+        } else {
+<span class="fc" id="L170">            tiles.put(cellKey(col, row), assetId);</span>
+        }
+<span class="fc" id="L172">        return this;</span>
+    }
+
+    /// The asset id painted at a cell, or null if the cell is empty.
+    public String getTile(int col, int row) {
+<span class="fc" id="L177">        return tiles.get(cellKey(col, row));</span>
+    }
+
+    public Layer removeTile(int col, int row) {
+<span class="fc" id="L181">        tiles.remove(cellKey(col, row));</span>
+<span class="fc" id="L182">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

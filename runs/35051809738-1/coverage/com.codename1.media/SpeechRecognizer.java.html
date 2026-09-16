@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpeechRecognizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">SpeechRecognizer.java</span></div><h1>SpeechRecognizer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.ui.Display;
+
+/// On-device speech-to-text.
+///
+/// - **iOS** -- backed by `SFSpeechRecognizer`. The first call
+///   prompts the user for microphone + speech-recognition permission
+///   (the latter requires `NSSpeechRecognitionUsageDescription` in
+///   Info.plist, which the build server injects automatically when
+///   this class is referenced).
+/// - **Android** -- backed by `android.speech.SpeechRecognizer`. May
+///   use Google's cloud speech endpoint on older devices; on Pixel
+///   and modern flagships it runs fully on-device.
+/// - **JavaSE simulator** -- no built-in implementation. Add
+///   `cn1-ai-whisper` to enable on-device transcription via
+///   whisper.cpp, or expect [#isSupported] to return false.
+///
+/// ```
+/// if (SpeechRecognizer.isSupported()) {
+///     SpeechRecognizer.recognizeOnce(new RecognitionCallback.Adapter() {
+///         public void onResult(String t, float c, String[] a) {
+///             form.findTextField().setText(t);
+///         }
+///     });
+/// }
+/// ```
+public final class SpeechRecognizer {
+
+    private SpeechRecognizer() {
+    }
+
+    /// True when the current platform implements on-device or
+    /// platform-bundled speech recognition. Even when true, the user
+    /// may still deny permission at runtime.
+    public static boolean isSupported() {
+<span class="nc" id="L59">        return Display.getInstance().isSpeechRecognitionSupported();</span>
+    }
+
+    /// Captures one utterance with default options
+    /// ([RecognitionOptions] `en-US`, partial results on, max 1
+    /// alternative). Convenience wrapper around [#recognize].
+    public static void recognizeOnce(RecognitionCallback callback) {
+<span class="nc" id="L66">        recognize(new RecognitionOptions(), callback);</span>
+<span class="nc" id="L67">    }</span>
+
+    /// Starts a recognition session. Use
+    /// [RecognitionOptions#setContinuous(boolean)] to keep listening
+    /// across silences. Call [#stop()] to end a continuous session.
+    public static void recognize(RecognitionOptions options, RecognitionCallback callback) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (options == null) {</span>
+<span class="nc" id="L74">            options = new RecognitionOptions();</span>
+        }
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (callback == null) {</span>
+<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;callback is required&quot;);</span>
+        }
+<span class="nc" id="L79">        Display.getInstance().startSpeechRecognition(options, callback);</span>
+<span class="nc" id="L80">    }</span>
+
+    /// Stops the active recognition session, if any. No-op when none.
+    public static void stop() {
+<span class="nc" id="L84">        Display.getInstance().stopSpeechRecognition();</span>
+<span class="nc" id="L85">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
