@@ -54,11 +54,57 @@
             <version>3.46.1.0</version>
             <optional>true</optional>
         </dependency>
+        <!--
+             The tests here exercise the half of this runtime that is plain Java
+             and needs no native: the dialect, the configuration, the pool, the
+             ORM and the server builder. They run in the PR CI plugin leg, which
+             builds this module with `-am` and therefore runs its tests; the
+             translated arm and the server engines are covered separately, by
+             vm/backend's demos under vm/tests.
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <sourceDirectory>${backend.dir}/src</sourceDirectory>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!--
+                         ONE JVM PER TEST CLASS, because this runtime has
+                         process-global state by design and the tests are the
+                         only place that is a problem.
+
+                         EntityManager's registry of generated daos is static:
+                         in a server the generated bootstrap fills it once at
+                         start-up and it stays filled, which is correct there and
+                         is why nothing clears it. In a shared test JVM it means
+                         EntityManagerTest's registration is still there when
+                         BackendTest asks whether a server with nothing
+                         configured opens a database, and the answer becomes yes,
+                         because a registered entity is one of the reasons to
+                         open one.
+
+                         That failed on the CI runner and passed locally purely
+                         because surefire's default run order is the filesystem's.
+                         A fork per class removes the order from the answer
+                         rather than making one test tolerate the other; five
+                         classes is five JVM starts, which is not measurable
+                         beside the servers these tests bind.
+
+                         (No double dash inside this comment: XML forbids one,
+                         and maven reports it as a non-parseable POM.)
+                    -->
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>

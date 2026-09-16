@@ -140,8 +140,9 @@ class BackendHttpIntegrationTest {
         build.environment().put("CN1_BACKEND_DEMO", "demo/petserver");
         build.redirectErrorStream(true);
         Process p = build.start();
-        String buildLog = readFully(p.getInputStream());
-        boolean built = p.waitFor(20, TimeUnit.MINUTES) && p.exitValue() == 0
+        boolean[] timedOut = new boolean[1];
+        String buildLog = BackendTestSupport.awaitOutput(p, 20, TimeUnit.MINUTES, timedOut);
+        boolean built = !timedOut[0] && p.exitValue() == 0
                 && Files.isExecutable(binary);
         if (!built) {
             String tail = buildLog.length() > 3000

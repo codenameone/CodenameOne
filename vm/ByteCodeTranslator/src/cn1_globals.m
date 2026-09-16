@@ -1794,6 +1794,13 @@ static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
 static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t);
 static void cn1GcMarkReleaseForced(struct ThreadLocalData* t);
 #endif
+/*
+ * The virtual thread this state belongs to, or 0 when the state is an OS
+ * thread's. Answered from the cycle's registry SNAPSHOT, never from the live
+ * registry, because walking that needs its mutex and a thread frozen by the stop
+ * signal may be the one holding it.
+ */
+static struct cn1VirtualThread* cn1GcVtForState(struct ThreadLocalData* t);
 void cn1GcBuildRootSnapshots(void);
 JAVA_OBJECT cn1ConservativeResolve(void* w);
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
@@ -3716,6 +3723,28 @@ void codenameOneGCMark() {
                 // function safe is how it got onto this list as SAFE the first time. A
                 // cross-platform helper has to be classified on its WORST platform.
                 JAVA_BOOLEAN forcedStop = JAVA_FALSE;
+                /*
+                 * A virtual thread that is RUNNING while this cycle looks at it.
+                 * Its state is neither waited for -- nothing can stop it -- nor
+                 * touched, for the same reason forcedStop skips the migration
+                 * below: the mutator is doing `pending[size] = o; size++` and the
+                 * migration would empty a table it is still appending to.
+                 */
+                JAVA_BOOLEAN vtExecuting = JAVA_FALSE;
+                /*
+                 * Whether the claim below is HELD, so it is released exactly once
+                 * at the end of this iteration. Held across both the migration
+                 * and the heapAllocationSize reset, because the two together are
+                 * what empties the table.
+                 */
+                JAVA_BOOLEAN vtClaimed = JAVA_FALSE;
+                /*
+                 * Hoisted to this scope because the claim is RELEASED further
+                 * down, outside the lightweightThread block it used to be
+                 * declared in. Null for every ordinary thread state, which is
+                 * what cn1GcVtForState answers for one.
+                 */
+                struct cn1VirtualThread* vtOfState = 0;
                 // Deferred report for the escalation (see above). Zero means nothing to
                 // report; the values are captured under the freeze and printed after it.
                 long long forcedStopWaitUs = 0;
@@ -3736,6 +3765,62 @@ void codenameOneGCMark() {
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
+                    /*
+                     * CARRIER ASSOCIATION. Resolved once, before the wait, because
+                     * it is a linear walk of the registry snapshot and has no
+                     * business inside a 500us spin.
+                     *
+                     * A virtual thread's state has gcPthreadValid permanently
+                     * false, so the escalation below can never fire for it and the
+                     * wait has no bound at all. That is not theoretical: it is a
+                     * permanent VM freeze, MEASURED after ~160,000 requests against
+                     * vm/backend and reported only as "[GC] trapped for 20 seconds
+                     * waiting for thread 162961 in slot 19 (killed=0)", killed=0
+                     * being the escalation declining. It reproduces with CN1_WORKERS
+                     * set too, so it is not confined to the virtual-thread
+                     * scheduler.
+                     *
+                     * The flag itself cannot be trusted for such a state: every park
+                     * in this file lowers threadActive, waits out the handshake and
+                     * then ASSERTS JAVA_TRUE rather than restoring what it was, so a
+                     * virtual thread that allocated once carries a raised flag for
+                     * the rest of its life. Setting the flag honestly instead was
+                     * tried and reverted -- see the known-gap note above
+                     * cn1SpawnVirtualThread -- because the collector then migrates
+                     * pendingHeapAllocations while the virtual thread is still
+                     * appending to it. So the question the wait asks has to change
+                     * rather than the flag: not "has it parked" but "is it
+                     * executing", which for a virtual thread is answerable exactly.
+                     */
+                    vtOfState = cn1GcVtForState(t);
+                    if(vtOfState != 0) {
+                        /*
+                         * CLAIMED BEFORE THE WAIT, not inside it, because the wait
+                         * is the one place this is NOT guaranteed to run.
+                         *
+                         * The loop below is entered only while threadActive is
+                         * raised, and for a virtual thread's state that flag is
+                         * not a statement about whether it is running:
+                         * cn1CreateThreadLocalData starts it FALSE and
+                         * cn1VirtualThreadResume deliberately never raises it, for
+                         * the reason the comment in the loop gives. So a virtual
+                         * thread that has not yet allocated -- a fresh one, which
+                         * under a request-per-thread server is most of them --
+                         * skips the loop entirely, and with the claim nested in
+                         * there it was never taken at all: the migration below
+                         * then emptied the table of a thread that was executing,
+                         * or that its carrier resumed a moment later.
+                         *
+                         * Taking it here makes the claim unconditional for every
+                         * virtual-thread state, which is what it has to be. The
+                         * loop keeps its own branch, because refusing to WAIT for
+                         * such a state is a separate question from whether its
+                         * table may be touched.
+                         */
+                        vtClaimed = cn1VirtualThreadGcClaim(vtOfState)
+                                ? JAVA_TRUE : JAVA_FALSE;
+                        vtExecuting = vtClaimed ? JAVA_FALSE : JAVA_TRUE;
+                    }
                     // 64-bit: at 500us a spin, an int overflowed after ~36 minutes of
                     // waiting, and signed overflow is undefined -- the one input that
                     // can reach it is precisely the wedge this loop is trying to report.
@@ -3758,6 +3843,92 @@ void codenameOneGCMark() {
                     long long __wt0 = cn1GcNowNs();
 #endif
                     while(t->threadActive) {
+                        if(vtOfState != 0) {
+                            /*
+                             * DO NOT WAIT FOR A VIRTUAL THREAD'S STATE. EVER.
+                             *
+                             * cn1VirtualThreadResume deliberately never marks such a
+                             * state threadActive, precisely because the escalation
+                             * that bounds this wait is gated on gcPthreadValid --
+                             * permanently false here -- so a raised flag is a wait
+                             * with no end and no diagnostic beyond "(killed=0)".
+                             * MEASURED as a permanent freeze after ~160,000 requests
+                             * against vm/backend, and it reproduces with CN1_WORKERS
+                             * set, so it is not confined to the virtual-thread
+                             * scheduler.
+                             *
+                             * The flag gets raised anyway because every park in this
+                             * file lowers threadActive, waits out the handshake and
+                             * then ASSERTS JAVA_TRUE instead of restoring what it
+                             * was, so one allocation inside a virtual thread leaves
+                             * it raised for that thread's whole life. Fixing the
+                             * parks instead was tried, and it is the state the
+                             * known-gap note above cn1SpawnVirtualThread describes as
+                             * reverted: with the flag honestly false the collector
+                             * migrates pendingHeapAllocations while the virtual
+                             * thread is still appending to it. Measured here too --
+                             * 511 requests to a wedge against 163,000.
+                             *
+                             * So the wait is skipped rather than the flag corrected,
+                             * which is what the runtime already promises: this
+                             * collector never waited for a virtual thread by design,
+                             * and every root it holds is reached anyway --
+                             * cn1GcScanParkedVirtualThreads walks every registered
+                             * virtual thread's C stack whether or not it is running,
+                             * and its Java object stack is walked below exactly as it
+                             * is for a state whose flag was honestly false.
+                             *
+                             * What this does NOT fix is the first known gap: that
+                             * walk can still race a running virtual thread. This
+                             * change does not widen that window -- it restores the
+                             * behaviour a correct flag would have produced -- and
+                             * closing it needs the stop handshake to stop being
+                             * per-TLD, which is a larger change than this one.
+                             *
+                             * BUT A RUNNING ONE IS NOT A PARKED ONE. Leaving the
+                             * wait is right either way -- nothing here can stop a
+                             * virtual thread -- and going on to MIGRATE its pending
+                             * table is not: the mutator is doing
+                             * `pending[size] = o; size++` at that moment, and
+                             * emptying the table under it loses an object or places
+                             * one twice, which is heap corruption rather than a
+                             * deferred reclaim. That is the same hazard forcedStop
+                             * already declines the migration for, so a running
+                             * virtual thread is marked and declines it too.
+                             */
+                            /*
+                             * CLAIMED, not merely observed. Reading "is it
+                             * running" here and acting on it below is a
+                             * check-to-use window: this loop stops one thread
+                             * state at a time, so the CARRIER is very likely
+                             * still running, and it can resume this virtual
+                             * thread between the read and the migration. The
+                             * migration would then empty a table the mutator has
+                             * started appending to, which is the lost or
+                             * double-placed object this whole branch exists to
+                             * avoid -- reached by a different route.
+                             *
+                             * The claim publishes the collector's intent and
+                             * re-reads `running` with seq_cst on both sides, and
+                             * resume does the mirror image, so one of the two
+                             * always sees the other. A failed claim means running
+                             * and is handled exactly as before.
+                             *
+                             * Deliberately NOT a mutex: a carrier blocked on one
+                             * holds threadActive raised, and this collector's
+                             * unbounded wait for a carrier is precisely what the
+                             * forced-stop escalation exists to break -- and
+                             * cannot, for a state with no pthread. Both reverted
+                             * attempts recorded above were that shape.
+                             */
+                            /*
+                             * The claim was taken before this loop -- see the
+                             * block above it -- because a state that never raises
+                             * threadActive never reaches here. All this does is
+                             * decline to wait.
+                             */
+                            break;
+                        }
                         usleep(500);
                         totalwait += 500;
                         // REPORTING, fixed. time(0) is in SECONDS; this compared the
@@ -3884,7 +4055,7 @@ void codenameOneGCMark() {
                 // deferred reclaim and nothing else. It cannot grow without bound either:
                 // a table over its threshold parks its own thread at a safepoint, which is
                 // the cooperative stop this escalation was standing in for.
-                if(!forcedStop) {
+                if(!forcedStop && !vtExecuting) {
                     lockCriticalSection();
                     if(allThreads[iter] == t) {
                         if (!t->lightweightThread) {
@@ -3941,8 +4112,18 @@ void codenameOneGCMark() {
                     
                 }
                 
-                if(!forcedStop) {
+                if(!forcedStop && !vtExecuting) {
                     t->heapAllocationSize = 0;
+                }
+                /*
+                 * RELEASED HERE, after the reset and not after the migration: the
+                 * table is only empty once heapAllocationSize is back to zero, so
+                 * a resume between the two would append at an index the migration
+                 * has already taken.
+                 */
+                if(vtClaimed) {
+                    cn1VirtualThreadGcRelease(vtOfState);
+                    vtClaimed = JAVA_FALSE;
                 }
 
                 int stackSize = t->threadObjectStackOffset;
@@ -11086,6 +11267,48 @@ static int cn1GcVtSnapshotTruncated = 0;
 
 // Reset at the start of every cycle; see the use below.
 static int cn1GcParkedVirtualThreadsScanned = 0;
+
+/*
+ * Linear over the snapshot, and that is deliberate: it runs ONCE per state per
+ * cycle, not inside the 500us wait spin, so the cost is bounded by
+ * (threads x virtual threads) per mark rather than per microsecond. A map keyed
+ * by state would have to be maintained by the scheduler on every switch, which
+ * is the hot path this is trying not to touch.
+ */
+/*
+ * THIS NEVER MATCHES ON vm/backend, AND THE COUNTERS ARE UNAMBIGUOUS. Over 600
+ * collections serving 200,000 requests: 11,748 calls here, a snapshot holding 2
+ * to 15 virtual threads every cycle, and ZERO matches. Instrumenting the
+ * snapshot itself says why -- every registered virtual thread reports a NULL
+ * attached state (withState=0 in every sample), so there is no pointer for an
+ * allThreads entry to equal.
+ *
+ * The whole virtual-thread arm of the stop loop therefore does not execute on
+ * that workload: not the refusal to wait, not the executing check, not the claim.
+ * Anything reasoning about those paths should say "correct by construction", and
+ * no measurement taken against this server proves one of them either way.
+ *
+ * Note what it also means for the hazard they guard. With vtOfState null the
+ * migration below runs with no virtual-thread handling at all -- so either those
+ * states are not in allThreads to be migrated, or they are and nothing is
+ * guarding them. Which of the two is open, and it is a bigger question than the
+ * claim: cn1SpawnVirtualThread does attach a state, and the backend creates its
+ * threads through it, so a null here is not what the code leads you to expect.
+ * The retire path clears the state before markDeadThread while the body is still
+ * running, which is the nearest candidate and is not established.
+ */
+static struct cn1VirtualThread* cn1GcVtForState(struct ThreadLocalData* t) {
+    if(t == 0) {
+        return 0;
+    }
+    for(int iter = 0 ; iter < cn1GcVtSnapshotCount ; iter++) {
+        struct cn1VirtualThread* vt = cn1GcVtSnapshot[iter];
+        if(vt != 0 && cn1VirtualThreadState(vt) == (void*)t) {
+            return vt;
+        }
+    }
+    return 0;
+}
 
 static void cn1GcBuildVirtualThreadSnapshot(void) {
     cn1GcParkedVirtualThreadsScanned = 0;

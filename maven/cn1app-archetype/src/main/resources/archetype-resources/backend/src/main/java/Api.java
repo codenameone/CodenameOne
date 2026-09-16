@@ -52,6 +52,19 @@ import java.util.Map;
  *
  * The local run deliberately does not terminate TLS, and therefore does not serve
  * HTTP/2. Build the binary when those are what you need to exercise.
+ *
+ * Settings come from application.properties in this module's ROOT -- next to its
+ * pom.xml, not under src/main/resources -- overridden by
+ * application-&lt;profile&gt;.properties and then by the environment -- which is what
+ * lets this run against an in-memory SQLite database here and a managed
+ * PostgreSQL in production without a branch in the code:
+ *
+ *     CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend
+ *
+ * A controller that needs the database says so in its constructor. Declare one
+ * taking a com.codename1.backend.DataSource for SQL, or one taking a
+ * com.codename1.backend.orm.EntityManager for the daos generated from the
+ * project's &#64;Entity classes, and the generated entry point passes it in.
  */
 @RestController
 public class Api {

@@ -55,8 +55,13 @@ public final class FileIo {
     /** openBeneath cannot answer here; fall back to open plus a resolved-path check. */
     public static final int BENEATH_UNSUPPORTED = -2;
 
+    /** openRead: the file is there and could not be opened. See openReadImpl. */
+    public static final int OPEN_FAILED = -2;
+
     public static int openRead(String path) {
         if(holdsNul(path)) {
+            // Absent rather than unreadable: a path this runtime truncates at a
+            // NUL is not a path to anything, and refusing it is the point.
             return -1;
         }
         return openReadImpl(path);
@@ -69,6 +74,19 @@ public final class FileIo {
      * with the body.
      */
     public static int stat(int fd, long[] out) {
+        return statImpl(fd, out);
+    }
+
+    /**
+     * The same call, because statImpl is a live fstat on the open descriptor and
+     * so is already current.
+     *
+     * <p>It exists so the two runtimes present one API: the Java SE
+     * implementation answers stat() from an open-time snapshot that asset
+     * serving needs, and therefore cannot answer whether the file has changed
+     * since. See the javadoc there.
+     */
+    public static int statFresh(int fd, long[] out) {
         return statImpl(fd, out);
     }
 

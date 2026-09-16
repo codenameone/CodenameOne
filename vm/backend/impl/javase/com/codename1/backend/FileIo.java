@@ -184,6 +184,9 @@ public final class FileIo {
         return BENEATH_UNSUPPORTED;
     }
 
+    /** openRead: the file is there and could not be opened. See the native twin. */
+    public static final int OPEN_FAILED = -2;
+
     public static int openRead(String path) {
         try {
             Path p = Paths.get(path);
@@ -225,9 +228,72 @@ public final class FileIo {
                 channel.close();
             }
             return Descriptors.add(opened);
-        } catch (Exception err) {
+        } catch (java.nio.file.NoSuchFileException absent) {
+            // A DANGLING SYMLINK IS NOT AN ABSENT FILE, and the open follows the
+            // link, so the exception names the missing TARGET and looks exactly
+            // like a path that names nothing. A deployment whose
+            // application.properties is a symlink into a volume that failed to
+            // mount then read as "no configuration": every file-based setting
+            // fell back to an environment default, and a server naming its TLS
+            // certificate and key in that file came up in PLAINTEXT. That is what
+            // this -1/-2 split exists to prevent, arriving through the one answer
+            // the split treats as benign.
+            //
+            // NOFOLLOW_LINKS asks about the entry rather than its target, so a
+            // link that is there answers true while a path that names nothing
+            // answers false. Matches the lstat the translated arm does.
+            try {
+                if(danglingLinkIn(java.nio.file.Paths.get(path))) {
+                    return OPEN_FAILED;
+                }
+            } catch (Exception unnameable) {
+                // A path Paths.get refuses is not a path to anything; fall
+                // through to the absent answer the other catch below gives it.
+            }
             return -1;
+        } catch (java.nio.file.InvalidPathException unnameable) {
+            // ABSENT, NOT UNREADABLE, and the translated arm says so explicitly:
+            // a path holding a NUL is not a path to anything. Paths.get throws
+            // this rather than NoSuchFileException, so the first version of the
+            // split below answered -2 here and the two arms disagreed about the
+            // one case SelfTest already checks on both.
+            return -1;
+        } catch (Exception err) {
+            // THE SAME SPLIT THE NATIVE ARM MAKES. -1 is "no such file", which a
+            // caller may treat as an absent optional file; -2 is "there is one
+            // and it could not be opened", which nobody may quietly ignore.
+            return OPEN_FAILED;
         }
+    }
+
+    /**
+     * Whether any component of {@code p} is a symlink whose target is missing.
+     *
+     * <p>EVERY COMPONENT, not just the last one. NOFOLLOW_LINKS asks about the
+     * entry the path names and nothing above it, so
+     * cn1.config.location=/config/current with current -> missing-release opened
+     * /config/current/application.properties, got NoSuchFileException for a
+     * component in the MIDDLE, and answered "absent" -- the same silent discard
+     * of every file-based setting, TLS paths included, that the final-component
+     * check was added to stop. A release directory swung by symlink is how most
+     * deployments roll forward, so the broken middle is the likelier half.
+     *
+     * <p>Walked from the root down, and a component that exists without following
+     * links but not with them is the answer: that is a link pointing at nothing.
+     * A path that simply names nothing has no such component and stays absent.
+     */
+    private static boolean danglingLinkIn(Path p) {
+        Path walked = p.isAbsolute() ? p.getRoot() : null;
+        java.util.Iterator<Path> parts = p.iterator();
+        while(parts.hasNext()) {
+            Path part = parts.next();
+            walked = walked == null ? part : walked.resolve(part);
+            if(java.nio.file.Files.exists(walked, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    && !java.nio.file.Files.exists(walked)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A file's identity, or null when the filesystem does not report one. */
@@ -236,6 +302,72 @@ public final class FileIo {
             return Files.readAttributes(p, BasicFileAttributes.class).fileKey();
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    /**
+     * The file's metadata AS IT IS NOW, rather than as it was when the
+     * descriptor opened.
+     *
+     * <p>{@link #stat} deliberately answers from the open-time snapshot -- the
+     * comment on OpenFile.size says why, and static asset serving depends on it,
+     * since a response has to describe the bytes the channel will actually
+     * stream. That makes stat() useless for asking whether the file CHANGED: on
+     * this runtime both a pre-read and a post-read stat return the identical
+     * captured values, so a comparison between them can never be unequal and the
+     * check reads as passed when it never ran. The native runtime's statImpl is
+     * a live fstat and does not have that problem, so the two runtimes disagreed
+     * about a check that looked symmetric.
+     *
+     * <p>Identity is reported from the same re-read, because mtime alone misses
+     * an atomic replace: a new file moved over the path can carry any timestamp,
+     * including the old one. The pair -- same identity with a different mtime is
+     * an in-place rewrite, a different identity is a replacement -- is what the
+     * caller compares against the open-time values.
+     *
+     * <p>Read through the unix view in one call where there is one, for the
+     * reason the open-time capture states: two lookups of a PATH can straddle a
+     * replace and pair one file's timestamp with another's inode.
+     */
+    public static int statFresh(int fd, long[] out) {
+        Object entry = Descriptors.get(fd);
+        if(!(entry instanceof OpenFile) || out == null || out.length < 3) {
+            return -1;
+        }
+        OpenFile file = (OpenFile)entry;
+        try {
+            Map unix = null;
+            try {
+                unix = Files.readAttributes(file.path, "unix:*");
+            } catch (Exception unsupported) {
+                unix = null;
+            }
+            if(unix != null) {
+                Object modifiedValue = unix.get("lastModifiedTime");
+                Object sizeValue = unix.get("size");
+                Object inoValue = unix.get("ino");
+                out[0] = sizeValue instanceof Number ? ((Number)sizeValue).longValue() : 0;
+                out[1] = modifiedValue instanceof FileTime
+                        ? ((FileTime)modifiedValue).toMillis() : 0;
+                out[2] = Boolean.TRUE.equals(unix.get("isDirectory")) ? 1 : 0;
+                if(out.length > 3) {
+                    out[3] = inoValue instanceof Number
+                            ? ((Number)inoValue).longValue() : 0;
+                }
+            } else {
+                BasicFileAttributes a = Files.readAttributes(file.path,
+                        BasicFileAttributes.class);
+                out[0] = a.size();
+                out[1] = a.lastModifiedTime().toMillis();
+                out[2] = a.isDirectory() ? 1 : 0;
+                if(out.length > 3) {
+                    Object key = a.fileKey();
+                    out[3] = key == null ? 0 : key.hashCode();
+                }
+            }
+            return 0;
+        } catch (Exception unreadable) {
+            return -1;
         }
     }
 

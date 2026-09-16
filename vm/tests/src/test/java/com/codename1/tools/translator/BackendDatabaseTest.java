@@ -112,9 +112,9 @@ class BackendDatabaseTest {
         run.environment().putAll(env);
         run.redirectErrorStream(true);
         Process p = run.start();
-        String output = BackendTestSupport.readFully(p.getInputStream());
-        if (!p.waitFor(5, TimeUnit.MINUTES)) {
-            p.destroyForcibly();
+        boolean[] timedOut = new boolean[1];
+        String output = BackendTestSupport.awaitOutput(p, 5, TimeUnit.MINUTES, timedOut);
+        if (timedOut[0]) {
             fail("the translated dbcheck did not finish:\n" + output);
         }
         return output;
