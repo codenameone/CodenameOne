@@ -412,6 +412,19 @@ public final class AndroidSecureStorage extends SecureStorage {
                     + "created here", Log.WARNING);
             return null;
         }
+        // The key is made usable BEFORE the gate is taken, never inside it. set() below reaches
+        // resetPlainKey when the keystore alias has become unusable, and a reset that runs while
+        // this thread holds a gate cannot take that gate -- an overlapping lock in the same JVM
+        // throws rather than blocking -- so it would abort, set() would fail, and the account
+        // could never recover because every retry re-enters through here and holds the gate
+        // again. Doing it out here means the reset, if one is needed, runs holding nothing.
+        try {
+            plainKey(true);
+        } catch (Throwable keyUnavailable) {
+            // Not fatal here: set() below reports its own failure, and this was only a chance to
+            // get the reset out of the way.
+            Log.e(keyUnavailable);
+        }
         java.io.RandomAccessFile handle = null;
         java.nio.channels.FileLock lock = null;
         try {
@@ -872,10 +885,23 @@ public final class AndroidSecureStorage extends SecureStorage {
         java.util.List<java.nio.channels.FileLock> locks =
                 new java.util.ArrayList<java.nio.channels.FileLock>();
         java.util.List<String> held = new java.util.ArrayList<String>();
+        // The keystore alias is ONE key shared by every account, so deleting it is all-or-
+        // nothing. Skipping an account whose gate could not be taken and deleting the alias
+        // anyway left that account holding ciphertext and a GATE_SETTLED mark with no key that
+        // can open it -- and nothing recovers from there: the failure its ciphertext now
+        // produces is GCM authentication, not InvalidKeyException, so no later reset recognises
+        // it, and setIfAbsent reads the entry as present and refuses to recreate the vault or
+        // managed key. Permanently.
+        boolean everyGateHeld = true;
         try {
             for (String account : candidates) {
                 java.io.File gate = gateFile(account);
                 if (gate == null) {
+                    // No gate for this account means it cannot be coordinated, and the alias
+                    // about to be deleted is shared by every account -- so proceeding would
+                    // strand this one exactly as a failed lock would. setIfAbsent refuses for
+                    // the same reason when it has no gate.
+                    everyGateHeld = false;
                     continue;
                 }
                 java.io.RandomAccessFile handle = null;
@@ -894,13 +920,14 @@ public final class AndroidSecureStorage extends SecureStorage {
                     held.add(account);
                     handle = null;
                 } catch (java.io.IOException cannotLock) {
-                    // This account keeps its mark, which is better than clearing one this reset
-                    // cannot hold -- that is the whole defect above.
                     Log.e(cannotLock);
+                    everyGateHeld = false;
                 } catch (RuntimeException cannotLock) {
-                    // OverlappingFileLockException among them, which would mean this process
-                    // already holds that gate. Refusing to clear is the safe answer either way.
+                    // OverlappingFileLockException among them, which means a thread in THIS
+                    // process already holds that gate -- setIfAbsent, most likely, since its
+                    // set() can reach here.
                     Log.e(cannotLock);
+                    everyGateHeld = false;
                 } finally {
                     // Non-null only when the lock was not taken, so this closes the handle that
                     // never made it into the lists rather than leaking it for the whole reset.
@@ -914,6 +941,14 @@ public final class AndroidSecureStorage extends SecureStorage {
                 }
             }
 
+            if (!everyGateHeld) {
+                // Nothing is touched. The alias stays, every value stays readable or not exactly
+                // as it was, and the next reset -- once whoever holds that gate has let go --
+                // does the whole job rather than half of it.
+                Log.p("SecureStorage: a gate could not be taken, so the key reset was not "
+                        + "started; it will be retried", Log.WARNING);
+                return;
+            }
             synchronized (PLAIN_KEY_LOCK) {
                 try {
                     // Same reasoning as plainKey(): this tier does not touch the shared KeyStore
