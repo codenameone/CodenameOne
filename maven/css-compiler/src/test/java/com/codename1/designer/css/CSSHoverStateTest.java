@@ -108,6 +108,43 @@ public class CSSHoverStateTest {
         assertEquals(null, theme.get("Unrelated.hover#bgColor"), "unrelated UIID stays opt-in");
     }
 
+    @Test
+    void testHoverOnlyRasterEffectTriggersCaptureAndHasAnHtmlElement() throws Exception {
+        assertHoverCapture("Button { background-color: #ffffff; }"
+                + "Button.hover { box-shadow: inset 0 2px 4px black; }", false);
+    }
+
+    @Test
+    void testHoverCaptureCoexistsWithOtherStatesAndInheritance() throws Exception {
+        assertHoverCapture("Button { background-color: #ffffff; }"
+                + "Button.hover { box-shadow: 0 2px 4px rgba(255,0,0,0.5); }"
+                + "Child { cn1-derive: Button; }"
+                + "Other { box-shadow: inset 0 1px 3px black; }", true);
+    }
+
+    private static void assertHoverCapture(String css, boolean inherited) throws Exception {
+        Path cssFile = Files.createTempFile("cn1-hover-capture", ".css");
+        try {
+            Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            assertEquals(true, theme.requiresCaptureHtml(), "hover raster effects need capture");
+            String html = theme.generateCaptureHtml();
+            assertEquals(true, html.contains("id=\"Button.hover\""), "hover processor needs matching HTML");
+            assertEquals(false, html.contains("id=\"Button\""), "native base style needs no capture");
+            if (!inherited) {
+                assertEquals(true, html.contains("data-box-shadow-padding=\"0.0,0.0,0.0,0.0\""),
+                        "inset shadows do not reserve outer capture padding");
+            }
+            if (inherited) {
+                assertEquals(true, html.contains("id=\"Child.hover\""), "inherited hover capture");
+                assertEquals(true, html.contains("id=\"Other\""), "existing state capture remains present");
+                assertEquals(false, html.contains("id=\"Other.hover\""), "no hover capture without a declaration");
+            }
+        } finally {
+            deleteIfExists(cssFile);
+        }
+    }
+
     private static Hashtable compile(String css) throws Exception {
         Path cssFile = Files.createTempFile("cn1-hover", ".css");
         Path resFile = Files.createTempFile("cn1-hover", ".res");

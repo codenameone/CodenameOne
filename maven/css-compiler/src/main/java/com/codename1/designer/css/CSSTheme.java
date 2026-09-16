@@ -1791,6 +1791,12 @@ public class CSSTheme {
             if (el.requiresBackgroundImageGeneration(pressedStyle) || el.requiresImageBorder(pressedStyle)) {
                 return true;
             }
+            if (el.declaresHover()) {
+                Map hoverStyle = el.getHover().getFlattenedStyle();
+                if (el.requiresBackgroundImageGeneration(hoverStyle) || el.requiresImageBorder(hoverStyle)) {
+                    return true;
+                }
+            }
             Map disabledStyle = el.getDisabled().getFlattenedStyle();
             if (el.requiresBackgroundImageGeneration(disabledStyle) || el.requiresImageBorder(disabledStyle)) {
                 return true;
@@ -1825,6 +1831,13 @@ public class CSSTheme {
             Map pressedStyle = el.getPressed().getFlattenedStyle();   
             if (el.requiresBackgroundImageGeneration(pressedStyle) || el.requiresImageBorder(pressedStyle)) {
                 sb.append(el.getPressed().getEmptyHtmlWithId(name+".press", pressedStyle));
+            }
+            // Keep the DOM IDs aligned with the hover processors registered by createImageBorders.
+            if (el.declaresHover()) {
+                Map hoverStyle = el.getHover().getFlattenedStyle();
+                if (el.requiresBackgroundImageGeneration(hoverStyle) || el.requiresImageBorder(hoverStyle)) {
+                    sb.append(el.getHover().getEmptyHtmlWithId(name+".hover", hoverStyle));
+                }
             }
             Map disabledStyle = el.getDisabled().getFlattenedStyle();
             if (el.requiresBackgroundImageGeneration(disabledStyle) || el.requiresImageBorder(disabledStyle)) {
@@ -4233,57 +4246,28 @@ public class CSSTheme {
             return generateMD5(sb.toString());
         }
         
+        private float shadowCapturePixels(LexicalUnit value) {
+            if (value == null || (value.getLexicalUnitType() == LexicalUnit.SAC_IDENT
+                    && "none".equals(value.getStringValue()))) {
+                return 0;
+            }
+            return ((ScaledUnit)value).getPixelValue();
+        }
+
         Insets getBoxShadowPadding(Map<String, LexicalUnit> style) {
             Insets i = new Insets();
-            ScaledUnit boxShadow = (ScaledUnit)style.get("cn1-box-shadow-h");
-            ScaledUnit tmp = boxShadow;
-            while (tmp != null) {
-                tmp = (ScaledUnit)tmp.getPreviousLexicalUnit();
-                if (tmp != null) {
-                    boxShadow = tmp;
-                }
-            }
-
-            if (isNone(boxShadow)) {
+            LexicalUnit inset = style.get("cn1-box-shadow-inset");
+            if (inset != null && "inset".equals(inset.getStringValue())) {
                 return i;
             }
+            // Read the parsed properties, not the original token chain: omitted spread
+            // must not consume the trailing color as a length, and normalized zero offsets
+            // need no linked tokens to recover inset or the other shadow dimensions.
+            double hShadow = shadowCapturePixels(style.get("cn1-box-shadow-h"));
+            double vShadow = shadowCapturePixels(style.get("cn1-box-shadow-v"));
+            double blur = shadowCapturePixels(style.get("cn1-box-shadow-blur"));
+            double spread = shadowCapturePixels(style.get("cn1-box-shadow-spread"));
 
-            ScaledUnit insetUnit = boxShadow;
-            while (insetUnit != null) {
-                if ("inset".equals(insetUnit.getStringValue())) {
-                    return i;
-                }
-                insetUnit = (ScaledUnit)insetUnit.getNextLexicalUnit();
-            }
-
-            double hShadow = boxShadow.getPixelValue();
-            boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
-
-            double vShadow = 0;
-            if (boxShadow == null) {
-                boxShadow = (ScaledUnit)style.get("cn1-box-shadow-v");
-            }
-            if (boxShadow != null) {
-                vShadow = boxShadow.getPixelValue();
-                boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
-            }
-            
-            double blur = 0;
-            if (boxShadow == null) {
-                boxShadow = (ScaledUnit)style.get("cn1-box-shadow-blur");
-            }
-            if (boxShadow != null) {
-                blur = boxShadow.getPixelValue();
-                boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
-            }
-            double spread = 0;
-            if (boxShadow == null) {
-                boxShadow = (ScaledUnit)style.get("cn1-box-shadow-spread");
-            }
-            if (boxShadow != null) {
-                spread = boxShadow.getPixelValue();
-            }
-            
             i.top = Math.max(0,(int)Math.ceil(spread - vShadow + blur/2));
             i.left = Math.max(0, (int)Math.ceil(spread - hShadow + blur/2));
             i.bottom = Math.max(0, (int)Math.ceil(spread + vShadow + blur/2));
