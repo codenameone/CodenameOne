@@ -197,17 +197,27 @@ class Redaction(unittest.TestCase):
     def test_run_redacts_every_supplied_credential(self):
         code, output = canary.run(
             [sys.executable, "-c", "print('tok-abc123 user@example.com ok')"],
-            cwd=".", what="probe", secrets=("tok-abc123", "user@example.com"))
+            cwd=".", what="probe", timeout=60,
+            secrets=("tok-abc123", "user@example.com"))
         self.assertNotIn("tok-abc123", output)
         self.assertNotIn("user@example.com", output)
         self.assertIn("***", output)
 
 
 class Budgets(unittest.TestCase):
-    def test_internal_budgets_fit_the_documented_job_timeout(self):
-        """The workflow allows 70 minutes; the canary must finish inside it."""
-        total_minutes = (canary.LAUNCH_TIMEOUT + canary.POLL_TIMEOUT) / 60
-        self.assertLess(total_minutes, 70, "job timeout-minutes must exceed this")
+    JOB_TIMEOUT_MINUTES = 70  # starter-canary.yml
+
+    def test_every_phase_fits_the_job_timeout(self):
+        """Each blocking phase must be counted, or the runner kills the job first."""
+        total = (canary.SEED_TIMEOUT + canary.LAUNCH_TIMEOUT + canary.POLL_TIMEOUT) / 60
+        self.assertLess(total, self.JOB_TIMEOUT_MINUTES,
+                        "raise timeout-minutes in starter-canary.yml to cover this")
+
+    def test_run_requires_an_explicit_timeout(self):
+        """No unbounded default: an uncounted phase is how the budget drifted."""
+        import inspect
+        parameter = inspect.signature(canary.run).parameters["timeout"]
+        self.assertIs(parameter.default, inspect.Parameter.empty)
 
 
 class PomProperties(unittest.TestCase):

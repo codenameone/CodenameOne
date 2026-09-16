@@ -62,6 +62,7 @@ AWKWARD = "Project O'Brien with spaces"
 # plus checkout/python/JDK setup. If the runner kills the job first, the canary
 # never writes its report and the alert job reports an outage that did not
 # happen -- so these two numbers and that one are a single decision.
+SEED_TIMEOUT = 600      # 10 min: resolving and running one small goal
 LAUNCH_TIMEOUT = 1800   # 30 min: mvnw downloads Maven and the toolchain
 POLL_TIMEOUT = 1200     # 20 min: waiting for the cloud build to finish
 
@@ -267,12 +268,13 @@ def seed_token(project, mvn, email, token, plugin_version):
          f"-Dtoken={token}", f"-Duser={email}"],
         cwd=project,
         what="cn1:set-user-token",
+        timeout=SEED_TIMEOUT,
         secrets=(token, email),
     )
     log("seeded build-client token")
 
 
-def run(command, cwd, what, timeout=3600, secrets=(), check=True):
+def run(command, cwd, what, timeout, secrets=(), check=True):
     result = subprocess.run(
         command, cwd=str(cwd), capture_output=True, text=True, timeout=timeout
     )
