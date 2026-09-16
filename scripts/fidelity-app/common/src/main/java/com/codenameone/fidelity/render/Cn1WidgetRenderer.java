@@ -212,11 +212,19 @@ public final class Cn1WidgetRenderer {
             s.setEditable("Slider".equals(id));
             s.setMinValue(0);
             s.setMaxValue(100);
-            // The two widgets sit at DIFFERENT values in every native reference app, and
-            // they have to match here or the comparison is between two different states:
-            // a slider at 0.5 (knob centred) and a progress bar at 0.6. Setting both to 60
-            // put the CN1 knob 24px to the right of the reference's.
-            s.setProgress("Slider".equals(id) ? 50 : 60);
+            // Every value here mirrors what the matching native reference app sets, and
+            // the DESKTOP apps disagree with the mobile ones, so this is scoped by row
+            // rather than shared:
+            //
+            //   mobile  slider 0.5, progress 0.5   (RefWidgets.java, NativeRef.swift)
+            //   desktop slider 0.5, progress 0.6   (the three desktop reference apps)
+            //
+            // Both sides must sit at the same value or the comparison is between two
+            // different states. Setting progress to 60 everywhere moved the MOBILE bar off
+            // its golden, which was captured at 0.5 -- a regression in the iOS and Android
+            // suites introduced while fixing the desktop one.
+            boolean desktopRow = spec.getId() != null && spec.getId().startsWith("Desktop");
+            s.setProgress("ProgressBar".equals(id) && desktopRow ? 60 : 50);
             if ("disabled".equals(state)) {
                 s.setEnabled(false);
             }
