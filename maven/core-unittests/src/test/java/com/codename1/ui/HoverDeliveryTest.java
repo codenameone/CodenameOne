@@ -175,6 +175,34 @@ class HoverDeliveryTest extends UITestBase {
                 "the component under the pointer at release must be hovered");
     }
 
+    @FormTest
+    void releaseNavigationDoesNotRestoreHoverOnTheHiddenForm() {
+        implementation.setDesktop(true);
+        final Form destination = new Form("destination");
+        Form source = new Form("source", new BorderLayout());
+        source.setTransitionOutAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
+        destination.setTransitionInAnimator(com.codename1.ui.animations.CommonTransitions.createEmpty());
+        Button button = new Button("navigate");
+        source.add(BorderLayout.CENTER, button);
+        button.addActionListener(event -> destination.show());
+        source.show();
+        DisplayTest.flushEdt();
+        installHoverTheme(source);
+        hoverForm(source, button);
+        assertTrue(button.isHovered());
+        int x = button.getAbsoluteX() + button.getWidth() / 2;
+        int y = button.getAbsoluteY() + button.getHeight() / 2;
+        implementation.setPointerType(PointerEvent.TYPE_MOUSE);
+        source.pointerPressed(x, y);
+        source.pointerReleased(x, y);
+        DisplayTest.flushEdt();
+        assertEquals(destination, Display.getInstance().getCurrent());
+        assertFalse(button.isHovered(), "release must not restore hover after navigation deinitializes the source");
+        source.show();
+        DisplayTest.flushEdt();
+        assertFalse(button.isHovered(), "showing the source again must not revive stale hover");
+    }
+
     /// A control in a secondary window responds to hover.
     ///
     /// `Window` is not a `Form` -- it extends `Container` -- and its `pointerHover` only

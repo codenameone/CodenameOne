@@ -4904,7 +4904,10 @@ public class Form extends Container implements TopLevelContainer {
             // In the finally, beside the other piece of end-of-gesture bookkeeping, because
             // this method returns from six places inside the try above and a catch-up after
             // the block is reached by none of them.
-            if (hoverOnRelease) {
+            // A release callback may navigate and deinitialize this form. Do not
+            // restore the hover that deinitialization just cleared on a hidden form.
+            // During a transition, getCurrent() can still name that deinitialized source.
+            if (hoverOnRelease && isInitialized() && isTopLevelShowing()) {
                 hoverTracker.pointerOver(hoverTargetAt(x, y), x, y);
             }
         }

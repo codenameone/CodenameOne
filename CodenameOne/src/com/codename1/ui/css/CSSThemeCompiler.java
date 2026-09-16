@@ -83,8 +83,97 @@ public class CSSThemeCompiler {
         for (Rule rule : rules) {
             applyRule(theme, resources, rule);
         }
+        inheritHoverDerivations(theme);
         resolveThemeConstantVars(theme);
         resources.setTheme(themeName, theme);
+    }
+
+    private void inheritHoverDerivations(Hashtable theme) {
+        ArrayList<String> ids = new ArrayList<String>();
+        for (Object keyObj : theme.keySet()) {
+            String key = String.valueOf(keyObj);
+            int dot = key.indexOf('.');
+            if (key.startsWith("@") || dot < 0) {
+                continue;
+            }
+            String id = key.substring(0, dot);
+            if (id.startsWith("$Dark")) {
+                id = id.substring(5);
+            }
+            if (!ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+        // Prefixed style lookup does not follow the normal derive key. Materialize
+        // only hover derivations whose base actually declares that state.
+        for (int appearance = 0; appearance < 2; appearance++) {
+            boolean dark = appearance == 1;
+            String prefix = dark ? "$Dark" : "";
+            for (int pass = 0; pass < ids.size(); pass++) {
+                boolean changed = false;
+                for (String id : ids) {
+                    String base = hoverBase(theme, id, dark);
+                    String key = prefix + id + ".hover#derive";
+                    if (base == null || theme.containsKey(key) || cyclicDerivation(theme, id, dark)) {
+                        continue;
+                    }
+                    boolean baseHasHover = hasHoverDefinition(theme, prefix + base);
+                    if (dark && theme.containsKey("$Dark" + id + ".derive")) {
+                        baseHasHover |= hasHoverDefinition(theme, base);
+                    }
+                    if (baseHasHover) {
+                        if (dark) {
+                            // An explicit dark derive bypasses UIManager's light-style
+                            // fallback, so retain the child's own light hover overrides.
+                            ArrayList<Object> keys = new ArrayList<Object>(theme.keySet());
+                            String lightPrefix = id + ".hover#";
+                            for (Object property : keys) {
+                                String lightKey = String.valueOf(property);
+                                if (lightKey.startsWith(lightPrefix) && !lightKey.endsWith("#derive")
+                                        && !theme.containsKey("$Dark" + lightKey)) {
+                                    theme.put("$Dark" + lightKey, theme.get(property));
+                                }
+                            }
+                        }
+                        theme.put(key, base + ".hover");
+                        changed = true;
+                    }
+                }
+                if (!changed) {
+                    break;
+                }
+            }
+        }
+    }
+
+    private String hoverBase(Hashtable theme, String id, boolean dark) {
+        Object base = dark ? theme.get("$Dark" + id + ".derive") : null;
+        if (base == null) {
+            base = theme.get(id + ".derive");
+        }
+        return base instanceof String ? (String) base : null;
+    }
+
+    private boolean cyclicDerivation(Hashtable theme, String id, boolean dark) {
+        ArrayList<String> seen = new ArrayList<String>();
+        while (id != null) {
+            if (seen.contains(id)) {
+                return true;
+            }
+            seen.add(id);
+            id = hoverBase(theme, id, dark);
+        }
+        return false;
+    }
+
+    private boolean hasHoverDefinition(Hashtable theme, String id) {
+        String prefix = id + ".hover#";
+        for (Object key : theme.keySet()) {
+            if (String.valueOf(key).startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void resolveThemeConstantVars(Hashtable theme) {

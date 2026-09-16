@@ -5,6 +5,32 @@ geometry measured against those references on each platform's hosted runner.
 Baseline updates require inspection of the comparison artifacts; do not increase
 tolerances to hide a failed run.
 
+The current desktop baselines use **1x logical pixels at 96 DPI** and the installed
+native font families. The previous captures used the simulator's mobile fallback
+of 5 pixels/mm and bundled Roboto aliases. Switching to about 3.78 pixels/mm
+changes geometry throughout the captures, so all 60 pairs per platform were
+re-rendered and their comparison overviews inspected. Native PNG references and
+all score, geometry, and upward-jump tolerances remain unchanged.
+
+| Platform | Capture run | Commit | Confirmed Java font family | Pairs | Mean | Minimum |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| GNOME | [35115207618](https://github.com/codenameone/CodenameOne/actions/runs/35115207618) | `1e194b0336` | Cantarell | 60 | 87.23% | 72.05% |
+| Windows 11 ARM | [35115210997](https://github.com/codenameone/CodenameOne/actions/runs/35115210997) | `1e194b0336` | Segoe UI Variable | 60 | 89.98% | 69.01% |
+| macOS 15 ARM | [35113942967](https://github.com/codenameone/CodenameOne/actions/runs/35113942967) | `6fc290880b` | .AppleSystemUIFont | 60 | 85.18% | 72.94% |
+
+The Windows runner now matches the Windows 11 reference host rather than using
+Windows Server; its JDKs run under x64 emulation. GNOME installs the same Cantarell
+family used by its native reference app. The tile runner asserts both the font
+family and the 96-DPI conversion before capturing. GTK body text uses the
+reference's 11pt size, and Fluent body text uses 14 logical pixels.
+
+These measurements still include visible differences in control geometry,
+switches, sliders, and pressed states. They provide a consistent regression
+baseline, not a claim of pixel equivalence. MacOS uses Zulu 8 to build and Temurin
+21 to render; the other hosts use Temurin 8 and 21.
+
+## Earlier measurements
+
 On 2026-09-16, the Windows and GNOME hover entries were refreshed from
 [run 35096538882](https://github.com/codenameone/CodenameOne/actions/runs/35096538882)
 (commit `bb4d619eb3`). That run includes the correction in `96d56fcf59` which

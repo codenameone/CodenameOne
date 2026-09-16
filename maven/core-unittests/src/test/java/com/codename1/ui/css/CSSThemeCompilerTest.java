@@ -40,6 +40,54 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class CSSThemeCompilerTest extends UITestBase {
 
     @Test
+    public void runtimeHoverFollowsNormalDerivationAndChildOverrides() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("Leaf{cn1-derive:Child;} Child{cn1-derive:Base;}"
+                + "Child:hover{color:#334455;} Base:hover{color:#112233;background-color:#abcdef;}"
+                + "Plain{cn1-derive:Other;} Other{color:#777777;}", resource, "Theme");
+        UIManager.getInstance().addThemeProps(resource.getTheme("Theme"));
+        for (String uiid : new String[]{"Child", "Leaf"}) {
+            Button button = new Button();
+            button.setUIID(uiid);
+            assertNotNull(button.getHoverStyle(), uiid);
+            assertEquals(0x334455, button.getHoverStyle().getFgColor());
+            assertEquals(0xabcdef, button.getHoverStyle().getBgColor());
+        }
+        Button plain = new Button();
+        plain.setUIID("Plain");
+        org.junit.jupiter.api.Assertions.assertNull(plain.getHoverStyle());
+    }
+
+    @Test
+    public void runtimeDarkHoverInheritanceRemainsDarkOnlyAndAvoidsCycles() {
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile("DarkChild{cn1-derive:DarkBase;}"
+                + "DarkOwn{cn1-derive:DarkBase;} DarkOwn:hover{color:#654321;}"
+                + "@media (prefers-color-scheme: dark) { DarkBase:hover{color:#123456;background-color:#abcdef;} }"
+                + "CycleA{cn1-derive:CycleB;} CycleB{cn1-derive:CycleA;} CycleA:hover{color:#abcdef;}", resource, "Theme");
+        Hashtable theme = resource.getTheme("Theme");
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("DarkChild.hover#derive"));
+        assertEquals("DarkBase.hover", theme.get("$DarkDarkChild.hover#derive"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("CycleA.hover#derive"));
+        org.junit.jupiter.api.Assertions.assertNull(theme.get("CycleB.hover#derive"));
+        Boolean previous = com.codename1.ui.CN.isDarkMode();
+        try {
+            com.codename1.ui.CN.setDarkMode(Boolean.TRUE);
+            UIManager.getInstance().addThemeProps(theme);
+            Button child = new Button();
+            child.setUIID("DarkChild");
+            assertNotNull(child.getHoverStyle());
+            assertEquals(0x123456, child.getHoverStyle().getFgColor());
+            Button own = new Button();
+            own.setUIID("DarkOwn");
+            assertEquals(0x654321, own.getHoverStyle().getFgColor());
+            assertEquals(0xabcdef, own.getHoverStyle().getBgColor());
+        } finally {
+            com.codename1.ui.CN.setDarkMode(previous);
+        }
+    }
+
+    @Test
     public void testCompilesThemeConstantsDeriveAndMutableImages() {
         CSSThemeCompiler compiler = new CSSThemeCompiler();
         MutableResource resource = new MutableResource();
