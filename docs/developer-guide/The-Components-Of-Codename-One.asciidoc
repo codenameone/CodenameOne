@@ -1833,7 +1833,7 @@ The customization of the title area allows for some pretty powerful UI effects f
 [[Advanced-search-code]]
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava090Snippet.java[tag=the-components-of-codename-one-java-090,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/screenshots/ComponentsToolbarSearchFigure.java[tag=the-components-of-codename-one-java-090,indent=0]
 ----
 
 <1> You use a `TextField` the whole time and style it to make it (and its hint) look like a regular title. An alternative way is to replace the title component dynamically.
@@ -1847,10 +1847,10 @@ Visible indicates whether a component can be seen. It will still occupy the phys
 For example, that isn't intuitive to most users so a button is added to start editing.
 
 .Search field within the toolbar
-image::img/components-toolbar-search.png[Search field within the toolbar,scaledwidth=20%]
+image::img/generated/components-toolbar-search.png[Search field within the toolbar,scaledwidth=20%]
 
 .Search field after typing a couple of letters
-image::img/components-toolbar-search-ongoing.png[Search field after typing a couple of letters,scaledwidth=20%]
+image::img/generated/components-toolbar-search-ongoing.png[Search field after typing a couple of letters,scaledwidth=20%]
 
 ==== Search mode
 
