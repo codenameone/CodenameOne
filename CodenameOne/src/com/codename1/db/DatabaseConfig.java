@@ -98,6 +98,7 @@ public final class DatabaseConfig {
     private char[] passphrase;
     private byte[] rawKey;
     private final com.codename1.security.vault.Vault vault;
+    private final int vaultKeyVersion;
 
     private DatabaseConfig(int keyMode, String keyAlias, char[] passphrase, byte[] rawKey) {
         this(keyMode, keyAlias, passphrase, rawKey, null);
@@ -105,6 +106,12 @@ public final class DatabaseConfig {
 
     private DatabaseConfig(int keyMode, String keyAlias, char[] passphrase, byte[] rawKey,
                            com.codename1.security.vault.Vault vault) {
+        this(keyMode, keyAlias, passphrase, rawKey, vault, 0);
+    }
+
+    private DatabaseConfig(int keyMode, String keyAlias, char[] passphrase, byte[] rawKey,
+                           com.codename1.security.vault.Vault vault, int vaultKeyVersion) {
+        this.vaultKeyVersion = vaultKeyVersion;
         this.keyMode = keyMode;
         this.keyAlias = keyAlias;
         this.passphrase = passphrase;
@@ -277,7 +284,9 @@ public final class DatabaseConfig {
     /// [com.codename1.security.vault.Vault#rotateDataKey] changes this key. A database opened
     /// under the old one has to be rekeyed in the same operation or it can no longer be opened;
     /// there is no automatic rekey, because an interrupted one leaves a database encrypted under
-    /// neither key and that is not a thing to do behind a caller's back.
+    /// neither key and that is not a thing to do behind a caller's back. An imported rotation has
+    /// the same effect. Use [#vault(com.codename1.security.vault.Vault,String,int)] with the
+    /// database's recorded key version to reopen an older file before rekeying it.
     ///
     /// #### Parameters
     ///
@@ -293,6 +302,23 @@ public final class DatabaseConfig {
             throw new IllegalArgumentException("A vault-keyed database needs a vault");
         }
         return new DatabaseConfig(KEY_VAULT, alias, null, null, vault);
+    }
+
+    /// Opens a vault-keyed database at a specific current or retired key version.
+    ///
+    /// Store the version with the database when creating or rekeying it. After importing a remote
+    /// rotation, this config can still open the existing file; [Database#changeKey] can then move
+    /// it to a config using the newer version. No automatic rekey or version guessing is performed.
+    ///
+    /// - `vault`: the unlocked vault that owns the database
+    /// - `alias`: the original database key alias
+    /// - `keyVersion`: the positive version used to encrypt the existing file
+    public static DatabaseConfig vault(com.codename1.security.vault.Vault vault, String alias,
+            int keyVersion) {
+        if (vault == null || keyVersion < 1) {
+            throw new IllegalArgumentException("A versioned vault config needs a vault and positive version");
+        }
+        return new DatabaseConfig(KEY_VAULT, alias, null, null, vault, keyVersion);
     }
 
     /// Returns the key mode, one of `#KEY_NONE`, `#KEY_PASSPHRASE`, `#KEY_MANAGED`,
@@ -438,7 +464,9 @@ public final class DatabaseConfig {
         // on iOS, and the wrong object would go on to be read as key material.
         Object resolved;
         try {
-            resolved = vault.databaseKey(keyAlias != null ? keyAlias : databaseName).get();
+            String alias = keyAlias != null ? keyAlias : databaseName;
+            resolved = (vaultKeyVersion == 0 ? vault.databaseKey(alias)
+                    : vault.databaseKey(alias, vaultKeyVersion)).get();
         } catch (RuntimeException failed) {
             com.codename1.security.vault.VaultError error = errorOf(failed);
             throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,

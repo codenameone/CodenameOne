@@ -68,7 +68,7 @@ class VaultSourceInvariantsTest extends UITestBase {
                 "public AsyncResource<byte[]> seal(",
                 "public AsyncResource<byte[]> open(",
                 "public AsyncResource<KeyHandle> operationalKey(",
-                "public AsyncResource<byte[]> databaseKey(",
+                "private AsyncResource<byte[]> databaseKeyForVersion(",
                 "public AsyncResource<char[]> createRecoveryCode("}) {
             String body = codeOnly(methodBody(source, signature));
             assertTrue(body.contains("completeUnlocked("), signature);

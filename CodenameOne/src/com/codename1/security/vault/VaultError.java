@@ -94,6 +94,11 @@ public enum VaultError {
     /// no authenticator, a hardware-backed key where there is no hardware.
     NOT_SUPPORTED,
 
+    /// Sync import reached committed state, but policy setup failed and rollback was unsafe or
+    /// could not be confirmed. The session is locked. Re-read the persisted state and finish
+    /// policy setup; do not assume that the previous password or data-key version is current.
+    IMPORT_COMMITTED,
+
     /// Anything the codes above do not cover.
     UNKNOWN
 }

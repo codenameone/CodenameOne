@@ -3188,6 +3188,76 @@ class VaultTest extends UITestBase {
     }
 
     @Test
+    void aFailedSessionOnlyRefreshRollsBackAnUntouchedPasswordChange() {
+        for (int failure = 0; failure < 3; failure++) {
+            VaultOptions remembering = fast().policy(UnlockPolicy.REMEMBER_DEVICE);
+            Vault origin = Vault.named(freshName()).configure(fast());
+            origin.enroll(pw("old"), fast()).get();
+            String name = freshName();
+            Vault local = Vault.named(name).configure(remembering);
+            local.importSyncState(origin.exportSyncState(), pw("old")).get();
+            byte[] before = local.exportSyncState();
+            origin.changePassword(pw("old"), pw("new")).get();
+            String deviceEntry = deviceRecordName(name);
+            if (failure == 0) {
+                TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(deviceEntry);
+            } else if (failure == 1) {
+                device.refuseDeletes = true;
+            } else {
+                TestCodenameOneImplementation.getInstance().putStorageEntry(deviceEntry,
+                        encodeStorageObject(Integer.valueOf(7)));
+            }
+            local.configure(fast());
+            try {
+                assertEquals(failure == 2 ? VaultError.TEMPORARILY_UNREADABLE : VaultError.STORAGE_UNAVAILABLE,
+                        errorOf(local.importSyncState(origin.exportSyncState(), pw("new"))));
+                assertFalse(local.isUnlocked(), "a failed import must close its published session");
+                assertArrayEquals(before, local.exportSyncState(), "the password change must be undone");
+            } finally {
+                device.refuseDeletes = false;
+                TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+            }
+            Vault reopened = Vault.named(name).configure(fast());
+            assertEquals(VaultError.AUTHENTICATION_FAILED, errorOf(reopened.unlockWithPassword(pw("new"))));
+            assertTrue(reopened.unlockWithPassword(pw("old")).get().booleanValue());
+        }
+    }
+
+    @Test
+    void aPolicyFailureReportsACommittedImportWhenAnotherSessionUsedIt() {
+        Vault origin = Vault.named(freshName()).configure(fast());
+        origin.enroll(pw("old"), fast()).get();
+        final String name = freshName();
+        Vault local = Vault.named(name).configure(fast().policy(UnlockPolicy.REMEMBER_DEVICE));
+        local.importSyncState(origin.exportSyncState(), pw("old")).get();
+        origin.rotateDataKey(pw("old")).get();
+        origin.changePassword(pw("old"), pw("new")).get();
+        final String deviceEntry = deviceRecordName(name);
+        TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(deviceEntry);
+        TestCodenameOneImplementation.getInstance().setDuringStorageDelete(deviceEntry, new Runnable() {
+            public void run() {
+                Vault concurrent = Vault.named(name).configure(fast());
+                concurrent.unlockWithPassword(pw("new")).get();
+                concurrent.putSecret("new", pw("keep this")).get();
+            }
+        });
+        local.configure(fast());
+        try {
+            assertEquals(VaultError.IMPORT_COMMITTED,
+                    errorOf(local.importSyncState(origin.exportSyncState(), pw("new"))));
+            assertFalse(local.isUnlocked());
+        } finally {
+            TestCodenameOneImplementation.getInstance().setStorageDeleteIgnored(null);
+            TestCodenameOneImplementation.getInstance().setDuringStorageDelete(null, null);
+        }
+        Vault reopened = Vault.named(name).configure(fast());
+        reopened.unlockWithPassword(pw("new")).get();
+        assertEquals(2, reopened.getDataKeyVersion());
+        assertArrayEquals(pw("keep this"), reopened.getSecret("new").get());
+        assertTrue(reopened.setPolicy(UnlockPolicy.SESSION_ONLY).get().booleanValue());
+    }
+
+    @Test
     void aPolicyChangeRefusesRatherThanRollBackToARecordItCannotRead() {
         // The rollback deletes the device record whenever its snapshot is not a String, and the
         // cached read collapsed "no record" and "a record that could not be read" into the same
@@ -4053,6 +4123,58 @@ class VaultTest extends UITestBase {
             fail("a locked vault must not key a database");
         } catch (java.io.IOException expected) {
             assertTrue(expected.getMessage().indexOf("locked") >= 0, expected.getMessage());
+        }
+    }
+
+    @Test
+    void importedRotationsKeepEveryDatabaseKeyVersionAvailableAfterRestart() throws Exception {
+        Vault origin = Vault.named(freshName()).configure(fast());
+        origin.enroll(pw("p"), fast()).get();
+        String name = freshName();
+        Vault local = Vault.named(name).configure(fast());
+        local.importSyncState(origin.exportSyncState(), pw("p")).get();
+        int originalVersion = local.getDataKeyVersion();
+        byte[] originalKey = local.databaseKey("notes").get();
+        String originalLiteral = com.codename1.db.DatabaseConfig.vault(local, "notes")
+                .resolveKeyMaterial("notes");
+        origin.rotateDataKey(pw("p")).get();
+        byte[] middleKey = origin.databaseKey("notes").get();
+        origin.rotateDataKey(pw("p")).get();
+        local.importSyncState(origin.exportSyncState(), pw("p")).get();
+        assertEquals(3, local.getDataKeyVersion());
+        assertFalse(java.util.Arrays.equals(originalKey, local.databaseKey("notes").get()));
+        local.lock();
+        Vault reopened = Vault.named(name).configure(fast());
+        reopened.unlockWithPassword(pw("p")).get();
+        assertArrayEquals(originalKey, reopened.databaseKey("notes", originalVersion).get());
+        assertArrayEquals(middleKey, reopened.databaseKey("notes", 2).get());
+        assertArrayEquals(origin.databaseKey("notes").get(), reopened.databaseKey("notes", 3).get());
+        assertEquals(originalLiteral, com.codename1.db.DatabaseConfig.vault(reopened, "notes", originalVersion)
+                .resolveKeyMaterial("notes"), "the old database config must still resolve the file's key");
+        assertFalse(java.util.Arrays.equals(originalKey, reopened.databaseKey("other", originalVersion).get()));
+        assertEquals(VaultError.UNSUPPORTED_FORMAT, errorOf(reopened.databaseKey("notes", 4)));
+        assertThrows(IllegalArgumentException.class, () -> reopened.databaseKey("notes", 0));
+        assertThrows(IllegalArgumentException.class, () -> com.codename1.db.DatabaseConfig.vault(reopened, "notes", -1));
+        reopened.configure(fast().requireOpaqueKeysOnly());
+        assertEquals(VaultError.POLICY_NOT_MET, errorOf(reopened.databaseKey("notes", 1)));
+        reopened.configure(fast());
+        reopened.lock();
+        assertEquals(VaultError.LOCKED, errorOf(reopened.databaseKey("notes", 1)));
+        assertThrows(VaultException.class, () -> reopened.getDataKeyVersion());
+    }
+
+    @Test
+    void aLockDuringRetiredDatabaseKeyRecoveryDiscardsTheResult() {
+        final Vault vault = Vault.named(freshName()).configure(fast());
+        vault.enroll(pw("p"), fast()).get();
+        vault.rotateDataKey(pw("p")).get();
+        TestCodenameOneImplementation.getInstance().setDuringAes(new Runnable() {
+            public void run() { vault.lock(); }
+        });
+        try {
+            assertEquals(VaultError.LOCKED, errorOf(vault.databaseKey("notes", 1)));
+        } finally {
+            TestCodenameOneImplementation.getInstance().setDuringAes(null);
         }
     }
 

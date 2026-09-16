@@ -909,7 +909,7 @@ public final class Vault {
         // catch-all reports as "this vault operation could not complete" -- a lock described as an
         // unknown fault. With the snapshot the write finishes and the caller is told it was LOCKED,
         // by the generation check the two public entry points make after this returns.
-        VaultMetadata meta = metadata;
+        VaultMetadata meta = sessionMetadata();
         byte[] key = dataKey;
         if (meta == null || key == null) {
             throw new VaultException(VaultError.LOCKED,
@@ -1171,7 +1171,7 @@ public final class Vault {
                     // the field, and this expression dereferenced it after requireUnlocked had
                     // already passed.
                     byte[] key = dataKey;
-                    VaultMetadata meta = metadata;
+                    VaultMetadata meta = sessionMetadata();
                     requireSameGeneration(generation);
                     if (key == null || meta == null) {
                         throw new VaultException(VaultError.LOCKED,
@@ -1277,7 +1277,7 @@ public final class Vault {
                     // NullPointerException that the terminal handler reported as UNKNOWN -- an
                     // ordinary lock described as an unknown fault, on a path whose documented
                     // answer is LOCKED. putSecret takes its snapshot for the same reason.
-                    VaultMetadata meta = metadata;
+                    VaultMetadata meta = sessionMetadata();
                     if (meta == null) {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this secret was being read");
@@ -1377,7 +1377,7 @@ public final class Vault {
                     // dereferencing it here after requireUnlocked has passed is a
                     // NullPointerException rather than a refusal.
                     byte[] key = dataKey;
-                    VaultMetadata meta = metadata;
+                    VaultMetadata meta = sessionMetadata();
                     requireSameGeneration(generation);
                     if (key == null || meta == null) {
                         throw new VaultException(VaultError.LOCKED,
@@ -1428,7 +1428,7 @@ public final class Vault {
                     // Snapshotted for the reason getSecret gives: lock() nulls this field, and
                     // reading it after requireUnlocked has passed reports an ordinary lock as an
                     // unknown fault.
-                    VaultMetadata meta = metadata;
+                    VaultMetadata meta = sessionMetadata();
                     if (meta == null) {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this record was being opened");
@@ -1473,7 +1473,7 @@ public final class Vault {
                 try {
                     requireUnlocked();
                     byte[] source = dataKey;
-                    VaultMetadata meta = metadata;
+                    VaultMetadata meta = sessionMetadata();
                     requireSameGeneration(generation);
                     if (source == null || meta == null) {
                         throw new VaultException(VaultError.LOCKED,
@@ -1532,6 +1532,38 @@ public final class Vault {
     /// [VaultError#POLICY_NOT_MET] when the vault was configured with
     /// [VaultOptions#requireOpaqueKeysOnly()], or [VaultError#LOCKED] when it is locked
     public AsyncResource<byte[]> databaseKey(final String alias) {
+        return databaseKeyForVersion(alias, 0);
+    }
+
+    /// Derives a database key from a specific current or retired data-key version.
+    ///
+    /// Use the version stored alongside a database to open it after a local or imported rotation,
+    /// then explicitly rekey it with the current version. The retired chain retains these keys
+    /// across restarts. The same lock and opaque-key restrictions as [#databaseKey(String)] apply.
+    ///
+    /// - `alias`: the alias originally used for this database
+    /// - `version`: a positive data-key version; future versions fail with
+    ///   [VaultError#UNSUPPORTED_FORMAT], unavailable retired keys with [VaultError#KEY_MISSING]
+    public AsyncResource<byte[]> databaseKey(final String alias, final int version) {
+        if (version < 1) {
+            throw new IllegalArgumentException("A database key version must be positive");
+        }
+        return databaseKeyForVersion(alias, version);
+    }
+
+    /// The current data-key version. Store this non-secret value alongside a database when
+    /// creating or rekeying it, so an imported rotation cannot hide which key opens the file.
+    /// Requires an unlocked vault.
+    public int getDataKeyVersion() {
+        int generation = lockGeneration();
+        requireUnlocked();
+        synchronized (this) {
+            requireSameGeneration(generation);
+            return metadata.dataKeyVersion;
+        }
+    }
+
+    private AsyncResource<byte[]> databaseKeyForVersion(final String alias, final int version) {
         final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
         // On the calling thread; see unlockWithPassword for why not in the worker.
         final int generation = lockGeneration();
@@ -1539,6 +1571,7 @@ public final class Vault {
         background(new Runnable() {
             @Override
             public void run() {
+                byte[] source = null;
                 try {
                     if (options.isOpaqueKeysOnly()) {
                         throw new VaultException(VaultError.POLICY_NOT_MET,
@@ -1547,12 +1580,13 @@ public final class Vault {
                                 Protection.NON_EXTRACTABLE_KEY, null);
                     }
                     requireUnlocked();
-                    byte[] source = dataKey;
+                    VaultMetadata meta = sessionMetadata();
                     requireSameGeneration(generation);
-                    if (source == null) {
+                    if (meta == null) {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while this key was being derived");
                     }
+                    source = dataKeyAtVersion(version == 0 ? meta.dataKeyVersion : version);
                     Hmac mac = Hmac.create(Hash.SHA256, source);
                     mac.update(Bytes.utf8("cn1.vault.dbkey.v1"));
                     mac.update(Bytes.utf8(alias == null ? "" : alias));
@@ -1568,6 +1602,8 @@ public final class Vault {
                     // cannot diagnose. Reached most easily by locking mid-operation, which nulls
                     // metadata under a worker that already passed requireUnlocked.
                     out.error(asVaultException(broke, "this vault operation could not complete"));
+                } finally {
+                    Bytes.zero(source);
                 }
             }
         });
@@ -1744,7 +1780,7 @@ public final class Vault {
                     // and four separate reads of it between here and the commit each gave a
                     // concurrent lock its own way to surface as an unknown fault. Found by the
                     // rule in VaultSourceInvariantsTest rather than by review.
-                    VaultMetadata current = metadata;
+                    VaultMetadata current = sessionMetadata();
                     if (current == null) {
                         throw new VaultException(VaultError.LOCKED,
                                 "the vault was locked while a recovery code was being created");
@@ -1890,7 +1926,7 @@ public final class Vault {
                 byte[] fresh = null;
                 try {
                     requireUnlocked();
-                    VaultMetadata meta = metadata;
+                    VaultMetadata meta = sessionMetadata();
                     // Snapshotted, not re-read. lock() sets dataKey to null, and the derivation
                     // below runs for seconds -- so comparing against the field afterwards compared
                     // against null and reported AUTHENTICATION_FAILED, telling the user their
@@ -2114,6 +2150,15 @@ public final class Vault {
 
     /// Enrolls this device from another device's [#exportSyncState()].
     ///
+    /// Importing a rotation changes the current database key. Existing database files keep their
+    /// previous keys: open them with [#databaseKey(String,int)] or a versioned
+    /// [com.codename1.db.DatabaseConfig#vault] and rekey explicitly. Keep the database's key version
+    /// with its local metadata; the retired key chain remains available after this import.
+    ///
+    /// A policy failure rolls back an untouched import and locks this session. If rollback is
+    /// unsafe or cannot be confirmed, [VaultError#IMPORT_COMMITTED] reports that the import
+    /// reached committed state; reread it and finish policy setup rather than assuming no change.
+    ///
     /// #### Replay and rollback
     ///
     /// The record carries a counter that increases on every change. This refuses a record whose
@@ -2231,8 +2276,8 @@ public final class Vault {
                     commitMetadata(local, incoming);
                     // Through the same lock-aware handoff as every other publication: the check
                     // above is before the commit, and the commit is a storage write wide enough
-                    // for a lock to land inside. publishKey withdraws the key and re-locks if it
-                    // did, so an overlapping lock leaves the vault closed rather than reopened.
+                    // for a lock to land inside. publishKey refuses to install a key if it did,
+                    // so an overlapping lock leaves the vault closed rather than reopened.
                     publishKey(generation, incoming, key);
                     // Ownership transferred, so the finally must not wipe what the vault now
                     // holds. This used to be a dead store and is not any more: the finally below
@@ -2242,119 +2287,50 @@ public final class Vault {
                     // key this record describes. A failure here is reported rather than
                     // swallowed: the device is enrolled, but not under the policy that was asked
                     // for, and the caller has to know that.
-                    if (options.getPolicy() == UnlockPolicy.SESSION_ONLY) {
-                        // A session-only import over a vault that already has a remembered
-                        // mechanism has to REMOVE it, not merely decline to add one. Skipping
-                        // straight past this left the old device record and its key in place, so
-                        // the import reported success while getPolicy() still answered the
-                        // previous remembering policy and unlockRemembered still opened the vault
-                        // without a password -- the opposite of what the caller configured.
-                        // Through the three-state read: deviceRecord() answers null both for
-                        // "there is none" and for "there is one and it could not be read", and
-                        // collapsing those let a transient failure skip the cleanup while the
-                        // import reported success. Once storage recovers the old record makes
-                        // getPolicy() report a remembering policy again, and at an unchanged key
-                        // version unlockRemembered reopens the vault without a password.
-                        if (deviceRecordState() == ProtectionReport.UNKNOWN) {
-                            throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
-                                    "a device record exists here and could not be read, so this "
-                                    + "import cannot make the vault session-only");
-                        }
-                        DeviceRecord standing = deviceRecord();
-                        if (standing != null) {
-                            Storage.getInstance().deleteStorageFile(deviceRecordKey());
-                            // Before the key goes, and before this reports success -- the check
-                            // setPolicy already makes on the same transition. deleteStorageFile
-                            // returns void and both real ports can fail one silently, and a
-                            // record that survived leaves getPolicy() answering the old
-                            // remembering policy while unlockRemembered follows it to a key that
-                            // has since been deleted.
-                            if (!definitelyGone(deviceRecordKey())) {
-                                throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
-                                        "the device record could not be removed, so this import "
-                                        + "cannot make the vault session-only");
+                    try {
+                        if (options.getPolicy() == UnlockPolicy.SESSION_ONLY) {
+                            // A session-only import over a vault that already has a remembered
+                            // mechanism has to REMOVE it, not merely decline to add one. Skipping
+                            // straight past this left the old device record and its key in place, so
+                            // the import reported success while getPolicy() still answered the
+                            // previous remembering policy and unlockRemembered still opened the vault
+                            // without a password -- the opposite of what the caller configured.
+                            // Through the three-state read: deviceRecord() answers null both for
+                            // "there is none" and for "there is one and it could not be read", and
+                            // collapsing those let a transient failure skip the cleanup while the
+                            // import reported success. Once storage recovers the old record makes
+                            // getPolicy() report a remembering policy again, and at an unchanged key
+                            // version unlockRemembered reopens the vault without a password.
+                            if (deviceRecordState() == ProtectionReport.UNKNOWN) {
+                                throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,
+                                        "a device record exists here and could not be read, so this "
+                                        + "import cannot make the vault session-only");
                             }
-                            requireKeyDeleted(deviceProtection(standing.policy),
-                                    "the previous device key could not be deleted");
-                        }
-                    } else {
-                        try {
+                            DeviceRecord standing = deviceRecord();
+                            if (standing != null) {
+                                Storage.getInstance().deleteStorageFile(deviceRecordKey());
+                                // Before the key goes, and before this reports success -- the check
+                                // setPolicy already makes on the same transition. deleteStorageFile
+                                // returns void and both real ports can fail one silently, and a
+                                // record that survived leaves getPolicy() answering the old
+                                // remembering policy while unlockRemembered follows it to a key that
+                                // has since been deleted.
+                                if (!definitelyGone(deviceRecordKey())) {
+                                    throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
+                                            "the device record could not be removed, so this import "
+                                            + "cannot make the vault session-only");
+                                }
+                                requireKeyDeleted(deviceProtection(standing.policy),
+                                        "the previous device key could not be deleted");
+                            }
+                        } else {
                             rememberNow(options.getPolicy());
-                            // Same reason as enrolment's: publishKey already checked this
-                            // generation, and a lock arriving during the prompt after it leaves a
-                            // record wrapping zeroes. The import is committed; only the wrap goes.
+                            // The import is committed; a lock during the prompt invalidates only
+                            // the device wrap, which must not remain capable of reopening it.
                             withdrawDeviceRecordIfLocked(generation);
-                        } catch (RuntimeException rememberFailed) {
-                            // Rolled back to whatever was here BEFORE, which is not always
-                            // nothing. The first version of this deleted the record outright, on
-                            // the reasoning that a device which has just joined has sealed
-                            // nothing of its own -- true for a first import, and false for the
-                            // refresh of a device that already had a vault. There, deleting
-                            // threw away the local password and recovery wraps and made every
-                            // secret already on the device unreadable, on a call that reported
-                            // failure.
-                            if (local == null) {
-                                // Guarded exactly as enrolment's rollback is, and for the same
-                                // reason: the record has been readable by every session on this
-                                // origin since it was committed, the step that failed is a
-                                // prompt, and another tab can unlock the vault and store secrets
-                                // inside that window. Deleting then takes the only password wrap
-                                // with it -- and forgetting every mechanism would also destroy a
-                                // remembered unlock that other tab had just established.
-                                if (vaultIsStillUntouched(incoming)) {
-                                    Storage.getInstance().deleteStorageFile(metadataKey());
-                                    if (!definitelyGone(metadataKey())) {
-                                        // Same check enrolment's rollback makes, and this is its
-                                        // sibling: a silently refused delete leaves the imported
-                                        // record ENROLLED while the call reports only the setup
-                                        // failure, so the device carries persisted state the
-                                        // caller never agreed to and no mechanism to go with it.
-                                        // The storage failure is what describes that, with the
-                                        // original as its cause.
-                                        throw new VaultException(VaultError.STORAGE_UNAVAILABLE,
-                                                "the imported vault record could not be removed "
-                                                + "after its setup failed, so this device is "
-                                                + "still enrolled from that import",
-                                                rememberFailed);
-                                    }
-                                    try {
-                                        forgetEveryMechanism();
-                                    } catch (RuntimeException alsoFailed) {
-                                        // Nothing here can reach a half-made key, and reporting
-                                        // this instead of the original would name the wrong
-                                        // failure.
-                                    }
-                                }
-                            } else {
-                                // Put the previous record back and leave the mechanisms alone:
-                                // rememberNow writes the device record last, so a failure inside
-                                // it leaves the existing record standing, and forgetting every
-                                // mechanism here would destroy a remembered unlock this device
-                                // already had and the caller never asked to give up.
-                                //
-                                // What cannot be undone is ensureKey having replaced the stored
-                                // key under the same id before failing later; the device record
-                                // then no longer unwraps, and a password unlock is the way back.
-                                // That is narrower than losing the vault, which is what the
-                                // delete did.
-                                //
-                                // And only while nothing has been sealed under what was just
-                                // published. This rollback puts the PREVIOUS record back, which
-                                // on a refresh that brought a rotation means putting back a key
-                                // chain that cannot reach the new key -- so a second tab that
-                                // unlocked the imported state and stored a secret during the
-                                // prompt would find its ciphertext permanently unreadable.
-                                // Secret writes do not touch the metadata, so the compare-and-set
-                                // inside commitMetadata cannot see them; vaultIsStillUntouched
-                                // can, and the first-import rollback beside this one already
-                                // asks it.
-                                if (vaultIsStillUntouched(incoming)) {
-                                    commitMetadata(incoming, local);
-                                }
-                            }
-                            lock();
-                            throw rememberFailed;
                         }
+                    } catch (RuntimeException policyFailed) {
+                        failImportPolicy(local, incoming, policyFailed);
                     }
                     touch();
                     out.complete(Boolean.TRUE);
@@ -2375,6 +2351,50 @@ public final class Vault {
             }
         });
         return out;
+    }
+
+    /// An import may be adopted by another session before its policy work finishes. Rollback
+    /// must not orphan ciphertext that session wrote under an incoming rotated key.
+    private void failImportPolicy(VaultMetadata local, VaultMetadata incoming,
+            RuntimeException policyFailed) {
+        try {
+            if (local != null && local.serialize().equals(incoming.serialize())) {
+                throw policyFailed;
+            }
+            boolean restored = false;
+            try {
+                if (vaultIsStillUntouched(incoming)) {
+                    if (local != null) {
+                        commitMetadata(incoming, local);
+                        restored = true;
+                    } else {
+                        Storage.getInstance().deleteStorageFile(metadataKey());
+                        restored = definitelyGone(metadataKey());
+                        if (restored) {
+                            try {
+                                forgetEveryMechanism();
+                            } catch (RuntimeException ignored) {
+                                // No vault remains for a partial device key to open.
+                            }
+                        }
+                    }
+                }
+            } catch (RuntimeException rollbackFailed) {
+                throw new VaultException(VaultError.IMPORT_COMMITTED,
+                        "the import committed, its policy setup failed, and rollback could not "
+                        + "be confirmed; reread the stored state before retrying", rollbackFailed);
+            }
+            if (!restored) {
+                throw new VaultException(VaultError.IMPORT_COMMITTED,
+                        "the import committed, but its configured policy could not be established; "
+                        + "the imported state was retained to protect data and this session was "
+                        + "locked; unlock with the imported credentials and retry setPolicy",
+                        policyFailed);
+            }
+            throw policyFailed;
+        } finally {
+            lock();
+        }
     }
 
     // ------------------------------------------------------------ policy
@@ -2640,7 +2660,7 @@ public final class Vault {
         //
         // Both callers are on this path: openAnyVersion, which every retired-version read goes
         // through, and subkeyAtVersion behind a post-rotation KeyHandle.
-        VaultMetadata record = metadata;
+        VaultMetadata record = sessionMetadata();
         byte[] live = dataKey;
         if (record == null || live == null) {
             throw new VaultException(VaultError.LOCKED,
@@ -2890,9 +2910,14 @@ public final class Vault {
         return mac.doFinal();
     }
 
+    /// Reads the published cache under the same monitor as lock() and adoptSession().
+    private synchronized VaultMetadata sessionMetadata() {
+        return metadata;
+    }
+
     private void requireUnlocked() {
         checkAutoLock();
-        VaultMetadata session = metadata;
+        VaultMetadata session = sessionMetadata();
         if (dataKey == null || session == null) {
             throw new VaultException(VaultError.LOCKED, "the vault is locked");
         }
@@ -3015,8 +3040,9 @@ public final class Vault {
     }
 
     private VaultMetadata loadMetadata() {
-        if (metadata != null) {
-            return metadata;
+        VaultMetadata cached = sessionMetadata();
+        if (cached != null) {
+            return cached;
         }
         return loadMetadataFresh();
     }

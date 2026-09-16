@@ -353,7 +353,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/V
 
 While the database is open the key is in the process and stays there; locking the vault doesn't close the connection. What the vault adds over `DatabaseConfig.managed()` is that the key doesn't exist at all until the user unlocks -- which in a browser is the difference between a page that holds a database key from the moment it loads and one that doesn't. If you can't accept the exposure, call `VaultOptions.requireOpaqueKeysOnly()`, which makes that call fail with `POLICY_NOT_MET` and means this vault can't key a database.
 
-`rotateDataKey` changes the database key. Re-key the database in the same operation or you won't be able to open it again; there's no automatic re-key, because an interrupted one leaves a database encrypted under neither key.
+`rotateDataKey` and importing a rotation both change the current database key. Record `vault.getDataKeyVersion()` alongside the database when creating it, and use `DatabaseConfig.vault(vault, alias, recordedVersion)` to open that file even after a later rotation arrives. The vault retains the retired keys across restarts; `vault.databaseKey(alias, version)` also exposes them for database engines you manage directly.
+
+To rekey, open the file at its recorded version, call `database.changeKey(DatabaseConfig.vault(vault, alias, newVersion))`, and update the recorded version only after that succeeds. Keep both version numbers in a local migration journal until reopening succeeds, so a crash between rekey and updating that record is recoverable. There is no automatic rekey.
+
+If import policy setup fails, an untouched import is rolled back. `VaultError.IMPORT_COMMITTED` means the import reached committed state and could not safely be rolled back, or rollback could not be confirmed. The session is locked; reread the persisted sync state before retrying policy setup.
 
 ==== Cross-platform interoperability
 
