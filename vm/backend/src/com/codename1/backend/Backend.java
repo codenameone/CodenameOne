@@ -256,16 +256,42 @@ public final class Backend {
             return this;
         }
 
-        /** Terminates TLS with this certificate and key. */
+        /**
+         * Terminates TLS with this certificate and key.
+         *
+         * <p>Drops a context given to the other overload earlier, because
+         * resolveTls answers from the context FIRST: without this, a builder
+         * configured conditionally kept serving the old certificate and this call
+         * did nothing at all -- silently, which is the part that matters, since
+         * an obsolete certificate looks like a working server until it expires.
+         * The last TLS choice wins, as it does for every other setter here.
+         *
+         * <p>Only when something is actually supplied. tls(null, null) is not a
+         * way to turn a context off; it would make an argument nobody meant as a
+         * choice erase one that was.
+         */
         public Builder tls(String certificatePath, String keyPath) {
             this.tlsCertificate = certificatePath;
             this.tlsKey = keyPath;
+            if(certificatePath != null || keyPath != null) {
+                this.tls = null;
+            }
             return this;
         }
 
-        /** Terminates TLS with a context the caller built. */
+        /**
+         * Terminates TLS with a context the caller built.
+         *
+         * <p>Drops paths given to the other overload earlier, for the reason
+         * stated there, and on the same terms: a null context is not a choice and
+         * erases nothing.
+         */
         public Builder tls(Tls tls) {
             this.tls = tls;
+            if(tls != null) {
+                this.tlsCertificate = null;
+                this.tlsKey = null;
+            }
             return this;
         }
 
@@ -276,17 +302,40 @@ public final class Backend {
             return this;
         }
 
-        /** The database, as a SQLite path or a postgres:// or mysql:// URL. */
+        /**
+         * The database, as a SQLite path or a postgres:// or mysql:// URL.
+         *
+         * <p>Drops a pool given to the other overload earlier: openDataSource
+         * answers from the pool FIRST, so without this a builder configured
+         * conditionally kept the earlier pool and this call was ignored -- which
+         * is a server reading and WRITING to the wrong database while its
+         * configuration says otherwise. The last choice wins.
+         *
+         * <p>Ownership follows the same rule and stays correct either way: the
+         * builder opens this URL itself and therefore closes it, while a pool
+         * handed in belongs to the caller.
+         */
         public Builder dataSource(String url) {
             this.dataSourceUrl = url;
             this.dataSourceGiven = true;
+            if(url != null) {
+                this.dataSource = null;
+            }
             return this;
         }
 
-        /** A pool the caller opened. It is closed when this server stops. */
+        /**
+         * A pool the caller opened. It is closed when this server stops.
+         *
+         * <p>Drops a URL given to the other overload earlier, for the reason
+         * stated there. A null pool is not a choice and erases nothing.
+         */
         public Builder dataSource(DataSource dataSource) {
             this.dataSource = dataSource;
             this.dataSourceGiven = true;
+            if(dataSource != null) {
+                this.dataSourceUrl = null;
+            }
             return this;
         }
 

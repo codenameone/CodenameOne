@@ -40,6 +40,8 @@ import com.codename1.backend.sql.Dialect;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -253,6 +255,55 @@ class BackendTest {
                 .handler(ok())
                 .start();
         backend.stop();
+    }
+
+    @Test
+    @DisplayName("the last datasource choice wins, whichever overload made it")
+    void theLastDataSourceChoiceWins(@TempDir File dir) throws Exception {
+        // openDataSource answers from the POOL first, so a builder given a pool
+        // and then reconfigured with a URL kept the pool and ignored the URL --
+        // silently, which for a database means reading and writing the wrong one
+        // while the configuration says otherwise. Conditional builder setup is
+        // the ordinary way to reach it.
+        DataSource handedIn = DataSource.open(":memory:", 1);
+        try {
+            File file = new File(dir, "last-wins.db");
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+            Backend backend = Backend.builder(Config.of(settings, "test"))
+                    .quiet()
+                    .handler(ok())
+                    .dataSource(handedIn)
+                    .dataSource(file.getAbsolutePath())
+                    .start();
+            try {
+                // The URL was the later call, so the server must be on it and NOT
+                // on the pool that was handed in.
+                assertNotSame(handedIn, backend.getDataSource(),
+                        "the later dataSource(url) was ignored in favour of the pool");
+            } finally {
+                backend.stop();
+            }
+
+            // AND THE OTHER ORDER, so this cannot pass by always preferring the
+            // URL: a pool given last must be the one that is used.
+            Properties other = new Properties();
+            other.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+            Backend second = Backend.builder(Config.of(other, "test"))
+                    .quiet()
+                    .handler(ok())
+                    .dataSource(file.getAbsolutePath())
+                    .dataSource(handedIn)
+                    .start();
+            try {
+                assertSame(handedIn, second.getDataSource(),
+                        "the later dataSource(pool) was ignored in favour of the url");
+            } finally {
+                second.stop();
+            }
+        } finally {
+            handedIn.close();
+        }
     }
 
     @Test
